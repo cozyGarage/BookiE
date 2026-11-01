@@ -3,8 +3,8 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
+use bookie_core::{AuthMode, ConnectOptions, TlsMode};
 use secrecy::ExposeSecret;
-use tablepro_core::{AuthMode, ConnectOptions, TlsMode};
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
 

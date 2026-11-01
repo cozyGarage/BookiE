@@ -1,1 +1,1 @@
-ALTER USER 'tablepro_mtls'@'%' REQUIRE X509;
+ALTER USER 'bookie_mtls'@'%' REQUIRE X509;

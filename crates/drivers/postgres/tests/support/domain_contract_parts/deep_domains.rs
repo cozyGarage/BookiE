@@ -53,7 +53,7 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "value_contract_nested_domain".into(),
             name: "state".into(),
         })
@@ -97,7 +97,7 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
         .expect_err("PostgreSQL cannot resolve domain = unknown without an explicit cast");
     assert!(matches!(
         uncast_comparison,
-        tablepro_core::DriverError::Query {
+        bookie_core::DriverError::Query {
             sqlstate: Some(code), ..
         } if code == "42883"
     ));
@@ -137,7 +137,7 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
         .expect_err("invalid nested-domain enum labels must be refused by PostgreSQL");
     assert!(matches!(
         invalid,
-        tablepro_core::DriverError::Query {
+        bookie_core::DriverError::Query {
             sqlstate: Some(code), ..
         } if code == "22P02"
     ));
@@ -160,11 +160,11 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
         rules: vec![FilterRule {
             column: "status".into(),
             op: FilterOp::Eq,
-            value: Some(tablepro_core::FilterValue::Single("NULL".into())),
+            value: Some(bookie_core::FilterValue::Single("NULL".into())),
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &literal_null_filter)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &literal_null_filter)
         .unwrap()
         .unwrap();
     let filtered = connection
@@ -186,7 +186,7 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
         ]]
     );
 
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("value_contract_nested_domain"),
         "rows",
@@ -196,7 +196,7 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
     )
     .unwrap();
     connection.execute_params(&update_sql, &update_params).await.unwrap();
-    let (insert_sql, insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (insert_sql, insert_params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         Some("value_contract_nested_domain"),
         "rows",
@@ -360,13 +360,13 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "value_contract_four_domains".into(),
             name: "state".into(),
         })
     );
 
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("value_contract_four_domains"),
         "rows",
@@ -405,7 +405,7 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
         .expect_err("pg_typeof leaves this enum comparison parameter ambiguous");
     assert!(matches!(
         ambiguous_parameter,
-        tablepro_core::DriverError::Query {
+        bookie_core::DriverError::Query {
             sqlstate: Some(code), ..
         } if code == "42P08"
     ));
@@ -447,7 +447,7 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filters)
         .unwrap()
         .unwrap();
     let filtered = connection
@@ -549,13 +549,13 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "value_contract_five_domains".into(),
             name: "state".into(),
         })
     );
 
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("value_contract_five_domains"),
         "rows",
@@ -601,7 +601,7 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
         .expect_err("invalid enum label must be refused through five domain layers");
     assert!(matches!(
         invalid,
-        tablepro_core::DriverError::Query {
+        bookie_core::DriverError::Query {
             sqlstate: Some(code), ..
         } if code == "22P02"
     ));
@@ -614,7 +614,7 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filtered)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filtered)
         .unwrap()
         .unwrap();
     let result = connection
@@ -680,7 +680,7 @@ async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path
     assert_domain_level_contract(opts, 4096).await;
 }
 
-async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
+async fn assert_domain_level_contract(opts: bookie_core::ConnectOptions, levels: usize) {
     let schema = format!("value_contract_{levels}_domains");
     let shadow_schema = format!("value_contract_{levels}_shadow");
     let setup = connect(opts.clone()).await;
@@ -748,7 +748,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
     let columns = connection.fetch_columns(Some(&schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.clone(),
             name: "state".into(),
         })
@@ -772,7 +772,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
     if levels >= 302 {
         assert_domain_array_result_contract(connection.as_ref(), &schema, &base_type, levels).await;
     }
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(&schema),
         "rows",
@@ -783,7 +783,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
     .unwrap();
     connection.execute_params(&update_sql, &update_params).await.unwrap();
 
-    let (insert_sql, insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (insert_sql, insert_params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         Some(&schema),
         "rows",
@@ -792,7 +792,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
     )
     .unwrap();
     connection.execute_params(&insert_sql, &insert_params).await.unwrap();
-    let (insert_null_sql, insert_null_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (insert_null_sql, insert_null_params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         Some(&schema),
         "rows",
@@ -816,7 +816,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         ));
     if levels >= 64 {
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Unsupported(message)
+            matches!(&invalid, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "depth {levels}: {invalid:?}"
         );
@@ -828,7 +828,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
             .await
             .expect_err(&format!("raw inferred SQL NULL must be refused at depth {levels}"));
         assert!(
-            matches!(&null_inference, tablepro_core::DriverError::Unsupported(message)
+            matches!(&null_inference, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "depth {levels}: {null_inference:?}"
         );
@@ -836,7 +836,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         assert!(
             matches!(
                 &invalid,
-                tablepro_core::DriverError::Query {
+                bookie_core::DriverError::Query {
                     sqlstate: Some(code), ..
                 } if code == "22P02"
             ),
@@ -883,7 +883,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filtered)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filtered)
         .unwrap()
         .unwrap();
     let result = connection
@@ -956,7 +956,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         vec![vec![Value::Text(shadow_schema.clone())]]
     );
 
-    let (session_update, session_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (session_update, session_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(&schema),
         "rows",
@@ -969,7 +969,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         .execute_params(&session_update, &session_params)
         .await
         .unwrap();
-    let (session_insert, session_insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (session_insert, session_insert_params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         Some(&schema),
         "rows",
@@ -981,7 +981,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         .execute_params(&session_insert, &session_insert_params)
         .await
         .unwrap();
-    let (session_null_insert, session_null_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (session_null_insert, session_null_params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         Some(&schema),
         "rows",
@@ -1039,7 +1039,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
             .await
             .expect_err(&format!("raw inferred enum text must be refused at depth {levels}"));
         assert!(
-            matches!(&valid_raw, tablepro_core::DriverError::Unsupported(message)
+            matches!(&valid_raw, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "depth {levels}: {valid_raw:?}"
         );
@@ -1056,7 +1056,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         ));
     if levels >= 64 {
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Unsupported(message)
+            matches!(&invalid, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "depth {levels}: {invalid:?}"
         );
@@ -1064,7 +1064,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         assert!(
             matches!(
                 &invalid,
-                tablepro_core::DriverError::Query {
+                bookie_core::DriverError::Query {
                     sqlstate: Some(code), ..
                 } if code == "22P02"
             ),
@@ -1108,7 +1108,7 @@ async fn assert_domain_array_result_contract(connection: &dyn Connection, schema
             .await
             .expect_err(&format!("{levels}-layer enum array decoding must refuse explicitly"));
         assert!(
-            matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
+            matches!(&error, bookie_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
             "unexpected {levels}-layer array outcome: {error:?}"
         );
     }
@@ -1156,7 +1156,7 @@ async fn assert_deep_enum_array_parameter_contract(
             .await
             .expect_err("deep inferred enum-array parameters must be refused explicitly");
         assert!(
-            matches!(&error, tablepro_core::DriverError::Unsupported(message)
+            matches!(&error, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "unexpected {levels}-level domain array outcome: {error:?}"
         );

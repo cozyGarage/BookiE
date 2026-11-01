@@ -6,13 +6,13 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tablepro_ssh::openssh::{
+use bookie_ssh::openssh::{
     OpenSshAuth, OpenSshConfig, OpenSshContext, OpenSshRuntime, OpenSshSession, OpenSshTimeouts, SshDestination,
     UnattendedPrompter,
 };
 use tokio_util::sync::CancellationToken;
 
-const TMP_DIR_ENV: &str = "TABLEPRO_TEST_PDEATHSIG_DIR";
+const TMP_DIR_ENV: &str = "BOOKIE_TEST_PDEATHSIG_DIR";
 
 const FAKE_SSH_THAT_NEVER_EXITS: &str = r#"#!/bin/sh
 dir='@DIR@'

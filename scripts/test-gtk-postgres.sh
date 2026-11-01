@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-if [[ "${TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE:-0}" != "1" ]]; then
-  runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk-postgres.XXXXXX")"
+if [[ "${BOOKIE_GTK_POSTGRES_DBUS_ACTIVE:-0}" != "1" ]]; then
+  runtime="$(mktemp -d "${TMPDIR:-/tmp}/bookie-gtk-postgres.XXXXXX")"
   mkdir -p "$runtime/home" "$runtime/config" "$runtime/data" "$runtime/cache" "$runtime/state" "$runtime/runtime"
   chmod 0700 "$runtime/runtime"
   cleanup_runtime() {
@@ -19,9 +19,9 @@ if [[ "${TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE:-0}" != "1" ]]; then
   trap cleanup_runtime EXIT
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
-  TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE=1 \
+  BOOKIE_GTK_POSTGRES_DBUS_ACTIVE=1 \
     ATSPI_DBUS_IMPLEMENTATION=dbus-daemon \
-    XDG_CURRENT_DESKTOP="${TABLEPRO_GTK_CURRENT_DESKTOP:-GNOME}" \
+    XDG_CURRENT_DESKTOP="${BOOKIE_GTK_CURRENT_DESKTOP:-GNOME}" \
     HOME="$runtime/home" \
     XDG_CONFIG_HOME="$runtime/config" \
     XDG_DATA_HOME="$runtime/data" \
@@ -41,8 +41,8 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::5432 \
-  --env POSTGRES_PASSWORD=tablepro_test --env POSTGRES_DB=bookie_test \
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::5432 \
+  --env POSTGRES_PASSWORD=bookie_test --env POSTGRES_DB=bookie_test \
   postgres:17-alpine)"
 cleanup() {
   docker rm --force "$container" >/dev/null 2>&1 || true
@@ -78,16 +78,16 @@ INSERT INTO public.enum_grid VALUES
   (3, NULL, 'SQL NULL'), (4, '', 'empty'), (5, 'ready', 'sibling');
 SQL
 
-eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
-printf 'tablepro_test' | secret-tool store --label='BookiE GTK PostgreSQL fixture' \
-  xdg:schema com.tablepro.linux.Password \
+eval "$(printf 'bookie-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+printf 'bookie_test' | secret-tool store --label='BookiE GTK PostgreSQL fixture' \
+  xdg:schema com.bookie.linux.Password \
   connection-id 0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11 \
   kind db_password
 
-TABLEPRO_GTK_POSTGRES_CONTAINER="$container" \
-  TABLEPRO_GTK_KEYRING_READY=1 \
-  TABLEPRO_GTK_DBUS_ACTIVE=1 \
-  TABLEPRO_GTK_POSTGRES_HOST=127.0.0.1 \
-  TABLEPRO_GTK_POSTGRES_PORT="$port" \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_database_switcher_reconnects_to_the_chosen_database,postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit,postgres_large_stream_pages_round_trip_from_spool,postgres_visible_evicted_page_can_be_revisited,postgres_structure_preserves_empty_and_populated_metadata}" \
+BOOKIE_GTK_POSTGRES_CONTAINER="$container" \
+  BOOKIE_GTK_KEYRING_READY=1 \
+  BOOKIE_GTK_DBUS_ACTIVE=1 \
+  BOOKIE_GTK_POSTGRES_HOST=127.0.0.1 \
+  BOOKIE_GTK_POSTGRES_PORT="$port" \
+  BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_hidden_projection_refresh_and_edit_preserve_hidden_value,postgres_grid_edit_and_delete_commit_to_the_server,postgres_enum_grid_edit_preserves_native_label_and_siblings,postgres_database_switcher_reconnects_to_the_chosen_database,postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit,postgres_large_stream_pages_round_trip_from_spool,postgres_visible_evicted_page_can_be_revisited,postgres_structure_preserves_empty_and_populated_metadata}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

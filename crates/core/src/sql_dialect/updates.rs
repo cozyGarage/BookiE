@@ -373,7 +373,7 @@ pub fn build_mongodb_keyed_delete(
         .filter(|(_, value)| !matches!(value, Value::Undecodable(kind) if kind == "missing BSON field"))
         .map(|(column, _)| serde_json::Value::String(column.name.clone()))
         .collect();
-    where_clauses.push("tablepro_mongodb_exact_field_set(?)".into());
+    where_clauses.push("bookie_mongodb_exact_field_set(?)".into());
     params.push(Value::Json(Box::new(serde_json::Value::Array(snapshot_fields))));
     let qualified = qualified_table(driver_id, schema, table);
     Ok((

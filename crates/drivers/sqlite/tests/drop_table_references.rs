@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::sync::Arc;
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 
 async fn seeded() -> Arc<dyn Connection> {
     let connection: Arc<dyn Connection> = SqliteDriver
@@ -42,7 +42,7 @@ async fn dropping_a_referenced_parent_is_refused_and_keeps_the_child_rows() {
 #[tokio::test]
 async fn every_execution_path_refuses_the_drop() {
     let connection = seeded().await;
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
 
     assert!(connection.execute_params("DROP TABLE customers", &[]).await.is_err());
     assert!(
@@ -91,7 +91,7 @@ async fn dropping_a_referenced_parent_in_an_attached_database_is_refused() {
         .await
         .expect("connect");
     let mut session = connection.open_session().await.expect("session");
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
     for sql in [
         format!("ATTACH DATABASE '{attached}' AS aux"),
         "CREATE TABLE aux.customers (id INTEGER PRIMARY KEY)".into(),

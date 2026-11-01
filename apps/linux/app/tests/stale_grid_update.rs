@@ -1,4 +1,4 @@
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, Value};
 
 #[tokio::test]
 async fn stale_sqlite_grid_update_rolls_back_the_batch_and_preserves_the_original_value() {

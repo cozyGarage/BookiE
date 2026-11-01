@@ -2,8 +2,8 @@ use std::error::Error;
 use std::io::Write;
 use std::time::Instant;
 
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver};
 
 fn status_kb(field: &str) -> u64 {
     std::fs::read_to_string("/proc/self/status")

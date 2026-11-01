@@ -4,7 +4,7 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender, adw, gtk};
 
-use tablepro_storage::{
+use bookie_storage::{
     CONNECTION_COLORS, ConnectionOrganization, ConnectionOrganizationIndex, MAX_TAGS_PER_CONNECTION, SavedConnection,
 };
 use uuid::Uuid;
@@ -19,7 +19,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    match tablepro_storage::load_organization().await {
+                    match bookie_storage::load_organization().await {
                         Ok(index) => sender_clone.input(AppMsg::ConnectionOrganizationLoaded(index)),
                         Err(error) => tracing::warn!(error = %error, "load connection organization failed"),
                     }
@@ -187,10 +187,10 @@ impl App {
     }
 
     /// Parse the pasted URL, then persist off the GTK thread. The parse
-    /// itself is synchronous and lives in `tablepro-storage`; only the
+    /// itself is synchronous and lives in `bookie-storage`; only the
     /// file write and the keyring call need a command.
     pub(super) fn on_import_connection_url_text(&self, url: String, connect: bool, sender: ComponentSender<Self>) {
-        let parsed = match tablepro_storage::parse_connection_url(&url) {
+        let parsed = match bookie_storage::parse_connection_url(&url) {
             Ok(parsed) => parsed,
             Err(error) => {
                 tracing::warn!(error = %error, "rejected imported connection URL");
@@ -208,18 +208,17 @@ impl App {
                         let connection = parsed.connection;
                         let connection_id = connection.id;
                         let label = connection.name.clone();
-                        if let Err(error) = tablepro_storage::save_connections(std::slice::from_ref(&connection)).await
-                        {
+                        if let Err(error) = bookie_storage::save_connections(std::slice::from_ref(&connection)).await {
                             tracing::warn!(error = %error, "saving the imported connection failed");
                             sender_clone.input(AppMsg::ImportConnectionUrlFailed);
                             return;
                         }
                         if let Some(password) = parsed.password
                             && let Err(error) =
-                                tablepro_storage::store_password(connection_id, secret(&password), &label).await
+                                bookie_storage::store_password(connection_id, secret(&password), &label).await
                         {
                             tracing::warn!(error = %error, "storing the imported password failed");
-                            if let Err(rollback_error) = tablepro_storage::delete_connection(connection_id).await {
+                            if let Err(rollback_error) = bookie_storage::delete_connection(connection_id).await {
                                 tracing::warn!(error = %rollback_error, "rolling back imported connection failed");
                             }
                             sender_clone.input(AppMsg::ImportConnectionUrlFailed);
@@ -309,10 +308,10 @@ enum OrganizationMutation {
 }
 
 fn apply_connection_strip_to_tab_bar(tab_bar: &adw::TabBar, color: Option<&str>) {
-    for class in tablepro_storage::CONNECTION_STRIP_CLASSES {
+    for class in bookie_storage::CONNECTION_STRIP_CLASSES {
         tab_bar.remove_css_class(class);
     }
-    if let Some(class) = color.and_then(tablepro_storage::connection_strip_class) {
+    if let Some(class) = color.and_then(bookie_storage::connection_strip_class) {
         tab_bar.add_css_class(class);
     }
 }
@@ -324,19 +323,19 @@ fn persist_connection_organization(mutation: OrganizationMutation, sender: Compo
             .register(async move {
                 let result = async {
                     let _guard = ORGANIZATION_FILE_MUTATION.lock().await;
-                    let mut index = tablepro_storage::load_organization().await?;
+                    let mut index = bookie_storage::load_organization().await?;
                     match mutation {
                         OrganizationMutation::ToggleFavorite(id) => {
                             index.set_favorite(id, !index.is_favorite(id))?;
                         }
                         OrganizationMutation::Set(id, organization) => index.set(id, organization)?,
                         OrganizationMutation::RetainKnown => {
-                            let connections = tablepro_storage::load_connections().await?;
+                            let connections = bookie_storage::load_connections().await?;
                             index.retain_known(&connections);
                         }
                     }
-                    tablepro_storage::save_organization(&index).await?;
-                    Ok::<_, tablepro_storage::StorageError>(index)
+                    bookie_storage::save_organization(&index).await?;
+                    Ok::<_, bookie_storage::StorageError>(index)
                 }
                 .await;
                 match result {
@@ -380,7 +379,7 @@ fn color_choice_label(color: &str) -> String {
 }
 
 fn color_choice_index(color: Option<&str>) -> u32 {
-    let Some(color) = color.and_then(tablepro_storage::connection_color) else {
+    let Some(color) = color.and_then(bookie_storage::connection_color) else {
         return 0;
     };
     CONNECTION_COLORS

@@ -20,4 +20,4 @@ python3 "$TOOLS/cargo/flatpak-cargo-generator.py" \
   -o "$ROOT/apps/linux/flatpak/generated-sources.json"
 
 echo "Wrote $ROOT/apps/linux/flatpak/generated-sources.json"
-echo "For Flathub, set CARGO_NET_OFFLINE=true and add \"generated-sources.json\" to the tablepro-app module sources."
+echo "For Flathub, set CARGO_NET_OFFLINE=true and add \"generated-sources.json\" to the bookie-app module sources."

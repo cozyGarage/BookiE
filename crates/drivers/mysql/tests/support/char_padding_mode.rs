@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{ConnectOptions, OperationControl, QueryResult, Session, Value};
+use bookie_core::{ConnectOptions, OperationControl, QueryResult, Session, Value};
 
 use crate::{connect, start_mariadb, start_mysql};
 

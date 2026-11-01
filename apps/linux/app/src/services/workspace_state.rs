@@ -1,4 +1,4 @@
-pub use tablepro_app_services::workspace_state::{
+pub use bookie_app_services::workspace_state::{
     ConnectionWorkspaceState, PersistedTableMode, RestoredWorkspaceTab, WorkspaceSaveToken, WorkspaceStore,
     WorkspaceTabRecord, restored_workspace_tab,
 };

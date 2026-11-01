@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, OperationControl, Value};
+use bookie_core::{Connection, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 pub async fn assert_time_contract(connection: &dyn Connection) {
@@ -47,7 +47,7 @@ pub async fn assert_time_contract(connection: &dyn Connection) {
                 &result.rows[0][1],
             )
             .await;
-            let json = tablepro_core::export::row_to_json(&result.columns, &result.rows[0]);
+            let json = bookie_core::export::row_to_json(&result.columns, &result.rows[0]);
             let text = match value {
                 Value::Time(time) => time.to_string(),
                 Value::Text(text) => text.clone(),
@@ -74,20 +74,20 @@ pub async fn assert_time_contract(connection: &dyn Connection) {
             .unwrap();
         assert_eq!(source.rows, vec![vec![Value::Text(input.into())]]);
 
-        let csv = tablepro_core::export::render_csv(
+        let csv = bookie_core::export::render_csv(
             &source.columns,
             &source.rows,
-            &tablepro_core::export::CsvOptions::default(),
+            &bookie_core::export::CsvOptions::default(),
         );
-        let options = tablepro_core::import::CsvImportOptions::default();
-        let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let options = bookie_core::import::CsvImportOptions::default();
+        let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
         let columns = connection.fetch_columns(None, &table).await.unwrap();
         let mapping = [Some(0)];
-        let plan = tablepro_core::import::build_insert_plan(
-            &tablepro_core::import::ImportTarget {
+        let plan = bookie_core::import::build_insert_plan(
+            &bookie_core::import::ImportTarget {
                 driver_id: "postgres",
 
-                capabilities: tablepro_core::DriverCapabilities::default(),
+                capabilities: bookie_core::DriverCapabilities::default(),
                 schema: None,
                 table: &table,
                 columns: &columns,
@@ -128,7 +128,7 @@ async fn assert_naive_timestamptz_csv_uses_the_server_session_zone(connection: &
         .await
         .unwrap()
         .columns;
-    let options = tablepro_core::import::CsvImportOptions::default();
+    let options = bookie_core::import::CsvImportOptions::default();
     let mapping = [Some(0)];
 
     for (zone, input) in [
@@ -145,12 +145,12 @@ async fn assert_naive_timestamptz_csv_uses_the_server_session_zone(connection: &
             .await
             .unwrap();
         let csv = format!("value\n{input}\n");
-        let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-        let plan = tablepro_core::import::build_insert_plan(
-            &tablepro_core::import::ImportTarget {
+        let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let plan = bookie_core::import::build_insert_plan(
+            &bookie_core::import::ImportTarget {
                 driver_id: "postgres",
 
-                capabilities: tablepro_core::DriverCapabilities::default(),
+                capabilities: bookie_core::DriverCapabilities::default(),
                 schema: None,
                 table: "naive_timestamptz_csv",
                 columns: &columns,

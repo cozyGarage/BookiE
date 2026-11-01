@@ -1,9 +1,9 @@
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender};
 
-use tablepro_core::sql_literal::RowStatement;
-use tablepro_core::{DriverError, Value};
-use tablepro_storage::query_history::{Outcome, Source};
+use bookie_core::sql_literal::RowStatement;
+use bookie_core::{DriverError, Value};
+use bookie_storage::query_history::{Outcome, Source};
 use uuid::Uuid;
 
 use crate::services::change_tracker::StatementSource;
@@ -123,7 +123,7 @@ impl App {
         &self,
         tab_id: Uuid,
         row_position: u32,
-        statement: tablepro_core::sql_literal::RowStatement,
+        statement: bookie_core::sql_literal::RowStatement,
     ) {
         let (columns, driver_id, row, table, schema) = {
             let tabs = self.workspace_tabs.borrow();
@@ -213,7 +213,7 @@ fn compute_concurrency_warning(statements: &[(String, Vec<Value>)], affected: &[
 mod tests {
     use super::compute_concurrency_warning;
 
-    fn stmt(sql: &str) -> (String, Vec<tablepro_core::Value>) {
+    fn stmt(sql: &str) -> (String, Vec<bookie_core::Value>) {
         (sql.to_string(), Vec::new())
     }
 

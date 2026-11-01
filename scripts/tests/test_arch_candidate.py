@@ -15,15 +15,15 @@ def main():
         (root / "apps/linux/app").mkdir(parents=True)
         (root / "crates/agentd").mkdir(parents=True)
         (root / "apps/linux/packaging/arch/PKGBUILD").write_text("""pkgname=bookie
-pkgver="${TABLEPRO_RC_VERSION:?Build through scripts/build-arch-rc.sh}"
-pkgrel="${TABLEPRO_RC_PKGREL:-1}"
-_commit="${TABLEPRO_RC_COMMIT:?Use scripts/build-arch-rc.sh}"
-_archive_sha256="${TABLEPRO_RC_SHA256:?Use scripts/build-arch-rc.sh}"
-_archive="${TABLEPRO_RC_ARCHIVE:?Use scripts/build-arch-rc.sh}"
-_vendor_sha256="${TABLEPRO_RC_VENDOR_SHA256:?Use scripts/build-arch-rc.sh}"
-_vendor_archive="${TABLEPRO_RC_VENDOR_ARCHIVE:?Use scripts/build-arch-rc.sh}"
-_metadata="${TABLEPRO_RC_METADATA:?Use scripts/build-arch-rc.sh}"
-_metadata_sha256="${TABLEPRO_RC_METADATA_SHA256:?Use scripts/build-arch-rc.sh}"
+pkgver="${BOOKIE_RC_VERSION:?Build through scripts/build-arch-rc.sh}"
+pkgrel="${BOOKIE_RC_PKGREL:-1}"
+_commit="${BOOKIE_RC_COMMIT:?Use scripts/build-arch-rc.sh}"
+_archive_sha256="${BOOKIE_RC_SHA256:?Use scripts/build-arch-rc.sh}"
+_archive="${BOOKIE_RC_ARCHIVE:?Use scripts/build-arch-rc.sh}"
+_vendor_sha256="${BOOKIE_RC_VENDOR_SHA256:?Use scripts/build-arch-rc.sh}"
+_vendor_archive="${BOOKIE_RC_VENDOR_ARCHIVE:?Use scripts/build-arch-rc.sh}"
+_metadata="${BOOKIE_RC_METADATA:?Use scripts/build-arch-rc.sh}"
+_metadata_sha256="${BOOKIE_RC_METADATA_SHA256:?Use scripts/build-arch-rc.sh}"
 source=("$(basename "$_archive")" "$(basename "$_vendor_archive")")
 sha256sums=("$_archive_sha256" "$_vendor_sha256")
 depends=('gtk4')
@@ -31,8 +31,8 @@ makedepends=('rust')
 checkdepends=('appstream')
 """)
         (root / "Cargo.toml").write_text('[workspace.package]\nversion = "0.1.1"\n')
-        (root / "apps/linux/app/Cargo.toml").write_text('[package]\nname = "tablepro-app"\nversion.workspace = true\n')
-        (root / "crates/agentd/Cargo.toml").write_text('[package]\nname = "tablepro-agentd"\nversion.workspace = true\n')
+        (root / "apps/linux/app/Cargo.toml").write_text('[package]\nname = "bookie-app"\nversion.workspace = true\n')
+        (root / "crates/agentd/Cargo.toml").write_text('[package]\nname = "bookie-agentd"\nversion.workspace = true\n')
         shutil.copy(source / "scripts/build-arch-rc.sh", scripts)
         shutil.copy(source / "scripts/resolve-arch-rc-pkgbuild.py", scripts)
         shutil.copy(source / "scripts/validate-arch-rc-packages.sh", scripts)
@@ -63,7 +63,7 @@ case "$1" in
 esac
 """)
         (commands / "rustc").write_text("#!/bin/sh\necho 'rustc 1.98.0'\n")
-        (commands / "bsdtar").write_text("#!/bin/sh\ntest \"$1\" = -xOf\ncat \"$TABLEPRO_RC_METADATA\"\n")
+        (commands / "bsdtar").write_text("#!/bin/sh\ntest \"$1\" = -xOf\ncat \"$BOOKIE_RC_METADATA\"\n")
         (commands / "namcap").write_text("""#!/usr/bin/bash
 set -euo pipefail
 if [[ "${1##*/}" == PKGBUILD ]]; then
@@ -95,25 +95,25 @@ set -eu
 if [[ "$1" == --packagelist ]]; then
   printf '%s\n' "$BOOKIE_TEST_PACKAGE" "$BOOKIE_TEST_DEBUG_PACKAGE"
 else
-  test "$TABLEPRO_RC_VERSION" = 0.1.1
-  test "$TABLEPRO_RC_DATE" = 2026-10-19
+  test "$BOOKIE_RC_VERSION" = 0.1.1
+  test "$BOOKIE_RC_DATE" = 2026-10-19
   test -n "${SRCDEST:-}"
-  test "$(basename "$TABLEPRO_RC_ARCHIVE")" = "bookie-0.1.1-$TABLEPRO_RC_COMMIT.tar.gz"
-  test -f "$TABLEPRO_RC_ARCHIVE"
-  test "$(sha256sum "$TABLEPRO_RC_ARCHIVE" | cut -d' ' -f1)" = "$TABLEPRO_RC_SHA256"
-  test "$(tar -xOf "$TABLEPRO_RC_ARCHIVE" "TablePro-$TABLEPRO_RC_COMMIT/probe")" = 'candidate bytes'
-  test -f "$TABLEPRO_RC_VENDOR_ARCHIVE"
-  test "$(sha256sum "$TABLEPRO_RC_VENDOR_ARCHIVE" | cut -d' ' -f1)" = "$TABLEPRO_RC_VENDOR_SHA256"
-  test "$(sha256sum "$TABLEPRO_RC_METADATA" | cut -d' ' -f1)" = "$TABLEPRO_RC_METADATA_SHA256"
-  tar -tzf "$TABLEPRO_RC_VENDOR_ARCHIVE" | grep -Fq "TablePro-$TABLEPRO_RC_COMMIT/cargo-vendor/fixture.crate"
-  tar -xOf "$TABLEPRO_RC_VENDOR_ARCHIVE" "TablePro-$TABLEPRO_RC_COMMIT/.cargo/config.toml" | grep -Fxq 'directory = "cargo-vendor"'
-  python3 - "$TABLEPRO_RC_METADATA" <<'PY'
+  test "$(basename "$BOOKIE_RC_ARCHIVE")" = "bookie-0.1.1-$BOOKIE_RC_COMMIT.tar.gz"
+  test -f "$BOOKIE_RC_ARCHIVE"
+  test "$(sha256sum "$BOOKIE_RC_ARCHIVE" | cut -d' ' -f1)" = "$BOOKIE_RC_SHA256"
+  test "$(tar -xOf "$BOOKIE_RC_ARCHIVE" "BookiE-$BOOKIE_RC_COMMIT/probe")" = 'candidate bytes'
+  test -f "$BOOKIE_RC_VENDOR_ARCHIVE"
+  test "$(sha256sum "$BOOKIE_RC_VENDOR_ARCHIVE" | cut -d' ' -f1)" = "$BOOKIE_RC_VENDOR_SHA256"
+  test "$(sha256sum "$BOOKIE_RC_METADATA" | cut -d' ' -f1)" = "$BOOKIE_RC_METADATA_SHA256"
+  tar -tzf "$BOOKIE_RC_VENDOR_ARCHIVE" | grep -Fq "BookiE-$BOOKIE_RC_COMMIT/cargo-vendor/fixture.crate"
+  tar -xOf "$BOOKIE_RC_VENDOR_ARCHIVE" "BookiE-$BOOKIE_RC_COMMIT/.cargo/config.toml" | grep -Fxq 'directory = "cargo-vendor"'
+  python3 - "$BOOKIE_RC_METADATA" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1]))
-assert data["commit"] == __import__("os").environ["TABLEPRO_RC_COMMIT"]
+assert data["commit"] == __import__("os").environ["BOOKIE_RC_COMMIT"]
 assert data["package_version"] == data["source_version"] == "0.1.1"
 assert data["release_date"] == "2026-10-19"
-assert data["tag"] == (__import__("os").environ.get("TABLEPRO_RC_TAG") or None)
+assert data["tag"] == (__import__("os").environ.get("BOOKIE_RC_TAG") or None)
 assert data["native_build_inputs"] == {
     "depends": ["gtk4"], "makedepends": ["rust"], "checkdepends": ["appstream"]
 }
@@ -125,9 +125,9 @@ fi
         for command in commands.iterdir():
             command.chmod(0o755)
         environment = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"],
-                           TABLEPRO_RC_COMMIT=sha, TABLEPRO_RC_VERSION="0.1.1",
-                           TABLEPRO_RC_DATE="2026-10-19", CARCH="x86_64",
-                           TABLEPRO_RC_OUTPUT_DIR=str(root / "target/arch-release-inputs"),
+                           BOOKIE_RC_COMMIT=sha, BOOKIE_RC_VERSION="0.1.1",
+                           BOOKIE_RC_DATE="2026-10-19", CARCH="x86_64",
+                           BOOKIE_RC_OUTPUT_DIR=str(root / "target/arch-release-inputs"),
                            TMPDIR=str(root / "shared-tmp"),
                            BOOKIE_TEST_OUTPUT=str(root / "target/arch-release-inputs"),
                            BOOKIE_TEST_PACKAGE=str(root / "bookie-0.1.1-1-x86_64.pkg.tar.zst"),
@@ -137,23 +137,23 @@ fi
         subprocess.run(runner, env=environment, check=True)
         package_files = [environment["BOOKIE_TEST_PACKAGE"], environment["BOOKIE_TEST_DEBUG_PACKAGE"]]
         metadata = Path(environment["BOOKIE_TEST_OUTPUT"]) / (
-            f"bookie-0.1.1-{environment['TABLEPRO_RC_COMMIT']}-inputs.json"
+            f"bookie-0.1.1-{environment['BOOKIE_RC_COMMIT']}-inputs.json"
         )
         subprocess.run(
             ["bash", str(scripts / "validate-arch-rc-packages.sh"),
              environment["BOOKIE_TEST_OUTPUT"], *package_files],
-            env=dict(environment, TABLEPRO_RC_METADATA=str(metadata)),
+            env=dict(environment, BOOKIE_RC_METADATA=str(metadata)),
             check=True,
         )
         assert not list(Path(environment["BOOKIE_TEST_OUTPUT"]).glob(".validate.*"))
         vendor_archive = Path(environment["BOOKIE_TEST_OUTPUT"]) / (
-            f"bookie-vendor-0.1.1-{environment['TABLEPRO_RC_COMMIT']}.tar.gz"
+            f"bookie-vendor-0.1.1-{environment['BOOKIE_RC_COMMIT']}.tar.gz"
         )
         vendor_archive.write_text("changed after packaging")
         failed_validation = subprocess.run(
             ["bash", str(scripts / "validate-arch-rc-packages.sh"),
              environment["BOOKIE_TEST_OUTPUT"], *package_files],
-            env=dict(environment, TABLEPRO_RC_METADATA=str(metadata)),
+            env=dict(environment, BOOKIE_RC_METADATA=str(metadata)),
             capture_output=True,
             text=True,
         )
@@ -168,13 +168,13 @@ fi
             "commit", "-qm", "tag anchor",
         ], check=True)
         sha = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
-        environment["TABLEPRO_RC_COMMIT"] = sha
+        environment["BOOKIE_RC_COMMIT"] = sha
         remote = root / "remote.git"
         subprocess.run(["git", "clone", "--bare", str(root), str(remote)], check=True, capture_output=True)
         subprocess.run(["git", "-C", str(root), "tag", "linux-v0.1.1"], check=True)
         subprocess.run(["git", "-C", str(root), "push", str(remote), "linux-v0.1.1"], check=True, capture_output=True)
-        tag_environment = dict(environment, TABLEPRO_RC_COMMIT="", TABLEPRO_RC_TAG="linux-v0.1.1",
-                              TABLEPRO_RC_REMOTE=str(remote))
+        tag_environment = dict(environment, BOOKIE_RC_COMMIT="", BOOKIE_RC_TAG="linux-v0.1.1",
+                              BOOKIE_RC_REMOTE=str(remote))
         subprocess.run(runner, env=tag_environment, check=True)
         subprocess.run(["git", "-C", str(root), "tag", "wrong-remote-tag"], check=True)
         subprocess.run(["git", "-C", str(root), "push", str(remote), "wrong-remote-tag"], check=True,
@@ -182,13 +182,13 @@ fi
         subprocess.run(["git", "-C", str(remote), "update-ref", "refs/tags/wrong-remote-tag", initial_sha],
                        check=True)
         for overrides, expected in [
-            ({"TABLEPRO_RC_COMMIT": "HEAD"}, "full immutable commit SHA"),
-            ({"TABLEPRO_RC_TAG": "linux-v0.1.1"}, "not both"),
-            ({"TABLEPRO_RC_VERSION": "../unsafe"}, "invalid candidate version"),
-            ({"TABLEPRO_RC_VERSION": "0.1.2"}, "does not match app and agentd source version"),
-            ({"TABLEPRO_RC_DATE": "2026-02-30"}, "invalid candidate release date"),
-            ({"TABLEPRO_RC_COMMIT": "", "TABLEPRO_RC_TAG": "wrong-remote-tag",
-              "TABLEPRO_RC_REMOTE": str(remote)}, "does not resolve to local commit"),
+            ({"BOOKIE_RC_COMMIT": "HEAD"}, "full immutable commit SHA"),
+            ({"BOOKIE_RC_TAG": "linux-v0.1.1"}, "not both"),
+            ({"BOOKIE_RC_VERSION": "../unsafe"}, "invalid candidate version"),
+            ({"BOOKIE_RC_VERSION": "0.1.2"}, "does not match app and agentd source version"),
+            ({"BOOKIE_RC_DATE": "2026-02-30"}, "invalid candidate release date"),
+            ({"BOOKIE_RC_COMMIT": "", "BOOKIE_RC_TAG": "wrong-remote-tag",
+              "BOOKIE_RC_REMOTE": str(remote)}, "does not resolve to local commit"),
         ]:
             result = subprocess.run(runner, env=dict(environment, **overrides), capture_output=True, text=True)
             assert result.returncode != 0, result.stderr

@@ -1,8 +1,8 @@
+use bookie_core::DriverError;
 use sqlparser::ast::{ObjectType, Statement};
 use sqlparser::dialect::SQLiteDialect;
 use sqlparser::parser::Parser;
 use sqlx::SqliteConnection;
-use tablepro_core::DriverError;
 
 use crate::{map_sqlx_error, quote_ident};
 

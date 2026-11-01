@@ -22,7 +22,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] A `.sql` file containing an excessively long line exceeding the per-line length ceiling is refused with an explanation before loading.
 - [ ] Ctrl+Shift+D lists saved queries; open, rename and delete all work.
 - [ ] Saving a structure change or edited rows appears in history, and the history dialog can filter those out.
-- [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as JSON; unset keeps the human format.
+- [ ] `BOOKIE_LOG_FORMAT=json ./target/debug/bookie` writes lines that parse as JSON; unset keeps the human format.
 
 ## Editor sessions (PostgreSQL, MySQL, SQL Server and SQLite files)
 

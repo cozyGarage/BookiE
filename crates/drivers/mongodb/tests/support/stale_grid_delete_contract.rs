@@ -1,6 +1,6 @@
+use bookie_core::{DatabaseDriver, Value};
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Document, doc, oid::ObjectId};
-use tablepro_core::{DatabaseDriver, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -74,7 +74,7 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
         .expect("change explicit NULL to an array containing NULL after the grid read");
 
     let build_delete = |row: &[Value]| {
-        tablepro_core::sql_dialect::build_mongodb_keyed_delete(
+        bookie_core::sql_dialect::build_mongodb_keyed_delete(
             Some("appdb"),
             "stale_grid_deletes",
             &before.columns,
@@ -181,7 +181,7 @@ async fn value_contract_stale_grid_delete_preserves_field_added_after_materializ
         )
         .await
         .expect("add a field outside the materialized grid columns");
-    let (sql, params) = tablepro_core::sql_dialect::build_mongodb_keyed_delete(
+    let (sql, params) = bookie_core::sql_dialect::build_mongodb_keyed_delete(
         Some("appdb"),
         "new_field_stale_delete",
         &before.columns,

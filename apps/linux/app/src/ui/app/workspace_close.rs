@@ -1,6 +1,6 @@
+use bookie_app_services::workspace::{close_other_page_indexes, close_page_indexes_to_right};
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw};
-use tablepro_app_services::workspace::{close_other_page_indexes, close_page_indexes_to_right};
 use uuid::Uuid;
 
 use super::types::read_workspace_tab_id;

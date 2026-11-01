@@ -24,7 +24,7 @@ class StreamProfileScriptTests(unittest.TestCase):
                 **os.environ,
                 "PATH": f"{stubs}:{os.environ['PATH']}",
                 "CARGO_TARGET_DIR": str(base / "target"),
-                "TABLEPRO_PROFILE_REPETITIONS": "0",
+                "BOOKIE_PROFILE_REPETITIONS": "0",
             }
 
             for script in ("profile-stream-pin-retention.sh", "profile-stream-export.sh"):
@@ -32,7 +32,7 @@ class StreamProfileScriptTests(unittest.TestCase):
                 result = subprocess.run(
                     ["bash", f"scripts/{script}"],
                     cwd=ROOT,
-                    env={**env, "TABLEPRO_PROFILE_OUT": str(output)},
+                    env={**env, "BOOKIE_PROFILE_OUT": str(output)},
                     capture_output=True,
                     text=True,
                     check=False,

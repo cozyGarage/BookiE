@@ -43,14 +43,14 @@ async fn value_contract_custom_enum_sql_file_export_restores_labels_and_native_t
 
     let directory = tempfile::tempdir().unwrap();
     let sql_path = directory.path().join("enum.sql");
-    let csv_options = tablepro_core::export::CsvOptions::default();
-    tablepro_core::export::write_result_file(
+    let csv_options = bookie_core::export::CsvOptions::default();
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "value_contract_sql_file_restore",
@@ -118,7 +118,7 @@ async fn value_contract_custom_enum_sql_file_replay_preserves_backslash_across_s
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     let label = r"back\nslash'quote";
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(label.into())).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &Value::Text(label.into())).unwrap();
     connection
         .execute(&format!(
             "CREATE TYPE value_contract_enum_string_mode AS ENUM ({literal})"
@@ -153,13 +153,13 @@ async fn value_contract_custom_enum_sql_file_replay_preserves_backslash_across_s
         .unwrap();
     let directory = tempfile::tempdir().unwrap();
     let sql_path = directory.path().join("enum-string-mode.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
-            csv: &tablepro_core::export::CsvOptions::default(),
-            sql: Some(tablepro_core::export::SqlTarget {
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
+            csv: &bookie_core::export::CsvOptions::default(),
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "value_contract_enum_string_restore",
@@ -375,7 +375,7 @@ async fn value_contract_custom_enum_parameters_infer_native_type_for_query_and_w
         .unwrap_err();
     assert!(matches!(
         invalid,
-        tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"
+        bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"
     ));
 
     let plain_text = connection
@@ -422,12 +422,12 @@ async fn value_contract_custom_enum_keyed_edit_preserves_label_and_siblings() {
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "value_contract_enum_schema".into(),
             name: "value_contract_grid_enum".into(),
         })
     );
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "value_contract_enum_edits",
@@ -438,7 +438,7 @@ async fn value_contract_custom_enum_keyed_edit_preserves_label_and_siblings() {
     .unwrap();
     connection.execute_params(&sql, &params).await.unwrap();
     let insert_columns = [columns[0].clone(), columns[1].clone(), columns[2].clone()];
-    let (sql, params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (sql, params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         None,
         "value_contract_enum_edits",
@@ -451,7 +451,7 @@ async fn value_contract_custom_enum_keyed_edit_preserves_label_and_siblings() {
     )
     .unwrap();
     connection.execute_params(&sql, &params).await.unwrap();
-    let (sql, params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (sql, params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         None,
         "value_contract_enum_edits",
@@ -460,7 +460,7 @@ async fn value_contract_custom_enum_keyed_edit_preserves_label_and_siblings() {
     )
     .unwrap();
     connection.execute_params(&sql, &params).await.unwrap();
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "value_contract_enum_edits",
@@ -559,12 +559,12 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
     let columns = connection.fetch_columns(Some("enum_shadow_b"), "items").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "enum_shadow_b".into(),
             name: "status_kind".into(),
         })
     );
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("enum_shadow_b"),
         "items",
@@ -602,15 +602,15 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         ]]
     );
 
-    let filters = tablepro_core::FilterSet {
-        rules: vec![tablepro_core::FilterRule {
+    let filters = bookie_core::FilterSet {
+        rules: vec![bookie_core::FilterRule {
             column: "status".into(),
-            op: tablepro_core::FilterOp::Eq,
-            value: Some(tablepro_core::FilterValue::Single("paused".into())),
+            op: bookie_core::FilterOp::Eq,
+            value: Some(bookie_core::FilterValue::Single("paused".into())),
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filters)
         .unwrap()
         .unwrap();
     let filtered = connection
@@ -634,23 +634,23 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
 
     for (operator, value) in [
         (
-            tablepro_core::FilterOp::In,
-            tablepro_core::FilterValue::List(vec!["ready".into(), "paused".into()]),
+            bookie_core::FilterOp::In,
+            bookie_core::FilterValue::List(vec!["ready".into(), "paused".into()]),
         ),
         (
-            tablepro_core::FilterOp::Between,
-            tablepro_core::FilterValue::Pair("ready".into(), "paused".into()),
+            bookie_core::FilterOp::Between,
+            bookie_core::FilterValue::Pair("ready".into(), "paused".into()),
         ),
     ] {
-        let filters = tablepro_core::FilterSet {
-            rules: vec![tablepro_core::FilterRule {
+        let filters = bookie_core::FilterSet {
+            rules: vec![bookie_core::FilterRule {
                 column: "status".into(),
                 op: operator,
                 value: Some(value),
             }],
             ..Default::default()
         };
-        let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+        let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filters)
             .unwrap()
             .unwrap();
         let filtered = connection
@@ -740,7 +740,7 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         ]]
     );
 
-    let session_update = tablepro_core::sql_dialect::build_keyed_update(
+    let session_update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("enum_shadow_b"),
         "items",
@@ -776,7 +776,7 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         .expect_err("PostgreSQL cannot infer a type shared only with pg_typeof");
     assert!(matches!(
         ambiguous_native,
-        tablepro_core::DriverError::Query {
+        bookie_core::DriverError::Query {
             sqlstate: Some(code), ..
         } if code == "42P08"
     ));
@@ -791,7 +791,7 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         .expect_err("ambiguous parameter type must remain a query error");
     assert!(matches!(
         ambiguous_driver,
-        tablepro_core::DriverError::Query {
+        bookie_core::DriverError::Query {
             sqlstate: Some(code), ..
         } if code == "42P08"
     ));

@@ -5,13 +5,13 @@ use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
-use tablepro_policy::{
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
+use bookie_policy::{
     AuditAdministrativeAction, AuditEvent, AuditRecordPhase, AuditState, AuditTerminalStatus, DenyApprovalSink,
     GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal,
 };
-use tablepro_storage::AuditJournal;
-use tablepro_transport::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel};
+use bookie_storage::AuditJournal;
+use bookie_transport::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel};
 
 use super::config_io::xdg_config_path;
 use super::connection_monitor;
@@ -19,7 +19,7 @@ use super::connection_monitor;
 mod policy_loading;
 use policy_loading::{load_policy, load_policy_file};
 
-pub use tablepro_app_services::connection_identity::ConnectionIdentity;
+pub use bookie_app_services::connection_identity::ConnectionIdentity;
 
 pub(super) struct EntryInner {
     pub(super) connection: Arc<dyn Connection>,
@@ -59,8 +59,8 @@ pub struct ReconnectParams {
 #[derive(Clone)]
 pub struct CandidateGuardFactory {
     policy: Option<Arc<PolicyConfig>>,
-    approval: Arc<dyn tablepro_policy::ApprovalSink>,
-    audit: Arc<dyn tablepro_policy::AuditSink>,
+    approval: Arc<dyn bookie_policy::ApprovalSink>,
+    audit: Arc<dyn bookie_policy::AuditSink>,
     audit_state: Arc<AuditState>,
     unresolved_connection_ids: Arc<HashSet<Uuid>>,
 }
@@ -120,7 +120,7 @@ struct EntryFaultSink {
     fault: Arc<Notify>,
 }
 
-impl tablepro_policy::ConnectionFaultSink for EntryFaultSink {
+impl bookie_policy::ConnectionFaultSink for EntryFaultSink {
     fn connection_became_unusable(&self, operation: &str) {
         tracing::warn!(
             connection_id = %self.connection_id,
@@ -132,7 +132,7 @@ impl tablepro_policy::ConnectionFaultSink for EntryFaultSink {
 }
 
 struct AuditRuntime {
-    sink: Arc<dyn tablepro_policy::AuditSink>,
+    sink: Arc<dyn bookie_policy::AuditSink>,
     journal: Option<Arc<AuditJournal>>,
     available: bool,
     state: Arc<AuditState>,
@@ -149,7 +149,7 @@ impl AuditRuntime {
         Self::from_journal(AuditJournal::open_validated(path))
     }
 
-    fn from_journal(result: Result<AuditJournal, tablepro_storage::StorageError>) -> Self {
+    fn from_journal(result: Result<AuditJournal, bookie_storage::StorageError>) -> Self {
         match result {
             Ok(journal) => {
                 let recovery = journal.recovery();
@@ -198,20 +198,20 @@ impl AuditRuntime {
 pub struct DatabaseService {
     connections: Mutex<HashMap<Uuid, Entry>>,
     policy: Mutex<Option<Arc<PolicyConfig>>>,
-    audit: Arc<dyn tablepro_policy::AuditSink>,
+    audit: Arc<dyn bookie_policy::AuditSink>,
     audit_journal: Option<Arc<AuditJournal>>,
     audit_available: bool,
     audit_state: Arc<AuditState>,
     unresolved_connection_ids: Arc<HashSet<Uuid>>,
-    approval: Mutex<Arc<dyn tablepro_policy::ApprovalSink>>,
+    approval: Mutex<Arc<dyn bookie_policy::ApprovalSink>>,
     ssh_environment: Mutex<SshEnvironment>,
-    stream_result_spools: tablepro_app_services::stream_result_spool::StreamResultSpoolManager,
+    stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager,
     #[cfg(test)]
     _audit_temp_dir: Option<tempfile::TempDir>,
 }
 
 impl DatabaseService {
-    pub async fn recent_audit(&self, limit: usize) -> Result<Vec<tablepro_policy::AuditEvent>, String> {
+    pub async fn recent_audit(&self, limit: usize) -> Result<Vec<bookie_policy::AuditEvent>, String> {
         let journal = self
             .audit_journal
             .clone()
@@ -268,8 +268,8 @@ impl DatabaseService {
             audit_state: audit.state,
             unresolved_connection_ids: audit.unresolved_connection_ids,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
-            ssh_environment: Mutex::new(SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse)),
-            stream_result_spools: tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default(),
+            ssh_environment: Mutex::new(SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse)),
+            stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager::default(),
             #[cfg(test)]
             _audit_temp_dir: audit_temp_dir,
         }
@@ -279,7 +279,7 @@ impl DatabaseService {
         self.audit_available
     }
 
-    pub fn stream_result_spool_manager(&self) -> tablepro_app_services::stream_result_spool::StreamResultSpoolManager {
+    pub fn stream_result_spool_manager(&self) -> bookie_app_services::stream_result_spool::StreamResultSpoolManager {
         self.stream_result_spools.clone()
     }
 
@@ -298,7 +298,7 @@ impl DatabaseService {
         terminal_status: AuditTerminalStatus,
         affected_count: usize,
         duration_ms: Option<u64>,
-    ) -> Result<(), tablepro_policy::AuditError> {
+    ) -> Result<(), bookie_policy::AuditError> {
         let event = AuditEvent::administrative_action(
             operation_id,
             action,
@@ -346,11 +346,11 @@ impl DatabaseService {
 
     pub fn ssh_environment_for_connection(
         &self,
-        saved: &tablepro_storage::SavedConnection,
-        principal: tablepro_policy::Principal,
+        saved: &bookie_storage::SavedConnection,
+        principal: bookie_policy::Principal,
     ) -> SshEnvironment {
         self.ssh_environment()
-            .with_audit(tablepro_transport::TransportAuditContext::new(
+            .with_audit(bookie_transport::TransportAuditContext::new(
                 self.audit.clone(),
                 self.audit_state.clone(),
                 principal,
@@ -361,8 +361,8 @@ impl DatabaseService {
             ))
     }
 
-    pub fn transport_audit_factory(&self) -> tablepro_transport::TransportAuditFactory {
-        tablepro_transport::TransportAuditFactory::new(self.audit.clone(), self.audit_state.clone())
+    pub fn transport_audit_factory(&self) -> bookie_transport::TransportAuditFactory {
+        bookie_transport::TransportAuditFactory::new(self.audit.clone(), self.audit_state.clone())
     }
 
     pub fn candidate_guard_factory(&self) -> CandidateGuardFactory {
@@ -390,14 +390,14 @@ impl DatabaseService {
             .openssh = Some(openssh);
     }
 
-    pub fn enable_builtin_ssh_prompter(&self, prompter: Arc<dyn tablepro_ssh::openssh::Prompter>) {
+    pub fn enable_builtin_ssh_prompter(&self, prompter: Arc<dyn bookie_ssh::openssh::Prompter>) {
         self.ssh_environment
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .set_builtin_prompter(prompter);
     }
 
-    pub fn set_approval_sink(&self, sink: Arc<dyn tablepro_policy::ApprovalSink>) {
+    pub fn set_approval_sink(&self, sink: Arc<dyn bookie_policy::ApprovalSink>) {
         *self.approval.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = sink;
     }
 

@@ -1,12 +1,12 @@
 use std::{collections::HashMap, iter};
 
+use bookie_core::{
+    ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBudget, Value,
+};
 use futures::stream::StreamExt;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgCancelToken, PgRow, PgTypeInfo, PgTypeKind};
 use sqlx::{Column, Connection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
-use tablepro_core::{
-    ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBudget, Value,
-};
 
 use super::params::{bind_pg_params, describe_query_parameters, needs_text_type_inference, pg_parameter_type_infos};
 use super::{array, decode, map_sqlx_error, numeric, temporal};
@@ -578,7 +578,7 @@ fn extract_non_null_value(row: &PgRow, idx: usize, type_name: &str, raw: &sqlx::
         "INT8" => row.try_get::<i64, _>(idx).map(Value::Int),
         "FLOAT4" => row
             .try_get::<f32, _>(idx)
-            .map(|v| Value::Float(tablepro_core::single_precision_as_f64(v))),
+            .map(|v| Value::Float(bookie_core::single_precision_as_f64(v))),
         "FLOAT8" => row.try_get::<f64, _>(idx).map(Value::Float),
         "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date),
         "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time),

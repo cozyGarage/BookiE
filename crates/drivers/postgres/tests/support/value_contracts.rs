@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use uuid::Uuid;
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use super::{array_contract, connect, date_contract, interval_contract, start_pg, time_contract, vector_contract};
 
@@ -26,7 +26,7 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
             .await
             .unwrap();
         let columns = connection.fetch_columns(None, &table).await.unwrap();
-        let options = tablepro_core::import::CsvImportOptions::default();
+        let options = bookie_core::import::CsvImportOptions::default();
         let mapping = [Some(0)];
         let mut expected_csv_imports = Vec::new();
         for input in ["infinity", "-infinity"] {
@@ -36,7 +36,7 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
                 .unwrap();
             assert_eq!(result.rows, vec![vec![Value::Text(input.into())]]);
             let value = &result.rows[0][0];
-            let literal = tablepro_core::sql_literal::render_sql_literal("postgres", value).unwrap();
+            let literal = bookie_core::sql_literal::render_sql_literal("postgres", value).unwrap();
             let restored = connection.query(&format!("SELECT {literal}::{kind}")).await.unwrap();
             assert_eq!(restored.rows, result.rows);
             let bound = connection
@@ -45,20 +45,17 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
                 .unwrap();
             assert_eq!(bound.rows, result.rows);
             assert_eq!(
-                tablepro_core::export::row_to_json(&result.columns, &result.rows[0])["value"],
+                bookie_core::export::row_to_json(&result.columns, &result.rows[0])["value"],
                 input
             );
-            let csv = tablepro_core::export::render_csv(
+            let csv = bookie_core::export::render_csv(
                 &result.columns,
                 &result.rows,
-                &tablepro_core::export::CsvOptions::default(),
+                &bookie_core::export::CsvOptions::default(),
             );
-            let sheet = tablepro_core::import::read_csv(
-                csv.as_bytes(),
-                &tablepro_core::import::CsvImportOptions::default(),
-                None,
-            )
-            .unwrap();
+            let sheet =
+                bookie_core::import::read_csv(csv.as_bytes(), &bookie_core::import::CsvImportOptions::default(), None)
+                    .unwrap();
             let expected_csv_cell = if input.starts_with(['+', '-']) {
                 format!("'{input}")
             } else {
@@ -69,11 +66,11 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
                 "default CSV formula safety marker for PostgreSQL {kind} {input}"
             );
 
-            let plan = tablepro_core::import::build_insert_plan(
-                &tablepro_core::import::ImportTarget {
+            let plan = bookie_core::import::build_insert_plan(
+                &bookie_core::import::ImportTarget {
                     driver_id: "postgres",
 
-                    capabilities: tablepro_core::DriverCapabilities::default(),
+                    capabilities: bookie_core::DriverCapabilities::default(),
                     schema: None,
                     table: &table,
                     columns: &columns,
@@ -125,17 +122,13 @@ async fn value_contract_wide_numeric_csv_round_trips_through_native_insert_plan(
         .query("SELECT amount, marker FROM numeric_csv_source ORDER BY id")
         .await
         .unwrap();
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let sheet = tablepro_core::import::read_csv(
-        csv.as_bytes(),
-        &tablepro_core::import::CsvImportOptions::default(),
-        None,
-    )
-    .unwrap();
+    let sheet =
+        bookie_core::import::read_csv(csv.as_bytes(), &bookie_core::import::CsvImportOptions::default(), None).unwrap();
 
     connection
         .execute(
@@ -145,18 +138,18 @@ async fn value_contract_wide_numeric_csv_round_trips_through_native_insert_plan(
         .unwrap();
     let columns = connection.fetch_columns(None, "numeric_csv_target").await.unwrap();
     let mapping = [None, Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "numeric_csv_target",
             columns: &columns,
             mapping: &mapping,
         },
         &sheet,
-        &tablepro_core::import::CsvImportOptions::default(),
+        &bookie_core::import::CsvImportOptions::default(),
     )
     .unwrap();
     assert!(plan.statement.contains("$1::text::pg_catalog.numeric"));
@@ -205,7 +198,7 @@ async fn value_contract_postgres_money_is_refused_with_exact_server_oracle() {
     assert_eq!(result.rows[0][1], Value::Text("money".into()));
     assert_eq!(result.rows[0][2], Value::Text("12345.67".into()));
     assert_eq!(result.rows[0][3], Value::Bool(true));
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&result.rows[0][0]))
@@ -259,7 +252,7 @@ async fn value_contract_geometric_types_keep_native_oracles_when_projection_is_r
             "{native_type} projection must be explicit, not lossy: {:?}; native text: {exact_native_text:?}",
             projected.rows[0][0]
         );
-        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &projected.rows[0][0]).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("postgres", &projected.rows[0][0]).is_err());
         assert!(
             connection
                 .query_params("SELECT $1", std::slice::from_ref(&projected.rows[0][0]))
@@ -368,7 +361,7 @@ async fn value_contract_citext_preserves_label_and_case_insensitive_comparison()
     );
 
     let value = Value::Text(original.into());
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
     let literal_result = connection
         .query(&format!("SELECT {literal}::citext::text"))
         .await
@@ -408,7 +401,7 @@ async fn value_contract_varbit_preserves_leading_zero_bits_across_consumers() {
     );
 
     let value = Value::Text(bits.clone());
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
     let literal_result = connection
         .query(&format!("SELECT {literal}::varbit::text"))
         .await
@@ -445,7 +438,7 @@ async fn value_contract_macaddr_preserves_exact_text_across_consumers() {
     );
 
     let value = Value::Text("08:00:2b:01:02:03".into());
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
     let literal_result = connection
         .query(&format!("SELECT {literal}::macaddr::text"))
         .await
@@ -482,7 +475,7 @@ async fn value_contract_macaddr8_preserves_eui64_text_across_consumers() {
     );
 
     let value = Value::Text("08:00:2b:ff:fe:01:02:03".into());
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
     let literal_result = connection
         .query(&format!("SELECT {literal}::macaddr8::text"))
         .await
@@ -538,7 +531,7 @@ async fn value_contract_inet_and_cidr_preserve_ipv6_prefix_semantics() {
         );
 
         let value = Value::Text(expected.into());
-        let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
         let literal_result = connection
             .query(&format!("SELECT {literal}::{kind}::text"))
             .await
@@ -578,7 +571,7 @@ async fn value_contract_pg_lsn_maximum_preserves_text_and_wire_identity() {
     );
 
     let value = Value::Text("FFFFFFFF/FFFFFFFF".into());
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
     let literal_result = connection
         .query(&format!("SELECT {literal}::pg_lsn::text"))
         .await
@@ -620,7 +613,7 @@ async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
     );
 
     let value = Value::Uuid(expected);
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
     let literal_result = connection
         .query(&format!("SELECT {literal}::value_contract_uuid_domain::uuid::text"))
         .await
@@ -668,7 +661,7 @@ async fn value_contract_jsonb_domain_keeps_json_null_distinct_from_sql_null() {
     );
 
     let json_null = Value::Json(Box::new(serde_json::Value::Null));
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &json_null).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &json_null).unwrap();
     let literal_result = connection
         .query(&format!("SELECT {literal}::value_contract_jsonb_domain::jsonb"))
         .await
@@ -718,7 +711,7 @@ async fn value_contract_int4range_reads_as_the_server_text() {
     assert_eq!(row[4], Value::Int(5));
     assert_eq!(row[5], Value::Bool(true));
     assert_eq!(row[6], Value::Bool(false));
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &row[0]).is_ok());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &row[0]).is_ok());
 }
 
 #[tokio::test]
@@ -750,7 +743,7 @@ async fn value_contract_int4multirange_is_explicitly_undecodable() {
         matches!(value, Value::Undecodable(name) if name.eq_ignore_ascii_case("int4multirange")),
         "{value:?}"
     );
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", value).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(value))
@@ -829,7 +822,7 @@ async fn value_contract_remaining_builtin_multiranges_are_undecodable_with_nativ
             matches!(value, Value::Undecodable(name) if name.eq_ignore_ascii_case(expected_type)),
             "{expected_type} must remain explicit and lossless: {value:?}"
         );
-        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("postgres", value).is_err());
         assert!(
             connection
                 .query_params("SELECT $1", std::slice::from_ref(value))
@@ -873,7 +866,7 @@ async fn value_contract_tstzrange_is_explicitly_unsupported() {
     assert_eq!(row[4], Value::Text("2024-01-02 02:05:06.654321+00".into()));
     assert_eq!(row[5], Value::Bool(true));
     assert_eq!(row[6], Value::Bool(false));
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&row[0]))
@@ -943,7 +936,7 @@ async fn value_contract_builtin_range_families_are_refused_without_losing_native
         assert_eq!(row[6], Value::Bool(upper_inclusive), "{native_type}");
         if !decodes {
             assert!(
-                tablepro_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err(),
+                bookie_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err(),
                 "{native_type} must not produce a lossy SQL literal"
             );
             assert!(
@@ -983,7 +976,7 @@ async fn value_contract_composite_result_is_explicitly_unsupported() {
     );
     assert_eq!(row[3], Value::Int(9_007_199_254_740_993));
     assert_eq!(row[4], Value::Text("東京".into()));
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&row[0]))

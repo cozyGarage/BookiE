@@ -1,4 +1,4 @@
-use tablepro_core::{
+use bookie_core::{
     Connection, DriverCapabilities, DriverError, ForeignKeyInfo, IndexInfo, OperationControl, check_pre_dispatch,
 };
 

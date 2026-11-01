@@ -5,9 +5,9 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk, gtk::glib};
 use tokio_util::sync::CancellationToken;
 
-use tablepro_app_services::er_diagram::read::{SchemaRead, read_schema};
-use tablepro_app_services::er_diagram::{SchemaDiagram, zoom};
-use tablepro_core::{DriverCapabilities, DriverError};
+use bookie_app_services::er_diagram::read::{SchemaRead, read_schema};
+use bookie_app_services::er_diagram::{SchemaDiagram, zoom};
+use bookie_core::{DriverCapabilities, DriverError};
 
 use super::canvas::DiagramCanvas;
 use super::describe::{diagram_label, table_description};

@@ -4,7 +4,7 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 use uuid::Uuid;
 
-use tablepro_core::{ColumnInfo, EnumInputStyle, ForeignKeyInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, EnumInputStyle, ForeignKeyInfo, QueryResult, Value};
 
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
@@ -95,21 +95,21 @@ pub struct BrowseTab {
     /// `(connection_id, schema, table)` via `services::filter_settings`.
     /// Empty FilterSet means no WHERE clause; updates restart pagination
     /// at offset 0 since filtered counts shift.
-    current_filter: tablepro_core::FilterSet,
+    current_filter: bookie_core::FilterSet,
     current_columns: Vec<ColumnInfo>,
     /// Foreign keys declared on this table, fetched alongside
     /// `current_columns`. Drives the cell value picker; empty for a
     /// driver that doesn't report foreign keys or a table with none.
     foreign_keys: Vec<ForeignKeyInfo>,
-    inbound_foreign_keys: Vec<tablepro_core::InboundForeignKeyInfo>,
+    inbound_foreign_keys: Vec<bookie_core::InboundForeignKeyInfo>,
     choice_labels: crate::ui::grid::ChoiceMap,
     current_result: Option<std::sync::Arc<QueryResult>>,
     current_projection: Option<Vec<usize>>,
     /// Last row's primary-key values from the most recent page. Used
     /// for keyset seek when offset exceeds `KEYSET_OFFSET_THRESHOLD`.
-    keyset_cursor: Option<Vec<tablepro_core::Value>>,
-    keyset_first_cursor: Option<Vec<tablepro_core::Value>>,
-    keyset_before_cursor: Option<Vec<tablepro_core::Value>>,
+    keyset_cursor: Option<Vec<bookie_core::Value>>,
+    keyset_first_cursor: Option<Vec<bookie_core::Value>>,
+    keyset_before_cursor: Option<Vec<bookie_core::Value>>,
     reverse_page: bool,
     last_page: bool,
     current_selection: Option<gtk::MultiSelection>,
@@ -398,7 +398,7 @@ impl SimpleComponent for BrowseTab {
         // a cell or the SQL editor.
         let filter_set_for_strip = initial_filter.clone();
         let sender_for_strip = sender.clone();
-        let on_apply_filter: std::rc::Rc<dyn Fn(tablepro_core::FilterSet)> = std::rc::Rc::new(move |set| {
+        let on_apply_filter: std::rc::Rc<dyn Fn(bookie_core::FilterSet)> = std::rc::Rc::new(move |set| {
             sender_for_strip.input(BrowseTabInput::FilterApplied(set));
         });
         let preset_context = init.connection_id.and_then(|connection| {
@@ -907,7 +907,7 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::PrevPage => {
                 if let Some(previous_offset) = previous_page_offset(self.current_offset, self.page_size) {
                     self.current_offset = previous_offset;
-                    self.reverse_page = self.current_offset >= tablepro_core::KEYSET_OFFSET_THRESHOLD
+                    self.reverse_page = self.current_offset >= bookie_core::KEYSET_OFFSET_THRESHOLD
                         && self.current_sort.is_none()
                         && self.keyset_first_cursor.is_some();
                     self.last_page = false;
@@ -953,7 +953,7 @@ impl SimpleComponent for BrowseTab {
                 if self.current_offset != last_page_offset {
                     self.current_offset = last_page_offset;
                     self.reset_keyset_navigation();
-                    self.last_page = last_page_offset >= tablepro_core::KEYSET_OFFSET_THRESHOLD
+                    self.last_page = last_page_offset >= bookie_core::KEYSET_OFFSET_THRESHOLD
                         && self.current_sort.is_none()
                         && self.current_columns.iter().any(|column| column.primary_key);
                     self.emit_fetch_page(&sender);

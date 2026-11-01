@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-driver-mssql"
+name = "bookie-driver-mssql"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,7 +15,7 @@ default = []
 kerberos = ["tiberius/integrated-auth-gssapi"]
 
 [dependencies]
-tablepro-core = { path = "../../core" }
+bookie-core = { path = "../../core" }
 async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
@@ -29,7 +29,7 @@ socket2 = { version = "0.6", features = ["all"] }
 tokio-util = { workspace = true, features = ["compat"] }
 
 [dev-dependencies]
-tablepro-app-services = { path = "../../app-services" }
+bookie-app-services = { path = "../../app-services" }
 secrecy.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mssql_server"] }
@@ -38,7 +38,7 @@ uuid.workspace = true
 
 # The shared exact-grid test is included by path and imports this crate.
 [package.metadata.cargo-shear]
-ignored = ["tablepro-app-services"]
+ignored = ["bookie-app-services"]
 
 [lints]
 workspace = true

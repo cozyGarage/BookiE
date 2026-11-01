@@ -5,8 +5,8 @@ use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use rust_decimal::Decimal;
 use serde_json::json;
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use drivers_mysql::MysqlDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use testcontainers::ImageExt;
 use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::mysql::Mysql;
@@ -79,7 +79,7 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
     let (_container, opts) = start_mysql().await;
     let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts.clone()).await.expect("connect").into();
     let observer = connect(opts).await;
-    let tag = "tablepro_mysql_backend_termination";
+    let tag = "bookie_mysql_backend_termination";
     let running = connection.clone();
     let task = tokio::spawn(async move { running.query(&format!("SELECT SLEEP(30) /* {tag} */")).await });
 
@@ -130,7 +130,7 @@ async fn a_disconnected_session_is_retired_without_affecting_the_shared_pool() {
     let connection = MysqlDriver.connect(opts.clone()).await.expect("connect");
     let observer = connect(opts).await;
     let mut session = connection.open_session().await.expect("open session");
-    let tag = "tablepro_mysql_session_backend_termination";
+    let tag = "bookie_mysql_session_backend_termination";
     let query = tokio::spawn(async move {
         let result = session
             .query_params_controlled(
@@ -229,7 +229,7 @@ async fn backend_loss_during_row_stream_fails_the_whole_query_as_disconnected() 
     let (_container, opts) = start_mysql().await;
     let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts.clone()).await.expect("connect").into();
     let observer = connect(opts).await;
-    let tag = "tablepro_mysql_midstream_backend_termination";
+    let tag = "bookie_mysql_midstream_backend_termination";
     let running = connection.clone();
     let task = tokio::spawn(async move {
         running
@@ -287,7 +287,7 @@ async fn a_restarted_mysql_server_restores_the_existing_pool() {
     let host_port = port_probe.local_addr().expect("test port address").port();
     drop(port_probe);
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_mapped_port(host_port, 3306.tcp())
         .start()
@@ -298,8 +298,8 @@ async fn a_restarted_mysql_server_restores_the_existing_pool() {
         port: host_port,
         database: "test".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     };
     let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts).await.expect("connect").into();
@@ -339,9 +339,9 @@ async fn a_column_collation_survives_a_nullability_change() {
     let label = columns.iter().find(|c| c.name == "label").unwrap().clone();
     assert_eq!(label.collation.as_deref(), Some("utf8mb4_bin"));
 
-    let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(label);
+    let mut draft = bookie_core::sql_ddl::DraftColumn::from_info(label);
     draft.nullable = false;
-    for statement in tablepro_core::sql_ddl::build_alter_column("mysql", None, "collated", &draft).unwrap() {
+    for statement in bookie_core::sql_ddl::build_alter_column("mysql", None, "collated", &draft).unwrap() {
         conn.execute(&statement).await.unwrap();
     }
 
@@ -351,7 +351,7 @@ async fn a_column_collation_survives_a_nullability_change() {
     assert_eq!(label.collation.as_deref(), Some("utf8mb4_bin"));
 }
 
-async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
+async fn session_value(session: &mut Box<dyn bookie_core::Session>, sql: &str) -> Value {
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
     let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
     result.rows[0][0].clone()
@@ -703,18 +703,18 @@ async fn a_cancelled_query_is_killed_on_the_server_and_the_pool_stays_usable() {
     let token = tokio_util::sync::CancellationToken::new();
     let control = OperationControl::new(token.clone(), None);
     create_long_query_source(observer.as_ref()).await;
-    let sql = long_query("tablepro_mysql_cancel");
+    let sql = long_query("bookie_mysql_cancel");
     let operation_connection = connection.clone();
     let task = tokio::spawn(async move { operation_connection.query_controlled(&sql, &control).await });
 
-    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_cancel", true).await;
+    wait_for_tagged_query(observer.as_ref(), "bookie_mysql_cancel", true).await;
     token.cancel();
     let error = task
         .await
         .expect("query task")
         .expect_err("the query must be cancelled");
     assert!(matches!(error, DriverError::Cancelled), "unexpected error: {error:?}");
-    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_cancel", false).await;
+    wait_for_tagged_query(observer.as_ref(), "bookie_mysql_cancel", false).await;
 
     let result = connection.query("SELECT 1").await.expect("the pool remains usable");
     assert_eq!(result.rows, vec![vec![Value::Int(1)]]);
@@ -734,17 +734,14 @@ async fn a_timed_out_write_is_killed_on_the_server_and_reports_a_timeout() {
 
     let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
     let control = OperationControl::new(tokio_util::sync::CancellationToken::new(), Some(deadline));
-    let sql = format!(
-        "INSERT INTO cancel_sink (total) {}",
-        long_query("tablepro_mysql_timeout")
-    );
+    let sql = format!("INSERT INTO cancel_sink (total) {}", long_query("bookie_mysql_timeout"));
     let operation_connection = connection.clone();
     let task = tokio::spawn(async move { operation_connection.execute_controlled(&sql, &control).await });
 
-    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_timeout", true).await;
+    wait_for_tagged_query(observer.as_ref(), "bookie_mysql_timeout", true).await;
     let error = task.await.expect("execute task").expect_err("the write must time out");
     assert!(matches!(error, DriverError::TimedOut), "unexpected error: {error:?}");
-    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_timeout", false).await;
+    wait_for_tagged_query(observer.as_ref(), "bookie_mysql_timeout", false).await;
 
     let rows = connection
         .query("SELECT count(*) FROM cancel_sink")
@@ -768,21 +765,21 @@ async fn a_cancelled_session_query_is_killed_on_the_server_and_the_session_stays
     let session = connection.open_session().await.expect("open session");
     let token = tokio_util::sync::CancellationToken::new();
     let control = OperationControl::new(token.clone(), None);
-    let sql = long_query("tablepro_mysql_session_cancel");
+    let sql = long_query("bookie_mysql_session_cancel");
     let task = tokio::spawn(async move {
         let mut session = session;
         let result = session.query_params_controlled(&sql, &[], &control).await;
         (session, result)
     });
 
-    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_session_cancel", true).await;
+    wait_for_tagged_query(observer.as_ref(), "bookie_mysql_session_cancel", true).await;
     token.cancel();
     let (mut session, result) = task.await.expect("session task");
     assert!(
         matches!(result, Err(DriverError::Cancelled)),
         "unexpected error: {result:?}"
     );
-    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_session_cancel", false).await;
+    wait_for_tagged_query(observer.as_ref(), "bookie_mysql_session_cancel", false).await;
 
     assert!(
         session.is_usable(),
@@ -816,7 +813,7 @@ async fn a_copied_insert_survives_a_value_that_could_escape_its_literal() {
         .expect("store the payload as data");
 
     let columns = connection.fetch_columns(None, "copy_probe").await.expect("columns");
-    let clause = tablepro_core::export::render_in_clause("mysql", &[vec![Value::Text(payload.into())]], 0);
+    let clause = bookie_core::export::render_in_clause("mysql", &[vec![Value::Text(payload.into())]], 0);
     let matching = connection
         .query(&format!("SELECT note FROM copy_probe WHERE note IN {}", clause.sql))
         .await
@@ -835,7 +832,7 @@ async fn a_copied_insert_survives_a_value_that_could_escape_its_literal() {
         })
         .collect();
 
-    let sql = tablepro_core::sql_literal::build_insert_literal("mysql", None, "copy_probe", &columns, &row)
+    let sql = bookie_core::sql_literal::build_insert_literal("mysql", None, "copy_probe", &columns, &row)
         .expect("render the insert");
     connection.execute(&sql).await.expect("the copied insert must execute");
 
@@ -971,9 +968,9 @@ async fn assert_defaults_survive_a_nullability_change(conn: Box<dyn Connection>,
 
     let columns = conn.fetch_columns(None, "defaults_kept").await.unwrap();
     for info in columns.into_iter().filter(|c| c.name != "id") {
-        let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(info);
+        let mut draft = bookie_core::sql_ddl::DraftColumn::from_info(info);
         draft.nullable = false;
-        for statement in tablepro_core::sql_ddl::build_alter_column("mysql", None, "defaults_kept", &draft).unwrap() {
+        for statement in bookie_core::sql_ddl::build_alter_column("mysql", None, "defaults_kept", &draft).unwrap() {
             conn.execute(&statement).await.unwrap();
         }
     }
@@ -1036,7 +1033,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
     let before = notes_in(conn, table).await;
     let others: Vec<String> = before.iter().filter(|n| *n != "target").cloned().collect();
 
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         driver_id,
         None,
         table,
@@ -1058,7 +1055,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
         "{table} update touched only the keyed row"
     );
 
-    let delete = tablepro_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
+    let delete = bookie_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
     assert_eq!(
         conn.execute_in_transaction(&[delete]).await.unwrap(),
         vec![1],
@@ -1114,7 +1111,7 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
     let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
     for (id, value) in values.iter().enumerate() {
-        let statement = tablepro_core::sql_literal::build_insert_literal(
+        let statement = bookie_core::sql_literal::build_insert_literal(
             "mysql",
             None,
             "binary_exports",

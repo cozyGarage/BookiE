@@ -1,5 +1,5 @@
 use super::{ROW_FORMAT, map_clickhouse_error};
-use tablepro_core::{DriverError, MAX_QUERY_RESULT_BYTES};
+use bookie_core::{DriverError, MAX_QUERY_RESULT_BYTES};
 
 pub(super) enum RowCell {
     StringBytes(Vec<u8>),

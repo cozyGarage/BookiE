@@ -18,7 +18,7 @@ if ! grep -Eq '^[[:space:]]*Package: bookie$' <<<"$control"; then
   echo "Debian package name must be bookie" >&2
   exit 1
 fi
-for relation in Replaces Conflicts Provides; do
+for relation in Replaces Conflicts; do
   if [[ "$(dpkg-deb -f "$package" "$relation")" != tablepro ]]; then
     echo "the Debian package must declare $relation: tablepro so it takes over from the old package name" >&2
     exit 1
@@ -30,7 +30,7 @@ if [[ "$(dpkg-deb -f "$package" Version)" != "$expected_version" ]]; then
 fi
 
 package_contents="$(dpkg-deb -c "$package")"
-if grep -Fq 'tablepro-agentd.service' <<<"$package_contents"; then
+if grep -Fq 'bookie-agentd.service' <<<"$package_contents"; then
   echo "the Debian package must not ship the obsolete agentd systemd unit" >&2
   exit 1
 fi
@@ -41,13 +41,13 @@ dpkg-deb -x "$package" "$stage"
 for required in \
   usr/bin/bookie \
   usr/bin/bookie-agentd \
-  usr/bin/tablepro \
-  usr/bin/tablepro-agentd \
-  usr/bin/tablepro-askpass \
-  usr/share/applications/com.tablepro.linux.desktop \
-  usr/share/metainfo/com.tablepro.linux.metainfo.xml \
-  usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \
-  usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml \
+  usr/bin/bookie \
+  usr/bin/bookie-agentd \
+  usr/bin/bookie-askpass \
+  usr/share/applications/com.bookie.linux.desktop \
+  usr/share/metainfo/com.bookie.linux.metainfo.xml \
+  usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg \
+  usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml \
   usr/share/doc/bookie/LICENSE.md \
   usr/share/doc/bookie/policy.example.toml; do
   if [[ ! -e "$stage/$required" ]]; then
@@ -56,24 +56,16 @@ for required in \
   fi
 done
 if command -v desktop-file-validate >/dev/null 2>&1; then
-  desktop-file-validate "$stage/usr/share/applications/com.tablepro.linux.desktop"
+  desktop-file-validate "$stage/usr/share/applications/com.bookie.linux.desktop"
 fi
 if command -v appstreamcli >/dev/null 2>&1; then
-  appstreamcli validate --no-net "$stage/usr/share/metainfo/com.tablepro.linux.metainfo.xml"
+  appstreamcli validate --no-net "$stage/usr/share/metainfo/com.bookie.linux.metainfo.xml"
 fi
-if [[ "$(readlink "$stage/usr/bin/tablepro")" != bookie ]]; then
-  echo "usr/bin/tablepro must be a symlink to bookie" >&2
-  exit 1
-fi
-if [[ "$(readlink "$stage/usr/bin/tablepro-agentd")" != bookie-agentd ]]; then
-  echo "usr/bin/tablepro-agentd must be a symlink to bookie-agentd" >&2
-  exit 1
-fi
-if ! grep -Fxq 'Exec=bookie %U' "$stage/usr/share/applications/com.tablepro.linux.desktop"; then
+if ! grep -Fxq 'Exec=bookie %U' "$stage/usr/share/applications/com.bookie.linux.desktop"; then
   echo "desktop file must launch bookie with launch arguments" >&2
   exit 1
 fi
-if ! grep -Eq '^MimeType=.*application/vnd\.sqlite3' "$stage/usr/share/applications/com.tablepro.linux.desktop"; then
+if ! grep -Eq '^MimeType=.*application/vnd\.sqlite3' "$stage/usr/share/applications/com.bookie.linux.desktop"; then
   echo "desktop file must offer BookiE for SQLite files" >&2
   exit 1
 fi

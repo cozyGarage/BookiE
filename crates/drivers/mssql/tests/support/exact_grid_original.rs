@@ -1,4 +1,4 @@
-use tablepro_core::{DatabaseDriver, Value};
+use bookie_core::{DatabaseDriver, Value};
 #[path = "../../../shared/tests/exact_grid_original.rs"]
 mod contract;
 

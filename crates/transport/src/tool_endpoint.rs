@@ -1,4 +1,4 @@
-use tablepro_core::{ConnectOptions, DatabaseDriver};
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use tokio_util::sync::CancellationToken;
 
 use crate::{

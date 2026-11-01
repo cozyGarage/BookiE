@@ -2,11 +2,11 @@
 
 use std::path::PathBuf;
 
+use bookie_core::{AuthMode, ConnectOptions, DatabaseDriver, DriverError, TlsConfig, TlsMode, Value};
 use drivers_mssql::MssqlDriver;
-use tablepro_core::{AuthMode, ConnectOptions, DatabaseDriver, DriverError, TlsConfig, TlsMode, Value};
 
 fn options() -> ConnectOptions {
-    tablepro_transport::install_crypto_provider();
+    bookie_transport::install_crypto_provider();
     let ca = std::env::var_os("BOOKIE_MSSQL_KRB_CA")
         .map(PathBuf::from)
         .expect("BOOKIE_MSSQL_KRB_CA must point to the fixture CA");

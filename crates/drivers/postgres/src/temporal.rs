@@ -1,5 +1,5 @@
+use bookie_core::Value;
 use chrono::NaiveTime;
-use tablepro_core::Value;
 
 const MICROS_PER_DAY: i64 = 86_400_000_000;
 const OFFSET_LIMIT: i32 = 57_600;
@@ -12,7 +12,7 @@ pub(crate) fn array_text(value: Value) -> Option<String> {
     match value {
         Value::Text(text) => Some(text),
         Value::Time(time) => Some(time.to_string()),
-        other => tablepro_core::sql_literal::postgres_temporal_text(&other),
+        other => bookie_core::sql_literal::postgres_temporal_text(&other),
     }
 }
 

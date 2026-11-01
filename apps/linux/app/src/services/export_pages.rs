@@ -2,8 +2,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use tablepro_core::export::{ExportError, RowPage};
-use tablepro_core::{ColumnInfo, Connection, DriverError, FilterSet, OperationControl};
+use bookie_core::export::{ExportError, RowPage};
+use bookie_core::{ColumnInfo, Connection, DriverError, FilterSet, OperationControl};
 use tokio_util::sync::CancellationToken;
 
 use crate::services::browse_query::{BrowseTarget, PageQuery};

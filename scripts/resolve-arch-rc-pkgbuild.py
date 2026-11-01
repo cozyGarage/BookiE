@@ -11,15 +11,15 @@ def main():
     output_path = Path(sys.argv[2])
     source = source_path.read_text()
     assignments = {
-        "pkgver": os.environ["TABLEPRO_RC_VERSION"],
-        "pkgrel": os.environ["TABLEPRO_RC_PKGREL"],
-        "_commit": os.environ["TABLEPRO_RC_COMMIT"],
-        "_archive_sha256": os.environ["TABLEPRO_RC_SHA256"],
-        "_archive": os.environ["TABLEPRO_RC_ARCHIVE"],
-        "_vendor_sha256": os.environ["TABLEPRO_RC_VENDOR_SHA256"],
-        "_vendor_archive": os.environ["TABLEPRO_RC_VENDOR_ARCHIVE"],
-        "_metadata": os.environ["TABLEPRO_RC_METADATA"],
-        "_metadata_sha256": os.environ["TABLEPRO_RC_METADATA_SHA256"],
+        "pkgver": os.environ["BOOKIE_RC_VERSION"],
+        "pkgrel": os.environ["BOOKIE_RC_PKGREL"],
+        "_commit": os.environ["BOOKIE_RC_COMMIT"],
+        "_archive_sha256": os.environ["BOOKIE_RC_SHA256"],
+        "_archive": os.environ["BOOKIE_RC_ARCHIVE"],
+        "_vendor_sha256": os.environ["BOOKIE_RC_VENDOR_SHA256"],
+        "_vendor_archive": os.environ["BOOKIE_RC_VENDOR_ARCHIVE"],
+        "_metadata": os.environ["BOOKIE_RC_METADATA"],
+        "_metadata_sha256": os.environ["BOOKIE_RC_METADATA_SHA256"],
     }
     lines = source.splitlines()
     for name, value in assignments.items():

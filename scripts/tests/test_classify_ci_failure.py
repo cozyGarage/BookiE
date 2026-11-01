@@ -34,7 +34,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
         self.assertEqual(self.tag(text), "infra")
 
     def test_a_compiler_crash_is_infrastructure(self):
-        self.assertEqual(self.tag("sccache: Compiler killed by signal 11\nerror: could not compile `tablepro-app`"), "infra")
+        self.assertEqual(self.tag("sccache: Compiler killed by signal 11\nerror: could not compile `bookie-app`"), "infra")
 
     def test_a_missing_runner_bind_path_is_infrastructure(self):
         text = 'invalid mount config for type "bind": bind source path does not exist: /tmp/.tmp1cLtTA'
@@ -49,7 +49,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
     def test_disk_exhaustion_precedes_a_following_compile_failure(self):
         for message in ("No space left on device", "Out of diskspace"):
             with self.subTest(message=message):
-                text = message + "\nerror: could not compile `tablepro-app`\nJob failed"
+                text = message + "\nerror: could not compile `bookie-app`\nJob failed"
                 self.assertEqual(self.tag(text), "infra")
 
     def test_an_unrelated_git_checkout_failure_stays_unknown(self):
@@ -85,7 +85,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
         self.assertEqual(self.tag(text), "code")
 
     def test_a_linker_bus_error_is_infrastructure_not_a_lint_failure(self):
-        text = "collect2: fatal error: ld terminated with signal 7 [Bus error]\nerror: could not compile `tablepro-agentd` (bin \"tablepro-agentd\") due to 1 previous error\nJob failed"
+        text = "collect2: fatal error: ld terminated with signal 7 [Bus error]\nerror: could not compile `bookie-agentd` (bin \"bookie-agentd\") due to 1 previous error\nJob failed"
         self.assertEqual(self.tag(text), "infra")
 
     def test_a_missing_fixture_image_is_infrastructure(self):
@@ -93,7 +93,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
         self.assertEqual(self.tag(text), "infra")
 
     def test_a_fixture_container_that_exited_before_the_tests_is_infrastructure(self):
-        text = "container tablepro-driver-tls-mongo-1 exited (48)\nJob failed"
+        text = "container bookie-driver-tls-mongo-1 exited (48)\nJob failed"
         self.assertEqual(self.tag(text), "infra")
 
     def test_an_unrecognised_log_is_unknown(self):

@@ -4,11 +4,11 @@
 //! the DBus session bus on a healthy GNOME session: a second launch
 //! sends `activate` to the primary and exits. That mechanism breaks
 //! when DBus is unavailable (sandboxed / headless / minimal session)
-//! and silently lets two processes through. Two TablePro processes
+//! and silently lets two processes through. Two BookiE processes
 //! racing on `workspace_state.json` corrupt each other's tab state.
 //!
 //! This module adds a belt-and-suspenders `flock(2)` exclusive lock on
-//! `$XDG_RUNTIME_DIR/tablepro.lock` (fallback `$XDG_CACHE_HOME` or
+//! `$XDG_RUNTIME_DIR/bookie.lock` (fallback `$XDG_CACHE_HOME` or
 //! `$HOME/.cache`). Held for the lifetime of the returned `Lock`
 //! guard. The kernel auto-releases the flock on process exit, so
 //! crashes don't leak the lock.

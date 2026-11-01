@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/com/tablepro/linux">
+  <gresource prefix="/com/bookie/linux">
     <file>style.css</file>
-    <file alias="icons/scalable/apps/com.tablepro.linux.svg">../../flatpak/icons/scalable/com.tablepro.linux.svg</file>
-    <file alias="icons/scalable/apps/com.tablepro.linux.Devel.svg">../../flatpak/icons/scalable/com.tablepro.linux.svg</file>
+    <file alias="icons/scalable/apps/com.bookie.linux.svg">../../flatpak/icons/scalable/com.bookie.linux.svg</file>
+    <file alias="icons/scalable/apps/com.bookie.linux.Devel.svg">../../flatpak/icons/scalable/com.bookie.linux.svg</file>
   </gresource>
 </gresources>

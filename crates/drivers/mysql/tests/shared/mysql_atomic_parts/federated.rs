@@ -10,7 +10,7 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 #[ignore = "requires docker"]
 async fn mysql_failed_batch_federated_write_survives_rollback() {
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd([
             "--default-authentication-plugin=mysql_native_password",
             "--federated",
@@ -26,8 +26,8 @@ async fn mysql_failed_batch_federated_write_survives_rollback() {
         port: container.get_host_port_ipv4(3306).await.unwrap(),
         database: "test".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     };
     let conn = connect(opts.clone()).await;
@@ -39,7 +39,7 @@ async fn mysql_failed_batch_federated_write_survives_rollback() {
         .unwrap();
     conn.execute(
         "CREATE TABLE federated_batch_effects (id INT PRIMARY KEY) ENGINE=FEDERATED \
-         CONNECTION='mysql://root:tablepro_test@127.0.0.1:3306/test/federated_remote_effects'",
+         CONNECTION='mysql://root:bookie_test@127.0.0.1:3306/test/federated_remote_effects'",
     )
     .await
     .unwrap();
@@ -61,7 +61,7 @@ async fn mariadb_failed_batch_federated_write_survives_rollback() {
         .unwrap();
     conn.execute(
         "CREATE TABLE federated_batch_effects (id INT PRIMARY KEY) ENGINE=FEDERATED \
-         CONNECTION='mysql://root:tablepro_test@127.0.0.1:3306/test/federated_remote_effects'",
+         CONNECTION='mysql://root:bookie_test@127.0.0.1:3306/test/federated_remote_effects'",
     )
     .await
     .unwrap();
@@ -172,7 +172,7 @@ async fn assert_federated_trigger_effect_survives_rollback(conn: &dyn Connection
         assert_eq!(remote_federated_rows(opts).await, initial_remote);
         conn.execute(
             "CREATE TABLE federated_trigger_target (id INT PRIMARY KEY) ENGINE=FEDERATED \
-             CONNECTION='mysql://root:tablepro_test@127.0.0.1:3306/test/federated_remote_effects'",
+             CONNECTION='mysql://root:bookie_test@127.0.0.1:3306/test/federated_remote_effects'",
         )
         .await
         .unwrap();
@@ -207,7 +207,7 @@ async fn start_mariadb_with_federated() -> (testcontainers::ContainerAsync<Gener
     let image = GenericImage::new("mariadb", "11")
         .with_exposed_port(3306.tcp())
         .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
-        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MARIADB_ROOT_PASSWORD", "bookie_test")
         .with_env_var("MARIADB_DATABASE", "test")
         .with_cmd(["mariadbd", "--plugin-load-add=ha_federated"]);
     let container = image.start().await.unwrap();
@@ -216,8 +216,8 @@ async fn start_mariadb_with_federated() -> (testcontainers::ContainerAsync<Gener
         port: container.get_host_port_ipv4(3306).await.unwrap(),
         database: "test".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     };
     (container, opts)
@@ -260,7 +260,7 @@ async fn create_federated_trigger(opts: &ConnectOptions, trigger: &'static str) 
 
 async fn start_mysql_with_federated() -> (testcontainers::ContainerAsync<Mysql>, ConnectOptions) {
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd([
             "--default-authentication-plugin=mysql_native_password",
             "--federated",
@@ -276,8 +276,8 @@ async fn start_mysql_with_federated() -> (testcontainers::ContainerAsync<Mysql>,
         port: container.get_host_port_ipv4(3306).await.unwrap(),
         database: "test".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     };
     (container, opts)

@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::native_connection;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn query_truncates_when_result_memory_budget_is_exceeded() {
@@ -24,7 +24,7 @@ async fn query_truncates_when_result_memory_budget_is_exceeded() {
 #[tokio::test]
 async fn narrow_queries_stop_at_the_row_limit_and_report_truncation() {
     let connection = native_connection().await;
-    let cap = tablepro_core::MAX_QUERY_ROWS;
+    let cap = bookie_core::MAX_QUERY_ROWS;
     let result = connection
         .query(&format!("SELECT i FROM range({}) AS t(i)", cap + 1))
         .await

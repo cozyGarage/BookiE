@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fast local gate before a full GTK build or .deb/.flatpak package.
-# Intentionally skips tablepro-app (GTK) so you get signal in seconds-to-minutes
+# Intentionally skips bookie-app (GTK) so you get signal in seconds-to-minutes
 # instead of waiting on a full UI link.
 set -euo pipefail
 
@@ -19,24 +19,24 @@ case "$CARGO_TARGET_DIR" in
 esac
 
 CRATES=(
-  tablepro-core
-  tablepro-policy
-  tablepro-storage
-  tablepro-transport
-  tablepro-app-services
-  tablepro-ssh
-  tablepro-dump
-  tablepro-mcp
-  tablepro-agentd
-  tablepro-driver-postgres
-  tablepro-driver-mysql
-  tablepro-driver-sqlite
-  tablepro-driver-mssql
-  tablepro-driver-clickhouse
-  tablepro-driver-redis
-  tablepro-driver-mongodb
-  tablepro-release-tests
-  tablepro-driver-tls-tests
+  bookie-core
+  bookie-policy
+  bookie-storage
+  bookie-transport
+  bookie-app-services
+  bookie-ssh
+  bookie-dump
+  bookie-mcp
+  bookie-agentd
+  bookie-driver-postgres
+  bookie-driver-mysql
+  bookie-driver-sqlite
+  bookie-driver-mssql
+  bookie-driver-clickhouse
+  bookie-driver-redis
+  bookie-driver-mongodb
+  bookie-release-tests
+  bookie-driver-tls-tests
 )
 
 PKG_ARGS=()
@@ -73,7 +73,7 @@ cargo clippy "${PKG_ARGS[@]}" --all-targets -- -D warnings
 
 echo "==> nextest --lib --bins (non-GTK crates)"
 NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-"$NEXTEST" nextest run "${PKG_ARGS[@]}" --lib --bins --profile "${TABLEPRO_NEXTEST_PROFILE:-default}" --no-tests=fail
+"$NEXTEST" nextest run "${PKG_ARGS[@]}" --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
 
 echo "==> sandbox integration tier"
 "$ROOT/scripts/test-sandbox.sh"

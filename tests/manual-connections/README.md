@@ -38,24 +38,24 @@ Set TLS to **Disabled** for every network connection. Each service has a `people
 
 | Driver | Host | Port | Database | Read-write user | Read-only user |
 |---|---:|---:|---|---|---|
-| PostgreSQL | `127.0.0.1` | `15432` | `tablepro_lab` | `tablepro_rw` | `tablepro_ro` |
-| MySQL | `127.0.0.1` | `13306` | `tablepro_lab` | `tablepro_rw` | `tablepro_ro` |
-| SQL Server | `127.0.0.1` | `11433` | `tablepro_lab` | `tablepro_rw` | `tablepro_ro` |
-| ClickHouse | `127.0.0.1` | `18123` | `tablepro_lab` | `tablepro_rw` | `tablepro_ro` |
-| MongoDB | `127.0.0.1` | `27017` | `tablepro_lab` | `tablepro_rw` | `tablepro_ro` |
-| Redis | `127.0.0.1` | `16379` | `0` | `tablepro_rw` | `tablepro_ro` |
+| PostgreSQL | `127.0.0.1` | `15432` | `bookie_lab` | `bookie_rw` | `bookie_ro` |
+| MySQL | `127.0.0.1` | `13306` | `bookie_lab` | `bookie_rw` | `bookie_ro` |
+| SQL Server | `127.0.0.1` | `11433` | `bookie_lab` | `bookie_rw` | `bookie_ro` |
+| ClickHouse | `127.0.0.1` | `18123` | `bookie_lab` | `bookie_rw` | `bookie_ro` |
+| MongoDB | `127.0.0.1` | `27017` | `bookie_lab` | `bookie_rw` | `bookie_ro` |
+| Redis | `127.0.0.1` | `16379` | `0` | `bookie_rw` | `bookie_ro` |
 
-The PostgreSQL and MySQL read-write accounts also own or can access `tablepro_extra`, so use that database to verify switching databases. Redis database `1` is also available for database-switch testing.
+The PostgreSQL and MySQL read-write accounts also own or can access `bookie_extra`, so use that database to verify switching databases. Redis database `1` is also available for database-switch testing.
 
 ## SQLite and DuckDB
 
 Create local fixture files outside the repository so manual data never becomes source state:
 
 ```bash
-mkdir -p "$HOME/.local/share/tablepro/manual-fixtures"
-sqlite3 "$HOME/.local/share/tablepro/manual-fixtures/tablepro-lab.sqlite" \
+mkdir -p "$HOME/.local/share/bookie/manual-fixtures"
+sqlite3 "$HOME/.local/share/bookie/manual-fixtures/bookie-lab.sqlite" \
   'CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT NOT NULL, active BOOLEAN NOT NULL); INSERT OR IGNORE INTO people VALUES (1, "Ada Lovelace", 1), (2, "Grace Hopper", 0);'
-duckdb "$HOME/.local/share/tablepro/manual-fixtures/tablepro-lab.duckdb" \
+duckdb "$HOME/.local/share/bookie/manual-fixtures/bookie-lab.duckdb" \
   "CREATE TABLE IF NOT EXISTS people (id BIGINT PRIMARY KEY, name VARCHAR NOT NULL, active BOOLEAN NOT NULL); INSERT OR IGNORE INTO people VALUES (1, 'Ada Lovelace', true), (2, 'Grace Hopper', false);"
 ```
 

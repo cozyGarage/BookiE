@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::classify::StatementFacts;
 use crate::principal::Principal;
-use tablepro_core::Environment;
+use bookie_core::Environment;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

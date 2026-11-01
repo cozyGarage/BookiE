@@ -26,7 +26,7 @@ fi
 
 mkdir -p "$BUILD_DIR" "$REPO_DIR"
 cd "$ROOT"
-flatpak-builder --force-clean --repo="$REPO_DIR" "$BUILD_DIR" apps/linux/flatpak/com.tablepro.linux.json
-flatpak build-bundle "$REPO_DIR" /tmp/bookie.flatpak com.tablepro.linux
+flatpak-builder --force-clean --repo="$REPO_DIR" "$BUILD_DIR" apps/linux/flatpak/com.bookie.linux.json
+flatpak build-bundle "$REPO_DIR" /tmp/bookie.flatpak com.bookie.linux
 echo "Bundle: /tmp/bookie.flatpak"
 echo "Install: flatpak install --user /tmp/bookie.flatpak"

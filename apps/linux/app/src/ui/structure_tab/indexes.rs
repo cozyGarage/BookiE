@@ -4,7 +4,7 @@
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 
-use tablepro_core::IndexInfo;
+use bookie_core::IndexInfo;
 
 use super::{StructureTab, StructureTabInput};
 

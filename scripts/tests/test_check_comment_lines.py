@@ -28,7 +28,7 @@ class CommentLineTests(unittest.TestCase):
             {
                 "crates/a/tests/t.rs": "// c\n",
                 "vendor/x/src/lib.rs": "// c\n",
-                "apps/linux/packaging/arch/src/TablePro/cargo-vendor/x/src/lib.rs": "// c\n",
+                "apps/linux/packaging/arch/src/BookiE/cargo-vendor/x/src/lib.rs": "// c\n",
             }
         )
         self.assertEqual(counts, {})

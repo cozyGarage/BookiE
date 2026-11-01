@@ -2,7 +2,7 @@
 
 use std::process::Command;
 
-const CHILD_PROCESS: &str = "TABLEPRO_PANIC_HOOK_TEST_CHILD";
+const CHILD_PROCESS: &str = "BOOKIE_PANIC_HOOK_TEST_CHILD";
 const PANIC_SENTINEL: &str = "panic-payload-secret-sentinel";
 
 #[test]
@@ -12,7 +12,7 @@ fn debug_panic_hook_withholds_payload_and_keeps_diagnostics() {
             .with_writer(std::io::stderr)
             .try_init()
             .expect("install the test log subscriber");
-        tablepro_policy::withhold_panic_messages();
+        bookie_policy::withhold_panic_messages();
         panic!("{PANIC_SENTINEL}");
     }
 
@@ -30,9 +30,9 @@ fn run_child(debug_panics: bool, rust_backtrace: bool) -> std::process::Output {
         ])
         .env(CHILD_PROCESS, "1");
     if debug_panics {
-        command.env("TABLEPRO_DEBUG_PANICS", "1");
+        command.env("BOOKIE_DEBUG_PANICS", "1");
     } else {
-        command.env_remove("TABLEPRO_DEBUG_PANICS");
+        command.env_remove("BOOKIE_DEBUG_PANICS");
     }
     if rust_backtrace {
         command.env("RUST_BACKTRACE", "1");

@@ -1,7 +1,7 @@
 use std::sync::{Arc, LazyLock, Mutex as StdMutex};
 
+use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use drivers_mysql::MysqlDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use testcontainers::ImageExt;
 use testcontainers::core::{ExecCommand, IntoContainerPort, Mount, WaitFor};
 use testcontainers::{ContainerAsync, GenericImage};
@@ -50,7 +50,7 @@ async fn create_multi_result_procedure(container: &ContainerAsync<Mysql>) {
         .exec(ExecCommand::new([
             "mysql",
             "-uroot",
-            "-ptablepro_test",
+            "-pbookie_test",
             "test",
             "-e",
             sql,
@@ -101,7 +101,7 @@ pub(crate) async fn start_mysql_durable() -> (TestDatabase, ConnectOptions) {
 async fn start_mysql_with_durability(durable: bool) -> (TestDatabase, ConnectOptions) {
     if can_reuse_server(
         &std::env::args().skip(1).collect::<Vec<_>>(),
-        std::env::var_os("TABLEPRO_TEST_RUN_ID").is_some(),
+        std::env::var_os("BOOKIE_TEST_RUN_ID").is_some(),
     ) && !durable
     {
         let test_lock = TEST_LOCK.lock().await;
@@ -128,7 +128,7 @@ async fn start_mysql_with_durability(durable: bool) -> (TestDatabase, ConnectOpt
 pub(crate) async fn start_mariadb() -> (MariaDbTestDatabase, ConnectOptions) {
     if can_reuse_server(
         &std::env::args().skip(1).collect::<Vec<_>>(),
-        std::env::var_os("TABLEPRO_TEST_RUN_ID").is_some(),
+        std::env::var_os("BOOKIE_TEST_RUN_ID").is_some(),
     ) {
         let test_lock = MARIADB_TEST_LOCK.lock().await;
         let server = MARIADB_SERVER.get_or_init(start_shared_mariadb).await;
@@ -183,7 +183,7 @@ async fn start_shared_mariadb() -> Server {
 }
 
 async fn create_server(durable: bool) -> (ContainerAsync<Mysql>, Server) {
-    let image = Mysql::default().with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test");
+    let image = Mysql::default().with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test");
     let image = if durable {
         image.with_cmd(["--default-authentication-plugin=mysql_native_password"])
     } else {
@@ -196,8 +196,8 @@ async fn create_server(durable: bool) -> (ContainerAsync<Mysql>, Server) {
             ])
             .with_mount(Mount::tmpfs_mount("/var/lib/mysql"))
     };
-    let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
-        Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
+    let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
         Err(_) => image,
     };
     let container = image
@@ -210,7 +210,7 @@ async fn create_server(durable: bool) -> (ContainerAsync<Mysql>, Server) {
         port: container.get_host_port_ipv4(3306).await.expect("port"),
         database: "mysql".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
         tls: TlsConfig::disabled(),
         ..Default::default()
     };
@@ -236,7 +236,7 @@ async fn create_mariadb_server() -> (ContainerAsync<GenericImage>, Server) {
     let image = GenericImage::new("mariadb", "11")
         .with_exposed_port(3306.tcp())
         .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
-        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MARIADB_ROOT_PASSWORD", "bookie_test")
         .with_env_var("MARIADB_DATABASE", "test")
         .with_cmd([
             "mariadbd",
@@ -245,8 +245,8 @@ async fn create_mariadb_server() -> (ContainerAsync<GenericImage>, Server) {
             "--sync-binlog=0",
         ])
         .with_mount(Mount::tmpfs_mount("/var/lib/mysql"));
-    let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
-        Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
+    let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
         Err(_) => image,
     };
     let container = image
@@ -259,7 +259,7 @@ async fn create_mariadb_server() -> (ContainerAsync<GenericImage>, Server) {
         port: container.get_host_port_ipv4(3306).await.expect("port"),
         database: "mysql".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
         tls: TlsConfig::disabled(),
         ..Default::default()
     };
@@ -331,7 +331,7 @@ async fn value_contract_mysql_fixtures_reset_the_database_on_one_server() {
 async fn value_contract_mariadb_fixtures_reset_the_database_on_one_server() {
     let reuse = can_reuse_server(
         &std::env::args().skip(1).collect::<Vec<_>>(),
-        std::env::var_os("TABLEPRO_TEST_RUN_ID").is_some(),
+        std::env::var_os("BOOKIE_TEST_RUN_ID").is_some(),
     );
     let first;
     {

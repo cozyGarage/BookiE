@@ -7,16 +7,16 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use drivers_sqlite::SqliteDriver;
-use tablepro_core::import::{CsvImportOptions, ImportTarget, InsertPlan, build_insert_plan, infer_columns, read_csv};
-use tablepro_core::sql_ddl::build_create_table;
-use tablepro_core::{
+use bookie_core::import::{CsvImportOptions, ImportTarget, InsertPlan, build_insert_plan, infer_columns, read_csv};
+use bookie_core::sql_ddl::build_create_table;
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value,
 };
-use tablepro_policy::{
+use bookie_policy::{
     AuditError, AuditEvent, AuditOperationClass, AuditSink, AuditState, AuditTerminalStatus, AutoApproveSink,
     BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, GuardContext, PolicyConfig, PolicyGuard, Principal,
 };
+use drivers_sqlite::SqliteDriver;
 use tempfile::TempDir;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -110,7 +110,7 @@ fn plan_for(table: &str, columns: &[ColumnInfo], csv: &[u8]) -> InsertPlan {
     let target = ImportTarget {
         driver_id: "sqlite",
 
-        capabilities: tablepro_core::DriverCapabilities::default(),
+        capabilities: bookie_core::DriverCapabilities::default(),
         schema: None,
         table,
         columns,
@@ -176,7 +176,7 @@ async fn value_contract_csv_binary_export_import_keeps_null_empty_and_every_byte
         vec![Value::Int(2), Value::Bytes(vec![])],
         vec![Value::Int(3), Value::Bytes((0..=255).collect())],
     ];
-    let csv = tablepro_core::export::render_csv(&columns, &expected, &tablepro_core::export::CsvOptions::default());
+    let csv = bookie_core::export::render_csv(&columns, &expected, &bookie_core::export::CsvOptions::default());
     let plan = plan_for("payloads", &columns, csv.as_bytes());
     assert_eq!(plan.rows, expected);
     let mut scope = begin(&fixture.guard, "payloads", &plan).await;

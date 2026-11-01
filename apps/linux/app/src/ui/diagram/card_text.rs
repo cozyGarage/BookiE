@@ -1,7 +1,7 @@
 use relm4::gtk::pango;
 
-use tablepro_app_services::er_diagram::scene::CardShape;
-use tablepro_app_services::er_diagram::{DiagramColumn, DiagramTable};
+use bookie_app_services::er_diagram::scene::CardShape;
+use bookie_app_services::er_diagram::{DiagramColumn, DiagramTable};
 
 pub(crate) const PAD_X: f64 = 12.0;
 const BADGE_GAP: f64 = 6.0;
