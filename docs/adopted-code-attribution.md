@@ -4,6 +4,8 @@ This file records source attribution for code adopted into BookiE. It does not d
 
 ## Adopted source
 
+BookiE is an independent project. It does not track, merge from or sync with TablePro; this file only records the origin of code that was adopted once.
+
 BookiE and the TablePro Linux client are both AGPL-3.0, so a reviewed file may be adopted with its history of origin recorded here instead of in source comments.
 
 | BookiE file | Source file (TablePro commit `86651d743`, its `diagram` UI module) | Changes |
