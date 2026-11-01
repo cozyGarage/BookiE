@@ -156,7 +156,48 @@ The script generates fixture certificates and SSH keys, starts PostgreSQL 16 wit
 
 The suite verifies certificate hostname and authority checks, tunnelled access to a database with no published port, that a tunnelled `VerifyFull` verifies the original database hostname while a TCP-forwarded one refuses to verify the local dial address, read-only denial of data-changing CTEs and administrative functions, batch and interactive rollback, activity and blocking-lock queries, and direct and SSH reconnect.
 
+Driver-only PostgreSQL catalog profiles use the release-test examples `column_metadata_benchmark` and `catalog_listing_benchmark`. They emit one JSON object per sample and create and remove their own schema in the disposable fixture. Start a uniquely named fixture project and build the examples:
+
+```bash
+bash tests/fixtures/postgres-release/generate-materials.sh
+docker compose --project-name bookie-meta-profile --project-directory tests/fixtures/postgres-release -f tests/fixtures/postgres-release/docker-compose.yml up -d --build --wait --wait-timeout 300
+export TABLEPRO_FIXTURE_POSTGRES_RELEASE=1
+export TABLEPRO_FIXTURE_MATERIALS="$PWD/tests/fixtures/postgres-release/materials"
+cargo build --release --locked -p tablepro-release-tests --example column_metadata_benchmark --example catalog_listing_benchmark
+```
+
+Run `target/release/examples/column_metadata_benchmark 1024 rich` or `target/release/examples/catalog_listing_benchmark 5000`. These measurements cover driver calls and decoding, not GTK sidebar construction, accessibility or painting. Stop only the fixture project started for the profile:
+
+```bash
+docker compose --project-name bookie-meta-profile --project-directory tests/fixtures/postgres-release -f tests/fixtures/postgres-release/docker-compose.yml down --volumes --remove-orphans
+```
+
 `tests/fixtures/postgres-release/README.md` documents the topology, generated materials, and `TABLEPRO_FIXTURE_KEEP_UP=1` for keeping the containers running.
+
+The CPU-only `tablepro-app-services` sidebar search benchmark measures tree construction and repeated filtering separately from GTK and database access:
+
+```bash
+TABLEPRO_SIDEBAR_PROFILE_OUTPUT="$PWD/target/quality/sidebar-search-5000.jsonl" \
+  cargo bench --locked -p tablepro-app-services --bench sidebar_search -- 5000
+TABLEPRO_SIDEBAR_PROFILE_OUTPUT="$PWD/target/quality/sidebar-search-50000.jsonl" \
+  cargo bench --locked -p tablepro-app-services --bench sidebar_search -- 50000
+```
+
+It runs 101 samples for a specific match, a schema-prefix match, and a broad match. The output includes the number of visible nodes and median/p95 time in nanoseconds. It measures the tree algorithm only; use the GTK profile below to measure widget construction and accessibility costs.
+
+The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connection-to-catalog visibility, accessible sidebar filtering, and the app process memory before and after loading a synthetic catalog. Start a disposable PostgreSQL database containing the named target table, then run:
+
+```bash
+TABLEPRO_GTK_POSTGRES_PORT=15432 \
+TABLEPRO_GTK_CATALOG_TARGET=profile_schema_0001.profile_table_00001 \
+TABLEPRO_GTK_CATALOG_TABLES=1000 \
+TABLEPRO_GTK_PROFILE_OUTPUT="$PWD/target/quality/sidebar-catalog.json" \
+TABLEPRO_GTK_SCENARIO=postgres_sidebar_catalog_profile \
+bash scripts/test-gtk-safety.sh
+```
+
+`TABLEPRO_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
+The app also logs the number of sidebar nodes and the time spent constructing their GTK rows at debug level; the GTK scenario records this value in its JSON output.
 
 ## Local PostgreSQL smoke test
 

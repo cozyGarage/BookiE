@@ -29,26 +29,82 @@ fn sustained_small_streams_keep_all_pages_within_the_byte_budget() {
 
 #[test]
 fn snapshots_share_payloads_and_release_evicted_pages_after_the_last_owner() {
+    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
     let mut cache = StreamPageCache::default();
     let mut wide_page = page(&["payload"], &[]).as_ref().clone();
     wide_page.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]];
     let result = Arc::new(wide_page);
     let weak = Arc::downgrade(&result);
     cache.append(0, result).unwrap();
-    let first = cache.snapshot(StreamTerminal::Loading, None);
-    let second = cache.snapshot(StreamTerminal::Complete, None);
-    assert!(Arc::ptr_eq(&first.pages[0], &second.pages[0]));
-    assert!(Arc::ptr_eq(&first.pages[0], &cache.pages()[0].1));
+    let first = cache.snapshot_with_spool(StreamTerminal::Loading, None, 0, Some(spool.clone()));
+    let second = cache.snapshot_with_spool(StreamTerminal::Loading, None, 0, Some(spool));
+    assert!(Weak::ptr_eq(&first.pages[0], &second.pages[0]));
+    assert!(Arc::ptr_eq(&first.pages[0].upgrade().unwrap(), &cache.pages()[0].1));
     for index in 1..4 {
         let mut next_page = page(&["payload"], &[]).as_ref().clone();
         next_page.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]];
         cache.append(index, Arc::new(next_page)).unwrap();
     }
     assert_eq!(cache.first_page(), 2);
+    assert!(weak.upgrade().is_none());
+    assert!(first.pages[0].upgrade().is_none());
     drop(first);
-    assert!(weak.upgrade().is_some());
     drop(second);
     assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn completed_spooled_snapshots_release_resident_pages_and_reload_from_the_spool() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let mut cache = StreamPageCache::default();
+    let mut references = Vec::new();
+    let mut columns = Vec::new();
+    for index in 0_u64..12 {
+        let page = page(&["id"], &[index as i64]);
+        if index == 0 {
+            columns.clone_from(&page.columns);
+        }
+        references.push(Arc::downgrade(&page));
+        runtime.block_on(spool.append_page(index, page.clone())).unwrap();
+        cache.append(index, page).unwrap();
+    }
+
+    let snapshot = cache.snapshot_with_spool(StreamTerminal::Complete, None, 0, Some(spool.clone()));
+
+    assert_eq!(snapshot.total_pages, 12);
+    assert!(snapshot.page_indices.is_empty());
+    assert_eq!(snapshot.retained_rows, 0);
+    assert!(references.iter().all(|page| page.upgrade().is_none()));
+    assert!(snapshot.resident_pages.get(0).is_none());
+    let restored = runtime.block_on(spool.load_page(0, columns)).unwrap();
+    assert_eq!(restored.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[test]
+fn terminal_snapshot_keeps_the_page_whose_spool_write_failed() {
+    let mut cache = StreamPageCache::default();
+    let first = page(&["id"], &[1]);
+    let first_ref = Arc::downgrade(&first);
+    cache.append(0, first).unwrap();
+    let last = page(&["id"], &[2]);
+    let last_ref = Arc::downgrade(&last);
+    cache.append_with_storage_status(1, last, false).unwrap();
+    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+
+    let snapshot = cache.snapshot_with_spool(StreamTerminal::Failed("spool failed".into()), None, 0, Some(spool));
+
+    assert_eq!(snapshot.total_pages, 2);
+    assert_eq!(snapshot.page_indices, vec![1]);
+    assert_eq!(snapshot.retained_rows, 1);
+    assert!(first_ref.upgrade().is_none());
+    assert_eq!(last_ref.upgrade().unwrap().rows, vec![vec![Value::Int(2)]]);
 }
 
 #[test]
@@ -64,6 +120,7 @@ fn exactly_sixty_four_mib_is_retained_and_the_next_row_evicts_an_old_page() {
         snapshot
             .pages
             .iter()
+            .filter_map(Weak::upgrade)
             .map(|page| page.estimated_row_bytes())
             .sum::<usize>(),
         64 * 1024 * 1024
