@@ -250,10 +250,20 @@ impl LocalResultView {
 }
 
 fn selected_source_rows(store: &RowStore, selection: &gtk4::MultiSelection) -> std::collections::HashSet<usize> {
-    (0..selection.n_items())
-        .filter(|position| selection.is_selected(*position))
-        .filter_map(|position| store.source_index_at(position))
-        .collect()
+    let positions = selection.selection();
+    let capacity = usize::try_from(positions.size()).unwrap_or_default();
+    let mut source_rows = HashSet::with_capacity(capacity);
+    let Some((mut iterator, mut position)) = gtk4::BitsetIter::init_first(&positions) else {
+        return source_rows;
+    };
+    loop {
+        if let Some(source_index) = store.source_index_at(position) {
+            source_rows.insert(source_index);
+        }
+        let Some(next) = iterator.next() else { break };
+        position = next;
+    }
+    source_rows
 }
 
 fn update_status(state: &LocalResultViewState) {
