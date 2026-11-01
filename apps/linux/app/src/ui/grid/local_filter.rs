@@ -23,7 +23,7 @@ pub(crate) struct LocalResultSettingsStore(Rc<RefCell<HashMap<ResultViewKey, Loc
 pub(crate) struct LocalResultSettings {
     pub(crate) filter: Option<(usize, Value)>,
     pub(crate) sort: Option<(usize, bool)>,
-    selection: Option<(std::sync::Weak<QueryResult>, HashSet<usize>)>,
+    selection: Option<(std::sync::Weak<QueryResult>, Arc<HashSet<usize>>)>,
 }
 
 impl LocalResultSettingsStore {
@@ -39,7 +39,7 @@ impl LocalResultSettingsStore {
         self.0.borrow_mut().retain(|key, _| keys.contains(key));
     }
 
-    fn selection_for(&self, key: ResultViewKey, result: &Arc<QueryResult>) -> Option<HashSet<usize>> {
+    fn selection_for(&self, key: ResultViewKey, result: &Arc<QueryResult>) -> Option<Arc<HashSet<usize>>> {
         let state = self.0.borrow();
         let (saved_result, selected) = state.get(&key)?.selection.as_ref()?;
         let saved_result = saved_result.upgrade()?;
@@ -141,18 +141,7 @@ impl LocalResultView {
             self.rebuild_visible_rows();
         }
         if let Some(selected) = settings_store.selection_for(settings_key, &result) {
-            selection_syncing.set(true);
-            let positions = gtk4::Bitset::new_empty();
-            for position in 0..store.n_items() {
-                if store
-                    .source_index_at(position)
-                    .is_some_and(|source| selected.contains(&source))
-                {
-                    positions.add(position);
-                }
-            }
-            selection.set_selection(&positions, &gtk4::Bitset::new_range(0, store.n_items()));
-            selection_syncing.set(false);
+            restore_selection(&store, &selection, &selected, has_saved_view_order, &selection_syncing);
         }
         selection.connect_selection_changed(move |selection, _, _| {
             if selection_syncing.get() {
@@ -160,7 +149,7 @@ impl LocalResultView {
             }
             let selected = selected_source_rows(&store, selection);
             settings_store.update(settings_key, |settings| {
-                settings.selection = Some((Arc::downgrade(&result), selected));
+                settings.selection = Some((Arc::downgrade(&result), Arc::new(selected)));
             });
         });
     }
@@ -236,6 +225,43 @@ impl LocalResultView {
         syncing.set(false);
         update_status(&self.0.borrow());
     }
+}
+
+fn restore_selection(
+    store: &RowStore,
+    selection: &gtk4::MultiSelection,
+    selected: &HashSet<usize>,
+    has_saved_view_order: bool,
+    selection_syncing: &Cell<bool>,
+) {
+    selection_syncing.set(true);
+    let item_count = store.n_items();
+    let positions = if !has_saved_view_order && selected.len() == item_count as usize {
+        gtk4::Bitset::new_range(0, item_count)
+    } else {
+        let positions = gtk4::Bitset::new_empty();
+        if !has_saved_view_order && selected.len().saturating_mul(4) < item_count as usize {
+            for source in selected {
+                if let Ok(position) = u32::try_from(*source) {
+                    if position < item_count {
+                        positions.add(position);
+                    }
+                }
+            }
+        } else {
+            for position in 0..item_count {
+                if store
+                    .source_index_at(position)
+                    .is_some_and(|source| selected.contains(&source))
+                {
+                    positions.add(position);
+                }
+            }
+        }
+        positions
+    };
+    selection.set_selection(&positions, &gtk4::Bitset::new_range(0, item_count));
+    selection_syncing.set(false);
 }
 
 fn selected_source_rows(store: &RowStore, selection: &gtk4::MultiSelection) -> std::collections::HashSet<usize> {

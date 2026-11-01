@@ -515,6 +515,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::local_filter::tests::attaching_an_unfiltered_result_restores_the_entire_selection"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_an_unfiltered_result_restores_saved_selection_by_source_row"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::local_filter::tests::local_filter_and_sort_keep_selection_attached_to_the_source_row"
     ],
     [
