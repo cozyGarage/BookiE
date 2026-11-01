@@ -95,7 +95,9 @@ pub enum GridMsg {
     FilterByValue {
         column: String,
         value: bookie_core::Value,
+        exclude: bool,
     },
+    ShowToast(String),
     GoToReference {
         column: String,
         row: Vec<(String, bookie_core::Value)>,

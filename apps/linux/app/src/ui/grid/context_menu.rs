@@ -434,7 +434,16 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
-        options.local_result_view,
+        options.local_result_view.clone(),
+        false,
+    );
+    let exclude_action = filter_by_value_action(
+        context.clone(),
+        sender.clone(),
+        column_view,
+        columns.clone(),
+        options.local_result_view.clone(),
+        true,
     );
     let reference_action = go_to_reference_action(context.clone(), sender.clone(), column_view, columns.clone());
     let show_referencing_action =
@@ -489,6 +498,7 @@ pub(super) fn install_grid_context_menus(
         delete_row_action,
         duplicate_row_action,
         filter_action,
+        exclude_action,
     ]);
     group.add_action(&reference_action);
     group.add_action(&show_referencing_action);
@@ -603,6 +613,7 @@ fn build_menu(
     let display = gio::Menu::new();
     if filterable || local_result {
         display.append(Some(&crate::tr!("Filter by This Value")), Some("cell.filter-by-value"));
+        display.append(Some(&crate::tr!("Exclude This Value")), Some("cell.exclude-value"));
     }
     if filterable {
         display.append(Some(&crate::tr!("Go to Referenced Row")), Some("cell.go-to-reference"));
@@ -700,9 +711,11 @@ fn filter_by_value_action(
     column_view: &gtk::ColumnView,
     columns: Rc<Vec<ColumnInfo>>,
     local_result_view: Option<LocalResultView>,
+    exclude: bool,
 ) -> gio::ActionEntry<gio::SimpleActionGroup> {
     let view = column_view.downgrade();
-    gio::ActionEntry::builder("filter-by-value")
+    let name = if exclude { "exclude-value" } else { "filter-by-value" };
+    gio::ActionEntry::builder(name)
         .activate(move |_, _, _| {
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
@@ -713,7 +726,13 @@ fn filter_by_value_action(
             };
             let Some(value) = value else { return };
             if let Some(local_result_view) = &local_result_view {
-                local_result_view.filter_by_value(slot.col_index, value);
+                if !local_result_view.filter_by_value(slot.col_index, value, exclude) {
+                    sender
+                        .send(GridMsg::ShowToast(crate::tr!(
+                            "Values of this type can't be used as a filter"
+                        )))
+                        .ok();
+                }
                 return;
             }
             let Some(column) = columns.get(slot.col_index) else {
@@ -723,6 +742,7 @@ fn filter_by_value_action(
                 .send(GridMsg::FilterByValue {
                     column: column.name.clone(),
                     value,
+                    exclude,
                 })
                 .ok();
         })
