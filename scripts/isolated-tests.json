@@ -53,7 +53,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::editor::pinned::tests::an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin"
+      "ui::editor::pinned::tests::a_pinned_spooled_page_reloads_without_retaining_its_payload"
     ],
     [
       "tablepro-app",
@@ -586,6 +586,11 @@
       "tablepro-app",
       "--lib",
       "ui::sidebar_row::tests::a_group_row_shows_a_chevron_that_follows_its_collapse_state"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::lazy_context_menu_tests::a_table_context_menu_is_created_on_demand_and_resolves_row_actions"
     ],
     [
       "tablepro-app",

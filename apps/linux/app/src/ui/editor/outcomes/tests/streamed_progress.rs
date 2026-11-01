@@ -11,10 +11,10 @@ fn streamed_progress_pluralizes_rows_and_pages_independently() {
     ] {
         let page_row_counts = vec![rows / pages.max(1) as usize; pages as usize];
         let page_row_starts = super::super::super::stream_pages::page_row_starts_from_counts(&page_row_counts);
-        let page = cursor_page(&vec![1; rows], false).result;
+        let page = std::sync::Arc::new(cursor_page(&vec![1; rows], false).result);
         let retained_rows = page.rows.len();
         let result = super::super::super::StreamedResult {
-            pages: vec![std::sync::Arc::new(page)],
+            pages: vec![std::sync::Arc::downgrade(&page)],
             page_indices: vec![pages.saturating_sub(1)],
             page_row_counts,
             page_row_starts,
@@ -26,7 +26,10 @@ fn streamed_progress_pluralizes_rows_and_pages_independently() {
             export: None,
             generation: 0,
             spool: None,
-            resident_pages: Default::default(),
+            resident_pages: super::super::super::stream_pages::ResidentPageStore::from_pages([(
+                pages.saturating_sub(1),
+                page,
+            )]),
         };
         let text = super::super::stream_result_view::stream_progress_text(&result);
         assert_eq!(text, expected);

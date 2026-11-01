@@ -84,6 +84,7 @@ impl App {
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let source =
             crate::ui::sidebar_columns::ColumnSource::capture(self.connection_id, self.database.clone(), timeout);
+        let row_construction_started = std::time::Instant::now();
         let mut guard = self.sidebar_factory.guard();
         guard.clear();
         for node in &nodes {
@@ -96,6 +97,11 @@ impl App {
             ));
         }
         drop(guard);
+        tracing::debug!(
+            sidebar_nodes = nodes.len(),
+            row_construction_ms = row_construction_started.elapsed().as_secs_f64() * 1000.0,
+            "sidebar rows constructed"
+        );
         *self.sidebar_nodes.borrow_mut() = nodes;
         refresh_visible(
             &self.sidebar_nodes,
