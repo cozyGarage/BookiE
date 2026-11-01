@@ -913,7 +913,7 @@ fn has_persisted_row_key(row_key: &[Value]) -> bool {
 fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
     (
         POSITION_SLOT.get(widget).unwrap_or(0),
-        ROW_KEY_SLOT.cloned(widget).unwrap_or_default(),
+        ROW_KEY_SLOT.cloned(widget).map_or_else(Vec::new, |key| key.to_vec()),
     )
 }
 fn pending_cell_value(widget: &gtk::Widget) -> Option<Value> {
