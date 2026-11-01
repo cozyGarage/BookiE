@@ -14,7 +14,7 @@ Every database driver is a Rust workspace crate under `crates/drivers/`. Drivers
 Adding an engine requires:
 
 1. A crate under `crates/drivers/<engine>/`.
-2. Implementations of the `tablepro-core` driver contracts.
+2. Implementations of the `bookie-core` driver contracts.
 3. Workspace membership and composition-root registration.
 4. Maturity documentation and real-engine tests.
 5. A new application release.
