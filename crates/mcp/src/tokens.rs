@@ -357,17 +357,7 @@ fn hash_token(plaintext: &str) -> String {
 }
 
 fn tokens_path() -> Result<PathBuf, String> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|h| {
-                let mut p = PathBuf::from(h);
-                p.push(".config");
-                p
-            })
-        })
-        .ok_or_else(|| "neither XDG_CONFIG_HOME nor HOME is set".to_string())?;
-    Ok(base.join("bookie").join("mcp-tokens.json"))
+    bookie_storage::config_path("mcp-tokens.json").map_err(|error| error.to_string())
 }
 
 #[cfg(test)]

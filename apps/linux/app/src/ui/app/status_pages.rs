@@ -7,7 +7,7 @@ use super::{App, AppMsg, shortcuts};
 
 const ABOUT_DEVELOPERS: &[&str] = &[
     "BookiE contributors https://github.com/cozyGarage/BookiE",
-    "TablePro Authors (upstream project) https://github.com/TableProApp/TablePro",
+    "TablePro Authors (adopted code) https://github.com/TableProApp/TablePro",
 ];
 
 impl App {
@@ -131,10 +131,10 @@ impl App {
             .website("https://github.com/cozyGarage/BookiE")
             .issue_url("https://github.com/cozyGarage/BookiE/issues")
             .support_url("https://github.com/cozyGarage/BookiE/discussions")
-            .copyright(crate::tr!("© 2025–2026 TablePro Authors"))
+            .copyright(crate::tr!("© 2025–2026 BookiE contributors and TablePro Authors"))
             .license_type(gtk::License::Agpl30)
             .comments(crate::tr!(
-                "A native Linux database client built with GTK4 + libadwaita. Based on the open-source TablePro project."
+                "A native Linux database client built with GTK4 + libadwaita."
             ))
             .build();
         dialog.set_developers(ABOUT_DEVELOPERS);
@@ -170,10 +170,10 @@ mod tests {
     use super::ABOUT_DEVELOPERS;
 
     #[test]
-    fn about_credits_distinguish_bookie_contributors_from_the_upstream_authors() {
+    fn about_credits_distinguish_bookie_contributors_from_the_adopted_code_authors() {
         assert!(ABOUT_DEVELOPERS[0].starts_with("BookiE contributors "));
         assert!(ABOUT_DEVELOPERS[0].contains("github.com/cozyGarage/BookiE"));
-        assert!(ABOUT_DEVELOPERS[1].starts_with("TablePro Authors (upstream project) "));
+        assert!(ABOUT_DEVELOPERS[1].starts_with("TablePro Authors (adopted code) "));
         assert!(ABOUT_DEVELOPERS[1].contains("github.com/TableProApp/TablePro"));
     }
 }

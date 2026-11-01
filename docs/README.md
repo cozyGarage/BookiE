@@ -11,7 +11,7 @@ Rules for contributors are in [AGENTS.md](../AGENTS.md). Accepted ADRs define ar
 | Testing | [Validation playbook](validation-playbook.md), [testing](testing.md), [GTK testing](testing-gtk.md), [CI testing](testing-ci.md), [test design rules](test-design-rules.md), [manual verification](manual-verification-0.2-features.md) |
 | Current work | [Work selection](backlog.md), [Project #3](https://github.com/users/cozyGarage/projects/3), [issue ledger](known-issues.md), [known limitations](known-limitations.md), [changelog](../CHANGELOG.md) |
 | Product and security | [PRODUCT.md](../PRODUCT.md), [personas](personas.md), [PRINCIPLES.md](../PRINCIPLES.md), [SECURITY.md](../SECURITY.md), [capability specs](../specs/README.md) |
-| Decisions and history | [ADRs](decisions/README.md), [adopted-code attribution](upstream-sync.md), [release history](../CHANGELOG.md) |
+| Decisions and history | [ADRs](decisions/README.md), [adopted-code attribution](adopted-code-attribution.md), [release history](../CHANGELOG.md) |
 
 ## Where each fact belongs
 
