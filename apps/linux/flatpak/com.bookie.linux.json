@@ -50,8 +50,6 @@
                 "install -Dm755 target/release/bookie-app /app/bin/bookie",
                 "install -Dm755 target/release/bookie-agentd /app/bin/bookie-agentd",
                 "install -Dm755 target/release/bookie-askpass /app/bin/bookie-askpass",
-                "ln -s bookie-agentd /app/bin/bookie-agentd",
-                "ln -s bookie /app/bin/bookie",
                 "install -Dm644 apps/linux/data/com.bookie.linux.gschema.xml /app/share/glib-2.0/schemas/com.bookie.linux.gschema.xml",
                 "glib-compile-schemas /app/share/glib-2.0/schemas",
                 "install -Dm644 apps/linux/flatpak/com.bookie.linux.desktop /app/share/applications/com.bookie.linux.desktop",
