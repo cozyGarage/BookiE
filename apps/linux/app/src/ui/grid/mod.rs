@@ -27,7 +27,7 @@ pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_null};
 
 use gtk4::prelude::*;
 
-use tablepro_core::{ColumnInfo, QueryResult};
+use bookie_core::{ColumnInfo, QueryResult};
 
 use crate::services::database_service::DatabaseService;
 use crate::ui::row_store::RowStore;
@@ -58,35 +58,35 @@ pub enum GridMsg {
         /// Primary-key values read when the editor opened. The receiver
         /// rejects the edit if the row now at `row_position` is a
         /// different one.
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
     },
     CellEditedValue {
         row_position: u32,
         col_index: usize,
-        value: tablepro_core::Value,
-        row_key: Vec<tablepro_core::Value>,
+        value: bookie_core::Value,
+        row_key: Vec<bookie_core::Value>,
     },
     CopyToClipboard(String),
     FetchCellValue {
         col_index: usize,
         column_name: String,
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
         edit_row_position: Option<u32>,
     },
     IncompleteRowData,
     ProjectionFailure,
-    CopyRowAsStatement(u32, tablepro_core::sql_literal::RowStatement),
+    CopyRowAsStatement(u32, bookie_core::sql_literal::RowStatement),
     ShowRowAsJson(String),
     ExportResults(std::sync::Arc<QueryResult>),
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
     SetCellNull {
         row_position: u32,
         col_index: usize,
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
     },
     DeleteRowAt {
         row_position: u32,
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
     },
     InsertRow,
     DuplicateRow {
@@ -94,16 +94,16 @@ pub enum GridMsg {
     },
     FilterByValue {
         column: String,
-        value: tablepro_core::Value,
+        value: bookie_core::Value,
         exclude: bool,
     },
     ShowToast(String),
     GoToReference {
         column: String,
-        row: Vec<(String, tablepro_core::Value)>,
+        row: Vec<(String, bookie_core::Value)>,
     },
     ShowReferencingRows {
-        row: Vec<(String, tablepro_core::Value)>,
+        row: Vec<(String, bookie_core::Value)>,
     },
 }
 
@@ -393,17 +393,17 @@ mod local_sort_tests {
             columns,
             rows: vec![
                 vec![
-                    tablepro_core::Value::Int(1),
-                    tablepro_core::Value::Null,
-                    tablepro_core::Value::Int(3),
-                    tablepro_core::Value::Int(4),
-                    tablepro_core::Value::Int(5),
+                    bookie_core::Value::Int(1),
+                    bookie_core::Value::Null,
+                    bookie_core::Value::Int(3),
+                    bookie_core::Value::Int(4),
+                    bookie_core::Value::Int(5),
                 ],
                 vec![
-                    tablepro_core::Value::Null,
-                    tablepro_core::Value::Null,
-                    tablepro_core::Value::Text("3".into()),
-                    tablepro_core::Value::Undecodable("unknown".into()),
+                    bookie_core::Value::Null,
+                    bookie_core::Value::Null,
+                    bookie_core::Value::Text("3".into()),
+                    bookie_core::Value::Undecodable("unknown".into()),
                 ],
             ],
             truncated: false,
@@ -430,7 +430,7 @@ mod local_sort_tests {
     fn local_sort_keeps_selection_attached_to_its_source_row() {
         gtk4::init().unwrap();
         let result = std::sync::Arc::new(QueryResult {
-            columns: vec![tablepro_core::ColumnInfo {
+            columns: vec![bookie_core::ColumnInfo {
                 name: "value".into(),
                 data_type: "INTEGER".into(),
                 nullable: false,
@@ -444,9 +444,9 @@ mod local_sort_tests {
                 domain_type: None,
             }],
             rows: vec![
-                vec![tablepro_core::Value::Int(3)],
-                vec![tablepro_core::Value::Int(1)],
-                vec![tablepro_core::Value::Int(2)],
+                vec![bookie_core::Value::Int(3)],
+                vec![bookie_core::Value::Int(1)],
+                vec![bookie_core::Value::Int(2)],
             ],
             truncated: false,
         });
@@ -463,7 +463,7 @@ mod local_sort_tests {
         assert_eq!(store.source_index_at(positions.nth(1)), Some(0));
         assert_eq!(
             store.source_value_at(positions.nth(1), 0),
-            Some(tablepro_core::Value::Int(3))
+            Some(bookie_core::Value::Int(3))
         );
     }
 
@@ -473,10 +473,10 @@ mod local_sort_tests {
         gtk4::init().unwrap();
         let rows = (0..2000_i64)
             .rev()
-            .map(|value| vec![tablepro_core::Value::Int(value)])
+            .map(|value| vec![bookie_core::Value::Int(value)])
             .collect();
         let result = std::sync::Arc::new(QueryResult {
-            columns: vec![tablepro_core::ColumnInfo {
+            columns: vec![bookie_core::ColumnInfo {
                 name: "value".into(),
                 data_type: "INTEGER".into(),
                 nullable: false,

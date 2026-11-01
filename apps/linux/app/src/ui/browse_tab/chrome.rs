@@ -1,6 +1,6 @@
 use relm4::{ComponentSender, adw, gtk};
 
-use tablepro_core::{ColumnInfo, QueryResult};
+use bookie_core::{ColumnInfo, QueryResult};
 
 use crate::ui::count_format::format_thousands;
 
@@ -360,7 +360,7 @@ impl BrowseTab {
     /// the badge and falls back to the generic shortcut hint. Called
     /// from FilterApplied + once on init so a restored filter shows
     /// immediately.
-    pub(super) fn apply_filter(&mut self, set: tablepro_core::FilterSet, sender: &ComponentSender<Self>) {
+    pub(super) fn apply_filter(&mut self, set: bookie_core::FilterSet, sender: &ComponentSender<Self>) {
         // No change to the rule list → don't churn the disk
         // or refetch. Re-fetch on identical filter would just
         // duplicate the F5 path, which the user can take
@@ -390,11 +390,11 @@ impl BrowseTab {
     pub(super) fn filter_by_value(
         &self,
         column: &str,
-        value: &tablepro_core::Value,
+        value: &bookie_core::Value,
         exclude: bool,
         sender: &ComponentSender<Self>,
     ) {
-        match tablepro_core::cell_filter_rule(column, value, exclude) {
+        match bookie_core::cell_filter_rule(column, value, exclude) {
             Some(rule) => sender.input(BrowseTabInput::FilterApplied(self.current_filter.narrowed_to(rule))),
             None => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
@@ -550,7 +550,7 @@ pub(super) fn extract_keyset_cursor(
     columns: &[ColumnInfo],
     result: &QueryResult,
     projected_columns: Option<&[usize]>,
-) -> Option<Vec<tablepro_core::Value>> {
+) -> Option<Vec<bookie_core::Value>> {
     extract_keyset_boundary(columns, result.rows.last()?, projected_columns)
 }
 
@@ -558,15 +558,15 @@ pub(super) fn extract_first_keyset_cursor(
     columns: &[ColumnInfo],
     result: &QueryResult,
     projected_columns: Option<&[usize]>,
-) -> Option<Vec<tablepro_core::Value>> {
+) -> Option<Vec<bookie_core::Value>> {
     extract_keyset_boundary(columns, result.rows.first()?, projected_columns)
 }
 
 fn extract_keyset_boundary(
     columns: &[ColumnInfo],
-    row: &[tablepro_core::Value],
+    row: &[bookie_core::Value],
     projected_columns: Option<&[usize]>,
-) -> Option<Vec<tablepro_core::Value>> {
+) -> Option<Vec<bookie_core::Value>> {
     let pk_indexes: Vec<usize> = columns
         .iter()
         .enumerate()
@@ -633,7 +633,7 @@ pub(super) fn bind_inspector(
 #[cfg(test)]
 mod tests {
     use super::{extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary};
-    use tablepro_core::{ColumnInfo, QueryResult, Value};
+    use bookie_core::{ColumnInfo, QueryResult, Value};
 
     #[test]
     fn projected_keyset_cursor_maps_primary_keys_to_result_positions() {

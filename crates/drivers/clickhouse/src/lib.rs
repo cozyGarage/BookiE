@@ -18,7 +18,7 @@ use serde::Deserialize;
 use tls::https_connector;
 use value_literal::literal;
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
     IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text,
     looks_like_tls_failure, run_server_cancellable, sql_dialect::quote_ident,
@@ -86,7 +86,7 @@ impl DatabaseDriver for ClickhouseDriver {
             HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls, opts.service_address().0)?);
         let mut client = clickhouse::Client::with_http_client(http)
             .with_url(url)
-            .with_product_info("tablepro-linux", env!("CARGO_PKG_VERSION"));
+            .with_product_info("bookie-linux", env!("CARGO_PKG_VERSION"));
         if !opts.username.is_empty() {
             client = client.with_user(opts.username);
         }

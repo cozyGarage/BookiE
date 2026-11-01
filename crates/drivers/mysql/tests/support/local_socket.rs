@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use drivers_mysql::MysqlDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver};
 use testcontainers::ImageExt;
 use testcontainers::core::Mount;
 use testcontainers_modules::mysql::Mysql;
@@ -16,14 +16,14 @@ async fn mysql_accepts_a_query_through_a_local_socket_file() {
     std::fs::set_permissions(socket_directory.path(), std::fs::Permissions::from_mode(0o777))
         .expect("make socket directory accessible to the container");
     let image = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_mount(Mount::bind_mount(
             socket_directory.path().to_string_lossy().to_string(),
             "/var/run/mysqld",
         ));
-    let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
-        Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
+    let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
         Err(_) => image,
     };
     let container = image
@@ -35,7 +35,7 @@ async fn mysql_accepts_a_query_through_a_local_socket_file() {
         local_socket_path: Some(socket_directory.path().join("mysqld.sock")),
         database: "mysql".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
         ..Default::default()
     };
 

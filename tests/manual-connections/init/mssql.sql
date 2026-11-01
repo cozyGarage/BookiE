@@ -1,16 +1,16 @@
-IF DB_ID(N'tablepro_lab') IS NULL CREATE DATABASE tablepro_lab;
+IF DB_ID(N'bookie_lab') IS NULL CREATE DATABASE bookie_lab;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'tablepro_rw')
-    CREATE LOGIN tablepro_rw WITH PASSWORD = 'TableProRw!123';
-IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'tablepro_ro')
-    CREATE LOGIN tablepro_ro WITH PASSWORD = 'TableProRo!123';
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'bookie_rw')
+    CREATE LOGIN bookie_rw WITH PASSWORD = 'BookiERw!123';
+IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'bookie_ro')
+    CREATE LOGIN bookie_ro WITH PASSWORD = 'BookiERo!123';
 GO
-USE tablepro_lab;
+USE bookie_lab;
 GO
-IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'tablepro_rw')
-    CREATE USER tablepro_rw FOR LOGIN tablepro_rw;
-IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'tablepro_ro')
-    CREATE USER tablepro_ro FOR LOGIN tablepro_ro;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'bookie_rw')
+    CREATE USER bookie_rw FOR LOGIN bookie_rw;
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'bookie_ro')
+    CREATE USER bookie_ro FOR LOGIN bookie_ro;
 IF OBJECT_ID(N'dbo.people', N'U') IS NULL
 BEGIN
     CREATE TABLE people (
@@ -24,6 +24,6 @@ BEGIN
         (1, 'Ada Lovelace', 'ada@example.test', 1),
         (2, 'Grace Hopper', 'grace@example.test', 0);
 END;
-GRANT SELECT, INSERT, UPDATE, DELETE TO tablepro_rw;
-GRANT SELECT TO tablepro_ro;
+GRANT SELECT, INSERT, UPDATE, DELETE TO bookie_rw;
+GRANT SELECT TO bookie_ro;
 GO

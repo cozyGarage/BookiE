@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-if [[ "${TABLEPRO_GTK_MYSQL_DBUS_ACTIVE:-0}" != "1" ]]; then
-  runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk-mysql.XXXXXX")"
+if [[ "${BOOKIE_GTK_MYSQL_DBUS_ACTIVE:-0}" != "1" ]]; then
+  runtime="$(mktemp -d "${TMPDIR:-/tmp}/bookie-gtk-mysql.XXXXXX")"
   mkdir -p "$runtime"/{home,config,data,cache,state,runtime}
   chmod 0700 "$runtime/runtime"
   cleanup_runtime() {
@@ -20,7 +20,7 @@ if [[ "${TABLEPRO_GTK_MYSQL_DBUS_ACTIVE:-0}" != "1" ]]; then
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
   ATSPI_DBUS_IMPLEMENTATION=dbus-daemon \
-  TABLEPRO_GTK_MYSQL_DBUS_ACTIVE=1 \
+  BOOKIE_GTK_MYSQL_DBUS_ACTIVE=1 \
     CARGO_HOME="$cargo_home" \
     RUSTUP_HOME="$rustup_home" \
     HOME="$runtime/home" \
@@ -40,9 +40,9 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   fi
 done
 
-container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::3306 \
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::3306 \
   --tmpfs /var/lib/mysql \
-  --env MYSQL_ROOT_PASSWORD=tablepro_test \
+  --env MYSQL_ROOT_PASSWORD=bookie_test \
   --env MYSQL_ROOT_HOST=% \
   --env MYSQL_DATABASE=bookie_test \
   mysql:8.0 --default-authentication-plugin=mysql_native_password)"
@@ -54,7 +54,7 @@ trap cleanup EXIT
 published="$(docker port "$container" 3306/tcp)"
 port="${published##*:}"
 attempt=0
-until docker exec "$container" mysql --user=root --password=tablepro_test --batch --skip-column-names \
+until docker exec "$container" mysql --user=root --password=bookie_test --batch --skip-column-names \
   --execute='SELECT 1' >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if (( attempt >= 180 )); then
@@ -65,15 +65,15 @@ until docker exec "$container" mysql --user=root --password=tablepro_test --batc
   sleep 1
 done
 
-eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
-printf 'tablepro_test' | secret-tool store --label='BookiE GTK MySQL fixture' \
-  xdg:schema com.tablepro.linux.Password \
+eval "$(printf 'bookie-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+printf 'bookie_test' | secret-tool store --label='BookiE GTK MySQL fixture' \
+  xdg:schema com.bookie.linux.Password \
   connection-id c38e2d93-4314-4c18-b192-08f164386e09 \
   kind db_password
-TABLEPRO_GTK_KEYRING_READY=1 \
-  TABLEPRO_GTK_DBUS_ACTIVE=1 \
-  TABLEPRO_GTK_SCENARIO=mysql_unparseable_routine_dialog_denial_preserves_database \
-  TABLEPRO_GTK_MYSQL_CONTAINER="$container" \
-  TABLEPRO_GTK_MYSQL_HOST=127.0.0.1 \
-  TABLEPRO_GTK_MYSQL_PORT="$port" \
+BOOKIE_GTK_KEYRING_READY=1 \
+  BOOKIE_GTK_DBUS_ACTIVE=1 \
+  BOOKIE_GTK_SCENARIO=mysql_unparseable_routine_dialog_denial_preserves_database \
+  BOOKIE_GTK_MYSQL_CONTAINER="$container" \
+  BOOKIE_GTK_MYSQL_HOST=127.0.0.1 \
+  BOOKIE_GTK_MYSQL_PORT="$port" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

@@ -1,12 +1,12 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use tablepro_ssh::openssh::{
+use bookie_ssh::openssh::{
     ForwardRoute, ForwardTarget, LocalEndpoint, OpenSshAuth, OpenSshConfig, OpenSshContext, OpenSshForward,
     OpenSshSession, Prompter, SshDestination,
 };
-use tablepro_ssh::{SshAuth, SshConfig, SshTunnel, UnknownHostKey};
-use tablepro_storage::SavedSshConfig;
+use bookie_ssh::{SshAuth, SshConfig, SshTunnel, UnknownHostKey};
+use bookie_storage::SavedSshConfig;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -148,8 +148,8 @@ pub(crate) async fn open_openssh(
     session.forward(target, route).await.map_err(map_openssh_error)
 }
 
-fn map_openssh_error(error: tablepro_ssh::openssh::OpenSshError) -> TransportError {
-    use tablepro_ssh::openssh::OpenSshError;
+fn map_openssh_error(error: bookie_ssh::openssh::OpenSshError) -> TransportError {
+    use bookie_ssh::openssh::OpenSshError;
 
     match error {
         error @ OpenSshError::HostKeyUnknown { .. } => TransportError::HostKeyRefused(error.to_string()),
@@ -161,18 +161,18 @@ fn map_openssh_error(error: tablepro_ssh::openssh::OpenSshError) -> TransportErr
     }
 }
 
-const ASKPASS_PROGRAM: &str = "tablepro-askpass";
+const ASKPASS_PROGRAM: &str = "bookie-askpass";
 
 pub async fn system_openssh(prompter: Arc<dyn Prompter>) -> Result<OpenSshEnvironment, TransportError> {
-    let ssh = |error: tablepro_ssh::openssh::OpenSshError| TransportError::Ssh(error.to_string());
+    let ssh = |error: bookie_ssh::openssh::OpenSshError| TransportError::Ssh(error.to_string());
     let ssh_program = find_in_path("ssh", std::env::var_os("PATH").as_deref())
         .ok_or_else(|| TransportError::Ssh("the ssh program was not found on PATH".into()))?;
     let askpass_program = beside_current_exe(ASKPASS_PROGRAM)
         .or_else(|| find_in_path(ASKPASS_PROGRAM, std::env::var_os("PATH").as_deref()))
         .ok_or_else(|| TransportError::Ssh(format!("the {ASKPASS_PROGRAM} helper is not installed")))?;
-    let base = tablepro_ssh::openssh::OpenSshRuntime::default_base().map_err(ssh)?;
-    let runtime = tablepro_ssh::openssh::OpenSshRuntime::acquire(&base).map_err(ssh)?;
-    tablepro_ssh::openssh::sweep_stale_masters(&runtime, &ssh_program).await;
+    let base = bookie_ssh::openssh::OpenSshRuntime::default_base().map_err(ssh)?;
+    let runtime = bookie_ssh::openssh::OpenSshRuntime::acquire(&base).map_err(ssh)?;
+    bookie_ssh::openssh::sweep_stale_masters(&runtime, &ssh_program).await;
     Ok(OpenSshEnvironment {
         context: OpenSshContext {
             runtime,
@@ -259,23 +259,23 @@ exec sleep 300
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
         let base = dir.path().join("run");
         std::fs::create_dir(&base).unwrap();
-        let runtime = tablepro_ssh::openssh::OpenSshRuntime::acquire(&base).unwrap();
-        let context = tablepro_ssh::openssh::OpenSshContext {
+        let runtime = bookie_ssh::openssh::OpenSshRuntime::acquire(&base).unwrap();
+        let context = bookie_ssh::openssh::OpenSshContext {
             runtime: runtime.clone(),
             ssh_program: script,
             askpass_program: dir.path().join("askpass"),
-            timeouts: tablepro_ssh::openssh::OpenSshTimeouts {
+            timeouts: bookie_ssh::openssh::OpenSshTimeouts {
                 handshake: std::time::Duration::from_secs(60),
                 grace: std::time::Duration::from_millis(300),
                 ..Default::default()
             },
         };
         let environment = SshEnvironment {
-            unknown_host_key: tablepro_ssh::UnknownHostKey::Refuse,
+            unknown_host_key: bookie_ssh::UnknownHostKey::Refuse,
             builtin_prompter: None,
             openssh: Some(OpenSshEnvironment {
                 context,
-                prompter: Arc::new(tablepro_ssh::openssh::UnattendedPrompter),
+                prompter: Arc::new(bookie_ssh::openssh::UnattendedPrompter),
             }),
             audit: None,
         };

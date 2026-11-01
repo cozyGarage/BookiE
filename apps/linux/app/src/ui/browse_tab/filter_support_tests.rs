@@ -1,5 +1,5 @@
+use bookie_core::EnumInputStyle;
 use relm4::{Component, ComponentController};
-use tablepro_core::EnumInputStyle;
 use uuid::Uuid;
 
 use super::tests::spin_for;
@@ -31,13 +31,13 @@ fn a_filter_is_ignored_when_the_driver_cannot_filter_a_browse() {
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         })
         .detach();
-    let rule = tablepro_core::equality_rule("Key", &tablepro_core::Value::Text("a".into())).unwrap();
+    let rule = bookie_core::equality_rule("Key", &bookie_core::Value::Text("a".into())).unwrap();
     let context = relm4::gtk::glib::MainContext::default();
 
     controller
         .sender()
         .send(BrowseTabInput::FilterApplied(
-            tablepro_core::FilterSet::default().narrowed_to(rule),
+            bookie_core::FilterSet::default().narrowed_to(rule),
         ))
         .unwrap();
     spin_for(&context, std::time::Duration::from_millis(200));
@@ -51,13 +51,13 @@ fn a_saved_filter_is_not_restored_when_the_driver_cannot_filter_a_browse() {
     relm4::gtk::init().unwrap();
     let connection_id = Uuid::new_v4();
     let store = crate::services::filter_settings::FilterSettingsStore::open().unwrap();
-    let rule = tablepro_core::equality_rule("Key", &tablepro_core::Value::Text("a".into())).unwrap();
+    let rule = bookie_core::equality_rule("Key", &bookie_core::Value::Text("a".into())).unwrap();
     store
         .save(
             connection_id,
             None,
             "db0",
-            tablepro_core::FilterSet::default().narrowed_to(rule),
+            bookie_core::FilterSet::default().narrowed_to(rule),
         )
         .unwrap();
     assert_eq!(store.load(connection_id, None, "db0").len(), 1);

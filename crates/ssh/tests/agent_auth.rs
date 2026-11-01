@@ -4,9 +4,9 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use bookie_ssh::openssh::{AskpassPrompt, PromptAnswer, Prompter};
+use bookie_ssh::{SshAuth, SshConfig, SshError, SshTunnel, UnknownHostKey};
 use secrecy::SecretString;
-use tablepro_ssh::openssh::{AskpassPrompt, PromptAnswer, Prompter};
-use tablepro_ssh::{SshAuth, SshConfig, SshError, SshTunnel, UnknownHostKey};
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
@@ -421,7 +421,7 @@ async fn declining_a_built_in_host_key_does_not_learn_it() {
     assert!(matches!(result, Err(SshError::UnknownHostKey { .. })));
     assert_eq!(prompter.calls.load(Ordering::SeqCst), 1);
     assert!(
-        !tablepro_ssh::default_known_hosts_path().unwrap().exists(),
+        !bookie_ssh::default_known_hosts_path().unwrap().exists(),
         "declining must leave the known_hosts file untouched"
     );
 }
@@ -432,9 +432,9 @@ async fn a_two_hop_chain_reaches_the_final_host() {
     let temp = tempfile::tempdir().unwrap();
     isolate_known_hosts(temp.path());
     let unique = unique_suffix();
-    let network = format!("tablepro-ssh-chain-{unique}");
-    let hop0_name = format!("tablepro-ssh-hop0-{unique}");
-    let hop1_name = format!("tablepro-ssh-hop1-{unique}");
+    let network = format!("bookie-ssh-chain-{unique}");
+    let hop0_name = format!("bookie-ssh-hop0-{unique}");
+    let hop1_name = format!("bookie-ssh-hop1-{unique}");
 
     let (_hop0, hop0_host, hop0_port) = start_first_hop_sshd(&hop0_name, &network).await;
     let hop1 = start_named_password_sshd(&hop1_name, &network).await;
@@ -482,9 +482,9 @@ async fn cancelling_while_trusting_the_second_hop_does_not_learn_its_host_key() 
     let temp = tempfile::tempdir().unwrap();
     isolate_known_hosts(temp.path());
     let unique = unique_suffix();
-    let network = format!("tablepro-ssh-chain-cancel-{unique}");
-    let hop0_name = format!("tablepro-ssh-hop0-cancel-{unique}");
-    let hop1_name = format!("tablepro-ssh-hop1-cancel-{unique}");
+    let network = format!("bookie-ssh-chain-cancel-{unique}");
+    let hop0_name = format!("bookie-ssh-hop0-cancel-{unique}");
+    let hop1_name = format!("bookie-ssh-hop1-cancel-{unique}");
 
     let (_hop0, hop0_host, hop0_port) = start_first_hop_sshd(&hop0_name, &network).await;
     let _hop1 = start_named_password_sshd(&hop1_name, &network).await;
@@ -519,7 +519,7 @@ async fn cancelling_while_trusting_the_second_hop_does_not_learn_its_host_key() 
     cancellation.cancel();
     assert!(!attempt.await.unwrap(), "the cancelled chain must not connect");
 
-    let known_hosts = tablepro_ssh::default_known_hosts_path().unwrap();
+    let known_hosts = bookie_ssh::default_known_hosts_path().unwrap();
     let learned = std::fs::read_to_string(known_hosts).unwrap();
     assert_eq!(
         learned.lines().filter(|line| !line.trim().is_empty()).count(),
@@ -539,9 +539,9 @@ async fn a_changed_key_on_the_second_hop_is_reported_as_a_host_key_mismatch() {
     let temp = tempfile::tempdir().unwrap();
     isolate_known_hosts(temp.path());
     let unique = unique_suffix();
-    let network = format!("tablepro-ssh-chain-mismatch-{unique}");
-    let hop0_name = format!("tablepro-ssh-hop0-mismatch-{unique}");
-    let hop1_name = format!("tablepro-ssh-hop1-mismatch-{unique}");
+    let network = format!("bookie-ssh-chain-mismatch-{unique}");
+    let hop0_name = format!("bookie-ssh-hop0-mismatch-{unique}");
+    let hop1_name = format!("bookie-ssh-hop1-mismatch-{unique}");
 
     let (_hop0, hop0_host, hop0_port) = start_first_hop_sshd(&hop0_name, &network).await;
     let hop1 = start_named_password_sshd(&hop1_name, &network).await;

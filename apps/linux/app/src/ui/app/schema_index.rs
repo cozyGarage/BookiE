@@ -6,8 +6,8 @@ use crate::ui::editor::catalog_reference;
 impl App {
     pub(super) fn set_completion_tables(
         &mut self,
-        tables: &[tablepro_core::TableInfo],
-        views: &[tablepro_core::TableInfo],
+        tables: &[bookie_core::TableInfo],
+        views: &[bookie_core::TableInfo],
     ) {
         let driver = self.current_driver_id.as_deref().unwrap_or("postgres");
         self.table_names = completion_names(driver, tables, views);
@@ -48,11 +48,7 @@ impl App {
     }
 }
 
-fn completion_names(
-    driver: &str,
-    tables: &[tablepro_core::TableInfo],
-    views: &[tablepro_core::TableInfo],
-) -> Vec<String> {
+fn completion_names(driver: &str, tables: &[bookie_core::TableInfo], views: &[bookie_core::TableInfo]) -> Vec<String> {
     let mut seen = std::collections::HashSet::new();
     tables
         .iter()
@@ -64,12 +60,12 @@ fn completion_names(
 
 #[cfg(test)]
 mod tests {
-    use tablepro_app_services::completion_identifiers::split_table_reference;
-    use tablepro_core::sql_syntax::SqlGrammar;
+    use bookie_app_services::completion_identifiers::split_table_reference;
+    use bookie_core::sql_syntax::SqlGrammar;
 
     #[test]
     fn overlapping_view_names_appear_once_in_completion() {
-        let view = tablepro_core::TableInfo {
+        let view = bookie_core::TableInfo {
             schema: Some("db".into()),
             name: "recent".into(),
         };

@@ -266,16 +266,12 @@ async fn a_saved_agent_hop_offers_only_the_chosen_key_when_one_is_named() {
     hop.agent = true;
 
     let any_key = resolve_saved_ssh_hop(id, &hop, 0).await.unwrap();
-    assert!(
-        matches!(any_key.auth, tablepro_ssh::SshAuth::Agent),
-        "{:?}",
-        any_key.auth
-    );
+    assert!(matches!(any_key.auth, bookie_ssh::SshAuth::Agent), "{:?}", any_key.auth);
 
     hop.agent_identity = Some(PathBuf::from("/home/me/.ssh/deploy.pub"));
     let chosen = resolve_saved_ssh_hop(id, &hop, 0).await.unwrap();
     assert!(
-        matches!(&chosen.auth, tablepro_ssh::SshAuth::AgentIdentity { public_key } if public_key == &PathBuf::from("/home/me/.ssh/deploy.pub")),
+        matches!(&chosen.auth, bookie_ssh::SshAuth::AgentIdentity { public_key } if public_key == &PathBuf::from("/home/me/.ssh/deploy.pub")),
         "{:?}",
         chosen.auth
     );

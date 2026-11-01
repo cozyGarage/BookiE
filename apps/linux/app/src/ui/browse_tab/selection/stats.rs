@@ -1,5 +1,5 @@
+use bookie_core::{ColumnInfo, Value};
 use rust_decimal::Decimal;
-use tablepro_core::{ColumnInfo, Value};
 
 #[derive(Debug, PartialEq)]
 pub(in crate::ui::browse_tab) struct ColumnStats {

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use tablepro_core::{CatalogObjectKind, TableInfo};
+use bookie_core::{CatalogObjectKind, TableInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupKind {

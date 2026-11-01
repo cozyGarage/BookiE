@@ -1,9 +1,9 @@
 use super::parse_input_for_grid_cell;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -39,7 +39,7 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
     )
     .unwrap();
     assert_eq!(decimal, Value::Decimal("42.50".parse().unwrap()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "sqlite",
         None,
         "flexible",
@@ -69,7 +69,7 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
         .is_err(),
         "numeric overflow must not be passed to SQLite as text and coerced by affinity"
     );
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "sqlite",
         None,
         "flexible",
@@ -114,7 +114,7 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
                 "the SQLite affinity fallback must not relax {driver} column {name}"
             );
         }
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "sqlite",
             None,
             "flexible",
@@ -167,7 +167,7 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
 
 #[tokio::test]
 async fn sqlite_numeric_affinity_grid_edit_respects_storage_class_constraints() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -198,7 +198,7 @@ async fn sqlite_numeric_affinity_grid_edit_respects_storage_class_constraints() 
     )
     .unwrap();
     assert_eq!(edit, Value::Text("not numeric".into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "sqlite",
         None,
         "constrained",

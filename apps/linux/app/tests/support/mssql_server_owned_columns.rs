@@ -1,4 +1,4 @@
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mssql_server::MssqlServer;
 
@@ -44,19 +44,19 @@ async fn value_contract_mssql_server_owned_columns_use_native_defaults_across_co
         &columns[3],
         &Value::Bytes(vec![0; 8])
     ));
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(
         b"id,note,calculated,version\n900,first,ignored,ignored\n901,second,ignored,ignored\n",
         &options,
         None,
     )
     .unwrap();
     let mapping = vec![Some(0), Some(1), Some(2), Some(3)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "mssql",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "csv_owned",
             columns: &columns,
@@ -106,8 +106,7 @@ async fn value_contract_mssql_server_owned_columns_use_native_defaults_across_co
     );
 
     let copy_sql =
-        tablepro_core::sql_literal::build_insert_literal("mssql", None, "csv_owned", &columns, &result.rows[1])
-            .unwrap();
+        bookie_core::sql_literal::build_insert_literal("mssql", None, "csv_owned", &columns, &result.rows[1]).unwrap();
     assert_eq!(copy_sql, "INSERT INTO [csv_owned] ([note]) VALUES (N'first');");
     connection.execute(&copy_sql).await.unwrap();
 
@@ -121,24 +120,24 @@ async fn value_contract_mssql_server_owned_columns_use_native_defaults_across_co
         .query("SELECT id, note, calculated, version FROM csv_owned ORDER BY id")
         .await
         .unwrap();
-    let export_result = tablepro_core::QueryResult {
+    let export_result = bookie_core::QueryResult {
         columns: columns.clone(),
         rows: source.rows,
         truncated: false,
     };
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("server-owned.sql");
-    let csv = tablepro_core::export::CsvOptions::default();
-    let export = tablepro_core::export::ResultExport {
-        format: tablepro_core::export::ResultFormat::Sql,
+    let csv = bookie_core::export::CsvOptions::default();
+    let export = bookie_core::export::ResultExport {
+        format: bookie_core::export::ResultFormat::Sql,
         csv: &csv,
-        sql: Some(tablepro_core::export::SqlTarget {
+        sql: Some(bookie_core::export::SqlTarget {
             driver_id: "mssql",
             schema: None,
             table: "csv_owned_export",
         }),
     };
-    tablepro_core::export::write_result_file(&path, &export_result, &export, || false, |_| {}).unwrap();
+    bookie_core::export::write_result_file(&path, &export_result, &export, || false, |_| {}).unwrap();
     let sql_file = std::fs::read_to_string(path).unwrap();
     assert_eq!(sql_file.lines().count(), 4);
     assert!(

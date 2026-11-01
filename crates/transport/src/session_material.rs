@@ -3,9 +3,9 @@ use std::io::Read;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
+use bookie_storage::{SavedConnection, SavedSshAuth, load_password};
 use secrecy::{ExposeSecret, SecretString};
 use sha2::{Digest, Sha256};
-use tablepro_storage::{SavedConnection, SavedSshAuth, load_password};
 
 use crate::{TransportError, jump_hop_password_refused, loads_database_password};
 
@@ -101,7 +101,7 @@ fn append_tls_client_identity(hasher: &mut MaterialHasher, saved: &SavedConnecti
             hasher.tag(b"tls_client_key", &read_material_file(key)?);
             Ok(())
         }
-        _ => Err(TransportError::Driver(tablepro_core::DriverError::Unsupported(
+        _ => Err(TransportError::Driver(bookie_core::DriverError::Unsupported(
             "TLS client authentication requires both a certificate and a private key".into(),
         ))),
     }

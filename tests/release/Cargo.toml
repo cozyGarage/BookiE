@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-release-tests"
+name = "bookie-release-tests"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,16 +7,16 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_release_tests"
+name = "bookie_release_tests"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../../crates/core" }
-tablepro-policy = { path = "../../crates/policy" }
-tablepro-ssh = { path = "../../crates/ssh" }
-tablepro-transport = { path = "../../crates/transport" }
-tablepro-driver-postgres = { path = "../../crates/drivers/postgres" }
-tablepro-storage = { path = "../../crates/storage" }
+bookie-core = { path = "../../crates/core" }
+bookie-policy = { path = "../../crates/policy" }
+bookie-ssh = { path = "../../crates/ssh" }
+bookie-transport = { path = "../../crates/transport" }
+bookie-driver-postgres = { path = "../../crates/drivers/postgres" }
+bookie-storage = { path = "../../crates/storage" }
 tempfile.workspace = true
 secrecy.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "io-util"] }
@@ -24,7 +24,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
-tablepro-mcp = { path = "../../crates/mcp" }
+bookie-mcp = { path = "../../crates/mcp" }
 async-trait.workspace = true
 serde_json.workspace = true
 

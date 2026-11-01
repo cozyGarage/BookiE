@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 pub fn corpus() -> serde_json::Value {
     serde_json::from_str(include_str!("../../../../tests/data/value-contract.json")).unwrap()

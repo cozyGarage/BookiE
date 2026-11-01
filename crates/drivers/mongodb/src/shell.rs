@@ -1,7 +1,7 @@
 use mongodb::bson::Document;
 
 use super::codec::serde_json_to_document;
-use tablepro_core::MAX_QUERY_ROWS;
+use bookie_core::MAX_QUERY_ROWS;
 
 pub(super) struct FindQuery {
     pub(super) collection: String,
@@ -89,7 +89,7 @@ pub(super) fn parse_delete_many(input: &str) -> Option<(String, Document)> {
 }
 
 /// The Structure tab's "Drop table" action builds engine-neutral SQL
-/// through `tablepro_core::sql_ddl::build_drop_table`, which has no
+/// through `bookie_core::sql_ddl::build_drop_table`, which has no
 /// MongoDB-specific case -- it emits `DROP TABLE IF EXISTS "name"`
 /// with the same quoting every other driver gets. Recognize that shape
 /// here and translate it into a native collection drop instead of

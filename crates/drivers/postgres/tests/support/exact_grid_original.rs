@@ -1,4 +1,4 @@
-use tablepro_core::{DatabaseDriver, Value};
+use bookie_core::{DatabaseDriver, Value};
 #[path = "../../../shared/tests/exact_grid_original.rs"]
 mod contract;
 
@@ -78,7 +78,7 @@ async fn exact_grid_original_detects_concurrent_text_changes() {
     connection.execute("DROP TABLE exact_grid").await.unwrap();
 }
 
-async fn assert_empty_text_is_distinct_from_null(connection: &dyn tablepro_core::Connection) {
+async fn assert_empty_text_is_distinct_from_null(connection: &dyn bookie_core::Connection) {
     connection
         .execute("CREATE TABLE exact_grid (id INT PRIMARY KEY, v text)")
         .await
@@ -87,9 +87,9 @@ async fn assert_empty_text_is_distinct_from_null(connection: &dyn tablepro_core:
     connection.execute("DROP TABLE exact_grid").await.unwrap();
 }
 
-async fn assert_shadowed_c_collation_is_exact(connection: &dyn tablepro_core::Connection) {
-    use tablepro_app_services::change_tracker::{RowKey, TabChangeTracker};
-    use tablepro_core::DriverError;
+async fn assert_shadowed_c_collation_is_exact(connection: &dyn bookie_core::Connection) {
+    use bookie_app_services::change_tracker::{RowKey, TabChangeTracker};
+    use bookie_core::DriverError;
 
     connection.execute("CREATE SCHEMA shadow").await.unwrap();
     connection

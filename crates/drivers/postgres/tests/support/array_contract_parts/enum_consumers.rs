@@ -24,7 +24,7 @@ async fn value_contract_jsonb_array_elements_read_as_the_server_text() {
     assert_eq!(result.rows[0][1], Value::Text("jsonb[]".into()));
     assert_eq!(result.rows[0][2], Value::Text("[{\"a\": 1},null]".into()));
     assert_eq!(result.rows[0][3], Value::Bool(true));
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_ok());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", value).is_ok());
 }
 
 #[tokio::test]
@@ -53,7 +53,7 @@ async fn value_contract_json_text_array_elements_read_as_the_server_text() {
     assert_eq!(result.rows[0][1], Value::Text("json[]".into()));
     assert_eq!(result.rows[0][2], Value::Text("[{\"a\": 1},null]".into()));
     assert_eq!(result.rows[0][3], Value::Bool(true));
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_ok());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", value).is_ok());
 }
 
 #[tokio::test]
@@ -157,15 +157,15 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
         serde_json::json!([" leading", "trailing ", " both ", "NULL", "", null])
     );
 
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let mapping = [Some(0), Some(1)];
-    let imported = tablepro_core::import::row_to_values(&sheet.rows[0], &mapping, &source.columns, &options, 2).unwrap();
+    let imported = bookie_core::import::row_to_values(&sheet.rows[0], &mapping, &source.columns, &options, 2).unwrap();
     assert_eq!(imported, source.rows[0]);
 
     let rebound = connection
@@ -185,11 +185,11 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
         .fetch_columns(None, "value_contract_whitespace_target")
         .await
         .unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "value_contract_whitespace_target",
             columns: &columns,
@@ -241,7 +241,7 @@ async fn value_contract_custom_enum_array_accepts_maximum_utf8_label_length() {
     assert!(
         matches!(
             rejected,
-            Err(tablepro_core::DriverError::Query {
+            Err(bookie_core::DriverError::Query {
                 sqlstate: Some(ref code),
                 ..
             }) if code == "42602"
@@ -479,7 +479,7 @@ async fn value_contract_enum_range_uses_qualified_type_under_shadowed_search_pat
         .await
         .unwrap_err();
     assert!(
-        matches!(&error, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&error, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {error:?}"
     );
 }
@@ -761,7 +761,7 @@ async fn value_contract_enum_first_and_last_use_qualified_type_under_shadowed_se
         .await
         .expect_err("a shadow-only label must not be accepted as the target enum");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
     );
 }
@@ -1060,7 +1060,7 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
     let labels_index = columns.iter().position(|column| column.name == "labels").unwrap();
     assert_eq!(
         columns[labels_index].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "enum_array_grid".into(),
             name: "label".into(),
         })
@@ -1073,7 +1073,7 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         .rows[0][0]
         .clone();
     let edited = r#"{"NULL","",東京,"a,b",NULL}"#;
-    let update = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let update = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",
@@ -1110,7 +1110,7 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         .unwrap();
     assert_eq!(saved.rows, native.rows);
 
-    let invalid = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let invalid = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",
@@ -1134,7 +1134,7 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         .unwrap();
     assert_eq!(unchanged.rows, native.rows);
 
-    let null_update = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let null_update = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",
@@ -1163,7 +1163,7 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         ]]
     );
 
-    let empty_update = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let empty_update = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",

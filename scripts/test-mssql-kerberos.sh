@@ -70,7 +70,7 @@ rm -f "$FIXTURE/materials/mssql-spn.keytab" "$FIXTURE/materials/mssql-account.ke
 chmod 0600 "$FIXTURE/materials/mssql.keytab"
 
 "${COMPOSE[@]}" up -d --wait mssql
-cargo test --locked --features mssql-kerberos -p tablepro-driver-tls-tests \
+cargo test --locked --features mssql-kerberos -p bookie-driver-tls-tests \
   --test mssql_kerberos --no-run
 test_binary="$(find "$BOOKIE_TEST_DEPS" -maxdepth 1 -type f -executable -name 'mssql_kerberos-*' -print -quit)"
 if [[ -z "$test_binary" ]]; then

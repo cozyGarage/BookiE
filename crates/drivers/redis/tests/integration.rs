@@ -119,8 +119,8 @@ async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
     server.abort();
 }
 
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use drivers_redis::RedisDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers_modules::redis::Redis;
@@ -607,7 +607,7 @@ async fn value_contract_redis_stream_commands_are_refused_without_consuming_the_
             .await
             .expect_err("streaming commands must not return a misleading one-shot result");
         assert!(
-            matches!(error, tablepro_core::DriverError::Unsupported(_)),
+            matches!(error, bookie_core::DriverError::Unsupported(_)),
             "{command} should have a visible unsupported result, got {error:?}"
         );
         assert!(

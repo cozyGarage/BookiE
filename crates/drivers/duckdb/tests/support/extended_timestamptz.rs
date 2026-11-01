@@ -1,4 +1,4 @@
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn value_contract_extended_timestamptz_matches_duckdb_text_and_epoch() {
@@ -43,7 +43,7 @@ async fn value_contract_extended_timestamptz_matches_duckdb_text_and_epoch() {
             .rows,
         vec![vec![Value::Bool(true)]]
     );
-    let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &result.rows[0][0]).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("duckdb", &result.rows[0][0]).unwrap();
     assert_eq!(
         connection
             .query(&format!(
@@ -60,22 +60,22 @@ async fn value_contract_extended_timestamptz_matches_duckdb_text_and_epoch() {
         .execute("CREATE TABLE extended_timestamptz_import (id INTEGER, moment TIMESTAMPTZ)")
         .await
         .unwrap();
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection
         .fetch_columns(None, "extended_timestamptz_import")
         .await
         .unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "duckdb",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "extended_timestamptz_import",
             columns: &columns,

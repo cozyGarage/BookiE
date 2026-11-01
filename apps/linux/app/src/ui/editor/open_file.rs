@@ -1,8 +1,8 @@
+use bookie_app_services::sql_text::{EDITOR_MAX_SQL_LINE_BYTES, SqlTextError, SqlTextLimits};
+use bookie_core::text_file::{FileVersion, TextFile, TextFileError, read_text_file, save_text_file};
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 use std::io::{BufRead, BufReader, Read};
-use tablepro_app_services::sql_text::{EDITOR_MAX_SQL_LINE_BYTES, SqlTextError, SqlTextLimits};
-use tablepro_core::text_file::{FileVersion, TextFile, TextFileError, read_text_file, save_text_file};
 
 use super::MAX_SQL_FILE_BYTES;
 

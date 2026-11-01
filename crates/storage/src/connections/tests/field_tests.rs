@@ -5,7 +5,7 @@ async fn clearing_an_optional_field_is_not_undone_by_field_preservation() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("connections.json");
     let mut connection = sample_connection();
-    connection.tls_root_cert = Some(PathBuf::from("/etc/tablepro/corp-ca.crt"));
+    connection.tls_root_cert = Some(PathBuf::from("/etc/bookie/corp-ca.crt"));
     save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
 
     connection.tls_root_cert = None;
@@ -47,7 +47,7 @@ async fn the_known_field_list_covers_every_serialized_key() {
     connection.connect_timeout_secs = Some(5);
     connection.query_timeout_secs = Some(30);
     connection.auth_source = Some("admin".into());
-    connection.attached_databases = vec![tablepro_core::AttachedDatabase::new("aux", "/tmp/aux.db")];
+    connection.attached_databases = vec![bookie_core::AttachedDatabase::new("aux", "/tmp/aux.db")];
     connection.ssh = Some(SavedSshConfig {
         hop_id: Uuid::new_v4(),
         credential_revision: 0,

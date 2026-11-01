@@ -1,5 +1,5 @@
+use bookie_transport::TransportError;
 use std::time::Duration;
-use tablepro_transport::TransportError;
 
 pub const BACKOFF_INITIAL: Duration = Duration::from_secs(5);
 const BACKOFF_MAX: Duration = Duration::from_secs(60);
@@ -9,7 +9,7 @@ pub fn was_cancelled(token: Option<&tokio_util::sync::CancellationToken>) -> boo
 }
 
 pub fn is_permanent_failure(error: &TransportError) -> bool {
-    use tablepro_core::DriverError;
+    use bookie_core::DriverError;
     match error {
         TransportError::Driver(driver) => {
             matches!(
@@ -56,8 +56,8 @@ mod failure_tests {
         assert!(was_cancelled(Some(&token)));
     }
 
-    use tablepro_core::DriverError;
-    use tablepro_storage::KeyringFailure;
+    use bookie_core::DriverError;
+    use bookie_storage::KeyringFailure;
 
     #[test]
     fn wrong_credentials_tls_and_configuration_are_permanent() {

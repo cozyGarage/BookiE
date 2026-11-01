@@ -1,4 +1,4 @@
-use tablepro_app_services::{completion, completion_identifiers, completion_proposals};
+use bookie_app_services::{completion, completion_identifiers, completion_proposals};
 mod bottom_panel;
 mod completion_provider;
 mod completion_requests;
@@ -18,8 +18,8 @@ pub(crate) mod query_changes;
 mod run_lifecycle;
 mod session_age;
 mod session_lexing;
+use bookie_core::sql_format as format_plan;
 use run_lifecycle::{clear_results_box, dim_previous_results};
-use tablepro_core::sql_format as format_plan;
 mod outcomes;
 mod pinned;
 mod run_generation;
@@ -46,10 +46,10 @@ use sourceview5::prelude::*;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
+use bookie_core::QueryResult;
+use bookie_storage::query_history::{HistoryStore, NewEntry, Outcome};
 use stream_pages::{StreamTerminal, StreamedResult};
 use streaming::ActiveStream;
-use tablepro_core::QueryResult;
-use tablepro_storage::query_history::{HistoryStore, NewEntry, Outcome};
 
 use crate::services::database_service::ConnectionMetadata;
 use crate::ui::grid::GridMsg;
@@ -172,17 +172,17 @@ pub enum SqlEditorInput {
         sql: String,
         anchor: Option<SourceAnchor>,
         planned: PlannedStatements,
-        values: std::collections::HashMap<String, tablepro_core::Value>,
+        values: std::collections::HashMap<String, bookie_core::Value>,
     },
     LexingRead {
         source: session_lexing::LexingSource,
         sql: String,
         anchor: Option<SourceAnchor>,
-        result: Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, String>,
+        result: Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, String>,
     },
     LexingRefreshed {
         source: session_lexing::LexingSource,
-        settings: Option<tablepro_core::sql_syntax::script::LexicalSettings>,
+        settings: Option<bookie_core::sql_syntax::script::LexicalSettings>,
     },
     Cancel,
     TogglePin,
@@ -246,7 +246,7 @@ pub enum SqlEditorInput {
     },
     SessionCommitFinished {
         session_id: Uuid,
-        result: Result<tablepro_core::SessionCommitOutcome, String>,
+        result: Result<bookie_core::SessionCommitOutcome, String>,
     },
     SessionRollbackFinished {
         session_id: Uuid,
@@ -271,13 +271,13 @@ pub enum SqlEditorOutput {
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
 }
 
-pub(super) const MAX_SQL_FILE_BYTES: u64 = tablepro_app_services::sql_text::EDITOR_MAX_SQL_BYTES;
+pub(super) const MAX_SQL_FILE_BYTES: u64 = bookie_app_services::sql_text::EDITOR_MAX_SQL_BYTES;
 
 #[derive(Debug)]
 struct ExecutionContext {
     sql: String,
     source: Option<ExecutionSource>,
-    lexical: Option<tablepro_core::sql_syntax::script::LexicalSettings>,
+    lexical: Option<bookie_core::sql_syntax::script::LexicalSettings>,
     metadata: ConnectionMetadata,
     started_at: SystemTime,
     timeout_secs: u32,
@@ -796,7 +796,7 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::ToggleFold => {
                 let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
                 let grammar = statement_cursor::grammar_for(&driver_id)
-                    .unwrap_or(tablepro_core::sql_syntax::SqlGrammar::PostgreSql);
+                    .unwrap_or(bookie_core::sql_syntax::SqlGrammar::PostgreSql);
                 let settings = self.lexing(&driver_id).settings_for(grammar);
                 if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
                     self.folding.borrow_mut().toggle_at_cursor(&buffer, grammar, settings);
@@ -988,7 +988,7 @@ impl SqlEditor {
         trimmed: String,
         anchor: Option<SourceAnchor>,
         planned: PlannedStatements,
-        parameter_values: std::collections::HashMap<String, tablepro_core::Value>,
+        parameter_values: std::collections::HashMap<String, bookie_core::Value>,
         sender: ComponentSender<Self>,
     ) {
         if !self.can_start_run() || self.session_ending() {
@@ -1000,7 +1000,7 @@ impl SqlEditor {
             self.status.set_label(&crate::tr!("no active connection"));
             return;
         };
-        let conn: std::sync::Arc<dyn tablepro_core::Connection> = guard.clone();
+        let conn: std::sync::Arc<dyn bookie_core::Connection> = guard.clone();
         let Some(metadata) = self.metadata() else {
             self.status.set_label(&crate::tr!("no active connection"));
             return;

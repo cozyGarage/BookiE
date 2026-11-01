@@ -24,7 +24,7 @@ The wordmark is written `BookiE`. The final capital E is set in brass.
 
 All files are vector, except the two PNG exports. Text in every SVG is converted to outlines, so the files look the same without any font installed.
 
-The packaged application icon (`apps/linux/flatpak/icons/scalable/com.tablepro.linux.svg`) is the same mark. It keeps the file name, because the app id and the Flatpak, Debian and Arch packages refer to it by that name. It renders identically to `bookie-mark.svg`, which carries a title and description for use on the web.
+The packaged application icon (`apps/linux/flatpak/icons/scalable/com.bookie.linux.svg`) is the same mark. It keeps the file name, because the app id and the Flatpak, Debian and Arch packages refer to it by that name. It renders identically to `bookie-mark.svg`, which carries a title and description for use on the web.
 
 ![Palette](palette.svg)
 

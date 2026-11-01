@@ -9,9 +9,9 @@ PRODUCT_URL = "https://github.com/cozyGarage/BookiE"
 class ProductRepositoryUrlTests(unittest.TestCase):
     def test_linux_product_metadata_and_rc_verification_use_the_product_repository(self):
         paths = {
-            "scripts/build-arch-rc.sh": f'remote="${{TABLEPRO_RC_REMOTE:-{PRODUCT_URL}.git}}"',
+            "scripts/build-arch-rc.sh": f'remote="${{BOOKIE_RC_REMOTE:-{PRODUCT_URL}.git}}"',
             "apps/linux/packaging/arch/PKGBUILD": f'url="{PRODUCT_URL}"',
-            "apps/linux/flatpak/com.tablepro.linux.metainfo.xml": f"<url type=\"homepage\">{PRODUCT_URL}</url>",
+            "apps/linux/flatpak/com.bookie.linux.metainfo.xml": f"<url type=\"homepage\">{PRODUCT_URL}</url>",
             "apps/linux/app/src/ui/app/status_pages.rs": f'.website("{PRODUCT_URL}")',
             "scripts/update-translations.py": f'--msgid-bugs-address={PRODUCT_URL}/issues',
         }

@@ -6,7 +6,7 @@ fn runtime_schema_directory_is_used_for_settings() {
     if std::env::var_os("BOOKIE_RUNTIME_SCHEMA_TEST").is_some() {
         assert_eq!(open_settings().unwrap().uint64("default-page-size"), 777);
         assert_eq!(
-            make_test_settings("/com/tablepro/linux/runtime/")
+            make_test_settings("/com/bookie/linux/runtime/")
                 .0
                 .uint64("default-page-size"),
             777
@@ -14,9 +14,9 @@ fn runtime_schema_directory_is_used_for_settings() {
         return;
     }
     let directory = tempfile::tempdir().unwrap();
-    let xml = include_str!("../../../data/com.tablepro.linux.gschema.xml")
+    let xml = include_str!("../../../data/com.bookie.linux.gschema.xml")
         .replace("<default>1000</default>", "<default>777</default>");
-    std::fs::write(directory.path().join("com.tablepro.linux.gschema.xml"), xml).unwrap();
+    std::fs::write(directory.path().join("com.bookie.linux.gschema.xml"), xml).unwrap();
     assert!(
         std::process::Command::new("glib-compile-schemas")
             .arg("--strict")
@@ -119,8 +119,8 @@ fn migrates_legacy_settings_and_keeps_rollback_copies() {
         return;
     }
     let dir = tempfile::tempdir().unwrap();
-    let schema = dir.path().join("com.tablepro.linux.gschema.xml");
-    std::fs::write(&schema, include_str!("../../../data/com.tablepro.linux.gschema.xml")).unwrap();
+    let schema = dir.path().join("com.bookie.linux.gschema.xml");
+    std::fs::write(&schema, include_str!("../../../data/com.bookie.linux.gschema.xml")).unwrap();
     assert!(
         std::process::Command::new("glib-compile-schemas")
             .arg("--strict")
@@ -155,7 +155,7 @@ fn make_test_settings(_path: &str) -> (gio::Settings, gio::SettingsBackend) {
 
 #[test]
 fn gsettings_updates_are_visible_to_reopened_handles() {
-    let (settings, backend) = make_test_settings("/com/tablepro/linux/test/");
+    let (settings, backend) = make_test_settings("/com/bookie/linux/test/");
     let store = PreferencesStore::from_settings(settings, None);
     store
         .update(|prefs| {
@@ -165,7 +165,7 @@ fn gsettings_updates_are_visible_to_reopened_handles() {
         .unwrap();
     store.flush().unwrap();
 
-    let reopened = test_settings_with_backend("/com/tablepro/linux/test/", backend);
+    let reopened = test_settings_with_backend("/com/bookie/linux/test/", backend);
     let reopened = PreferencesStore::from_settings(reopened, None);
     assert_eq!(reopened.load().default_page_size, 424_242);
     assert!(!reopened.load().csv_include_header);
@@ -176,8 +176,8 @@ fn production_and_development_profiles_use_separate_gsettings_paths() {
     let production = settings_path_for_profile(crate::config::Profile::Default);
     let development = settings_path_for_profile(crate::config::Profile::Development);
     assert_ne!(production, development);
-    assert!(production.starts_with("/com/tablepro/linux/"));
-    assert!(development.starts_with("/com/tablepro/linux/Devel/"));
+    assert!(production.starts_with("/com/bookie/linux/"));
+    assert!(development.starts_with("/com/bookie/linux/Devel/"));
 }
 
 #[test]
@@ -190,7 +190,7 @@ fn gsettings_keyfile_backend_survives_a_process_restart() {
                 "services::preferences::tests::gsettings_keyfile_child",
                 "--nocapture",
             ])
-            .env("TABLEPRO_GSETTINGS_CHILD", mode)
+            .env("BOOKIE_GSETTINGS_CHILD", mode)
             .env("GSETTINGS_BACKEND", "keyfile")
             .env("XDG_CONFIG_HOME", config.path())
             .status()
@@ -201,7 +201,7 @@ fn gsettings_keyfile_backend_survives_a_process_restart() {
 
 #[test]
 fn gsettings_keyfile_child() {
-    let Ok(mode) = std::env::var("TABLEPRO_GSETTINGS_CHILD") else {
+    let Ok(mode) = std::env::var("BOOKIE_GSETTINGS_CHILD") else {
         return;
     };
     assert!(matches!(mode.as_str(), "write" | "read"));
@@ -237,7 +237,7 @@ fn legacy_preferences_migrate_once_and_source_file_is_a_rollback_copy() {
     })
     .unwrap();
     std::fs::write(&path, &original).unwrap();
-    let (settings, backend) = make_test_settings("/com/tablepro/linux/migration/");
+    let (settings, backend) = make_test_settings("/com/bookie/linux/migration/");
 
     migrate_json_preferences(&settings, Some(&path)).unwrap();
 
@@ -263,7 +263,7 @@ fn legacy_preferences_migrate_once_and_source_file_is_a_rollback_copy() {
     assert_eq!(downgraded_preferences.default_page_size, 999);
     assert_eq!(std::fs::read(backup_path(&path).unwrap()).unwrap(), original);
 
-    let reopened = test_settings_with_backend("/com/tablepro/linux/migration/", backend);
+    let reopened = test_settings_with_backend("/com/bookie/linux/migration/", backend);
     migrate_json_preferences(&reopened, Some(&path)).unwrap();
     assert_eq!(read_settings(&reopened).default_page_size, 999);
 }
@@ -272,7 +272,7 @@ fn legacy_preferences_migrate_once_and_source_file_is_a_rollback_copy() {
 fn remote_migration_marker_keeps_settings_and_imports_rollback_edits() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("preferences.json");
-    let (settings, _) = make_test_settings("/com/tablepro/linux/remote/");
+    let (settings, _) = make_test_settings("/com/bookie/linux/remote/");
     settings.set_boolean("preferences-migrated", true).unwrap();
     settings.set_uint64("default-page-size", 555).unwrap();
     migrate_json_preferences(&settings, Some(&path)).unwrap();
@@ -295,7 +295,7 @@ fn malformed_legacy_preferences_are_preserved_and_migration_can_retry() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("preferences.json");
     std::fs::write(&path, b"broken json").unwrap();
-    let (settings, _) = make_test_settings("/com/tablepro/linux/bad-migration/");
+    let (settings, _) = make_test_settings("/com/bookie/linux/bad-migration/");
 
     assert!(migrate_json_preferences(&settings, Some(&path)).is_err());
     assert_eq!(settings.uint("migration-version"), 0);
@@ -310,7 +310,7 @@ fn malformed_legacy_preferences_are_preserved_and_migration_can_retry() {
 
 #[test]
 fn a_newer_gsettings_migration_marker_is_not_downgraded() {
-    let (settings, _) = make_test_settings("/com/tablepro/linux/future-version/");
+    let (settings, _) = make_test_settings("/com/bookie/linux/future-version/");
     settings
         .set_uint("migration-version", SETTINGS_MIGRATION_VERSION + 1)
         .unwrap();
@@ -325,7 +325,7 @@ fn failed_legacy_mirror_rolls_back_the_gsettings_update() {
     let parent_file = dir.path().join("not-a-directory");
     std::fs::write(&parent_file, b"block directory creation").unwrap();
     let path = parent_file.join("preferences.json");
-    let (settings, _) = make_test_settings("/com/tablepro/linux/mirror-failure/");
+    let (settings, _) = make_test_settings("/com/bookie/linux/mirror-failure/");
     let store = PreferencesStore::from_settings(settings, Some(path));
 
     assert!(store.update(|prefs| prefs.default_page_size = 500).is_err());
@@ -356,7 +356,7 @@ fn after_a_round_trip(path: &str, change: impl FnOnce(&mut Preferences)) -> (Pre
 
 #[test]
 fn the_color_scheme_survives_a_gsettings_round_trip_and_defaults_to_the_system() {
-    let (before, after) = after_a_round_trip("/com/tablepro/linux/scheme/", |prefs| {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/scheme/", |prefs| {
         prefs.color_scheme = ColorSchemePref::Dark;
     });
     assert_eq!(before.color_scheme, ColorSchemePref::System);
@@ -365,7 +365,7 @@ fn the_color_scheme_survives_a_gsettings_round_trip_and_defaults_to_the_system()
 
 #[test]
 fn the_editor_font_family_survives_a_gsettings_round_trip_and_defaults_to_empty() {
-    let (before, after) = after_a_round_trip("/com/tablepro/linux/font-family/", |prefs| {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/font-family/", |prefs| {
         prefs.editor_font_family = "Iosevka".into();
     });
     assert_eq!(before.editor_font_family, "");
@@ -374,7 +374,7 @@ fn the_editor_font_family_survives_a_gsettings_round_trip_and_defaults_to_empty(
 
 #[test]
 fn the_theme_defaults_to_default_and_survives_a_gsettings_round_trip() {
-    let (before, after) = after_a_round_trip("/com/tablepro/linux/theme/", |prefs| {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/theme/", |prefs| {
         prefs.theme = ThemePref::Gruvbox;
     });
     assert_eq!(before.theme, ThemePref::Default);
@@ -383,7 +383,7 @@ fn the_theme_defaults_to_default_and_survives_a_gsettings_round_trip() {
 
 #[test]
 fn vim_mode_is_off_by_default_and_survives_a_gsettings_round_trip() {
-    let (before, after) = after_a_round_trip("/com/tablepro/linux/vim-mode/", |prefs| {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/vim-mode/", |prefs| {
         prefs.editor_vim_mode = true;
     });
     assert!(!before.editor_vim_mode);
@@ -392,7 +392,7 @@ fn vim_mode_is_off_by_default_and_survives_a_gsettings_round_trip() {
 
 #[test]
 fn opening_a_table_reuses_the_preview_tab_by_default_and_the_choice_survives_a_gsettings_round_trip() {
-    let (before, after) = after_a_round_trip("/com/tablepro/linux/preview-tab/", |prefs| {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/preview-tab/", |prefs| {
         prefs.open_tables_in_preview_tab = false;
     });
     assert!(before.open_tables_in_preview_tab);
@@ -401,7 +401,7 @@ fn opening_a_table_reuses_the_preview_tab_by_default_and_the_choice_survives_a_g
 
 #[test]
 fn the_null_display_survives_a_gsettings_round_trip_and_defaults_to_standard() {
-    let (before, after) = after_a_round_trip("/com/tablepro/linux/null-display/", |prefs| {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/null-display/", |prefs| {
         prefs.null_display = NullDisplayPref::Symbol;
     });
     assert_eq!(before.null_display, NullDisplayPref::Standard);

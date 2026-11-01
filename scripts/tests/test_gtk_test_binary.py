@@ -19,8 +19,8 @@ while [ $# -gt 0 ]; do
   shift
 done
 mkdir -p "$CARGO_TARGET_DIR/$profile"
-printf '#!/bin/sh\\necho %s\\n' "$profile" > "$CARGO_TARGET_DIR/$profile/tablepro-app"
-chmod +x "$CARGO_TARGET_DIR/$profile/tablepro-app"
+printf '#!/bin/sh\\necho %s\\n' "$profile" > "$CARGO_TARGET_DIR/$profile/bookie-app"
+chmod +x "$CARGO_TARGET_DIR/$profile/bookie-app"
 """
 
 
@@ -37,7 +37,7 @@ class GtkTestBinaryTests(unittest.TestCase):
         env = {
             key: value
             for key, value in os.environ.items()
-            if key not in {"TABLEPRO_GTK_BINARY", "TABLEPRO_GTK_BUILD_PROFILE"}
+            if key not in {"BOOKIE_GTK_BINARY", "BOOKIE_GTK_BUILD_PROFILE"}
         }
         env.update(
             {
@@ -63,7 +63,7 @@ class GtkTestBinaryTests(unittest.TestCase):
         self.assertEqual(self._built_profile(result), "ci")
 
     def test_profiling_can_still_measure_an_optimized_release_build(self) -> None:
-        result, _ = self._run({"TABLEPRO_GTK_BUILD_PROFILE": "release"})
+        result, _ = self._run({"BOOKIE_GTK_BUILD_PROFILE": "release"})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self._built_profile(result), "release")
 
@@ -72,13 +72,13 @@ class GtkTestBinaryTests(unittest.TestCase):
         self.addCleanup(lambda: supplied.unlink(missing_ok=True) or supplied.parent.rmdir())
         supplied.write_text("#!/bin/sh\necho supplied\n")
         supplied.chmod(0o755)
-        result, root = self._run({"TABLEPRO_GTK_BINARY": str(supplied)})
+        result, root = self._run({"BOOKIE_GTK_BINARY": str(supplied)})
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((root / "cargo.log").exists())
         self.assertEqual(result.stdout.strip(), str(supplied))
 
     def test_an_unknown_build_profile_is_refused(self) -> None:
-        result, root = self._run({"TABLEPRO_GTK_BUILD_PROFILE": "dev"})
+        result, root = self._run({"BOOKIE_GTK_BUILD_PROFILE": "dev"})
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse((root / "cargo.log").exists())
 

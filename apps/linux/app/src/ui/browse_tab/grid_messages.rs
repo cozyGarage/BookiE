@@ -64,7 +64,7 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
 fn fetch_cell_input(
     col_index: usize,
     column_name: String,
-    row_key: Vec<tablepro_core::Value>,
+    row_key: Vec<bookie_core::Value>,
     edit_row_position: Option<u32>,
 ) -> BrowseTabInput {
     BrowseTabInput::GridFetchCellValue {

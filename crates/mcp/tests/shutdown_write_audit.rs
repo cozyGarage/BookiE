@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! MCP shutdown must never truncate a write's audit trail. Production
-//! (`tablepro-app`'s `RunningMcpServer`) runs the streamable-HTTP server on a
+//! (`bookie-app`'s `RunningMcpServer`) runs the streamable-HTTP server on a
 //! dedicated single-thread runtime and drops that runtime once
 //! `serve_streamable_http_until` returns. If a write is still in flight when
 //! that happens, its future is dropped mid-poll, and unless it has already
@@ -15,16 +15,16 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl,
     QueryResult, TableInfo, Transaction, Value,
 };
-use tablepro_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenPermissions, TokenStore};
-use tablepro_policy::{
+use bookie_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenPermissions, TokenStore};
+use bookie_policy::{
     AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, GuardContext, PolicyConfig,
     PolicyGuard, Principal, WritePolicy,
 };
-use tablepro_storage::SavedConnection;
+use bookie_storage::SavedConnection;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -132,7 +132,7 @@ impl ConnectionProvider for GuardedProvider {
             read_only: false,
             principal,
             policy: self.policy.clone(),
-            approval: Arc::new(tablepro_policy::AutoApproveSink),
+            approval: Arc::new(bookie_policy::AutoApproveSink),
             audit: self.audit.clone(),
             audit_state: self.audit_state.clone(),
         };
@@ -196,7 +196,7 @@ fn shutdown_during_a_write_still_records_a_terminal_audit_outcome() {
                 .build()
                 .expect("nested current-thread runtime");
             rt.block_on(async move {
-                let _ = tablepro_mcp::serve_streamable_http_until(bridge, config, server_shutdown).await;
+                let _ = bookie_mcp::serve_streamable_http_until(bridge, config, server_shutdown).await;
             });
         })
         .expect("spawn the mcp server thread");

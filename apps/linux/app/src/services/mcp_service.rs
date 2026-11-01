@@ -4,10 +4,10 @@
 use std::{future::Future, sync::Arc};
 
 use async_trait::async_trait;
-use tablepro_core::Connection;
-use tablepro_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenPermissions, TokenStore};
-use tablepro_policy::Principal;
-use tablepro_storage::{SavedConnection, StorageError, load_connections, store_mcp_token};
+use bookie_core::Connection;
+use bookie_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenPermissions, TokenStore};
+use bookie_policy::Principal;
+use bookie_storage::{SavedConnection, StorageError, load_connections, store_mcp_token};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -74,11 +74,11 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
         shutdown.clone(),
     ));
     let bridge_http = bridge.clone();
-    let test_port = std::env::var("TABLEPRO_TEST_MCP_HTTP_PORT").ok();
+    let test_port = std::env::var("BOOKIE_TEST_MCP_HTTP_PORT").ok();
     let config = server_config(test_port.as_deref());
     let server_shutdown = shutdown.clone();
     tracing::info!(host = %config.bind_host, port = config.bind_port, "MCP HTTP server starting");
-    let thread = match std::thread::Builder::new().name("tablepro-mcp".into()).spawn(move || {
+    let thread = match std::thread::Builder::new().name("bookie-mcp".into()).spawn(move || {
         let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
             Ok(rt) => rt,
             Err(e) => {
@@ -87,7 +87,7 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServ
             }
         };
         rt.block_on(async move {
-            if let Err(e) = tablepro_mcp::serve_streamable_http_until(bridge_http, config, server_shutdown).await {
+            if let Err(e) = bookie_mcp::serve_streamable_http_until(bridge_http, config, server_shutdown).await {
                 tracing::warn!(error = %e, "MCP HTTP server stopped");
             }
         });
@@ -152,7 +152,7 @@ where
     let (meta, plaintext) = bridge
         .tokens()
         .issue(name.clone(), permissions, connection_allowlist, None)?;
-    let keyring_saved = match store(meta.id, plaintext.clone(), format!("TablePro MCP: {name}")).await {
+    let keyring_saved = match store(meta.id, plaintext.clone(), format!("BookiE MCP: {name}")).await {
         Ok(()) => true,
         Err(error) => {
             tracing::warn!(error = %error, "failed to store MCP token in libsecret");
@@ -169,14 +169,14 @@ pub fn revoke_token(bridge: Option<&Arc<McpBridge>>, id: Uuid) -> Result<(), Str
     let bridge = bridge.ok_or_else(|| "MCP server is not running".to_string())?;
     bridge.tokens().revoke(id)?;
     relm4::spawn(async move {
-        if let Err(e) = tablepro_storage::delete_mcp_token(id).await {
+        if let Err(e) = bookie_storage::delete_mcp_token(id).await {
             tracing::warn!(error = %e, "failed to delete MCP token from libsecret");
         }
     });
     Ok(())
 }
 
-pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<tablepro_mcp::McpToken> {
+pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<bookie_mcp::McpToken> {
     bridge.map(|b| b.tokens().list()).unwrap_or_default()
 }
 
@@ -185,9 +185,9 @@ mod tests {
     use super::{issue_token_with_store, server_config};
     use std::sync::Arc;
 
-    use tablepro_core::Connection;
-    use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
-    use tablepro_storage::{KeyringFailure, SavedConnection, StorageError};
+    use bookie_core::Connection;
+    use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+    use bookie_storage::{KeyringFailure, SavedConnection, StorageError};
     use uuid::Uuid;
 
     struct NoConnections;
@@ -201,7 +201,7 @@ mod tests {
         async fn connection(
             &self,
             _connection_id: Uuid,
-            _principal: tablepro_policy::Principal,
+            _principal: bookie_policy::Principal,
         ) -> Result<Arc<dyn Connection>, String> {
             Err("unused test connection".into())
         }

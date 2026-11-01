@@ -1,5 +1,5 @@
 #[cfg(test)]
-extern crate self as tablepro_core;
+extern crate self as bookie_core;
 #[cfg(test)]
 #[path = "../tests/support/parser_contract.rs"]
 mod parser_contract;

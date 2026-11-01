@@ -2,8 +2,8 @@ use std::any::Any;
 use std::future::Future;
 use std::panic::{AssertUnwindSafe, resume_unwind};
 
+use bookie_core::DriverError;
 use futures::FutureExt;
-use tablepro_core::DriverError;
 
 const UNSUPPORTED_VARIANT: &str = "Tiberius cannot decode this sql_variant value; the connection was retired";
 
@@ -38,8 +38,8 @@ mod tests {
     use std::any::Any;
     use std::panic::AssertUnwindSafe;
 
+    use bookie_core::DriverError;
     use futures::FutureExt;
-    use tablepro_core::DriverError;
 
     #[test]
     fn only_the_known_ssvariant_metadata_panic_is_classified() {

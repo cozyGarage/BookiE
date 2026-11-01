@@ -16,7 +16,7 @@ CREATE TABLE lock_targets (
 
 INSERT INTO lock_targets (id, note) VALUES (1, 'contended row');
 
-CREATE ROLE tablepro_mtls LOGIN PASSWORD 'tablepro';
-GRANT CONNECT ON DATABASE tablepro TO tablepro_mtls;
-GRANT USAGE ON SCHEMA public TO tablepro_mtls;
-GRANT SELECT ON release_items TO tablepro_mtls;
+CREATE ROLE bookie_mtls LOGIN PASSWORD 'bookie';
+GRANT CONNECT ON DATABASE bookie TO bookie_mtls;
+GRANT USAGE ON SCHEMA public TO bookie_mtls;
+GRANT SELECT ON release_items TO bookie_mtls;

@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 pub(super) fn page(columns: &[&str], values: &[i64]) -> Arc<QueryResult> {
     Arc::new(QueryResult {

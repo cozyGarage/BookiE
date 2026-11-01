@@ -356,7 +356,7 @@ impl App {
         let enum_input_style = self
             .registry
             .get(&driver_id)
-            .map_or(tablepro_core::EnumInputStyle::RawValue, |driver| {
+            .map_or(bookie_core::EnumInputStyle::RawValue, |driver| {
                 driver.capabilities().enum_input_style
             });
         let browse_filters = self
@@ -1011,7 +1011,7 @@ fn omitted_tabs_notice(count: u32) -> Option<String> {
     })
 }
 
-fn editor_titles(tabs: &tablepro_app_services::workspace::WorkspaceTabs<WorkspaceTab>) -> Vec<String> {
+fn editor_titles(tabs: &bookie_app_services::workspace::WorkspaceTabs<WorkspaceTab>) -> Vec<String> {
     tabs.values()
         .filter_map(|tab| match tab {
             WorkspaceTab::Editor(slot) => Some(slot.page.title().to_string()),

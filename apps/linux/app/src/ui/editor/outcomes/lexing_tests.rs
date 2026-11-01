@@ -1,6 +1,6 @@
 use super::super::session_mode::StatementTarget;
 use super::{ScriptRunResult, StatementOutcomeKind, StatementRun, run_statements_with_stream};
-use tablepro_core::sql_syntax::script::LexicalSettings;
+use bookie_core::sql_syntax::script::LexicalSettings;
 
 struct SqlModeSession {
     executed: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
@@ -8,18 +8,18 @@ struct SqlModeSession {
 }
 
 #[async_trait::async_trait]
-impl tablepro_core::Session for SqlModeSession {
+impl bookie_core::Session for SqlModeSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,
-        _params: &[tablepro_core::Value],
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
+        _params: &[bookie_core::Value],
+        _control: &bookie_core::OperationControl,
+    ) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
         self.executed.lock().unwrap().push(sql.to_owned());
         if let Some(mode) = sql.strip_prefix("SET SESSION sql_mode = ") {
             self.settings = LexicalSettings::from_mysql_sql_mode(mode.trim_matches('\''));
         }
-        Ok(tablepro_core::QueryResult {
+        Ok(bookie_core::QueryResult {
             columns: Vec::new(),
             rows: Vec::new(),
             truncated: false,
@@ -28,8 +28,8 @@ impl tablepro_core::Session for SqlModeSession {
 
     async fn lexical_settings_controlled(
         &mut self,
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<Option<LexicalSettings>, tablepro_core::DriverError> {
+        _control: &bookie_core::OperationControl,
+    ) -> Result<Option<LexicalSettings>, bookie_core::DriverError> {
         Ok(Some(self.settings))
     }
 
@@ -37,7 +37,7 @@ impl tablepro_core::Session for SqlModeSession {
         true
     }
 
-    async fn close(self: Box<Self>) -> Result<(), tablepro_core::DriverError> {
+    async fn close(self: Box<Self>) -> Result<(), bookie_core::DriverError> {
         Ok(())
     }
 }
@@ -53,7 +53,7 @@ async fn run_in_sql_mode(sql_mode: &str, script: &str) -> (Vec<String>, Vec<Stat
     )
     .expect("the script plans under the session's settings");
     let executed = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-    let session: Box<dyn tablepro_core::Session> = Box::new(SqlModeSession {
+    let session: Box<dyn bookie_core::Session> = Box::new(SqlModeSession {
         executed: executed.clone(),
         settings,
     });

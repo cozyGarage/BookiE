@@ -7,8 +7,8 @@ mod batch_cleanup;
 mod exact_grid_original;
 
 use super::{connect, start_mssql};
-use tablepro_core::Value;
-use tablepro_core::sql_ddl::{DraftColumn, diff_to_ops, materialize_ops};
+use bookie_core::Value;
+use bookie_core::sql_ddl::{DraftColumn, diff_to_ops, materialize_ops};
 
 #[path = "masked_column_alter.rs"]
 mod masked_column_alter;
@@ -57,7 +57,7 @@ async fn alter_column_default_round_trips() {
         .await
         .unwrap();
 
-    let mut column = tablepro_core::sql_ddl::DraftColumn {
+    let mut column = bookie_core::sql_ddl::DraftColumn {
         original: Some(
             conn.fetch_columns(None, "def_demo")
                 .await
@@ -75,10 +75,10 @@ async fn alter_column_default_round_trips() {
         comment: None,
         collation: None,
     };
-    for sql in tablepro_core::sql_ddl::build_alter_column("mssql", None, "def_demo", &column).unwrap() {
+    for sql in bookie_core::sql_ddl::build_alter_column("mssql", None, "def_demo", &column).unwrap() {
         conn.execute(&sql).await.unwrap();
     }
-    let status = |cols: Vec<tablepro_core::ColumnInfo>| cols.into_iter().find(|c| c.name == "status").unwrap();
+    let status = |cols: Vec<bookie_core::ColumnInfo>| cols.into_iter().find(|c| c.name == "status").unwrap();
     let after_add = status(conn.fetch_columns(None, "def_demo").await.unwrap());
     assert_eq!(after_add.default_value.as_deref(), Some("'pending'"));
 
@@ -88,7 +88,7 @@ async fn alter_column_default_round_trips() {
 
     column.original = Some(after_add);
     column.default_value = None;
-    for sql in tablepro_core::sql_ddl::build_alter_column("mssql", None, "def_demo", &column).unwrap() {
+    for sql in bookie_core::sql_ddl::build_alter_column("mssql", None, "def_demo", &column).unwrap() {
         conn.execute(&sql).await.unwrap();
     }
     assert!(

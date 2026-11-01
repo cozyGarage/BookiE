@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 
+use bookie_core::{QueryResult, Value};
 use gtk4::prelude::*;
-use tablepro_core::{QueryResult, Value};
 
 use crate::ui::row_store::RowStore;
 

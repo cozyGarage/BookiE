@@ -3,7 +3,7 @@ use std::sync::Arc;
 use gtk4::prelude::*;
 use std::rc::Rc;
 
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 use super::display::{
     COLUMN_SLOT, CellView, FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT,

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::{
     LocalResultSettingsStore, LocalResultView, ResultViewKey, filter_summary, matching_source_indices,

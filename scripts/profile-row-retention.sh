@@ -8,25 +8,25 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 target="${CARGO_TARGET_DIR:-$ROOT/target}"
-rows_list="${TABLEPRO_PROFILE_ROWS_LIST:-10000 100000 300000}"
-repetitions="${TABLEPRO_PROFILE_REPETITIONS:-3}"
-scroll_steps="${TABLEPRO_PROFILE_SCROLL_STEPS:-1000}"
-cell_bytes="${TABLEPRO_PROFILE_CELL_BYTES:-0}"
-out="${TABLEPRO_PROFILE_OUT:-/tmp/bookie-row-retention-$(date +%Y%m%d-%H%M%S).jsonl}"
+rows_list="${BOOKIE_PROFILE_ROWS_LIST:-10000 100000 300000}"
+repetitions="${BOOKIE_PROFILE_REPETITIONS:-3}"
+scroll_steps="${BOOKIE_PROFILE_SCROLL_STEPS:-1000}"
+cell_bytes="${BOOKIE_PROFILE_CELL_BYTES:-0}"
+out="${BOOKIE_PROFILE_OUT:-/tmp/bookie-row-retention-$(date +%Y%m%d-%H%M%S).jsonl}"
 
-cargo build --release --locked -p tablepro-app --bin tablepro-app
-install -Dm755 "$target/release/tablepro-app" "$target/installed/usr/bin/tablepro"
+cargo build --release --locked -p bookie-app --bin bookie-app
+install -Dm755 "$target/release/bookie-app" "$target/installed/usr/bin/bookie"
 : > "$out"
 
 for rows in $rows_list; do
   for repetition in $(seq 1 "$repetitions"); do
-    TABLEPRO_PROFILE_ROWS="$rows" \
-    TABLEPRO_PROFILE_REPETITION="$repetition" \
-    TABLEPRO_PROFILE_SCROLL_STEPS="$scroll_steps" \
-    TABLEPRO_PROFILE_CELL_BYTES="$cell_bytes" \
-    TABLEPRO_PROFILE_OUT="$out" \
-    TABLEPRO_GTK_SCENARIO=profile_large_result_in_the_grid \
-    TABLEPRO_GTK_BINARY="$target/installed/usr/bin/tablepro" \
+    BOOKIE_PROFILE_ROWS="$rows" \
+    BOOKIE_PROFILE_REPETITION="$repetition" \
+    BOOKIE_PROFILE_SCROLL_STEPS="$scroll_steps" \
+    BOOKIE_PROFILE_CELL_BYTES="$cell_bytes" \
+    BOOKIE_PROFILE_OUT="$out" \
+    BOOKIE_GTK_SCENARIO=profile_large_result_in_the_grid \
+    BOOKIE_GTK_BINARY="$target/installed/usr/bin/bookie" \
       bash scripts/test-gtk-safety.sh
   done
 done

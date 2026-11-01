@@ -200,8 +200,8 @@ jobs:
           chown -R builder .
           sudo -u builder bash -ceu '
             git config --global --add safe.directory "$PWD"
-            export TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION="'"$VERSION"'"
-            export TABLEPRO_RC_DATE="$(date -u +%F)" TABLEPRO_RC_PKGREL=1
+            export BOOKIE_RC_COMMIT="$(git rev-parse HEAD)" BOOKIE_RC_VERSION="'"$VERSION"'"
+            export BOOKIE_RC_DATE="$(date -u +%F)" BOOKIE_RC_PKGREL=1
             bash scripts/build-arch-rc.sh
             cd apps/linux/packaging/arch
             for package in bookie-'"$VERSION"'-*.pkg.tar.zst; do sha256sum "$package" > "$package.sha256"; done
@@ -229,7 +229,7 @@ jobs:
       - uses: flatpak/flatpak-github-actions/flatpak-builder@401fe28a8384095fc1531b9d320b292f0ee45adb
         with:
           bundle: bookie.flatpak
-          manifest-path: apps/linux/flatpak/com.tablepro.linux.json
+          manifest-path: apps/linux/flatpak/com.bookie.linux.json
           cache-key: flatpak-release-${{ hashFiles('apps/linux/flatpak/**') }}
           upload-artifact: false
       - name: Checksum

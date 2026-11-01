@@ -1,6 +1,6 @@
+use bookie_core::Value;
 use sqlx::Decode;
 use sqlx::mysql::{MySql, MySqlValueRef};
-use tablepro_core::Value;
 
 pub(crate) fn bit_value(raw: MySqlValueRef<'_>) -> Option<Value> {
     bits(<&[u8] as Decode<MySql>>::decode(raw).ok()?)
@@ -25,7 +25,7 @@ fn bits(bytes: &[u8]) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::bits;
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     #[test]
     fn value_contract_bit_payloads_become_integers_until_they_pass_i64() {

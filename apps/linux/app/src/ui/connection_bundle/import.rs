@@ -3,7 +3,7 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_storage::ImportItem;
+use bookie_storage::ImportItem;
 use uuid::Uuid;
 
 use super::{boxed_list, checkbox_row, disposition_detail, disposition_title};

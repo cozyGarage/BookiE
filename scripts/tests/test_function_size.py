@@ -25,7 +25,7 @@ class FunctionSizeTests(unittest.TestCase):
         checker = load_checker()
         with tempfile.TemporaryDirectory(prefix="bookie-function-size-") as temporary:
             root = Path(temporary)
-            source = root / "apps/linux/packaging/arch/src/TablePro/cargo-vendor/x/src/lib.rs"
+            source = root / "apps/linux/packaging/arch/src/BookiE/cargo-vendor/x/src/lib.rs"
             source.parent.mkdir(parents=True)
             source.write_text("fn f() {}\n", encoding="utf8")
             assert checker.source_files(root) == []

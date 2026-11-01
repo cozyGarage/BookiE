@@ -7,8 +7,8 @@ if [ "$#" -ne 2 ]; then
 fi
 released=$(realpath "$1")
 candidate=$(realpath "$2")
-config="${XDG_CONFIG_HOME:-$HOME/.config}/tablepro"
-data="${XDG_DATA_HOME:-$HOME/.local/share}/tablepro"
+config="${XDG_CONFIG_HOME:-$HOME/.config}/bookie"
+data="${XDG_DATA_HOME:-$HOME/.local/share}/bookie"
 
 if [ -e "$config/connections.json" ] || [ -e "$data/history.db" ]; then
   echo "refusing to run over existing user data in $config or $data" >&2

@@ -1,7 +1,7 @@
-use tablepro_core::Value;
+use bookie_core::Value;
 
 include!("enum_contract_parts/scalar_imports.rs");
-use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue};
+use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue};
 
 use crate::{connect, start_pg};
 
@@ -70,12 +70,12 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "Enum \"Shelf".into(),
             name: "State \"Kind".into(),
         })
     );
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("Enum \"Shelf"),
         "Row \"Box",
@@ -132,15 +132,15 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
         ]]
     );
 
-    let filters = tablepro_core::FilterSet {
-        rules: vec![tablepro_core::FilterRule {
+    let filters = bookie_core::FilterSet {
+        rules: vec![bookie_core::FilterRule {
             column: "status".into(),
-            op: tablepro_core::FilterOp::Eq,
-            value: Some(tablepro_core::FilterValue::Single("paused".into())),
+            op: bookie_core::FilterOp::Eq,
+            value: Some(bookie_core::FilterValue::Single("paused".into())),
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filters)
         .unwrap()
         .unwrap();
     let filtered = connection
@@ -164,14 +164,14 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
         ]]
     );
 
-    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let import_options = bookie_core::import::CsvImportOptions::default();
     let sheet =
-        tablepro_core::import::read_csv(b"id,status,sibling\n3,paused,csv import\n", &import_options, None).unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+        bookie_core::import::read_csv(b"id,status,sibling\n3,paused,csv import\n", &import_options, None).unwrap();
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("Enum \"Shelf"),
             table: "Row \"Box",
             columns: &columns,
@@ -306,7 +306,7 @@ async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "enum_domain_shadow_b".into(),
             name: "status_kind".into(),
         })
@@ -320,7 +320,7 @@ async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filters)
         .unwrap()
         .unwrap();
     let filtered = connection

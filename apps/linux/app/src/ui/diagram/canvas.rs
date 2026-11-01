@@ -6,9 +6,9 @@ use relm4::gtk::prelude::*;
 use relm4::gtk::subclass::prelude::*;
 use relm4::gtk::{self, gdk, glib, graphene};
 
-use tablepro_app_services::er_diagram::layout::{self, Point, Size};
-use tablepro_app_services::er_diagram::scene::{self, Card, EdgePath, Rect};
-use tablepro_app_services::er_diagram::{SchemaDiagram, zoom};
+use bookie_app_services::er_diagram::layout::{self, Point, Size};
+use bookie_app_services::er_diagram::scene::{self, Card, EdgePath, Rect};
+use bookie_app_services::er_diagram::{SchemaDiagram, zoom};
 
 use super::card_text::CardText;
 use super::draw::{self, DETAIL_ZOOM, Frame};
@@ -423,11 +423,11 @@ mod tests {
     use std::cell::Cell;
     use std::rc::Rc;
 
+    use bookie_app_services::er_diagram::{SchemaDiagram, TableRead};
+    use bookie_core::{ColumnInfo, ForeignKeyInfo};
     use relm4::gtk;
     use relm4::gtk::gdk;
     use relm4::gtk::prelude::*;
-    use tablepro_app_services::er_diagram::{SchemaDiagram, TableRead};
-    use tablepro_core::{ColumnInfo, ForeignKeyInfo};
 
     use super::DiagramCanvas;
 
@@ -527,7 +527,7 @@ mod tests {
         for _ in 0..40 {
             canvas.zoom_out();
         }
-        assert!(canvas.zoom() >= tablepro_app_services::er_diagram::zoom::MIN);
+        assert!(canvas.zoom() >= bookie_app_services::er_diagram::zoom::MIN);
         canvas.fit();
         assert_eq!(canvas.zoom(), fitted);
         window.destroy();
