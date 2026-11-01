@@ -229,10 +229,7 @@ mod tests {
             lines.next(),
             Some("id | select_type | table | type | key | rows | Extra")
         );
-        assert_eq!(
-            lines.next(),
-            Some("1 | SIMPLE | c | const | PRIMARY | 1 | NULL")
-        );
+        assert_eq!(lines.next(), Some("1 | SIMPLE | c | const | PRIMARY | 1 | NULL"));
         assert_eq!(lines.next(), None);
     }
 
@@ -246,10 +243,7 @@ mod tests {
             truncated: false,
         };
         let text = format_explain_result(&result);
-        assert_eq!(
-            text,
-            "Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4)"
-        );
+        assert_eq!(text, "Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4)");
     }
 
     #[test]

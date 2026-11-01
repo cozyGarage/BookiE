@@ -201,10 +201,7 @@ mod tests {
         assert!(parse_plan("Seq Scan on a").is_empty());
         assert!(parse_plan("(empty plan)").is_empty());
         assert!(parse_plan("1 | MySQL | table").is_empty());
-        assert!(parse_plan(
-            "id | select_type | table | type\n1 | SIMPLE | c | const"
-        )
-        .is_empty());
+        assert!(parse_plan("id | select_type | table | type\n1 | SIMPLE | c | const").is_empty());
         assert!(parse_plan("").is_empty());
     }
 }
