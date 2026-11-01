@@ -642,15 +642,13 @@ mod tests {
         super::setup_editable_cell(
             &item,
             0,
-            "value".into(),
-            false,
             sender,
             super::super::types::CellEditorKind::Text,
             std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::<
                 String,
                 (bool, Vec<String>),
             >::new())),
-            None,
+            std::rc::Rc::from("value"),
         );
         let editor = item
             .child()
