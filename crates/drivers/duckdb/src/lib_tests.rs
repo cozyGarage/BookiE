@@ -195,9 +195,10 @@ fn quote_ident_doubles_quotes() {
 }
 
 #[tokio::test]
-async fn connect_create_and_list_tables() {
+async fn connect_existing_and_list_tables() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("test.duckdb");
+    drop(DuckConnection::open(&path).unwrap());
     let driver = DuckdbDriver;
     let conn = driver
         .connect(ConnectOptions {

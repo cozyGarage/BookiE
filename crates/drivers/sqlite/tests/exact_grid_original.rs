@@ -6,6 +6,7 @@ mod contract;
 #[tokio::test]
 async fn exact_grid_original_detects_concurrent_text_changes() {
     let directory = tempfile::tempdir().unwrap();
+    std::fs::File::create(directory.path().join("grid.db")).unwrap();
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
             database: directory.path().join("grid.db").to_string_lossy().into(),
