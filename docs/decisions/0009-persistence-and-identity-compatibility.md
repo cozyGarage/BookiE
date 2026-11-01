@@ -1,6 +1,6 @@
 # 0009: Preserve durable identity and recoverable state during evolution
 
-- **Status**: Superseded by 0027 where it keeps `tablepro` identifiers
+- **Status**: Superseded by 0027 for identifiers
 - **Date**: 2026-10-03
 
 ## Context
