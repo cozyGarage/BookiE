@@ -914,7 +914,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
-      TMPDIR: /var/cache/ci/t
+      TMPDIR: /var/cache/ci/tmp
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}

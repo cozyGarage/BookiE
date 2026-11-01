@@ -36,11 +36,19 @@ impl PinnedResults {
         self.last.iter().any(has_grid_result)
     }
 
-    pub(super) fn show(&mut self, fresh: Vec<StatementOutcome>) -> Vec<StatementOutcome> {
-        let mut shown: Vec<StatementOutcome> = self.pins.clone();
-        shown.extend(fresh.iter().cloned());
-        self.last = fresh;
+    pub(super) fn set_latest(&mut self, outcome: StatementOutcome) {
+        self.last = vec![outcome];
+    }
+
+    pub(super) fn displayed(&self) -> Vec<StatementOutcome> {
+        let mut shown = self.pins.clone();
+        shown.extend(self.last.iter().cloned());
         shown
+    }
+
+    pub(super) fn show(&mut self, fresh: Vec<StatementOutcome>) -> Vec<StatementOutcome> {
+        self.last = fresh;
+        self.displayed()
     }
 
     pub(super) fn pin_last(&mut self) -> usize {
