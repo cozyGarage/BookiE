@@ -81,7 +81,8 @@ fn bind_state_reads_a_modified_value_once_for_display_and_editing() {
         pk_col_indices: vec![0],
         ..Default::default()
     };
-    let state = state_for_bind(&context, &row, 1, &[Value::Int(7)], &original);
+    let key = crate::services::change_tracker::RowKey::from_pk_values(&[Value::Int(7)]);
+    let state = state_for_bind(&context, &row, 1, key.as_ref(), &original);
     crate::services::change_tracker::close_tab(tab_id);
     assert_eq!(state, (true, Some(updated), vec!["tp-cell-modified"]));
 }

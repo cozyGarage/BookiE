@@ -1160,10 +1160,14 @@ GLib.MainLoop().run()
         import sqlite3
         rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
         columns = int(os.environ["TABLEPRO_PROFILE_COLUMNS"])
+        key_bytes = int(os.environ.get("TABLEPRO_PROFILE_KEY_BYTES", "0"))
         if not 1 <= rows <= 100_000 or not 3 <= columns <= 512:
             raise ValueError("profile row or column count is outside its supported bounds")
+        if not 0 <= key_bytes <= 8192:
+            raise ValueError("profile primary-key size is outside its supported bounds")
         column_names = ["id", "marker"] + [f"value_{index:03d}" for index in range(columns - 2)]
-        definitions = ["id INTEGER PRIMARY KEY", "marker TEXT NOT NULL"]
+        key_type = "TEXT" if key_bytes else "INTEGER"
+        definitions = [f"id {key_type} PRIMARY KEY", "marker TEXT NOT NULL"]
         definitions.extend(f'"{name}" INTEGER NOT NULL' for name in column_names[2:])
         placeholders = ",".join("?" for _ in column_names)
         with sqlite3.connect(database) as connection:
@@ -1171,7 +1175,11 @@ GLib.MainLoop().run()
             connection.executemany(
                 f'INSERT INTO profile_wide ({", ".join(column_names)}) VALUES ({placeholders})',
                 (
-                    (row, f"row-{row:06d}", *(row * columns + index for index in range(columns - 2)))
+                    (
+                        f"row-{row:06d}".ljust(key_bytes, "x") if key_bytes else row,
+                        f"row-{row:06d}",
+                        *(row * columns + index for index in range(columns - 2)),
+                    )
                     for row in range(1, rows + 1)
                 ),
             )
@@ -1194,6 +1202,7 @@ GLib.MainLoop().run()
                 "profile_mode": "wide-table-browse",
                 "rows_requested": rows,
                 "columns_requested": columns,
+                "primary_key_bytes": key_bytes,
                 "open_action_seconds": round(open_action_seconds, 3),
                 "observation_seconds_without_accessibility_scan": observation_seconds,
                 "rss_before_mb": round(before_rss / 1024, 1),
