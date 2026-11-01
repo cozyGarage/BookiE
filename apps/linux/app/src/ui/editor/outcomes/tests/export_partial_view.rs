@@ -21,7 +21,9 @@ fn exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values() {
     let streamed = StreamedResult {
         pages: vec![page.clone()],
         page_indices: vec![2],
+        page_row_starts: super::super::super::stream_pages::page_row_starts_from_counts(&[1, 1, page.rows.len(), 1]),
         page_row_counts: vec![1, 1, page.rows.len(), 1],
+        retained_rows: page.rows.len(),
         columns: page.columns.clone(),
         total_pages: 4,
         total_rows: tablepro_core::MAX_QUERY_CURSOR_PAGE_ROWS * 3 + 2,

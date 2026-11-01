@@ -194,7 +194,7 @@ impl SqlEditor {
     }
 
     fn show_stream_page(&mut self, outcome: StatementOutcome, total_rows: usize, sender: &ComponentSender<Self>) {
-        let shown = self.pinned.show(vec![outcome.clone()]);
+        self.pinned.set_latest(outcome);
         self.refresh_pin_button();
         let target = super::stream_view::LiveStreamTarget {
             grid_sender: &self.grid_sender,
@@ -202,14 +202,15 @@ impl SqlEditor {
             database: self.database.clone(),
             settings_store: self.result_view_settings.clone(),
         };
-        let updated = match &outcome.kind {
+        let updated = self.pinned.latest().last().is_some_and(|outcome| match &outcome.kind {
             StatementOutcomeKind::Streamed(result) => {
-                super::stream_view::update_live_stream(&self.results_holder, &outcome, result, &target)
+                super::stream_view::update_live_stream(&self.results_holder, outcome, result, &target)
             }
             _ => false,
-        };
+        });
         if !updated {
             clear_results_box(&self.results_holder);
+            let shown = self.pinned.displayed();
             render_outcomes(
                 &self.results_holder,
                 &shown,

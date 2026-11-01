@@ -78,7 +78,8 @@ def gate(tasks, initial_status='failure'):
         token.write_text('fixture-token')
         env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
                    GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
-                   FORGEJO_GATE_LOCK=str(root / 'gate.lock'), FORGEJO_GATE_TIMEOUT_MINUTES='1')
+                   FORGEJO_GATE_LOCK=str(root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(root / 'locks'),
+                   FORGEJO_GATE_TIMEOUT_MINUTES='1')
         return subprocess.run(['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject'],
                               cwd=root, env=env, capture_output=True, text=True, timeout=10)
 
