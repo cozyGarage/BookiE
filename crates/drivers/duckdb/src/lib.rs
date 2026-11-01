@@ -635,25 +635,33 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
             truncated = true;
             break;
         }
-        let values = zoned_columns
-            .iter()
-            .zip(&uuid_columns)
-            .enumerate()
-            .map(
-                |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
-                    Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
-                    Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
-                        Value::Text(format!("{timestamp}+00"))
-                    }
-                    value => value,
-                },
-            )
-            .collect::<Vec<_>>();
-        if !budget.admit(&values) {
-            truncated = true;
-            break;
+        let payload_bytes = (0..column_count).fold(0usize, |total, i| {
+            total.saturating_add(cell_payload_bytes(&row.get_ref_unwrap(i)))
+        });
+        let admitted = budget.decode_and_admit_row::<std::convert::Infallible>(column_count, payload_bytes, || {
+            Ok(zoned_columns
+                .iter()
+                .zip(&uuid_columns)
+                .enumerate()
+                .map(
+                    |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
+                        Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                        Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
+                            Value::Text(format!("{timestamp}+00"))
+                        }
+                        value => value,
+                    },
+                )
+                .collect::<Vec<_>>())
+        });
+        match admitted {
+            Ok(Some(values)) => raw_rows.push(values),
+            Ok(None) => {
+                truncated = true;
+                break;
+            }
+            Err(never) => match never {},
         }
-        raw_rows.push(values);
     }
     if column_count == 0
         && let Some(stmt_ref) = rows.as_ref()
@@ -706,6 +714,13 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
         rows: raw_rows,
         truncated,
     })
+}
+
+fn cell_payload_bytes(value: &ValueRef<'_>) -> usize {
+    match value {
+        ValueRef::Text(bytes) | ValueRef::Blob(bytes) | ValueRef::Geometry(bytes) => bytes.len(),
+        _ => 0,
+    }
 }
 
 fn duck_value_ref_to_value(v: ValueRef<'_>, uuid_column: bool) -> Value {
