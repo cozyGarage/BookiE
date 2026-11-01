@@ -2,133 +2,190 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-01
+
 ### Added
 
-- Positioned SQL errors offer Go to error in the result and Errors views, restoring the editor and placing the caret in the original statement; changed queries and connections require a fresh run.
-- SQL editors have a hideable, resizable results panel with an Errors view, maximize/restore controls and Ctrl+J.
-- The query editor has visible run scopes and result-file export choices, plus commit-and-close and rollback-and-close controls for an owned session with an open transaction.
-- Tables and views expand to show bounded field/type previews, with a Structure shortcut; the docked sidebar has a native resize handle, and the header **Tables sidebar** button shows or hides it at every window width.
-- Run (Ctrl+Enter or the Run button) executes the selected text when something is selected, and the whole editor otherwise. It goes through the same guard, policy and audit path as any run.
-- The Columns dialog has a Reset button that forgets the column widths you set by dragging for that table.
-- The Session button shows how long its transaction has been open ("Session · transaction open · 12 min") once it passes a minute, so a forgotten transaction holding locks stands out.
-- F10 opens the main menu, as in other GNOME applications.
-- **Audit Log** in the main menu lists the operations recorded in the local audit journal, newest first: connection, who ran it, kind, outcome, rows and duration, with the operation id, policy rule, stored statement text and error on expand. A filter matches operation id, connection, outcome or statement. It verifies the journal chain before showing anything and reports a broken or unavailable journal instead of a partial list. It shows only what the journal stored; statement text is the redacted form. A failed statement's panel has **View in Audit Log**, which opens it with the newest operation, usually the failure, at the top.
-- A Preview SQL button in the unsaved-changes bar of a table tab shows the statements and values Save would run, without running them.
-- While a query result is locally filtered, its menu also offers **Export All Loaded Rows…** next to **Export Visible Rows…**, so the full loaded result can still be exported. Neither runs the query again.
-- The "Token issued" dialog for MCP has a **Copy Token** button, so the token (shown only once) no longer has to be selected by hand.
-- Preferences has a **Theme** choice: Default, Ledger (the BookiE brand colours), Catppuccin, Tokyo Night and Gruvbox, each with a light and a dark variant that follows the Appearance setting. The SQL editor, the Structure tab's SQL preview and the JSON cell editor follow the theme too.
-- SQLite files open from the file manager (Open With BookiE), and `bookie books.db` or `bookie postgres://user@host/db` opens a database file or a connection URL from a terminal. A URL asks you to confirm before it is imported and connected; a missing or non-database file is refused instead of creating an empty database. A second launch hands its argument to the running window. DuckDB files open from the terminal only.
+- Revisit earlier pages of a large PostgreSQL result without rerunning the query. (#1660)
+- Open the exact audit record from a failed SQL statement. (#1670)
+- The sidebar has a Collapse all / Expand all button, and PostgreSQL connections get a Catalog group that opens the Catalog dialog on a chosen object kind. (#1877)
+- AppStream screenshots for Linux software stores and desktop file associations for SQL scripts and database URI schemes. (#1981)
+- Copy as Text Table, JSON Lines, and Values List clipboard options to data grid cell menu. (#1982)
+- ClickHouse multi-dimensional array and nested structure decoding and export preservation. (#1986)
+- Show Referencing Rows in the table browse grid context menu navigates to matching rows in tables that reference the current row. (#1984)
+- Attach additional SQLite database files to a connection for cross-schema querying and schema browsing. (#1985)
+- Show ER Diagram on a schema or table in the sidebar draws the schema's tables and foreign keys, with pan and zoom. (#1880)
+- SQL Server multi-schema trigger and object catalog inspection and native batch execution. (#1988)
+- SSH connections through the built-in client now use OpenSSH certificates held by the SSH agent. (#1937)
+- A saved SSH connection can name the one agent key to use, so an agent holding many keys no longer trips the server's attempt limit (settable in the saved connection file; no form control yet). (#1936)
+- Query history keeps at most 100,000 unpinned entries; pinned entries are always kept. (#2072)
 
 ### Changed
 
-- PostgreSQL CSV imports preserve BC-era `timestamptz` values exported with a year-zero timestamp.
-- If database editor sessions cannot close, the window offers the close-anyway choice after up to five seconds instead of waiting up to twenty.
-- Large sidebar catalogs filter faster, and saved collapse state cannot hide objects under a schema heading that is no longer present.
-- SQL completion checks table names faster in large catalogs.
-
-- Large PostgreSQL query results stream faster while retained pages remain available through the result pager.
-
-- Grid context menus reuse shared keyboard and pointer routing, reducing per-cell allocations.
-
-- Editing a cell or pasting in a table tab no longer rebuilds every loaded row on the page, so large pages with long text values stay responsive.
-- Editing a saved table row stays attached to that row when a draft row is inserted above it.
-- Keyboard shortcuts use a native adaptive dialog that fits smaller windows and preserves keyboard and mouse gesture descriptions.
-
-- Running statements no longer slows down as the audit log grows. The full audit log is checked when BookiE opens and when you view it; each new record checks only what was written since the last check.
-- BookiE now requires GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 or newer and exits with a message naming the missing versions on older systems; Ubuntu 26.04, Ubuntu 24.04 and Debian 13 are no longer supported.
-- The Debian and Arch packages and the AppImage install smaller program files, about a quarter smaller than before.
-- SQL execution marks follow statement boundaries, so SQL text inside comments is not marked as executed.
-- Export reviews the table-page, loaded-result or query-rerun scope before file format; all matching table rows remain unavailable until consistent snapshot export is qualified.
-- Grid headers preserve exact engine type case and keep comments, key and nullability metadata in a native column-details menu.
-- Oversized text and JSON cells use shorter visible previews to reduce text-layout work; full values remain available through View Value and Copy Value.
-- Column and loaded-row search return keyboard focus to the result grid after selection or dismissal.
-- Editing rows with large values uses less temporary memory when verifying the row identity.
-- Statements spend less time on sensitive-column checks, and desktop sessions that never mask results skip them.
-- Background database work runs on up to four threads, so one slow operation no longer holds up others such as loading the sidebar or another tab.
-- Query results hold each cell in less than half the memory, so large results use less memory and more rows fit within the result size limit.
-
-- Large streamed results retain pages within a 64 MiB estimated row-storage budget, keep the newest page and show when earlier rows are no longer available.
-- Oversized streamed result rows are rejected before value decoding, reducing memory spikes.
-- The Debian package is named `bookie` (`bookie_X.Y.Z-1_amd64.deb`). It replaces an installed `tablepro` package and keeps your settings, saved connections and credentials. The `tablepro` commands remain as aliases.
-- Selecting rows with large text or binary cells no longer copies their contents to calculate numeric summaries.
-- Large JSON previews use less temporary memory.
-- Inspecting a row with oversized cell previews avoids copying the full row contents.
-- Multi-line SQL edits update workspace query state once per undoable action, reducing repeated full-script copying.
-- Saving workspaces with large SQL drafts uses less temporary memory.
-- Oversized saved SQL drafts are kept on disk and shown as a read-only notice instead of being laid out or executed.
-
-### Security
-
-- Background session cleanup logs diagnostic categories without server error details.
+- Transaction age labels show translated minute and hour units. (#1643)
+- Use consistent title capitalization for the server activity menu and dialog. (#1659)
+- Column comments in the Structure editor now follow each database’s supported behavior. (#1690)
+- Closing SQL editor tabs uses less temporary memory. (#1693)
+- SQL editor input checks size and line limits without duplicating the full script when validating a dropped file. (#1691)
+- Structure views explain when a driver cannot read index or foreign-key metadata. (#1695)
+- Searching loaded rows uses less memory on very large values and stops sooner on JSON cells. (#1788)
+- SQL completion stays responsive with very large schemas and large scripts. (#1830)
+- A MongoDB field that a document lacks now shows as "(missing)" in the grid and "Absent from this document" in the row inspector, instead of an "undecodable" marker. (#1970)
+- Polished in-app data grid styling and streaming view pagination states. (#1981)
+- The editor bottom bar groups Results and Errors in one switcher, the filter panel and editor toolbar take one row each, and a streamed result no longer blanks while loading or jumps to a Status page after a timeout. (#1873)
+- The saved-queries list now opens with Ctrl+Shift+B, because GTK reserves Ctrl+Shift+D for its inspector. (#1957)
+- The empty connections page now offers Import connections and Import from URL next to Add Connection. (#1958)
+- Long text and JSON cells show a bounded preview in the result grid while Copy Value and View Value retain access to the full value. (#2158)
+- Browsing a PostgreSQL, MySQL, SQLite or SQL Server table no longer downloads text cells larger than 1 MiB just to show a preview; View Value fetches the full text on demand. (#1955)
+- An SSH host-key or password prompt left unanswered for five minutes now ends the connection attempt. (#2073)
+- Streamed query results update with less repeated copying. (#2087)
+- Evicting older streamed result pages does less repeated work. (#2157)
 
 ### Fixed
 
-- Workspace saves no longer rewrite other connections' editor drafts, preserving external edits and avoiding needless file I/O.
-- PostgreSQL CSV imports preserve the session time zone when a `timestamptz` value has no explicit offset.
-- Expanding a table in the sidebar now displays its field and type previews instead of remaining on “Loading fields…”.
-- SQL editor results keep every streamed page within the estimated memory budget, so users can navigate back through completed PostgreSQL results that fit the budget.
-- The tab overview no longer shows a duplicate window-close button beside its tab cards.
+- Large cell previews remain compact while copy and export keep the complete value. (#1625)
+- Refuse local database file paths that contain non-UTF-8 bytes instead of saving a lossy path. (#1629, #1663)
+- Cancelling a paged export is reported as cancellation instead of a source failure. (#1637)
+- Software centers classify the published 0.2.0 release as stable and show its release date. (#1642)
+- The read-only structure SQL preview no longer shows a blinking insertion caret. (#1644)
+- The connection port field now shows five-digit port numbers with room to spare. (#1645)
+- Large result counts now use consistent grouping in filtered results and the browse pager. (#1647)
+- Skipped statement tabs now show a stopped-state icon. (#1655)
+- Gruvbox warning text now uses a distinct, readable color. (#1657)
+- Saving a new query to a file now preserves the visible SQL. (#1664)
+- PostgreSQL metadata follows implicit schema visibility when resolving a table name. (#1672)
+- PostgreSQL column completion now follows each editor session's search path and keeps editor suggestions isolated. (#1673)
+- SQL files now receive syntax highlighting in AppImage builds without host GtkSourceView data. (#1677)
+- The editor clears its transient closing message after an idle session closes. (#1679)
+- Importing a growing file stops at the size limit, and oversized clipboard pastes are refused before parsing. (#1689)
+- Invalid agent-token guesses are throttled without locking out valid tokens issued by another process. (#1689)
+- Dismissing export setup releases retained result data. (#1699)
+- Closing SQL editors releases their text buffers and input contexts. (#1694)
+- Tables changed in an editor transaction appear in the sidebar after committing the session. (#1701)
+- Dismissing index and foreign-key setup releases the closed forms. (#1702)
+- Connection setup shows consistent recovery guidance for connection and metadata errors. (#1758)
+- Closing import setup releases its source data and callbacks. (#1704)
+- Closing cell edit popovers releases their widgets and callbacks. (#1752)
+- Preferences, the quick switcher, saved queries, the full value editor and the CSV import dialog are now freed when closed instead of leaking memory. (#1802)
+- Deleted connection drafts stay removed when a late workspace save arrives. (#1798)
+- Reimporting a deleted connection restores its saved workspace and rejects stale saves. (#1798)
+- Unreadable SQL drafts remain recoverable when connections are deleted or another database workspace is saved. (#1757)
+- Closing SQL editors removes their saved draft files after the workspace is saved. (#1759)
+- Closing a grid editor releases its cell and popover callbacks instead of retaining them for the session. (#1763)
+- Closing Structure tabs releases their views and SQL previews. (#1816)
+- The value viewer preserves JSON-looking text without dropping duplicate keys or reformatting numbers. (#1816)
+- Refreshing or closing query history releases its rows and menus. (#1819)
+- Closing connection organisation releases the colour chooser popover. (#1819)
+- Database listing now honors request timeouts and cancellation when switching databases. (#1764)
+- Redis command input preserves quoted escapes and binary bytes. (#1780)
+- A SQL Server result that exceeds the result size limit now keeps only the first rows, instead of skipping a large row and keeping later ones after it. (#1766)
+- Running a script that creates a SQLite trigger together with other statements no longer fails with a transaction-control error on a shared connection. (#1779)
+- MySQL stored procedures and text-protocol statements retain their result rows and result sets. (#1773)
+- Text using binary collations is displayed as text, while binary data remains bytes. (#1765)
+- SQLite columns declared BOOLEAN show a stored integer other than 0 or 1 as that number instead of turning it into true. (#1770)
+- The case-insensitive text filter now ignores case on DuckDB and ClickHouse tables instead of matching case-sensitively. (#1771)
+- CSV import reads only integer column types as whole numbers, so MySQL spatial and ClickHouse interval columns are imported as exact text instead of failing as non-integers. (#1772)
+- SQLite temporal values retain their stored offsets and storage classes. (#1781)
+- CSV import auto-mapping prefers exact column-name case before a case-insensitive match. (#1783)
+- Stopping a SQLite query now works even when the stop arrives just as the query starts. (#1852)
+- A connection's connect and query timeouts can be cleared again after being set, and importing a connection bundle no longer resets them on a connection that already exists. (#1774)
+- ClickHouse results preserve non-UTF-8 string bytes. (#1778)
+- The SET and ENUM picker popover is now as wide as its widest label, so labels and the Apply button are no longer cut off. (#1968)
+- An unreadable saved SQL draft no longer prevents other connections from restoring their workspaces. (#1826)
+- Deleted connections no longer reappear in the workspace cache when an earlier restore finishes late. (#1827)
+- Unreadable or invalid policy configuration blocks database access instead of silently using default restrictions. (#1832)
+- A failed workspace save preserves previously saved editor drafts. (#1829)
+- Opening large text values no longer stalls the window. (#1983)
+- Read-only SHOW statements such as SHOW STATUS and SHOW VARIABLES no longer ask for write approval on a local connection. (#1959)
+- Query history reports export failures instead of silently leaving the file unsaved. (#1760)
+- Oversized SQL lines are rejected before the full file is loaded. (#1857)
+- Changing a MySQL generated column in the Structure tab keeps its expression instead of failing or dropping it. (#1933)
+- MySQL accounts that have no password can now be used to connect. (#1885)
+- Approval dialogs no longer display an empty table list. (#1929)
+- Refusing SET autocommit=0, SET IMPLICIT_TRANSACTIONS ON or XA START on a shared connection now names that statement instead of showing the BEGIN, COMMIT and ROLLBACK message. (#1954)
+- Long saved connection names wrap in narrow connection lists. (#1868)
+- A failed workspace save no longer lets restore replace newer unsaved SQL with an older saved draft. (#1964)
+- Workspace saves reject invalid destinations before staging SQL and preserve private draft permissions and previously missing saved bodies. (#1965)
+- PostgreSQL custom enum values preserve canonical declaration and alter sort order and populate query dialect metadata. (#1987)
+- Paging deep into a SQLite table whose composite key contains NULLs no longer skips rows. (#1894)
+- A MySQL write preview from an agent is refused when the statement touches a table that cannot be rolled back, instead of reporting a rollback that did not happen. (#1914)
+- The row inspector shows text that looks like markup, such as the marker for an undecodable value, instead of a blank field. (#1882)
+- A busy PostgreSQL or MySQL connection is no longer treated as lost while long queries are running, so it is not reconnected underneath them. (#1912)
+- Timeout retry actions use clear wording for any duration. (#1926)
+- Changing a MySQL invisible column in the Structure tab no longer makes it visible. (#1930)
+- Exporting or copying a SQLite row whose text contains a NUL byte no longer truncates the generated SQL. (#1892)
+- A ClickHouse account with the read-only profile can now connect instead of being refused. (#1901)
+- A Redis host that would change the connection address is now refused, and IPv6 hosts connect. (#2025)
+- The ER diagram zoom percentage now matches the real zoom. (#2038)
+- Editing a MariaDB text cell to or from an empty value no longer stores NULL or fails when EMPTY_STRING_IS_NULL is on. (#1889)
+- A ClickHouse query with its own FORMAT clause that produces one enormous line now stops with an error instead of exhausting memory. (#1890)
+- Backup, restore and import progress dialogs identify the running operation. (#1934)
+- The Structure tab no longer shows a disabled column Comment row for SQLite and DuckDB. (#1956)
+- The sidebar can refresh tables and views changed by another client. (#1940)
+- Saved-connection and history-filter popovers stay within the application window. (#1931)
+- Explain on MySQL 8.4 now shows the query plan instead of an empty window. (#2056)
+- The cell editor's focus ring no longer overlaps the text being edited. (#2059)
+- Swapping two column names in the Structure tab, or renaming columns in a chain, now saves instead of failing on the server. (#1891)
+- Filtering a MySQL FLOAT or SQL Server real column by a value now finds the matching rows. (#1897)
+- Saving a grid edit on a SQL Server text column now detects a concurrent change that only differs in letter case or accents. (#1900)
+- SQLite, MySQL and MariaDB views appear in the sidebar Views group. (#1944)
+- A MongoDB query with stray text between chained calls is now rejected, and a bare JSON filter no longer silently searches an arbitrary collection. (#1893)
+- Browsing a Redis database no longer lists the same key twice. (#1895)
+- Text filters on MySQL servers that use NO_BACKSLASH_ESCAPES now match percent signs and underscores literally. (#1896)
+- A saved connect timeout longer than five seconds now also applies when MySQL or PostgreSQL has to open another connection later. (#1898)
+- When an SSH agent holds more keys than the server allows attempts, the error now explains the limit instead of a low-level agent message. (#1904)
+- Editor completion closes when another control or dialog takes focus. (#1935)
+- Large Redis string previews are identified as incomplete rather than copied or exported as whole values. (#1903)
+- A SQLite connection no longer shows an irrelevant connect timeout, and the SQL preview no longer shows a blinking caret. (#1915)
+- Version and help flags print information without starting the application. (#1939)
+- Direct PostgreSQL and MySQL connections now use TCP keepalive, so a connection whose server silently disappeared is detected instead of hanging. (#1923)
+- Tab context menu actions now work. (#1951)
+- Sidebar groups show their expanded state while search reveals matching tables and remain usable for blank searches. (#1941)
+- Creating a connection no longer overwrites a saved profile when several profiles match. (#2008)
+- ER diagrams read tables from their own schemas when names are repeated across attached databases. (#2005)
+- Paged results release hidden grids after navigation while keeping cached rows. (#2078)
+- Opening a large JSON value no longer serializes its entire contents before showing the preview. (#2030)
+- Exporting and importing connections now keeps a SQLite connection's attached database files. (#2032)
+- Redis tables no longer offer a filter that cannot work. (#2039)
+- Oversized PostgreSQL vector values no longer build unbounded formatted previews. (#2040)
+- SQL Server batches report failed transaction cleanup and prevent reuse of connections with uncertain outcomes. (#2042)
+- Editing a cell and then deleting its row no longer makes the save fail. (#2060)
+- Column types and defaults in the Structure tab can no longer add a second clause to the generated statement. (#2061)
+- Row-locking reads (FOR UPDATE, FOR SHARE) are now refused on read-only connections and for agents that may not write. (#2062)
+- A raw filter ending in a comment no longer breaks the query, and CSV import into a table whose name contains the word VALUES works on PostgreSQL. (#2063)
+- Agents can no longer run more ClickHouse table functions that reach files, other servers or programs, or copy PostgreSQL replication slots. (#2064)
+- An agent write preview no longer runs when the connection list cannot be read. (#2067)
+- Importing a connection bundle can no longer remove or replace the certificate authority pinned on an existing connection. (#2065)
+- Approval prompts and the audit log now name every table an UPDATE or DELETE joins. (#2066)
+- ClickHouse, Redis and SQL Server connections now use TCP keepalive, so a connection whose server silently disappeared is detected instead of hanging. (#1924)
+- Grid saves detect concurrent text and binary changes even when the column comparison considers the values equal. (#1961)
+- Large spreadsheets are rejected before their imported data can exhaust memory. (#2013)
+- ER diagrams now report connection and policy failures instead of showing incomplete results as unreadable tables. (#2021)
+- An SSH tunnel no longer stops accepting connections after a brief file-descriptor shortage. (#2071)
+- Malformed and unknown MCP tool calls now count against the per-token rate limit. (#2074)
+- Connecting to an already-missing SQLite or DuckDB database path reports an error instead of creating an empty file. (#2010)
+- SQL editor lines no longer clip a few pixels off the top of the text. (#2179)
+- PostgreSQL now suggests enabling PgBouncer prepared-statement support when transaction pooling returns this binary-bind error. (#2192)
+- Failed workspace saves no longer trigger a duplicate background retry. (#2195)
+- Back Up Database keeps a single .dump suffix when the chosen file name already ends in .dump. (#2180)
+- Large CSV imports keep the app responsive while their file and insert plan are prepared. (#2171)
+- Explain Text tab shows column names for MySQL and other multi-column plans. (#2182)
 
-- A confirmed session rollback clears obsolete query gutter marks, including when a commit request ends in rollback.
-- SQL files with lines over 256 KiB are refused before opening to prevent excessive text-layout memory use; the original file remains unchanged.
-- Streamed result summaries use singular row and page labels when each count is one.
+### Security
 
-- SQL completion avoids catalog reads for incomplete table names and coalesces rapid editor changes.
-- Connection choices open from the keyboard, mark the selected option and release their popups when the dialog closes.
-
-- Multiline read-only cell previews stay compact instead of expanding query result rows to many text lines.
-- Closing streamed query results releases hidden page labels instead of accumulating retired tab widgets.
-- Closing a SQL editor releases its syntax analysis engine so background highlighting does not keep growing memory for a closed large script.
-
-- Save-conflict messages keep the recovery advice without a redundant failure prefix or unrelated session warning, and save errors no longer double sentence-ending periods.
-- Restoring older workspaces skips empty table-structure tabs while keeping the active editor aligned and the empty workspace usable.
-
-- Export cleanup warnings omit database error details that could contain private query text or values.
-- Exporting loaded results avoids two extra copies of the result data while choosing and writing the destination file.
-
-- Keyboard cell menus refresh reference and loaded-row export availability for the current cell and filter.
-- A SQL editor result that was cut short by the result size limit now says so and shows how many rows were loaded, instead of only after sorting or filtering.
-- BookiE and `bookie-agentd` no longer crash when the terminal or pipe receiving their log output closes.
-- In a table tab, the total row count no longer briefly shows the count from before a filter change or refresh.
-- The Rows per page choice in a table tab works after the first page failed to load.
-- The "Couldn't load rows" page in a table tab has a Retry button.
-- The multi-row selection badge no longer suggests pressing Delete on read-only connections or tables without a primary key.
-- PostgreSQL dump and restore retries briefly when its client executable is temporarily busy starting.
-- Screen readers name the page navigation and export buttons of a table tab and read the Rows label with the page-size choice.
-- When a connection had more than 32 open tabs, the table tabs left out on the next start are now reported in a notice instead of disappearing silently. Query editor tabs are always kept.
-- Query cursor cleanup warnings use diagnostic codes without including database error payloads.
-
-- Copying rows and pasting them back into the grid keeps NULL, empty text and text such as `\N` unchanged. Previously empty text pasted as `""`, and a cell holding `\N` could swap with a NULL.
-- Undoing or redoing a cell edit on a saved row no longer replaces the row's stored value with an unsaved one, so a later edit is no longer lost or rejected as a conflict when saved.
-- Closing a table browse tab releases its widgets and loaded rows.
-- PostgreSQL: a table named without its schema is found through the whole `search_path`, as PostgreSQL itself resolves it. Before, only the first schema on the path was searched, so SQL completion showed no columns (and structure lookups found nothing) for a table that lives in a later schema.
-- Removing a saved connection asks for confirmation once and preserves the database.
-- Saved connection rows show environment and engine names beside the endpoint, keep connection names readable in narrow lists, and place secondary actions in a menu.
-- SQLite refuses to drop a table in an attached database while other tables there still reference it, so their ON DELETE actions no longer empty those tables.
-- The Structure tab lists MySQL tables that have an index on an expression, and Show CREATE TABLE explains that an expression index cannot be recreated instead of writing it as a column index (MySQL, PostgreSQL, SQLite).
-- Open tabs, the active tab and sidebar group state are saved per database. Switching a saved connection to another database no longer restores the first database's tabs against the second, where a same-named table could show with the wrong page, sort or filter. Each database gets its own tabs back when you return to it; workspaces saved by earlier versions restore for the database you connect to first.
-- Table browsing identifies when the result byte limit cuts a page short.
-- Next page in table browsing continues from the first row not shown when the result byte limit cut the page short, instead of skipping the remaining rows or disabling Next.
-- The main window has a minimum size, which stops repeated libadwaita warnings on older libadwaita releases.
-- Choosing a kind in the Catalog dialog no longer resizes its dropdown and shifts the schema search field.
-- SQL completion popups remain usable when suggestions disappear and return, instead of triggering a GTK critical or showing a blank popup.
-- Spaces pasted around a connection's host are removed before connecting; database names and file paths are kept exactly as typed.
-- A PostgreSQL `VOID` result, such as `SELECT pg_sleep(0)`, shows as an empty value instead of undecodable.
-- In a window narrower than 960 px the tables sidebar no longer opens over the workspace after connecting, where it swallowed the first click on Run and the other editor controls. A **Tables sidebar** button in the header opens it on demand, and the sidebar returns by itself when the window is widened.
-- Closing SQL editors releases their retained query text and search state.
-- SQL execution waits for a dedicated session to open, so an immediate query cannot run outside the selected session.
-- Opening a connection that has no stored password no longer makes the system keyring ask you to create a new keyring. Reading or removing a password now uses the keyring only if it already exists; the keyring is created only when a password is actually saved.
-- Loading a cell's full value (row inspector, View Value) is cancelled when its tab closes, the connection changes or a newer value is opened, instead of running on until its timeout.
-- A schema change stops the SQL-completion column lookups still running from before it.
-- The database switcher ignores, and stops, a database list still loading from the session before a database switch.
-- A cancelled Structure tab load no longer replaces the newer one.
-- A new empty editor tab takes the first free "Query N" title instead of counting open editors, so closing Query 1 and opening a new tab no longer produces a second "Query 2".
-- Closing a result grid releases its selection and row inspector.
-- Long text previews show embedded NUL characters visibly instead of cutting off the remaining preview.
-- Streamed result pages wait until their first display frame before building a grid, avoiding work for discarded pages.
-- SQL query controls and secondary tools use separate rows to stay reachable in narrow editor panes.
-- Discarding changes to a SQL file closes its tab without reopening the same save prompt.
-- PostgreSQL queries ending on a full result page complete without a false column-change error.
+- Updated the SSH library so a malicious or compromised SSH server can no longer exhaust BookiE's memory with repeated protocol messages or stall a tunnel by announcing a zero packet size. (#1777)
+- Exporting query history as SQL keeps connection names and error text inside comments, so a name containing a line break can no longer add a statement to the exported script. (#1768)
+- More malformed MySQL or MariaDB server packets are rejected safely. (#1871)
+- After an import fails in a way that may have committed some rows, the audit log records the outcome as unknown and further writes on that connection are held until it is resolved. (#1884)
+- Results returned to agents now hide sensitive keys such as passwords inside JSON and document values, not only in sensitive column names. (#1887)
+- A policy file that sets two overrides for the same connection is now rejected instead of applying one of them at random. (#1879)
+- Database backups are now readable only by their owner. (#2023)
+- Agents can no longer read server files or other servers through ClickHouse and SQL Server table functions. (#2024)
+- An agent's browse_table request can no longer force Redis to scan its whole keyspace with a huge offset. (#1878)
+- A query that was streaming when the app crashed is now recorded as unknown in the audit log on the next start. (#1881)
+- Changing the type or nullability of a SQL Server column in the Structure tab no longer removes its dynamic data mask. (#1899)
+- A statement run in a SQL session is now checked against the row-count approval threshold using that session's own view of the data. (#1911)
+- Writes inside an interactive transaction are now checked against the row-count approval threshold using that transaction's own view of the data. (#1913)
 
 ## [0.2.0] - 2026-10-23
 
@@ -658,6 +715,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.0...linux
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.2...linux
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
+[0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
