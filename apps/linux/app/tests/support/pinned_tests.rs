@@ -121,19 +121,26 @@ fn pinned_results_stay_ahead_of_the_next_run() {
 
 #[test]
 #[ignore = "app-server isolated regression"]
-fn an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin() {
+fn a_pinned_spooled_page_reloads_without_retaining_its_payload() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
     let mut cache = super::super::stream_pages::StreamPageCache::default();
     let first_page = page(&[1]);
     let first_page_weak = Arc::downgrade(&first_page);
+    let columns = first_page.columns.clone();
+    runtime.block_on(spool.append_page(0, first_page.clone())).unwrap();
     assert!(cache.append(0, first_page.clone()).is_ok());
     drop(first_page);
 
-    let first_result = cache.snapshot(super::super::stream_pages::StreamTerminal::Complete, None);
-    let mut wide_page = page(&[]).as_ref().clone();
-    wide_page.rows = vec![vec![Value::Text("x".repeat(65 * 1024 * 1024))]];
-    assert!(cache.append(1, Arc::new(wide_page)).is_ok());
-    assert_eq!(cache.first_page(), 1);
-    assert!(first_page_weak.upgrade().is_some());
+    let first_result = cache.snapshot_with_spool(
+        super::super::stream_pages::StreamTerminal::Complete,
+        None,
+        0,
+        Some(spool.clone()),
+    );
+    assert!(first_page_weak.upgrade().is_none());
 
     let first_outcome = StatementOutcome {
         kind: StatementOutcomeKind::Streamed(Box::new(first_result)),
@@ -149,7 +156,9 @@ fn an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin() {
         &[2],
         super::super::stream_pages::StreamTerminal::Complete,
     )]);
-    assert!(first_page_weak.upgrade().is_some());
+    assert!(first_page_weak.upgrade().is_none());
+    let reloaded_page = runtime.block_on(spool.load_page(0, columns)).unwrap();
+    assert_eq!(reloaded_page.rows, vec![vec![Value::Int(1)]]);
     drop(next_render);
 
     drop(pins.unpin_all());
