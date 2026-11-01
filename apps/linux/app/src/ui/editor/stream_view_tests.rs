@@ -1,8 +1,8 @@
 use super::*;
 use crate::ui::editor::stream_pages::{ResidentPageStore, StreamPageCache, StreamTerminal};
 use crate::ui::editor::{StatementIdentity, StatementOutcomeKind};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 fn wait_for_grid(root: &gtk::Widget) -> gtk::ColumnView {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -465,7 +465,7 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
     let retired = Arc::downgrade(&original);
     let columns = original.columns.clone();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
     runtime.block_on(spool.append_page(0, original.clone())).unwrap();

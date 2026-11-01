@@ -4,7 +4,7 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_core::AuthMode;
+use bookie_core::AuthMode;
 
 type ChoiceChanged = Rc<RefCell<Option<Box<dyn Fn(u32)>>>>;
 

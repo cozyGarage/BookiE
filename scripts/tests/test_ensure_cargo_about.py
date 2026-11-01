@@ -60,7 +60,7 @@ class EnsureCargoAboutTests(unittest.TestCase):
         env = {
             **os.environ,
             "PATH": f"{self.stubs}:{os.environ['PATH']}",
-            "TABLEPRO_TOOL_DIR": str(self.tools),
+            "BOOKIE_TOOL_DIR": str(self.tools),
             "STUB_LOG": str(self.log),
             "STUB_ARCHIVE": str(self.archive),
             "STUB_MACHINE": machine,

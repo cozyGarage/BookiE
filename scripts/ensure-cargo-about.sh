@@ -5,7 +5,7 @@ VERSION="0.9.2"
 TARGET="x86_64-unknown-linux-musl"
 SHA256="9099a59e820c38a68b9d65f300662a567d56562f9a10f6aa4c7e86c17c2566af"
 BINARY_SHA256="b06bd6a8bfd726cffb90e3e0588e3e0b1cfbb582bf6a34f4c1c2692ba8f2e7b8"
-TOOL_DIR="${TABLEPRO_TOOL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/bookie-tools}/cargo-about-$VERSION"
+TOOL_DIR="${BOOKIE_TOOL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/bookie-tools}/cargo-about-$VERSION"
 BIN="$TOOL_DIR/cargo-about"
 
 cached_binary_is_valid() {

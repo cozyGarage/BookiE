@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, OperationControl, Value};
+use bookie_core::{Connection, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 async fn assert_extended_temporal_csv_round_trip(connection: &dyn Connection, kind: &str, text: &str, send: &str) {
@@ -14,22 +14,22 @@ async fn assert_extended_temporal_csv_round_trip(connection: &dyn Connection, ki
         .await
         .unwrap();
     assert_eq!(source.rows[0][0], Value::Text(text.into()));
-    let json = tablepro_core::export::render_json(&source.columns, &source.rows);
+    let json = bookie_core::export::render_json(&source.columns, &source.rows);
     let parsed_json: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed_json, serde_json::json!([{"value": text}]));
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection.fetch_columns(None, &table).await.unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: &table,
             columns: &columns,
@@ -200,7 +200,7 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
 async fn value_contract_bc_dates_survive_default_csv_import() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
-    let options = tablepro_core::import::CsvImportOptions::default();
+    let options = bookie_core::import::CsvImportOptions::default();
     for (kind, send_fn, bc, ad, last, beyond) in [
         (
             "date",
@@ -249,9 +249,8 @@ async fn value_contract_bc_dates_survive_default_csv_import() {
             .unwrap();
         let csv_columns = &source.columns[..2];
         let csv_rows: Vec<_> = source.rows.iter().map(|row| row[..2].to_vec()).collect();
-        let csv =
-            tablepro_core::export::render_csv(csv_columns, &csv_rows, &tablepro_core::export::CsvOptions::default());
-        let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let csv = bookie_core::export::render_csv(csv_columns, &csv_rows, &bookie_core::export::CsvOptions::default());
+        let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
 
         connection
             .execute(&format!(
@@ -261,11 +260,11 @@ async fn value_contract_bc_dates_survive_default_csv_import() {
             .unwrap();
         let columns = connection.fetch_columns(None, &target_table).await.unwrap();
         let mapping = [None, Some(1)];
-        let plan = tablepro_core::import::build_insert_plan(
-            &tablepro_core::import::ImportTarget {
+        let plan = bookie_core::import::build_insert_plan(
+            &bookie_core::import::ImportTarget {
                 driver_id: "postgres",
 
-                capabilities: tablepro_core::DriverCapabilities::default(),
+                capabilities: bookie_core::DriverCapabilities::default(),
                 schema: None,
                 table: &target_table,
                 columns: &columns,

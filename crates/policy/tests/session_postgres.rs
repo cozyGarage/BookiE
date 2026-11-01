@@ -3,13 +3,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use drivers_postgres::PgDriver;
-use sha2::{Digest, Sha256};
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value};
-use tablepro_policy::{
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value};
+use bookie_policy::{
     AuditError, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus,
     AuditTransactionOutcome, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal,
 };
+use drivers_postgres::PgDriver;
+use sha2::{Digest, Sha256};
 use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
 use testcontainers_modules::postgres::Postgres;
@@ -62,7 +62,7 @@ async fn start_pg() -> (ContainerAsync<Postgres>, ConnectOptions) {
         database: "postgres".into(),
         username: "postgres".into(),
         password: secrecy::SecretString::new("postgres".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     };
     (container, opts)
@@ -91,10 +91,7 @@ fn guard_context(audit: Arc<CapturingAudit>, audit_state: Arc<AuditState>) -> Gu
     }
 }
 
-async fn run(
-    session: &mut Box<dyn tablepro_core::Session>,
-    sql: &str,
-) -> Result<tablepro_core::QueryResult, DriverError> {
+async fn run(session: &mut Box<dyn bookie_core::Session>, sql: &str) -> Result<bookie_core::QueryResult, DriverError> {
     session.query_params_controlled(sql, &[], &no_timeout()).await
 }
 
@@ -295,7 +292,7 @@ async fn a_read_scoped_agent_sleep_times_out_is_audited_and_keeps_its_session_us
     assert_eq!(sleep_events[1].terminal_status, AuditTerminalStatus::TimedOut);
     assert_eq!(
         sleep_events[1].error_category,
-        Some(tablepro_policy::AuditErrorCategory::Timeout)
+        Some(bookie_policy::AuditErrorCategory::Timeout)
     );
 }
 
@@ -609,7 +606,7 @@ async fn an_agent_cannot_expose_sensitive_columns_through_table_to_xml() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn typed_postgres_commit_reports_rollback_and_recovered_commit_with_matching_rows() {
-    use tablepro_core::SessionCommitOutcome;
+    use bookie_core::SessionCommitOutcome;
 
     let (_container, opts) = start_pg().await;
     let raw = connect(opts.clone()).await;

@@ -88,9 +88,9 @@ impl Connection for PolicyGuard {
 
     async fn list_objects(
         &self,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<&str>,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         let operation = self.metadata_operation("LIST OBJECTS", catalog_target(kind, schema));
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
@@ -104,10 +104,10 @@ impl Connection for PolicyGuard {
 
     async fn list_objects_controlled(
         &self,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<&str>,
         control: &OperationControl,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         check_pre_dispatch(control)?;
         let operation = self.metadata_operation("LIST OBJECTS", catalog_target(kind, schema));
         self.prepare_governed_read(&operation).await?;
@@ -677,7 +677,7 @@ impl Connection for PolicyGuard {
         result
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         let inner = self.caught_read("OPEN SESSION", self.inner.open_session()).await?;
         Ok(self.wrap_session(inner))
     }
@@ -708,7 +708,7 @@ impl Connection for PolicyGuard {
     async fn lexical_settings_controlled(
         &self,
         control: &OperationControl,
-    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+    ) -> Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, DriverError> {
         self.caught_read("LEXICAL SETTINGS", self.inner.lexical_settings_controlled(control))
             .await
     }

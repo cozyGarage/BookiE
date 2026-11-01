@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_ddl::{StructureOp, materialize_ops};
+use bookie_core::sql_ddl::{StructureOp, materialize_ops};
 
 use crate::{connect, start_pg};
 
@@ -61,7 +61,7 @@ async fn replacing_an_index_and_a_foreign_key_under_the_same_name_changes_the_ta
     let mut keys = original_keys.clone();
     keys[0].on_delete = Some("CASCADE".into());
 
-    let ops = tablepro_core::sql_ddl::diff_to_ops(
+    let ops = bookie_core::sql_ddl::diff_to_ops(
         None,
         "swap",
         "swap",
@@ -105,9 +105,9 @@ async fn an_expression_index_is_marked_and_not_rebuilt_as_a_column_index() {
     let functional = indexes.iter().find(|index| index.name == "people_email_lower").unwrap();
     assert!(functional.has_expression_key);
     assert_eq!(functional.columns, ["lower(email)", "id"]);
-    let error = tablepro_core::sql_ddl::build_create_index("postgres", None, "people", functional).unwrap_err();
+    let error = bookie_core::sql_ddl::build_create_index("postgres", None, "people", functional).unwrap_err();
     assert!(
-        matches!(error, tablepro_core::sql_ddl::BuildDdlError::ExpressionIndex),
+        matches!(error, bookie_core::sql_ddl::BuildDdlError::ExpressionIndex),
         "{error:?}"
     );
     let plain = indexes.iter().find(|index| index.name == "people_email").unwrap();

@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-storage"
+name = "bookie-storage"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,12 +7,12 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_storage"
+name = "bookie_storage"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../core" }
-tablepro-policy = { path = "../policy" }
+bookie-core = { path = "../core" }
+bookie-policy = { path = "../policy" }
 oo7.workspace = true
 secrecy.workspace = true
 serde.workspace = true

@@ -1,8 +1,8 @@
 use super::*;
 use crate::approval::AutoApproveSink;
 use crate::audit::{AuditRecordPhase, AuditTerminalStatus};
+use bookie_core::Session;
 use std::time::Duration;
-use tablepro_core::Session;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 

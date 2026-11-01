@@ -1,7 +1,7 @@
 use super::super::stream_pages::StreamPageCache;
 use super::*;
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 fn page(index: u64) -> Arc<QueryResult> {
     Arc::new(QueryResult {

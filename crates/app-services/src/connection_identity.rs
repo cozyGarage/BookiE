@@ -1,6 +1,6 @@
 use std::sync::{Arc, Weak};
 
-use tablepro_core::Connection;
+use bookie_core::Connection;
 
 #[derive(Debug, Clone)]
 pub struct ConnectionIdentity(Weak<dyn Connection>);

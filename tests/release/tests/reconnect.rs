@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{Connection, DatabaseDriver, TlsMode};
-use tablepro_release_tests::Fixture;
+use bookie_core::{Connection, DatabaseDriver, TlsMode};
+use bookie_release_tests::Fixture;
 
 use drivers_postgres::PgDriver;
 

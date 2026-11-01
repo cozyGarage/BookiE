@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_app_services::workspace::{
+use bookie_app_services::workspace::{
     CloseAfterSave, OpenMode, TabContent, TableOpenPlan, TableOpenRequest, WorkspaceTabs,
 };
 use uuid::Uuid;

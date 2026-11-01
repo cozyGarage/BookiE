@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::DatabaseDriver;
+use bookie_core::DatabaseDriver;
 
 #[path = "database_service/tests/identity_tests.rs"]
 mod identity_tests;
@@ -53,10 +53,10 @@ async fn recovered_unknown_write_blocks_only_its_saved_connection() {
     let path = dir.path().join("audit.jsonl");
     let connection_id = Uuid::new_v4();
     let journal = AuditJournal::open_validated(path.clone()).unwrap();
-    let mut event = tablepro_storage::sample_event(Principal::human_gui());
+    let mut event = bookie_storage::sample_event(Principal::human_gui());
     event.connection_id = connection_id;
     event.phase = AuditRecordPhase::Intent;
-    event.operation_class = tablepro_policy::AuditOperationClass::Mutation;
+    event.operation_class = bookie_policy::AuditOperationClass::Mutation;
     event.terminal_status = AuditTerminalStatus::Pending;
     journal.append_durable(event).await.unwrap();
     drop(journal);
@@ -102,7 +102,7 @@ async fn open_memory_connection(service: &DatabaseService, name: &str) -> Uuid {
             driver,
             opts: options,
             ssh: None,
-            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+            environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
         },
     );
     assert!(activated, "the id is freshly generated, so activation must succeed");
@@ -110,11 +110,11 @@ async fn open_memory_connection(service: &DatabaseService, name: &str) -> Uuid {
 }
 
 async fn assert_read_only_write_is_refused(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     sql: &str,
-    params: Vec<tablepro_core::Value>,
+    params: Vec<bookie_core::Value>,
     expect_one: &[usize],
-    control: &tablepro_core::OperationControl,
+    control: &bookie_core::OperationControl,
 ) {
     let statements = [(sql.to_string(), params)];
     let result = connection
@@ -122,7 +122,7 @@ async fn assert_read_only_write_is_refused(
         .await;
 
     assert!(
-        matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))),
+        matches!(result, Err(bookie_core::DriverError::PolicyDenied(_))),
         "{sql}"
     );
 }
@@ -158,7 +158,7 @@ async fn gui_read_only_guarded_transactions_deny_insert_update_and_delete() {
         ..Default::default()
     };
     let connection = driver.connect(options.clone()).await.expect("sqlite connection");
-    let setup_control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let setup_control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
     connection
         .execute_controlled(
             "CREATE TABLE guarded_notes (id INTEGER PRIMARY KEY, value TEXT NOT NULL)",
@@ -188,27 +188,21 @@ async fn gui_read_only_guarded_transactions_deny_insert_update_and_delete() {
             driver,
             opts: options,
             ssh: None,
-            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+            environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
         },
     ));
 
     let guarded = service.get(id).expect("active GUI connection");
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
     for (sql, params, expect_one) in [
         (
             "INSERT INTO guarded_notes VALUES (?, ?)",
-            vec![
-                tablepro_core::Value::Int(2),
-                tablepro_core::Value::Text("inserted".into()),
-            ],
+            vec![bookie_core::Value::Int(2), bookie_core::Value::Text("inserted".into())],
             vec![],
         ),
         (
             "UPDATE guarded_notes SET value = ? WHERE id = ?",
-            vec![
-                tablepro_core::Value::Text("updated".into()),
-                tablepro_core::Value::Int(1),
-            ],
+            vec![bookie_core::Value::Text("updated".into()), bookie_core::Value::Int(1)],
             vec![0],
         ),
         ("DELETE FROM guarded_notes WHERE id = 1", vec![], vec![0]),
@@ -220,7 +214,7 @@ async fn gui_read_only_guarded_transactions_deny_insert_update_and_delete() {
         .await
         .unwrap()
         .rows;
-    assert_eq!(rows, [[tablepro_core::Value::Text("before".into())]]);
+    assert_eq!(rows, [[bookie_core::Value::Text("before".into())]]);
     assert_three_denied_mutations_are_audited(&service, id);
     service.close(id);
 }
@@ -265,7 +259,7 @@ async fn gui_local_write_records_successful_terminal_audit_outcome() {
         .await
         .unwrap()
         .rows;
-    assert_eq!(rows, [[tablepro_core::Value::Text("saved".into())]]);
+    assert_eq!(rows, [[bookie_core::Value::Text("saved".into())]]);
     service.close(id);
 }
 
@@ -424,7 +418,7 @@ async fn candidate_metadata_read_refuses_when_its_audit_intent_cannot_be_written
         .unwrap();
 
     let result = guard.list_tables().await;
-    assert!(matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))));
+    assert!(matches!(result, Err(bookie_core::DriverError::PolicyDenied(_))));
 }
 
 #[tokio::test]
@@ -490,7 +484,7 @@ async fn a_second_window_cannot_steal_an_already_active_connection() {
             driver: driver.clone(),
             opts: options.clone(),
             ssh: None,
-            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+            environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
         },
     ));
 
@@ -514,7 +508,7 @@ async fn a_second_window_cannot_steal_an_already_active_connection() {
             driver,
             opts: options,
             ssh: None,
-            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+            environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
         },
     );
 

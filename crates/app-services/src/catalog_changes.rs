@@ -6,7 +6,7 @@ pub struct CatalogChanges {
 
 impl CatalogChanges {
     pub fn succeeded(&mut self, sql: &str, driver: &str) -> bool {
-        use tablepro_policy::{CatalogEffect, catalog_effect};
+        use bookie_policy::{CatalogEffect, catalog_effect};
         match catalog_effect(sql, driver) {
             CatalogEffect::Begin => {
                 self.transaction = true;
@@ -33,20 +33,20 @@ impl CatalogChanges {
             CatalogEffect::None => false,
         }
     }
-    pub fn transaction_finished<E>(&mut self, outcome: &Result<tablepro_core::SessionCommitOutcome, E>) -> bool {
+    pub fn transaction_finished<E>(&mut self, outcome: &Result<bookie_core::SessionCommitOutcome, E>) -> bool {
         let Ok(outcome) = outcome else {
             return false;
         };
         self.transaction = false;
         let changed = std::mem::take(&mut self.pending);
-        matches!(outcome, tablepro_core::SessionCommitOutcome::Committed) && changed
+        matches!(outcome, bookie_core::SessionCommitOutcome::Committed) && changed
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::CatalogChanges;
-    use tablepro_core::{DriverError, SessionCommitOutcome};
+    use bookie_core::{DriverError, SessionCommitOutcome};
 
     fn pending_ddl() -> CatalogChanges {
         let mut changes = CatalogChanges::default();

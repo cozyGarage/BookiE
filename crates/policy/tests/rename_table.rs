@@ -1,5 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_policy::{StatementClass, classify};
+use bookie_policy::{StatementClass, classify};
 
 #[test]
 fn a_rename_table_statement_is_ddl_naming_the_old_table() {

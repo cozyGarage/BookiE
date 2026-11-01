@@ -1,8 +1,8 @@
-pub use tablepro_app_services::quick_switcher::{QuickItem, QuickTarget, favorite_items, filter};
-use tablepro_core::TableInfo;
+pub use bookie_app_services::quick_switcher::{QuickItem, QuickTarget, favorite_items, filter};
+use bookie_core::TableInfo;
 
 pub fn relation_items(tables: &[TableInfo], views: &[TableInfo]) -> Vec<QuickItem> {
-    tablepro_app_services::quick_switcher::relation_items(tables, views, &crate::tr!("Table"), &crate::tr!("View"))
+    bookie_app_services::quick_switcher::relation_items(tables, views, &crate::tr!("Table"), &crate::tr!("View"))
 }
 
 fn commands() -> Vec<(&'static str, String)> {

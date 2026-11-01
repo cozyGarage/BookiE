@@ -2,10 +2,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
+use bookie_core::Environment;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tablepro_core::Environment;
 use thiserror::Error;
 use uuid::Uuid;
 

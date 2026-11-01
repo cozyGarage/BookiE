@@ -1,6 +1,6 @@
+use bookie_core::{ColumnInfo, Value};
 use relm4::gtk;
 use relm4::gtk::prelude::*;
-use tablepro_core::{ColumnInfo, Value};
 
 use super::render_csv;
 
@@ -16,7 +16,7 @@ fn clipboard_csv_keeps_null_empty_enum_and_marker_labels_distinct() {
         is_generated: false,
         comment: None,
         collation: None,
-        enum_type: Some(tablepro_core::QualifiedTypeName {
+        enum_type: Some(bookie_core::QualifiedTypeName {
             schema: "sample_schema".into(),
             name: "status_kind".into(),
         }),
@@ -55,7 +55,7 @@ fn clipboard_csv_is_published_and_read_back_exactly() {
         is_generated: false,
         comment: None,
         collation: None,
-        enum_type: Some(tablepro_core::QualifiedTypeName {
+        enum_type: Some(bookie_core::QualifiedTypeName {
             schema: "sample_schema".into(),
             name: "status_kind".into(),
         }),
@@ -80,19 +80,19 @@ fn clipboard_csv_is_published_and_read_back_exactly() {
         .unwrap();
     assert_eq!(received.as_str(), csv);
 
-    let options = tablepro_core::import::CsvImportOptions {
-        delimiter: tablepro_core::export::CsvDelimiter::Comma,
+    let options = bookie_core::import::CsvImportOptions {
+        delimiter: bookie_core::export::CsvDelimiter::Comma,
         has_header: false,
-        null_marker: tablepro_core::export::unique_csv_null_marker(&rows),
+        null_marker: bookie_core::export::unique_csv_null_marker(&rows),
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(received.as_bytes(), &options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(received.as_bytes(), &options, None).unwrap();
     let pasted = sheet
         .rows
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            tablepro_core::import::row_to_values(row, &[Some(0)], &columns, &options, index + 1)
+            bookie_core::import::row_to_values(row, &[Some(0)], &columns, &options, index + 1)
                 .unwrap()
                 .remove(0)
         })
@@ -124,7 +124,7 @@ fn clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct() {
         is_generated: false,
         comment: None,
         collation: None,
-        enum_type: Some(tablepro_core::QualifiedTypeName {
+        enum_type: Some(bookie_core::QualifiedTypeName {
             schema: "sample_schema".into(),
             name: "status_kind".into(),
         }),
@@ -138,7 +138,7 @@ fn clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct() {
         vec![Value::Text("\\NN".into())],
         vec![Value::Text("=1+1".into())],
     ];
-    let tsv = tablepro_core::export::render_tsv(&columns, &rows, false);
+    let tsv = bookie_core::export::render_tsv(&columns, &rows, false);
     let window = gtk::Window::new();
     let clipboard = window.clipboard();
     clipboard.set_text(&tsv);
@@ -149,19 +149,19 @@ fn clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct() {
         .unwrap();
     assert_eq!(received.as_str(), tsv);
 
-    let options = tablepro_core::import::CsvImportOptions {
-        delimiter: tablepro_core::export::CsvDelimiter::Tab,
+    let options = bookie_core::import::CsvImportOptions {
+        delimiter: bookie_core::export::CsvDelimiter::Tab,
         has_header: false,
-        null_marker: tablepro_core::export::unique_csv_null_marker(&rows),
+        null_marker: bookie_core::export::unique_csv_null_marker(&rows),
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(received.as_bytes(), &options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(received.as_bytes(), &options, None).unwrap();
     let pasted = sheet
         .rows
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            tablepro_core::import::row_to_values(row, &[Some(0)], &columns, &options, index + 1)
+            bookie_core::import::row_to_values(row, &[Some(0)], &columns, &options, index + 1)
                 .unwrap()
                 .remove(0)
         })

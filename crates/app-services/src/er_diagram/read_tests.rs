@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverCapabilities, DriverError, ExecResult, ForeignKeyInfo, OperationControl, QueryResult,
     TableInfo, Value,
 };

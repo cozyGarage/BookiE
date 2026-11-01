@@ -1,14 +1,14 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
-fn export_csv(result: &tablepro_core::QueryResult, path: &std::path::Path) {
-    tablepro_core::export::write_result_file(
+fn export_csv(result: &bookie_core::QueryResult, path: &std::path::Path) {
+    bookie_core::export::write_result_file(
         path,
         result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -44,12 +44,12 @@ async fn value_contract_interval_array_csv_import_survives_intervalstyle_change(
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("interval.csv");
     export_csv(&source, &path);
-    let sheet = tablepro_core::import::read_csv(&std::fs::read(path).unwrap(), &Default::default(), None).unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let sheet = bookie_core::import::read_csv(&std::fs::read(path).unwrap(), &Default::default(), None).unwrap();
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "interval_csv_target",
             columns: &columns,

@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError, Weak};
 
-use tablepro_app_services::stream_result_spool::StreamResultSpool;
-use tablepro_core::{ColumnInfo, MAX_QUERY_RESULT_BYTES, QueryResult};
+use bookie_app_services::stream_result_spool::StreamResultSpool;
+use bookie_core::{ColumnInfo, MAX_QUERY_RESULT_BYTES, QueryResult};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum PageAppendError {

@@ -8,7 +8,7 @@ export GDK_BACKEND=x11 GTK_A11Y=atspi
 unset NO_AT_BRIDGE
 dbus-update-activation-environment DISPLAY XAUTHORITY GDK_BACKEND GTK_A11Y
 gdbus call --session --dest org.a11y.Bus --object-path /org/a11y/bus --method org.a11y.Bus.GetAddress >/dev/null
-flatpak run com.tablepro.linux >/tmp/flatpak-app.log 2>&1 &
+flatpak run com.bookie.linux >/tmp/flatpak-app.log 2>&1 &
 app=$!
 trap 'kill $app 2>/dev/null || true' EXIT
 python3 - <<'PY'

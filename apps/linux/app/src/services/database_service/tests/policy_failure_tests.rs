@@ -90,7 +90,7 @@ async fn a_failed_reload_keeps_the_last_loaded_restrictions_and_a_valid_reload_r
     let guard = service.get(id).unwrap();
     assert!(matches!(
         guard.execute("CREATE TABLE restricted (id INTEGER)").await,
-        Err(tablepro_core::DriverError::PolicyDenied(_))
+        Err(bookie_core::DriverError::PolicyDenied(_))
     ));
     std::fs::write(&path, "").unwrap();
     service.reload_policy_file(&path).unwrap();

@@ -1,6 +1,6 @@
 use super::*;
 use ::mongodb::bson::{Binary, Bson, doc, oid::ObjectId, spec::BinarySubtype};
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mongo::Mongo;
@@ -64,7 +64,7 @@ async fn mongodb_guarded_refetch_preserves_long_text_and_binary_values() {
         schema: Some("appdb"),
         table: "value_preview_records",
         columns: &columns,
-        filter: &tablepro_core::FilterSet::default(),
+        filter: &bookie_core::FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
     };
@@ -121,7 +121,7 @@ async fn assert_native_values(
 async fn assert_refetched_value(
     target: &BrowseTarget<'_>,
     connection: &std::sync::Arc<dyn Connection>,
-    control: &tablepro_core::OperationControl,
+    control: &bookie_core::OperationControl,
     key: &Value,
     name: &str,
     expected: Value,

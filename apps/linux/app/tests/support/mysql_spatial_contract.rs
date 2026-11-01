@@ -1,5 +1,5 @@
 use super::parse_input_for_driver;
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 fn col(data_type: &str, nullable: bool) -> ColumnInfo {
     ColumnInfo {
@@ -40,13 +40,13 @@ fn value_contract_mysql_spatial_parser_refuses_lossy_text_edits() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_spatial_grid_refusal_preserves_native_bytes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -58,7 +58,7 @@ async fn value_contract_mysql_spatial_grid_refusal_preserves_native_bytes() {
             port: container.get_host_port_ipv4(3306).await.unwrap(),
             database: "test".into(),
             username: "root".into(),
-            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            password: secrecy::SecretString::new("bookie_test".to_string().into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })

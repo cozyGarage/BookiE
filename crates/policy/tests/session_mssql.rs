@@ -4,13 +4,13 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use drivers_mssql::MssqlDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value};
-use tablepro_policy::{
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value};
+use bookie_policy::{
     AuditError, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus,
     AuditTransactionOutcome, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal, StatementClass,
     classify,
 };
+use drivers_mssql::MssqlDriver;
 use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mssql_server::MssqlServer;
@@ -28,9 +28,9 @@ impl AuditSink for CapturingAudit {
 }
 
 async fn run_session(
-    session: &mut Box<dyn tablepro_core::Session>,
+    session: &mut Box<dyn bookie_core::Session>,
     sql: &str,
-) -> Result<tablepro_core::QueryResult, DriverError> {
+) -> Result<bookie_core::QueryResult, DriverError> {
     session
         .query_params_controlled(sql, &[], &OperationControl::with_timeout(Duration::from_secs(10)))
         .await
@@ -52,7 +52,7 @@ async fn sql_server_tran_forms_are_refused_shared_and_tracked_in_sessions() {
             database: "master".into(),
             username: "sa".into(),
             password: secrecy::SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
-            tls: tablepro_core::TlsConfig::disabled(),
+            tls: bookie_core::TlsConfig::disabled(),
             ..Default::default()
         })
         .await
@@ -132,7 +132,7 @@ async fn sql_server_batches_with_mutations_are_classified_and_denied_before_disp
             database: "master".into(),
             username: "sa".into(),
             password: secrecy::SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
-            tls: tablepro_core::TlsConfig::disabled(),
+            tls: bookie_core::TlsConfig::disabled(),
             ..Default::default()
         })
         .await
@@ -209,9 +209,9 @@ async fn sql_server_batches_with_mutations_are_classified_and_denied_before_disp
         assert_eq!(
             state.rows,
             vec![vec![
-                tablepro_core::Value::Int(1),
-                tablepro_core::Value::Int(1),
-                tablepro_core::Value::Int(10)
+                bookie_core::Value::Int(1),
+                bookie_core::Value::Int(1),
+                bookie_core::Value::Int(10)
             ]]
         );
     }

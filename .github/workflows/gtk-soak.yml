@@ -78,20 +78,20 @@ jobs:
           prefix-key: linux-gtk-soak
       - name: Build application once
         run: |
-          cargo build --release --locked -p tablepro-app --bin tablepro-app
-          install -Dm755 target/release/tablepro-app target/installed/usr/bin/tablepro
+          cargo build --release --locked -p bookie-app --bin bookie-app
+          install -Dm755 target/release/bookie-app target/installed/usr/bin/bookie
       - name: Five independent attempts
         env:
-          TABLEPRO_GTK_BINARY: ${{ github.workspace }}/target/installed/usr/bin/tablepro
+          BOOKIE_GTK_BINARY: ${{ github.workspace }}/target/installed/usr/bin/bookie
         run: |
           mkdir -p "${GITHUB_WORKSPACE}/gtk-artifacts"
           for attempt in 1 2 3 4 5; do
-            export TABLEPRO_GTK_ARTIFACT_DIR="${GITHUB_WORKSPACE}/gtk-artifacts/attempt-${attempt}"
-            mkdir -p "$TABLEPRO_GTK_ARTIFACT_DIR"
-            if ./scripts/test-gtk-safety.sh >"$TABLEPRO_GTK_ARTIFACT_DIR/stdout.txt" 2>"$TABLEPRO_GTK_ARTIFACT_DIR/stderr.txt"; then
-              printf 'pass\n' >"$TABLEPRO_GTK_ARTIFACT_DIR/result.txt"
+            export BOOKIE_GTK_ARTIFACT_DIR="${GITHUB_WORKSPACE}/gtk-artifacts/attempt-${attempt}"
+            mkdir -p "$BOOKIE_GTK_ARTIFACT_DIR"
+            if ./scripts/test-gtk-safety.sh >"$BOOKIE_GTK_ARTIFACT_DIR/stdout.txt" 2>"$BOOKIE_GTK_ARTIFACT_DIR/stderr.txt"; then
+              printf 'pass\n' >"$BOOKIE_GTK_ARTIFACT_DIR/result.txt"
             else
-              printf 'fail\n' >"$TABLEPRO_GTK_ARTIFACT_DIR/result.txt"
+              printf 'fail\n' >"$BOOKIE_GTK_ARTIFACT_DIR/result.txt"
               exit 1
             fi
           done

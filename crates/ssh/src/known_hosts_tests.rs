@@ -61,7 +61,7 @@ fn default_known_hosts_path_uses_the_product_config_directory() {
             assert_eq!(path.file_name().and_then(|name| name.to_str()), Some("known_hosts"));
             assert_eq!(
                 path.parent().and_then(Path::file_name).and_then(|name| name.to_str()),
-                Some("tablepro")
+                Some("bookie")
             );
         }
         None => {
@@ -367,7 +367,7 @@ fn comments_blank_lines_and_crlf_do_not_hide_or_break_an_entry() {
 #[test]
 fn the_default_path_ignores_an_empty_or_relative_xdg_config_home() {
     let home = Some(OsString::from("/h"));
-    let expected = Some(PathBuf::from("/h/.config/tablepro/known_hosts"));
+    let expected = Some(PathBuf::from("/h/.config/bookie/known_hosts"));
     assert_eq!(known_hosts_path_from(Some(OsString::new()), home.clone()), expected);
     assert_eq!(
         known_hosts_path_from(Some(OsString::from("cfg")), home.clone()),
@@ -376,7 +376,7 @@ fn the_default_path_ignores_an_empty_or_relative_xdg_config_home() {
     assert_eq!(known_hosts_path_from(None, home.clone()), expected);
     assert_eq!(
         known_hosts_path_from(Some(OsString::from("/x")), home),
-        Some(PathBuf::from("/x/tablepro/known_hosts"))
+        Some(PathBuf::from("/x/bookie/known_hosts"))
     );
     assert_eq!(known_hosts_path_from(Some(OsString::new()), None), None);
 }

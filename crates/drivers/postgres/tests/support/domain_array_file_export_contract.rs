@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -78,17 +78,17 @@ async fn value_contract_domain_enum_array_file_exports_preserve_values_and_nativ
     assert_eq!(rebound.rows[0], native.rows[0][2..4]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv = tablepro_core::export::CsvOptions::default();
+    let csv = bookie_core::export::CsvOptions::default();
     for (extension, format, marker) in [
-        ("xml", tablepro_core::export::ResultFormat::Xml, "&lt;tag&gt;&amp;"),
-        ("html", tablepro_core::export::ResultFormat::Html, "&lt;tag&gt;&amp;"),
-        ("md", tablepro_core::export::ResultFormat::Markdown, "&lt;tag&gt;&amp;"),
+        ("xml", bookie_core::export::ResultFormat::Xml, "&lt;tag&gt;&amp;"),
+        ("html", bookie_core::export::ResultFormat::Html, "&lt;tag&gt;&amp;"),
+        ("md", bookie_core::export::ResultFormat::Markdown, "&lt;tag&gt;&amp;"),
     ] {
         let path = directory.path().join(format!("domain-array.{extension}"));
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             &path,
             &result,
-            &tablepro_core::export::ResultExport {
+            &bookie_core::export::ResultExport {
                 format,
                 csv: &csv,
                 sql: None,
@@ -105,11 +105,11 @@ async fn value_contract_domain_enum_array_file_exports_preserve_values_and_nativ
     }
 
     let json_path = directory.path().join("domain-array.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv,
             sql: None,
         },
@@ -121,11 +121,11 @@ async fn value_contract_domain_enum_array_file_exports_preserve_values_and_nativ
     assert_eq!(json[0]["value"], array_text.as_str());
 
     let csv_path = directory.path().join("domain-array.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv,
             sql: None,
         },
@@ -140,11 +140,11 @@ async fn value_contract_domain_enum_array_file_exports_preserve_values_and_nativ
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("domain-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv,
             sql: None,
         },
@@ -176,13 +176,13 @@ async fn value_contract_domain_enum_array_file_exports_preserve_values_and_nativ
         .await
         .unwrap();
     let sql_path = directory.path().join("domain-array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: Some("domain_array_file_export"),
                 table: "target",

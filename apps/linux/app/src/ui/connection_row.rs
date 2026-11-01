@@ -3,8 +3,8 @@ use relm4::factory::{DynamicIndex, FactoryComponent, FactorySender};
 use relm4::{adw, gtk};
 use uuid::Uuid;
 
-use tablepro_core::{AuthMode, DriverRegistry, Environment};
-use tablepro_storage::{ConnectionOrganization, SavedConnection};
+use bookie_core::{AuthMode, DriverRegistry, Environment};
+use bookie_storage::{ConnectionOrganization, SavedConnection};
 
 /// What a row needs to render: the saved record plus its organisation
 /// entry. The two live in different files on disk, so the parent hands
@@ -229,7 +229,7 @@ fn color_css_class(organization: &ConnectionOrganization) -> Option<&'static str
     organization
         .color
         .as_deref()
-        .and_then(tablepro_storage::connection_color_css_class)
+        .and_then(bookie_storage::connection_color_css_class)
 }
 
 fn color_classes(organization: &ConnectionOrganization) -> Vec<&'static str> {

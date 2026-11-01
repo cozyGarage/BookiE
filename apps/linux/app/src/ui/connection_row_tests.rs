@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{Environment, TlsMode};
+use bookie_core::{Environment, TlsMode};
 
 fn saved(username: &str, auth_mode: AuthMode) -> SavedConnection {
     SavedConnection {

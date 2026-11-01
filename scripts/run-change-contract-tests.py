@@ -175,7 +175,7 @@ def execute(command, log_path, expected_test=None, timeout=900):
 
 def main():
     parser = argparse.ArgumentParser(description="Run mapped unit regressions for changed B3 value paths.")
-    parser.add_argument("--base", default=os.environ.get("TABLEPRO_CHANGE_BASE", "HEAD"))
+    parser.add_argument("--base", default=os.environ.get("BOOKIE_CHANGE_BASE", "HEAD"))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 

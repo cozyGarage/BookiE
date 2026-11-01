@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tablepro_policy::{
+use bookie_policy::{
     AuditApprovalOutcome, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditTerminalStatus, Principal,
 };
 use uuid::Uuid;
@@ -138,7 +138,7 @@ pub fn contains_operation(rows: &[OperationRow], operation_id: Uuid) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_policy::{AuditOperationClass, AuditPreviewState, AuditTransactionOutcome, Principal};
+    use bookie_policy::{AuditOperationClass, AuditPreviewState, AuditTransactionOutcome, Principal};
 
     fn event(operation_id: Uuid, phase: AuditRecordPhase, status: AuditTerminalStatus) -> AuditEvent {
         AuditEvent {
@@ -149,7 +149,7 @@ mod tests {
             principal: Principal::human_gui(),
             connection_id: Uuid::nil(),
             connection_name: "shop".into(),
-            environment: tablepro_core::Environment::Prod,
+            environment: bookie_core::Environment::Prod,
             driver_id: "postgres".into(),
             operation_class: AuditOperationClass::Mutation,
             redacted_sql: "UPDATE orders SET note = ?".into(),

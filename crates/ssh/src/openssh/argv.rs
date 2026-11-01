@@ -24,7 +24,7 @@ const FORCED_OPTIONS: [&str; 17] = [
     "GatewayPorts=no",
 ];
 
-const CONTROL_HOST: &str = "tablepro";
+const CONTROL_HOST: &str = "bookie";
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ControlOp<'a> {

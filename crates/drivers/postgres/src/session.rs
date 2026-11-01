@@ -1,17 +1,17 @@
 use async_trait::async_trait;
-use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::{Pool, Postgres};
-use tablepro_core::{
+use bookie_core::{
     DriverError, MAX_QUERY_CURSOR_PAGE_ROWS, OperationControl, QueryCursorId, QueryCursorPage, QueryResult, Value,
     check_pre_dispatch,
 };
+use sqlx::pool::PoolConnection;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::{Pool, Postgres};
 
 use crate::{CONTROL_SETUP_TIMEOUT, controlled_execute, controlled_query, map_sqlx_error};
 
 struct ActiveCursor {
     id: QueryCursorId,
-    columns: Vec<tablepro_core::ColumnInfo>,
+    columns: Vec<bookie_core::ColumnInfo>,
     failed: bool,
 }
 
@@ -21,7 +21,7 @@ pub(crate) struct PgSession {
     active_cursor: Option<ActiveCursor>,
 }
 
-pub(crate) async fn open(options: &PgConnectOptions) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+pub(crate) async fn open(options: &PgConnectOptions) -> Result<Box<dyn bookie_core::Session>, DriverError> {
     let pool = PgPoolOptions::new()
         .max_connections(1)
         .acquire_timeout(CONTROL_SETUP_TIMEOUT)
@@ -39,7 +39,7 @@ pub(crate) async fn open(options: &PgConnectOptions) -> Result<Box<dyn tablepro_
 }
 
 #[async_trait]
-impl tablepro_core::Session for PgSession {
+impl bookie_core::Session for PgSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,
@@ -60,7 +60,7 @@ impl tablepro_core::Session for PgSession {
     async fn lexical_settings_controlled(
         &mut self,
         _control: &OperationControl,
-    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+    ) -> Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, DriverError> {
         let connection = self
             .connection
             .as_ref()
@@ -300,7 +300,7 @@ fn position_in_cursor_query(error: DriverError) -> DriverError {
 
 #[cfg(test)]
 mod tests {
-    use tablepro_core::DriverError;
+    use bookie_core::DriverError;
 
     use super::{CURSOR_PREFIX, position_in_cursor_query};
 

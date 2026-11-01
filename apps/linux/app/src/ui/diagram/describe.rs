@@ -1,4 +1,4 @@
-use tablepro_app_services::er_diagram::{DiagramColumn, SchemaDiagram};
+use bookie_app_services::er_diagram::{DiagramColumn, SchemaDiagram};
 
 pub(super) fn table_description(diagram: &SchemaDiagram, table: usize) -> String {
     let Some(found) = diagram.tables.get(table) else {
@@ -44,8 +44,8 @@ pub(super) fn diagram_label(schema: Option<&str>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use tablepro_app_services::er_diagram::TableRead;
-    use tablepro_core::{ColumnInfo, ForeignKeyInfo};
+    use bookie_app_services::er_diagram::TableRead;
+    use bookie_core::{ColumnInfo, ForeignKeyInfo};
 
     use super::*;
 

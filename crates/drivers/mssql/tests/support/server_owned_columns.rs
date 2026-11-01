@@ -1,4 +1,4 @@
-use tablepro_core::{Connection, Value};
+use bookie_core::{Connection, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -75,14 +75,9 @@ async fn value_contract_server_owned_columns_and_identity_copy_inserts_use_defau
         .unwrap()
         .rows
         .remove(0);
-    let sql = tablepro_core::sql_literal::build_insert_literal(
-        "mssql",
-        Some("owned.schema"),
-        "identity_only",
-        &columns,
-        &row,
-    )
-    .unwrap();
+    let sql =
+        bookie_core::sql_literal::build_insert_literal("mssql", Some("owned.schema"), "identity_only", &columns, &row)
+            .unwrap();
     assert_eq!(sql, "INSERT INTO [owned.schema].[identity_only] DEFAULT VALUES;");
     connection.execute(&sql).await.unwrap();
     assert_eq!(
@@ -105,9 +100,9 @@ async fn create_source(connection: &dyn Connection) {
     }
 }
 
-async fn assert_insert_consumers(connection: &dyn Connection, columns: &[tablepro_core::ColumnInfo], row: &[Value]) {
+async fn assert_insert_consumers(connection: &dyn Connection, columns: &[bookie_core::ColumnInfo], row: &[Value]) {
     let sql =
-        tablepro_core::sql_literal::build_insert_literal("mssql", Some("owned.schema"), "owned.table", columns, row)
+        bookie_core::sql_literal::build_insert_literal("mssql", Some("owned.schema"), "owned.table", columns, row)
             .unwrap();
     assert!(!sql.contains("[version]"));
     assert!(!sql.contains("[starts]"));
@@ -116,7 +111,7 @@ async fn assert_insert_consumers(connection: &dyn Connection, columns: &[tablepr
     connection.execute(&sql).await.unwrap();
     let mut draft = row.to_vec();
     draft[0] = Value::Int(3);
-    let (sql, parameters) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (sql, parameters) = bookie_core::sql_dialect::build_insert_from_draft(
         "mssql",
         Some("owned.schema"),
         "owned.table",

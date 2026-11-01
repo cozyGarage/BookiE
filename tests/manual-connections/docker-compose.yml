@@ -1,18 +1,18 @@
-name: tablepro-manual-connections
+name: bookie-manual-connections
 
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: tablepro_lab
-      POSTGRES_USER: tablepro_admin
-      POSTGRES_PASSWORD: tablepro_admin_password
+      POSTGRES_DB: bookie_lab
+      POSTGRES_USER: bookie_admin
+      POSTGRES_PASSWORD: bookie_admin_password
     volumes:
       - ./init/postgres:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:15432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tablepro_admin -d tablepro_lab"]
+      test: ["CMD-SHELL", "pg_isready -U bookie_admin -d bookie_lab"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -20,16 +20,16 @@ services:
   mysql:
     image: mysql:8.4
     environment:
-      MYSQL_DATABASE: tablepro_lab
-      MYSQL_USER: tablepro_rw
-      MYSQL_PASSWORD: tablepro_rw_password
-      MYSQL_ROOT_PASSWORD: tablepro_root_password
+      MYSQL_DATABASE: bookie_lab
+      MYSQL_USER: bookie_rw
+      MYSQL_PASSWORD: bookie_rw_password
+      MYSQL_ROOT_PASSWORD: bookie_root_password
     volumes:
       - ./init/mysql:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:13306:3306"
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -ptablepro_root_password"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -pbookie_root_password"]
       interval: 3s
       timeout: 5s
       retries: 30
@@ -38,14 +38,14 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: Y
-      MSSQL_SA_PASSWORD: TablePro_sa_password1
+      MSSQL_SA_PASSWORD: BookiE_sa_password1
     ports:
       - "127.0.0.1:11433:1433"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P TablePro_sa_password1 -Q 'SELECT 1' || exit 1",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P BookiE_sa_password1 -Q 'SELECT 1' || exit 1",
         ]
       interval: 5s
       timeout: 5s
@@ -67,7 +67,7 @@ services:
         "-U",
         "sa",
         "-P",
-        "TablePro_sa_password1",
+        "BookiE_sa_password1",
         "-b",
         "-i",
         "/init/mssql.sql",
@@ -77,16 +77,16 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     environment:
-      CLICKHOUSE_DB: tablepro_lab
-      CLICKHOUSE_USER: tablepro_rw
-      CLICKHOUSE_PASSWORD: tablepro_rw_password
+      CLICKHOUSE_DB: bookie_lab
+      CLICKHOUSE_USER: bookie_rw
+      CLICKHOUSE_PASSWORD: bookie_rw_password
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     volumes:
       - ./init/clickhouse:/docker-entrypoint-initdb.d:ro
     ports:
       - "127.0.0.1:18123:8123"
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --user tablepro_rw --password tablepro_rw_password --query 'SELECT 1'"]
+      test: ["CMD-SHELL", "clickhouse-client --user bookie_rw --password bookie_rw_password --query 'SELECT 1'"]
       interval: 3s
       timeout: 5s
       retries: 30
@@ -94,8 +94,8 @@ services:
   mongo:
     image: mongo:8.0
     environment:
-      MONGO_INITDB_ROOT_USERNAME: tablepro_admin
-      MONGO_INITDB_ROOT_PASSWORD: tablepro_admin_password
+      MONGO_INITDB_ROOT_USERNAME: bookie_admin
+      MONGO_INITDB_ROOT_PASSWORD: bookie_admin_password
     volumes:
       - ./init/mongo:/docker-entrypoint-initdb.d:ro
     ports:
@@ -115,7 +115,7 @@ services:
     ports:
       - "127.0.0.1:16379:6379"
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --user tablepro_rw --pass tablepro_rw_password ping"]
+      test: ["CMD-SHELL", "redis-cli --user bookie_rw --pass bookie_rw_password ping"]
       interval: 2s
       timeout: 3s
       retries: 30

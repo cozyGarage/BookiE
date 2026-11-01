@@ -6,8 +6,8 @@ use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgCancelToken, PgConnectOptions};
 use sqlx::{Connection as SqlxConnection, Pool, Postgres, Row};
 
-use tablepro_core::sql_syntax::script::LexicalSettings;
-use tablepro_core::{
+use bookie_core::sql_syntax::script::LexicalSettings;
+use bookie_core::{
     CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, ConnectOptions, Connection, DatabaseDriver,
     DriverError, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl,
     QualifiedTypeName, QueryResult, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
@@ -73,7 +73,7 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
-    fn catalog_object_kinds(&self) -> &'static [tablepro_core::CatalogObjectKind] {
+    fn catalog_object_kinds(&self) -> &'static [bookie_core::CatalogObjectKind] {
         catalog::SUPPORTED_KINDS
     }
 
@@ -102,7 +102,7 @@ impl DatabaseDriver for PgDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        use tablepro_core::TlsMode;
+        use bookie_core::TlsMode;
         let mut pg_opts = postgres_connect_options(&opts)?;
         pg_opts = pg_opts
             .database(&opts.database)
@@ -220,9 +220,9 @@ impl Connection for PgConnection {
 
     async fn list_objects(
         &self,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<&str>,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         catalog::list_objects(&self.pool, kind, schema).await
     }
 
@@ -675,7 +675,7 @@ impl Connection for PgConnection {
         Ok(())
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         session::open(&self.session_options).await
     }
 
@@ -689,7 +689,7 @@ impl Connection for PgConnection {
         reported_lexical_settings(&connection).map(Some)
     }
 
-    async fn begin(&self) -> Result<Box<dyn tablepro_core::Transaction>, DriverError> {
+    async fn begin(&self) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
         let mut connection = tokio::time::timeout(CONTROL_SETUP_TIMEOUT, self.pool.acquire())
             .await
             .map_err(|_| DriverError::TimedOut)?
@@ -752,7 +752,7 @@ impl Drop for PgTransaction {
 }
 
 #[async_trait]
-impl tablepro_core::Transaction for PgTransaction {
+impl bookie_core::Transaction for PgTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
         let stop = Some(QueryStop {
             cancel_token: self.cancel_token.clone(),
