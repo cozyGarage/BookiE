@@ -950,6 +950,13 @@ def owned_application():
 def start_application(binary, environment, restored=False):
     global _owned_application
     environment.setdefault("G_DEBUG", "fatal-criticals")
+    heaptrack_preload = os.environ.get("TABLEPRO_GTK_APP_LD_PRELOAD")
+    heaptrack_output = os.environ.get("TABLEPRO_GTK_APP_HEAPTRACK_OUTPUT")
+    if (heaptrack_preload is None) != (heaptrack_output is None):
+        raise AssertionError("Heaptrack requires both an app preload library and output pipe")
+    if heaptrack_preload is not None and heaptrack_output is not None:
+        environment["LD_PRELOAD"] = heaptrack_preload
+        environment["DUMP_HEAPTRACK_OUTPUT"] = heaptrack_output
     stderr_capture = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
     try:
         process = subprocess.Popen(
