@@ -46,6 +46,8 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     if matches!(result.terminal, StreamTerminal::Loading) {
         page_switcher.set_widget_name(super::super::stream_view::LIVE_PAGES);
         progress.set_widget_name(super::super::stream_view::LIVE_PROGRESS);
+    } else {
+        page_switcher.set_widget_name(&super::super::stream_view::completed_page_stack_name(result.generation));
     }
     holder.append(&progress);
     if let Some(notice) = notice {
