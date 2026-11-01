@@ -204,15 +204,13 @@ impl SqlEditor {
             settings_store: self.result_view_settings.clone(),
         };
         let updated = self.pinned.latest().last().is_some_and(|outcome| match &outcome.kind {
-            StatementOutcomeKind::Streamed(result) => {
-                super::stream_view::update_live_stream(
-                    &self.results_holder,
-                    outcome,
-                    result,
-                    &target,
-                    &mut self.stream_eviction_cursor,
-                )
-            }
+            StatementOutcomeKind::Streamed(result) => super::stream_view::update_live_stream(
+                &self.results_holder,
+                outcome,
+                result,
+                &target,
+                &mut self.stream_eviction_cursor,
+            ),
             _ => false,
         });
         if !updated {
