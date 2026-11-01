@@ -236,10 +236,15 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
     let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
     let (sender, _receiver) = relm4::channel();
     let local = local_result_for_menu();
+    let columns = [
+        menu_test_column("linked", "INTEGER"),
+        menu_test_column("payload", "TEXT"),
+        menu_test_column("active", "BOOLEAN"),
+    ];
     let menus = install_grid_context_menus(
         &view,
         sender,
-        &[],
+        &columns,
         false,
         "sqlite".into(),
         GridMenuOptions {
@@ -251,7 +256,7 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
         },
     );
     let cells = Rc::new(std::cell::RefCell::new(Vec::new()));
-    let factory = keyboard_menu_factory(&menus, cells.clone());
+    let factory = keyboard_menu_factory(cells.clone());
     view.append_column(&gtk::ColumnViewColumn::new(None, Some(factory)));
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     content.append(&view);
@@ -278,15 +283,11 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
     (window, label, menus, local)
 }
 
-fn keyboard_menu_factory(
-    menus: &GridMenus,
-    cells: Rc<std::cell::RefCell<Vec<gtk::Label>>>,
-) -> gtk::SignalListItemFactory {
+fn keyboard_menu_factory(cells: Rc<std::cell::RefCell<Vec<gtk::Label>>>) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
-    let menus = menus.clone();
     factory.connect_setup(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
-        super::super::editing::setup_readonly_cell(item, 0, "linked".into(), None, Some(&menus));
+        super::super::editing::setup_readonly_cell(item, 0, None);
         cells
             .borrow_mut()
             .push(item.child().and_downcast::<gtk::Label>().unwrap());
@@ -427,21 +428,27 @@ fn append_menu_widget(view: &gtk::ColumnView, widget: gtk::Widget) {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
-        let idx = super::super::display::COLUMN_SLOT.get(&widget).unwrap();
+        super::super::display::COLUMN_SLOT.get(&widget).unwrap();
         POSITION_SLOT.set(&widget, 0);
-        set_cell_menu_options(
-            &widget,
-            CellGestureOptions {
-                idx,
-                column_name: format!("c{idx}"),
-                is_editable: true,
-                is_text_editable: widget.is::<crate::ui::cell_editor::CellEditor>(),
-                supports_full_value: false,
-            },
-        );
         item.set_child(Some(&widget));
     });
     view.append_column(&gtk::ColumnViewColumn::new(Some("Fixture"), Some(factory)));
+}
+
+fn menu_test_column(name: &str, data_type: &str) -> ColumnInfo {
+    ColumnInfo {
+        name: name.into(),
+        data_type: data_type.into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        is_generated: false,
+        default_value: None,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }
 }
 
 fn pointer_menu_uses_target_and_current_row() {

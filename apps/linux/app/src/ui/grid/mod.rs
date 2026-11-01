@@ -203,7 +203,7 @@ pub fn build_column_view(
         .show_column_separators(true)
         .build();
 
-    let grid_menus = menu_sender.as_ref().map(|sender| {
+    if let Some(sender) = menu_sender.as_ref() {
         let driver_id = connection_id
             .and_then(|id| database.metadata(id))
             .map(|metadata| metadata.driver_id)
@@ -221,8 +221,8 @@ pub fn build_column_view(
                 has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
                 local_result_view: tab_ctx.local_result_view.clone(),
             },
-        )
-    });
+        );
+    }
 
     let default_min_width = if columns.len() > WIDE_TABLE_THRESHOLD {
         Some(MIN_COLUMN_WIDTH_PX)
@@ -243,7 +243,6 @@ pub fn build_column_view(
             tab_ctx.clone(),
             sort_sender.is_some() || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
             default_min_width,
-            grid_menus.clone(),
             column_widths.clone(),
         );
         col.set_id(Some(&i.to_string()));
