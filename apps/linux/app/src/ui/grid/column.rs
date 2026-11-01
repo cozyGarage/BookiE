@@ -294,17 +294,17 @@ fn state_for_bind(
     };
     crate::services::change_tracker::with_tab_ref(tab_id, |tracker| {
         use crate::services::change_tracker::{CellState, RowState};
-        let cell_state = tracker.cell_state(&key, index);
+        let cell_state = tracker.cell_state(key, index);
         let updated =
-            (cell_state == CellState::Modified).then(|| tracker.current_cell_value(&key, index, source_value).clone());
+            (cell_state == CellState::Modified).then(|| tracker.current_cell_value(key, index, source_value).clone());
         let mut classes = Vec::new();
-        match (tracker.row_state(&key), cell_state) {
+        match (tracker.row_state(key), cell_state) {
             (RowState::PendingDelete, _) => classes.push("tp-row-pending-delete"),
             (RowState::InsertDraft, _) => classes.push("tp-row-pending-insert"),
             (_, CellState::Modified) => classes.push("tp-cell-modified"),
             _ => {}
         }
-        if index == 0 && tracker.is_error_row(&key) {
+        if index == 0 && tracker.is_error_row(key) {
             classes.push("tp-row-leftmost-error-flash");
         }
         (cell_state == CellState::Modified, updated, classes)
