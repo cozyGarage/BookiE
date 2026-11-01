@@ -30,13 +30,17 @@ docker run --detach --name "$container_name" \
   --volume "$socket_root:/var/run/postgresql" \
   postgres:16-alpine >/dev/null
 
+ready=0
 for _ in $(seq 1 60); do
-  if docker exec "$container_name" pg_isready -h /var/run/postgresql -U postgres -d postgres >/dev/null 2>&1; then
+  container_logs="$(docker logs "$container_name" 2>&1 || true)"
+  if [[ "$container_logs" == *"PostgreSQL init process complete; ready for start up."* ]] \
+    && docker exec "$container_name" pg_isready -h /var/run/postgresql -U postgres -d postgres >/dev/null 2>&1; then
+    ready=1
     break
   fi
   sleep 1
 done
-if ! docker exec "$container_name" pg_isready -h /var/run/postgresql -U postgres -d postgres >/dev/null 2>&1; then
+if [[ "$ready" -ne 1 ]]; then
   docker logs "$container_name" >&2
   echo "PostgreSQL socket server did not become ready" >&2
   exit 1
