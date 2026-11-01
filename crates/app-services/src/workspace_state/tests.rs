@@ -170,6 +170,42 @@ fn workspace_queue_failed_write_is_not_acknowledged_as_persisted() {
 }
 
 #[test]
+fn workspace_queue_flush_during_a_write_does_not_enqueue_a_duplicate_wake() {
+    let (wake, receiver) = mpsc::sync_channel(1);
+    let queue = Arc::new(Mutex::new(WorkspaceQueue::default()));
+    let writer = WorkspaceWriter {
+        wake,
+        queue: Arc::clone(&queue),
+    };
+    let id = Uuid::new_v4();
+    queue.lock().unwrap().save(id, connection("SELECT 1"));
+    assert!(wake_writer(&writer));
+    assert_eq!(receiver.try_recv(), Ok(()));
+
+    let (sender, flush) = mpsc::channel();
+    let pending = {
+        let mut queue = queue.lock().unwrap();
+        let pending = queue.begin_attempt();
+        queue.flush(sender);
+        pending
+    };
+    assert!(wake_writer(&writer));
+    assert!(matches!(receiver.try_recv(), Err(mpsc::TryRecvError::Empty)));
+
+    let mut guard = queue.lock().unwrap();
+    guard.restore_pending(pending);
+    guard.complete_attempt(1, Err(WorkspaceFlushError::WriteFailed));
+    assert_eq!(flush.try_recv(), Ok(Err(WorkspaceFlushError::WriteFailed)));
+    drop(guard);
+
+    let (retry_sender, retry) = mpsc::channel();
+    queue.lock().unwrap().flush(retry_sender);
+    assert!(wake_writer(&writer));
+    assert_eq!(receiver.try_recv(), Ok(()));
+    assert!(matches!(retry.try_recv(), Err(mpsc::TryRecvError::Empty)));
+}
+
+#[test]
 fn workspace_queue_failed_write_requires_a_successful_retry() {
     let mut queue = WorkspaceQueue::default();
     let id = Uuid::new_v4();

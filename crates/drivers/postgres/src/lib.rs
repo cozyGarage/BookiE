@@ -1091,12 +1091,15 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
 }
 
 fn with_pooler_hint(message: &str, sqlstate: Option<&str>) -> String {
-    match sqlstate {
-        Some("42P05" | "26000") if message.contains("\"sqlx_s_") => format!(
+    let prepared_statement_conflict = matches!(sqlstate, Some("42P05" | "26000")) && message.contains("\"sqlx_s_");
+    let unsupported_binary_bind =
+        sqlstate == Some("22P03") && message.starts_with("incorrect binary data format in bind parameter ");
+    if prepared_statement_conflict || unsupported_binary_bind {
+        return format!(
             "{message} (the server connection may be behind a pooler in transaction mode: enable its prepared statement support, for example PgBouncer max_prepared_statements, or use session pooling)"
-        ),
-        _ => message.to_string(),
+        );
     }
+    message.to_string()
 }
 
 fn is_enum_label_metadata_null(err: &sqlx::Error) -> bool {

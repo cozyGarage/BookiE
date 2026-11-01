@@ -29,6 +29,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] For SQLite `id INTEGER PRIMARY KEY`, a matching CSV `id` header is preselected when explicit auto-increment values are supported. The preview says those CSV values will be inserted when mapped, and source IDs 51 and 52 are preserved.
 - [ ] Creating a table shows a name and an inferred type per column, both editable before anything runs.
 - [ ] Approval is requested **once** for the whole import, not per batch.
+- [ ] Import a 900,000-row CSV: a preparation dialog stays visible and the window continues responding while the file is read and its insert plan is built. Cancel during preparation: no approval is requested and no rows are written.
 - [ ] Progress advances and Cancel stops it.
 - [ ] A file with a bad row partway through stops the import and the message says how many rows were written.
 - [ ] Import refuses to start on a read-only connection.
