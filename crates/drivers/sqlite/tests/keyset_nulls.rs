@@ -5,9 +5,11 @@ use tablepro_core::{keyset_before_where_clause, keyset_order_by, keyset_order_by
 use tempfile::TempDir;
 
 async fn seeded(directory: &TempDir) -> Box<dyn Connection> {
+    let db_path = directory.path().join("keyset.db");
+    let _ = std::fs::File::create(&db_path);
     let connection = SqliteDriver
         .connect(ConnectOptions {
-            database: directory.path().join("keyset.db").to_string_lossy().to_string(),
+            database: db_path.to_string_lossy().to_string(),
             ..Default::default()
         })
         .await
