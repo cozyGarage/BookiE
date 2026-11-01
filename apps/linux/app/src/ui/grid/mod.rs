@@ -361,9 +361,7 @@ fn sort_local_result(
 }
 
 pub(crate) fn sortable_result_columns(result: &QueryResult) -> std::collections::HashSet<usize> {
-    (0..result.columns.len())
-        .filter(|column| local_sort::is_sortable_column(result, *column))
-        .collect()
+    local_sort::sortable_columns(result)
 }
 
 pub(crate) fn jump_to_column(widget: &gtk4::Widget) -> bool {
@@ -373,6 +371,59 @@ pub(crate) fn jump_to_column(widget: &gtk4::Widget) -> bool {
 #[cfg(test)]
 mod local_sort_tests {
     use super::*;
+
+    #[test]
+    fn sortable_columns_preserve_null_mixed_type_and_missing_cell_rules() {
+        let columns = (0..5)
+            .map(|index| ColumnInfo {
+                name: format!("column_{index}"),
+                data_type: "INTEGER".into(),
+                nullable: true,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            })
+            .collect();
+        let result = QueryResult {
+            columns,
+            rows: vec![
+                vec![
+                    tablepro_core::Value::Int(1),
+                    tablepro_core::Value::Null,
+                    tablepro_core::Value::Int(3),
+                    tablepro_core::Value::Int(4),
+                    tablepro_core::Value::Int(5),
+                ],
+                vec![
+                    tablepro_core::Value::Null,
+                    tablepro_core::Value::Null,
+                    tablepro_core::Value::Text("3".into()),
+                    tablepro_core::Value::Undecodable("unknown".into()),
+                ],
+            ],
+            truncated: false,
+        };
+
+        let expected = std::collections::HashSet::from([0, 1]);
+        assert_eq!(sortable_result_columns(&result), expected);
+        for column in 0..result.columns.len() {
+            assert_eq!(
+                local_sort::is_sortable_column(&result, column),
+                expected.contains(&column)
+            );
+        }
+        let empty = QueryResult {
+            columns: result.columns.clone(),
+            rows: Vec::new(),
+            truncated: false,
+        };
+        assert_eq!(sortable_result_columns(&empty), (0..result.columns.len()).collect());
+    }
 
     #[test]
     #[ignore = "requires isolated GTK display"]
