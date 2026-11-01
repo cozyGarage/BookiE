@@ -162,7 +162,7 @@ impl LocalResultView {
     }
 
     pub(crate) fn filter_by_value(&self, column: usize, value: Value, exclude: bool) -> bool {
-        if tablepro_core::equality_rule("_", &value).is_none() {
+        if bookie_core::equality_rule("_", &value).is_none() {
             return false;
         }
         if !self.0.borrow().result.rows.iter().any(|row| row.get(column).is_some()) {
