@@ -331,7 +331,7 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             self.assertIn(required, fast)
         self.assertIn(
-            "cargo test --locked -p bookie-app --features duckdb --lib value_contract_duckdb",
+            "cargo test --locked -p bookie-app --lib value_contract_duckdb",
             workflow,
         )
         ledger = subprocess.check_output(["python3", str(ROOT / "scripts/inventory-ignored-tests.py")], text=True)

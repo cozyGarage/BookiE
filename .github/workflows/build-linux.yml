@@ -673,7 +673,7 @@ jobs:
   duckdb:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     needs: pin-revision
-    name: Optional DuckDB driver and GTK feature
+    name: DuckDB driver and GTK app
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     container:
@@ -719,9 +719,9 @@ jobs:
       - name: Driver tests including offline extensions and flat files
         run: cargo test --locked -p bookie-driver-duckdb
       - name: Build the GTK application with DuckDB
-        run: cargo build --locked -p bookie-app --features duckdb
+        run: cargo build --locked -p bookie-app
       - name: Run app DuckDB value contracts
-        run: cargo test --locked -p bookie-app --features duckdb --lib value_contract_duckdb
+        run: cargo test --locked -p bookie-app --lib value_contract_duckdb
 
   regression-gate:
     name: Linux regression gate

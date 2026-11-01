@@ -1,9 +1,6 @@
-#[cfg(feature = "duckdb")]
 use super::parse_input_for_grid_cell;
-#[cfg(feature = "duckdb")]
 use bookie_core::Value;
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_siblings() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -114,7 +111,6 @@ async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_sibling
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_null() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -185,7 +181,6 @@ async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_nu
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_list_result_matches_native_json() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -241,7 +236,6 @@ async fn value_contract_duckdb_enum_list_result_matches_native_json() {
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -296,7 +290,6 @@ async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
     use bookie_core::{ConnectOptions, DatabaseDriver};

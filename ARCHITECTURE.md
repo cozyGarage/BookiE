@@ -17,7 +17,7 @@ These identifiers are retained strictly for on-disk persistence stability, keyri
 
 ![BookiE architecture overview: the desktop app and the headless MCP host reach every database through one PolicyGuard, then routing and static drivers](docs/images/architecture-overview.svg)
 
-DuckDB is an optional build feature and is not shown. The diagrams below give the detail.
+DuckDB is a built-in driver. The diagrams below give the detail.
 
 ## Repository layout
 
@@ -120,7 +120,7 @@ flowchart TB
     end
 
     subgraph drivers["Static drivers"]
-        drv["postgres · mysql · sqlite · mssql<br/>clickhouse · redis · mongodb<br/>duckdb (optional build feature)"]
+        drv["postgres · mysql · sqlite · mssql<br/>clickhouse · redis · mongodb<br/>duckdb"]
     end
 
     app --> mcp
@@ -370,7 +370,7 @@ Each engine exports a type implementing `bookie_core::DatabaseDriver`. Connect r
 | ClickHouse | `clickhouse` | Driver + TLS fixtures |
 | Redis | `redis` | Experimental; single host/port in 0.2.0 |
 | MongoDB | `mongodb` | Experimental |
-| DuckDB | DuckDB | Optional workspace feature |
+| DuckDB | DuckDB | Built in |
 
 `rust_decimal` is the shared decimal carrier; exact support is recorded per type/consumer under [ADR 0007](docs/decisions/0007-type-and-value-preservation.md). Session trust: [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md). Durable identity: [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md). Registration: [adding drivers](docs/adding-drivers.md).
 
@@ -448,7 +448,7 @@ Config and history live under `$XDG_CONFIG_HOME/bookie/` (or `bookie-devel` in d
 
 ## Build and validation
 
-Default workspace Clippy/unit checks exclude optional DuckDB. Required checks and local commands are listed in [AGENTS.md](./AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
+Default workspace Clippy/unit checks exclude the DuckDB driver crate, which has its own CI job; the app build includes it. Required checks and local commands are listed in [AGENTS.md](./AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
 
 ## Deliberate limits
 

@@ -51,7 +51,7 @@ run_full() {
   echo "==> nextest --workspace --lib --bins"
   # Compiling tests already builds the crates; a separate `cargo build`
   # beforehand doubles wall time for little signal.
-  # DuckDB is optional (--features duckdb) and expensive to compile.
+  # The DuckDB driver crate has its own CI job; the app build already includes it.
   NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
   "$NEXTEST" nextest run --workspace --exclude bookie-driver-duckdb --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
 
@@ -103,7 +103,7 @@ run_release() {
   echo "==> MongoDB-backed GTK cursor and edit contract"
   python3 scripts/run-test-layer.py gtk-mongodb
   cargo test --locked -p bookie-driver-duckdb
-  cargo build --locked -p bookie-app --features duckdb
+  cargo build --locked -p bookie-app
   cargo deny check
   cargo audit
   echo "Automated release gates passed. Package install/upgrade/rollback, Wayland and candidate soak remain separate."
