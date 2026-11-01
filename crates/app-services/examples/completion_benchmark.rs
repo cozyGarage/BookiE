@@ -88,12 +88,29 @@ fn main() -> Result<(), Box<dyn Error>> {
     let index = catalog(50);
     for statements in SCRIPT_STATEMENTS {
         let sql = script(statements);
-        let timing = time_lookups(SCRIPT_ITERATIONS, || candidates(&sql, sql.len(), &index).values.len());
-        rows.push(row(
-            "script",
-            &format!(r#""script_bytes":{},"tables":50"#, sql.len()),
-            &timing,
-        ));
+        let cursor_positions = [
+            (
+                "early",
+                sql.find("INSERT INTO t")
+                    .map(|start| start + "INSERT INTO ".len())
+                    .unwrap_or(0),
+            ),
+            (
+                "middle",
+                sql.find("SELECT a, b FROM")
+                    .map(|start| start + "SELECT a, b FROM ".len())
+                    .unwrap_or(0),
+            ),
+            ("end", sql.len()),
+        ];
+        for (position, cursor) in cursor_positions {
+            let timing = time_lookups(SCRIPT_ITERATIONS, || candidates(&sql, cursor, &index).values.len());
+            rows.push(row(
+                "script",
+                &format!(r#""script_bytes":{},"tables":50,"cursor":"{position}""#, sql.len()),
+                &timing,
+            ));
+        }
     }
     writeln!(std::io::stdout(), "[{}]", rows.join(",\n "))?;
     Ok(())
