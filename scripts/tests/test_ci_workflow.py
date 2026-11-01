@@ -314,7 +314,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mssql_max_values_survive_connection_session_and_consumers",
                 "value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers",
                 "value_contract_postgres_csv_import_preserves_explicit_identity_values",
-                "an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin",
+                "a_pinned_spooled_page_reloads_without_retaining_its_payload",
                 "evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest",
                 "closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages",
             },
