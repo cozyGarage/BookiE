@@ -13,6 +13,7 @@ mod dialog_focus;
 mod display;
 mod editing;
 mod export;
+mod font_zoom;
 pub(crate) mod full_value_editor;
 #[cfg(test)]
 mod lifetime_tests;
@@ -281,6 +282,7 @@ pub fn build_column_view(
         &grid_actions,
         columns.iter().map(|column| column.name.clone()).collect(),
     );
+    font_zoom::install(&column_view, &grid_actions);
     column_view.insert_action_group("grid", Some(&grid_actions));
 
     if let Some((col_idx, ascending)) = sort
