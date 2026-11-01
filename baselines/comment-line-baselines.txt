@@ -116,7 +116,7 @@ crates/core/src/sql_literal.rs 28
 crates/core/src/sql_literal_tests.rs 8
 crates/core/src/tls.rs 17
 crates/core/src/transaction.rs 4
-crates/drivers/clickhouse/src/lib.rs 76
+crates/drivers/clickhouse/src/lib.rs 71
 crates/drivers/clickhouse/src/query.rs 15
 crates/drivers/clickhouse/src/temporal.rs 2
 crates/drivers/clickhouse/src/tests.rs 2
@@ -175,7 +175,7 @@ crates/storage/src/connection_bundle_crypto.rs 17
 crates/storage/src/connection_color.rs 12
 crates/storage/src/connection_organization.rs 32
 crates/storage/src/connection_url.rs 12
-crates/storage/src/connections.rs 39
+crates/storage/src/connections.rs 33
 crates/storage/src/connections_copy.rs 5
 crates/storage/src/query_history.rs 17
 crates/storage/src/query_history_tests.rs 2

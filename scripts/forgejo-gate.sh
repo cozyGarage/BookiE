@@ -43,16 +43,21 @@ fi
 gate_lock_dir="${FORGEJO_GATE_LOCK_DIR:-${XDG_RUNTIME_DIR:-$HOME/.cache}/bookie-forgejo-gates}"
 mkdir -p "$gate_lock_dir"
 slot_acquired=0
-for slot in 1 2; do
-  exec {slot_fd}>"$gate_lock_dir/slot-$slot.lock"
-  if flock -n "$slot_fd"; then
-    slot_acquired=1
-    break
-  fi
-done
-if [ "$slot_acquired" -eq 0 ]; then
+exec {slot_1_fd}>"$gate_lock_dir/slot-1.lock"
+exec {slot_2_fd}>"$gate_lock_dir/slot-2.lock"
+try_acquire_slot() {
+  local slot_fd
+  for slot_fd in "$slot_1_fd" "$slot_2_fd"; do
+    if flock -n "$slot_fd"; then
+      slot_acquired=1
+      return 0
+    fi
+  done
+  return 1
+}
+if ! try_acquire_slot; then
   echo "two Forgejo gates are already running on this host; waiting for a slot"
-  flock "$slot_fd"
+  until try_acquire_slot; do sleep 1; done
 fi
 latest_run_id() {
   api_get "$api/actions/runs?page=1&limit=1" | python3 -c '

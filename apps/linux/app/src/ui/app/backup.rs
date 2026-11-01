@@ -36,6 +36,7 @@ impl App {
             let Some(output) = outcome.ok().and_then(|file| file.path()) else {
                 return;
             };
+            let output = normalize_duplicate_extension(output, "dump");
             sender.input(AppMsg::StartBackupJob(BackupJob::Backup { output }));
         });
     }
@@ -199,9 +200,21 @@ fn archive_filter() -> gtk::FileFilter {
     filter
 }
 
+fn normalize_duplicate_extension(path: PathBuf, extension: &str) -> PathBuf {
+    let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) else {
+        return path;
+    };
+    let duplicate_suffix = format!(".{extension}.{extension}");
+    if !name.ends_with(&duplicate_suffix) {
+        return path;
+    }
+    path.with_file_name(&name[..name.len() - extension.len() - 1])
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{append_missing_role_hint, backup_error_text};
+    use super::{append_missing_role_hint, backup_error_text, normalize_duplicate_extension};
+    use std::path::PathBuf;
     use tablepro_core::DriverError;
 
     #[test]
@@ -232,5 +245,21 @@ mod tests {
     fn a_failure_without_a_missing_role_gets_no_role_hint() {
         let text = append_missing_role_hint("pg_restore failed with exit code 1: disk full".into());
         assert_eq!(text, "pg_restore failed with exit code 1: disk full");
+    }
+
+    #[test]
+    fn a_backup_name_that_already_ends_in_dump_keeps_one_suffix() {
+        assert_eq!(
+            normalize_duplicate_extension(PathBuf::from("/tmp/bk_ssh1.dump.dump"), "dump"),
+            PathBuf::from("/tmp/bk_ssh1.dump")
+        );
+        assert_eq!(
+            normalize_duplicate_extension(PathBuf::from("/tmp/bk_ssh2.dump"), "dump"),
+            PathBuf::from("/tmp/bk_ssh2.dump")
+        );
+        assert_eq!(
+            normalize_duplicate_extension(PathBuf::from("/tmp/bk_ssh3"), "dump"),
+            PathBuf::from("/tmp/bk_ssh3")
+        );
     }
 }

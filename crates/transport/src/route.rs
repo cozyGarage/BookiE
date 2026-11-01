@@ -113,6 +113,11 @@ fn build_openssh_config(config: &SshConfig, sandboxed: bool) -> Result<OpenSshCo
             passphrase: passphrase.clone(),
         },
         SshAuth::Agent => OpenSshAuth::Agent,
+        SshAuth::AgentIdentity { .. } => {
+            return Err(TransportError::Ssh(
+                "choosing one agent key needs the built-in SSH client".into(),
+            ));
+        }
     };
     Ok(OpenSshConfig {
         destination,

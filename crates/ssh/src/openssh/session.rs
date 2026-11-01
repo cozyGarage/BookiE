@@ -376,6 +376,9 @@ async fn handshake(
                 tokio::select! {
                     biased;
                     () = cancel.cancelled() => return Handshake::Failed(OpenSshError::Cancelled),
+                    () = tokio::time::sleep(crate::handshake::PROMPT_WAIT_LIMIT) => {
+                        return Handshake::Failed(handshake_timeout());
+                    }
                     handled = bridge.handle(stream) => {
                         if let Err(error) = handled {
                             tracing::warn!(kind = ?error.kind(), "an askpass exchange failed");

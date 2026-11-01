@@ -1581,7 +1581,7 @@ limitations under the License.
 
 Packages:
 
-- `aws-lc-sys 0.46.0`
+- `aws-lc-sys 0.47.0`
 - `mongodb 3.9.1`
 - `mongodb-internal-macros 3.9.1`
 - `russh 0.65.0`
@@ -1670,7 +1670,7 @@ limitations under the License.
 
 Packages:
 
-- `encoding_rs 0.8.42`
+- `encoding_rs 0.8.44`
 
 ```text
 // Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
@@ -1926,7 +1926,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Packages:
 
-- `aws-lc-sys 0.46.0`
+- `aws-lc-sys 0.47.0`
 
 ```text
 Copyright (c) <year> <owner>. 
@@ -1946,7 +1946,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 Packages:
 
-- `encoding_rs 0.8.42`
+- `encoding_rs 0.8.44`
 
 ```text
 Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
@@ -2800,8 +2800,8 @@ third-party/chromium/LICENSE.
 
 Packages:
 
-- `aws-lc-rs 1.18.2`
-- `aws-lc-sys 0.46.0`
+- `aws-lc-rs 1.19.0`
+- `aws-lc-sys 0.47.0`
 
 ```text
 ISC License:
@@ -3286,7 +3286,7 @@ Packages:
 - `bitflags 2.13.2`
 - `bnum 0.13.0`
 - `glob 0.3.4`
-- `log 0.4.34`
+- `log 0.4.35`
 - `num 0.4.3`
 - `num-bigint 0.4.8`
 - `num-bigint 0.5.1`
@@ -3561,7 +3561,7 @@ Packages:
 - `heck 0.5.0`
 - `unicode-bidi 0.3.18`
 - `unicode-normalization 0.1.26`
-- `unicode-properties 0.1.4`
+- `unicode-properties 0.1.5`
 - `unicode-segmentation 1.13.3`
 - `unicode-xid 0.2.6`
 
@@ -6781,7 +6781,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `ctutils 0.4.6`
+- `ctutils 0.4.7`
 
 ```text
 Copyright (c) 2025-2026 The RustCrypto Project Developers
@@ -6885,7 +6885,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `zcheapstr 1.1.0`
+- `zcheapstr 1.2.0`
 
 ```text
 Copyright (c) 2026 Zeeshan Ali Khan & zcheapstr contributors
@@ -7317,9 +7317,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `codepage 0.1.3`
-- `encoding_rs 0.8.42`
+- `encoding_rs 0.8.44`
 - `multiversion_no_op 1.0.0`
-- `utf8_iter 1.0.4`
+- `utf8_iter 1.1.0`
+- `utf_types 1.0.0`
 
 ```text
 Copyright Mozilla Foundation
@@ -8552,7 +8553,7 @@ Packages:
 
 - `spin 0.9.9`
 - `tracing-core 0.1.36`
-- `zip 9.1.2`
+- `zip 9.2.0`
 
 ```text
 The MIT License (MIT)
@@ -8891,7 +8892,7 @@ SOFTWARE.
 
 Packages:
 
-- `aws-lc-sys 0.46.0`
+- `aws-lc-sys 0.47.0`
 
 ```text
 The MIT License (MIT)
@@ -9285,6 +9286,54 @@ UNICODE LICENSE V3
 COPYRIGHT AND PERMISSION NOTICE
 
 Copyright © 1991-2023 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+```
+
+## Unicode-3.0
+
+Packages:
+
+- `unicode-properties 0.1.5`
+
+```text
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2026 Unicode, Inc.
 
 NOTICE TO USER: Carefully read the following legal agreement. BY
 DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
