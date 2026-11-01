@@ -40,14 +40,6 @@ pub(super) fn setup_editable_cell(
     label.set_margin_end(8);
     COLUMN_SLOT.set(&label, idx);
     item.set_child(Some(&label));
-    let remember_click = gtk::GestureClick::builder().button(gtk::gdk::BUTTON_PRIMARY).build();
-    remember_click.set_propagation_phase(gtk::PropagationPhase::Capture);
-    remember_click.connect_pressed(move |gesture, _, _, _| {
-        if let Some(widget) = gesture.widget() {
-            super::display::remember_clicked_cell(&widget);
-        }
-    });
-    label.add_controller(remember_click);
 
     install_edit_commit_handler(&label, idx, sender.clone());
     install_edit_triggers(&label, idx, sender, editor_kind, column_name, choices);
@@ -68,7 +60,7 @@ pub(super) fn setup_bool_cell(item: &gtk::ListItem, idx: usize, sender: relm4::S
             return;
         }
         let position = POSITION_SLOT.get(cb).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(cb).unwrap_or_default();
+        let row_key = ROW_KEY_SLOT.cloned(cb).map_or_else(Vec::new, |key| key.to_vec());
         let new_value = if cb.is_active() { "true" } else { "false" };
         sender
             .send(GridMsg::CellEdited {
@@ -175,6 +167,9 @@ fn install_edit_triggers(
     let label_for_press = label.downgrade();
     let trigger_for_press = trigger.clone();
     gesture.connect_pressed(move |gesture, n_press, _, _| {
+        if let Some(widget) = gesture.widget() {
+            super::display::remember_clicked_cell(&widget);
+        }
         if n_press != 2 {
             return;
         }
@@ -462,7 +457,7 @@ pub(super) fn commit_popover_value(
     new_value: String,
 ) {
     let row_position = POSITION_SLOT.get(label).unwrap_or(0);
-    let row_key = ROW_KEY_SLOT.cloned(label).unwrap_or_default();
+    let row_key = ROW_KEY_SLOT.cloned(label).map_or_else(Vec::new, |key| key.to_vec());
     label.set_text(&new_value);
     sender
         .send(GridMsg::CellEdited {
@@ -502,7 +497,7 @@ fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: rel
             let original = FULL_EDIT_TEXT_SLOT
                 .cloned(label)
                 .unwrap_or_else(|| label.text().to_string());
-            let row_key = ROW_KEY_SLOT.cloned(label).unwrap_or_default();
+            let row_key = ROW_KEY_SLOT.cloned(label).map_or_else(Vec::new, |key| key.to_vec());
             SNAPSHOT_SLOT.set(
                 label,
                 EditSnapshot {
@@ -565,7 +560,7 @@ mod cell_lifetime_tests {
         gtk::init().unwrap();
         let cell = CellEditor::new();
         POSITION_SLOT.set(&cell, 5);
-        ROW_KEY_SLOT.set(&cell, vec![tablepro_core::Value::Int(23)]);
+        ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([tablepro_core::Value::Int(23)]));
         let (sender, receiver) = relm4::channel();
         commit_popover_value(&cell, 2, &sender, "committed".into());
         assert!(matches!(
@@ -635,6 +630,48 @@ mod tests {
             );
             assert_eq!(label.text().as_str(), text);
         }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn editable_cells_share_primary_gesture_without_losing_double_click_editing() {
+        use gtk4::prelude::*;
+        gtk4::init().unwrap();
+        let item = gtk4::glib::Object::new::<gtk4::ListItem>();
+        let (sender, _receiver) = relm4::channel();
+        super::setup_editable_cell(
+            &item,
+            0,
+            "value".into(),
+            false,
+            sender,
+            super::super::types::CellEditorKind::Text,
+            std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::<
+                String,
+                (bool, Vec<String>),
+            >::new())),
+            None,
+        );
+        let editor = item
+            .child()
+            .unwrap()
+            .downcast::<crate::ui::cell_editor::CellEditor>()
+            .unwrap();
+        let controllers = editor.observe_controllers();
+        let primary_gesture = (0..controllers.n_items())
+            .filter_map(|index| controllers.item(index)?.downcast::<gtk4::GestureClick>().ok())
+            .find(|gesture| gesture.button() == gtk4::gdk::BUTTON_PRIMARY)
+            .unwrap();
+        assert_eq!(
+            (0..controllers.n_items())
+                .filter_map(|index| controllers.item(index)?.downcast::<gtk4::GestureClick>().ok())
+                .filter(|gesture| gesture.button() == gtk4::gdk::BUTTON_PRIMARY)
+                .count(),
+            1
+        );
+        editor.set_inline_editable(true);
+        primary_gesture.emit_by_name::<()>("pressed", &[&2_i32, &0.0_f64, &0.0_f64]);
+        assert!(editor.is_editing());
     }
 
     #[test]
