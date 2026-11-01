@@ -1,7 +1,6 @@
 use gtk4::{self as gtk, prelude::*};
 
-use super::super::display::CELL_MENU_OPTIONS_SLOT;
-use super::{GridMenus, prepare_cell_menu};
+use super::{GridMenus, cell_menu_options, is_cell_menu_widget, prepare_cell_menu};
 
 pub(super) fn install(view: &gtk::ColumnView, menus: &GridMenus, empty: gtk::PopoverMenu) {
     let weak_view = view.downgrade();
@@ -33,14 +32,15 @@ pub(super) fn popover_at(
         return Some(empty.clone());
     }
     loop {
-        if CELL_MENU_OPTIONS_SLOT.with(&widget, |_| ()).is_some() {
+        if is_cell_menu_widget(menus, &widget) {
             if widget
                 .downcast_ref::<crate::ui::cell_editor::CellEditor>()
                 .is_some_and(|editor| editor.is_editing())
             {
                 return None;
             }
-            return CELL_MENU_OPTIONS_SLOT.with(&widget, |options| prepare_cell_menu(menus, view, &widget, options));
+            let options = cell_menu_options(menus, &widget)?;
+            return Some(prepare_cell_menu(menus, view, &widget, &options));
         }
         widget = widget.parent()?;
         if widget == *view {

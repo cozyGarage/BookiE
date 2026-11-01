@@ -69,7 +69,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
     let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let resident_pages = ResidentPageStore::from_pages(indices.iter().copied().zip(pages.iter().cloned()));
     let result = StreamedResult {
-        pages,
+        pages: pages.iter().map(Arc::downgrade).collect(),
         page_indices: indices.to_vec(),
         page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
@@ -305,7 +305,7 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
     cache.append(1, page(&[3, 4])).unwrap();
     let result = cache.snapshot(StreamTerminal::Loading, None);
     let resident_pages = result.resident_pages.clone();
-    let original = result.pages[0].clone();
+    let original = result.pages[0].upgrade().unwrap();
     let original_weak = Arc::downgrade(&original);
     let outcome = StatementOutcome {
         identity: StatementIdentity::default(),
