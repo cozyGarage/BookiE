@@ -302,6 +302,73 @@ fn filtering_a_fully_selected_result_restores_the_selection_in_one_signal() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn sorting_a_fully_selected_result_keeps_all_source_rows_selected() {
+    gtk4::init().unwrap();
+    let result = Arc::new(result(vec![Value::Int(3), Value::Int(1), Value::Int(2)]));
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [8; 32],
+        },
+        result_set_index: 0,
+    };
+    let view = LocalResultView::new(result, LocalResultSettingsStore::default(), key);
+    view.attach(store.clone(), selection.clone());
+    selection.select_all();
+
+    view.sort_by(0, true);
+
+    assert_eq!(
+        (0..store.n_items())
+            .map(|position| store.source_index_at(position))
+            .collect::<Vec<_>>(),
+        vec![Some(1), Some(2), Some(0)]
+    );
+    let restored = selection.selection();
+    assert_eq!(restored.size(), 3);
+    assert_eq!(
+        (0..restored.size() as u32)
+            .map(|index| store.source_index_at(restored.nth(index)))
+            .collect::<Vec<_>>(),
+        vec![Some(1), Some(2), Some(0)]
+    );
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn clearing_a_filter_does_not_select_rows_that_were_hidden() {
+    gtk4::init().unwrap();
+    let result = Arc::new(result(vec![Value::Int(1), Value::Int(2), Value::Int(1), Value::Int(2)]));
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [9; 32],
+        },
+        result_set_index: 0,
+    };
+    let view = LocalResultView::new(result, LocalResultSettingsStore::default(), key);
+    view.attach(store.clone(), selection.clone());
+    view.filter_by_value(0, Value::Int(1));
+    selection.select_all();
+
+    view.clear_filter();
+
+    let restored = selection.selection();
+    assert_eq!(restored.size(), 2);
+    assert_eq!(
+        (0..restored.size() as u32)
+            .map(|index| store.source_index_at(restored.nth(index)))
+            .collect::<Vec<_>>(),
+        vec![Some(0), Some(2)]
+    );
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn sorting_a_truncated_result_without_a_filter_warns_that_only_loaded_rows_were_sorted() {
     gtk4::init().unwrap();
     let mut loaded = result(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
