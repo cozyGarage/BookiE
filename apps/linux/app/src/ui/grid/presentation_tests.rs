@@ -26,6 +26,48 @@ fn runtime_values_and_column_ownership_both_gate_edits() {
 }
 
 #[test]
+fn cached_column_eligibility_preserves_inline_edit_decisions() {
+    for data_type in ["BOOLEAN", "bit(1)", "NUMERIC", "mixed", "geometry"] {
+        for (primary_key, generated, auto_increment) in [
+            (false, false, false),
+            (true, false, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
+            let column = ColumnInfo {
+                name: "value".into(),
+                data_type: data_type.into(),
+                nullable: true,
+                primary_key,
+                is_auto_increment: auto_increment,
+                is_generated: generated,
+                comment: None,
+                default_value: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            };
+            let cached_column_eligible = column_is_editable(&column);
+            for value in [
+                Value::Null,
+                Value::Bool(true),
+                Value::Int(0),
+                Value::Int(2),
+                Value::Bytes(vec![1]),
+                Value::Text("value".into()),
+                Value::Undecodable(data_type.into()),
+            ] {
+                assert_eq!(
+                    cell_allows_inline_edit_with_column_eligibility(&column, &value, cached_column_eligible),
+                    cell_allows_inline_edit(&column, &value),
+                    "{data_type}, primary_key={primary_key}, generated={generated}, auto_increment={auto_increment}, {value:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn an_undecodable_value_is_never_inline_editable() {
     let column = ColumnInfo {
         name: "amount".into(),
