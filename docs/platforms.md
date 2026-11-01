@@ -9,7 +9,7 @@ The [GitHub release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.
 | Target | Architecture | Artifact | Install or launch |
 |---|---|---|---|
 | Arch Linux | x86_64 | `bookie-0.2.0-1-x86_64.pkg.tar.zst` | Install with `pacman` |
-| Debian | amd64 | `bookie_0.2.0-1_amd64.deb` | Install with `apt`; command is `bookie` |
+| Debian | amd64 | `tablepro_0.2.0-1_amd64.deb` | Install with `apt`; command is `bookie` |
 | AppImage | x86_64 | `BookiE-0.2.0-x86_64.AppImage` | Run the downloaded file |
 | Flatpak bundle | x86_64 | `bookie.flatpak` | Install with `flatpak` |
 

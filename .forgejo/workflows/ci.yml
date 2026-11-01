@@ -536,10 +536,10 @@ jobs:
         run: python3 src/scripts/ci-gtk-artifact.py verify --package "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}" > "$GITHUB_WORKSPACE/floor-package-path"
       - name: Debian package build, install, upgrade from the released package and purge
         run: |
-          released=/var/cache/ci/releases/bookie_0.1.5-1_amd64.deb
+          released=/var/cache/ci/releases/tablepro_0.1.5-1_amd64.deb
           if [ ! -s "$released" ]; then
             mkdir -p "$(dirname "$released")"
-            curl -fsSL -o "$released.part" https://github.com/cozyGarage/BookiE/releases/download/linux-v0.1.5/bookie_0.1.5-1_amd64.deb
+            curl -fsSL -o "$released.part" https://github.com/cozyGarage/BookiE/releases/download/linux-v0.1.5/tablepro_0.1.5-1_amd64.deb
             mv "$released.part" "$released"
           fi
           cd src && package=$(cat "$GITHUB_WORKSPACE/floor-package-path") && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
