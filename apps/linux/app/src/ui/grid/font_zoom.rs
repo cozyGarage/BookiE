@@ -212,6 +212,12 @@ mod tests {
         let actions = gio::SimpleActionGroup::new();
         install(&view, &actions);
         view.insert_action_group("grid", Some(&actions));
+        let window = gtk::Window::builder().child(&view).build();
+        window.present();
+        let context = glib::MainContext::default();
+        while !view.is_mapped() {
+            context.iteration(true);
+        }
         assert!(view.activate_action("grid.zoom-in", None).is_ok());
         assert_eq!(session_pt(), step_in(DEFAULT_PT));
         assert_eq!(column.fixed_width(), scaled_fixed_width(100, DEFAULT_PT, session_pt()));
