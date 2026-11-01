@@ -967,10 +967,10 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
         return match &o.kind {
             StatementOutcomeKind::Rows(sets) => crate::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
-                .replace("{rows}", &result_rows(sets).to_string()),
+                .replace("{rows}", &format_result_rows(result_rows(sets))),
             StatementOutcomeKind::Streamed(result) => crate::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
-                .replace("{rows}", &result.total_rows.to_string()),
+                .replace("{rows}", &format_result_rows(result.total_rows as usize)),
             StatementOutcomeKind::Error(_) => crate::tr!("Result {n} (error)").replace("{n}", &n),
             StatementOutcomeKind::NotRun => crate::tr!("Result {n} (skipped)").replace("{n}", &n),
         };
@@ -979,11 +979,11 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
         StatementOutcomeKind::Rows(sets) => crate::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
-            .replace("{rows}", &result_rows(sets).to_string()),
+            .replace("{rows}", &format_result_rows(result_rows(sets))),
         StatementOutcomeKind::Streamed(result) => crate::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
-            .replace("{rows}", &result.total_rows.to_string()),
+            .replace("{rows}", &format_result_rows(result.total_rows as usize)),
         StatementOutcomeKind::Error(_) => crate::tr!("{n} · {statement} (error)")
             .replace("{n}", &n)
             .replace("{statement}", &statement),
@@ -995,8 +995,8 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
 
 fn pinned_tab_label(o: &StatementOutcome) -> String {
     let rows = match &o.kind {
-        StatementOutcomeKind::Rows(sets) => result_rows(sets).to_string(),
-        StatementOutcomeKind::Streamed(result) => result.total_rows.to_string(),
+        StatementOutcomeKind::Rows(sets) => format_result_rows(result_rows(sets)),
+        StatementOutcomeKind::Streamed(result) => format_result_rows(result.total_rows as usize),
         StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => String::new(),
     };
     let subject = statement_subject(&o.sql_preview).unwrap_or_else(|| crate::tr!("Result"));
@@ -1007,6 +1007,10 @@ fn pinned_tab_label(o: &StatementOutcome) -> String {
 
 fn result_rows(result_sets: &[std::sync::Arc<tablepro_core::QueryResult>]) -> usize {
     result_sets.iter().map(|result| result.rows.len()).sum()
+}
+
+fn format_result_rows(rows: usize) -> String {
+    crate::ui::count_format::format_thousands(rows as u128)
 }
 
 const MAX_SWITCHER_BUTTONS: usize = 5;

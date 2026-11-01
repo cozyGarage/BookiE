@@ -127,9 +127,15 @@ pub(in crate::ui::editor) fn stream_page_placeholder_with_title(title: String) -
 
 pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> String {
     let rows = crate::trn!("Received {rows} row", "Received {rows} rows", result.total_rows)
-        .replace("{rows}", &result.total_rows.to_string());
+        .replace(
+            "{rows}",
+            &crate::ui::count_format::format_thousands(result.total_rows as u128),
+        );
     let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages)
-        .replace("{pages}", &result.total_pages.to_string());
+        .replace(
+            "{pages}",
+            &crate::ui::count_format::format_thousands(u128::from(result.total_pages)),
+        );
     let received = format!("{rows} · {pages}");
     if stream_retained_rows(result) == result.total_rows {
         return received;
@@ -158,8 +164,8 @@ pub(in crate::ui::editor) fn stream_page_label(result: &StreamedResult, page_ind
     };
     let end = start.saturating_add(count.saturating_sub(1));
     crate::tr!("Rows {start}-{end}")
-        .replace("{start}", &start.to_string())
-        .replace("{end}", &end.to_string())
+        .replace("{start}", &crate::ui::count_format::format_thousands(start as u128))
+        .replace("{end}", &crate::ui::count_format::format_thousands(end as u128))
 }
 
 fn stream_page_row_count(result: &StreamedResult, page_index: usize) -> Option<usize> {

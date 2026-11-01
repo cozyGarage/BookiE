@@ -226,8 +226,10 @@ impl SqlEditor {
                 Some(sender),
             );
         }
-        self.status
-            .set_label(&crate::tr!("Received {n} rows").replace("{n}", &total_rows.to_string()));
+        self.status.set_label(
+            &crate::tr!("Received {n} rows")
+                .replace("{n}", &crate::ui::count_format::format_thousands(total_rows as u128)),
+        );
     }
 
     pub(super) fn on_stream_finished(
