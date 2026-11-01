@@ -25,6 +25,8 @@ pub struct StreamedResult {
     pub(super) pages: Vec<Arc<QueryResult>>,
     pub(super) page_indices: Vec<u64>,
     pub(super) page_row_counts: Vec<usize>,
+    pub(super) page_row_starts: Vec<usize>,
+    pub(super) retained_rows: usize,
     pub(super) columns: Vec<ColumnInfo>,
     pub(super) total_pages: u64,
     pub(super) total_rows: usize,
@@ -72,6 +74,8 @@ pub(super) struct StreamPageCache {
     next_page: u64,
     empty_pages: u64,
     page_row_counts: Vec<usize>,
+    page_row_starts: Vec<usize>,
+    retained_rows: usize,
     total_rows: usize,
     resident_pages: ResidentPageStore,
 }
@@ -91,21 +95,24 @@ impl StreamPageCache {
             self.columns = Some(result.columns.clone());
         }
         self.page_row_counts.push(result.rows.len());
+        self.page_row_starts.push(self.total_rows.saturating_add(1));
         if index > 0 && result.rows.is_empty() {
             self.next_page = self.next_page.saturating_add(1);
             self.empty_pages = self.empty_pages.saturating_add(1);
             return Ok(());
         }
         self.total_rows = self.total_rows.saturating_add(result.rows.len());
+        self.retained_rows = self.retained_rows.saturating_add(result.rows.len());
         let bytes = result.estimated_row_bytes();
         self.retained_bytes = self.retained_bytes.saturating_add(bytes);
         self.resident_pages.insert(index, result.clone());
         self.pages.push_back((index, result, bytes));
         self.next_page = self.next_page.saturating_add(1);
         while self.pages.len() > 1 && self.retained_bytes > MAX_QUERY_RESULT_BYTES {
-            if let Some((retired_index, _, bytes)) = self.pages.pop_front() {
+            if let Some((retired_index, retired, bytes)) = self.pages.pop_front() {
                 self.resident_pages.remove(retired_index);
                 self.retained_bytes = self.retained_bytes.saturating_sub(bytes);
+                self.retained_rows = self.retained_rows.saturating_sub(retired.rows.len());
             }
         }
         Ok(())
@@ -153,6 +160,8 @@ impl StreamPageCache {
             pages: self.pages.iter().map(|(_, page, _)| page.clone()).collect(),
             page_indices: self.pages.iter().map(|(index, _, _)| *index).collect(),
             page_row_counts: self.page_row_counts.clone(),
+            page_row_starts: self.page_row_starts.clone(),
+            retained_rows: self.retained_rows,
             columns: self.columns.clone().unwrap_or_default(),
             total_pages: self.next_page.saturating_sub(self.empty_pages),
             total_rows: self.total_rows,
@@ -163,6 +172,19 @@ impl StreamPageCache {
             resident_pages: self.resident_pages.clone(),
         }
     }
+}
+
+#[cfg(test)]
+pub(super) fn page_row_starts_from_counts(page_row_counts: &[usize]) -> Vec<usize> {
+    let mut total_rows = 0usize;
+    page_row_counts
+        .iter()
+        .map(|count| {
+            let start = total_rows.saturating_add(1);
+            total_rows = total_rows.saturating_add(*count);
+            start
+        })
+        .collect()
 }
 
 #[cfg(test)]
