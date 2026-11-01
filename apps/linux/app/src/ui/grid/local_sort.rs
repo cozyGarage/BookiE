@@ -30,22 +30,44 @@ pub(super) fn sorted_source_indices_for_subset(
     ascending: bool,
     source_indices: Vec<usize>,
 ) -> Result<Vec<usize>, Vec<usize>> {
-    let Some(values) = sortable_values(result, column) else {
-        return Err(source_indices);
-    };
-    if source_indices.iter().any(|source_index| *source_index >= values.len()) {
+    if !is_sortable_column(result, column) {
         return Err(source_indices);
     }
-    if values.iter().any(|value| matches!(value, Value::Text(_))) {
-        return Ok(sorted_text_subset(&values, source_indices, ascending));
+    if source_indices
+        .iter()
+        .any(|source_index| result.rows.get(*source_index).and_then(|row| row.get(column)).is_none())
+    {
+        return Err(source_indices);
+    }
+    let sorts_text = source_indices
+        .iter()
+        .filter_map(|source_index| result.rows.get(*source_index).and_then(|row| row.get(column)))
+        .find(|value| !matches!(value, Value::Null))
+        .is_some_and(|value| matches!(value, Value::Text(_)));
+    if sorts_text {
+        return Ok(sorted_text_subset(result, column, source_indices, ascending));
     }
     let mut source_indices = source_indices;
-    source_indices.sort_by(|left, right| compare_values(values[*left], values[*right], ascending));
+    source_indices.sort_by(|left, right| compare_source_values(result, column, left, right, ascending));
     Ok(source_indices)
 }
 
 pub(super) fn is_sortable_column(result: &QueryResult, column: usize) -> bool {
-    sortable_values(result, column).is_some()
+    let mut kind = None;
+    for row in &result.rows {
+        let Some(value) = row.get(column) else { return false };
+        if matches!(value, Value::Null) {
+            continue;
+        }
+        let Some(candidate) = comparable_kind(value) else {
+            return false;
+        };
+        if kind.is_some_and(|current| current != candidate) {
+            return false;
+        }
+        kind = Some(candidate);
+    }
+    true
 }
 
 fn sortable_values(result: &QueryResult, column: usize) -> Option<Vec<&Value>> {
@@ -64,12 +86,12 @@ fn sortable_values(result: &QueryResult, column: usize) -> Option<Vec<&Value>> {
         .then_some(values)
 }
 
-fn sorted_text_subset(values: &[&Value], source_indices: Vec<usize>, ascending: bool) -> Vec<usize> {
+fn sorted_text_subset(result: &QueryResult, column: usize, source_indices: Vec<usize>, ascending: bool) -> Vec<usize> {
     let mut keyed_indices = source_indices
         .into_iter()
         .map(|source_index| {
-            let key = match values[source_index] {
-                Value::Text(text) => Some(glib::CollationKey::from(text)),
+            let key = match result.rows.get(source_index).and_then(|row| row.get(column)) {
+                Some(Value::Text(text)) => Some(glib::CollationKey::from(text)),
                 _ => None,
             };
             (source_index, key)
@@ -79,15 +101,31 @@ fn sorted_text_subset(values: &[&Value], source_indices: Vec<usize>, ascending: 
         (Some(left_key), Some(right_key)) => {
             let order = left_key
                 .cmp(right_key)
-                .then_with(|| compare_values(values[*left], values[*right], true));
+                .then_with(|| compare_source_values(result, column, left, right, true));
             if ascending { order } else { order.reverse() }
         }
-        _ => compare_values(values[*left], values[*right], ascending),
+        _ => compare_source_values(result, column, left, right, ascending),
     });
     keyed_indices
         .into_iter()
         .map(|(source_index, _)| source_index)
         .collect()
+}
+
+fn compare_source_values(
+    result: &QueryResult,
+    column: usize,
+    left: &usize,
+    right: &usize,
+    ascending: bool,
+) -> Ordering {
+    match (
+        result.rows.get(*left).and_then(|row| row.get(column)),
+        result.rows.get(*right).and_then(|row| row.get(column)),
+    ) {
+        (Some(left), Some(right)) => compare_values(left, right, ascending),
+        _ => Ordering::Equal,
+    }
 }
 
 fn comparable_kind(value: &Value) -> Option<std::mem::Discriminant<Value>> {
@@ -233,6 +271,32 @@ mod tests {
         assert_eq!(
             sorted_source_indices_for_subset(&result, 0, false, vec![0, 1, 2, 3]),
             Ok(vec![1, 3, 2, 0])
+        );
+    }
+
+    #[test]
+    fn text_subset_sort_keeps_nulls_last_and_stable_in_descending_order() {
+        let result = result(vec![
+            Value::Null,
+            Value::Text("apple".into()),
+            Value::Null,
+            Value::Text("zebra".into()),
+        ]);
+
+        assert_eq!(
+            sorted_source_indices_for_subset(&result, 0, false, vec![0, 1, 2, 3]),
+            Ok(vec![3, 1, 0, 2])
+        );
+    }
+
+    #[test]
+    fn subset_sort_refuses_a_row_missing_the_column_outside_the_subset() {
+        let mut result = result(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
+        result.rows[2].clear();
+
+        assert_eq!(
+            sorted_source_indices_for_subset(&result, 0, true, vec![0, 1]),
+            Err(vec![0, 1])
         );
     }
 
