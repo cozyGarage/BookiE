@@ -239,6 +239,7 @@ impl SqlEditor {
         let Some((run_terminal, context)) = self.finish_run(generation, sender) else {
             return;
         };
+        let visible_page = self.visible_stream_page(generation);
         let elapsed = SystemTime::now()
             .duration_since(context.started_at)
             .map(|duration| duration.as_millis() as i64)
@@ -294,6 +295,17 @@ impl SqlEditor {
             self.result_view_settings.clone(),
             Some(sender),
         );
+        self.restore_stream_page(generation, visible_page);
+    }
+
+    fn visible_stream_page(&self, generation: u64) -> Option<u64> {
+        super::stream_view::visible_page_index(&self.results_holder, generation)
+    }
+
+    fn restore_stream_page(&self, generation: u64, page_index: Option<u64>) {
+        if let Some(page_index) = page_index {
+            super::stream_view::restore_page_selection(&self.results_holder, generation, page_index);
+        }
     }
 }
 

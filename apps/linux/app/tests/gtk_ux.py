@@ -2026,23 +2026,17 @@ GLib.MainLoop().run()
             if first_run_marker is None:
                 time.sleep(ui.POLL_SECONDS)
         assert first_run_marker is not None, "the first streamed page never exposed its run marker"
-        last_page_start = stream_rows - page_size + 1
-        ui.wait_for_node_containing(f"Rows {last_page_start}-{stream_rows}", timeout=120)
-        ui.wait_for_node(name=str(last_page_start))
-        scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
-        capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-last-page")
-        for first_id in range(stream_rows - 2 * page_size + 1, 0, -page_size):
-            ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
-            ui.wait_for_node_containing(f"Rows {first_id}-{first_id + page_size - 1}", timeout=30)
-            ui.wait_for_node(name=str(first_id), timeout=30)
+        ui.wait_for_node_containing(f"Rows 1-{page_size}", timeout=120)
         ui.wait_for_node(name="1")
-        ui.wait_for_node(name=first_run_marker, role=pyatspi.ROLE_LABEL, timeout=120)
+        wait_for_visible_marker(first_run_marker)
+        scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
         ui.invoke(ui.wait_for_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node_containing("Rows 5001-10000", timeout=30)
+        wait_for_visible_marker(first_run_marker)
         ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node_containing("Rows 1-5000", timeout=30)
-        ui.wait_for_node(name=first_run_marker, role=pyatspi.ROLE_LABEL, timeout=120)
+        wait_for_visible_marker(first_run_marker)
 
     def wait_for_visible_marker(name):
         deadline = time.monotonic() + 30
@@ -2061,10 +2055,13 @@ GLib.MainLoop().run()
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
         ui.invoke(ui.wait_for_node(name="Open SQL editor"))
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        payload_expression = "value::text"
+        for _ in range(32):
+            payload_expression = f"md5({payload_expression})"
+        payload_expression = f"repeat({payload_expression}, 64)"
         ui.run_sql(
             "SELECT value AS id, 'page-marker-' || value::text AS marker, "
-            "repeat('x', 2048) AS payload "
-            "FROM generate_series(1, 400000) AS value"
+            f"{payload_expression} AS payload FROM generate_series(1, 400000) AS value"
         )
         ui.wait_for_node(name="page-marker-1", role=pyatspi.ROLE_LABEL, timeout=120)
         deadline = time.monotonic() + 120
@@ -2083,6 +2080,8 @@ GLib.MainLoop().run()
         wait_for_visible_marker("page-marker-5001")
         ui.invoke(ui.wait_for_sensitive_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node_containing("Rows 1-5000", timeout=30)
+        wait_for_visible_marker("page-marker-1")
+        ui.wait_for_node_containing("done in", timeout=120)
         wait_for_visible_marker("page-marker-1")
 
     def postgres_hidden_projection_refresh_and_edit_preserve_hidden_value(database, base):
