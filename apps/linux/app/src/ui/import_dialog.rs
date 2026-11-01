@@ -2,16 +2,16 @@ use std::path::PathBuf;
 
 use crate::services::csv_import_mappings::{CsvMappingScope, CsvMappingStore};
 use crate::ui::progress_dialog::CancellableDialog;
-use relm4::adw::prelude::*;
-use relm4::{adw, gtk};
-use tablepro_core::export::CsvDelimiter;
-use tablepro_core::import::{
+use bookie_core::export::CsvDelimiter;
+use bookie_core::import::{
     CsvFormat, CsvImportOptions, CsvSheet, INFER_SAMPLE_ROWS, MAX_PREVIEW_ROWS, infer_columns, read_csv,
     suggest_mapping,
 };
-use tablepro_core::import::{CsvImportEncoding, CsvImportQuote};
-use tablepro_core::sql_ddl::DraftColumn;
-use tablepro_core::{ColumnInfo, DriverCapabilities, sql_dialect};
+use bookie_core::import::{CsvImportEncoding, CsvImportQuote};
+use bookie_core::sql_ddl::DraftColumn;
+use bookie_core::{ColumnInfo, DriverCapabilities, sql_dialect};
+use relm4::adw::prelude::*;
+use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
 /// Whether the rows go into a table that is already there, or into one
@@ -712,8 +712,8 @@ fn mark(row: &adw::EntryRow, ok: bool) {
 
 fn type_names_for(driver_id: &str) -> Vec<&'static str> {
     let mut names = Vec::new();
-    for kind in tablepro_core::import::ColumnKind::ALL {
-        let name = tablepro_core::import::type_name(driver_id, kind);
+    for kind in bookie_core::import::ColumnKind::ALL {
+        let name = bookie_core::import::type_name(driver_id, kind);
         if !names.contains(&name) {
             names.push(name);
         }

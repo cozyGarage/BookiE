@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 use drivers_duckdb::DuckdbDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 
 #[path = "support/ubigint_array.rs"]
 mod bigint_array;
@@ -177,7 +177,7 @@ async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
         if kind == "TIMESTAMPTZ" {
             assert!(matches!(value, Value::TimestampTz(_)));
         }
-        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
         let round_trip = connection
             .query(&format!(
                 "SELECT CAST(CAST({literal} AS {kind}) AS VARCHAR) = CAST({source} AS VARCHAR)"
@@ -284,7 +284,7 @@ async fn value_contract_enum_labels_and_unsupported_collections_are_explicit() {
     );
     for label in ["", "NULL", "東京"] {
         let value = Value::Text(label.into());
-        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
         let literal_result = connection
             .query(&format!("SELECT typeof({literal}::mood), {literal}::mood::VARCHAR"))
             .await
@@ -320,7 +320,7 @@ async fn value_contract_enum_labels_and_unsupported_collections_are_explicit() {
         let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
         let value = &result.rows[0][0];
         assert!(matches!(value, Value::Undecodable(_)), "{expression}: {value:?}");
-        assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("duckdb", value).is_err());
         assert!(
             connection
                 .query_params("SELECT ?", std::slice::from_ref(value))
@@ -349,7 +349,7 @@ async fn value_contract_nested_uhugeint_refuses_lossy_consumers() {
     let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
     let value = &result.rows[0][0];
     assert!(matches!(value, Value::Undecodable(_)), "{value:?}");
-    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("duckdb", value).is_err());
     assert!(
         connection
             .query_params("SELECT ?", std::slice::from_ref(value))
@@ -391,7 +391,7 @@ async fn value_contract_nested_uhugeint_struct_shapes_refuse_lossy_consumers() {
         let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
         let value = &result.rows[0][0];
         assert!(matches!(value, Value::Undecodable(_)), "{expression}: {value:?}");
-        assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("duckdb", value).is_err());
         assert!(
             connection
                 .query_params("SELECT ?", std::slice::from_ref(value))
@@ -422,7 +422,7 @@ async fn value_contract_wide_map_refuses_lossy_consumers_with_native_oracle() {
     let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
     let value = &result.rows[0][0];
     assert!(matches!(value, Value::Undecodable(_)), "{value:?}");
-    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("duckdb", value).is_err());
     assert!(
         connection
             .query_params("SELECT ?", std::slice::from_ref(value))
@@ -458,7 +458,7 @@ async fn value_contract_list_array_and_struct_refusals_keep_native_oracles() {
         let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
         let value = &result.rows[0][0];
         assert!(matches!(value, Value::Undecodable(_)), "{expression}: {value:?}");
-        assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("duckdb", value).is_err());
         assert!(
             connection
                 .query_params("SELECT ?", std::slice::from_ref(value))
@@ -495,7 +495,7 @@ async fn value_contract_scalar_hugeints_preserve_exact_text_across_consumers() {
         );
 
         let value = Value::Text(text.into());
-        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
         let literal_result = connection
             .query(&format!("SELECT {literal}::{kind}::VARCHAR"))
             .await
@@ -530,7 +530,7 @@ async fn value_contract_interval_components_round_trip_as_exact_text() {
     assert_eq!(result.rows[0][4], Value::Int(2));
     assert_eq!(result.rows[0][5], Value::Int(3));
 
-    let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
     let literal_round_trip = connection
         .query(&format!("SELECT CAST({literal} AS INTERVAL)"))
         .await
@@ -630,7 +630,7 @@ async fn value_contract_interval_all_component_signs_round_trip_as_exact_text() 
         );
 
         let value = &source.rows[0][0];
-        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
         let literal_round_trip = connection
             .query(&format!(
                 "SELECT typeof(CAST({literal} AS INTERVAL)), CAST({literal} AS INTERVAL)"
@@ -703,7 +703,7 @@ async fn value_contract_interval_component_extremes_round_trip_as_exact_text() {
             ]]
         );
 
-        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &source.rows[0][0]).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("duckdb", &source.rows[0][0]).unwrap();
         let literal_round_trip = connection
             .query(&format!(
                 "SELECT typeof(CAST({literal} AS INTERVAL)), CAST({literal} AS INTERVAL)"
@@ -761,7 +761,7 @@ async fn value_contract_interval_grid_edit_persists_native_components() {
         "DuckDB must expose its primary key for keyed grid edits"
     );
     let span_index = columns.iter().position(|column| column.name == "span").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "interval_grid",
@@ -815,7 +815,7 @@ async fn value_contract_native_temporal_nulls_and_json_preserve_precision() {
         .query("SELECT TIMESTAMP_NS '1969-12-31 23:59:59.999999999' AS stamp, TIME '23:59:59.123456' AS clock")
         .await
         .unwrap();
-    let json = tablepro_core::export::render_json(&result.columns, &result.rows);
+    let json = bookie_core::export::render_json(&result.columns, &result.rows);
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(
         parsed,
@@ -1015,7 +1015,7 @@ async fn value_contract_bound_timestamptz_keeps_its_instant_in_any_session_zone(
 
 #[tokio::test]
 async fn value_contract_temporal_filter_parameters_keep_duckdb_column_precision_end_to_end() {
-    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+    use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
     let connection = native_connection().await;
     connection
@@ -1092,7 +1092,7 @@ async fn value_contract_temporal_filter_parameters_keep_duckdb_column_precision_
 
 #[tokio::test]
 async fn value_contract_time_ns_filter_uses_exact_text_fallback() {
-    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+    use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
     let connection = native_connection().await;
     connection
@@ -1128,7 +1128,7 @@ async fn value_contract_time_ns_filter_uses_exact_text_fallback() {
 
 #[tokio::test]
 async fn value_contract_timestamptz_filter_preserves_offset_origin_instant() {
-    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+    use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
     let connection = native_connection().await;
     connection

@@ -1,5 +1,5 @@
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings, ScriptPlan};
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings, ScriptPlan};
 
 pub fn grammar_for(driver: &str) -> Option<SqlGrammar> {
     match driver {
@@ -52,7 +52,7 @@ pub fn script_statements<'a>(text: &str, lexing: impl Into<Lexing<'a>>) -> Resul
     let lexing = lexing.into();
     let Some(grammar) = grammar_for(lexing.driver) else {
         return Ok(PlannedStatements {
-            statements: tablepro_core::sql_lex::split_statements(text, lexing.driver),
+            statements: bookie_core::sql_lex::split_statements(text, lexing.driver),
             source_ranges: Vec::new(),
             error_policy: BatchErrorPolicy::StopScript,
             settings_check: None,
@@ -95,11 +95,11 @@ pub fn script_statements<'a>(text: &str, lexing: impl Into<Lexing<'a>>) -> Resul
 pub fn statement_at_cursor<'a>(text: &str, lexing: impl Into<Lexing<'a>>, byte: usize) -> Option<String> {
     let lexing = lexing.into();
     let Some(plan) = lexing.plan(text) else {
-        return tablepro_core::sql_lex::statement_at_cursor(text, lexing.driver, byte);
+        return bookie_core::sql_lex::statement_at_cursor(text, lexing.driver, byte);
     };
     let statement = plan.statement_at(byte)?;
     let affected = plan.diagnostics().iter().any(|diagnostic| {
-        let tablepro_core::sql_syntax::script::ScriptDiagnostic::Unterminated { start, .. } = diagnostic;
+        let bookie_core::sql_syntax::script::ScriptDiagnostic::Unterminated { start, .. } = diagnostic;
         statement.range.contains(start)
     });
     if affected {
@@ -116,7 +116,7 @@ pub fn statement_range_at<'a>(
     let plan = lexing.into().plan(text)?;
     let statement = plan.statement_at(byte)?;
     let unterminated = plan.diagnostics().iter().any(|diagnostic| {
-        let tablepro_core::sql_syntax::script::ScriptDiagnostic::Unterminated { start, .. } = diagnostic;
+        let bookie_core::sql_syntax::script::ScriptDiagnostic::Unterminated { start, .. } = diagnostic;
         statement.range.contains(start)
     });
     if unterminated {

@@ -59,7 +59,7 @@ async fn all_result_sets_keep_order_and_metadata_when_the_first_is_empty() {
 async fn one_result_budget_is_shared_across_later_sql_server_sets() {
     let (_container, opts) = start_mssql().await;
     let conn = connect(opts).await;
-    let payload_bytes = tablepro_core::MAX_QUERY_RESULT_BYTES / 2;
+    let payload_bytes = bookie_core::MAX_QUERY_RESULT_BYTES / 2;
     let sql = format!(
         "SELECT REPLICATE(CAST('x' AS varchar(max)), {payload_bytes}) AS first_set; \
          SELECT REPLICATE(CAST('y' AS varchar(max)), {payload_bytes}) AS second_set"
@@ -91,7 +91,7 @@ async fn a_result_cut_at_the_memory_budget_reports_truncation_and_drains_the_bat
     let (_container, opts) = start_mssql().await;
     let conn = connect(opts).await;
     let rows = 70;
-    let bytes_per_row = tablepro_core::MAX_QUERY_RESULT_BYTES / 64 + 1;
+    let bytes_per_row = bookie_core::MAX_QUERY_RESULT_BYTES / 64 + 1;
     let result = conn
         .query(&format!(
             "SELECT TOP ({rows}) REPLICATE(CAST('x' AS varchar(max)), {bytes_per_row}) AS payload FROM sys.all_objects a CROSS JOIN sys.all_objects b"

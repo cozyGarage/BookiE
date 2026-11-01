@@ -6,11 +6,11 @@
 
 use std::path::PathBuf;
 
-use tablepro_transport::TransportError;
+use bookie_transport::TransportError;
 
 use async_trait::async_trait;
-use tablepro_core::{AuthMode, ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
-use tablepro_ssh::{SshAuth, SshConfig};
+use bookie_core::{AuthMode, ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
+use bookie_ssh::{SshAuth, SshConfig};
 
 struct FakeDriver {
     integrated_auth: bool,
@@ -117,15 +117,8 @@ async fn refusal(
     ssh: Option<Vec<SshConfig>>,
     what: &str,
 ) -> TransportError {
-    let environment = tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn);
-    match tablepro_transport::establish(
-        driver,
-        opts,
-        ssh.map(tablepro_transport::SshRoute::Builtin),
-        &environment,
-    )
-    .await
-    {
+    let environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn);
+    match bookie_transport::establish(driver, opts, ssh.map(bookie_transport::SshRoute::Builtin), &environment).await {
         Ok(_) => panic!("{what}"),
         Err(error) => error,
     }

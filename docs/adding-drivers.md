@@ -10,8 +10,8 @@ flowchart LR
     B --> C["Implement Connection & Session"]
     C --> D["Wrap in PolicyGuard"]
     D --> E["Register in Composition Roots"]
-    E --> F["tablepro-app (GUI)"]
-    E --> G["tablepro-agentd (MCP)"]
+    E --> F["bookie-app (GUI)"]
+    E --> G["bookie-agentd (MCP)"]
 ```
 
 Read the actual traits before implementing a driver:
@@ -23,7 +23,7 @@ Read the actual traits before implementing a driver:
 
 Use an existing driver's implementation and manifest as the starting point. The actual trait definitions own the contract; an incomplete example can omit safety hooks. Unsupported defaults do not establish capability support.
 
-Production drivers depend on `tablepro-core`, not GTK, Relm4, policy, MCP, storage, transport or sibling drivers. Shared saved-credential assembly and tunnel ownership belong in `tablepro-transport`; SSH backends belong in `tablepro-ssh`. Policy wraps the raw handle in the composition root.
+Production drivers depend on `bookie-core`, not GTK, Relm4, policy, MCP, storage, transport or sibling drivers. Shared saved-credential assembly and tunnel ownership belong in `bookie-transport`; SSH backends belong in `bookie-ssh`. Policy wraps the raw handle in the composition root.
 
 ## Existing libraries
 
@@ -42,7 +42,7 @@ Review engine/library proposals against [driver maturity](adding-drivers.md#orde
 
 ## Implementation checklist
 
-1. Create `crates/drivers/<engine>/`. Package name is `tablepro-driver-<engine>`; existing library names use `drivers_<engine>`. Reuse workspace versions/lints and review dependencies with `deny.toml`.
+1. Create `crates/drivers/<engine>/`. Package name is `bookie-driver-<engine>`; existing library names use `drivers_<engine>`. Reuse workspace versions/lints and review dependencies with `deny.toml`.
 2. Implement the current traits. Preserve SQL NULL versus unsupported/non-NULL values; unsupported values must remain `Value::Undecodable` or be refused, rather than becoming NULL. Map errors to typed `DriverError` variants.
 3. Bind values and quote identifiers for the actual dialect. Carry schema and table identity separately. Declare generated/identity metadata accurately; include composite keys and real affected-row behavior.
 4. Declare maturity and static capabilities honestly, including `enum_input_style` when grid and paste input need dialect-specific enum handling. Controlled calls need a bounded operation, confirmed server cancellation or an honest unknown outcome with retirement. Do not claim Stop support from a dropped client future.
@@ -60,7 +60,7 @@ Use current testcontainers `AsyncRunner` examples in existing drivers. Integrati
 From the repository root, a focused engine fixture command is:
 
 ```bash
-cargo test -p tablepro-driver-<engine> --test integration -- --include-ignored --test-threads=1
+cargo test -p bookie-driver-<engine> --test integration -- --include-ignored --test-threads=1
 ```
 
 Cover native stored type/value, invalid neighbors, bound parameters, consumer round trips, late stream failures, server loss and subsequent handle usability. Mocks cover dispatch/denial; real engine assertions establish server behavior. Record initial failing behavior before applying a bug fix.

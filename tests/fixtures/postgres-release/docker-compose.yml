@@ -1,4 +1,4 @@
-name: tablepro-postgres-release
+name: bookie-postgres-release
 
 services:
   db:
@@ -6,9 +6,9 @@ services:
       context: .
       dockerfile: db/Dockerfile
     environment:
-      POSTGRES_DB: tablepro
-      POSTGRES_USER: tablepro
-      POSTGRES_PASSWORD: tablepro
+      POSTGRES_DB: bookie
+      POSTGRES_USER: bookie
+      POSTGRES_PASSWORD: bookie
     volumes:
       - ./seed:/docker-entrypoint-initdb.d:ro
     command:
@@ -26,14 +26,14 @@ services:
       - -c
       - max_connections=200
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tablepro -d tablepro"]
+      test: ["CMD-SHELL", "pg_isready -U bookie -d bookie"]
       interval: 2s
       timeout: 3s
       retries: 30
     networks:
       fixture:
         aliases:
-          - db.tablepro.test
+          - db.bookie.test
 
   bastion:
     build:

@@ -4,7 +4,7 @@ use std::sync::{Arc, Weak};
 use gtk4::glib;
 use gtk4::subclass::prelude::*;
 
-use tablepro_core::{QueryResult, Value};
+use bookie_core::{QueryResult, Value};
 
 const PREVIEW_BYTES: usize = 8 * 1024;
 
@@ -51,7 +51,7 @@ mod imp {
 
     #[glib::object_subclass]
     impl ObjectSubclass for RowObject {
-        const NAME: &str = "TableProRowObject";
+        const NAME: &str = "BookiERowObject";
         type Type = super::RowObject;
     }
 
@@ -298,13 +298,13 @@ impl RowObject {
 }
 
 fn is_partial(value: &Value) -> bool {
-    matches!(value, Value::Undecodable(type_name) if tablepro_app_services::browse_query::parse_partial(type_name).is_some())
+    matches!(value, Value::Undecodable(type_name) if bookie_app_services::browse_query::parse_partial(type_name).is_some())
 }
 
 fn preview_value(value: &Value) -> Option<CellPreview> {
     match value {
         Value::Undecodable(type_name) => {
-            let (bytes, prefix) = tablepro_app_services::browse_query::parse_partial(type_name)?;
+            let (bytes, prefix) = bookie_app_services::browse_query::parse_partial(type_name)?;
             Some(CellPreview {
                 value: Value::Text(prefix.to_owned()),
                 byte_count: usize::try_from(bytes).ok()?,

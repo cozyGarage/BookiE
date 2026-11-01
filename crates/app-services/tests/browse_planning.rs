@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_app_services::browse_query::{BrowseTarget, PageQuery};
-use tablepro_core::FilterSet;
+use bookie_app_services::browse_query::{BrowseTarget, PageQuery};
+use bookie_core::FilterSet;
 
 #[test]
 fn unfiltered_native_browsing_needs_no_gui_or_sql_execution() {

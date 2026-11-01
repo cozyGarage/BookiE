@@ -2,8 +2,8 @@
 //! Enabling TLS on a driver must not cost it the ability to speak plaintext.
 //! These run against servers that offer no encryption at all.
 
-use tablepro_core::{DatabaseDriver, TlsMode};
-use tablepro_driver_tls_tests::DriverTlsFixture;
+use bookie_core::{DatabaseDriver, TlsMode};
+use bookie_driver_tls_tests::DriverTlsFixture;
 
 use drivers_clickhouse::ClickhouseDriver;
 use drivers_mongodb::MongodbDriver;
@@ -44,7 +44,7 @@ async fn a_verifying_mongodb_client_will_not_fall_back_to_plaintext() {
     let accepted = fixture.mongo_plaintext();
     let mut rejected = accepted.clone();
     rejected.tls.mode = TlsMode::VerifyFull;
-    tablepro_driver_tls_tests::assert_connection_rejected(&MongodbDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&MongodbDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -54,7 +54,7 @@ async fn a_verifying_redis_client_will_not_fall_back_to_plaintext() {
     let accepted = fixture.redis_plaintext();
     let mut rejected = accepted.clone();
     rejected.tls.mode = TlsMode::VerifyFull;
-    tablepro_driver_tls_tests::assert_connection_rejected(&RedisDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&RedisDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -64,7 +64,7 @@ async fn a_verifying_mysql_client_will_not_fall_back_to_plaintext() {
     let accepted = fixture.mysql_plaintext();
     let mut rejected = accepted.clone();
     rejected.tls.mode = TlsMode::VerifyFull;
-    tablepro_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -74,7 +74,7 @@ async fn a_verifying_clickhouse_client_will_not_fall_back_to_plaintext() {
     let accepted = fixture.clickhouse_plaintext();
     let mut rejected = accepted.clone();
     rejected.tls.mode = TlsMode::VerifyFull;
-    tablepro_driver_tls_tests::assert_connection_rejected(&ClickhouseDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&ClickhouseDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -84,5 +84,5 @@ async fn a_verifying_mssql_client_will_not_fall_back_to_plaintext() {
     let accepted = fixture.mssql_plaintext();
     let mut rejected = accepted.clone();
     rejected.tls.mode = TlsMode::VerifyFull;
-    tablepro_driver_tls_tests::assert_connection_rejected(&MssqlDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&MssqlDriver, accepted, rejected).await;
 }

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{ActivityQuery, Connection, Value, activity_sql};
-use tablepro_release_tests::Fixture;
+use bookie_core::{ActivityQuery, Connection, Value, activity_sql};
+use bookie_release_tests::Fixture;
 
 async fn activity_rows(connection: &dyn Connection, kind: ActivityQuery) -> usize {
     let sql = activity_sql("postgres", kind, None).expect("postgres activity template");

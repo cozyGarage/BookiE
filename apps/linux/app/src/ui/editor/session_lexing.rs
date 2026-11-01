@@ -1,8 +1,8 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use bookie_core::sql_syntax::script::LexicalSettings;
 use relm4::ComponentSender;
-use tablepro_core::sql_syntax::script::LexicalSettings;
 use uuid::Uuid;
 
 use super::statement_cursor::Lexing;
@@ -67,7 +67,7 @@ impl SqlEditor {
             self.status.set_label(&crate::tr!("no active connection"));
             return;
         };
-        let conn: std::sync::Arc<dyn tablepro_core::Connection> = guard.clone();
+        let conn: std::sync::Arc<dyn bookie_core::Connection> = guard.clone();
         let target = self.statement_target(conn, Some(guard));
         let source = self.lexing_source();
         let timeout_secs =

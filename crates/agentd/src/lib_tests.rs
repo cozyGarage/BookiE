@@ -1,13 +1,13 @@
 use super::*;
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, Environment};
+use bookie_policy::{DenyApprovalSink, NullAuditSink};
+use bookie_storage::SavedSshAuth;
 use drivers_sqlite::SqliteDriver;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, Environment};
-use tablepro_policy::{DenyApprovalSink, NullAuditSink};
-use tablepro_storage::SavedSshAuth;
 
 #[test]
 fn the_agent_never_adds_an_unknown_ssh_host_key() {
-    assert_eq!(AGENT_UNKNOWN_HOST_KEY, tablepro_ssh::UnknownHostKey::Refuse);
+    assert_eq!(AGENT_UNKNOWN_HOST_KEY, bookie_ssh::UnknownHostKey::Refuse);
 }
 
 fn saved_connection() -> SavedConnection {
@@ -280,7 +280,7 @@ async fn a_key_material_rotation_during_connect_is_not_cached_under_the_stale_di
         .await
         .expect("open session across rotation");
 
-    let post_connect_material = tablepro_transport::session_material_digest(&saved)
+    let post_connect_material = bookie_transport::session_material_digest(&saved)
         .await
         .expect("digest after the rotation");
     let current_key = SessionKey::from_saved(&saved, post_connect_material);
@@ -304,7 +304,7 @@ async fn a_material_lookup_failure_does_not_reuse_a_healthy_cached_connection() 
         port: 22,
         username: "tunnel".into(),
         auth: SavedSshAuth::PrivateKey {
-            path: "/nonexistent/tablepro-test-key".into(),
+            path: "/nonexistent/bookie-test-key".into(),
             has_passphrase: false,
         },
         jump: None,
@@ -419,7 +419,7 @@ async fn a_healthy_cached_connection_is_reused_when_material_is_verified() {
     saved.database = ":memory:".into();
     saved.tls_root_cert = None;
     saved.ssh = None;
-    let material = tablepro_transport::session_material_digest(&saved)
+    let material = bookie_transport::session_material_digest(&saved)
         .await
         .expect("digest valid material");
     let key = SessionKey::from_saved(&saved, material);

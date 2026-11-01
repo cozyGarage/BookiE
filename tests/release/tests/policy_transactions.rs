@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::sync::Arc;
 
-use tablepro_core::{Connection, DriverError, Value};
-use tablepro_release_tests::{Fixture, guard};
+use bookie_core::{Connection, DriverError, Value};
+use bookie_release_tests::{Fixture, guard};
 
 async fn scalar_int(connection: &dyn Connection, sql: &str) -> i64 {
     let result = connection.query(sql).await.expect("scalar query");
@@ -140,7 +140,7 @@ async fn guarded_application_error_does_not_replay_sequence_effects() {
     .await
     .unwrap();
     let harness = guard(raw.clone(), false);
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
     let result = harness
         .guard
         .query_controlled("SELECT release_retry_probe_fn()", &control)

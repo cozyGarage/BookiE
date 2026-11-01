@@ -25,7 +25,7 @@ async fn a_failed_statement_reports_the_character_position_of_the_error() {
 
     let error = conn.query("SELECT 'é', * FROM missing_table").await.unwrap_err();
 
-    let tablepro_core::DriverError::Query { sqlstate, position, .. } = error else {
+    let bookie_core::DriverError::Query { sqlstate, position, .. } = error else {
         panic!("expected a query error, got {error:?}")
     };
     assert_eq!(sqlstate.as_deref(), Some("42P01"));
@@ -35,9 +35,9 @@ async fn a_failed_statement_reports_the_character_position_of_the_error() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn session_string_settings_follow_standard_conforming_strings() {
-    use tablepro_core::sql_syntax::SqlGrammar;
-    use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
-    use tablepro_core::{OperationControl, Value};
+    use bookie_core::sql_syntax::SqlGrammar;
+    use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
+    use bookie_core::{OperationControl, Value};
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));

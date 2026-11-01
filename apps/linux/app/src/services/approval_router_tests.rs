@@ -1,14 +1,12 @@
 use super::*;
-use std::collections::VecDeque;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use tablepro_core::{
-    ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, TlsConfig,
-};
-use tablepro_policy::{
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, TlsConfig};
+use bookie_policy::{
     ApprovalRequest, AuditError, AuditEvent, AuditSink, AuditState, PolicyConfig, PolicyGuard, Principal,
     StatementClass, StatementFacts,
 };
+use std::collections::VecDeque;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct CountingSink {
     calls: Arc<AtomicUsize>,
@@ -102,7 +100,7 @@ async fn value_contract_mysql_unparseable_procedure_uses_human_approval_before_e
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -113,7 +111,7 @@ async fn value_contract_mysql_unparseable_procedure_uses_human_approval_before_e
         port: container.get_host_port_ipv4(3306).await.expect("port"),
         database: "test".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
         tls: TlsConfig::disabled(),
         ..Default::default()
     };
@@ -138,7 +136,7 @@ async fn value_contract_mysql_unparseable_procedure_uses_human_approval_before_e
     ));
     let guard = PolicyGuard::new(
         connection.clone(),
-        tablepro_policy::GuardContext {
+        bookie_policy::GuardContext {
             connection_id,
             connection_name: "MySQL approval fixture".into(),
             driver_id: "mysql".into(),
@@ -203,7 +201,7 @@ async fn mysql_routine_count(connection: &dyn Connection) -> u64 {
         .await
         .expect("query MySQL routine catalog");
     match result.rows.first().and_then(|row| row.first()) {
-        Some(tablepro_core::Value::Int(count)) => *count as u64,
+        Some(bookie_core::Value::Int(count)) => *count as u64,
         value => panic!("unexpected MySQL routine count: {value:?}"),
     }
 }

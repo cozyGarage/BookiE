@@ -1,17 +1,17 @@
 use adw::prelude::*;
+use bookie_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget};
 use relm4::{adw, gtk};
 use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
 };
-use tablepro_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget};
 use tokio_util::sync::CancellationToken;
 
 pub(super) enum JobSource {
-    Loaded(Arc<tablepro_core::QueryResult>),
+    Loaded(Arc<bookie_core::QueryResult>),
     Paged {
         mode: super::PagedExportMode,
-        columns: Vec<tablepro_core::ColumnInfo>,
+        columns: Vec<bookie_core::ColumnInfo>,
         total: Option<usize>,
         open: super::PageFetcherFactory,
     },
@@ -50,7 +50,7 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
     let progress = |rows| completed.store(rows, Ordering::Relaxed);
     match job.source {
         JobSource::Loaded(result) => {
-            tablepro_core::export::write_result_file(&job.path, &result, &export, cancelled, progress)
+            bookie_core::export::write_result_file(&job.path, &result, &export, cancelled, progress)
         }
         JobSource::Paged {
             mode: super::PagedExportMode::GuardedQuery,
@@ -59,7 +59,7 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
             open,
         } => {
             let mut pages = open(cancel.clone());
-            let result = tablepro_core::export::write_paged_file(
+            let result = bookie_core::export::write_paged_file(
                 &job.path,
                 &columns,
                 total.unwrap_or(0),

@@ -1,7 +1,7 @@
+use bookie_core::{DatabaseDriver, KEYSET_OFFSET_THRESHOLD, Value};
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Document, doc};
 use std::time::Instant;
-use tablepro_core::{DatabaseDriver, KEYSET_OFFSET_THRESHOLD, Value};
 
 #[tokio::test]
 #[ignore = "requires docker; diagnostic timing only"]

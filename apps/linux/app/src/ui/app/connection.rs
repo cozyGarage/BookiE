@@ -1,6 +1,6 @@
+use bookie_storage::SavedConnection;
 use relm4::adw::prelude::*;
 use relm4::{Component, ComponentController, ComponentSender, adw};
-use tablepro_storage::SavedConnection;
 use uuid::Uuid;
 
 use crate::services::connection_service;
@@ -14,7 +14,7 @@ impl App {
     /// The policy-guarded connection this window owns, or `None` when the
     /// window is disconnected. Never resolves through the process-wide focus,
     /// so another window's connection can never answer for this one.
-    pub(super) fn window_connection(&self) -> Option<std::sync::Arc<dyn tablepro_core::Connection>> {
+    pub(super) fn window_connection(&self) -> Option<std::sync::Arc<dyn bookie_core::Connection>> {
         let id = self.connection_id?;
         self.database.get(id)
     }
@@ -28,13 +28,13 @@ impl App {
         self.open_connect_dialog(None, sender);
     }
 
-    pub(super) fn on_edit_connection(&self, saved: tablepro_storage::SavedConnection, sender: ComponentSender<Self>) {
+    pub(super) fn on_edit_connection(&self, saved: bookie_storage::SavedConnection, sender: ComponentSender<Self>) {
         self.load_connection_for_edit(saved, false, sender);
     }
 
     fn load_connection_for_edit(
         &self,
-        saved: tablepro_storage::SavedConnection,
+        saved: bookie_storage::SavedConnection,
         prompt_for_password: bool,
         sender: ComponentSender<Self>,
     ) {
@@ -249,7 +249,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    if let Ok(connections) = tablepro_storage::load_connections().await {
+                    if let Ok(connections) = bookie_storage::load_connections().await {
                         let ids = connections.iter().map(|connection| connection.id).collect::<Vec<_>>();
                         if workspace.prefetch_connections(&ids).is_err() {
                             sender_clone.input(AppMsg::ShowToast(crate::tr!(
@@ -294,7 +294,7 @@ impl App {
         }
         let last = self.window_state.borrow().last_connection_id;
         let available: Vec<Uuid> = connections.iter().map(|saved| saved.id).collect();
-        let Some(id) = tablepro_app_services::window_state::connection_id_to_restore(last, &available) else {
+        let Some(id) = bookie_app_services::window_state::connection_id_to_restore(last, &available) else {
             return;
         };
         let Some(saved) = connections.iter().find(|saved| saved.id == id).cloned() else {
@@ -381,7 +381,7 @@ impl App {
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let ssh_environment = self
             .database
-            .ssh_environment_for_connection(&saved, tablepro_policy::Principal::human_gui());
+            .ssh_environment_for_connection(&saved, bookie_policy::Principal::human_gui());
         let guard_factory = self.database.candidate_guard_factory();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -779,12 +779,12 @@ impl App {
                             if !eligible {
                                 false
                             } else {
-                                prompt_for_stored_password(tablepro_storage::load_password(source.id).await)
+                                prompt_for_stored_password(bookie_storage::load_password(source.id).await)
                             }
                         }
                         None => false,
                     };
-                    match tablepro_storage::duplicate_connection(id).await {
+                    match bookie_storage::duplicate_connection(id).await {
                         Ok(copy) => {
                             sender_clone.input(AppMsg::DuplicateConnectionSucceeded {
                                 copy,
@@ -826,7 +826,7 @@ fn duplicate_connection_message(name: &str) -> String {
     crate::tr!("Created “{name}”. Enter its password the first time you connect.").replace("{name}", name)
 }
 
-fn prompt_for_stored_password(stored: Result<Option<secrecy::SecretString>, tablepro_storage::StorageError>) -> bool {
+fn prompt_for_stored_password(stored: Result<Option<secrecy::SecretString>, bookie_storage::StorageError>) -> bool {
     use secrecy::ExposeSecret;
     match stored {
         Ok(Some(password)) => !password.expose_secret().is_empty(),
@@ -839,11 +839,11 @@ fn prompt_for_stored_password(stored: Result<Option<secrecy::SecretString>, tabl
 }
 
 fn duplicate_connection_prompt_eligible(
-    auth_mode: tablepro_core::AuthMode,
+    auth_mode: bookie_core::AuthMode,
     file_based: bool,
     has_jump_chain: bool,
 ) -> bool {
-    auth_mode == tablepro_core::AuthMode::Password && !file_based && !has_jump_chain
+    auth_mode == bookie_core::AuthMode::Password && !file_based && !has_jump_chain
 }
 
 /// Performs the actual disk + keyring teardown for a saved connection.
@@ -860,7 +860,7 @@ fn execute_delete_connection(
         shutdown
             .register(async move {
                 let _save_turn = crate::services::connection_save_turn::take().await;
-                let result = tablepro_storage::delete_connection(id).await;
+                let result = bookie_storage::delete_connection(id).await;
                 if let Err(error) = result {
                     tracing::warn!(error = %error, "deleting the connection file entry failed");
                     sender_clone.input(AppMsg::ShowToast(crate::tr!("The connection could not be deleted.")));
@@ -871,9 +871,9 @@ fn execute_delete_connection(
                     tracing::warn!(error = %error, "forgetting the connection's column settings failed");
                 }
 
-                let password = tablepro_storage::delete_password(id).await;
-                let ssh_password = tablepro_storage::delete_ssh_password(id).await;
-                let ssh_passphrase = tablepro_storage::delete_ssh_passphrase(id).await;
+                let password = bookie_storage::delete_password(id).await;
+                let ssh_password = bookie_storage::delete_ssh_password(id).await;
+                let ssh_passphrase = bookie_storage::delete_ssh_passphrase(id).await;
                 let mut credential_failure = false;
                 for error in [password.err(), ssh_password.err(), ssh_passphrase.err()]
                     .into_iter()
@@ -896,7 +896,7 @@ fn execute_delete_connection(
 
 fn touch_last_opened(connection_id: Uuid, sender: ComponentSender<App>) {
     relm4::spawn(async move {
-        let result = tablepro_storage::touch_last_opened(connection_id).await;
+        let result = bookie_storage::touch_last_opened(connection_id).await;
         if let Err(error) = result {
             tracing::warn!(error = %error, "touch_last_opened failed");
             sender.input(AppMsg::ShowToast(crate::tr!(
@@ -922,22 +922,22 @@ mod tests {
     #[test]
     fn duplicate_prompts_only_for_editable_password_authenticated_connections() {
         assert!(duplicate_connection_prompt_eligible(
-            tablepro_core::AuthMode::Password,
+            bookie_core::AuthMode::Password,
             false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
-            tablepro_core::AuthMode::Kerberos,
+            bookie_core::AuthMode::Kerberos,
             false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
-            tablepro_core::AuthMode::Password,
+            bookie_core::AuthMode::Password,
             true,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
-            tablepro_core::AuthMode::Password,
+            bookie_core::AuthMode::Password,
             false,
             true
         ));
@@ -952,7 +952,7 @@ mod tests {
 
     #[test]
     fn an_unreadable_keyring_prompts_instead_of_pretending_there_is_no_password() {
-        let failure = tablepro_storage::StorageError::Schema("keyring locked".into());
+        let failure = bookie_storage::StorageError::Schema("keyring locked".into());
         assert!(prompt_for_stored_password(Err(failure)));
     }
 }

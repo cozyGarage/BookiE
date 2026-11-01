@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 
 use uuid::Uuid;
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Value,
     sql_dialect::{
         build_insert_from_draft_touched, build_keyed_delete, build_keyed_update, build_mongodb_keyed_delete,

@@ -45,7 +45,7 @@ fn postgres_wide_numeric_updates_cast_text_to_the_builtin_numeric_type() {
 #[test]
 fn postgres_domain_text_updates_cast_to_the_qualified_type() {
     let mut columns = [col("id", true), col("items", false)];
-    columns[1].domain_type = Some(tablepro_core::QualifiedTypeName {
+    columns[1].domain_type = Some(bookie_core::QualifiedTypeName {
         schema: "domain_over_array".into(),
         name: "small_ints".into(),
     });

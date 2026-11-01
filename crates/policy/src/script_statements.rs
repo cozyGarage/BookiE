@@ -1,9 +1,9 @@
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
 
 pub(crate) fn script_statements(sql: &str, driver_id: &str) -> Vec<String> {
     let Some(grammar) = compound_body_grammar(driver_id) else {
-        return tablepro_core::sql_lex::split_statements(sql, driver_id);
+        return bookie_core::sql_lex::split_statements(sql, driver_id);
     };
     ScriptPlan::build(sql, grammar, LexicalSettings::default_for(grammar))
         .statements()
@@ -88,7 +88,7 @@ mod tests {
         for driver in ["postgres", "mysql", "mssql", "clickhouse", "duckdb", "redis"] {
             assert_eq!(
                 script_statements("SELECT 1; BEGIN", driver),
-                tablepro_core::sql_lex::split_statements("SELECT 1; BEGIN", driver),
+                bookie_core::sql_lex::split_statements("SELECT 1; BEGIN", driver),
                 "{driver}"
             );
         }

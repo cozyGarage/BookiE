@@ -1,6 +1,6 @@
 use relm4::ComponentSender;
 
-use tablepro_core::{FilterSet, ForeignKeyInfo, InboundForeignKeyInfo, Value};
+use bookie_core::{FilterSet, ForeignKeyInfo, InboundForeignKeyInfo, Value};
 
 use super::*;
 
@@ -51,7 +51,7 @@ fn reference_target(
             return Err(crate::tr!("This foreign key is empty"));
         }
         rules.push(
-            tablepro_core::equality_rule(referenced, value)
+            bookie_core::equality_rule(referenced, value)
                 .ok_or_else(|| crate::tr!("Values of this type can't be used as a filter"))?,
         );
     }
@@ -95,7 +95,7 @@ fn referencing_target(key: &InboundForeignKeyInfo, row: &[(String, Value)]) -> R
             return Err(crate::tr!("A referenced value is empty"));
         }
         rules.push(
-            tablepro_core::equality_rule(source_col, value)
+            bookie_core::equality_rule(source_col, value)
                 .ok_or_else(|| crate::tr!("Values of this type can't be used as a filter"))?,
         );
     }
@@ -147,7 +147,7 @@ impl BrowseTab {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::FilterOp;
+    use bookie_core::FilterOp;
 
     fn foreign_key(columns: &[&str], ref_columns: &[&str], ref_schema: Option<&str>) -> ForeignKeyInfo {
         ForeignKeyInfo {

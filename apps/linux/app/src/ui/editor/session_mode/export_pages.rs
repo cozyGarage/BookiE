@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use tablepro_core::export::{ExportError, RowPage};
-use tablepro_core::{Connection, DriverError, OperationControl, Value};
+use bookie_core::export::{ExportError, RowPage};
+use bookie_core::{Connection, DriverError, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 use super::{StatementCursor, StatementTarget};
@@ -200,14 +200,14 @@ fn export_driver_error(error: DriverError) -> ExportError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::DatabaseDriver;
+    use bookie_core::DatabaseDriver;
 
     fn pool() -> Arc<dyn Connection> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        let options = tablepro_core::ConnectOptions {
+        let options = bookie_core::ConnectOptions {
             database: ":memory:".into(),
             ..Default::default()
         };

@@ -29,14 +29,14 @@ if [[ -f "$ROOT/scripts/dev-env.sh" ]]; then
 fi
 
 if [[ "${DEB_SKIP_BUILD:-0}" != "1" ]]; then
-  echo "==> cargo build --profile $PROFILE -p tablepro-app -p tablepro-agentd"
-  cargo build --profile "$PROFILE" -p tablepro-app -p tablepro-agentd --locked
-  cargo build --profile "$PROFILE" -p tablepro-ssh --bin tablepro-askpass --locked
+  echo "==> cargo build --profile $PROFILE -p bookie-app -p bookie-agentd"
+  cargo build --profile "$PROFILE" -p bookie-app -p bookie-agentd --locked
+  cargo build --profile "$PROFILE" -p bookie-ssh --bin bookie-askpass --locked
 else
   echo "==> DEB_SKIP_BUILD=1; packaging existing $PROFILE binaries"
 fi
 
-for bin in tablepro-app tablepro-agentd tablepro-askpass; do
+for bin in bookie-app bookie-agentd bookie-askpass; do
   if [[ ! -x "$CARGO_TARGET_DIR/$PROFILE/$bin" ]]; then
     echo "missing $CARGO_TARGET_DIR/$PROFILE/$bin; run without DEB_SKIP_BUILD" >&2
     exit 1
@@ -45,16 +45,14 @@ done
 
 STAGE="$OUT/$PKG_NAME"
 rm -rf "$STAGE"
-install -Dsm755 "$CARGO_TARGET_DIR/$PROFILE/tablepro-app" "$STAGE/usr/bin/bookie"
-install -Dsm755 "$CARGO_TARGET_DIR/$PROFILE/tablepro-agentd" "$STAGE/usr/bin/bookie-agentd"
-install -Dsm755 "$CARGO_TARGET_DIR/$PROFILE/tablepro-askpass" "$STAGE/usr/bin/tablepro-askpass"
-ln -s bookie "$STAGE/usr/bin/tablepro"
-ln -s bookie-agentd "$STAGE/usr/bin/tablepro-agentd"
-install -Dm644 apps/linux/flatpak/com.tablepro.linux.desktop "$STAGE/usr/share/applications/com.tablepro.linux.desktop"
-install -Dm644 apps/linux/flatpak/com.tablepro.linux.metainfo.xml "$STAGE/usr/share/metainfo/com.tablepro.linux.metainfo.xml"
-install -Dm644 apps/linux/data/com.tablepro.linux.gschema.xml "$STAGE/usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml"
-install -Dm644 apps/linux/flatpak/icons/scalable/com.tablepro.linux.svg \
-  "$STAGE/usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg"
+install -Dsm755 "$CARGO_TARGET_DIR/$PROFILE/bookie-app" "$STAGE/usr/bin/bookie"
+install -Dsm755 "$CARGO_TARGET_DIR/$PROFILE/bookie-agentd" "$STAGE/usr/bin/bookie-agentd"
+install -Dsm755 "$CARGO_TARGET_DIR/$PROFILE/bookie-askpass" "$STAGE/usr/bin/bookie-askpass"
+install -Dm644 apps/linux/flatpak/com.bookie.linux.desktop "$STAGE/usr/share/applications/com.bookie.linux.desktop"
+install -Dm644 apps/linux/flatpak/com.bookie.linux.metainfo.xml "$STAGE/usr/share/metainfo/com.bookie.linux.metainfo.xml"
+install -Dm644 apps/linux/data/com.bookie.linux.gschema.xml "$STAGE/usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml"
+install -Dm644 apps/linux/flatpak/icons/scalable/com.bookie.linux.svg \
+  "$STAGE/usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg"
 install -Dm644 apps/linux/packaging/policy.example.toml "$STAGE/usr/share/doc/bookie/policy.example.toml"
 install -Dm644 LICENSE.md "$STAGE/usr/share/doc/bookie/LICENSE.md"
 
@@ -65,15 +63,14 @@ Version: ${VERSION}
 Section: database
 Priority: optional
 Architecture: ${ARCH}
-Maintainer: BookiE Contributors <noreply@tablepro.app>
+Maintainer: BookiE Contributors <noreply@bookie.app>
 Homepage: https://github.com/cozyGarage/BookiE
 Depends: libgtk-4-1 (>= 4.24), libadwaita-1-0 (>= 1.10), libgtksourceview-5-0 (>= 5.22), libsecret-1-0, libgssapi-krb5-2, libkrb5-3, libsqlite3-0
 Replaces: tablepro
 Conflicts: tablepro
-Provides: tablepro
 Description: Native Linux database client
  BookiE is a native GTK4 / libadwaita database client. It installs
- bookie and bookie-agentd, with tablepro aliases.
+ bookie, bookie-agentd and bookie-askpass.
 EOF
 
 dpkg-deb --root-owner-group --build "$STAGE" "$OUT/${PKG_NAME}.deb"

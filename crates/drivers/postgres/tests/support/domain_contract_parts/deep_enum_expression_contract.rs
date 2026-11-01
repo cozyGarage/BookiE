@@ -1,5 +1,5 @@
 async fn assert_deep_enum_expression_parameters(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -42,7 +42,7 @@ async fn assert_deep_enum_expression_parameters(
 }
 
 async fn assert_deep_enum_array_scalar_parameters(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -57,7 +57,7 @@ async fn assert_deep_enum_array_scalar_parameters(
 }
 
 async fn assert_deep_enum_array_remove_supported(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
 ) {
     for parameter in [Value::Text("paused".into()), Value::Null] {
@@ -94,7 +94,7 @@ async fn assert_deep_enum_array_remove_supported(
 }
 
 async fn assert_deep_enum_array_remove_refused(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -107,7 +107,7 @@ async fn assert_deep_enum_array_remove_refused(
             .await
             .expect_err("deep enum array scalar parameters must be refused");
         assert!(
-            matches!(&error, tablepro_core::DriverError::Unsupported(message)
+            matches!(&error, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "array_remove parameter {parameter:?}, depth {levels}: {error:?}"
         );
@@ -115,7 +115,7 @@ async fn assert_deep_enum_array_remove_refused(
 }
 
 async fn assert_deep_enum_array_prepend_supported(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
 ) {
     for (parameter, values) in [
@@ -151,7 +151,7 @@ async fn assert_deep_enum_array_prepend_supported(
 }
 
 async fn assert_deep_enum_array_prepend_refused(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -164,7 +164,7 @@ async fn assert_deep_enum_array_prepend_refused(
             .await
             .expect_err("deep enum array_prepend parameter must be refused");
         assert!(
-            matches!(&error, tablepro_core::DriverError::Unsupported(message)
+            matches!(&error, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "array_prepend parameter {parameter:?}, depth {levels}: {error:?}"
         );
@@ -172,7 +172,7 @@ async fn assert_deep_enum_array_prepend_refused(
 }
 
 async fn assert_deep_enum_array_position_supported(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -210,7 +210,7 @@ async fn assert_deep_enum_array_position_supported(
 }
 
 async fn assert_deep_enum_array_positions_supported(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -248,7 +248,7 @@ async fn assert_deep_enum_array_positions_supported(
 }
 
 async fn assert_deep_enum_case_parameters(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -298,7 +298,7 @@ async fn assert_deep_enum_case_parameters(
 }
 
 async fn assert_deep_enum_array_expression_refused(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -314,7 +314,7 @@ async fn assert_deep_enum_array_expression_refused(
             .await
             .expect_err("deep enum array parameter must be refused");
         assert!(
-            matches!(&error, tablepro_core::DriverError::Unsupported(message)
+            matches!(&error, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "array_append parameter {parameter:?}, depth {levels}: {error:?}"
         );
@@ -322,7 +322,7 @@ async fn assert_deep_enum_array_expression_refused(
 }
 
 async fn assert_deep_enum_greatest_least_parameters(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -376,7 +376,7 @@ async fn assert_deep_enum_greatest_least_parameters(
 }
 
 async fn assert_deep_enum_nullif_refused(
-    connection: &dyn tablepro_core::Connection,
+    connection: &dyn bookie_core::Connection,
     schema: &str,
     levels: usize,
 ) {
@@ -389,7 +389,7 @@ async fn assert_deep_enum_nullif_refused(
             .await
             .expect_err("raw domain NULLIF parameter must retain PostgreSQL refusal");
         assert!(
-            matches!(&error, tablepro_core::DriverError::Query { sqlstate: Some(code), .. }
+            matches!(&error, bookie_core::DriverError::Query { sqlstate: Some(code), .. }
                 if code == "42883"),
             "NULLIF parameter {parameter:?}, depth {levels}: {error:?}"
         );

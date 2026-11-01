@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use bookie_core::Environment;
 use serde::{Deserialize, Serialize};
-use tablepro_core::Environment;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

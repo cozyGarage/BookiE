@@ -1,10 +1,10 @@
+pub use bookie_app_services::reconnect::{is_permanent_failure, was_cancelled};
 use std::sync::Arc;
-pub use tablepro_app_services::reconnect::{is_permanent_failure, was_cancelled};
 
-use tablepro_core::{ConnectOptions, Connection, DriverRegistry};
-use tablepro_storage::SavedConnection;
-use tablepro_transport::TransportError;
-use tablepro_transport::{SshEnvironment, SshRoute, Tunnel};
+use bookie_core::{ConnectOptions, Connection, DriverRegistry};
+use bookie_storage::SavedConnection;
+use bookie_transport::TransportError;
+use bookie_transport::{SshEnvironment, SshRoute, Tunnel};
 use uuid::Uuid;
 
 use super::database_service::{CandidateGuardFactory, ConnectionMetadata, DatabaseService, ReconnectParams};
@@ -14,8 +14,8 @@ use super::database_service::{CandidateGuardFactory, ConnectionMetadata, Databas
 /// Keeping preparation separate from activation makes failed switches leave
 /// the existing workspace and connection untouched.
 pub struct PreparedConnection {
-    pub tables: Vec<tablepro_core::TableInfo>,
-    pub views: Vec<tablepro_core::TableInfo>,
+    pub tables: Vec<bookie_core::TableInfo>,
+    pub views: Vec<bookie_core::TableInfo>,
     pub driver_id: String,
     id: uuid::Uuid,
     metadata: ConnectionMetadata,
@@ -38,8 +38,8 @@ impl std::fmt::Debug for PreparedConnection {
 
 pub struct ActivatedConnection {
     pub id: Uuid,
-    pub tables: Vec<tablepro_core::TableInfo>,
-    pub views: Vec<tablepro_core::TableInfo>,
+    pub tables: Vec<bookie_core::TableInfo>,
+    pub views: Vec<bookie_core::TableInfo>,
     pub driver_id: String,
     pub database: String,
 }
@@ -54,8 +54,8 @@ impl PreparedConnection {
     }
 
     pub(crate) fn new(
-        tables: Vec<tablepro_core::TableInfo>,
-        views: Vec<tablepro_core::TableInfo>,
+        tables: Vec<bookie_core::TableInfo>,
+        views: Vec<bookie_core::TableInfo>,
         driver_id: String,
         metadata: ConnectionMetadata,
         connection: Arc<dyn Connection>,
@@ -121,11 +121,11 @@ pub async fn open_saved(
     let environment = saved.environment;
     let read_only = saved.read_only;
 
-    let ssh_hops = tablepro_transport::saved_ssh_route(&saved).await.map_err(message)?;
-    let mut opts = tablepro_transport::connect_options_for(&saved).await.map_err(message)?;
+    let ssh_hops = bookie_transport::saved_ssh_route(&saved).await.map_err(message)?;
+    let mut opts = bookie_transport::connect_options_for(&saved).await.map_err(message)?;
     opts.application_name = Some("BookiE".into());
 
-    let (conn, tunnel) = tablepro_transport::establish_with_cancellation(
+    let (conn, tunnel) = bookie_transport::establish_with_cancellation(
         &*driver,
         opts.clone(),
         ssh_hops.clone(),
@@ -144,10 +144,10 @@ pub async fn open_saved(
         server_version: None,
         query_timeout_secs: saved.query_timeout_secs,
     };
-    let guarded = guard_factory.guard(connection.clone(), &metadata, tablepro_policy::Principal::human_gui())?;
+    let guarded = guard_factory.guard(connection.clone(), &metadata, bookie_policy::Principal::human_gui())?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
-        Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),
         Err(_) => None,
     };
     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -186,13 +186,13 @@ pub struct EstablishFailure {
 }
 
 pub async fn establish_classified_with_cancellation(
-    driver: &dyn tablepro_core::DatabaseDriver,
+    driver: &dyn bookie_core::DatabaseDriver,
     opts: ConnectOptions,
     ssh: Option<SshRoute>,
     environment: &SshEnvironment,
     cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), EstablishFailure> {
-    tablepro_transport::establish_with_cancellation(driver, opts, ssh, environment, cancellation)
+    bookie_transport::establish_with_cancellation(driver, opts, ssh, environment, cancellation)
         .await
         .map_err(|error| EstablishFailure {
             permanent: is_permanent_failure(&error),

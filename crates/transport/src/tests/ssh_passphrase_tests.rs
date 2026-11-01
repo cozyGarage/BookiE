@@ -9,7 +9,7 @@ async fn private_key_passphrases_use_the_secret_bound_to_each_hop() {
     let root = encrypted_key_chain();
     let hops = root.flatten_hops();
     for (hop, passphrase) in hops.iter().zip([&root_passphrase, &jump_passphrase]) {
-        tablepro_storage::store_ssh_hop_passphrase(
+        bookie_storage::store_ssh_hop_passphrase(
             connection_id,
             hop.hop_id,
             hop.credential_revision,
@@ -32,7 +32,7 @@ async fn private_key_passphrases_use_the_secret_bound_to_each_hop() {
         .collect::<Vec<_>>();
 
     for hop in hops {
-        tablepro_storage::delete_ssh_hop_passphrase(connection_id, hop.hop_id, hop.credential_revision)
+        bookie_storage::delete_ssh_hop_passphrase(connection_id, hop.hop_id, hop.credential_revision)
             .await
             .unwrap();
     }
@@ -46,7 +46,7 @@ async fn a_missing_jump_key_passphrase_does_not_receive_the_root_secret() {
     let root_passphrase = Uuid::new_v4().to_string();
     let root = encrypted_key_chain();
     let hops = root.flatten_hops();
-    tablepro_storage::store_ssh_hop_passphrase(
+    bookie_storage::store_ssh_hop_passphrase(
         connection_id,
         hops[0].hop_id,
         hops[0].credential_revision,
@@ -57,7 +57,7 @@ async fn a_missing_jump_key_passphrase_does_not_receive_the_root_secret() {
     .unwrap();
 
     let resolved = resolve_saved_ssh_chain(connection_id, &root).await.unwrap();
-    tablepro_storage::delete_ssh_hop_passphrase(connection_id, hops[0].hop_id, hops[0].credential_revision)
+    bookie_storage::delete_ssh_hop_passphrase(connection_id, hops[0].hop_id, hops[0].credential_revision)
         .await
         .unwrap();
 

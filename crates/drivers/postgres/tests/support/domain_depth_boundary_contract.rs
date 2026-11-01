@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, Value};
+use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue, Value};
 
 use crate::{connect, start_pg};
 
@@ -40,7 +40,7 @@ async fn value_contract_deep_enum_domain_refuses_incompatible_typed_assignments(
     assert_incompatible_enum_assignments_refused(connection.as_ref(), schema).await;
 }
 
-async fn assert_incompatible_enum_assignments_refused(connection: &dyn tablepro_core::Connection, schema: &str) {
+async fn assert_incompatible_enum_assignments_refused(connection: &dyn bookie_core::Connection, schema: &str) {
     let date = chrono::NaiveDate::from_ymd_opt(2000, 1, 2).unwrap();
     let time = chrono::NaiveTime::from_hms_opt(12, 34, 56).unwrap();
     let timestamp = chrono::NaiveDateTime::new(date, time);
@@ -66,8 +66,8 @@ async fn assert_incompatible_enum_assignments_refused(connection: &dyn tablepro_
         ),
         (Value::Json(Box::new(serde_json::json!({}))), "'{}'::jsonb"),
     ];
-    let sqlstate = |error: tablepro_core::DriverError| match error {
-        tablepro_core::DriverError::Query {
+    let sqlstate = |error: bookie_core::DriverError| match error {
+        bookie_core::DriverError::Query {
             sqlstate: Some(sqlstate),
             ..
         } => sqlstate,
@@ -147,20 +147,20 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: "status".into()
         })
     );
     assert_eq!(
         columns[1].domain_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: "status_domain_257".into(),
         })
     );
 
-    let (update, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -183,7 +183,7 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
         .await
         .expect_err("deep raw enum inference remains an explicit refusal");
     assert!(
-        matches!(&raw, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
+        matches!(&raw, bookie_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
         "{raw:?}"
     );
 
@@ -195,7 +195,7 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
         }],
         ..Default::default()
     };
-    let (where_sql, filter_params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+    let (where_sql, filter_params) = bookie_core::build_filter_where("postgres", &columns, &filters)
         .unwrap()
         .unwrap();
     let filtered = connection
@@ -222,7 +222,7 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
         .execute(&format!("SET LOCAL search_path TO {shadow}, public"))
         .await
         .unwrap();
-    let (transaction_update, transaction_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (transaction_update, transaction_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -333,20 +333,20 @@ async fn value_contract_domain_over_enum_259_levels_preserve_schema_aware_values
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: "status".into(),
         })
     );
     assert_eq!(
         columns[1].domain_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: "status_domain_259".into(),
         })
     );
 
-    let (update, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -369,7 +369,7 @@ async fn value_contract_domain_over_enum_259_levels_preserve_schema_aware_values
         }],
         ..Default::default()
     };
-    let (where_sql, filter_params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+    let (where_sql, filter_params) = bookie_core::build_filter_where("postgres", &columns, &filters)
         .unwrap()
         .unwrap();
     let rows = connection
@@ -469,7 +469,7 @@ async fn value_contract_inferred_enum_array_parameter_respects_domain_depth_boun
         .await
         .expect_err("PostgreSQL cannot resolve equality for this deep domain chain");
     assert!(
-        matches!(&native_equality, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+        matches!(&native_equality, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
         "expected native missing-operator SQLSTATE 42883, got {native_equality:?}"
     );
     transaction
@@ -538,7 +538,7 @@ async fn value_contract_inferred_enum_array_parameter_respects_domain_depth_boun
             .await
             .expect_err("inferred enum-array parameters at depth 64 must be explicitly refused");
         assert!(
-            matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
+            matches!(&error, bookie_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
             "expected the enum-domain depth refusal at depth 64, got {error:?}"
         );
     }
@@ -587,7 +587,7 @@ async fn value_contract_deep_enum_scalar_contexts_resolve_under_shadowed_search_
     transaction.rollback().await.unwrap();
 }
 
-async fn create_enum_scalar_depth_fixture(connection: &dyn tablepro_core::Connection, schema: &str) {
+async fn create_enum_scalar_depth_fixture(connection: &dyn bookie_core::Connection, schema: &str) {
     connection.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
     connection
         .execute(&format!(
@@ -631,7 +631,7 @@ async fn create_enum_scalar_depth_fixture(connection: &dyn tablepro_core::Connec
 }
 
 async fn assert_scalar_contexts_match_native_inference(
-    session: &mut dyn tablepro_core::Transaction,
+    session: &mut dyn bookie_core::Transaction,
     schema: &str,
     depth: usize,
 ) {
@@ -680,7 +680,7 @@ async fn assert_scalar_contexts_match_native_inference(
     }
 }
 
-async fn assert_deep_enum_between_parameters(session: &mut dyn tablepro_core::Transaction, schema: &str, depth: usize) {
+async fn assert_deep_enum_between_parameters(session: &mut dyn bookie_core::Transaction, schema: &str, depth: usize) {
     for parameters in [
         [Value::Text("ready".into()), Value::Text("paused".into())],
         [Value::Text("NULL".into()), Value::Text(String::new())],
@@ -704,11 +704,11 @@ async fn assert_deep_enum_between_parameters(session: &mut dyn tablepro_core::Tr
         session.execute("ROLLBACK TO SAVEPOINT between_contract").await.unwrap();
         session.execute("RELEASE SAVEPOINT between_contract").await.unwrap();
         assert!(
-            matches!(&native, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+            matches!(&native, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
             "depth {depth}: {native:?}"
         );
         assert!(
-            matches!(&inferred, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+            matches!(&inferred, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
             "depth {depth}: {inferred:?}"
         );
         assert_eq!(session.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);

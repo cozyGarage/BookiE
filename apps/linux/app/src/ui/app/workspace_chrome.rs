@@ -1,7 +1,7 @@
 use relm4::adw::prelude::*;
 
 use crate::services::database_service::ConnectionMetadata;
-use tablepro_core::DriverRegistry;
+use bookie_core::DriverRegistry;
 
 use super::{App, qualified_label};
 use crate::services::sidebar_tree::NodeKind;
@@ -175,7 +175,7 @@ mod tests {
             id: uuid::Uuid::nil(),
             name: "pg-local".into(),
             driver_id: "postgres".into(),
-            environment: tablepro_core::Environment::Local,
+            environment: bookie_core::Environment::Local,
             read_only: false,
             server_version: Some("PostgreSQL 17.11".into()),
             query_timeout_secs: None,
@@ -222,7 +222,7 @@ mod tests {
             id: uuid::Uuid::nil(),
             name: "pg-local".into(),
             driver_id: "postgres".into(),
-            environment: tablepro_core::Environment::Local,
+            environment: bookie_core::Environment::Local,
             read_only: false,
             server_version: Some("PostgreSQL 17.11".into()),
             query_timeout_secs: None,

@@ -1,4 +1,4 @@
-use tablepro_core::{AuthMode, DriverCapabilities};
+use bookie_core::{AuthMode, DriverCapabilities};
 
 use super::*;
 

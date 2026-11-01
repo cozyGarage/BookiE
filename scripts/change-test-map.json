@@ -3,37 +3,37 @@
   "scopes": [
     {
       "prefix": "crates/core/src/",
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib"
     },
     {
       "prefix": "crates/core/tests/",
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--tests"
     },
     {
       "prefix": "apps/linux/app/src/",
-      "package": "tablepro-app",
+      "package": "bookie-app",
       "target": "--lib"
     },
     {
       "prefix": "apps/linux/app/tests/",
-      "package": "tablepro-app",
+      "package": "bookie-app",
       "target": "--tests"
     },
     {
       "prefix": "crates/drivers/sqlite/tests/",
-      "package": "tablepro-driver-sqlite",
+      "package": "bookie-driver-sqlite",
       "target": "--tests"
     },
     {
       "prefix": "crates/drivers/postgres/tests/",
-      "package": "tablepro-driver-postgres",
+      "package": "bookie-driver-postgres",
       "target": "--test=integration"
     },
     {
       "prefix": "crates/mcp/src/",
-      "package": "tablepro-mcp",
+      "package": "bookie-mcp",
       "target": "--lib"
     },
     {
@@ -44,60 +44,60 @@
     },
     {
       "prefix": "crates/policy/src/",
-      "package": "tablepro-policy",
+      "package": "bookie-policy",
       "target": "--lib"
     },
     {
       "prefix": "crates/policy/tests/",
-      "package": "tablepro-policy",
+      "package": "bookie-policy",
       "target": "--tests"
     }
   ],
   "exact_tests": {
     "crates/core/src/query.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "query::tests::result_budget_caps_cells_and_dynamic_value_storage"
       ]
     },
     "crates/core/src/numeric_input.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "numeric_input::tests::sqlite_declared_types_follow_native_affinity_precedence"
       ]
     },
     "crates/core/src/import/cell.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "import::cell::tests::sqlite_affinity_tests::sqlite_unrecognized_numeric_affinity_types_parse_numeric_values_safely"
       ]
     },
     "crates/core/src/sql_dialect/updates.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "sql_dialect::updates::tests::optimistic_updates_compare_the_original_value_with_null_safe_dialect_syntax"
       ]
     },
     "crates/app-services/src/change_tracker.rs": {
-      "package": "tablepro-app-services",
+      "package": "bookie-app-services",
       "target": "--lib",
       "tests": [
         "change_tracker::tests::materialize_orders_deletes_then_updates_then_inserts"
       ]
     },
     "apps/linux/app/tests/stale_grid_update.rs": {
-      "package": "tablepro-app",
+      "package": "bookie-app",
       "target": "--test=stale_grid_update",
       "tests": [
         "stale_sqlite_grid_update_rolls_back_the_batch_and_preserves_the_original_value"
       ]
     },
     "crates/core/src/sql_dialect.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "sql_dialect::tests::value_contract_postgres_text_array_updates_cast_through_text_to_a_builtin_array_type",
@@ -108,7 +108,7 @@
       ]
     },
     "apps/linux/app/src/ui/browse_tab/row_ops.rs": {
-      "package": "tablepro-app",
+      "package": "bookie-app",
       "target": "--lib",
       "tests": [
         "ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_blanks_database_owned_cells_and_preserves_exact_values",
@@ -118,7 +118,7 @@
       ]
     },
     "apps/linux/app/src/ui/browse_tab/value_parse.rs": {
-      "package": "tablepro-app",
+      "package": "bookie-app",
       "target": "--lib",
       "tests": [
         "ui::browse_tab::value_parse::tests::sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior",
@@ -128,14 +128,14 @@
       ]
     },
     "crates/drivers/sqlite/tests/runtime_typed_values.rs": {
-      "package": "tablepro-driver-sqlite",
+      "package": "bookie-driver-sqlite",
       "target": "--test=runtime_typed_values",
       "tests": [
         "declared_enum_values_follow_sqlite_numeric_affinity_and_keep_runtime_kinds"
       ]
     },
     "crates/drivers/clickhouse/src/lib.rs": {
-      "package": "tablepro-driver-clickhouse",
+      "package": "bookie-driver-clickhouse",
       "target": "--lib",
       "tests": [
         "tests::clickhouse_response_rejects_column_type_count_mismatch",
@@ -145,7 +145,7 @@
       ]
     },
     "crates/core/src/export/csv.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::csv::tests::value_contract_csv_keeps_empty_text_distinct_from_null",
@@ -157,7 +157,7 @@
       ]
     },
     "crates/core/src/export/paged.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::paged::tests::every_page_lands_in_one_file_in_order",
@@ -167,7 +167,7 @@
       ]
     },
     "crates/core/src/export/file.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::file::tests::value_contract_workbook_empty_text_is_refused_without_losing_destination",
@@ -177,7 +177,7 @@
       ]
     },
     "crates/core/src/export/stream_tests.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::file::stream_tests::value_contract_text_exports_retry_interruptions_and_complete_short_writes",
@@ -186,7 +186,7 @@
       ]
     },
     "crates/core/src/import/extended_temporal.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "import::extended_temporal::tests::extended_dates_accept_far_future_leap_days_plus_years_and_bc_era",
@@ -196,7 +196,7 @@
       ]
     },
     "crates/core/src/import/csv_import.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "import::csv_import::tests::a_quoted_field_keeps_its_delimiters_and_newlines",
@@ -205,7 +205,7 @@
       ]
     },
     "crates/core/src/export/json.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::json::tests::value_contract_nonfinite_numbers_remain_distinct_from_sql_null",
@@ -214,7 +214,7 @@
       ]
     },
     "crates/core/src/export/html.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::html::tests::value_contract_html_preserves_carriage_returns_through_parser_normalization",
@@ -222,7 +222,7 @@
       ]
     },
     "crates/core/src/export/xml.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::xml::tests::value_contract_xml_preserves_carriage_returns_and_literal_entity_text",
@@ -230,7 +230,7 @@
       ]
     },
     "crates/core/src/export/sql.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::sql::tests::one_insert_is_written_for_each_row_and_the_table_is_qualified_and_quoted",
@@ -238,7 +238,7 @@
       ]
     },
     "crates/core/src/export/markdown.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::markdown::tests::markdown_renderer_quotes_text_and_escapes_table_and_inline_markup",
@@ -246,7 +246,7 @@
       ]
     },
     "crates/core/src/export/in_clause.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::in_clause::tests::in_clause_renderer_quotes_values_and_reports_unusable_values",
@@ -254,7 +254,7 @@
       ]
     },
     "crates/core/src/export/xlsx.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "export::xlsx::tests::value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text",
@@ -262,7 +262,7 @@
       ]
     },
     "crates/core/src/import/infer.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "import::infer::tests::sqlite_import_types_preserve_storage_affinity_for_numeric_and_binary_kinds",
@@ -270,7 +270,7 @@
       ]
     },
     "crates/core/src/import/plan.rs": {
-      "package": "tablepro-core",
+      "package": "bookie-core",
       "target": "--lib",
       "tests": [
         "import::plan::tests::value_contract_postgres_wide_numeric_csv_rows_share_text_cast_parameters",
@@ -278,7 +278,7 @@
       ]
     },
     "apps/linux/app/src/ui/export_dialog.rs": {
-      "package": "tablepro-app",
+      "package": "bookie-app",
       "target": "--lib",
       "tests": [
         "ui::export_dialog::tests::a_connection_without_sql_literals_is_not_offered_the_statement_format",
@@ -288,7 +288,7 @@
       ]
     },
     "apps/linux/app/src/ui/connection_row.rs": {
-      "package": "tablepro-app",
+      "package": "bookie-app",
       "target": "--lib",
       "tests": [
         "ui::connection_row::tests::kerberos_rows_hide_the_username_separator",
@@ -297,7 +297,7 @@
       ]
     },
     "crates/policy/src/rules.rs": {
-      "package": "tablepro-policy",
+      "package": "bookie-policy",
       "target": "--lib",
       "tests": [
         "rules::tests::human_unscoped_and_ddl_approval_survive_permissive_write_defaults",
@@ -306,7 +306,7 @@
       ]
     },
     "crates/policy/src/sensitive_projection.rs": {
-      "package": "tablepro-policy",
+      "package": "bookie-policy",
       "target": "--lib",
       "tests": [
         "sensitive_projection::tests::a_cte_alias_keeps_sensitive_lineage",
@@ -315,7 +315,7 @@
       ]
     },
     "crates/policy/src/effects_classification.rs": {
-      "package": "tablepro-policy",
+      "package": "bookie-policy",
       "target": "--lib",
       "tests": [
         "effects::tests::effects_match_legacy_write_facts_without_changing_legacy_classes",
@@ -323,7 +323,7 @@
       ]
     },
     "crates/policy/src/classify.rs": {
-      "package": "tablepro-policy",
+      "package": "bookie-policy",
       "target": "--lib",
       "tests": [
         "classify::tests::grant_copy_and_merge_name_their_targets",
@@ -332,7 +332,7 @@
       ]
     },
     "crates/policy/tests/aud11_s6_s7.rs": {
-      "package": "tablepro-policy",
+      "package": "bookie-policy",
       "target": "--test=aud11_s6_s7",
       "tests": [
         "malformed_writes_still_need_approval_when_write_approval_is_on",

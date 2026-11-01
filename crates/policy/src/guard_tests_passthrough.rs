@@ -1,6 +1,6 @@
 use super::*;
 
-use tablepro_core::{
+use bookie_core::{
     CatalogObject, CatalogObjectKind, ColumnInfo, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, TableInfo,
 };
 

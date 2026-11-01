@@ -8,7 +8,7 @@ def cleanup(run_id):
     if not re.fullmatch(r"[A-Za-z0-9_-]+", run_id):
         raise ValueError("invalid test-container run id")
     containers = subprocess.run(
-        ["docker", "ps", "-aq", "--filter", f"label=com.tablepro.test-run={run_id}"],
+        ["docker", "ps", "-aq", "--filter", f"label=com.bookie.test-run={run_id}"],
         check=True,
         capture_output=True,
         text=True,

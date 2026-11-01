@@ -7,13 +7,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex as StdMutex, OnceLock, Weak};
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use tablepro_policy::{
+use bookie_policy::{
     AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditTerminalStatus,
     AuditTransactionOutcome, Principal,
 };
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -864,7 +864,7 @@ impl AuditSink for AuditJournal {
 }
 
 pub fn sample_event(principal: Principal) -> AuditEvent {
-    use tablepro_core::Environment;
+    use bookie_core::Environment;
 
     AuditEvent {
         timestamp: Utc::now(),
@@ -881,8 +881,8 @@ pub fn sample_event(principal: Principal) -> AuditEvent {
         sql_hash: hex::encode(Sha256::digest(b"SELECT 1")),
         targets: Vec::new(),
         decision_rule: "read_allow".into(),
-        approval_outcome: tablepro_policy::AuditApprovalOutcome::NotRequired,
-        preview_state: tablepro_policy::AuditPreviewState::NotRequested,
+        approval_outcome: bookie_policy::AuditApprovalOutcome::NotRequired,
+        preview_state: bookie_policy::AuditPreviewState::NotRequested,
         terminal_status: AuditTerminalStatus::Succeeded,
         transaction_outcome: AuditTransactionOutcome::NotApplicable,
         error_category: None,

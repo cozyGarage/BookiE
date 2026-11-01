@@ -4,7 +4,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MANIFEST = ROOT / "apps/linux/flatpak/com.tablepro.linux.json"
+MANIFEST = ROOT / "apps/linux/flatpak/com.bookie.linux.json"
 HELPER = ROOT / "scripts/build-flatpak.sh"
 
 
