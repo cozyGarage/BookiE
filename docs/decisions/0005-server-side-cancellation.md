@@ -5,7 +5,7 @@
 
 ## Context
 
-`OperationControl` carries a cancellation token and an optional deadline into every `*_controlled` driver call. When a driver does not implement server-side cancellation, the default in `tablepro-core` races the operation against the token with `tokio::select!` and drops the losing future.
+`OperationControl` carries a cancellation token and an optional deadline into every `*_controlled` driver call. When a driver does not implement server-side cancellation, the default in `bookie-core` races the operation against the token with `tokio::select!` and drops the losing future.
 
 Dropping a future closes the client side of the statement. It does not stop the server. The statement can keep holding locks, keep writing rows, and keep consuming a worker until it finishes on its own. Because the caller cannot know what happened, the default returns `OperationOutcomeUnknown`, and `PolicyGuard` treats that as poisoning: one Stop or one timeout on a write disabled governed writes for the rest of the session while the write was possibly still in flight.
 
@@ -17,7 +17,7 @@ A driver that offers `*_controlled` must ask the server to stop the statement, a
 
 Three rules follow.
 
-**One shared interruption sequence.** `tablepro_core::run_server_cancellable` owns the sequence: run the operation; on cancel or deadline, dispatch the engine's cancellation request; wait for the operation to settle; classify the result. Drivers supply only the three engine-specific parts — how to identify the running session, how to ask the server to stop it, and which error proves the server stopped it. The timings (2s to set up, 2s to dispatch, 5s of grace) are shared so behaviour does not drift between engines.
+**One shared interruption sequence.** `bookie_core::run_server_cancellable` owns the sequence: run the operation; on cancel or deadline, dispatch the engine's cancellation request; wait for the operation to settle; classify the result. Drivers supply only the three engine-specific parts — how to identify the running session, how to ask the server to stop it, and which error proves the server stopped it. The timings (2s to set up, 2s to dispatch, 5s of grace) are shared so behaviour does not drift between engines.
 
 **Only the engine's own abort error is a terminal outcome.** `Cancelled` and `TimedOut` are returned when the statement fails with the error the engine raises for a statement it aborted: SQLSTATE `57014` on PostgreSQL, `70100` (`ER_QUERY_INTERRUPTED`) on MySQL. Any other error, and any statement that does not settle within the grace period, stays `OperationOutcomeUnknown`. A cancellation request that is dispatched but unconfirmed is not proof.
 

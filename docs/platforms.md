@@ -2,15 +2,15 @@
 
 BookiE is a native Linux desktop application. Current source builds require GTK 4.24, libadwaita 1.10, GtkSourceView 5.22 and GLib 2.88 or newer ([ADR 0021](decisions/0021-toolkit-floor.md)). Arch Linux and Debian testing provide the native toolkit floor. Older native toolkit versions are unsupported.
 
-## Published 0.2.0 artifacts
+## Published 0.2.2 artifacts
 
-The [GitHub release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0) provides these Linux artifacts:
+The [GitHub release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2) provides these Linux artifacts:
 
 | Target | Architecture | Artifact | Install or launch |
 |---|---|---|---|
-| Arch Linux | x86_64 | `bookie-0.2.0-1-x86_64.pkg.tar.zst` | Install with `pacman` |
-| Debian | amd64 | `tablepro_0.2.0-1_amd64.deb` | Install with `apt`; command is `bookie` |
-| AppImage | x86_64 | `BookiE-0.2.0-x86_64.AppImage` | Run the downloaded file |
+| Arch Linux | x86_64 | `bookie-0.2.2-1-x86_64.pkg.tar.zst` | Install with `pacman` |
+| Debian | amd64 | `bookie_0.2.2-1_amd64.deb` | Install with `apt`; command is `bookie` |
+| AppImage | x86_64 | `BookiE-0.2.2-x86_64.AppImage` | Run the downloaded file |
 | Flatpak bundle | x86_64 | `bookie.flatpak` | Install with `flatpak` |
 
 The published binaries were built before the current native toolkit floor. Build from the current `linux` branch to use current source and dependencies.
