@@ -124,10 +124,11 @@ pub fn present(
     null_row.set_subtitle(&crate::tr!(
         "How a NULL cell is shown. Applies to cells drawn after the change."
     ));
+    let null_choices = null_display_choices();
     null_row.set_model(Some(&gtk::StringList::new(&[
-        &crate::tr!("NULL"),
-        &crate::tr!("\u{2205} (empty set)"),
-        &crate::tr!("(null)"),
+        null_choices[0].as_str(),
+        null_choices[1].as_str(),
+        null_choices[2].as_str(),
     ])));
     null_row.set_selected(current.null_display.index());
     null_row.connect_selected_notify({
@@ -368,9 +369,19 @@ pub fn present(
     window.present(Some(parent));
 }
 
+fn null_display_choices() -> [String; 3] {
+    [
+        crate::tr!("<NULL>"),
+        crate::tr!("\u{2205} (empty set)"),
+        crate::tr!("(null)"),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui::grid::{set_null_display, value_to_display_text};
+    use tablepro_core::Value;
 
     #[test]
     fn format_thousands_matches_the_browse_tab_paginator() {
@@ -379,6 +390,15 @@ mod tests {
         assert_eq!(format_thousands(1_000), "1,000");
         assert_eq!(format_thousands(5_000), "5,000");
         assert_eq!(format_thousands(10_000), "10,000");
+    }
+
+    #[test]
+    fn the_standard_null_choice_matches_the_grid_marker() {
+        set_null_display(NullDisplayPref::Standard);
+        assert_eq!(
+            null_display_choices()[NullDisplayPref::Standard.index() as usize],
+            value_to_display_text(&Value::Null)
+        );
     }
 
     /// The stored default must always be one of the choices the per-tab
