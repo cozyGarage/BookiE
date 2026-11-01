@@ -1,6 +1,6 @@
+use bookie_core::Value;
 use relm4::gtk::prelude::*;
 use relm4::{ComponentController, Controller, gtk};
-use tablepro_core::Value;
 use uuid::Uuid;
 
 use super::save_in_flight_tests::{column, launch_with_read_only, load_two_rows, pump};

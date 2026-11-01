@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{ConnectOptions, OperationControl, Value};
 use chrono::{TimeZone, Utc};
-use tablepro_core::{ConnectOptions, OperationControl, Value};
 
 use crate::{connect, start_mariadb, start_mysql};
 

@@ -20,7 +20,7 @@ fn only_a_server_without_tls_suggests_disabling_it() {
 
 #[test]
 fn each_keyring_failure_says_what_to_do_next() {
-    use tablepro_storage::KeyringFailure;
+    use bookie_storage::KeyringFailure;
     let texts: Vec<String> = [
         KeyringFailure::Unavailable,
         KeyringFailure::Locked,

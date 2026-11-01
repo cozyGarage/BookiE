@@ -1,9 +1,9 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use bookie_app_services::editor_panel::{EditorPanel, PanelMode};
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
-use tablepro_app_services::editor_panel::{EditorPanel, PanelMode};
 
 use super::{SqlEditor, SqlEditorInput, StatementOutcome, StatementOutcomeKind};
 

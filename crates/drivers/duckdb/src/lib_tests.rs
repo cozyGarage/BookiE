@@ -55,7 +55,7 @@ async fn open_session_is_refused() {
 #[tokio::test]
 async fn a_timed_out_query_is_interrupted() {
     let conn = in_memory_connection().await;
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(5));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_millis(5));
 
     let result = conn
         .query_controlled("SELECT count(*) FROM range(100000000) a, range(2) b", &control)
@@ -70,7 +70,7 @@ async fn a_timed_out_query_is_interrupted() {
 #[tokio::test]
 async fn cancelling_a_long_query_stops_it_and_frees_the_connection() {
     let conn = in_memory_connection().await;
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(100));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_millis(100));
     let started = std::time::Instant::now();
 
     let result = conn
@@ -101,7 +101,7 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
     let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
     for (id, value) in values.iter().enumerate() {
-        let sql = tablepro_core::sql_literal::build_insert_literal(
+        let sql = bookie_core::sql_literal::build_insert_literal(
             "duckdb",
             None,
             "binary_exports",

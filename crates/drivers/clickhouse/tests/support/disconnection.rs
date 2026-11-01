@@ -12,11 +12,11 @@ async fn start_clickhouse_row_stream(
 ) -> (
     ContainerAsync<GenericImage>,
     ConnectOptions,
-    std::sync::Arc<dyn tablepro_core::Connection>,
-    tokio::task::JoinHandle<Result<tablepro_core::QueryResult, DriverError>>,
+    std::sync::Arc<dyn bookie_core::Connection>,
+    tokio::task::JoinHandle<Result<bookie_core::QueryResult, DriverError>>,
 ) {
     let (container, opts) = super::start_clickhouse().await;
-    let connection: std::sync::Arc<dyn tablepro_core::Connection> =
+    let connection: std::sync::Arc<dyn bookie_core::Connection> =
         ClickhouseDriver.connect(opts.clone()).await.expect("connect").into();
     let observer = super::connect(opts.clone()).await;
     let running = connection.clone();

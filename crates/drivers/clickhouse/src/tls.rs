@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
+use bookie_core::{DriverError, TlsConfig};
 use hyper_rustls::{FixedServerNameResolver, HttpsConnector};
 use hyper_util::client::legacy::connect::HttpConnector;
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::{ClientConfig, DigitallySignedStruct, RootCertStore, SignatureScheme};
 use rustls_pki_types::{CertificateDer, ServerName, UnixTime, pem::PemObject};
-use tablepro_core::{DriverError, TlsConfig};
 
 /// Build the connector ClickHouse talks through. `service_host` is the
 /// database's own hostname, which is what the certificate was issued for.

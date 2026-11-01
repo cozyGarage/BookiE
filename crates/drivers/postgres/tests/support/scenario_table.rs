@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
-use tablepro_core::sql_dialect::{build_insert_from_draft, build_keyed_delete, build_optimistic_keyed_update};
+use bookie_core::Value;
+use bookie_core::sql_dialect::{build_insert_from_draft, build_keyed_delete, build_optimistic_keyed_update};
 
 use crate::{connect, start_pg};
 
@@ -78,13 +78,13 @@ const SCENARIOS: &[(&str, &str, &str)] = &[
     ),
 ];
 
-async fn decode(conn: &dyn tablepro_core::Connection, ty: &str, literal: &str) -> Value {
+async fn decode(conn: &dyn bookie_core::Connection, ty: &str, literal: &str) -> Value {
     let sql = format!("SELECT '{}'::{ty}", literal.replace('\'', "''"));
     conn.query(&sql).await.unwrap().rows.remove(0).remove(0)
 }
 
 async fn run_scenario(
-    conn: &dyn tablepro_core::Connection,
+    conn: &dyn bookie_core::Connection,
     index: usize,
     ty: &str,
     a: &str,

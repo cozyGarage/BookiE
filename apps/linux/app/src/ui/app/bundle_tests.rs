@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use bookie_core::{AuthMode, Environment, TlsMode};
 
 fn saved(name: &str) -> SavedConnection {
     SavedConnection {
@@ -126,7 +126,7 @@ async fn workspace_save_recovery_failure_is_reported_after_connection_import() {
     workspace.save_connection(Uuid::new_v4(), Default::default());
     assert_eq!(
         workspace.flush().recv().unwrap(),
-        Err(tablepro_app_services::workspace_state::WorkspaceFlushError::WriteFailed)
+        Err(bookie_app_services::workspace_state::WorkspaceFlushError::WriteFailed)
     );
 
     let outcome = apply_items(vec![imported], Vec::new(), false, workspace, |_, _, _| async { Ok(()) }).await;
@@ -160,8 +160,8 @@ async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
         id,
         "main",
         &old_session,
-        tablepro_app_services::workspace_state::ConnectionWorkspaceState {
-            tabs: vec![tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor {
+        bookie_app_services::workspace_state::ConnectionWorkspaceState {
+            tabs: vec![bookie_app_services::workspace_state::WorkspaceTabRecord::Editor {
                 query: "SELECT stale_session".into(),
                 draft_id: None,
                 file: None,
@@ -176,8 +176,8 @@ async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
         id,
         "main",
         &new_session,
-        tablepro_app_services::workspace_state::ConnectionWorkspaceState {
-            tabs: vec![tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor {
+        bookie_app_services::workspace_state::ConnectionWorkspaceState {
+            tabs: vec![bookie_app_services::workspace_state::WorkspaceTabRecord::Editor {
                 query: "SELECT after_reimport".into(),
                 draft_id: None,
                 file: None,
@@ -190,7 +190,7 @@ async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
     reopened.prefetch_connections(&[id]).unwrap();
     assert!(matches!(
         &reopened.load_database(id, "main").unwrap().tabs[0],
-        tablepro_app_services::workspace_state::WorkspaceTabRecord::Editor { query, .. }
+        bookie_app_services::workspace_state::WorkspaceTabRecord::Editor { query, .. }
             if query == "SELECT after_reimport"
     ));
 }

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_app_services::workspace_state::{ConnectionWorkspaceState, WorkspaceStore, WorkspaceTabRecord};
+use bookie_app_services::workspace_state::{ConnectionWorkspaceState, WorkspaceStore, WorkspaceTabRecord};
 use uuid::Uuid;
 
 #[test]
@@ -33,7 +33,7 @@ fn an_explicit_workspace_path_survives_flush_and_a_fresh_store() {
     assert!(json["connections"][id.to_string()]["tabs"][0].get("query").is_none());
 }
 
-fn flush(store: &WorkspaceStore) -> Result<(), tablepro_app_services::workspace_state::WorkspaceFlushError> {
+fn flush(store: &WorkspaceStore) -> Result<(), bookie_app_services::workspace_state::WorkspaceFlushError> {
     store.flush().recv_timeout(std::time::Duration::from_secs(30)).unwrap()
 }
 
@@ -74,7 +74,7 @@ fn legacy_records_migrate_without_changing_selection_or_the_disk_contract() {
 
 #[test]
 fn an_unreadable_workspace_is_preserved_and_a_retry_can_flush_the_pending_save() {
-    use tablepro_app_services::workspace_state::WorkspaceFlushError;
+    use bookie_app_services::workspace_state::WorkspaceFlushError;
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("workspace_state.json");
     std::fs::write(&path, b"invalid workspace").unwrap();
@@ -100,7 +100,7 @@ fn an_unreadable_workspace_is_preserved_and_a_retry_can_flush_the_pending_save()
 
 #[test]
 fn a_missing_config_path_reports_failure_without_creating_drafts() {
-    use tablepro_app_services::workspace_state::WorkspaceFlushError;
+    use bookie_app_services::workspace_state::WorkspaceFlushError;
     let dir = tempfile::tempdir().unwrap();
     let drafts = dir.path().join("drafts");
     let store = WorkspaceStore::new(None, drafts.clone());

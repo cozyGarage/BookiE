@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::Session;
+use bookie_core::Session;
 
 #[tokio::test]
 async fn a_read_only_connection_can_open_a_postgres_read_only_session() {
@@ -202,7 +202,7 @@ async fn an_audited_retired_session_refuses_completion_metadata_before_driver_di
         },
         false,
     );
-    let mut session: Box<dyn tablepro_core::Session> =
+    let mut session: Box<dyn bookie_core::Session> =
         Box::new(h.guard.open_session_with_audit().await.expect("open audited session"));
     run(&mut session, "SELECT 1")
         .await

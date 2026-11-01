@@ -1,5 +1,5 @@
-pub use tablepro_core::parse_partial;
-use tablepro_core::{QueryResult, Value, partial_value};
+pub use bookie_core::parse_partial;
+use bookie_core::{QueryResult, Value, partial_value};
 
 use super::BrowseTarget;
 
@@ -12,7 +12,7 @@ pub(super) fn projection(target: &BrowseTarget<'_>) -> Option<String> {
         return None;
     }
     let driver_id = target.driver_id;
-    let quote = |name: &str| tablepro_core::sql_dialect::quote_ident(driver_id, name);
+    let quote = |name: &str| bookie_core::sql_dialect::quote_ident(driver_id, name);
     let mut any = false;
     let list: Vec<String> = target
         .columns

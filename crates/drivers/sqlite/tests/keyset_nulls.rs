@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use bookie_core::{keyset_before_where_clause, keyset_order_by, keyset_order_by_before, keyset_where_clause};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
-use tablepro_core::{keyset_before_where_clause, keyset_order_by, keyset_order_by_before, keyset_where_clause};
 use tempfile::TempDir;
 
 async fn seeded(directory: &TempDir) -> Box<dyn Connection> {

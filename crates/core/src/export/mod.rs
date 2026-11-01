@@ -97,7 +97,7 @@ where
         None => Path::new("."),
     };
     let mut temporary = tempfile::Builder::new()
-        .prefix(".tablepro-export-")
+        .prefix(".bookie-export-")
         .tempfile_in(directory)?;
     {
         let mut writer = BufWriter::new(temporary.as_file_mut());
@@ -191,7 +191,7 @@ mod atomic_write_tests {
         let path = directory.path().join("page.csv");
         let unrelated = directory.path().join("unrelated.txt");
         fs::write(&unrelated, "keep me").expect("unrelated file");
-        std::os::unix::fs::symlink(&unrelated, directory.path().join("page.csv.tablepro-part"))
+        std::os::unix::fs::symlink(&unrelated, directory.path().join("page.csv.bookie-part"))
             .expect("preexisting symlink");
 
         write_atomically(&path, |writer| writer.write_all(b"export")).expect("export");

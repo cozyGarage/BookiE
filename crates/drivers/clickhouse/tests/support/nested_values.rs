@@ -1,5 +1,5 @@
 use super::clickhouse::{connect, start_clickhouse};
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -165,19 +165,19 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "nested {expected_type} value differs from the native server JSON oracle"
         );
         let json_output: serde_json::Value =
-            serde_json::from_str(&tablepro_core::export::render_json(&source.columns, &source.rows)).unwrap();
+            serde_json::from_str(&bookie_core::export::render_json(&source.columns, &source.rows)).unwrap();
         assert_eq!(
             json_output[0]["value"], oracle,
             "JSON export must preserve nested {expected_type}"
         );
-        let csv_output = tablepro_core::export::render_csv(
+        let csv_output = bookie_core::export::render_csv(
             &source.columns,
             &source.rows,
-            &tablepro_core::export::CsvOptions::default(),
+            &bookie_core::export::CsvOptions::default(),
         );
-        let csv_sheet = tablepro_core::import::read_csv(
+        let csv_sheet = bookie_core::import::read_csv(
             csv_output.as_bytes(),
-            &tablepro_core::import::CsvImportOptions::default(),
+            &bookie_core::import::CsvImportOptions::default(),
             None,
         )
         .unwrap();
@@ -187,12 +187,12 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
 
         let directory = tempfile::tempdir().unwrap();
         let workbook_path = directory.path().join("nested.xlsx");
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             &workbook_path,
             &source,
-            &tablepro_core::export::ResultExport {
-                format: tablepro_core::export::ResultFormat::Xlsx,
-                csv: &tablepro_core::export::CsvOptions::default(),
+            &bookie_core::export::ResultExport {
+                format: bookie_core::export::ResultFormat::Xlsx,
+                csv: &bookie_core::export::CsvOptions::default(),
                 sql: None,
             },
             || false,
@@ -218,8 +218,8 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "XLSX text must preserve the native {expected_type} JSON oracle: {shared_strings}"
         );
         assert_eq!(
-            tablepro_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
-            Err(tablepro_core::sql_literal::LiteralError::Unsupported),
+            bookie_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
+            Err(bookie_core::sql_literal::LiteralError::Unsupported),
             "nested {expected_type} without type metadata must be refused by SQL export"
         );
 
@@ -264,7 +264,7 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         assert_eq!(before.rows[0][2], Value::Text(expected_type.into()));
         assert_eq!(before.rows[0][1], source.rows[0][0]);
 
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "clickhouse",
             None,
             &table,
@@ -277,10 +277,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         assert!(
             matches!(
                 &edit_result,
-                Err(tablepro_core::DriverError::Transaction {
+                Err(bookie_core::DriverError::Transaction {
                     statement_index: 0,
                     source,
-                }) if matches!(source.as_ref(), tablepro_core::DriverError::Unsupported(_))
+                }) if matches!(source.as_ref(), bookie_core::DriverError::Unsupported(_))
             ),
             "nested {expected_type} grid edit must be refused before changing the row, got {edit_result:?}"
         );
@@ -342,7 +342,7 @@ async fn value_contract_clickhouse_nested_structures_decode_and_round_trip() {
         Value::Json(Box::new(serde_json::json!([["fruit", "sweet"], ["fruit", "yellow"]])))
     );
     let json_output: serde_json::Value =
-        serde_json::from_str(&tablepro_core::export::render_json(&source.columns, &source.rows)).unwrap();
+        serde_json::from_str(&bookie_core::export::render_json(&source.columns, &source.rows)).unwrap();
     assert_eq!(
         json_output[0]["items.tags"],
         serde_json::json!([["fruit", "sweet"], ["fruit", "yellow"]])

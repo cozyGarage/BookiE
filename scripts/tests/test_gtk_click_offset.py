@@ -15,7 +15,7 @@ with patch.dict(sys.modules, {"pyatspi": Mock()}):
 
 class GtkClickOffsetTests(unittest.TestCase):
     def offset(self, override=None):
-        environment = {} if override is None else {"TABLEPRO_GTK_Y_OFFSET": override}
+        environment = {} if override is None else {"BOOKIE_GTK_Y_OFFSET": override}
         with patch.dict(os.environ, environment, clear=True):
             return gtk_input.window_y_offset()
 

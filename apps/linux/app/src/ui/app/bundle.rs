@@ -3,7 +3,7 @@ use std::future::Future;
 use relm4::ComponentSender;
 use relm4::gtk::prelude::FileExt;
 
-use tablepro_storage::{
+use bookie_storage::{
     BundleError, BundleExport, ImportDisposition, ImportItem, ImportPlan, ParsedBundle, SavedConnection,
 };
 use uuid::Uuid;
@@ -20,7 +20,7 @@ use super::{App, AppMsg};
 /// plan has been shown.
 pub(crate) struct PendingImport {
     pub(crate) plan: ImportPlan,
-    pub(crate) secrets: Vec<tablepro_storage::BundleSecrets>,
+    pub(crate) secrets: Vec<bookie_storage::BundleSecrets>,
 }
 
 impl std::fmt::Debug for PendingImport {
@@ -51,7 +51,7 @@ impl App {
 
     pub(super) fn on_export_connections_to(&self, choice: ExportChoice, sender: ComponentSender<Self>) {
         let chosen = selected_connections(&self.saved_connections, &choice.connections);
-        let organization: Vec<(Uuid, tablepro_storage::ConnectionOrganization)> = chosen
+        let organization: Vec<(Uuid, bookie_storage::ConnectionOrganization)> = chosen
             .iter()
             .map(|connection| (connection.id, self.connection_organization.get(connection.id)))
             .collect();
@@ -65,9 +65,9 @@ impl App {
                     if database
                         .audit_administrative_action(
                             operation_id,
-                            tablepro_policy::AuditAdministrativeAction::ConnectionBundleExport,
-                            tablepro_policy::AuditRecordPhase::Intent,
-                            tablepro_policy::AuditTerminalStatus::Pending,
+                            bookie_policy::AuditAdministrativeAction::ConnectionBundleExport,
+                            bookie_policy::AuditRecordPhase::Intent,
+                            bookie_policy::AuditTerminalStatus::Pending,
                             affected_count,
                             None,
                         )
@@ -82,15 +82,15 @@ impl App {
                     let started = std::time::Instant::now();
                     let outcome = write_bundle(choice, chosen, organization).await;
                     let status = if outcome.is_ok() {
-                        tablepro_policy::AuditTerminalStatus::Succeeded
+                        bookie_policy::AuditTerminalStatus::Succeeded
                     } else {
-                        tablepro_policy::AuditTerminalStatus::Failed
+                        bookie_policy::AuditTerminalStatus::Failed
                     };
                     if database
                         .audit_administrative_action(
                             operation_id,
-                            tablepro_policy::AuditAdministrativeAction::ConnectionBundleExport,
-                            tablepro_policy::AuditRecordPhase::Outcome,
+                            bookie_policy::AuditAdministrativeAction::ConnectionBundleExport,
+                            bookie_policy::AuditRecordPhase::Outcome,
                             status,
                             affected_count,
                             Some(started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64),
@@ -164,7 +164,7 @@ impl App {
 
     pub(super) fn on_import_bundle_encrypted(
         &mut self,
-        sealed: tablepro_storage::EncryptedBundle,
+        sealed: bookie_storage::EncryptedBundle,
         sender: ComponentSender<Self>,
     ) {
         self.pending_bundle = Some(sealed);
@@ -265,16 +265,16 @@ async fn apply_import_with_audit(
     workspace: crate::services::workspace_state::WorkspaceStore,
     operation_id: Uuid,
     plan: ImportPlan,
-    secrets: Vec<tablepro_storage::BundleSecrets>,
+    secrets: Vec<bookie_storage::BundleSecrets>,
     replace: bool,
 ) -> Result<(usize, usize), ImportFailure> {
     let planned_count = plan.items.len();
     if database
         .audit_administrative_action(
             operation_id,
-            tablepro_policy::AuditAdministrativeAction::ConnectionBundleImport,
-            tablepro_policy::AuditRecordPhase::Intent,
-            tablepro_policy::AuditTerminalStatus::Pending,
+            bookie_policy::AuditAdministrativeAction::ConnectionBundleImport,
+            bookie_policy::AuditRecordPhase::Intent,
+            bookie_policy::AuditTerminalStatus::Pending,
             planned_count,
             None,
         )
@@ -290,15 +290,15 @@ async fn apply_import_with_audit(
     let started = std::time::Instant::now();
     let outcome = apply_plan(plan, secrets, replace, workspace).await;
     let (status, affected_count) = match &outcome {
-        Ok((imported, planned)) if imported == planned => (tablepro_policy::AuditTerminalStatus::Succeeded, *imported),
-        Ok((imported, _)) => (tablepro_policy::AuditTerminalStatus::Failed, *imported),
-        Err(error) => (tablepro_policy::AuditTerminalStatus::Failed, error.affected_count),
+        Ok((imported, planned)) if imported == planned => (bookie_policy::AuditTerminalStatus::Succeeded, *imported),
+        Ok((imported, _)) => (bookie_policy::AuditTerminalStatus::Failed, *imported),
+        Err(error) => (bookie_policy::AuditTerminalStatus::Failed, error.affected_count),
     };
     if database
         .audit_administrative_action(
             operation_id,
-            tablepro_policy::AuditAdministrativeAction::ConnectionBundleImport,
-            tablepro_policy::AuditRecordPhase::Outcome,
+            bookie_policy::AuditAdministrativeAction::ConnectionBundleImport,
+            bookie_policy::AuditRecordPhase::Outcome,
             status,
             affected_count,
             Some(started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64),
@@ -331,13 +331,13 @@ pub(super) fn accepted_items(plan: &ImportPlan, accepted: &[Uuid]) -> Vec<Import
 async fn write_bundle(
     choice: ExportChoice,
     connections: Vec<SavedConnection>,
-    organization: Vec<(Uuid, tablepro_storage::ConnectionOrganization)>,
+    organization: Vec<(Uuid, bookie_storage::ConnectionOrganization)>,
 ) -> Result<usize, BundleError> {
     let count = connections.len();
     let secrets = if choice.passphrase.is_empty() {
         Vec::new()
     } else {
-        tablepro_storage::collect_bundle_secrets(&connections).await?
+        bookie_storage::collect_bundle_secrets(&connections).await?
     };
     let export = BundleExport {
         producer: format!("bookie {}", env!("CARGO_PKG_VERSION")),
@@ -347,9 +347,9 @@ async fn write_bundle(
         secrets,
     };
     let bytes = if choice.passphrase.is_empty() {
-        tablepro_storage::export_plaintext(&export)?
+        bookie_storage::export_plaintext(&export)?
     } else {
-        tablepro_storage::export_encrypted(&export, &choice.passphrase)?
+        bookie_storage::export_encrypted(&export, &choice.passphrase)?
     };
     tokio::fs::write(&choice.path, &bytes)
         .await
@@ -358,11 +358,11 @@ async fn write_bundle(
 }
 
 pub(super) fn read_bundle_file(bytes: &[u8]) -> Result<ParsedBundle, BundleError> {
-    tablepro_storage::parse_bundle(bytes)
+    bookie_storage::parse_bundle(bytes)
 }
 
 async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleError> {
-    let bytes = read_bounded(path, tablepro_storage::MAX_BUNDLE_BYTES).await?;
+    let bytes = read_bounded(path, bookie_storage::MAX_BUNDLE_BYTES).await?;
     read_bundle_file(&bytes)
 }
 
@@ -391,11 +391,11 @@ async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, B
     Ok(bytes)
 }
 
-async fn plan_from_body(body: &tablepro_storage::BundleBody) -> Result<PendingImport, String> {
-    let local = tablepro_storage::load_connections()
+async fn plan_from_body(body: &bookie_storage::BundleBody) -> Result<PendingImport, String> {
+    let local = bookie_storage::load_connections()
         .await
         .map_err(|_| crate::tr!("The saved connections could not be read."))?;
-    let plan = tablepro_storage::plan_import(&local, body).map_err(|error| error.to_string())?;
+    let plan = bookie_storage::plan_import(&local, body).map_err(|error| error.to_string())?;
     Ok(PendingImport {
         plan,
         secrets: body.secrets.clone(),
@@ -404,7 +404,7 @@ async fn plan_from_body(body: &tablepro_storage::BundleBody) -> Result<PendingIm
 
 async fn apply_plan(
     plan: ImportPlan,
-    secrets: Vec<tablepro_storage::BundleSecrets>,
+    secrets: Vec<bookie_storage::BundleSecrets>,
     replace_saved_passwords: bool,
     workspace: crate::services::workspace_state::WorkspaceStore,
 ) -> Result<(usize, usize), ImportFailure> {
@@ -418,14 +418,14 @@ async fn apply_plan(
             let single_item = ImportPlan {
                 items: vec![item.clone()],
             };
-            if tablepro_storage::apply_import(&single_item).await.is_err() {
+            if bookie_storage::apply_import(&single_item).await.is_err() {
                 return Err(ItemApplyFailure::ConnectionSave);
             }
             if apply_item_secrets(&item, carried.as_ref(), replace).await.is_err() {
                 if let Some(carried) = carried.as_ref() {
                     roll_back(&item, carried).await;
                 } else {
-                    let restored = tablepro_storage::restore_connection(item.previous.as_ref(), item.connection.id)
+                    let restored = bookie_storage::restore_connection(item.previous.as_ref(), item.connection.id)
                         .await
                         .is_ok();
                     if !restored {
@@ -469,13 +469,13 @@ struct ImportFailure {
 
 async fn apply_items<F, Fut>(
     items: Vec<ImportItem>,
-    secrets: Vec<tablepro_storage::BundleSecrets>,
+    secrets: Vec<bookie_storage::BundleSecrets>,
     replace_saved_passwords: bool,
     workspace: crate::services::workspace_state::WorkspaceStore,
     mut apply: F,
 ) -> (usize, Option<ItemApplyFailure>)
 where
-    F: FnMut(ImportItem, Option<tablepro_storage::BundleSecrets>, bool) -> Fut,
+    F: FnMut(ImportItem, Option<bookie_storage::BundleSecrets>, bool) -> Fut,
     Fut: Future<Output = Result<(), ItemApplyFailure>>,
 {
     let mut imported = 0;
@@ -500,13 +500,13 @@ where
 
 async fn apply_item_secrets(
     item: &ImportItem,
-    secrets: Option<&tablepro_storage::BundleSecrets>,
+    secrets: Option<&bookie_storage::BundleSecrets>,
     replace_saved_passwords: bool,
-) -> Result<(), tablepro_storage::StorageError> {
+) -> Result<(), bookie_storage::StorageError> {
     let Some(secrets) = secrets else {
         return Ok(());
     };
-    tablepro_storage::store_bundle_secrets(
+    bookie_storage::store_bundle_secrets(
         item.connection.id,
         secrets,
         &item.connection.name,
@@ -518,8 +518,8 @@ async fn apply_item_secrets(
 /// Undo one item after a failed credential write. An entry that existed
 /// before the import is restored from its snapshot; one this import
 /// created is removed along with whatever it managed to store.
-async fn roll_back(item: &ImportItem, secrets: &tablepro_storage::BundleSecrets) {
-    let restored = match tablepro_storage::restore_connection(item.previous.as_ref(), item.connection.id).await {
+async fn roll_back(item: &ImportItem, secrets: &bookie_storage::BundleSecrets) {
+    let restored = match bookie_storage::restore_connection(item.previous.as_ref(), item.connection.id).await {
         Ok(()) => true,
         Err(error) => {
             tracing::warn!(error = %error, "rolling back an imported connection failed");
@@ -527,7 +527,7 @@ async fn roll_back(item: &ImportItem, secrets: &tablepro_storage::BundleSecrets)
         }
     };
     if should_forget_imported_secrets(item, restored) {
-        tablepro_storage::forget_imported_bundle_secrets(item.connection.id, secrets).await;
+        bookie_storage::forget_imported_bundle_secrets(item.connection.id, secrets).await;
     }
 }
 

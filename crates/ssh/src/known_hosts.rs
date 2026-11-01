@@ -117,7 +117,7 @@ struct ScratchFile(PathBuf);
 impl ScratchFile {
     fn create(contents: &str) -> std::io::Result<Self> {
         use std::os::unix::fs::OpenOptionsExt;
-        let path = std::env::temp_dir().join(format!("tablepro-revoked-{}", uuid::Uuid::new_v4().simple()));
+        let path = std::env::temp_dir().join(format!("bookie-revoked-{}", uuid::Uuid::new_v4().simple()));
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -239,7 +239,7 @@ fn known_hosts_path_from(xdg_config_home: Option<OsString>, home: Option<OsStrin
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .or_else(|| home.map(|home| PathBuf::from(home).join(".config")))?;
-    Some(base.join("tablepro").join("known_hosts"))
+    Some(base.join("bookie").join("known_hosts"))
 }
 
 #[cfg(test)]

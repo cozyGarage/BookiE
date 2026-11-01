@@ -1,6 +1,6 @@
+use bookie_core::Value;
 use gtk4 as gtk;
 use libadwaita::{self as adw, prelude::*};
-use tablepro_core::Value;
 
 use crate::services::change_tracker::EditStatement;
 
@@ -26,8 +26,7 @@ pub(super) fn preview_text(driver_id: &str, statements: &[EditStatement]) -> Str
 const MAX_VALUE_CHARS: usize = 200;
 
 fn value_text(driver_id: &str, value: &Value) -> String {
-    let text =
-        tablepro_core::sql_literal::render_sql_literal(driver_id, value).unwrap_or_else(|_| format!("{value:?}"));
+    let text = bookie_core::sql_literal::render_sql_literal(driver_id, value).unwrap_or_else(|_| format!("{value:?}"));
     let total = text.chars().count();
     if total <= MAX_VALUE_CHARS {
         return text;

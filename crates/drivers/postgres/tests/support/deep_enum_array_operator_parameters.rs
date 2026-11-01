@@ -1,4 +1,4 @@
-use tablepro_core::{Connection, Transaction, Value};
+use bookie_core::{Connection, Transaction, Value};
 
 use crate::{connect, start_pg};
 
@@ -119,7 +119,7 @@ async fn compare_operator_parameter(
             .await
             .expect_err("64-level enum-array operator parameter must refuse");
         assert!(
-            matches!(&error, tablepro_core::DriverError::Unsupported(message)
+            matches!(&error, bookie_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
             "64-level operator parameter {literal}: {error:?}"
         );

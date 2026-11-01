@@ -1,7 +1,7 @@
 use std::fmt;
 
+use bookie_core::DriverError;
 use serde::Serialize;
-use tablepro_core::DriverError;
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -90,7 +90,7 @@ impl McpToolError {
                 "The write may have been applied; check database state before retrying.",
             ),
             DriverError::PartiallyApplied { source, .. } | DriverError::Transaction { source, .. }
-                if tablepro_policy::is_ambiguous_post_dispatch(source) =>
+                if bookie_policy::is_ambiguous_post_dispatch(source) =>
             {
                 (
                     "operation_outcome_unknown",
@@ -205,8 +205,8 @@ fn batch_failure_envelope(error: &DriverError) -> (&'static str, OperationOutcom
 
 #[cfg(test)]
 mod tests {
+    use bookie_core::DriverError;
     use serde_json::json;
-    use tablepro_core::DriverError;
 
     use super::{McpToolError, OperationOutcome, TransactionOutcome};
 

@@ -131,8 +131,8 @@ fn verify_ca_with_a_named_authority_does_not_panic_on_conflicting_trust_settings
     // root_cert into trust_cert_ca() only, never trust_cert(), for
     // VerifyCa/VerifyFull.
     let options = ConnectOptions {
-        tls: tablepro_core::TlsConfig {
-            mode: tablepro_core::TlsMode::VerifyCa,
+        tls: bookie_core::TlsConfig {
+            mode: bookie_core::TlsMode::VerifyCa,
             root_cert: Some(std::path::PathBuf::from("/etc/ssl/private-ca.pem")),
             ..Default::default()
         },
@@ -144,8 +144,8 @@ fn verify_ca_with_a_named_authority_does_not_panic_on_conflicting_trust_settings
 #[test]
 fn verify_full_without_a_named_authority_does_not_panic() {
     let options = ConnectOptions {
-        tls: tablepro_core::TlsConfig {
-            mode: tablepro_core::TlsMode::VerifyFull,
+        tls: bookie_core::TlsConfig {
+            mode: bookie_core::TlsMode::VerifyFull,
             ..Default::default()
         },
         ..direct_options()
@@ -282,22 +282,22 @@ async fn retire_wakes_the_fault_sink_and_leaves_the_outcome_unknown() {
 #[test]
 fn only_prefer_may_continue_without_encryption() {
     let with_mode = |mode| ConnectOptions {
-        tls: tablepro_core::TlsConfig {
+        tls: bookie_core::TlsConfig {
             mode,
-            ..tablepro_core::TlsConfig::default()
+            ..bookie_core::TlsConfig::default()
         },
         ..direct_options()
     };
     assert!(
-        build_target(&with_mode(tablepro_core::TlsMode::Prefer))
+        build_target(&with_mode(bookie_core::TlsMode::Prefer))
             .unwrap()
             .plaintext_fallback
     );
     for strict in [
-        tablepro_core::TlsMode::Disabled,
-        tablepro_core::TlsMode::Require,
-        tablepro_core::TlsMode::VerifyCa,
-        tablepro_core::TlsMode::VerifyFull,
+        bookie_core::TlsMode::Disabled,
+        bookie_core::TlsMode::Require,
+        bookie_core::TlsMode::VerifyCa,
+        bookie_core::TlsMode::VerifyFull,
     ] {
         assert!(
             !build_target(&with_mode(strict)).unwrap().plaintext_fallback,

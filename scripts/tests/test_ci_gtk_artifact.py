@@ -32,7 +32,7 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
         }
         self.assertIn("gtk-build", list(jobs))
         build_job = jobs["gtk-build"]
-        self.assertIn("cargo build --profile ci --locked -p tablepro-app --bin tablepro-app", build_job)
+        self.assertIn("cargo build --profile ci --locked -p bookie-app --bin bookie-app", build_job)
         self.assertNotIn("--no-default-features", build_job)
         self.assertNotRegex(build_job, r"cargo build[^\n]*--features")
         self.assertEqual(len(re.findall(r"ci-gtk-artifact\.py create (?!--package)", workflow)), 1)
@@ -40,7 +40,7 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
             job = jobs[name]
             self.assertRegex(job, r"needs: \[[^\]]*gtk-build[^\]]*\]")
             self.assertIn("ci-gtk-artifact.py verify", job)
-            self.assertIn("TABLEPRO_GTK_BINARY=", job)
+            self.assertIn("BOOKIE_GTK_BINARY=", job)
             self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build\n", job)
             self.assertIn('"${{ github.sha }}"', job)
             self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ github.sha }}", job)
@@ -52,7 +52,7 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
         builder = (ROOT / "scripts/build-deb.sh").read_text()
 
         self.assertIn("build-deb.sh", package_workflow)
-        self.assertRegex(builder, r"cargo build[^\n]*-p tablepro-app[^\n]*--locked")
+        self.assertRegex(builder, r"cargo build[^\n]*-p bookie-app[^\n]*--locked")
         self.assertNotIn("--no-default-features", builder)
         self.assertNotRegex(builder, r"cargo build[^\n]*--features")
 

@@ -1,5 +1,5 @@
 use super::clickhouse::{connect, start_clickhouse};
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -162,27 +162,27 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         );
     }
 
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&result.rows);
-    let csv = tablepro_core::export::render_csv(
+    let null_marker = bookie_core::export::unique_csv_null_marker(&result.rows);
+    let csv = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
-        &tablepro_core::export::CsvOptions {
+        &bookie_core::export::CsvOptions {
             null_to_empty: false,
             null_marker: Some(null_marker.clone()),
             ..Default::default()
         },
     );
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let mapping: Vec<_> = (0..result.columns.len()).map(Some).collect();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "clickhouse",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "enum_csv_copy",
             columns: &result.columns,
@@ -226,7 +226,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .unwrap();
     for row in &result.rows {
         let copy_sql =
-            tablepro_core::sql_literal::build_insert_literal("clickhouse", None, "enum_sql_copy", &result.columns, row)
+            bookie_core::sql_literal::build_insert_literal("clickhouse", None, "enum_sql_copy", &result.columns, row)
                 .unwrap();
         connection.execute(&copy_sql).await.unwrap();
     }
@@ -287,27 +287,27 @@ async fn value_contract_clickhouse_nullable_enum16_preserves_null_and_labels_acr
         assert_eq!(row[3], Value::Int(i64::from(index == 0)));
     }
 
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&result.rows);
-    let csv = tablepro_core::export::render_csv(
+    let null_marker = bookie_core::export::unique_csv_null_marker(&result.rows);
+    let csv = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
-        &tablepro_core::export::CsvOptions {
+        &bookie_core::export::CsvOptions {
             null_to_empty: false,
             null_marker: Some(null_marker.clone()),
             ..Default::default()
         },
     );
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let mapping = vec![Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "clickhouse",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "nullable_enum16_csv",
             columns: &result.columns,
@@ -341,7 +341,7 @@ async fn value_contract_clickhouse_nullable_enum16_preserves_null_and_labels_acr
         .await
         .unwrap();
     for row in &result.rows {
-        let sql = tablepro_core::sql_literal::build_insert_literal(
+        let sql = bookie_core::sql_literal::build_insert_literal(
             "clickhouse",
             None,
             "nullable_enum16_copy",

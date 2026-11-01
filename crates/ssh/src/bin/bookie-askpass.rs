@@ -8,7 +8,7 @@ use zeroize::Zeroizing;
 
 const MAX_FRAME: usize = 65_536;
 const ANSWER: u8 = 0x00;
-const SOCKET_ENV: &str = "TABLEPRO_ASKPASS_SOCKET";
+const SOCKET_ENV: &str = "BOOKIE_ASKPASS_SOCKET";
 
 fn main() -> ExitCode {
     let Some(answer) = request_answer() else {

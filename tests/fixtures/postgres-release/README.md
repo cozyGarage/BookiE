@@ -6,7 +6,7 @@ Deterministic PostgreSQL environment for release acceptance. Run it from the wor
 ./scripts/test-postgres-release.sh
 ```
 
-The script generates materials, builds and starts the containers, waits for each path, and runs agentd SSH/mTLS tests, the `tablepro-release-tests` suite, and a GTK saved-mTLS connection scenario. The Rust suites run with `--include-ignored --test-threads=1`. Set `TABLEPRO_FIXTURE_KEEP_UP=1` to leave the containers running after the suite.
+The script generates materials, builds and starts the containers, waits for each path, and runs agentd SSH/mTLS tests, the `bookie-release-tests` suite, and a GTK saved-mTLS connection scenario. The Rust suites run with `--include-ignored --test-threads=1`. Set `BOOKIE_FIXTURE_KEEP_UP=1` to leave the containers running after the suite.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ Docker with Compose v2, `openssl`, `ssh-keygen`, `dbus-run-session`, `gnome-keyr
 
 | Service | Role |
 |---|---|
-| `db` | PostgreSQL 16 with TLS enabled and the network alias `db.tablepro.test`. No published port. |
+| `db` | PostgreSQL 16 with TLS enabled and the network alias `db.bookie.test`. No published port. |
 | `bastion` | OpenSSH server with a fixed host key and one public-key user, `tunnel`. No published port. |
 | `toxiproxy` | Publishes the only host entry points: API `8474`, database path `5433`, bastion path `2223`. |
 
@@ -27,7 +27,7 @@ The database is reachable from the host only through Toxiproxy or through the ba
 `generate-materials.sh` writes `materials/`, which is not tracked:
 
 - `ca.crt` / `ca.key`: fixture certificate authority
-- `server.crt` / `server.key`: server certificate for `CN=db.tablepro.test` with `subjectAltName=DNS:db.tablepro.test,DNS:localhost`
+- `server.crt` / `server.key`: server certificate for `CN=db.bookie.test` with `subjectAltName=DNS:db.bookie.test,DNS:localhost`
 - `other-ca.crt`: unrelated authority for unknown-CA rejection
 - `client.crt` / `client.key`: client identity accepted by the dedicated mTLS role
 - `rotated-client.crt` / `rotated-client.key`: second valid identity for rotation checks
@@ -53,6 +53,6 @@ Regenerate with `./generate-materials.sh --force`. The runner script points `XDG
 - Activity templates run, and the blocking-lock query reports a contended row
 - Direct and SSH reconnect produce usable sessions
 
-Server-confirmed cancellation and timeout are covered by `cargo test -p tablepro-driver-postgres --test integration`.
+Server-confirmed cancellation and timeout are covered by `cargo test -p bookie-driver-postgres --test integration`.
 
 The separate `scripts/test-driver-tls.sh` fixture verifies MySQL mTLS directly and through SSH, including missing/untrusted identities and certificate rotation.

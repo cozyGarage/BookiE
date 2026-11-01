@@ -107,27 +107,27 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         )
         .await
         .unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let csv_options = bookie_core::export::CsvOptions::default();
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(None, "value_contract_domain_array_import")
         .await
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "public".into(),
             name: "value_contract_domain_array_label".into(),
         })
     );
     let mapping = [Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "value_contract_domain_array_import",
             columns: &columns,
@@ -167,7 +167,7 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
     assert_eq!(imported.rows, native.rows);
 
     let edited = r#"{"NULL","",東京,NULL}"#;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "value_contract_domain_array_import",
@@ -213,7 +213,7 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         }],
         ..Default::default()
     };
-    let (predicate, params) = tablepro_core::filter::build_filter_where("postgres", &columns, &filters)
+    let (predicate, params) = bookie_core::filter::build_filter_where("postgres", &columns, &filters)
         .unwrap()
         .unwrap();
     assert!(predicate.contains("$1::\"public\".\"value_contract_domain_array_label\"[]"));
@@ -238,7 +238,7 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         ]]
     );
 
-    let invalid_grid = tablepro_core::sql_dialect::build_keyed_update(
+    let invalid_grid = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "value_contract_domain_array_import",
@@ -249,14 +249,14 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
     .unwrap();
     let error = connection.execute_in_transaction(&[invalid_grid]).await.unwrap_err();
     let cause = match &error {
-        tablepro_core::DriverError::Transaction { source, .. }
-        | tablepro_core::DriverError::TransactionRollbackFailed { source, .. } => source.as_ref(),
+        bookie_core::DriverError::Transaction { source, .. }
+        | bookie_core::DriverError::TransactionRollbackFailed { source, .. } => source.as_ref(),
         other => other,
     };
     assert!(
         matches!(
             cause,
-            tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
+            bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
         ),
         "unexpected invalid grid edit error: {error:?}"
     );
@@ -273,7 +273,7 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         grid_native.rows
     );
 
-    let invalid_domain = tablepro_core::sql_dialect::build_insert_from_draft(
+    let invalid_domain = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         None,
         "value_contract_domain_array_import",
@@ -287,7 +287,7 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         .unwrap_err();
     assert!(matches!(
         error,
-        tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
+        bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
     ));
     assert_eq!(
         connection
@@ -307,6 +307,6 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         .unwrap_err();
     assert!(matches!(
         invalid_array,
-        tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"
+        bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"
     ));
 }

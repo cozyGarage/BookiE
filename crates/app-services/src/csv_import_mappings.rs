@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use bookie_core::{ColumnInfo, DriverCapabilities};
 use serde::{Deserialize, Serialize};
-use tablepro_core::{ColumnInfo, DriverCapabilities};
 use uuid::Uuid;
 
 use super::config_io::xdg_config_path;

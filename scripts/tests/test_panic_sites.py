@@ -21,7 +21,7 @@ class PanicSiteModuleResolutionTests(unittest.TestCase):
         (root / "baselines" / "panic-site-baselines.txt").write_text("", encoding="utf8")
         for path, source in files.items():
             target = (
-                root / "apps/linux/packaging/arch/src/TablePro/cargo-vendor/sample/src/lib.rs"
+                root / "apps/linux/packaging/arch/src/BookiE/cargo-vendor/sample/src/lib.rs"
                 if path == "generated-vendor.rs"
                 else root / "crates" / "sample" / "src" / path
             )

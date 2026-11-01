@@ -1,8 +1,8 @@
+use bookie_core::{ColumnInfo, DriverError, Value};
 use sqlx::encode::IsNull;
 use sqlx::postgres::types::Oid;
 use sqlx::postgres::{PgArgumentBuffer, PgConnection, PgTypeInfo, PgTypeKind};
 use sqlx::{Encode, Executor, Postgres, SqlSafeStr, Statement, Type, TypeInfo};
-use tablepro_core::{ColumnInfo, DriverError, Value};
 
 use crate::array::MAX_ARRAY_TEXT_BYTES;
 use crate::query::{QueryFailure, statement_column_origins, statement_columns, statement_type_infos};

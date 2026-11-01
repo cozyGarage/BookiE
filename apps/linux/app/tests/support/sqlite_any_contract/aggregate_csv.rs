@@ -1,6 +1,6 @@
 #[tokio::test]
 async fn sqlite_group_concat_any_csv_round_trip_preserves_text_and_null() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -100,7 +100,7 @@ async fn sqlite_group_concat_any_csv_round_trip_preserves_text_and_null() {
 
 #[tokio::test]
 async fn sqlite_printf_any_csv_round_trip_preserves_text_and_null_semantics() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -174,7 +174,7 @@ async fn sqlite_printf_any_csv_round_trip_preserves_text_and_null_semantics() {
 
 #[tokio::test]
 async fn sqlite_sum_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -271,7 +271,7 @@ async fn sqlite_sum_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_avg_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -363,7 +363,7 @@ async fn sqlite_avg_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_total_any_csv_round_trip_preserves_real_results() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -454,7 +454,7 @@ async fn sqlite_total_any_csv_round_trip_preserves_real_results() {
 
 #[tokio::test]
 async fn sqlite_any_arithmetic_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -569,7 +569,7 @@ async fn sqlite_any_arithmetic_csv_round_trip_preserves_runtime_storage_classes(
 
 #[tokio::test]
 async fn sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -641,7 +641,7 @@ async fn sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text
             ],
         ]
     );
-    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+    let json: serde_json::Value = serde_json::from_str(&bookie_core::export::render_json(
         &result.columns,
         &result.rows,
     ))
@@ -674,7 +674,7 @@ async fn sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text
 
 #[tokio::test]
 async fn sqlite_json_group_object_any_csv_round_trip_preserves_native_text() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -760,7 +760,7 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_native_text() {
         ],
         "SQLite {version:?} native aggregate output must be preserved"
     );
-    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+    let json: serde_json::Value = serde_json::from_str(&bookie_core::export::render_json(
         &result.columns,
         &result.rows,
     ))
@@ -771,12 +771,12 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_native_text() {
 
     let directory = tempfile::tempdir().unwrap();
     let workbook_path = directory.path().join("sqlite-json-object-any.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &workbook_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -822,7 +822,7 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_native_text() {
 
 #[tokio::test]
 async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -927,12 +927,12 @@ async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classe
 
     let directory = tempfile::tempdir().unwrap();
     let json_path = directory.path().join("sqlite-json-extract-any.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -953,12 +953,12 @@ async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classe
     assert!(json[8]["json_kind"].is_null());
 
     let xlsx_path = directory.path().join("sqlite-json-extract-any.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -1064,7 +1064,7 @@ async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classe
 
 #[tokio::test]
 async fn sqlite_json_quote_any_csv_round_trip_keeps_json_text_distinct_from_null() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -1124,7 +1124,7 @@ async fn sqlite_json_quote_any_csv_round_trip_keeps_json_text_distinct_from_null
         .collect::<Vec<_>>();
     assert_eq!(result.columns[1].data_type, "NULL");
     assert_eq!(result.rows, expected);
-    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+    let json: serde_json::Value = serde_json::from_str(&bookie_core::export::render_json(
         &result.columns,
         &result.rows,
     ))

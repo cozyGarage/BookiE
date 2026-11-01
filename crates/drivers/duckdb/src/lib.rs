@@ -10,7 +10,7 @@ use duckdb::{
     AccessMode, Config, Connection as DuckConnection, core::LogicalTypeId, params_from_iter, types::ValueRef,
 };
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, EnumInputStyle, ExecResult,
     MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, run_server_cancellable,
 };
@@ -739,7 +739,7 @@ fn duck_value_ref_to_value(v: ValueRef<'_>, uuid_column: bool) -> Value {
                 Value::Text(i.to_string())
             }
         }
-        ValueRef::Float(f) => Value::Float(tablepro_core::single_precision_as_f64(f)),
+        ValueRef::Float(f) => Value::Float(bookie_core::single_precision_as_f64(f)),
         ValueRef::Double(f) => Value::Float(f),
         ValueRef::Decimal(d) => rust_decimal_or_text(d),
         ValueRef::Text(t) => match std::str::from_utf8(t) {

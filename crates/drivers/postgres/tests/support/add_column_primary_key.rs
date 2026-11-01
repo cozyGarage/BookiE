@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
-use tablepro_core::sql_ddl::{DraftColumn, build_add_column};
+use bookie_core::Value;
+use bookie_core::sql_ddl::{DraftColumn, build_add_column};
 
 use crate::{connect, start_pg};
 

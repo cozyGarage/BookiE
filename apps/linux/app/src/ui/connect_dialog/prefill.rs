@@ -2,8 +2,8 @@ use relm4::adw;
 use relm4::adw::prelude::*;
 use secrecy::{ExposeSecret, SecretString};
 
-use tablepro_core::{AuthMode, Environment};
-use tablepro_storage::{
+use bookie_core::{AuthMode, Environment};
+use bookie_storage::{
     SavedConnection, SavedSshAuth, StorageError, load_password, load_ssh_passphrase, load_ssh_password,
 };
 
@@ -155,8 +155,8 @@ impl ConnectDialog {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::DriverMaturity;
-    use tablepro_storage::{KeyringFailure, SavedSshConfig};
+    use bookie_core::DriverMaturity;
+    use bookie_storage::{KeyringFailure, SavedSshConfig};
     use uuid::Uuid;
 
     fn entry(id: &str) -> DriverEntry {
@@ -204,7 +204,7 @@ mod tests {
             username: "me".into(),
             auth: SavedSshAuth::Password,
             jump: jump.map(Box::new),
-            client: tablepro_storage::SshClient::Builtin,
+            client: bookie_storage::SshClient::Builtin,
             agent: false,
             agent_identity: None,
         }

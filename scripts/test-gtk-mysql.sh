@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-if [[ "${TABLEPRO_GTK_MYSQL_E2E_DBUS_ACTIVE:-0}" != "1" ]]; then
-  runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk-mysql.XXXXXX")"
+if [[ "${BOOKIE_GTK_MYSQL_E2E_DBUS_ACTIVE:-0}" != "1" ]]; then
+  runtime="$(mktemp -d "${TMPDIR:-/tmp}/bookie-gtk-mysql.XXXXXX")"
   mkdir -p "$runtime"/{home,config,data,cache,state,runtime}
   chmod 0700 "$runtime/runtime"
   cleanup_runtime() {
@@ -20,7 +20,7 @@ if [[ "${TABLEPRO_GTK_MYSQL_E2E_DBUS_ACTIVE:-0}" != "1" ]]; then
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
   ATSPI_DBUS_IMPLEMENTATION=dbus-daemon \
-  TABLEPRO_GTK_MYSQL_E2E_DBUS_ACTIVE=1 \
+  BOOKIE_GTK_MYSQL_E2E_DBUS_ACTIVE=1 \
     CARGO_HOME="$cargo_home" \
     RUSTUP_HOME="$rustup_home" \
     HOME="$runtime/home" \
@@ -43,10 +43,10 @@ done
 socket_directory="$XDG_RUNTIME_DIR/mysql-socket"
 mkdir -m 777 "$socket_directory"
 
-container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::3306 \
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::3306 \
   --tmpfs /var/lib/mysql \
   --mount "type=bind,source=$socket_directory,target=/var/run/mysqld" \
-  --env MYSQL_ROOT_PASSWORD=tablepro_test \
+  --env MYSQL_ROOT_PASSWORD=bookie_test \
   --env MYSQL_ROOT_HOST=% \
   --env MYSQL_DATABASE=bookie_test \
   mysql:8.0 --default-authentication-plugin=mysql_native_password)"
@@ -58,7 +58,7 @@ trap cleanup EXIT
 published="$(docker port "$container" 3306/tcp)"
 port="${published##*:}"
 attempt=0
-until docker exec "$container" mysql --protocol=TCP --host=127.0.0.1 --user=root --password=tablepro_test --batch \
+until docker exec "$container" mysql --protocol=TCP --host=127.0.0.1 --user=root --password=bookie_test --batch \
   --skip-column-names --execute='SELECT 1' >/dev/null 2>&1; do
   attempt=$((attempt + 1))
   if (( attempt >= 180 )); then
@@ -69,7 +69,7 @@ until docker exec "$container" mysql --protocol=TCP --host=127.0.0.1 --user=root
   sleep 1
 done
 
-docker exec --interactive "$container" mysql --user=root --password=tablepro_test bookie_test <<'SQL'
+docker exec --interactive "$container" mysql --user=root --password=bookie_test bookie_test <<'SQL'
 CREATE TABLE people (id INT PRIMARY KEY, name VARCHAR(100) NOT NULL, profile JSON NULL, active BOOLEAN NOT NULL);
 INSERT INTO people VALUES
   (1, 'Ada Lovelace', '{"role": "analyst"}', 1),
@@ -88,16 +88,16 @@ INSERT INTO enum_grid VALUES
   (5, 'ready', 'read,write', 'sibling');
 SQL
 
-eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
-printf 'tablepro_test' | secret-tool store --label='BookiE GTK MySQL fixture' \
-  xdg:schema com.tablepro.linux.Password \
+eval "$(printf 'bookie-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+printf 'bookie_test' | secret-tool store --label='BookiE GTK MySQL fixture' \
+  xdg:schema com.bookie.linux.Password \
   connection-id c38e2d93-4314-4c18-b192-08f164386e09 \
   kind db_password
-TABLEPRO_GTK_KEYRING_READY=1 \
-  TABLEPRO_GTK_DBUS_ACTIVE=1 \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-mysql_grid_edit_and_delete_commit_to_the_server,mysql_enum_set_grid_edit_preserves_native_values_and_siblings,imported_socket_urls_connect_to_mysql}" \
-  TABLEPRO_GTK_MYSQL_CONTAINER="$container" \
-  TABLEPRO_GTK_MYSQL_HOST=127.0.0.1 \
-  TABLEPRO_GTK_MYSQL_PORT="$port" \
-  TABLEPRO_GTK_MYSQL_SOCKET="$socket_directory/mysqld.sock" \
+BOOKIE_GTK_KEYRING_READY=1 \
+  BOOKIE_GTK_DBUS_ACTIVE=1 \
+  BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-mysql_grid_edit_and_delete_commit_to_the_server,mysql_enum_set_grid_edit_preserves_native_values_and_siblings,imported_socket_urls_connect_to_mysql}" \
+  BOOKIE_GTK_MYSQL_CONTAINER="$container" \
+  BOOKIE_GTK_MYSQL_HOST=127.0.0.1 \
+  BOOKIE_GTK_MYSQL_PORT="$port" \
+  BOOKIE_GTK_MYSQL_SOCKET="$socket_directory/mysqld.sock" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

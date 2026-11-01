@@ -5,14 +5,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 target="${CARGO_TARGET_DIR:-$ROOT/target}"
-rows="${TABLEPRO_PROFILE_ROWS:-100000}"
-repetitions="${TABLEPRO_PROFILE_REPETITIONS:-3}"
-out="${TABLEPRO_PROFILE_OUT:-$ROOT/target/quality/grid-scroll-matrix-$(date +%Y%m%d-%H%M%S).jsonl}"
-full_matrix="${TABLEPRO_PROFILE_MATRIX_FULL:-0}"
-include_scrub_reference="${TABLEPRO_PROFILE_INCLUDE_SCRUB_REFERENCE:-0}"
-wheel_events="${TABLEPRO_PROFILE_WHEEL_EVENTS:-40}"
-wheel_delay="${TABLEPRO_PROFILE_WHEEL_DELAY_SECONDS:-0.08}"
-scroll_steps="${TABLEPRO_PROFILE_SCROLL_STEPS:-1000}"
+rows="${BOOKIE_PROFILE_ROWS:-100000}"
+repetitions="${BOOKIE_PROFILE_REPETITIONS:-3}"
+out="${BOOKIE_PROFILE_OUT:-$ROOT/target/quality/grid-scroll-matrix-$(date +%Y%m%d-%H%M%S).jsonl}"
+full_matrix="${BOOKIE_PROFILE_MATRIX_FULL:-0}"
+include_scrub_reference="${BOOKIE_PROFILE_INCLUDE_SCRUB_REFERENCE:-0}"
+wheel_events="${BOOKIE_PROFILE_WHEEL_EVENTS:-40}"
+wheel_delay="${BOOKIE_PROFILE_WHEEL_DELAY_SECONDS:-0.08}"
+scroll_steps="${BOOKIE_PROFILE_SCROLL_STEPS:-1000}"
 
 if [[ ! "$rows" =~ ^[0-9]+$ || ! "$repetitions" =~ ^[1-9][0-9]*$ ]]; then
   echo "rows and repetitions must be positive integers" >&2
@@ -27,9 +27,9 @@ if [[ ! "$full_matrix" =~ ^[01]$ || ! "$include_scrub_reference" =~ ^[01]$ ]]; t
   exit 2
 fi
 
-cargo build --release --locked -p tablepro-app --bin tablepro-app
-binary="$target/installed/usr/bin/tablepro"
-install -Dm755 "$target/release/tablepro-app" "$binary"
+cargo build --release --locked -p bookie-app --bin bookie-app
+binary="$target/installed/usr/bin/bookie"
+install -Dm755 "$target/release/bookie-app" "$binary"
 source_revision="$(git rev-parse HEAD)"
 binary_sha256="$(sha256sum "$binary" | cut -d' ' -f1)"
 mkdir -p "$(dirname "$out")"
@@ -42,19 +42,19 @@ run_case() {
   local repetition="$4"
   printf 'profile text=%s layout=%s input=%s repetition=%s rows=%s\n' \
     "$text_mode" "$layout" "$input_mode" "$repetition" "$rows"
-  TABLEPRO_PROFILE_ROWS="$rows" \
-  TABLEPRO_PROFILE_TEXT_MODE="$text_mode" \
-  TABLEPRO_PROFILE_LAYOUT="$layout" \
-  TABLEPRO_PROFILE_INPUT="$input_mode" \
-  TABLEPRO_PROFILE_WHEEL_EVENTS="$wheel_events" \
-  TABLEPRO_PROFILE_WHEEL_DELAY_SECONDS="$wheel_delay" \
-  TABLEPRO_PROFILE_SCROLL_STEPS="$scroll_steps" \
-  TABLEPRO_PROFILE_REPETITION="$repetition" \
-  TABLEPRO_PROFILE_OUT="$out" \
-  TABLEPRO_PROFILE_SOURCE_REVISION="$source_revision" \
-  TABLEPRO_PROFILE_BINARY_SHA256="$binary_sha256" \
-  TABLEPRO_GTK_SCENARIO=profile_large_result_in_the_grid \
-  TABLEPRO_GTK_BINARY="$binary" \
+  BOOKIE_PROFILE_ROWS="$rows" \
+  BOOKIE_PROFILE_TEXT_MODE="$text_mode" \
+  BOOKIE_PROFILE_LAYOUT="$layout" \
+  BOOKIE_PROFILE_INPUT="$input_mode" \
+  BOOKIE_PROFILE_WHEEL_EVENTS="$wheel_events" \
+  BOOKIE_PROFILE_WHEEL_DELAY_SECONDS="$wheel_delay" \
+  BOOKIE_PROFILE_SCROLL_STEPS="$scroll_steps" \
+  BOOKIE_PROFILE_REPETITION="$repetition" \
+  BOOKIE_PROFILE_OUT="$out" \
+  BOOKIE_PROFILE_SOURCE_REVISION="$source_revision" \
+  BOOKIE_PROFILE_BINARY_SHA256="$binary_sha256" \
+  BOOKIE_GTK_SCENARIO=profile_large_result_in_the_grid \
+  BOOKIE_GTK_BINARY="$binary" \
     bash scripts/test-gtk-safety.sh
 }
 

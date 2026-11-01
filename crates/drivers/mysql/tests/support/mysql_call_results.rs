@@ -1,5 +1,5 @@
 use super::{connect, start_mysql};
-use tablepro_core::{OperationControl, Value};
+use bookie_core::{OperationControl, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]

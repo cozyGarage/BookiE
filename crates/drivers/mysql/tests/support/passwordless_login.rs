@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use drivers_mysql::MysqlDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver};
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 

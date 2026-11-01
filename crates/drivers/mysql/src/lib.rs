@@ -22,8 +22,8 @@ pub(crate) use text_protocol::{is_call_statement, text_protocol};
 use text_protocol::{mysql_row_payload_bytes, statement_columns};
 mod temporal;
 
-use tablepro_core::sql_syntax::script::LexicalSettings;
-use tablepro_core::{
+use bookie_core::sql_syntax::script::LexicalSettings;
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
     InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
     QueryResultBudget, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
@@ -504,7 +504,7 @@ impl Connection for MysqlConnection {
         Ok(())
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         session::open(&self.session_options, self.cancellation_pool.clone(), self.read_only).await
     }
 
@@ -517,7 +517,7 @@ impl Connection for MysqlConnection {
             .map(Some)
     }
 
-    async fn begin(&self) -> Result<Box<dyn tablepro_core::Transaction>, DriverError> {
+    async fn begin(&self) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
         let tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         Ok(Box::new(MysqlTransaction { tx: Some(tx) }))
     }
@@ -584,7 +584,7 @@ struct MysqlTransaction {
 }
 
 #[async_trait]
-impl tablepro_core::Transaction for MysqlTransaction {
+impl bookie_core::Transaction for MysqlTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
         let tx = self
             .tx
@@ -849,7 +849,7 @@ fn bind_mysql_params<'q>(
 /// dial and verify the same TCP host, exactly as an untunnelled connection
 /// already did.
 fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
-    use tablepro_core::TlsMode;
+    use bookie_core::TlsMode;
     let mut mysql_opts = match opts.transport() {
         Transport::Tcp { host, port } => MySqlConnectOptions::new().host(host).port(port),
         Transport::LocalSocketFile { path } => MySqlConnectOptions::new().socket(path),
@@ -962,7 +962,7 @@ fn default_expression(raw: Option<String>, column_type: &str, extra: &str, maria
     if numeric || temporal_now || extra.contains("default_generated") {
         return Some(raw);
     }
-    tablepro_core::sql_literal::render_sql_literal("mysql", &Value::Text(raw)).ok()
+    bookie_core::sql_literal::render_sql_literal("mysql", &Value::Text(raw)).ok()
 }
 
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
@@ -1021,8 +1021,8 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
             position: None,
         },
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
-        Io(e) if tablepro_core::looks_like_tls_failure(&tablepro_core::error_chain_text(&e)) => {
-            DriverError::Tls(tablepro_core::error_chain_text(&e))
+        Io(e) if bookie_core::looks_like_tls_failure(&bookie_core::error_chain_text(&e)) => {
+            DriverError::Tls(bookie_core::error_chain_text(&e))
         }
         Io(_) => DriverError::Disconnected,
         Tls(e) => DriverError::Tls(e.to_string()),

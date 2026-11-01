@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::path::PathBuf;
 
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsMode};
-use tablepro_driver_tls_tests::{DriverTlsFixture, assert_endpoint_identity_rejected};
+use bookie_core::{ConnectOptions, DatabaseDriver, TlsMode};
+use bookie_driver_tls_tests::{DriverTlsFixture, assert_endpoint_identity_rejected};
 
 use drivers_mysql::MysqlDriver;
 use drivers_postgres::PgDriver;

@@ -1,11 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::path::PathBuf;
 
+use bookie_core::{AuthMode, DriverError, Environment, TlsMode};
+use bookie_release_tests::Fixture;
+use bookie_storage::SavedConnection;
+use bookie_transport::{SshRoute, TransportError, connect_options_for, establish};
 use secrecy::SecretString;
-use tablepro_core::{AuthMode, DriverError, Environment, TlsMode};
-use tablepro_release_tests::Fixture;
-use tablepro_storage::SavedConnection;
-use tablepro_transport::{SshRoute, TransportError, connect_options_for, establish};
 use uuid::Uuid;
 
 use drivers_postgres::PgDriver;
@@ -56,7 +56,7 @@ async fn connect_with_route(
         &PgDriver,
         opts,
         route,
-        &tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        &bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     )
     .await?;
     connection
@@ -69,7 +69,7 @@ async fn connect_with_route(
 fn saved_mtls(fixture: &Fixture, cert_name: Option<&str>, key_name: Option<&str>) -> SavedConnection {
     let materials = fixture.ca_cert.parent().expect("fixture material directory");
     let mut connection = saved(fixture, TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
-    connection.username = "tablepro_mtls".into();
+    connection.username = "bookie_mtls".into();
     connection.tls_client_cert = cert_name.map(|name| materials.join(name));
     connection.tls_client_key = key_name.map(|name| materials.join(name));
     connection

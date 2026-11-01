@@ -19,7 +19,7 @@ pub fn init() {
 }
 
 fn locale_dir() -> String {
-    if let Ok(d) = std::env::var("TABLEPRO_LOCALEDIR") {
+    if let Ok(d) = std::env::var("BOOKIE_LOCALEDIR") {
         return d;
     }
     if std::path::Path::new("/app/share/locale").is_dir() {

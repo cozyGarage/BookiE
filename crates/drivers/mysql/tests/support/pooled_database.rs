@@ -17,7 +17,7 @@ async fn use_on_a_pooled_connection_does_not_change_what_later_catalog_reads_see
     connection
         .query_controlled(
             "USE other_db",
-            &tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5)),
+            &bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5)),
         )
         .await
         .unwrap();

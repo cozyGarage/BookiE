@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, Value};
+use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue, Value};
 
 use crate::{connect, start_pg};
 
@@ -41,12 +41,12 @@ async fn value_contract_postgres_enum_identifiers_at_catalog_byte_limit_preserve
     let columns = connection.fetch_columns(Some(&schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.clone(),
             name: type_name.clone(),
         })
     );
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(&schema),
         "rows",
@@ -112,13 +112,13 @@ async fn value_contract_quoted_enum_identifiers_preserve_metadata_and_typed_writ
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
         })
     );
 
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -133,7 +133,7 @@ async fn value_contract_quoted_enum_identifiers_preserve_metadata_and_typed_writ
     );
     connection.execute_params(&update_sql, &update_params).await.unwrap();
 
-    let (insert_sql, insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (insert_sql, insert_params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         Some(schema),
         "rows",
@@ -147,7 +147,7 @@ async fn value_contract_quoted_enum_identifiers_preserve_metadata_and_typed_writ
     );
     connection.execute_params(&insert_sql, &insert_params).await.unwrap();
 
-    let (where_sql, filter_params) = tablepro_core::build_filter_where(
+    let (where_sql, filter_params) = bookie_core::build_filter_where(
         "postgres",
         &columns,
         &FilterSet {
@@ -276,7 +276,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
         })
@@ -306,7 +306,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
     let import_columns = connection.fetch_columns(Some(schema), "import rows").await.unwrap();
     assert_eq!(
         import_columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
         })
@@ -317,7 +317,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
         .execute("SET LOCAL search_path TO enum_quoted_shadow, public")
         .await
         .unwrap();
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -332,7 +332,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
     );
     transaction.execute_params(&update_sql, &update_params).await.unwrap();
 
-    let (where_sql, filter_params) = tablepro_core::build_filter_where(
+    let (where_sql, filter_params) = bookie_core::build_filter_where(
         "postgres",
         &columns,
         &FilterSet {
@@ -362,7 +362,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
         .execute("SAVEPOINT reject_shadow_only_enum_label")
         .await
         .unwrap();
-    let (invalid_sql, invalid_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (invalid_sql, invalid_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -376,7 +376,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
         .await
         .expect_err("a label present only in the shadow enum must be refused");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
     );
     transaction
@@ -390,23 +390,23 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
         ))
         .await
         .unwrap();
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let csv_options = tablepro_core::export::CsvOptions {
+    let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = bookie_core::export::CsvOptions {
         null_to_empty: false,
         null_marker: Some(null_marker.clone()),
         ..Default::default()
     };
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some(schema),
             table: "import rows",
             columns: &import_columns,
@@ -554,13 +554,13 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_a
     let columns = connection.fetch_columns(Some(schema), "Rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
         })
     );
 
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "Rows",
@@ -572,7 +572,7 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_a
     assert!(update_sql.contains("\"EnumCaseTarget\".\"StateKind\""), "{update_sql}");
     connection.execute_params(&update_sql, &update_params).await.unwrap();
 
-    let (where_sql, filter_params) = tablepro_core::build_filter_where(
+    let (where_sql, filter_params) = bookie_core::build_filter_where(
         "postgres",
         &columns,
         &FilterSet {
@@ -689,7 +689,7 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_a
         ]]
     );
 
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("EnumCaseTarget"),
         "Rows",
@@ -754,8 +754,8 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_a
         .query("SELECT 'shadow-only'::\"EnumCaseTarget\".\"StateKind\"")
         .await
         .expect_err("native target enum rejects the shadow-only label");
-    let sqlstate = |error: &tablepro_core::DriverError| match error {
-        tablepro_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
+    let sqlstate = |error: &bookie_core::DriverError| match error {
+        bookie_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
         _ => None,
     };
     assert_eq!(sqlstate(&invalid).as_deref(), Some("22P02"));
@@ -871,12 +871,12 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
     let columns = connection.fetch_columns(Some(schema), "Rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
         })
     );
-    let (update_sql, _) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, _) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "Rows",
@@ -886,7 +886,7 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
     )
     .unwrap();
     assert!(update_sql.contains("\"EnumCaseLocal\".\"StateKind\""), "{update_sql}");
-    let (where_sql, filter_params) = tablepro_core::build_filter_where(
+    let (where_sql, filter_params) = bookie_core::build_filter_where(
         "postgres",
         &columns,
         &FilterSet {
@@ -941,7 +941,7 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
             .await
             .expect_err("a shadow-only label is invalid for the target enum");
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected native enum SQLSTATE 22P02, got {invalid:?}"
         );
         transaction
@@ -1082,13 +1082,13 @@ async fn value_contract_unicode_enum_identifiers_survive_metadata_and_typed_writ
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
         })
     );
 
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -1099,7 +1099,7 @@ async fn value_contract_unicode_enum_identifiers_survive_metadata_and_typed_writ
     .unwrap();
     connection.execute_params(&update_sql, &update_params).await.unwrap();
 
-    let (insert_sql, insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+    let (insert_sql, insert_params) = bookie_core::sql_dialect::build_insert_from_draft(
         "postgres",
         Some(schema),
         "rows",
@@ -1109,7 +1109,7 @@ async fn value_contract_unicode_enum_identifiers_survive_metadata_and_typed_writ
     .unwrap();
     connection.execute_params(&insert_sql, &insert_params).await.unwrap();
 
-    let (where_sql, filter_params) = tablepro_core::build_filter_where(
+    let (where_sql, filter_params) = bookie_core::build_filter_where(
         "postgres",
         &columns,
         &FilterSet {
@@ -1137,7 +1137,7 @@ async fn value_contract_unicode_enum_identifiers_survive_metadata_and_typed_writ
         .await
         .expect_err("invalid label must not enter the Unicode-named enum");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected native enum SQLSTATE 22P02, got {invalid:?}"
     );
 

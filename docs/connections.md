@@ -4,7 +4,7 @@
 
 ## Shared assembly and ownership
 
-GUI and agentd use `tablepro-transport` to resolve saved configuration/secrets, assemble options, open the selected SSH route, and connect the driver. Consumers receive `PolicyGuard` handles. MCP scopes and connection allowlists apply in addition to SQL policy. Dedicated editor sessions retain their own physical identity; loss refuses subsequent SQL rather than using a pool or replaying it.
+GUI and agentd use `bookie-transport` to resolve saved configuration/secrets, assemble options, open the selected SSH route, and connect the driver. Consumers receive `PolicyGuard` handles. MCP scopes and connection allowlists apply in addition to SQL policy. Dedicated editor sessions retain their own physical identity; loss refuses subsequent SQL rather than using a pool or replaying it.
 
 Saved UUID, live handle, editor session and namespace are distinct owners. The GUI monitor watches tunnel closure and driver fault signals as well as ping; replacement changes identity and invalidates old editor sessions. Stop visibility uses the driver's capability, not an engine-name list. Actual loss/cancellation outcomes and test ownership are in [disconnection contracts](disconnection-contracts.md).
 
@@ -28,7 +28,7 @@ The GUI defaults to `UnknownHostKey::Refuse` and installs a prompter. An unknown
 
 A saved tunnel can select `client: open_ssh`. Its ControlMaster/forward lives in a private runtime directory; `StrictHostKeyChecking=ask` applies to the destination and every `ProxyJump` hop. GUI prompts explicitly and agentd declines unanswered prompts. Saved passwords/passphrases answer only a matching destination/key prompt. Jump routing comes from `~/.ssh/config`/`ProxyJump`; effective `ProxyCommand` routes are refused. Saved per-hop chains are refused for this backend. Built-in SSH supports saved chains and ssh-agent.
 
-Inside Flatpak, selecting system OpenSSH fails with an explicit message before resolving saved SSH credentials or dispatching the database driver. The client does not switch to built-in SSH; select that backend explicitly if it is wanted. Native system OpenSSH remains available outside Flatpak. The executable `tablepro-askpass` helper must be installed beside the app or on PATH. Debian packages install it with the application binaries.
+Inside Flatpak, selecting system OpenSSH fails with an explicit message before resolving saved SSH credentials or dispatching the database driver. The client does not switch to built-in SSH; select that backend explicitly if it is wanted. Native system OpenSSH remains available outside Flatpak. The executable `bookie-askpass` helper must be installed beside the app or on PATH. Debian packages install it with the application binaries.
 
 ## Daemon session cache and DuckDB flat files
 

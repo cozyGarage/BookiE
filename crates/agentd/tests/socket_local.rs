@@ -5,17 +5,17 @@
 
 use std::sync::Arc;
 
-use tablepro_agentd::DaemonProvider;
-use tablepro_core::{AuthMode, DriverRegistry, Environment, TlsMode, Value};
-use tablepro_mcp::ConnectionProvider;
-use tablepro_policy::{AuditState, DenyApprovalSink, PolicyConfig, Principal};
-use tablepro_storage::{AuditJournal, SavedConnection, save_connections};
+use bookie_agentd::DaemonProvider;
+use bookie_core::{AuthMode, DriverRegistry, Environment, TlsMode, Value};
+use bookie_mcp::ConnectionProvider;
+use bookie_policy::{AuditState, DenyApprovalSink, PolicyConfig, Principal};
+use bookie_storage::{AuditJournal, SavedConnection, save_connections};
 use uuid::Uuid;
 
 #[tokio::test]
 #[ignore = "requires scripts/test-postgres-socket.sh"]
 async fn saved_socket_is_available_through_the_agent_provider() {
-    let socket_dir = std::env::var("TABLEPRO_PG_SOCKET_DIR").expect("socket fixture directory");
+    let socket_dir = std::env::var("BOOKIE_PG_SOCKET_DIR").expect("socket fixture directory");
     let saved = SavedConnection {
         auth_source: None,
         id: Uuid::new_v4(),

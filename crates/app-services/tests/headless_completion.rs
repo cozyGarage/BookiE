@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_app_services::completion::SchemaIndex;
-use tablepro_app_services::completion_proposals::candidates;
-use tablepro_core::sql_syntax::SqlGrammar;
+use bookie_app_services::completion::SchemaIndex;
+use bookie_app_services::completion_proposals::candidates;
+use bookie_core::sql_syntax::SqlGrammar;
 
 #[test]
 fn quoted_table_completion_preserves_the_replacement_and_catalog_identity() {

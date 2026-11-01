@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::{connect, start_mysql};
-use tablepro_core::sql_dialect::build_optimistic_keyed_update;
-use tablepro_core::{ColumnInfo, DriverError, Value};
+use bookie_core::sql_dialect::build_optimistic_keyed_update;
+use bookie_core::{ColumnInfo, DriverError, Value};
 
 fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
@@ -211,7 +211,7 @@ async fn an_empty_original_does_not_overwrite_a_concurrent_space() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn filtering_a_float_column_by_its_own_value_finds_the_row() {
-    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+    use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
     let (_container, options) = start_mysql().await;
     let connection = connect(options).await;

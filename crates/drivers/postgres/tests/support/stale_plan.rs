@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::{connect, start_pg};
-use tablepro_core::{DriverError, OperationControl, Value};
+use bookie_core::{DriverError, OperationControl, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]

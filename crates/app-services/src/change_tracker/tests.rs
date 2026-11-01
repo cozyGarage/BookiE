@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::ColumnInfo;
+use bookie_core::ColumnInfo;
 
 fn pk_col(name: &str) -> ColumnInfo {
     ColumnInfo {
@@ -219,7 +219,7 @@ fn mongodb_materialize_guards_deletes_with_the_complete_original_row() {
 
     assert_eq!(
         statements[0].0,
-        "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ? AND tablepro_mongodb_exact_field_set(?)"
+        "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ? AND bookie_mongodb_exact_field_set(?)"
     );
     assert_eq!(
         statements[0].1,

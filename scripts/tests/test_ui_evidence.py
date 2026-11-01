@@ -28,7 +28,7 @@ class UiEvidenceTests(unittest.TestCase):
                          open_editor=lambda: None, stop_application=stop_application,
                          accessible_snapshot=lambda: "fixture accessibility")
         exec(compile(ast.Module(body=[function], type_ignores=[]), str(source), "exec"), namespace)
-        with patch.dict(os.environ, {"TABLEPRO_GTK_ARTIFACT_DIR": str(artifact_dir)}), patch.object(shutil, "which", return_value=None):
+        with patch.dict(os.environ, {"BOOKIE_GTK_ARTIFACT_DIR": str(artifact_dir)}), patch.object(shutil, "which", return_value=None):
             namespace["run_scenario"]("fixture-binary", scenario)
 
     def test_successful_scenario_creates_uploadable_evidence(self):
