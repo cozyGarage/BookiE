@@ -33,7 +33,7 @@ The [personas](docs/personas.md) describe the main usage contexts. The common wo
 
 ## Capability and delivery status
 
-The [architecture](ARCHITECTURE.md) describes crate boundaries and data flow. The [capability review](docs/capability-review.md) records current technical limits. The [0.2.0 completion status](docs/bookie-0.2-sprint.md), [Project #3](https://github.com/users/cozyGarage/projects/3), and [known limitations](docs/known-limitations.md) own delivery status, selected work, and user-visible gaps respectively. Those pages are the source for changing implementation status; this overview states product constraints only.
+The [architecture](ARCHITECTURE.md) describes crate boundaries and data flow. [Project #3](https://github.com/users/cozyGarage/projects/3) owns selected work; [known limitations](docs/known-limitations.md) describes user-visible restrictions. This overview states product constraints only.
 
 ## Product outcomes
 

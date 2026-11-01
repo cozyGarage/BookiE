@@ -212,7 +212,8 @@ pub fn build_filter_where(
         // re-bind operator precedence with the structured rules.
         // The user types `a OR b`, we emit `(... AND (a OR b))` and
         // the OR stays scoped to their fragment.
-        clauses.push(format!("({raw})"));
+        let line_comment = raw.contains("--") || raw.contains('#');
+        clauses.push(format!("({raw}{})", if line_comment { "\n" } else { "" }));
     }
     let joiner = match set.combinator {
         Combinator::And => " AND ",

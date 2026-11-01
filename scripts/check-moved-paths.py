@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail when a tracked file still uses a path from before the move out of linux/.
 
-Dated records (docs/archive, docs/evidence, CHANGELOG.md) keep their old paths on purpose.
+Dated public history (docs/archive, CHANGELOG.md) keeps its established paths.
 """
 import re
 import subprocess
@@ -13,7 +13,7 @@ OLD = re.compile(
     r"|(?<![\w.\-])crates/(app(?![\w\-])|release-tests|driver-tls-tests)\b|(?<![\w.\-])testdata/value-contract"
     r"|^\s*cd\s+['\"]?linux['\"]?\s*(?:#.*)?$"
 )
-SKIP = ("docs/archive/", "docs/evidence/", "CHANGELOG.md",
+SKIP = ("docs/archive/", "CHANGELOG.md",
         "scripts/check-moved-paths.py", "scripts/tests/test_check_moved_paths.py", "vendor/", "apps/linux/po/")
 
 

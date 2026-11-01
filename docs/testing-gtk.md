@@ -76,7 +76,7 @@ On Arch or Omarchy, install the local harness dependencies with:
 sudo pacman -S --needed dbus xorg-server-xvfb at-spi2-core python-atspi
 ```
 
-Current GTK reliability and native Wayland acceptance remain in TEST-31 ([#556](https://github.com/cozyGarage/BookiE/issues/556)) and PKG-1 ([#574](https://github.com/cozyGarage/BookiE/issues/574)). Service-level tests still cover pure state and policy behavior, but they do not replace these cross-layer tests.
+Service-level tests cover pure state and policy behavior, but they do not replace cross-layer GTK and native desktop checks.
 
 SQLite integration regressions also distinguish NULL from zero, false, empty text, and empty blobs in declared columns, and preserve binary values despite declared-type affinity mismatches. Export unit tests overlap writers deterministically and check that pre-existing temporary symlinks cannot redirect writes. Workspace tests preserve active-tab identity when unknown records are removed.
 
@@ -90,7 +90,6 @@ Set `TABLEPRO_PROFILE_ROWS`, `TABLEPRO_PROFILE_REPETITIONS`, `TABLEPRO_PROFILE_W
 
 Use `bash scripts/profile-export-dialog.sh` to measure how long the loaded-result CSV export dialog takes to open for a synthetic ten-column SQLite query. It records query time separately from export-dialog wall time and application CPU, plus resident and peak memory. The default uses 39,999 rows with one 2 KiB text cell per row, matching the shape of a locally observed export without copying that data into the repository. Set `TABLEPRO_PROFILE_EXPORT_ROWS`, `TABLEPRO_PROFILE_EXPORT_CELL_BYTES`, `TABLEPRO_PROFILE_EXPORT_TEXT_MODE=unique|repeated`, `TABLEPRO_PROFILE_REPETITIONS` or `TABLEPRO_PROFILE_OUT` to adjust the bounded sample. The script caps the generated text payload at 256 MiB. These figures measure opening the dialog, not writing an export file.
 
-## Lessons that shape GTK tests
+## GTK test design
 
-- **Replacing a selected model's contents in one remove-and-add notification makes GTK scan every inserted row.** Deselect, then send the removal, then the insertion. Assert the number of row objects constructed, which is deterministic, not wall-clock time.
-- **A scenario is promoted only after 30 consecutive attempts across at least six runs, and adding a scenario restarts that ledger.** A diagnostic probe that passes is not a product regression.
+Prefer deterministic assertions about visible state, accessibility actions and stored data over wall-clock timing. Keep each scenario isolated from other test profiles and fixture databases.
