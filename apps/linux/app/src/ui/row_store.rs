@@ -13,6 +13,12 @@ use crate::services::change_tracker::{KeyValue, RowKey};
 
 use super::row_object::RowObject;
 
+#[derive(Clone)]
+pub(in crate::ui) struct ColumnProjection {
+    source_to_view: Arc<[usize]>,
+    view_to_source: Arc<[Option<usize>]>,
+}
+
 pub(super) enum Slot {
     /// A row that has not yet been requested from the shared result.
     Shared(usize),
@@ -34,7 +40,7 @@ mod imp {
     pub struct RowStore {
         pub(in crate::ui) slots: RefCell<Vec<Slot>>,
         pub(in crate::ui) source: RefCell<Option<Arc<QueryResult>>>,
-        pub(in crate::ui) projection: RefCell<Option<(Vec<usize>, usize)>>,
+        pub(in crate::ui) projection: RefCell<Option<ColumnProjection>>,
         pub(in crate::ui) preview_keys: RefCell<Vec<usize>>,
         pub(in crate::ui) preview_redis_strings: std::cell::Cell<bool>,
         pub(in crate::ui) preview_from_result: std::cell::Cell<bool>,
@@ -113,12 +119,16 @@ mod imp {
 fn row_for_source(
     result: &Arc<QueryResult>,
     source_index: usize,
-    projection: Option<&(Vec<usize>, usize)>,
+    projection: Option<&ColumnProjection>,
     preview_keys: &[usize],
     preview_redis_strings: bool,
     preview_from_result: bool,
 ) -> Option<RowObject> {
-    let row = RowObject::from_shared(result, source_index, projection.cloned())?;
+    let row = RowObject::from_shared(
+        result,
+        source_index,
+        projection.map(|map| Arc::clone(&map.view_to_source)),
+    )?;
     if preview_from_result {
         row.preview_values_from_result();
     } else if preview_redis_strings {
@@ -134,6 +144,17 @@ fn valid_projection(result: &QueryResult, indices: &[usize], width: usize) -> bo
         && indices.iter().all(|index| *index < width)
         && indices.iter().copied().collect::<std::collections::HashSet<_>>().len() == indices.len()
         && result.rows.iter().all(|row| row.len() == indices.len())
+}
+
+fn column_projection(indices: Vec<usize>, width: usize) -> ColumnProjection {
+    let mut view_to_source = vec![None; width];
+    for (source, view) in indices.iter().copied().enumerate() {
+        view_to_source[view] = Some(source);
+    }
+    ColumnProjection {
+        source_to_view: indices.into(),
+        view_to_source: view_to_source.into(),
+    }
 }
 
 glib::wrapper! {
@@ -164,9 +185,13 @@ impl RowStore {
             return false;
         };
         let projection = self.imp().projection.borrow();
-        if let Some((indices, _)) = projection.as_ref() {
+        if let Some(projection) = projection.as_ref() {
             for (source_index, value) in cells.iter().enumerate() {
-                if indices.get(source_index).is_some_and(|column| visit(*column, value)) {
+                if projection
+                    .source_to_view
+                    .get(source_index)
+                    .is_some_and(|column| visit(*column, value))
+                {
                     return true;
                 }
             }
@@ -186,7 +211,7 @@ impl RowStore {
         let cells = result.rows.get(source_index)?;
         let projection = self.imp().projection.borrow();
         let source_column = match projection.as_ref() {
-            Some((indices, _)) => indices.iter().position(|index| *index == column)?,
+            Some(projection) => projection.view_to_source.get(column).copied().flatten()?,
             None => column,
         };
         cells.get(source_column).cloned()
@@ -223,7 +248,7 @@ impl RowStore {
             return Err("projected browse result does not match its schema mapping".into());
         }
         let store: Self = glib::Object::new();
-        store.install_shared(result, Some((indices, width)), Vec::new());
+        store.install_shared(result, Some(column_projection(indices, width)), Vec::new());
         Ok(store)
     }
 
@@ -237,7 +262,7 @@ impl RowStore {
             return Err("projected browse result does not match its schema mapping".into());
         }
         let store: Self = glib::Object::new();
-        store.install_shared(result, Some((indices, width)), key_indices);
+        store.install_shared(result, Some(column_projection(indices, width)), key_indices);
         Ok(store)
     }
 
@@ -284,7 +309,7 @@ impl RowStore {
             return Err("projected browse result does not match its schema mapping".into());
         }
         let removed = self.n_items();
-        self.install_shared(result, Some((indices, width)), key_indices);
+        self.install_shared(result, Some(column_projection(indices, width)), key_indices);
         self.items_changed(0, removed, self.n_items());
         Ok(())
     }
@@ -301,12 +326,7 @@ impl RowStore {
         Ok(())
     }
 
-    fn install_shared(
-        &self,
-        result: Arc<QueryResult>,
-        projection: Option<(Vec<usize>, usize)>,
-        preview_keys: Vec<usize>,
-    ) {
+    fn install_shared(&self, result: Arc<QueryResult>, projection: Option<ColumnProjection>, preview_keys: Vec<usize>) {
         self.detach_cached_rows();
         *self.imp().slots.borrow_mut() = (0..result.rows.len()).map(Slot::Shared).collect();
         *self.imp().source.borrow_mut() = Some(result);
@@ -476,7 +496,10 @@ impl RowStore {
         let cells = source.as_ref()?.rows.get(source_index)?;
         let projection = self.imp().projection.borrow();
         let (width, source_column) = match projection.as_ref() {
-            Some((indices, width)) => (*width, indices.iter().position(|mapped| *mapped == column)),
+            Some(projection) => (
+                projection.view_to_source.len(),
+                projection.view_to_source.get(column).copied().flatten(),
+            ),
             None => (cells.len(), Some(column)),
         };
         if column >= width {

@@ -6718,8 +6718,8 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `ml-kem 0.3.3`
-- `module-lattice 0.2.3`
+- `ml-kem 0.3.4`
+- `module-lattice 0.2.4`
 
 ```text
 Copyright (c) 2024-2026 RustCrypto Developers
@@ -8553,7 +8553,7 @@ Packages:
 
 - `spin 0.9.9`
 - `tracing-core 0.1.36`
-- `zip 9.2.0`
+- `zip 9.2.1`
 
 ```text
 The MIT License (MIT)

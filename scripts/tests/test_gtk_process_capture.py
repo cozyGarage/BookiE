@@ -33,7 +33,7 @@ class GtkProcessCaptureTests(unittest.TestCase):
                 time.sleep(0.01)
             raise AssertionError("the child did not finish writing its diagnostics")
 
-        namespace = dict(subprocess=subprocess, signal=signal, tempfile=tempfile, gtk_process=gtk_process, _owned_application=None,
+        namespace = dict(os=os, subprocess=subprocess, signal=signal, tempfile=tempfile, gtk_process=gtk_process, _owned_application=None,
                          wait_for_node=wait_for_window, CONNECTION_NAME="fixture", pyatspi=SimpleNamespace(ROLE_FRAME=1))
         exec(compile(ast.Module(body=functions, type_ignores=[]), str(source), "exec"), namespace)
         return namespace
