@@ -174,20 +174,30 @@ impl LocalResultView {
     }
 
     pub(crate) fn sort_by(&self, column: usize, ascending: bool) {
-        let (result, attached) = {
+        let (result, attached, filter) = {
             let state = self.0.borrow();
-            (state.result.clone(), state.store.is_some() && state.selection.is_some())
+            (
+                state.result.clone(),
+                state.store.is_some() && state.selection.is_some(),
+                state.filter.clone(),
+            )
         };
-        let sorted_order = if attached {
-            let Some(order) = local_sort::sorted_source_indices(&result, column, ascending) else {
-                return;
-            };
-            Some(order)
-        } else {
+        let sorted_order = if !attached {
             if !local_sort::is_sortable_column(&result, column) {
                 return;
             }
             None
+        } else if let Some((filter_column, value)) = filter.as_ref() {
+            let matches = matching_source_indices(&result, *filter_column, value);
+            let Ok(order) = local_sort::sorted_source_indices_for_subset(&result, column, ascending, matches) else {
+                return;
+            };
+            Some(order)
+        } else {
+            let Some(order) = local_sort::sorted_source_indices(&result, column, ascending) else {
+                return;
+            };
+            Some(order)
         };
         self.0.borrow_mut().sort = Some((column, ascending));
         self.persist_settings();
@@ -216,21 +226,28 @@ impl LocalResultView {
             (state.result.clone(), store, selection, state.filter.clone(), state.sort)
         };
         let selected = selected_source_rows(&store, &selection);
-        let mut order = match sort {
-            Some((column, ascending)) => sorted_order
-                .or_else(|| local_sort::sorted_source_indices(&result, column, ascending))
-                .unwrap_or_else(|| (0..result.rows.len()).collect()),
-            None => (0..result.rows.len()).collect(),
+        let order = match filter {
+            Some((column, value)) => {
+                if let Some(order) = sorted_order {
+                    order
+                } else {
+                    let matches = matching_source_indices(&result, column, &value);
+                    match sort {
+                        Some((sort_column, ascending)) => {
+                            local_sort::sorted_source_indices_for_subset(&result, sort_column, ascending, matches)
+                                .unwrap_or_else(|unsorted| unsorted)
+                        }
+                        None => matches,
+                    }
+                }
+            }
+            None => match sort {
+                Some((column, ascending)) => sorted_order
+                    .or_else(|| local_sort::sorted_source_indices(&result, column, ascending))
+                    .unwrap_or_else(|| (0..result.rows.len()).collect()),
+                None => (0..result.rows.len()).collect(),
+            },
         };
-        if let Some((column, value)) = filter {
-            order.retain(|source_index| {
-                result
-                    .rows
-                    .get(*source_index)
-                    .and_then(|row| row.get(column))
-                    .is_some_and(|candidate| same_filter_value(candidate, &value))
-            });
-        }
         let syncing = self.0.borrow().selection_syncing.clone();
         syncing.set(true);
         if !store.replace_source_rows(&order) {
@@ -322,7 +339,6 @@ fn same_filter_value(left: &Value, right: &Value) -> bool {
     }
 }
 
-#[cfg(test)]
 fn matching_source_indices(result: &QueryResult, column: usize, value: &Value) -> Vec<usize> {
     result
         .rows
