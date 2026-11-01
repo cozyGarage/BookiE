@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashSet;
 
 use tablepro_core::{QueryResult, Value};
 
@@ -53,21 +54,59 @@ pub(super) fn sorted_source_indices_for_subset(
 }
 
 pub(super) fn is_sortable_column(result: &QueryResult, column: usize) -> bool {
-    let mut kind = None;
+    let mut state = Sortability::new();
     for row in &result.rows {
         let Some(value) = row.get(column) else { return false };
-        if matches!(value, Value::Null) {
-            continue;
-        }
-        let Some(candidate) = comparable_kind(value) else {
-            return false;
-        };
-        if kind.is_some_and(|current| current != candidate) {
-            return false;
-        }
-        kind = Some(candidate);
+        state.observe(value);
     }
-    true
+    state.is_sortable
+}
+
+pub(super) fn sortable_columns(result: &QueryResult) -> HashSet<usize> {
+    let mut states = vec![Sortability::new(); result.columns.len()];
+    for row in &result.rows {
+        for (state, value) in states.iter_mut().zip(row) {
+            state.observe(value);
+        }
+        for state in states.iter_mut().skip(row.len()) {
+            state.is_sortable = false;
+        }
+    }
+    states
+        .into_iter()
+        .enumerate()
+        .filter_map(|(column, state)| state.is_sortable.then_some(column))
+        .collect()
+}
+
+#[derive(Clone, Copy)]
+struct Sortability {
+    kind: Option<std::mem::Discriminant<Value>>,
+    is_sortable: bool,
+}
+
+impl Sortability {
+    fn new() -> Self {
+        Self {
+            kind: None,
+            is_sortable: true,
+        }
+    }
+
+    fn observe(&mut self, value: &Value) {
+        if !self.is_sortable || matches!(value, Value::Null) {
+            return;
+        }
+        let Some(kind) = comparable_kind(value) else {
+            self.is_sortable = false;
+            return;
+        };
+        if self.kind.is_some_and(|current| current != kind) {
+            self.is_sortable = false;
+            return;
+        }
+        self.kind = Some(kind);
+    }
 }
 
 fn sortable_values(result: &QueryResult, column: usize) -> Option<Vec<&Value>> {
