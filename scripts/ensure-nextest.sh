@@ -4,7 +4,7 @@ set -euo pipefail
 VERSION="0.9.148"
 TARGET="x86_64-unknown-linux-gnu"
 SHA256="223ba936714cc861a9cdedad5a8eb664dfdd69d6fbdf6cea6aa8184f523290dc"
-TOOL_DIR="${TABLEPRO_TOOL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/bookie-tools}/nextest-$VERSION"
+TOOL_DIR="${BOOKIE_TOOL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/bookie-tools}/nextest-$VERSION"
 BIN="$TOOL_DIR/cargo-nextest"
 
 if [ "$(uname -m)" != "x86_64" ]; then

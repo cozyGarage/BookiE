@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{DatabaseDriver, DriverError, TlsMode};
-use tablepro_driver_tls_tests::DriverTlsFixture;
+use bookie_core::{DatabaseDriver, DriverError, TlsMode};
+use bookie_driver_tls_tests::DriverTlsFixture;
 
 use drivers_mssql::MssqlDriver;
 
@@ -31,7 +31,7 @@ async fn verify_ca_accepts_the_fixture_authority() {
 async fn verify_full_rejects_an_ip_endpoint_absent_from_the_certificate() {
     let fixture = DriverTlsFixture::from_env();
     let options = fixture.mssql(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
-    tablepro_driver_tls_tests::assert_endpoint_identity_rejected(&MssqlDriver, options).await;
+    bookie_driver_tls_tests::assert_endpoint_identity_rejected(&MssqlDriver, options).await;
 }
 
 #[tokio::test]
@@ -41,7 +41,7 @@ async fn a_verifying_mode_naming_the_wrong_authority_is_refused() {
     for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
         let accepted = fixture.mssql(mode, Some(fixture.ca_cert.clone()));
         let rejected = fixture.mssql(mode, Some(fixture.other_ca_cert.clone()));
-        tablepro_driver_tls_tests::assert_certificate_rejected(&MssqlDriver, accepted, rejected).await;
+        bookie_driver_tls_tests::assert_certificate_rejected(&MssqlDriver, accepted, rejected).await;
     }
 }
 
@@ -63,7 +63,7 @@ async fn verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query
     let tunnel = fixture.open_mssql_ssh_tunnel().await;
     let connection = MssqlDriver
         .connect(fixture.mssql_ssh(
-            "mssql-ssh.tablepro.test",
+            "mssql-ssh.bookie.test",
             &tunnel,
             TlsMode::VerifyFull,
             Some(fixture.ca_cert.clone()),
@@ -83,18 +83,18 @@ async fn verify_full_through_ssh_rejects_an_untrusted_authority() {
     let fixture = DriverTlsFixture::from_env();
     let tunnel = fixture.open_mssql_ssh_tunnel().await;
     let accepted = fixture.mssql_ssh(
-        "mssql-ssh.tablepro.test",
+        "mssql-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );
     let rejected = fixture.mssql_ssh(
-        "mssql-ssh.tablepro.test",
+        "mssql-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.other_ca_cert.clone()),
     );
-    tablepro_driver_tls_tests::assert_certificate_rejected(&MssqlDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_certificate_rejected(&MssqlDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -103,18 +103,18 @@ async fn verify_full_through_ssh_rejects_a_wrong_or_local_identity() {
     let fixture = DriverTlsFixture::from_env();
     let tunnel = fixture.open_mssql_ssh_tunnel().await;
     let accepted = fixture.mssql_ssh(
-        "mssql-ssh.tablepro.test",
+        "mssql-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );
     let wrong_host = fixture.mssql_ssh(
-        "wrong.tablepro.test",
+        "wrong.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );
-    tablepro_driver_tls_tests::assert_certificate_rejected(&MssqlDriver, accepted, wrong_host).await;
+    bookie_driver_tls_tests::assert_certificate_rejected(&MssqlDriver, accepted, wrong_host).await;
 
     let local_identity = fixture.mssql_ssh("127.0.0.1", &tunnel, TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
     let error = MssqlDriver
@@ -134,7 +134,7 @@ async fn the_server_forces_encryption_and_dropping_tunnel_closes_forward() {
     let fixture = DriverTlsFixture::from_env();
     let tunnel = fixture.open_mssql_ssh_tunnel().await;
     let local_address = (tunnel.local_host().to_string(), tunnel.local_port());
-    let rejected = fixture.mssql_ssh("mssql-ssh.tablepro.test", &tunnel, TlsMode::Disabled, None);
+    let rejected = fixture.mssql_ssh("mssql-ssh.bookie.test", &tunnel, TlsMode::Disabled, None);
     let connection = MssqlDriver
         .connect(rejected)
         .await
@@ -145,7 +145,7 @@ async fn the_server_forces_encryption_and_dropping_tunnel_closes_forward() {
         .expect("inspect the native connection encryption state");
     assert_eq!(
         encryption.rows[0][0],
-        tablepro_core::Value::Text("TRUE".into()),
+        bookie_core::Value::Text("TRUE".into()),
         "the server must not accept a plaintext SQL Server connection"
     );
     drop(tunnel);

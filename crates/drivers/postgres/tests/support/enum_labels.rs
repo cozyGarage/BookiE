@@ -39,7 +39,7 @@ async fn enum_labels_come_back_in_declared_order_for_the_named_type_only() {
     let query_res = conn.query("SELECT 'happy'::mood AS current_mood").await.unwrap();
     assert_eq!(
         query_res.columns[0].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "public".into(),
             name: "mood".into(),
         })

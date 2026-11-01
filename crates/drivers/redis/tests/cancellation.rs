@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Protocol fixture pauses SCAN after SELECT has succeeded. No timing guess is
 //! used to establish that cancellation occurs inside the temporary database.
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, OperationControl, TlsConfig, Value};
 use drivers_redis::RedisDriver;
 use std::{sync::Arc, time::Duration};
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, OperationControl, TlsConfig, Value};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::TcpListener,
@@ -11,7 +11,7 @@ use tokio::{
 };
 
 async fn fixture() -> (
-    Box<dyn tablepro_core::Connection>,
+    Box<dyn bookie_core::Connection>,
     Arc<Notify>,
     tokio::task::JoinHandle<()>,
 ) {
@@ -84,7 +84,7 @@ async fn fixture() -> (
 async fn interrupted_browse_never_changes_normal_command_database() {
     for timeout in [false, true] {
         let (conn, scanning, server) = fixture().await;
-        let conn: Arc<dyn tablepro_core::Connection> = conn.into();
+        let conn: Arc<dyn bookie_core::Connection> = conn.into();
         let control = OperationControl::with_timeout(Duration::from_millis(if timeout { 200 } else { 5000 }));
         let cancel = control.cancellation_token().clone();
         let browse_conn = conn.clone();

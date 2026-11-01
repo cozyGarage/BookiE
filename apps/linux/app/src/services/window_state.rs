@@ -3,10 +3,10 @@ use std::rc::{Rc, Weak};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use bookie_app_services::window_state;
+pub use bookie_app_services::window_state::WindowState;
 use gtk4::gio;
 use gtk4::gio::prelude::*;
-use tablepro_app_services::window_state;
-pub use tablepro_app_services::window_state::WindowState;
 
 use super::config_io::{atomic_write_json, backup_file_if_exists, xdg_config_path};
 

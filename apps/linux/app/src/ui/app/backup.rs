@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
+use bookie_app_services::database_backup::{BackupJob, SavedBackupContext, run_saved_backup_job};
+use bookie_core::{DriverError, OperationControl};
+use bookie_policy::Principal;
 use relm4::ComponentSender;
 use relm4::adw::prelude::*;
 use relm4::gtk;
 use relm4::gtk::gio;
-use tablepro_app_services::database_backup::{BackupJob, SavedBackupContext, run_saved_backup_job};
-use tablepro_core::{DriverError, OperationControl};
-use tablepro_policy::Principal;
 
 use crate::services::error_text;
 use crate::ui::progress_dialog::CancellableDialog;
@@ -214,8 +214,8 @@ fn normalize_duplicate_extension(path: PathBuf, extension: &str) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{append_missing_role_hint, backup_error_text, normalize_duplicate_extension};
+    use bookie_core::DriverError;
     use std::path::PathBuf;
-    use tablepro_core::DriverError;
 
     #[test]
     fn a_restore_failure_from_pg_restore_omits_the_internal_driver_prefix() {

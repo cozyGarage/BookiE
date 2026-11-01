@@ -177,9 +177,9 @@ mod tests {
         let executable = std::env::current_exe().unwrap();
         let mut first = Command::new(&executable)
             .args(["--exact", "file_access::tests::subprocess_holds_path_lock", "--ignored"])
-            .env("TABLEPRO_LOCK_TEST_PATH", &path)
-            .env("TABLEPRO_LOCK_TEST_MARKER", &first_marker)
-            .env("TABLEPRO_LOCK_TEST_HOLD_MS", "500")
+            .env("BOOKIE_LOCK_TEST_PATH", &path)
+            .env("BOOKIE_LOCK_TEST_MARKER", &first_marker)
+            .env("BOOKIE_LOCK_TEST_HOLD_MS", "500")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -187,9 +187,9 @@ mod tests {
         wait_for_path(&first_marker);
         let mut second = Command::new(executable)
             .args(["--exact", "file_access::tests::subprocess_holds_path_lock", "--ignored"])
-            .env("TABLEPRO_LOCK_TEST_PATH", &path)
-            .env("TABLEPRO_LOCK_TEST_MARKER", &second_marker)
-            .env("TABLEPRO_LOCK_TEST_HOLD_MS", "0")
+            .env("BOOKIE_LOCK_TEST_PATH", &path)
+            .env("BOOKIE_LOCK_TEST_MARKER", &second_marker)
+            .env("BOOKIE_LOCK_TEST_HOLD_MS", "0")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -213,9 +213,9 @@ mod tests {
     #[tokio::test]
     #[ignore = "helper process spawned by other tests through --exact --ignored, not a standalone test"]
     async fn subprocess_holds_path_lock() {
-        let path = PathBuf::from(std::env::var_os("TABLEPRO_LOCK_TEST_PATH").unwrap());
-        let marker = PathBuf::from(std::env::var_os("TABLEPRO_LOCK_TEST_MARKER").unwrap());
-        let hold_ms: u64 = std::env::var("TABLEPRO_LOCK_TEST_HOLD_MS").unwrap().parse().unwrap();
+        let path = PathBuf::from(std::env::var_os("BOOKIE_LOCK_TEST_PATH").unwrap());
+        let marker = PathBuf::from(std::env::var_os("BOOKIE_LOCK_TEST_MARKER").unwrap());
+        let hold_ms: u64 = std::env::var("BOOKIE_LOCK_TEST_HOLD_MS").unwrap().parse().unwrap();
         let _guard = lock_path(&path).await.unwrap();
         std::fs::write(marker, b"acquired").unwrap();
         std::thread::sleep(Duration::from_millis(hold_ms));

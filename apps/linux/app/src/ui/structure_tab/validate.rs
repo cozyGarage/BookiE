@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use tablepro_core::IndexInfo;
-use tablepro_core::sql_ddl::{DraftColumn, identifiers_fold_case};
+use bookie_core::IndexInfo;
+use bookie_core::sql_ddl::{DraftColumn, identifiers_fold_case};
 
 use super::StructureMode;
 

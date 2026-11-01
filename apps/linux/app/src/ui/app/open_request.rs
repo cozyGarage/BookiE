@@ -58,7 +58,7 @@ impl App {
                 .register(async move {
                     let database = file.database_path().to_owned();
                     let driver_id = file.driver_id();
-                    let existing = tablepro_storage::load_connections().await.unwrap_or_default();
+                    let existing = bookie_storage::load_connections().await.unwrap_or_default();
                     let saved = match existing
                         .into_iter()
                         .find(|saved| saved.driver_id == driver_id && saved.database == database)
@@ -67,7 +67,7 @@ impl App {
                         None => {
                             let saved = file_connection(&file);
                             if let Err(error) = crate::services::connection_save_turn::run(
-                                tablepro_storage::save_connections(std::slice::from_ref(&saved)),
+                                bookie_storage::save_connections(std::slice::from_ref(&saved)),
                             )
                             .await
                             {

@@ -1,5 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_policy::classify;
+use bookie_policy::classify;
 
 fn tables(sql: &str, driver_id: &str) -> Vec<String> {
     let mut names = classify(sql, driver_id).tables;

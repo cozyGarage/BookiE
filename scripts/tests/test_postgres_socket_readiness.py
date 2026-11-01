@@ -9,7 +9,7 @@ class PostgresSocketReadinessTests(unittest.TestCase):
     def test_waits_for_the_final_server_after_database_initialization(self):
         script = SCRIPT.read_text()
         start = script.index('for _ in $(seq 1 60); do')
-        end = script.index('TABLEPRO_PG_SOCKET_DIR=', start)
+        end = script.index('BOOKIE_PG_SOCKET_DIR=', start)
         readiness = script[start:end]
 
         init_complete = "PostgreSQL init process complete; ready for start up."

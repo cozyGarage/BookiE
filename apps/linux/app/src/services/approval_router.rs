@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tablepro_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink, Principal};
+use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink, Principal};
 
 pub struct ApprovalRouter {
     human: Arc<dyn ApprovalSink>,

@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use bookie_core::sql_dialect::build_optimistic_keyed_update;
+use bookie_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, Value};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::sql_dialect::build_optimistic_keyed_update;
-use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, Value};
 use tempfile::TempDir;
 
 fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {

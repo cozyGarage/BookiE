@@ -122,7 +122,7 @@ fn a_server_still_offering_password_reports_a_plain_auth_failure() {
 
 #[test]
 fn unknown_host_key_error_does_not_advise_running_ssh() {
-    let known_hosts = PathBuf::from("/home/user/.config/tablepro/known_hosts");
+    let known_hosts = PathBuf::from("/home/user/.config/bookie/known_hosts");
     let error = unknown_host_key("db.example.com", 5432, "fp".to_string(), &known_hosts);
     let message = error.to_string();
     assert!(

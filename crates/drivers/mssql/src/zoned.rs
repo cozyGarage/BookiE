@@ -1,5 +1,5 @@
+use bookie_core::Value;
 use chrono::{DateTime, FixedOffset, Timelike};
-use tablepro_core::Value;
 use tiberius::ColumnData;
 use tiberius::FromSql;
 use tiberius::time::DateTimeOffset;

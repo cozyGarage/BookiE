@@ -6,7 +6,7 @@ use redis::{AsyncCommands, Client, IntoConnectionInfo, RedisError, TlsCertificat
 use secrecy::ExposeSecret;
 use tokio::sync::Mutex;
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text,
     looks_like_tls_failure,
@@ -85,7 +85,7 @@ fn tls_certificates_for(opts: &ConnectOptions, verifies: bool) -> Result<TlsCert
 
 /// Read the certificate authority the connection names. Only a verifying mode
 /// consults it, so an encrypt-only session never fails on a path it ignores.
-fn root_certificate(config: &tablepro_core::TlsConfig, verifies: bool) -> Result<Option<Vec<u8>>, DriverError> {
+fn root_certificate(config: &bookie_core::TlsConfig, verifies: bool) -> Result<Option<Vec<u8>>, DriverError> {
     if !verifies {
         return Ok(None);
     }
@@ -383,7 +383,7 @@ async fn string_preview(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]
         Ok(text) => text,
         Err(error) => format!("{:?}", error.into_bytes()),
     };
-    Ok(tablepro_core::partial_value(length, &prefix))
+    Ok(bookie_core::partial_value(length, &prefix))
 }
 
 async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Result<Vec<Value>, DriverError> {
@@ -767,7 +767,7 @@ fn invalid_redis_command_quoting() -> DriverError {
 
 fn connection_url(opts: &ConnectOptions) -> Result<String, DriverError> {
     let scheme = match opts.tls.mode {
-        tablepro_core::TlsMode::Disabled => "redis",
+        bookie_core::TlsMode::Disabled => "redis",
         _ => "rediss",
     };
     let password = opts.password.expose_secret();
@@ -779,7 +779,7 @@ fn connection_url(opts: &ConnectOptions) -> Result<String, DriverError> {
         String::new()
     };
     let host =
-        tablepro_core::uri_host(&opts.host).ok_or_else(|| DriverError::Unsupported("invalid Redis host".into()))?;
+        bookie_core::uri_host(&opts.host).ok_or_else(|| DriverError::Unsupported("invalid Redis host".into()))?;
     let db_index = parse_db_index(&opts.database)?;
     let verifies = opts.tls.mode.verifies_cert();
     let suffix = if opts.tls.mode.encrypts() && !verifies {

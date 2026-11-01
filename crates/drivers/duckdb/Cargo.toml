@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-driver-duckdb"
+name = "bookie-driver-duckdb"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ name = "drivers_duckdb"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../../core" }
+bookie-core = { path = "../../core" }
 async-trait.workspace = true
 chrono.workspace = true
 duckdb = { version = "1.10505", features = ["bundled", "json", "parquet", "rust_decimal"] }

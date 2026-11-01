@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-app-services"
+name = "bookie-app-services"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_app_services"
+name = "bookie_app_services"
 path = "src/lib.rs"
 
 [[bench]]
@@ -21,11 +21,11 @@ harness = false
 [dependencies]
 aes-gcm.workspace = true
 getrandom.workspace = true
-tablepro-core = { path = "../core" }
-tablepro-dump = { path = "../dump" }
-tablepro-policy = { path = "../policy" }
-tablepro-transport = { path = "../transport" }
-tablepro-storage = { path = "../storage" }
+bookie-core = { path = "../core" }
+bookie-dump = { path = "../dump" }
+bookie-policy = { path = "../policy" }
+bookie-transport = { path = "../transport" }
+bookie-storage = { path = "../storage" }
 chrono.workspace = true
 thiserror.workspace = true
 serde.workspace = true
@@ -41,11 +41,11 @@ uuid.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
-tablepro-driver-postgres = { path = "../drivers/postgres" }
-tablepro-driver-mysql = { path = "../drivers/mysql" }
-tablepro-driver-mssql = { path = "../drivers/mssql" }
-tablepro-driver-sqlite = { path = "../drivers/sqlite" }
-tablepro-ssh = { path = "../ssh" }
+bookie-driver-postgres = { path = "../drivers/postgres" }
+bookie-driver-mysql = { path = "../drivers/mysql" }
+bookie-driver-mssql = { path = "../drivers/mssql" }
+bookie-driver-sqlite = { path = "../drivers/sqlite" }
+bookie-ssh = { path = "../ssh" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres", "mysql", "mssql_server"] }
 tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }

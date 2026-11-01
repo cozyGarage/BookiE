@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use super::*;
 use crate::approval::AutoApproveSink;
 use crate::audit::{AuditRecordPhase, AuditTerminalStatus};
-use tablepro_core::{QueryCursorId, QueryCursorPage};
+use bookie_core::{QueryCursorId, QueryCursorPage};
 use tokio_util::sync::CancellationToken;
 
 struct CursorScript {
@@ -83,7 +83,7 @@ fn make_guard(
 }
 
 #[async_trait]
-impl tablepro_core::Session for CursorSession {
+impl bookie_core::Session for CursorSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,
@@ -118,7 +118,7 @@ impl tablepro_core::Session for CursorSession {
         id: QueryCursorId,
         control: &OperationControl,
     ) -> Result<QueryCursorPage, DriverError> {
-        tablepro_core::check_pre_dispatch(control)?;
+        bookie_core::check_pre_dispatch(control)?;
         if control.cancellation_token().is_cancelled() {
             return Err(DriverError::Cancelled);
         }
@@ -203,7 +203,7 @@ impl Connection for CursorConnection {
         Err(DriverError::Unsupported("cursor fixture transaction".into()))
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         Ok(Box::new(CursorSession {
             script: self.0.clone(),
             usable: true,
@@ -219,7 +219,7 @@ impl Connection for CursorConnection {
     }
 }
 
-async fn begin_read_snapshot(session: &mut Box<dyn tablepro_core::Session>) {
+async fn begin_read_snapshot(session: &mut Box<dyn bookie_core::Session>) {
     session
         .query_params_controlled(
             "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY",
@@ -527,7 +527,7 @@ async fn completion_metadata_refuses_an_active_cursor_before_driver_dispatch() {
 #[tokio::test]
 async fn audited_completion_metadata_refuses_an_active_cursor_before_driver_dispatch() {
     let (guard, script, audit) = make_guard(vec![page("secret", true)], None, false);
-    let mut session: Box<dyn tablepro_core::Session> =
+    let mut session: Box<dyn bookie_core::Session> =
         Box::new(guard.open_session_with_audit().await.expect("open audited session"));
     begin_read_snapshot(&mut session).await;
     let control = OperationControl::new(CancellationToken::new(), None);

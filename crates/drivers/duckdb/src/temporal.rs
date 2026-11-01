@@ -1,6 +1,6 @@
+use bookie_core::Value;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use duckdb::types::TimeUnit;
-use tablepro_core::Value;
 
 pub(crate) fn date(days: i32) -> Value {
     match days {

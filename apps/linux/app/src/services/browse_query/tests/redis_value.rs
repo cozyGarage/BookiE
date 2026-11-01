@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::redis::Redis;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -37,7 +37,7 @@ async fn redis_guarded_refetch_preserves_binary_key_and_value() {
         schema: None,
         table: "db0",
         columns: &columns,
-        filter: &tablepro_core::FilterSet::default(),
+        filter: &bookie_core::FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
     };

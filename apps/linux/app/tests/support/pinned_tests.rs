@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::Arc;
 
-use tablepro_core::{ColumnInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 
 fn rows(sql: &str) -> StatementOutcome {
     StatementOutcome {
@@ -123,7 +123,7 @@ fn pinned_results_stay_ahead_of_the_next_run() {
 #[ignore = "app-server isolated regression"]
 fn a_pinned_spooled_page_reloads_without_retaining_its_payload() {
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
     let mut cache = super::super::stream_pages::StreamPageCache::default();

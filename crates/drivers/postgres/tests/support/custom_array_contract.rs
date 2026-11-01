@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -59,7 +59,7 @@ async fn value_contract_custom_composite_array_refusal_preserves_rows() {
         )
         .await
         .unwrap();
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&refusal))
@@ -138,7 +138,7 @@ async fn value_contract_money_array_refusal_preserves_target_and_sibling_rows() 
         .await
         .unwrap();
 
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&refusal))
@@ -200,7 +200,7 @@ async fn value_contract_point_array_refusal_preserves_target_and_sibling_rows() 
         )
         .await
         .unwrap();
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&refusal))
@@ -295,7 +295,7 @@ async fn value_contract_geometric_array_refusals_preserve_target_and_sibling_row
             .await
             .unwrap();
 
-        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
         assert!(
             connection
                 .query_params("SELECT $1", std::slice::from_ref(&refusal))

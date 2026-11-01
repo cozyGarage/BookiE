@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
+use bookie_core::{DatabaseDriver, MAX_QUERY_RESULT_BYTES, Value};
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Document, doc};
-use tablepro_core::{DatabaseDriver, MAX_QUERY_RESULT_BYTES, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]

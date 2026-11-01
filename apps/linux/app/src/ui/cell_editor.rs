@@ -52,7 +52,7 @@ mod imp {
 
     #[glib::object_subclass]
     impl ObjectSubclass for CellEditor {
-        const NAME: &str = "TableProCellEditor";
+        const NAME: &str = "BookiECellEditor";
         type Type = super::CellEditor;
         type ParentType = gtk4::Widget;
 

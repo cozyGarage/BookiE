@@ -337,7 +337,7 @@ impl HistoryStore {
                 limit: MAX_QUERY_BYTES,
             });
         }
-        if tablepro_core::sql_credentials::carries_credentials(&entry.query, &entry.driver_id) {
+        if bookie_core::sql_credentials::carries_credentials(&entry.query, &entry.driver_id) {
             return Ok(None);
         }
         let pool = &self.pool;
@@ -559,7 +559,7 @@ impl HistoryStore {
     pub async fn export_sql(&self, ids: &[i64]) -> Result<String, StorageError> {
         let entries = self.fetch_by_ids(ids).await?;
         let mut out = String::new();
-        out.push_str("-- TablePro query history export\n");
+        out.push_str("-- BookiE query history export\n");
         out.push_str(&format!("-- Generated at {}\n", chrono::Utc::now().to_rfc3339()));
         out.push_str(&format!("-- Entries: {}\n\n", entries.len()));
         for entry in &entries {

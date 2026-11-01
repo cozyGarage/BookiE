@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{ConnectOptions, DriverError};
+use bookie_core::{ConnectOptions, DriverError};
 
 use crate::{connect, start_pg};
 

@@ -2,7 +2,7 @@ use relm4::ComponentSender;
 use std::sync::Arc;
 
 use crate::services::database_service::ConnectionIdentity;
-use tablepro_core::Connection;
+use bookie_core::Connection;
 
 use super::{SchemaRequest, SqlEditor, SqlEditorInput};
 
@@ -111,7 +111,7 @@ struct CompletionFetch {
     identity: ConnectionIdentity,
     session: Option<super::session_mode::SharedSession>,
     use_session: bool,
-    grammar: Option<tablepro_core::sql_syntax::SqlGrammar>,
+    grammar: Option<bookie_core::sql_syntax::SqlGrammar>,
     timeout_secs: u32,
     token: tokio_util::sync::CancellationToken,
 }
@@ -128,7 +128,7 @@ fn dispatch_fetch(pending: Vec<SchemaRequest>, context: CompletionFetch, sender:
                     }
                     let (request, columns) = match (context.use_session, context.session.as_ref()) {
                         (true, Some(session)) => {
-                            tablepro_app_services::completion::fetch_session_column_names(
+                            bookie_app_services::completion::fetch_session_column_names(
                                 session.clone(),
                                 request,
                                 context.grammar,
@@ -138,7 +138,7 @@ fn dispatch_fetch(pending: Vec<SchemaRequest>, context: CompletionFetch, sender:
                             .await
                         }
                         _ => {
-                            tablepro_app_services::completion::fetch_column_names(
+                            bookie_app_services::completion::fetch_column_names(
                                 context.connection.clone(),
                                 request,
                                 context.grammar,

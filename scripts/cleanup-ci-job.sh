@@ -4,8 +4,8 @@ set -u
 workspace="${GITHUB_WORKSPACE:-$PWD}"
 status=0
 
-if [[ -n "${TABLEPRO_TEST_RUN_ID:-}" && -f "$workspace/src/scripts/cleanup-testcontainers.py" ]]; then
-  python3 "$workspace/src/scripts/cleanup-testcontainers.py" "$TABLEPRO_TEST_RUN_ID" || status=$?
+if [[ -n "${BOOKIE_TEST_RUN_ID:-}" && -f "$workspace/src/scripts/cleanup-testcontainers.py" ]]; then
+  python3 "$workspace/src/scripts/cleanup-testcontainers.py" "$BOOKIE_TEST_RUN_ID" || status=$?
 fi
 
 if [[ -f "$workspace/src/scripts/ci-cache.py" && "${CARGO_TARGET_DIR:-}" == /var/cache/ci/target/* ]]; then

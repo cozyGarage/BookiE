@@ -2,9 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
+use bookie_core::{ConnectOptions, TlsConfig};
+use bookie_dump::{ClientTool, DumpError, DumpFormat, PgDumpRequest, PgRestoreRequest, pg_dump, pg_restore};
 use secrecy::SecretString;
-use tablepro_core::{ConnectOptions, TlsConfig};
-use tablepro_dump::{ClientTool, DumpError, DumpFormat, PgDumpRequest, PgRestoreRequest, pg_dump, pg_restore};
 use testcontainers::core::{CmdWaitFor, ExecCommand};
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
@@ -56,7 +56,7 @@ async fn client_tool(name: &str, variable: &str) -> ClientTool {
 }
 
 async fn dump(options: &ConnectOptions, output: &Path, format: DumpFormat) -> Result<(), DumpError> {
-    let tool = client_tool("pg_dump", "TABLEPRO_TEST_PG_DUMP").await;
+    let tool = client_tool("pg_dump", "BOOKIE_TEST_PG_DUMP").await;
     let request = PgDumpRequest {
         options,
         output,
@@ -110,7 +110,7 @@ async fn pg_restore_brings_back_the_dumped_rows() {
     )
     .await;
 
-    let tool = client_tool("pg_restore", "TABLEPRO_TEST_PG_RESTORE").await;
+    let tool = client_tool("pg_restore", "BOOKIE_TEST_PG_RESTORE").await;
     let request = PgRestoreRequest {
         options: &options,
         input: &archive,

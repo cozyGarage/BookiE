@@ -159,7 +159,7 @@ class ForgejoTrainTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
 
     def test_branches_come_from_the_bookie_remote_even_when_origin_points_elsewhere(self):
-        decoy = Path(self.tmp.name) / "hosts/upstream/TablePro.git"
+        decoy = Path(self.tmp.name) / "hosts/upstream/BookiE.git"
         decoy.mkdir(parents=True)
         init_git_repo(decoy, "--quiet", "--bare")
         git(self.fixture.repo, "remote", "add", "origin", str(decoy))

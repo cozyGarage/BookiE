@@ -1,6 +1,6 @@
+use bookie_core::{DatabaseDriver, Value};
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Document, doc, oid::ObjectId};
-use tablepro_core::{DatabaseDriver, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]

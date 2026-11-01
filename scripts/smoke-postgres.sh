@@ -9,9 +9,9 @@ cd "$ROOT"
 
 SMOKE_HOST="${SMOKE_PG_HOST:-127.0.0.1}"
 SMOKE_PORT="${SMOKE_PG_PORT:-54329}"
-SMOKE_USER="${SMOKE_PG_USER:-tablepro}"
-SMOKE_PASS="${SMOKE_PG_PASS:-tablepro}"
-SMOKE_DB="${SMOKE_PG_DB:-tablepro}"
+SMOKE_USER="${SMOKE_PG_USER:-bookie}"
+SMOKE_PASS="${SMOKE_PG_PASS:-bookie}"
+SMOKE_DB="${SMOKE_PG_DB:-bookie}"
 
 if [[ -f "$ROOT/scripts/dev-env.sh" ]]; then
   # shellcheck source=/dev/null
@@ -25,5 +25,5 @@ export SMOKE_PG_PASS="$SMOKE_PASS"
 export SMOKE_PG_DB="$SMOKE_DB"
 
 echo "Smoke against postgres://${SMOKE_USER}@${SMOKE_HOST}:${SMOKE_PORT}/${SMOKE_DB}"
-cargo test -p tablepro-driver-postgres --test smoke_local -- --include-ignored --nocapture
+cargo test -p bookie-driver-postgres --test smoke_local -- --include-ignored --nocapture
 echo "Smoke passed."

@@ -1,6 +1,6 @@
 use super::{connect, start_mariadb, start_mysql};
+use bookie_core::{Connection, OperationControl, Value};
 use serde_json::json;
-use tablepro_core::{Connection, OperationControl, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]

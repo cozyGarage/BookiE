@@ -3,8 +3,8 @@ use std::ops::Range;
 use relm4::gtk;
 use sourceview5::prelude::*;
 
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptToken, ScriptTokenKind};
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptToken, ScriptTokenKind};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(super) struct FoldRange {
@@ -367,7 +367,7 @@ fn token_text<'a>(sql: &'a str, token: &ScriptToken) -> &'a str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::sql_syntax::SqlGrammar;
+    use bookie_core::sql_syntax::SqlGrammar;
 
     #[test]
     fn folds_the_innermost_multiline_parenthesized_region() {

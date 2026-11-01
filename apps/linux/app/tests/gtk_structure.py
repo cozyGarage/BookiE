@@ -19,7 +19,7 @@ def scenarios(ui):
 
     def postgres(sql):
         return subprocess.run(
-            ["docker", "exec", os.environ["TABLEPRO_GTK_POSTGRES_CONTAINER"], "psql",
+            ["docker", "exec", os.environ["BOOKIE_GTK_POSTGRES_CONTAINER"], "psql",
              "--username=postgres", "--dbname=bookie_test", "--set=ON_ERROR_STOP=1", "--command", sql],
             check=True, capture_output=True, text=True, timeout=30,
         ).stdout
@@ -63,9 +63,9 @@ def scenarios(ui):
         ui.gtk_ux.capture_grid_navigation_artifact("clickhouse-structure-unavailable-foreign-keys")
 
     result = []
-    if os.environ.get("TABLEPRO_GTK_POSTGRES_CONTAINER"):
+    if os.environ.get("BOOKIE_GTK_POSTGRES_CONTAINER"):
         result.append(postgres_structure_preserves_empty_and_populated_metadata)
-    if os.environ.get("TABLEPRO_GTK_CLICKHOUSE_CONTAINER"):
+    if os.environ.get("BOOKIE_GTK_CLICKHOUSE_CONTAINER"):
         result.append(clickhouse_structure_distinguishes_unavailable_foreign_keys)
     for scenario in result:
         scenario.environment = "local"

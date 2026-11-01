@@ -13,7 +13,7 @@ fn information_flags_exit_without_display_or_profile_access() {
     ] {
         let home = tempfile::tempdir().unwrap();
         let output = Command::new(
-            std::env::var_os("CARGO_BIN_EXE_tablepro-app").unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-app").into()),
+            std::env::var_os("CARGO_BIN_EXE_bookie-app").unwrap_or_else(|| env!("CARGO_BIN_EXE_bookie-app").into()),
         )
         .arg(flag)
         .env("HOME", home.path())

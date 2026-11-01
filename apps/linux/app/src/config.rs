@@ -1,12 +1,12 @@
-pub const APP_ID: &str = default_env(option_env!("TABLEPRO_APP_ID"), "com.tablepro.linux");
-pub const VERSION: &str = default_env(option_env!("TABLEPRO_VERSION"), env!("CARGO_PKG_VERSION"));
-pub const PROFILE: &str = default_env(option_env!("TABLEPRO_PROFILE"), "default");
-pub const LOCALEDIR: &str = default_env(option_env!("TABLEPRO_LOCALEDIR"), "/usr/share/locale");
-pub const LIBEXECDIR: &str = default_env(option_env!("TABLEPRO_LIBEXECDIR"), "/usr/libexec");
+pub const APP_ID: &str = default_env(option_env!("BOOKIE_APP_ID"), "com.bookie.linux");
+pub const VERSION: &str = default_env(option_env!("BOOKIE_VERSION"), env!("CARGO_PKG_VERSION"));
+pub const PROFILE: &str = default_env(option_env!("BOOKIE_PROFILE"), "default");
+pub const LOCALEDIR: &str = default_env(option_env!("BOOKIE_LOCALEDIR"), "/usr/share/locale");
+pub const LIBEXECDIR: &str = default_env(option_env!("BOOKIE_LIBEXECDIR"), "/usr/libexec");
 
-pub const GETTEXT_PACKAGE: &str = "tablepro";
-pub const SCHEMA_ID: &str = "com.tablepro.linux";
-pub const RESOURCE_BASE_PATH: &str = "/com/tablepro/linux";
+pub const GETTEXT_PACKAGE: &str = "bookie";
+pub const SCHEMA_ID: &str = "com.bookie.linux";
+pub const RESOURCE_BASE_PATH: &str = "/com/bookie/linux";
 
 const fn default_env(value: Option<&'static str>, fallback: &'static str) -> &'static str {
     match value {
@@ -33,13 +33,13 @@ pub fn profile() -> Profile {
 /// development build keeps its own so `cargo run` never writes over an
 /// installed build's connections, history or workspace state.
 pub fn storage_dir_name() -> &'static str {
-    tablepro_storage::storage_dir_name()
+    bookie_storage::storage_dir_name()
 }
 
 /// `xdg:schema` attribute for keyring items. It follows the app ID, so
 /// a development build never reads an installed build's secrets.
 pub fn secret_schema() -> String {
-    tablepro_storage::secret_schema().to_string()
+    bookie_storage::secret_schema().to_string()
 }
 
 #[cfg(test)]
@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn the_desktop_file_window_class_is_the_program_name_the_app_sets() {
-        let desktop = include_str!("../../flatpak/com.tablepro.linux.desktop");
+        let desktop = include_str!("../../flatpak/com.bookie.linux.desktop");
         let class = desktop
             .lines()
             .find_map(|line| line.strip_prefix("StartupWMClass="))
@@ -80,11 +80,11 @@ mod tests {
     #[test]
     fn storage_dir_name_separates_development_from_installed_builds() {
         let expected = match profile() {
-            Profile::Default => "tablepro",
-            Profile::Development => "tablepro-devel",
+            Profile::Default => "bookie",
+            Profile::Development => "bookie-devel",
         };
         assert_eq!(storage_dir_name(), expected);
-        assert_ne!("tablepro", "tablepro-devel");
+        assert_ne!("bookie", "bookie-devel");
     }
 
     #[test]
@@ -101,6 +101,6 @@ mod tests {
 
     #[test]
     fn gettext_package_is_the_package_name() {
-        assert_eq!(GETTEXT_PACKAGE, "tablepro");
+        assert_eq!(GETTEXT_PACKAGE, "bookie");
     }
 }

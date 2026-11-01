@@ -33,7 +33,7 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, FilterValueKind, filter_value_kind,
 };
 

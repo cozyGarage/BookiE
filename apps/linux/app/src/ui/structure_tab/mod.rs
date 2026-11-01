@@ -36,15 +36,15 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, SimpleComponent, adw, gtk};
 
-use tablepro_app_services::structure_metadata::StructureMetadata;
-use tablepro_core::sql_ddl::ColumnCommentCapability;
-use tablepro_core::sql_ddl::{BuildDdlError, DraftColumn};
-use tablepro_core::{ColumnInfo, DriverCapabilities, ForeignKeyInfo, IndexInfo};
+use bookie_app_services::structure_metadata::StructureMetadata;
+use bookie_core::sql_ddl::ColumnCommentCapability;
+use bookie_core::sql_ddl::{BuildDdlError, DraftColumn};
+use bookie_core::{ColumnInfo, DriverCapabilities, ForeignKeyInfo, IndexInfo};
 use uuid::Uuid;
 
 use crate::services::structure_tracker;
 use crate::ui::structure_tab_dialogs::{present_fk_dialog, present_index_dialog};
-use tablepro_core::sql_ddl::{StructureOp, diff_to_ops, materialize_ops};
+use bookie_core::sql_ddl::{StructureOp, diff_to_ops, materialize_ops};
 
 mod columns;
 mod fks;
@@ -85,7 +85,7 @@ pub struct StructureTabInit {
 }
 
 pub(super) fn comment_capability_for(
-    registry: &tablepro_core::DriverRegistry,
+    registry: &bookie_core::DriverRegistry,
     driver_id: &str,
 ) -> ColumnCommentCapability {
     registry
@@ -94,7 +94,7 @@ pub(super) fn comment_capability_for(
         .unwrap_or_default()
 }
 
-pub(super) fn driver_capabilities_for(registry: &tablepro_core::DriverRegistry, driver_id: &str) -> DriverCapabilities {
+pub(super) fn driver_capabilities_for(registry: &bookie_core::DriverRegistry, driver_id: &str) -> DriverCapabilities {
     registry
         .get(driver_id)
         .map(|driver| driver.capabilities())
@@ -120,7 +120,7 @@ pub struct StructureTab {
     /// produces SQL by walking that diff. Discard simply copies the
     /// snapshots back over the live fields.
     original_table_name: Rc<RefCell<String>>,
-    original_columns: Rc<RefCell<Vec<tablepro_core::ColumnInfo>>>,
+    original_columns: Rc<RefCell<Vec<bookie_core::ColumnInfo>>>,
     original_indexes: Rc<RefCell<Vec<IndexInfo>>>,
     original_fks: Rc<RefCell<Vec<ForeignKeyInfo>>>,
 

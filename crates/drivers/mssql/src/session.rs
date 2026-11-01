@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ConnectOptions, DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, Value,
     check_pre_dispatch, run_server_cancellable,
 };
@@ -11,7 +11,7 @@ pub(crate) struct MssqlSession {
     client: Option<MssqlClient>,
 }
 
-pub(crate) async fn open(options: &ConnectOptions) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+pub(crate) async fn open(options: &ConnectOptions) -> Result<Box<dyn bookie_core::Session>, DriverError> {
     let client = open_for(options).await?;
     Ok(Box::new(MssqlSession { client: Some(client) }))
 }
@@ -48,7 +48,7 @@ impl MssqlSession {
 }
 
 #[async_trait]
-impl tablepro_core::Session for MssqlSession {
+impl bookie_core::Session for MssqlSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,

@@ -2,7 +2,7 @@ use relm4::adw;
 use relm4::adw::prelude::{ActionRowExt, PreferencesRowExt};
 use relm4::gtk::{self, prelude::*};
 
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 use super::grid::value_to_display_text;
 

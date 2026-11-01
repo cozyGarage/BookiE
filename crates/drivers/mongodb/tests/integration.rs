@@ -10,8 +10,8 @@ mod server_restart;
 #[path = "support/value_refetch_and_server_info.rs"]
 mod value_refetch_and_server_info;
 
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use drivers_mongodb::MongodbDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::core::IntoContainerPort;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::mongo::Mongo;
@@ -64,7 +64,7 @@ async fn an_unavailable_mongodb_server_is_classified_as_connection_refused() {
 async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
     let container = Mongo::default()
         .with_tag(MONGO_TAG)
-        .with_env_var("MONGO_INITDB_ROOT_USERNAME", "tablepro")
+        .with_env_var("MONGO_INITDB_ROOT_USERNAME", "bookie")
         .with_env_var("MONGO_INITDB_ROOT_PASSWORD", "correct-password")
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -73,7 +73,7 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
     let host = container.get_host().await.expect("host").to_string();
     let port = container.get_host_port_ipv4(27017).await.expect("port");
     let mut connection_options = opts(&host, port, "admin");
-    connection_options.username = "tablepro".into();
+    connection_options.username = "bookie".into();
     connection_options.password = secrecy::SecretString::new("wrong-password".to_string().into());
 
     let mut valid_options = connection_options.clone();
@@ -209,7 +209,7 @@ async fn a_cancelled_mongodb_read_leaves_the_client_usable() {
         .expect("start MongoDB with test failpoints enabled");
     let host = container.get_host().await.expect("host").to_string();
     let port = container.get_host_port_ipv4(27017).await.expect("port");
-    let connection: std::sync::Arc<dyn tablepro_core::Connection> = MongodbDriver
+    let connection: std::sync::Arc<dyn bookie_core::Connection> = MongodbDriver
         .connect(opts(&host, port, "appdb"))
         .await
         .expect("connect")
@@ -232,7 +232,7 @@ async fn a_cancelled_mongodb_read_leaves_the_client_usable() {
         .expect("block one listCollections response");
 
     let token = tokio_util::sync::CancellationToken::new();
-    let control = tablepro_core::OperationControl::new(token.clone(), None);
+    let control = bookie_core::OperationControl::new(token.clone(), None);
     let running = connection.clone();
     let task = tokio::spawn(async move { running.list_tables_controlled(&control).await });
     let mut blocked_on_server = false;
@@ -280,7 +280,7 @@ async fn a_cancelled_mongodb_read_leaves_the_client_usable() {
     );
 }
 
-async fn seeded_connection(host: &str, port: u16) -> Box<dyn tablepro_core::Connection> {
+async fn seeded_connection(host: &str, port: u16) -> Box<dyn bookie_core::Connection> {
     let conn = MongodbDriver.connect(opts(host, port, "appdb")).await.expect("connect");
     conn.execute(r#"db.people.insertOne({"name": "ada", "team": "core"})"#)
         .await
@@ -294,7 +294,7 @@ async fn seeded_connection(host: &str, port: u16) -> Box<dyn tablepro_core::Conn
     conn
 }
 
-fn column_values(result: &tablepro_core::QueryResult, column: &str) -> Vec<String> {
+fn column_values(result: &bookie_core::QueryResult, column: &str) -> Vec<String> {
     let index = result
         .columns
         .iter()
@@ -512,9 +512,9 @@ async fn mixed_string_decimal128_exports_preserve_bson_kind() {
     );
 
     let mut bytes = Vec::new();
-    tablepro_core::export::write_csv_header(&mut bytes, &result.columns).unwrap();
+    bookie_core::export::write_csv_header(&mut bytes, &result.columns).unwrap();
     for row in &result.rows {
-        tablepro_core::export::write_csv_row(&mut bytes, row).unwrap();
+        bookie_core::export::write_csv_row(&mut bytes, row).unwrap();
     }
     let mut csv = csv::Reader::from_reader(bytes.as_slice());
     let headers = csv.headers().unwrap().clone();
@@ -539,7 +539,7 @@ async fn mixed_string_decimal128_exports_preserve_bson_kind() {
     );
 
     let json: serde_json::Value =
-        serde_json::from_str(&tablepro_core::export::render_json(&result.columns, &result.rows)).unwrap();
+        serde_json::from_str(&bookie_core::export::render_json(&result.columns, &result.rows)).unwrap();
     let json_rows = json.as_array().unwrap();
     let value_for_id = |id: &str| {
         json_rows
@@ -558,12 +558,12 @@ async fn mixed_string_decimal128_exports_preserve_bson_kind() {
 
     let directory = tempfile::tempdir().unwrap();
     let workbook_path = directory.path().join("mixed-bson.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &workbook_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -617,22 +617,22 @@ async fn decimal128_csv_round_trip_through_typed_grid_edit_keeps_native_bson() {
     assert_eq!(result.columns[amount_index].data_type, "decimal");
     assert_eq!(result.rows[0][amount_index], Value::Text(decimal.to_string()));
 
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let import_columns = [result.columns[id_index].clone(), result.columns[amount_index].clone()];
     let imported =
-        tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &import_columns, &import_options, 2)
+        bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &import_columns, &import_options, 2)
             .unwrap();
     assert!(matches!(imported[1], Value::Decimal(_)), "{:?}", imported[1]);
 
     let mut columns = result.columns.clone();
     columns[id_index].primary_key = true;
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "decimal_csv_round_trip",
@@ -685,23 +685,23 @@ async fn negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128
         .unwrap();
     assert_eq!(result.columns[amount_index].data_type, "decimal");
 
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
     assert!(csv.contains("\"'-123.45\""), "{csv}");
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let import_columns = [result.columns[id_index].clone(), result.columns[amount_index].clone()];
     let imported =
-        tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &import_columns, &import_options, 2)
+        bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &import_columns, &import_options, 2)
             .expect("valid formula marker is removed for the typed decimal column");
     assert!(matches!(imported[1], Value::Decimal(_)), "{:?}", imported[1]);
 
     let mut columns = result.columns.clone();
     columns[id_index].primary_key = true;
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "negative_decimal_csv_round_trip",

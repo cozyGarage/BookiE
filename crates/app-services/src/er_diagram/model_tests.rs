@@ -1,4 +1,4 @@
-use tablepro_core::{ColumnInfo, ForeignKeyInfo};
+use bookie_core::{ColumnInfo, ForeignKeyInfo};
 
 use super::*;
 

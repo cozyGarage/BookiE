@@ -1,4 +1,4 @@
-use tablepro_core::ConnectOptions;
+use bookie_core::ConnectOptions;
 use testcontainers::ContainerAsync;
 use testcontainers::core::ExecCommand;
 use testcontainers_modules::mssql_server::MssqlServer;

@@ -58,7 +58,7 @@ Other options and why they were rejected.
 | [0006](0006-driver-panic-containment.md) | A driver panic is contained, not trusted away | Accepted | The guard converts a panic to a typed failure; the GUI wakes its monitor, and agentd retires its cached session for replacement on the next acquisition. |
 | [0007](0007-type-and-value-preservation.md) | Native type and value preservation | Accepted | One outcome, conversion and proof standard across every driver and consumer. |
 | [0008](0008-connection-and-session-ownership.md) | Connection/session ownership and trust | Accepted | Distinct live identities, no pool/replay/security fallback, and scoped uncertainty with durable audit obligations. |
-| [0009](0009-persistence-and-identity-compatibility.md) | Durable identity and recoverable state | Accepted | Stable identifiers, compatible adapters, recoverable migrations and distinct persistence writer contracts. |
+| [0009](0009-persistence-and-identity-compatibility.md) | Durable identity and recoverable state | Superseded by 0027 for identifiers | Stable identifiers, compatible adapters, recoverable migrations and distinct persistence writer contracts. |
 | [0010](0010-administrative-action-audit.md) | Audit confirmed bundle administration | Accepted | Bundle import/export use durable, paired aggregate audit records and fail closed before side effects. |
 | [0011](0011-paged-query-results.md) | Page large editor results through a cursor | Accepted | Supported single-statement PostgreSQL editor SELECTs stream within an estimated 64 MiB row-storage budget; other paths keep their caps. |
 | [0012](0012-sidebar-object-tree.md) | Show database objects in a collapsible sidebar tree | Accepted | Collapsible Tables and Views groups use the existing `GtkListBox`. |
@@ -73,6 +73,7 @@ Other options and why they were rejected.
 | [0022](0022-release-notes-from-merge-commits.md) | Release notes come from merge commits | Accepted | A `Release-Note:` trailer on each squash commit replaces edits to `CHANGELOG.md`; notes are assembled at release. |
 | [0023](0023-system-openssh-transport-boundaries.md) | System OpenSSH transport boundaries | Accepted | Askpass answers only exact prompts, forced client options, no global state, and no `core` dependency in the ssh crate. |
 | [0024](0024-keyed-grid-writes-check-what-they-overwrite.md) | Keyed grid writes check what they overwrite | Accepted | Relational updates compare edited columns' original values and must affect exactly one row; MongoDB guards by field and row; deletes and ABA are limits. |
+| [0027](0027-complete-bookie-rename.md) | Complete the BookiE rename and copy legacy state forward | Accepted | Every identifier becomes `bookie`; legacy state, keyring entries and bundles are carried forward without rewriting. |
 | [0025](0025-transient-result-page-spool.md) | Keep fetched result pages in a transient spool | Accepted | A private, bounded, encrypted spool makes every fetched PostgreSQL page revisitable without retaining all rows in RAM or rerunning SQL. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.

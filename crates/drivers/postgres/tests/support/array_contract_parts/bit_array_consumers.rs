@@ -70,27 +70,27 @@ async fn value_contract_bit_arrays_roundtrip_wire_and_csv() {
         assert_eq!(rebound.rows[0][0], *expected_wire);
     }
 
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let csv = tablepro_core::export::render_csv(
+    let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions {
+        &bookie_core::export::CsvOptions {
             null_marker: Some(null_marker.clone()),
             ..Default::default()
         },
     );
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection.fetch_columns(None, "bit_array_target").await.unwrap();
     let mapping = (0..columns.len()).map(Some).collect::<Vec<_>>();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "bit_array_target",
             columns: &columns,

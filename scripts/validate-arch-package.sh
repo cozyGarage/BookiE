@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
-  echo "usage: $0 /path/to/tablepro.pkg.tar.zst" >&2
+  echo "usage: $0 /path/to/bookie.pkg.tar.zst" >&2
   exit 2
 fi
 package="$1"
@@ -15,13 +15,13 @@ contents="$(bsdtar -tf "$package")"
 for required in \
   usr/bin/bookie \
   usr/bin/bookie-agentd \
-  usr/bin/tablepro-askpass \
-  usr/bin/tablepro \
-  usr/bin/tablepro-agentd \
-  usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml \
-  usr/share/applications/com.tablepro.linux.desktop \
-  usr/share/metainfo/com.tablepro.linux.metainfo.xml \
-  usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \
+  usr/bin/bookie-askpass \
+  usr/bin/bookie \
+  usr/bin/bookie-agentd \
+  usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml \
+  usr/share/applications/com.bookie.linux.desktop \
+  usr/share/metainfo/com.bookie.linux.metainfo.xml \
+  usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg \
   usr/share/licenses/bookie/LICENSE.md \
   usr/share/doc/bookie/BUILD_INPUTS.json \
   usr/share/licenses/bookie/THIRD_PARTY_NOTICES.md \
@@ -31,7 +31,7 @@ for required in \
     exit 1
   fi
 done
-if grep -Fq 'tablepro-agentd.service' <<<"$contents"; then
+if grep -Fq 'bookie-agentd.service' <<<"$contents"; then
   echo "the internal RC must not ship the obsolete agentd systemd unit" >&2
   exit 1
 fi
@@ -72,9 +72,9 @@ for key in ("depends", "makedepends", "checkdepends"):
     if not isinstance(values, list) or not values or any(not isinstance(value, str) for value in values):
         raise SystemExit(f"invalid native {key}")
 PY
-desktop-file-validate "$stage/usr/share/applications/com.tablepro.linux.desktop"
-appstreamcli validate --no-net "$stage/usr/share/metainfo/com.tablepro.linux.metainfo.xml"
-agent_help="$("$stage/usr/bin/tablepro-agentd" --help)"
+desktop-file-validate "$stage/usr/share/applications/com.bookie.linux.desktop"
+appstreamcli validate --no-net "$stage/usr/share/metainfo/com.bookie.linux.metainfo.xml"
+agent_help="$("$stage/usr/bin/bookie-agentd" --help)"
 if grep -Eq -- '--transport|loopback HTTP|http transport' <<<"$agent_help"; then
   echo "the packaged agentd must remain an on-demand stdio-only process" >&2
   exit 1

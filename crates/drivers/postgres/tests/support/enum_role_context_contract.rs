@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -179,8 +179,8 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_and_loc
         .query("SELECT 'shadow-only'::enum_role_target.state")
         .await
         .expect_err("the native target enum must reject the shadow-only label");
-    let error_code = |error: &tablepro_core::DriverError| match error {
-        tablepro_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
+    let error_code = |error: &bookie_core::DriverError| match error {
+        bookie_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
         _ => None,
     };
     assert!(
@@ -482,12 +482,12 @@ async fn value_contract_quoted_enum_keyed_edit_survives_role_and_shadowed_local_
     let columns = connection.fetch_columns(Some(target_schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: target_schema.into(),
             name: type_name.into(),
         })
     );
-    let edit = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let edit = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(target_schema),
         "rows",
@@ -556,7 +556,7 @@ async fn value_contract_quoted_enum_keyed_edit_survives_role_and_shadowed_local_
         .query_params_controlled("SAVEPOINT reject_shadow_label", &[], &control)
         .await
         .unwrap();
-    let invalid_edit = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let invalid_edit = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(target_schema),
         "rows",
@@ -573,8 +573,8 @@ async fn value_contract_quoted_enum_keyed_edit_survives_role_and_shadowed_local_
         .query(&format!("SELECT 'shadow-only'::{target_type_sql}"))
         .await
         .expect_err("the native target enum must refuse the shadow-only label");
-    let error_code = |error: &tablepro_core::DriverError| match error {
-        tablepro_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
+    let error_code = |error: &bookie_core::DriverError| match error {
+        bookie_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
         _ => None,
     };
     assert!(
@@ -669,7 +669,7 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_login()
         .await
         .unwrap();
 
-    let login = connect(tablepro_core::ConnectOptions {
+    let login = connect(bookie_core::ConnectOptions {
         username: "enum_role_login_contract".into(),
         password: secrecy::SecretString::new("enum-role-login-test".to_string().into()),
         ..options
@@ -754,8 +754,8 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_login()
         .query("SELECT 'shadow-only'::enum_role_login_target.state")
         .await
         .expect_err("native target enum cast must reject shadow-only label");
-    let error_code = |error: &tablepro_core::DriverError| match error {
-        tablepro_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
+    let error_code = |error: &bookie_core::DriverError| match error {
+        bookie_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
         _ => None,
     };
     assert_eq!(error_code(&invalid).as_deref(), Some("22P02"));

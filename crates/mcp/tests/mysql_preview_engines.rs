@@ -3,11 +3,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, TlsConfig, Value};
+use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use bookie_policy::Principal;
+use bookie_storage::SavedConnection;
 use drivers_mysql::MysqlDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment, TlsConfig, Value};
-use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
-use tablepro_policy::Principal;
-use tablepro_storage::SavedConnection;
 use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mysql::Mysql;
 use uuid::Uuid;
@@ -33,7 +33,7 @@ impl ConnectionProvider for Provider {
 async fn a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb() {
     let container = Mysql::default()
         .with_tag("8.4")
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .start()
         .await
         .unwrap();
@@ -45,7 +45,7 @@ async fn a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb() {
             port,
             database: "test".into(),
             username: "root".into(),
-            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            password: secrecy::SecretString::new("bookie_test".to_string().into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })

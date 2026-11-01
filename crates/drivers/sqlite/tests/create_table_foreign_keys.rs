@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use bookie_core::sql_ddl::{BuildDdlError, DraftColumn, build_add_foreign_key, build_create_table};
+use bookie_core::{ConnectOptions, DatabaseDriver, ForeignKeyInfo};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::sql_ddl::{BuildDdlError, DraftColumn, build_add_foreign_key, build_create_table};
-use tablepro_core::{ConnectOptions, DatabaseDriver, ForeignKeyInfo};
 use tempfile::TempDir;
 
 fn column(name: &str, primary_key: bool) -> DraftColumn {

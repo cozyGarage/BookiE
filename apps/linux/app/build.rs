@@ -3,7 +3,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let schema_dir = std::path::PathBuf::from(manifest_dir).join("../data");
     println!(
         "cargo:rerun-if-changed={}",
-        schema_dir.join("com.tablepro.linux.gschema.xml").display()
+        schema_dir.join("com.bookie.linux.gschema.xml").display()
     );
     let out_dir = std::path::PathBuf::from(std::env::var_os("OUT_DIR").ok_or("OUT_DIR is set")?);
     let status = std::process::Command::new("glib-compile-schemas")
@@ -15,12 +15,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !status.success() {
         return Err("GSettings schema compilation failed".into());
     }
-    println!("cargo:rustc-env=TABLEPRO_GSETTINGS_SCHEMA_DIR={}", out_dir.display());
+    println!("cargo:rustc-env=BOOKIE_GSETTINGS_SCHEMA_DIR={}", out_dir.display());
 
     glib_build_tools::compile_resources(
         &["../data/resources"],
         "../data/resources/resources.gresource.xml",
-        "tablepro.gresource",
+        "bookie.gresource",
     );
     Ok(())
 }

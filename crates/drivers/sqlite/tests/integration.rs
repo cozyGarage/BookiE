@@ -2,8 +2,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use tempfile::TempDir;
 use tokio_util::sync::CancellationToken;
 
@@ -183,7 +183,7 @@ async fn transaction_query_obeys_result_budget_and_remains_usable() {
     assert!(result.truncated, "omitted rows must be reported");
     assert!(!result.rows.is_empty());
     assert!(result.rows.len() < 20_000);
-    assert!(result.rows.len() * payload.len() <= tablepro_core::MAX_QUERY_RESULT_BYTES);
+    assert!(result.rows.len() * payload.len() <= bookie_core::MAX_QUERY_RESULT_BYTES);
     assert!(result.rows.iter().enumerate().all(|(index, row)| {
         row.first() == Some(&Value::Int(index as i64 + 1))
             && matches!(row.get(1), Some(Value::Text(value)) if value == &payload)
@@ -536,7 +536,7 @@ async fn sqlite_numeric_affinity_transitions_survive_bound_edits_and_sql_reimpor
         .rows
     {
         let statement =
-            tablepro_core::sql_literal::build_insert_literal("sqlite", None, "flexible_copy", &columns, row).unwrap();
+            bookie_core::sql_literal::build_insert_literal("sqlite", None, "flexible_copy", &columns, row).unwrap();
         connection.execute(&statement).await.unwrap();
     }
     let imported = connection
@@ -810,7 +810,7 @@ async fn sqlite_columns_report_no_comment() {
     assert!(columns.iter().all(|c| c.comment.is_none()));
 }
 
-async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
+async fn session_value(session: &mut Box<dyn bookie_core::Session>, sql: &str) -> Value {
     let control = OperationControl::with_timeout(Duration::from_secs(30));
     session.query_params_controlled(sql, &[], &control).await.unwrap().rows[0][0].clone()
 }
@@ -911,10 +911,10 @@ async fn fetched_defaults_keep_no_default_null_empty_and_literal_apart_and_reapp
     );
 
     for info in columns.into_iter().filter(|c| c.name != "id") {
-        let mut copy = tablepro_core::sql_ddl::DraftColumn::from_info(info.clone());
+        let mut copy = bookie_core::sql_ddl::DraftColumn::from_info(info.clone());
         copy.original = None;
         copy.name = format!("{}_copy", info.name);
-        for statement in tablepro_core::sql_ddl::build_add_column("sqlite", None, "defaults_kept", &copy).unwrap() {
+        for statement in bookie_core::sql_ddl::build_add_column("sqlite", None, "defaults_kept", &copy).unwrap() {
             connection.execute(&statement).await.unwrap();
         }
     }
@@ -965,7 +965,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
     let before = notes_in(conn, table).await;
     let others: Vec<String> = before.iter().filter(|n| *n != "target").cloned().collect();
 
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         driver_id,
         None,
         table,
@@ -987,7 +987,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
         "{table} update touched only the keyed row"
     );
 
-    let delete = tablepro_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
+    let delete = bookie_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
     assert_eq!(
         conn.execute_in_transaction(&[delete]).await.unwrap(),
         vec![1],
@@ -1033,7 +1033,7 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
     let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
     for (id, value) in values.iter().enumerate() {
-        let statement = tablepro_core::sql_literal::build_insert_literal(
+        let statement = bookie_core::sql_literal::build_insert_literal(
             "sqlite",
             None,
             "binary_exports",
@@ -1077,7 +1077,7 @@ async fn an_auto_decimal_parameter_binds_as_real_unless_only_text_keeps_its_digi
         ),
     ];
     for (input, storage_class, expected) in cases {
-        let parameter = tablepro_core::parse_parameter_value(tablepro_core::ParameterKind::Auto, input).unwrap();
+        let parameter = bookie_core::parse_parameter_value(bookie_core::ParameterKind::Auto, input).unwrap();
         let result = connection
             .query_params("SELECT typeof(?1), ?1, ?1 > 10", &[parameter])
             .await
