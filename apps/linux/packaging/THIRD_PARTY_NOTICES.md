@@ -8,23 +8,23 @@ This file records the license expressions declared by package authors and the co
 
 Packages:
 
-- `tablepro-agentd 0.2.2`
-- `tablepro-app 0.2.2`
-- `tablepro-app-services 0.2.2`
-- `tablepro-core 0.2.2`
-- `tablepro-driver-clickhouse 0.2.2`
-- `tablepro-driver-mongodb 0.2.2`
-- `tablepro-driver-mssql 0.2.2`
-- `tablepro-driver-mysql 0.2.2`
-- `tablepro-driver-postgres 0.2.2`
-- `tablepro-driver-redis 0.2.2`
-- `tablepro-driver-sqlite 0.2.2`
-- `tablepro-dump 0.2.2`
-- `tablepro-mcp 0.2.2`
-- `tablepro-policy 0.2.2`
-- `tablepro-ssh 0.2.2`
-- `tablepro-storage 0.2.2`
-- `tablepro-transport 0.2.2`
+- `tablepro-agentd 0.2.3`
+- `tablepro-app 0.2.3`
+- `tablepro-app-services 0.2.3`
+- `tablepro-core 0.2.3`
+- `tablepro-driver-clickhouse 0.2.3`
+- `tablepro-driver-mongodb 0.2.3`
+- `tablepro-driver-mssql 0.2.3`
+- `tablepro-driver-mysql 0.2.3`
+- `tablepro-driver-postgres 0.2.3`
+- `tablepro-driver-redis 0.2.3`
+- `tablepro-driver-sqlite 0.2.3`
+- `tablepro-dump 0.2.3`
+- `tablepro-mcp 0.2.3`
+- `tablepro-policy 0.2.3`
+- `tablepro-ssh 0.2.3`
+- `tablepro-storage 0.2.3`
+- `tablepro-transport 0.2.3`
 
 ```text
 # License
