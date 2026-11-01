@@ -12,8 +12,11 @@ class PostgresSocketReadinessTests(unittest.TestCase):
         end = script.index('TABLEPRO_PG_SOCKET_DIR=', start)
         readiness = script[start:end]
 
-        self.assertIn("PostgreSQL init process complete; ready for start up.", readiness)
-        self.assertIn('docker exec "$container_name" pg_isready -h /var/run/postgresql', readiness)
+        init_complete = "PostgreSQL init process complete; ready for start up."
+        self.assertIn(init_complete, readiness)
+        probe = 'docker exec "$container_name" pg_isready -h /var/run/postgresql'
+        self.assertLess(readiness.index(init_complete), readiness.index(probe))
+        self.assertEqual(script.count(probe), 1)
 
 
 if __name__ == "__main__":
