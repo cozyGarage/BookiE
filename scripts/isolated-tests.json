@@ -53,7 +53,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::editor::pinned::tests::an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin"
+      "ui::editor::pinned::tests::a_pinned_spooled_page_reloads_without_retaining_its_payload"
     ],
     [
       "tablepro-app",
@@ -202,6 +202,11 @@
     ]
   ],
   "gtk": [
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::cell_editor::tests::editable_cell_defers_its_text_widget_until_editing"
+    ],
     [
       "tablepro-app",
       "--lib",
@@ -566,6 +571,11 @@
       "tablepro-app",
       "--lib",
       "ui::sidebar_row::tests::a_group_row_shows_a_chevron_that_follows_its_collapse_state"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::lazy_context_menu_tests::a_table_context_menu_is_created_on_demand_and_resolves_row_actions"
     ],
     [
       "tablepro-app",
@@ -1081,6 +1091,11 @@
       "tablepro-app",
       "--lib",
       "ui::browse_tab::chrome_tests::an_edit_for_a_saved_row_does_not_land_on_a_draft_inserted_at_its_position"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::editing::tests::editable_cells_share_primary_gesture_without_losing_double_click_editing"
     ],
     [
       "tablepro-app",
