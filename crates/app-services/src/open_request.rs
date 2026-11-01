@@ -37,9 +37,36 @@ pub enum OpenRejection {
     NonUtf8Path(PathBuf),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum OpenablePath {
+    Database(DatabaseFile),
+    SqlScript(PathBuf),
+}
+
 const SQLITE_MAGIC: &[u8] = b"SQLite format 3\0";
 const SQLITE_EXTENSIONS: &[&str] = &["sqlite", "sqlite3", "db", "db3", "s3db"];
 const DUCKDB_EXTENSIONS: &[&str] = &["duckdb", "ddb"];
+const SQL_SCRIPT_EXTENSIONS: &[&str] = &["sql"];
+
+fn path_extension_lower(path: &Path) -> String {
+    path.extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .map(str::to_ascii_lowercase)
+        .unwrap_or_default()
+}
+
+pub fn classify_openable(path: &Path) -> Result<OpenablePath, OpenRejection> {
+    if !path.is_file() {
+        return Err(OpenRejection::Missing(path.to_path_buf()));
+    }
+    if path.to_str().is_none() {
+        return Err(OpenRejection::NonUtf8Path(path.to_path_buf()));
+    }
+    if SQL_SCRIPT_EXTENSIONS.contains(&path_extension_lower(path).as_str()) {
+        return Ok(OpenablePath::SqlScript(path.to_path_buf()));
+    }
+    classify_file(path).map(OpenablePath::Database)
+}
 
 pub fn classify_file(path: &Path) -> Result<DatabaseFile, OpenRejection> {
     if !path.is_file() {
@@ -49,11 +76,7 @@ pub fn classify_file(path: &Path) -> Result<DatabaseFile, OpenRejection> {
         .to_str()
         .map(str::to_owned)
         .ok_or_else(|| OpenRejection::NonUtf8Path(path.to_path_buf()))?;
-    let extension = path
-        .extension()
-        .and_then(std::ffi::OsStr::to_str)
-        .map(str::to_ascii_lowercase)
-        .unwrap_or_default();
+    let extension = path_extension_lower(path);
     let mut header = [0u8; 16];
     let read = std::fs::File::open(path)
         .and_then(|mut file| file.read(&mut header))
@@ -111,7 +134,7 @@ pub fn file_connection(file: &DatabaseFile) -> SavedConnection {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{DatabaseFile, OpenRejection, classify_file, file_connection};
+    use super::{DatabaseFile, OpenRejection, OpenablePath, classify_file, classify_openable, file_connection};
 
     const SQLITE_MAGIC: &[u8] = b"SQLite format 3\0";
 
@@ -206,5 +229,29 @@ mod tests {
         assert!(saved.ssh.is_none());
         assert!(saved.attached_databases.is_empty());
         assert!(saved.tls_root_cert.is_none() && saved.tls_client_cert.is_none() && saved.tls_client_key.is_none());
+    }
+
+    #[test]
+    fn a_sql_script_path_opens_as_an_editor_script_not_a_database() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = write(dir.path(), "report.SQL", b"SELECT 1;\n");
+
+        assert_eq!(classify_openable(&path), Ok(OpenablePath::SqlScript(path.clone())));
+        assert_eq!(classify_file(&path), Err(OpenRejection::NotADatabase(path)));
+    }
+
+    #[test]
+    fn classify_openable_still_recognises_sqlite_and_refuses_plain_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut bytes = SQLITE_MAGIC.to_vec();
+        bytes.extend_from_slice(&[0; 84]);
+        let database = write(dir.path(), "books.db", &bytes);
+        let notes = write(dir.path(), "notes.txt", b"not sql");
+
+        assert!(matches!(
+            classify_openable(&database),
+            Ok(OpenablePath::Database(file)) if file.driver_id() == "sqlite"
+        ));
+        assert_eq!(classify_openable(&notes), Err(OpenRejection::NotADatabase(notes)));
     }
 }
