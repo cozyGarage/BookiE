@@ -1110,6 +1110,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::editing::tests::editable_cells_share_primary_gesture_without_losing_double_click_editing"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::editing::tests::readonly_multiline_cells_keep_compact_height_and_exact_text"
     ],
     [
