@@ -4,16 +4,16 @@
 
 The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). BookiE is a fully autonomous project with its own architecture, development lifecycle, and product roadmap.
 
-### Independence and stable system identifiers
+### Product and system identifiers
 
-BookiE is completely decoupled from any external projects and operates independently. To ensure seamless continuity for users, desktop environments, and Linux package maintainers, low-level system and storage identifiers remain stable:
+BookiE is completely decoupled from any external projects and operates independently. After [ADR 0027](docs/decisions/0027-complete-bookie-rename.md), current system and storage identifiers are `bookie` / `com.bookie.linux`:
 - **Crate & binary names**: Workspace crates and Cargo binaries use `bookie-*`, `bookie-app`, and `bookie-agentd`.
 - **Packaging names**: The user-facing binaries installed by Meson and distro packages are `bookie` and `bookie-agentd`.
 - **Application ID & D-Bus**: `com.bookie.linux`
 - **XDG storage paths**: `$XDG_CONFIG_HOME/bookie/` and `$XDG_DATA_HOME/bookie/`
 - **Secret Service schema**: `com.bookie.linux.Password`
 
-These identifiers are retained strictly for on-disk persistence stability, keyring continuity, and rollback safety across upgrades.
+Legacy `tablepro` paths and keyring entries are copied forward on first start and left in place for rollback; do not reintroduce them as current identifiers.
 
 ![BookiE architecture overview: the desktop app and the headless MCP host reach every database through one PolicyGuard, then routing and static drivers](docs/images/architecture-overview.svg)
 
