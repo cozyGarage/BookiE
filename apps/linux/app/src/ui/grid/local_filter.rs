@@ -174,12 +174,24 @@ impl LocalResultView {
     }
 
     pub(crate) fn sort_by(&self, column: usize, ascending: bool) {
-        let result = self.0.borrow().result.clone();
-        if local_sort::is_sortable_column(&result, column) {
-            self.0.borrow_mut().sort = Some((column, ascending));
-            self.persist_settings();
-            self.rebuild_visible_rows();
-        }
+        let (result, attached) = {
+            let state = self.0.borrow();
+            (state.result.clone(), state.store.is_some() && state.selection.is_some())
+        };
+        let sorted_order = if attached {
+            let Some(order) = local_sort::sorted_source_indices(&result, column, ascending) else {
+                return;
+            };
+            Some(order)
+        } else {
+            if !local_sort::is_sortable_column(&result, column) {
+                return;
+            }
+            None
+        };
+        self.0.borrow_mut().sort = Some((column, ascending));
+        self.persist_settings();
+        self.rebuild_visible_rows_with_sorted_order(sorted_order);
     }
 
     fn persist_settings(&self) {
@@ -191,6 +203,10 @@ impl LocalResultView {
     }
 
     fn rebuild_visible_rows(&self) {
+        self.rebuild_visible_rows_with_sorted_order(None);
+    }
+
+    fn rebuild_visible_rows_with_sorted_order(&self, sorted_order: Option<Vec<usize>>) {
         let (result, store, selection, filter, sort) = {
             let state = self.0.borrow();
             let Some(store) = state.store.clone() else { return };
@@ -201,7 +217,8 @@ impl LocalResultView {
         };
         let selected = selected_source_rows(&store, &selection);
         let mut order = match sort {
-            Some((column, ascending)) => local_sort::sorted_source_indices(&result, column, ascending)
+            Some((column, ascending)) => sorted_order
+                .or_else(|| local_sort::sorted_source_indices(&result, column, ascending))
                 .unwrap_or_else(|| (0..result.rows.len()).collect()),
             None => (0..result.rows.len()).collect(),
         };
