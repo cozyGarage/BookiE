@@ -461,7 +461,7 @@ fn carry_unknown_fields(document: &mut serde_json::Value, stored: &serde_json::M
 }
 
 fn connections_path() -> Result<PathBuf, StorageError> {
-    crate::config_path("connections.json")
+    crate::paths::connections_config_path()
 }
 
 #[cfg(test)]
