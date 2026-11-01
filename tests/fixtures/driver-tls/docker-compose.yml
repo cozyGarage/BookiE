@@ -1,4 +1,4 @@
-name: tablepro-driver-tls
+name: bookie-driver-tls
 
 services:
   mongo:
@@ -7,9 +7,9 @@ services:
       dockerfile: mongo/Dockerfile
     restart: on-failure:3
     environment:
-      MONGO_INITDB_ROOT_USERNAME: tablepro
-      MONGO_INITDB_ROOT_PASSWORD: tablepro
-      MONGO_INITDB_DATABASE: tablepro
+      MONGO_INITDB_ROOT_USERNAME: bookie
+      MONGO_INITDB_ROOT_PASSWORD: bookie
+      MONGO_INITDB_DATABASE: bookie
     volumes:
       - ./seed:/docker-entrypoint-initdb.d:ro
     command:
@@ -33,9 +33,9 @@ services:
         - --host
         - localhost
         - -u
-        - tablepro
+        - bookie
         - -p
-        - tablepro
+        - bookie
         - --authenticationDatabase
         - admin
         - --eval
@@ -48,7 +48,7 @@ services:
     networks:
       fixture:
         aliases:
-          - mongo.tablepro.test
+          - mongo.bookie.test
 
   redis:
     build:
@@ -69,7 +69,7 @@ services:
       - --tls-auth-clients
       - "no"
       - --requirepass
-      - tablepro
+      - bookie
     healthcheck:
       test:
         - CMD
@@ -78,7 +78,7 @@ services:
         - --cacert
         - /certs/ca.crt
         - -a
-        - tablepro
+        - bookie
         - --no-auth-warning
         - ping
       interval: 3s
@@ -89,15 +89,15 @@ services:
     networks:
       fixture:
         aliases:
-          - redis.tablepro.test
+          - redis.bookie.test
 
   mongo-plain:
     image: mongo:7
     restart: on-failure:3
     environment:
-      MONGO_INITDB_ROOT_USERNAME: tablepro
-      MONGO_INITDB_ROOT_PASSWORD: tablepro
-      MONGO_INITDB_DATABASE: tablepro
+      MONGO_INITDB_ROOT_USERNAME: bookie
+      MONGO_INITDB_ROOT_PASSWORD: bookie
+      MONGO_INITDB_DATABASE: bookie
     volumes:
       - ./seed:/docker-entrypoint-initdb.d:ro
     command: ["mongod", "--bind_ip_all"]
@@ -109,9 +109,9 @@ services:
         - --host
         - localhost
         - -u
-        - tablepro
+        - bookie
         - -p
-        - tablepro
+        - bookie
         - --authenticationDatabase
         - admin
         - --eval
@@ -126,9 +126,9 @@ services:
 
   redis-plain:
     image: redis:7-alpine
-    command: ["redis-server", "--requirepass", "tablepro"]
+    command: ["redis-server", "--requirepass", "bookie"]
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "tablepro", "--no-auth-warning", "ping"]
+      test: ["CMD", "redis-cli", "-a", "bookie", "--no-auth-warning", "ping"]
       interval: 3s
       timeout: 5s
       retries: 40
@@ -142,10 +142,10 @@ services:
       context: .
       dockerfile: mysql/Dockerfile
     environment:
-      MYSQL_ROOT_PASSWORD: tablepro
-      MYSQL_DATABASE: tablepro
-      MYSQL_USER: tablepro
-      MYSQL_PASSWORD: tablepro
+      MYSQL_ROOT_PASSWORD: bookie
+      MYSQL_DATABASE: bookie
+      MYSQL_USER: bookie
+      MYSQL_PASSWORD: bookie
     command:
       - mysqld
       - --require_secure_transport=ON
@@ -161,9 +161,9 @@ services:
         - CMD
         - mysql
         - --protocol=socket
-        - -utablepro
-        - -ptablepro
-        - -Dtablepro
+        - -ubookie
+        - -pbookie
+        - -Dbookie
         - -e
         - "SELECT 1"
       interval: 3s
@@ -174,16 +174,16 @@ services:
     networks:
       fixture:
         aliases:
-          - mysql.tablepro.test
+          - mysql.bookie.test
 
   postgres:
     build:
       context: .
       dockerfile: postgres/Dockerfile
     environment:
-      POSTGRES_USER: tablepro
-      POSTGRES_PASSWORD: tablepro
-      POSTGRES_DB: tablepro
+      POSTGRES_USER: bookie
+      POSTGRES_PASSWORD: bookie
+      POSTGRES_DB: bookie
     command:
       - postgres
       - -c
@@ -193,7 +193,7 @@ services:
       - -c
       - ssl_key_file=/certs/server.key
     healthcheck:
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "tablepro", "-d", "tablepro"]
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "bookie", "-d", "bookie"]
       interval: 3s
       timeout: 5s
       retries: 40
@@ -207,10 +207,10 @@ services:
       context: .
       dockerfile: mysql/Dockerfile
     environment:
-      MYSQL_ROOT_PASSWORD: tablepro
-      MYSQL_DATABASE: tablepro
-      MYSQL_USER: tablepro
-      MYSQL_PASSWORD: tablepro
+      MYSQL_ROOT_PASSWORD: bookie
+      MYSQL_DATABASE: bookie
+      MYSQL_USER: bookie
+      MYSQL_PASSWORD: bookie
     command:
       - mysqld
       - --require_secure_transport=ON
@@ -222,9 +222,9 @@ services:
         - CMD
         - mysql
         - --protocol=socket
-        - -utablepro
-        - -ptablepro
-        - -Dtablepro
+        - -ubookie
+        - -pbookie
+        - -Dbookie
         - -e
         - "SELECT 1"
       interval: 3s
@@ -233,17 +233,17 @@ services:
     networks:
       fixture:
         aliases:
-          - mysql-ssh.tablepro.test
+          - mysql-ssh.bookie.test
 
   mysql-mtls:
     build:
       context: .
       dockerfile: mysql-mtls/Dockerfile
     environment:
-      MYSQL_ROOT_PASSWORD: tablepro
-      MYSQL_DATABASE: tablepro
-      MYSQL_USER: tablepro_mtls
-      MYSQL_PASSWORD: tablepro
+      MYSQL_ROOT_PASSWORD: bookie
+      MYSQL_DATABASE: bookie
+      MYSQL_USER: bookie_mtls
+      MYSQL_PASSWORD: bookie
     command:
       - mysqld
       - --require_secure_transport=ON
@@ -256,8 +256,8 @@ services:
         - mysql
         - --protocol=socket
         - -uroot
-        - -ptablepro
-        - -Dtablepro
+        - -pbookie
+        - -Dbookie
         - -e
         - "SELECT 1"
       interval: 3s
@@ -268,17 +268,17 @@ services:
     networks:
       fixture:
         aliases:
-          - mysql-mtls.tablepro.test
+          - mysql-mtls.bookie.test
 
   mysql-mtls-ssh:
     build:
       context: .
       dockerfile: mysql-mtls/Dockerfile
     environment:
-      MYSQL_ROOT_PASSWORD: tablepro
-      MYSQL_DATABASE: tablepro
-      MYSQL_USER: tablepro_mtls
-      MYSQL_PASSWORD: tablepro
+      MYSQL_ROOT_PASSWORD: bookie
+      MYSQL_DATABASE: bookie
+      MYSQL_USER: bookie_mtls
+      MYSQL_PASSWORD: bookie
     command:
       - mysqld
       - --require_secure_transport=ON
@@ -291,8 +291,8 @@ services:
         - mysql
         - --protocol=socket
         - -uroot
-        - -ptablepro
-        - -Dtablepro
+        - -pbookie
+        - -Dbookie
         - -e
         - "SELECT 1"
       interval: 3s
@@ -301,7 +301,7 @@ services:
     networks:
       fixture:
         aliases:
-          - mysql-mtls-ssh.tablepro.test
+          - mysql-mtls-ssh.bookie.test
 
   ssh-bastion:
     build:
@@ -322,17 +322,17 @@ services:
       context: .
       dockerfile: clickhouse/Dockerfile
     environment:
-      CLICKHOUSE_USER: tablepro
-      CLICKHOUSE_PASSWORD: tablepro
-      CLICKHOUSE_DB: tablepro
+      CLICKHOUSE_USER: bookie
+      CLICKHOUSE_PASSWORD: bookie
+      CLICKHOUSE_DB: bookie
     healthcheck:
       test:
         - CMD
         - clickhouse-client
         - --user
-        - tablepro
+        - bookie
         - --password
-        - tablepro
+        - bookie
         - --query
         - "SELECT 1"
       interval: 3s
@@ -343,24 +343,24 @@ services:
     networks:
       fixture:
         aliases:
-          - clickhouse.tablepro.test
+          - clickhouse.bookie.test
 
   mysql-plain:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: tablepro
-      MYSQL_DATABASE: tablepro
-      MYSQL_USER: tablepro
-      MYSQL_PASSWORD: tablepro
+      MYSQL_ROOT_PASSWORD: bookie
+      MYSQL_DATABASE: bookie
+      MYSQL_USER: bookie
+      MYSQL_PASSWORD: bookie
     command: ["mysqld", "--tls-version="]
     healthcheck:
       test:
         - CMD
         - mysql
         - --protocol=socket
-        - -utablepro
-        - -ptablepro
-        - -Dtablepro
+        - -ubookie
+        - -pbookie
+        - -Dbookie
         - -e
         - "SELECT 1"
       interval: 3s
@@ -375,17 +375,17 @@ services:
   clickhouse-plain:
     image: clickhouse/clickhouse-server:24.8-alpine
     environment:
-      CLICKHOUSE_USER: tablepro
-      CLICKHOUSE_PASSWORD: tablepro
-      CLICKHOUSE_DB: tablepro
+      CLICKHOUSE_USER: bookie
+      CLICKHOUSE_PASSWORD: bookie
+      CLICKHOUSE_DB: bookie
     healthcheck:
       test:
         - CMD
         - clickhouse-client
         - --user
-        - tablepro
+        - bookie
         - --password
-        - tablepro
+        - bookie
         - --query
         - "SELECT 1"
       interval: 3s
@@ -405,11 +405,11 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
-      MSSQL_SA_PASSWORD: "TablePro_fixture!2026"
+      MSSQL_SA_PASSWORD: "BookiE_fixture!2026"
     healthcheck:
       test:
         - CMD-SHELL
-        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U tablepro -P tablepro -Q "SELECT 1" || exit 1
+        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U bookie -P bookie -Q "SELECT 1" || exit 1
       interval: 5s
       timeout: 5s
       retries: 60
@@ -418,7 +418,7 @@ services:
     networks:
       fixture:
         aliases:
-          - mssql.tablepro.test
+          - mssql.bookie.test
 
   mssql-ssh:
     build:
@@ -429,18 +429,18 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
-      MSSQL_SA_PASSWORD: "TablePro_fixture!2026"
+      MSSQL_SA_PASSWORD: "BookiE_fixture!2026"
     healthcheck:
       test:
         - CMD-SHELL
-        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U tablepro -P tablepro -Q "SELECT 1" || exit 1
+        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U bookie -P bookie -Q "SELECT 1" || exit 1
       interval: 5s
       timeout: 5s
       retries: 60
     networks:
       fixture:
         aliases:
-          - mssql-ssh.tablepro.test
+          - mssql-ssh.bookie.test
 
   mssql-plain:
     build:
@@ -449,11 +449,11 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
-      MSSQL_SA_PASSWORD: "TablePro_fixture!2026"
+      MSSQL_SA_PASSWORD: "BookiE_fixture!2026"
     healthcheck:
       test:
         - CMD-SHELL
-        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U tablepro -P tablepro -Q "SELECT 1" || exit 1
+        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U bookie -P bookie -Q "SELECT 1" || exit 1
       interval: 5s
       timeout: 5s
       retries: 60

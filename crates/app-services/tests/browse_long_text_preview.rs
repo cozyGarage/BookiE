@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_app_services::browse_query::{BrowseTarget, PageQuery, mark_partial_cells, parse_partial};
+use bookie_core::{ColumnInfo, ConnectOptions, DatabaseDriver, FilterSet, TlsConfig, Value};
 use drivers_postgres::PgDriver;
 use secrecy::SecretString;
-use tablepro_app_services::browse_query::{BrowseTarget, PageQuery, mark_partial_cells, parse_partial};
-use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, FilterSet, TlsConfig, Value};
 use testcontainers::ImageExt;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;

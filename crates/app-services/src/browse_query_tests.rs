@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{FilterOp, FilterRule, FilterValue};
+use bookie_core::{FilterOp, FilterRule, FilterValue};
 #[path = "browse_query/tests/reverse_paging.rs"]
 mod reverse_paging;
 #[path = "browse_query/tests/stable_order.rs"]
@@ -261,7 +261,7 @@ fn preview_projection_is_opt_in_and_per_engine() {
 
 #[test]
 fn only_a_well_formed_marker_becomes_a_partial_cell() {
-    let mut result = tablepro_core::QueryResult {
+    let mut result = bookie_core::QueryResult {
         columns: (0..7).map(|index| column(&index.to_string(), false)).collect(),
         rows: vec![vec![
             Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into()),
@@ -295,7 +295,7 @@ fn only_a_well_formed_marker_becomes_a_partial_cell() {
 #[test]
 fn ordinary_marker_shaped_text_is_preserved() {
     let stored = Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into());
-    let mut result = tablepro_core::QueryResult {
+    let mut result = bookie_core::QueryResult {
         columns: vec![],
         rows: vec![vec![stored.clone()]],
         truncated: false,

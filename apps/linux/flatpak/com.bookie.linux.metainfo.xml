@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.tablepro.linux</id>
+  <id>com.bookie.linux</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>AGPL-3.0-or-later</project_license>
   <name>BookiE</name>
@@ -46,10 +46,10 @@
       <image type="source" width="1400" height="860">https://raw.githubusercontent.com/cozyGarage/BookiE/linux/docs/images/connections-light.png</image>
     </screenshot>
   </screenshots>
-  <launchable type="desktop-id">com.tablepro.linux.desktop</launchable>
+  <launchable type="desktop-id">com.bookie.linux.desktop</launchable>
   <url type="homepage">https://github.com/cozyGarage/BookiE</url>
   <url type="bugtracker">https://github.com/cozyGarage/BookiE/issues</url>
-  <developer id="com.tablepro">
+  <developer id="com.bookie">
     <name>BookiE contributors</name>
   </developer>
   <categories>
@@ -104,14 +104,14 @@
           BookiE 0.1.1: Jump to Column, complete SQL drafts, dialect-safe
           formatting, and PostgreSQL values that no longer appear as false
           NULLs. Server Activity still shows session duration. Legacy
-          tablepro commands remain available.
+          bookie commands remain available.
         </p>
       </description>
     </release>
   </releases>
   <provides>
     <binary>bookie</binary>
-    <binary>tablepro</binary>
+    <binary>bookie</binary>
   </provides>
   <recommends>
     <control>keyboard</control>

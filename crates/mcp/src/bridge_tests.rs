@@ -2,20 +2,20 @@ use std::sync::Arc;
 
 use super::{McpBridge, McpLimits, count_from_value, count_statement, sql_looks_like_write, validated_identifier};
 use crate::tokens::TokenStore;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 struct NoProvider;
 
 #[async_trait::async_trait]
 impl super::ConnectionProvider for NoProvider {
-    async fn list_saved_connections(&self) -> Result<Vec<tablepro_storage::SavedConnection>, String> {
+    async fn list_saved_connections(&self) -> Result<Vec<bookie_storage::SavedConnection>, String> {
         Ok(Vec::new())
     }
     async fn connection(
         &self,
         _connection_id: uuid::Uuid,
-        _principal: tablepro_policy::Principal,
-    ) -> Result<Arc<dyn tablepro_core::Connection>, String> {
+        _principal: bookie_policy::Principal,
+    ) -> Result<Arc<dyn bookie_core::Connection>, String> {
         Err("no connections in this test".into())
     }
 }

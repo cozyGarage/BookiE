@@ -25,15 +25,15 @@ class ValueRunnerTests(unittest.TestCase):
 
     def test_build_selection_is_explicit_and_locked(self):
         self.assertIn("--locked", runner.build_command())
-        self.assertIn("tablepro-app", runner.build_command())
-        self.assertIn("tablepro-driver-duckdb", runner.build_command())
+        self.assertIn("bookie-app", runner.build_command())
+        self.assertIn("bookie-driver-duckdb", runner.build_command())
         self.assertNotIn("--exclude", runner.build_command(gtk=True, duckdb=True))
 
     def test_combined_gtk_duckdb_run_enables_app_duckdb_consumer_tests(self):
         command = runner.build_command(gtk=True, duckdb=True)
-        self.assertIn("tablepro-app/duckdb", command)
-        self.assertNotIn("tablepro-app/duckdb", runner.build_command(gtk=True))
-        self.assertNotIn("tablepro-app/duckdb", runner.build_command(duckdb=True))
+        self.assertIn("bookie-app/duckdb", command)
+        self.assertNotIn("bookie-app/duckdb", runner.build_command(gtk=True))
+        self.assertNotIn("bookie-app/duckdb", runner.build_command(duckdb=True))
 
     def test_a_suite_with_no_matching_tests_is_a_failure(self):
         with tempfile.TemporaryDirectory() as root:
@@ -54,7 +54,7 @@ class ValueRunnerTests(unittest.TestCase):
             self.assertEqual(result["exit_code"], 124)
 
     def test_only_expected_test_executables_are_selected(self):
-        message = {"reason": "compiler-artifact", "executable": "/tmp/test", "manifest_path": str(runner.ROOT / "crates/core/Cargo.toml"), "target": {"name": "tablepro_core"}, "profile": {"test": True}}
+        message = {"reason": "compiler-artifact", "executable": "/tmp/test", "manifest_path": str(runner.ROOT / "crates/core/Cargo.toml"), "target": {"name": "bookie_core"}, "profile": {"test": True}}
         self.assertEqual(runner.select_artifact(message, runner.expected_suites()), ("crates/core/Cargo.toml", "/tmp/test"))
         message["profile"]["test"] = False
         self.assertIsNone(runner.select_artifact(message, runner.expected_suites()))
@@ -65,7 +65,7 @@ class ValueRunnerTests(unittest.TestCase):
             cleanup_runner.cleanup("run-123")
         self.assertEqual(run.call_count, 2)
         self.assertEqual(run.call_args_list[0].args[0], [
-            "docker", "ps", "-aq", "--filter", "label=com.tablepro.test-run=run-123"
+            "docker", "ps", "-aq", "--filter", "label=com.bookie.test-run=run-123"
         ])
         self.assertEqual(run.call_args_list[1].args[0], ["docker", "rm", "-f", "one", "two"])
 

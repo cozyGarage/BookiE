@@ -1,6 +1,6 @@
 use super::{connect, start_mssql};
+use bookie_core::{OperationControl, Value};
 use chrono::{NaiveDate, NaiveDateTime};
-use tablepro_core::{OperationControl, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -101,14 +101,9 @@ async fn value_contract_supported_temporal_calendar_edges_match_native_text_and_
 
     let columns = connection.fetch_columns(None, "date_time_edges_copy").await.unwrap();
     for row in &rows.rows {
-        let insert = tablepro_core::sql_literal::build_insert_literal(
-            "mssql",
-            None,
-            "date_time_edges_copy",
-            &columns,
-            &row[..4],
-        )
-        .expect("calendar edge remains exactly representable as SQL literals");
+        let insert =
+            bookie_core::sql_literal::build_insert_literal("mssql", None, "date_time_edges_copy", &columns, &row[..4])
+                .expect("calendar edge remains exactly representable as SQL literals");
         connection.execute(&insert).await.expect("re-import literal");
     }
     let copied = connection

@@ -1,5 +1,5 @@
-use tablepro_core::TableInfo;
-use tablepro_storage::SavedQuery;
+use bookie_core::TableInfo;
+use bookie_storage::SavedQuery;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +19,7 @@ pub struct QuickItem {
 }
 
 pub fn favorite_items(favorites: &[SavedQuery]) -> Vec<QuickItem> {
-    tablepro_storage::rank_favorites(favorites)
+    bookie_storage::rank_favorites(favorites)
         .into_iter()
         .map(|favorite| QuickItem {
             target: QuickTarget::Favorite(favorite.id),

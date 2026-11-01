@@ -1,6 +1,6 @@
+use bookie_core::{Value, single_precision_as_f64};
 use sqlx::mysql::MySqlRow;
 use sqlx::{Column, Row, TypeInfo, ValueRef};
-use tablepro_core::{Value, single_precision_as_f64};
 
 use crate::{packed, temporal};
 

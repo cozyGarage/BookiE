@@ -29,7 +29,7 @@ fn pasting_copied_rows_undoes_the_formula_guard_and_null_marker() {
 
 #[test]
 fn copied_rows_paste_back_with_null_empty_text_and_marker_text_unchanged() {
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     let texts = [
         "",
@@ -61,7 +61,7 @@ fn copied_rows_paste_back_with_null_empty_text_and_marker_text_unchanged() {
         })
         .collect();
 
-    let copied = tablepro_core::export::render_tsv(&[], &rows, false);
+    let copied = bookie_core::export::render_tsv(&[], &rows, false);
     assert_eq!(parse_clipboard_grid(&copied), expected, "{copied:?}");
 }
 
@@ -130,7 +130,7 @@ fn a_huge_paste_is_refused_before_any_cell_is_touched() {
 #[test]
 fn a_pending_paste_requires_the_same_page_generation_and_target_row_identities() {
     use crate::services::change_tracker::RowKey;
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     let first = RowKey::from_pk_values(&[Value::Int(1)]).unwrap();
     let second = RowKey::from_pk_values(&[Value::Int(2)]).unwrap();

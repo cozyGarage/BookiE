@@ -1,4 +1,4 @@
-use tablepro_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError, Value};
+use bookie_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError, Value};
 
 use crate::{MssqlClient, run_query};
 

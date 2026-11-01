@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tablepro_core::{AuthMode, DriverCapabilities};
+use bookie_core::{AuthMode, DriverCapabilities};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LocalSocketPathKind {

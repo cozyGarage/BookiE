@@ -1,4 +1,4 @@
-use tablepro_core::ColumnInfo;
+use bookie_core::ColumnInfo;
 
 pub(super) fn resolved_order_by(
     driver_id: &str,
@@ -12,7 +12,7 @@ pub(super) fn resolved_order_by(
             let direction = if ascending { "ASC" } else { "DESC" };
             terms.push(format!(
                 "{} {direction}",
-                tablepro_core::sql_dialect::quote_ident(driver_id, &column.name)
+                bookie_core::sql_dialect::quote_ident(driver_id, &column.name)
             ));
             column.name.as_str()
         })
@@ -23,7 +23,7 @@ pub(super) fn resolved_order_by(
         }
         terms.push(format!(
             "{} ASC",
-            tablepro_core::sql_dialect::quote_ident(driver_id, &column.name)
+            bookie_core::sql_dialect::quote_ident(driver_id, &column.name)
         ));
     }
     if row_id_order && driver_id == "postgres" && !columns.iter().any(|column| column.primary_key) {

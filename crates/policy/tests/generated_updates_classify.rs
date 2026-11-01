@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_dialect::build_optimistic_keyed_update;
-use tablepro_core::{ColumnInfo, Value};
-use tablepro_policy::{StatementClass, classify};
+use bookie_core::sql_dialect::build_optimistic_keyed_update;
+use bookie_core::{ColumnInfo, Value};
+use bookie_policy::{StatementClass, classify};
 
 fn column(name: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {

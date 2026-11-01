@@ -1,6 +1,6 @@
+use bookie_app_services::workspace::CloseAfterSave;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use tablepro_app_services::workspace::CloseAfterSave;
 
 use relm4::adw::prelude::*;
 use relm4::gtk::glib;

@@ -2,11 +2,11 @@ mod file;
 mod scope;
 pub(crate) use scope::ExportScope;
 
+use bookie_core::QueryResult;
+use bookie_core::export::{ExportError, RowPage};
 use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
-use tablepro_core::QueryResult;
-use tablepro_core::export::{ExportError, RowPage};
 use tokio_util::sync::CancellationToken;
 
 use crate::services::preferences::PreferencesStore;
@@ -59,7 +59,7 @@ pub(crate) struct StreamExportQuery {
     pub(crate) origin: crate::services::catalog::CatalogOrigin,
     pub(crate) driver_id: String,
     pub(crate) sql: String,
-    pub(crate) params: Vec<tablepro_core::Value>,
+    pub(crate) params: Vec<bookie_core::Value>,
     pub(crate) timeout_secs: u32,
     pub(crate) suggested_name: String,
     pub(crate) session: Option<crate::ui::editor::StreamSession>,
@@ -68,7 +68,7 @@ pub(crate) struct StreamExportQuery {
 #[derive(Debug, Clone)]
 pub(crate) struct StreamExportRequest {
     pub(crate) query: StreamExportQuery,
-    pub(crate) columns: Vec<tablepro_core::ColumnInfo>,
+    pub(crate) columns: Vec<bookie_core::ColumnInfo>,
 }
 
 pub(crate) struct ExportRequest {
@@ -192,7 +192,7 @@ fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String 
 }
 
 fn available_formats(driver_id: &str, paged: Option<&PagedExport>) -> Vec<ExportFormat> {
-    let statements = tablepro_core::export::supports_sql_literals(driver_id);
+    let statements = bookie_core::export::supports_sql_literals(driver_id);
     let workbook_fits = paged.is_none_or(|paged| paged.total_rows.is_some());
     FORMATS
         .iter()
@@ -300,7 +300,7 @@ fn present_export(
     let null_marker = if paged.is_some() {
         "\\N".to_string()
     } else {
-        tablepro_core::export::unique_csv_null_marker(&result.rows)
+        bookie_core::export::unique_csv_null_marker(&result.rows)
     };
     let page = adw::PreferencesPage::new();
 
@@ -506,7 +506,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             return;
         };
         let path = normalize_duplicate_extension(path, format.extension());
-        let options = tablepro_core::export::CsvOptions {
+        let options = bookie_core::export::CsvOptions {
             null_to_empty: false,
             header_row: include_header,
             sanitize_formulas,
@@ -547,7 +547,7 @@ fn job_source(paged: &Option<PagedExport>, result: &std::sync::Arc<QueryResult>)
 fn show_export_error(
     parent: &adw::ApplicationWindow,
     path: &std::path::Path,
-    error: &tablepro_core::export::ExportError,
+    error: &bookie_core::export::ExportError,
 ) {
     let alert = adw::AlertDialog::new(
         Some(&crate::tr!("Couldn't export")),
@@ -587,7 +587,7 @@ mod scope_presentation_tests {
     fn export_describes_the_row_scope_before_the_format() {
         adw::init().unwrap();
         let application = adw::Application::builder()
-            .application_id("com.tablepro.linux.scope-test")
+            .application_id("com.bookie.linux.scope-test")
             .build();
         application.register(None::<&gio::Cancellable>).unwrap();
         let window = adw::ApplicationWindow::new(&application);

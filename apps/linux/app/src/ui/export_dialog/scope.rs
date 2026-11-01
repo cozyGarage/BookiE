@@ -1,6 +1,6 @@
+use bookie_core::QueryResult;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
-use tablepro_core::QueryResult;
 
 use super::PagedExport;
 

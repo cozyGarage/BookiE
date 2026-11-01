@@ -878,14 +878,14 @@ mod tests {
             host: "db.corp.example".into(),
             port: 5432,
             service_endpoint: Some(("db.corp.example".into(), 5432)),
-            forwarded_socket_dir: Some(PathBuf::from("/run/user/1000/tablepro-ssh-abc")),
+            forwarded_socket_dir: Some(PathBuf::from("/run/user/1000/bookie-ssh-abc")),
             ..Default::default()
         };
 
         assert_eq!(
             options.transport(),
             Transport::Socket {
-                directory: Path::new("/run/user/1000/tablepro-ssh-abc"),
+                directory: Path::new("/run/user/1000/bookie-ssh-abc"),
                 identity_host: "db.corp.example",
                 identity_port: 5432,
                 origin: SocketOrigin::Forwarded,

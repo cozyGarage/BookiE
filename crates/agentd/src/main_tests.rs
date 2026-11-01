@@ -9,7 +9,7 @@ fn only_a_single_y_allows_a_terminal_approval() {
 }
 
 use super::*;
-use tablepro_core::{AuthMode, Environment};
+use bookie_core::{AuthMode, Environment};
 
 #[test]
 fn sanitize_for_terminal_strips_ansi_escapes_and_carriage_returns() {
@@ -75,7 +75,7 @@ fn saved_connection(id: Uuid) -> SavedConnection {
 fn an_issued_token_is_read_only_unless_asked_otherwise() {
     let id = Uuid::new_v4();
     let args = Args::parse_from([
-        "tablepro-agentd",
+        "bookie-agentd",
         "--policy",
         "policy.toml",
         "--issue-token",
@@ -88,7 +88,7 @@ fn an_issued_token_is_read_only_unless_asked_otherwise() {
     assert!(args.token_file.is_none());
 
     let elevated = Args::parse_from([
-        "tablepro-agentd",
+        "bookie-agentd",
         "--policy",
         "policy.toml",
         "--issue-token",
@@ -154,10 +154,10 @@ fn sanitize_for_terminal_keeps_ordinary_unicode_text() {
 #[test]
 fn the_daemon_exposes_no_network_bind_option() {
     for flag in ["--bind", "--host", "--port", "--listen", "--http", "--address"] {
-        let parsed = Args::try_parse_from(["tablepro-agentd", "--policy", "policy.toml", flag, "0.0.0.0"]);
+        let parsed = Args::try_parse_from(["bookie-agentd", "--policy", "policy.toml", flag, "0.0.0.0"]);
         assert!(parsed.is_err(), "{flag} must not be accepted");
     }
-    let stdio_only = Args::try_parse_from(["tablepro-agentd", "--policy", "policy.toml"]);
+    let stdio_only = Args::try_parse_from(["bookie-agentd", "--policy", "policy.toml"]);
     assert!(stdio_only.is_ok(), "the daemon serves stdio with only a policy path");
 }
 

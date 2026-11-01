@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{DatabaseDriver, DriverError, Value};
 use drivers_redis::RedisDriver;
-use tablepro_core::{DatabaseDriver, DriverError, Value};
 
 use crate::{opts, start_redis};
 

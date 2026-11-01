@@ -1,7 +1,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
+use bookie_core::DatabaseDriver;
 use drivers_mssql::MssqlDriver;
-use tablepro_core::DatabaseDriver;
 
 #[path = "support/mssql_startup.rs"]
 mod mssql_startup;

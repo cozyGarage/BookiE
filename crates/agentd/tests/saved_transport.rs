@@ -5,14 +5,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use drivers_sqlite::SqliteDriver;
-use tablepro_agentd::DaemonProvider;
-use tablepro_core::{
+use bookie_agentd::DaemonProvider;
+use bookie_core::{
     AuthMode, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverRegistry, Environment, TlsMode,
 };
-use tablepro_mcp::ConnectionProvider;
-use tablepro_policy::{AuditState, DenyApprovalSink, PolicyConfig, Principal};
-use tablepro_storage::{AuditJournal, SavedConnection, SavedSshAuth, SavedSshConfig, save_connections};
+use bookie_mcp::ConnectionProvider;
+use bookie_policy::{AuditState, DenyApprovalSink, PolicyConfig, Principal};
+use bookie_storage::{AuditJournal, SavedConnection, SavedSshAuth, SavedSshConfig, save_connections};
+use drivers_sqlite::SqliteDriver;
 use uuid::Uuid;
 
 static ENV_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());

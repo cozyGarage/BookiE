@@ -25,10 +25,10 @@ mod non_utf8;
 #[path = "support/temporal.rs"]
 mod temporal;
 
+use bookie_core::sql_dialect::{build_full_row_update, build_single_cell_update};
+use bookie_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, Value};
 use clickhouse::{connect, start_clickhouse};
 use drivers_clickhouse::ClickhouseDriver;
-use tablepro_core::sql_dialect::{build_full_row_update, build_single_cell_update};
-use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, Value};
 use testcontainers::{ContainerAsync, GenericImage};
 
 #[tokio::test]
@@ -107,18 +107,18 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
         .unwrap();
     assert_eq!(result.rows, vec![values.to_vec()]);
 
-    let csv_options = tablepro_core::export::CsvOptions {
+    let csv_options = bookie_core::export::CsvOptions {
         sanitize_formulas: false,
         ..Default::default()
     };
-    let csv = tablepro_core::export::render_csv(&result.columns, &result.rows, &csv_options);
+    let csv = bookie_core::export::render_csv(&result.columns, &result.rows, &csv_options);
     assert_eq!(
         csv,
         "signed_min,signed_max,unsigned_max\n-170141183460469231731687303715884105728,170141183460469231731687303715884105727,340282366920938463463374607431768211455\n"
     );
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
-    let imported = tablepro_core::import::row_to_values(
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let imported = bookie_core::import::row_to_values(
         &sheet.rows[0],
         &[Some(0), Some(1), Some(2)],
         &result.columns,
@@ -128,17 +128,17 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
     .unwrap();
     assert_eq!(imported, values);
 
-    let safe_csv = tablepro_core::export::render_csv(
+    let safe_csv = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
     assert_eq!(
         safe_csv,
         "signed_min,signed_max,unsigned_max\n\"'-170141183460469231731687303715884105728\",170141183460469231731687303715884105727,340282366920938463463374607431768211455\n"
     );
-    let safe_sheet = tablepro_core::import::read_csv(safe_csv.as_bytes(), &import_options, None).unwrap();
-    let safe_imported = tablepro_core::import::row_to_values(
+    let safe_sheet = bookie_core::import::read_csv(safe_csv.as_bytes(), &import_options, None).unwrap();
+    let safe_imported = bookie_core::import::row_to_values(
         &safe_sheet.rows[0],
         &[Some(0), Some(1), Some(2)],
         &result.columns,
@@ -157,7 +157,7 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
     )
     .await
     .unwrap();
-    let export = tablepro_core::sql_literal::build_insert_literal(
+    let export = bookie_core::sql_literal::build_insert_literal(
         "clickhouse",
         None,
         "wide_integer_copy",
@@ -235,7 +235,7 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
         .position(|column| column.name == "unsigned_amount")
         .unwrap();
     assert!(columns[id_index].primary_key);
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "wide_grid_edits",
@@ -267,7 +267,7 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
             Value::Text("0".into()),
         ]
     );
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "wide_grid_edits",
@@ -311,8 +311,8 @@ async fn copied_in_clause_keeps_backslash_payload_as_data() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
     let payload = Value::Text("x\\' OR 1=1 -- ".into());
-    let clause = tablepro_core::export::render_in_clause("clickhouse", &[vec![payload.clone()]], 0);
-    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &payload).unwrap();
+    let clause = bookie_core::export::render_in_clause("clickhouse", &[vec![payload.clone()]], 0);
+    let literal = bookie_core::sql_literal::render_sql_literal("clickhouse", &payload).unwrap();
     let result = conn
         .query(&format!("SELECT {literal} WHERE {literal} IN {}", clause.sql))
         .await
@@ -636,7 +636,7 @@ async fn value_contract_datetime64_named_timezone_preserves_the_instant() {
             "bound timestamp timezone round trip for {timezone}"
         );
 
-        let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &expected).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("clickhouse", &expected).unwrap();
         let exported = conn
             .query(&format!("SELECT CAST({literal} AS DateTime64({scale}, '{timezone}'))"))
             .await
@@ -672,7 +672,7 @@ async fn value_contract_ambiguous_datetime64_local_time_is_refused() {
         result.rows[0][2],
         Value::Int(1_730_611_800_000 | 1_730_615_400_000)
     ));
-    assert!(tablepro_core::sql_literal::render_sql_literal("clickhouse", value).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("clickhouse", value).is_err());
     assert!(
         conn.query_params("SELECT ?", std::slice::from_ref(value))
             .await
@@ -696,7 +696,7 @@ async fn value_contract_ambiguous_datetime64_local_time_is_refused() {
         lord_howe.rows[0][2],
         Value::Int(1_712_414_700_000 | 1_712_416_500_000)
     ));
-    assert!(tablepro_core::sql_literal::render_sql_literal("clickhouse", value).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("clickhouse", value).is_err());
     assert!(
         conn.query_params("SELECT ?", std::slice::from_ref(value))
             .await
@@ -818,10 +818,10 @@ async fn bad_sql_returns_query_error() {
         .query("SELECT * FROM definitely_missing_table_xyz")
         .await
         .unwrap_err();
-    assert!(matches!(err, tablepro_core::DriverError::Query { .. }));
+    assert!(matches!(err, bookie_core::DriverError::Query { .. }));
 }
 
-async fn running_query_count(connection: &dyn tablepro_core::Connection, query_id: &str) -> i64 {
+async fn running_query_count(connection: &dyn bookie_core::Connection, query_id: &str) -> i64 {
     let sql = format!("SELECT count() FROM system.processes WHERE query_id = '{query_id}'");
     let result = connection.query(&sql).await.expect("inspect system.processes");
     match result.rows.first().and_then(|row| row.first()) {
@@ -842,7 +842,7 @@ async fn the_driver_declares_server_side_cancellation() {
 #[ignore = "requires docker"]
 async fn a_cancelled_query_is_killed_on_the_server_and_the_client_stays_usable() {
     let (_container, opts) = start_clickhouse().await;
-    let connection: std::sync::Arc<dyn tablepro_core::Connection> =
+    let connection: std::sync::Arc<dyn bookie_core::Connection> =
         ClickhouseDriver.connect(opts.clone()).await.expect("connect").into();
     let observer = connect(opts).await;
 
@@ -928,7 +928,7 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
     let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
     for (id, value) in values.iter().enumerate() {
-        let statement = tablepro_core::sql_literal::build_insert_literal(
+        let statement = bookie_core::sql_literal::build_insert_literal(
             "clickhouse",
             None,
             "binary_exports",
@@ -1036,7 +1036,7 @@ fn fractional_stamps() -> (chrono::NaiveDateTime, chrono::NaiveDateTime) {
     (local, instant)
 }
 
-async fn create_stamp_table(connection: &dyn tablepro_core::Connection) {
+async fn create_stamp_table(connection: &dyn bookie_core::Connection) {
     connection
         .execute("CREATE TABLE stamps (nanos DateTime64(9), micros DateTime64(6)) ENGINE = MergeTree ORDER BY nanos")
         .await
@@ -1074,7 +1074,7 @@ async fn temporal_sql_exports_keep_fractional_seconds() {
     let (local, instant) = fractional_stamps();
     let literals: Vec<String> = [Value::DateTime(local), Value::TimestampTz(instant.and_utc())]
         .iter()
-        .map(|value| tablepro_core::sql_literal::render_sql_literal("clickhouse", value).unwrap())
+        .map(|value| bookie_core::sql_literal::render_sql_literal("clickhouse", value).unwrap())
         .collect();
     connection
         .execute(&format!("INSERT INTO stamps VALUES ({}, {})", literals[0], literals[1]))
@@ -1167,8 +1167,8 @@ async fn datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal() {
         "values below the 1900 calendar boundary are refused before dispatch"
     );
     assert_eq!(
-        tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(below)),
-        Err(tablepro_core::sql_literal::LiteralError::Unsupported)
+        bookie_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(below)),
+        Err(bookie_core::sql_literal::LiteralError::Unsupported)
     );
 
     let precision_nine_parameter = connection
@@ -1178,7 +1178,7 @@ async fn datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal() {
         matches!(precision_nine_parameter, Err(DriverError::Query { .. })),
         "an explicit DateTime64(9) cast above its Int64 epoch bound must fail visibly"
     );
-    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(requested))
+    let literal = bookie_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(requested))
         .expect("the same whole-second value has an exact lower-scale literal");
     assert_eq!(literal, "toDateTime64('2262-04-12 00:00:00', 0)");
 }

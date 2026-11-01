@@ -1,7 +1,7 @@
 use std::time::{Instant, SystemTime};
 
-use tablepro_core::Value;
-use tablepro_storage::query_history::{HistoryStore, NewEntry, Outcome, Source};
+use bookie_core::Value;
+use bookie_storage::query_history::{HistoryStore, NewEntry, Outcome, Source};
 
 use crate::services::database_service::ConnectionMetadata;
 
@@ -93,14 +93,14 @@ pub(super) async fn finish_if_recorded(recorded: &mut Option<RanStatements>, out
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     fn metadata() -> ConnectionMetadata {
         ConnectionMetadata {
             id: uuid::Uuid::nil(),
             name: "local".into(),
             driver_id: "postgres".into(),
-            environment: tablepro_core::Environment::Local,
+            environment: bookie_core::Environment::Local,
             read_only: false,
             server_version: None,
             query_timeout_secs: None,

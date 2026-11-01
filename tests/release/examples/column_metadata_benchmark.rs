@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
-use tablepro_core::{Connection, DriverError, OperationControl};
-use tablepro_release_tests::{Fixture, fixture_enabled};
+use bookie_core::{Connection, DriverError, OperationControl};
+use bookie_release_tests::{Fixture, fixture_enabled};
 use uuid::Uuid;
 
 type BoxError = Box<dyn std::error::Error>;
@@ -119,12 +119,12 @@ async fn measure(
 
 async fn run() -> Result<(), BoxError> {
     if !fixture_enabled() {
-        return Err("set TABLEPRO_FIXTURE_POSTGRES_RELEASE=1 for a disposable database".into());
+        return Err("set BOOKIE_FIXTURE_POSTGRES_RELEASE=1 for a disposable database".into());
     }
     let (width, rich) = profile_args()?;
     let fixture = Fixture::from_env();
     let connection = fixture.connect_verified().await;
-    let schema = format!("tablepro_meta_{}", Uuid::new_v4().simple());
+    let schema = format!("bookie_meta_{}", Uuid::new_v4().simple());
     let table = "metadata_rows";
     let control = OperationControl::with_timeout(Duration::from_secs(120));
     setup(connection.as_ref(), &schema, table, width, rich, &control).await?;

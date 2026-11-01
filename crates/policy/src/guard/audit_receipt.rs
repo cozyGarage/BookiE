@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     Connection, DriverError, OperationControl, QueryCursorId, QueryCursorPage, QueryResult, QueryResultBatch, Session,
     SessionCommitOutcome, Value,
 };
@@ -260,7 +260,7 @@ impl Session for AuditedSession {
     async fn lexical_settings_controlled(
         &mut self,
         control: &OperationControl,
-    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+    ) -> Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, DriverError> {
         self.inner.lexical_settings_controlled(control).await
     }
 

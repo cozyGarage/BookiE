@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, TlsConfig, TlsMode};
+use bookie_policy::{AuditState, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
+use bookie_ssh::{SshAuth, SshConfig, SshTunnel};
+use bookie_storage::AuditJournal;
 use secrecy::SecretString;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment, TlsConfig, TlsMode};
-use tablepro_policy::{AuditState, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
-use tablepro_ssh::{SshAuth, SshConfig, SshTunnel};
-use tablepro_storage::AuditJournal;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub const FIXTURE_ENV: &str = "TABLEPRO_FIXTURE_POSTGRES_RELEASE";
+pub const FIXTURE_ENV: &str = "BOOKIE_FIXTURE_POSTGRES_RELEASE";
 
 pub fn fixture_enabled() -> bool {
     std::env::var(FIXTURE_ENV).map(|value| value == "1").unwrap_or(false)
@@ -46,29 +46,29 @@ pub struct Fixture {
 impl Fixture {
     /// This crate's test binaries link several TLS stacks, so like the GUI and
     /// the agent daemon they are composition roots and must choose the rustls
-    /// provider. See `tablepro_transport::install_crypto_provider`.
+    /// provider. See `bookie_transport::install_crypto_provider`.
     pub fn from_env() -> Self {
-        tablepro_transport::install_crypto_provider();
-        let materials = std::env::var("TABLEPRO_FIXTURE_MATERIALS")
+        bookie_transport::install_crypto_provider();
+        let materials = std::env::var("BOOKIE_FIXTURE_MATERIALS")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/postgres-release/materials")
             });
         Self {
-            proxy_host: env_or("TABLEPRO_FIXTURE_PROXY_HOST", "localhost"),
-            proxy_port: env_port("TABLEPRO_FIXTURE_PROXY_PORT", 5433),
-            database_hostname: env_or("TABLEPRO_FIXTURE_DB_HOSTNAME", "db.tablepro.test"),
-            database_port: env_port("TABLEPRO_FIXTURE_DB_PORT", 5432),
-            database: env_or("TABLEPRO_FIXTURE_DB", "tablepro"),
-            username: env_or("TABLEPRO_FIXTURE_USER", "tablepro"),
-            password: env_or("TABLEPRO_FIXTURE_PASSWORD", "tablepro"),
+            proxy_host: env_or("BOOKIE_FIXTURE_PROXY_HOST", "localhost"),
+            proxy_port: env_port("BOOKIE_FIXTURE_PROXY_PORT", 5433),
+            database_hostname: env_or("BOOKIE_FIXTURE_DB_HOSTNAME", "db.bookie.test"),
+            database_port: env_port("BOOKIE_FIXTURE_DB_PORT", 5432),
+            database: env_or("BOOKIE_FIXTURE_DB", "bookie"),
+            username: env_or("BOOKIE_FIXTURE_USER", "bookie"),
+            password: env_or("BOOKIE_FIXTURE_PASSWORD", "bookie"),
             ca_cert: materials.join("ca.crt"),
             other_ca_cert: materials.join("other-ca.crt"),
-            ssh_host: env_or("TABLEPRO_FIXTURE_SSH_HOST", "127.0.0.1"),
-            ssh_port: env_port("TABLEPRO_FIXTURE_SSH_PORT", 2223),
-            ssh_username: env_or("TABLEPRO_FIXTURE_SSH_USER", "tunnel"),
+            ssh_host: env_or("BOOKIE_FIXTURE_SSH_HOST", "127.0.0.1"),
+            ssh_port: env_port("BOOKIE_FIXTURE_SSH_PORT", 2223),
+            ssh_username: env_or("BOOKIE_FIXTURE_SSH_USER", "tunnel"),
             ssh_key: materials.join("client_ed25519_key"),
-            toxiproxy: env_or("TABLEPRO_FIXTURE_TOXIPROXY", "127.0.0.1:8474"),
+            toxiproxy: env_or("BOOKIE_FIXTURE_TOXIPROXY", "127.0.0.1:8474"),
         }
     }
 
@@ -105,7 +105,7 @@ impl Fixture {
             self.ssh_config(),
             self.database_hostname.clone(),
             self.database_port,
-            tablepro_ssh::UnknownHostKey::Learn,
+            bookie_ssh::UnknownHostKey::Learn,
         )
         .await
         .expect("open ssh tunnel to the fixture database")
@@ -117,7 +117,7 @@ impl Fixture {
             self.database_hostname.clone(),
             self.database_port,
             socket_name,
-            tablepro_ssh::UnknownHostKey::Learn,
+            bookie_ssh::UnknownHostKey::Learn,
         )
         .await
         .expect("open a socket-forwarded ssh tunnel to the fixture database")

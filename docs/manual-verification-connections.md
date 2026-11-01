@@ -48,7 +48,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 ## Connection bundles
 
 - [ ] Export without a passphrase, then read the file: it contains hosts and usernames and **no** password, passphrase or token.
-- [ ] Export with a passphrase, then import it on a second profile (`TABLEPRO_PROFILE=development`) and confirm the connections and their credentials arrive.
+- [ ] Export with a passphrase, then import it on a second profile (`BOOKIE_PROFILE=development`) and confirm the connections and their credentials arrive.
 - [ ] A wrong passphrase and a file edited after export give the **same** message.
 - [ ] Importing a bundle whose id already exists locally against a different server creates a new connection and leaves the local one untouched.
 - [ ] The import plan lists every connection with its disposition and can be unticked before anything is written.
@@ -66,7 +66,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## System OpenSSH tunnel
 
-Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-askpass` beside the app binary, or an installed package).
+Build and install with the helper (`cargo build -p bookie-ssh --bin bookie-askpass` beside the app binary, or an installed package).
 
 - [ ] Turn on "Use system OpenSSH" in the SSH section and connect to a host already in `~/.ssh/known_hosts`: no prompt, the connection works.
 - [ ] Connect to a new host: a "Trust this SSH host?" dialog shows the fingerprint; Cancel fails the connection and writes nothing.

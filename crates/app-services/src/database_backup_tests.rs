@@ -61,8 +61,8 @@ fn each_job_names_its_tool_and_its_administrative_operation() {
 struct IdleConnection;
 
 #[async_trait::async_trait]
-impl tablepro_core::Connection for IdleConnection {
-    async fn list_tables(&self) -> Result<Vec<tablepro_core::TableInfo>, DriverError> {
+impl bookie_core::Connection for IdleConnection {
+    async fn list_tables(&self) -> Result<Vec<bookie_core::TableInfo>, DriverError> {
         Ok(Vec::new())
     }
 
@@ -70,7 +70,7 @@ impl tablepro_core::Connection for IdleConnection {
         &self,
         _schema: Option<&str>,
         _table: &str,
-    ) -> Result<Vec<tablepro_core::ColumnInfo>, DriverError> {
+    ) -> Result<Vec<bookie_core::ColumnInfo>, DriverError> {
         Ok(Vec::new())
     }
 
@@ -80,29 +80,29 @@ impl tablepro_core::Connection for IdleConnection {
         _table: &str,
         _offset: u64,
         _limit: u64,
-    ) -> Result<tablepro_core::QueryResult, DriverError> {
+    ) -> Result<bookie_core::QueryResult, DriverError> {
         Err(DriverError::Internal("unused".into()))
     }
 
-    async fn query(&self, _sql: &str) -> Result<tablepro_core::QueryResult, DriverError> {
+    async fn query(&self, _sql: &str) -> Result<bookie_core::QueryResult, DriverError> {
         Err(DriverError::Internal("unused".into()))
     }
 
-    async fn execute(&self, _sql: &str) -> Result<tablepro_core::ExecResult, DriverError> {
+    async fn execute(&self, _sql: &str) -> Result<bookie_core::ExecResult, DriverError> {
         Err(DriverError::Internal("unused".into()))
     }
 
     async fn execute_params(
         &self,
         _sql: &str,
-        _params: &[tablepro_core::Value],
-    ) -> Result<tablepro_core::ExecResult, DriverError> {
+        _params: &[bookie_core::Value],
+    ) -> Result<bookie_core::ExecResult, DriverError> {
         Err(DriverError::Internal("unused".into()))
     }
 
     async fn execute_in_transaction(
         &self,
-        _statements: &[(String, Vec<tablepro_core::Value>)],
+        _statements: &[(String, Vec<bookie_core::Value>)],
     ) -> Result<Vec<u64>, DriverError> {
         Err(DriverError::Internal("unused".into()))
     }
@@ -132,7 +132,7 @@ impl DatabaseDriver for UnusedDriver {
         5432
     }
 
-    async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn tablepro_core::Connection>, DriverError> {
+    async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn bookie_core::Connection>, DriverError> {
         Err(DriverError::Internal("the driver must not be dialled".into()))
     }
 }
@@ -140,8 +140,8 @@ impl DatabaseDriver for UnusedDriver {
 struct DiscardAudit;
 
 #[async_trait::async_trait]
-impl tablepro_policy::AuditSink for DiscardAudit {
-    async fn record(&self, _event: tablepro_policy::AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+impl bookie_policy::AuditSink for DiscardAudit {
+    async fn record(&self, _event: bookie_policy::AuditEvent) -> Result<(), bookie_policy::AuditError> {
         Ok(())
     }
 }
@@ -149,17 +149,17 @@ impl tablepro_policy::AuditSink for DiscardAudit {
 fn guard() -> PolicyGuard {
     PolicyGuard::new(
         Arc::new(IdleConnection),
-        tablepro_policy::GuardContext {
+        bookie_policy::GuardContext {
             connection_id: uuid::Uuid::new_v4(),
             connection_name: "unit".into(),
             driver_id: "mysql".into(),
-            environment: tablepro_core::Environment::Local,
+            environment: bookie_core::Environment::Local,
             read_only: false,
-            principal: tablepro_policy::Principal::human_gui(),
-            policy: Arc::new(tablepro_policy::PolicyConfig::default()),
-            approval: Arc::new(tablepro_policy::AutoApproveSink),
+            principal: bookie_policy::Principal::human_gui(),
+            policy: Arc::new(bookie_policy::PolicyConfig::default()),
+            approval: Arc::new(bookie_policy::AutoApproveSink),
             audit: Arc::new(DiscardAudit),
-            audit_state: Arc::new(tablepro_policy::AuditState::new()),
+            audit_state: Arc::new(bookie_policy::AuditState::new()),
         },
     )
 }
@@ -176,7 +176,7 @@ async fn a_saved_connection_that_is_not_postgres_is_refused_before_any_tool_runs
         "username": "root",
     }))
     .unwrap();
-    let environment = SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse);
+    let environment = SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse);
     let runtime = std::env::temp_dir();
     let guard = guard();
     let context = SavedBackupContext {

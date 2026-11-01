@@ -37,7 +37,7 @@ fn a_failure_action_targets_its_exact_audit_operation() {
     relm4::adw::init().unwrap();
     let operation_id = uuid::Uuid::new_v4();
     let failure = super::super::super::StatementFailure::from("query failed")
-        .with_audit_receipts([tablepro_policy::AuditReceipt { operation_id }]);
+        .with_audit_receipts([bookie_policy::AuditReceipt { operation_id }]);
     let page = super::super::error_page(0, &failure);
     let mut widgets = vec![page.clone().upcast::<relm4::gtk::Widget>()];
     let mut action_target = None;
@@ -68,9 +68,9 @@ fn a_failure_action_targets_its_exact_audit_operation() {
 fn a_refused_statement_keeps_its_recorded_audit_action() {
     relm4::adw::init().unwrap();
     let operation_id = uuid::Uuid::new_v4();
-    let error = tablepro_core::DriverError::PolicyDenied("write refused".into());
+    let error = bookie_core::DriverError::PolicyDenied("write refused".into());
     let failure = super::super::super::StatementFailure::located(&error, "DELETE FROM people", "DELETE FROM people")
-        .with_audit_receipts([tablepro_policy::AuditReceipt { operation_id }]);
+        .with_audit_receipts([bookie_policy::AuditReceipt { operation_id }]);
     let page = super::super::error_page(0, &failure);
     let widget = page.upcast::<gtk::Widget>();
     assert_eq!(

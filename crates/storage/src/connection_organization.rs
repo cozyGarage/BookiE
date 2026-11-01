@@ -35,7 +35,7 @@ pub struct ConnectionOrganization {
     /// `connection_color`. A value outside it reads as no colour.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
-    /// Keys written by a newer TablePro. Carried through a rewrite so a
+    /// Keys written by a newer BookiE. Carried through a rewrite so a
     /// downgrade does not strip settings the newer version depends on.
     #[serde(flatten)]
     extra: serde_json::Map<String, serde_json::Value>,

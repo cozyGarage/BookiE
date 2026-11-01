@@ -1,7 +1,7 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use serde_json::json;
 
-use tablepro_core::{ConnectOptions, Connection, OperationControl, Value};
+use bookie_core::{ConnectOptions, Connection, OperationControl, Value};
 
 use super::{connect, start_mariadb, start_mysql};
 
@@ -118,7 +118,7 @@ async fn native_time_zero_date_and_year_values_survive_reads_parameters_and_expo
             .await
             .unwrap();
         let statement =
-            tablepro_core::sql_literal::build_insert_literal("mysql", None, "native_exported", &columns, row).unwrap();
+            bookie_core::sql_literal::build_insert_literal("mysql", None, "native_exported", &columns, row).unwrap();
         conn.execute(&statement).await.unwrap();
     }
     for copy in ["native_bound", "native_exported"] {
@@ -185,7 +185,7 @@ async fn assert_strict_zero_date_modes_refuse_invalid_dates(options: &ConnectOpt
         assert!(
             matches!(
                 &error,
-                tablepro_core::DriverError::Query {
+                bookie_core::DriverError::Query {
                     sqlstate: Some(code), ..
                 } if code == "22007"
             ),
@@ -565,7 +565,7 @@ async fn assert_datetime_and_timestamp_fractional_precision_matrix(
             row.extend((0..=6).map(|_| input_datetime.clone()));
             row.extend((0..=6).map(|_| input_timestamp.clone()));
             if literal {
-                let statement = tablepro_core::sql_literal::build_insert_literal(
+                let statement = bookie_core::sql_literal::build_insert_literal(
                     "mysql",
                     None,
                     "fractional_temporal_precision_values",
@@ -712,7 +712,7 @@ async fn assert_time_fractional_precision_matrix(
             let mut row = vec![Value::Int(id)];
             row.extend((0..=6).map(|_| input.clone()));
             if literal {
-                let statement = tablepro_core::sql_literal::build_insert_literal(
+                let statement = bookie_core::sql_literal::build_insert_literal(
                     "mysql",
                     None,
                     "fractional_precision_values",
@@ -842,7 +842,7 @@ async fn assert_fractional_storage_mode_for_binds_and_literals(
             )
             .await
             .unwrap();
-        let literal = tablepro_core::sql_literal::build_insert_literal(
+        let literal = bookie_core::sql_literal::build_insert_literal(
             "mysql",
             None,
             "fractional_values",
@@ -966,7 +966,7 @@ async fn assert_text_exports_survive_sql_mode(options: &ConnectOptions, mode: &s
     assert_eq!(labels, expected, "sql_mode '{mode}'");
     let columns = conn.fetch_columns(None, &copy).await.unwrap();
     for row in &rows {
-        let statement = tablepro_core::sql_literal::build_insert_literal("mysql", None, &copy, &columns, row).unwrap();
+        let statement = bookie_core::sql_literal::build_insert_literal("mysql", None, &copy, &columns, row).unwrap();
         conn.execute(&statement)
             .await
             .unwrap_or_else(|error| panic!("sql_mode '{mode}': {statement}: {error}"));
@@ -1043,15 +1043,15 @@ async fn value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_a
         "PAD_CHAR_TO_FULL_LENGTH must expose the native five-byte CHAR value"
     );
 
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns[..1],
         &[source.rows[0][..1].to_vec()],
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection.fetch_columns(None, "pad_char_bound").await.unwrap();
-    let imported = tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    let imported = bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
     assert_eq!(imported, vec![Value::Text("x    ".into())]);
     connection
         .execute_params("INSERT INTO pad_char_bound VALUES (?)", &imported)
@@ -1059,14 +1059,9 @@ async fn value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_a
         .unwrap();
 
     let literal_columns = connection.fetch_columns(None, "pad_char_literal").await.unwrap();
-    let literal = tablepro_core::sql_literal::build_insert_literal(
-        "mysql",
-        None,
-        "pad_char_literal",
-        &literal_columns,
-        &imported,
-    )
-    .unwrap();
+    let literal =
+        bookie_core::sql_literal::build_insert_literal("mysql", None, "pad_char_literal", &literal_columns, &imported)
+            .unwrap();
     connection.execute(&literal).await.unwrap();
 
     for table in ["pad_char_bound", "pad_char_literal"] {
@@ -1163,7 +1158,7 @@ async fn value_contract_bit_enum_set_and_geometry_survive_reads_parameters_and_e
             .await
             .unwrap();
         let statement =
-            tablepro_core::sql_literal::build_insert_literal("mysql", None, "packed_exported", &columns, row).unwrap();
+            bookie_core::sql_literal::build_insert_literal("mysql", None, "packed_exported", &columns, row).unwrap();
         conn.execute(&statement)
             .await
             .unwrap_or_else(|error| panic!("{statement}: {error}"));

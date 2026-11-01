@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{DatabaseDriver, TlsMode};
-use tablepro_driver_tls_tests::DriverTlsFixture;
+use bookie_core::{DatabaseDriver, TlsMode};
+use bookie_driver_tls_tests::DriverTlsFixture;
 
 use drivers_mongodb::MongodbDriver;
 
@@ -25,7 +25,7 @@ async fn a_plaintext_mode_is_refused_by_a_tls_only_server() {
     let fixture = DriverTlsFixture::from_env();
     let accepted = fixture.mongo(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
     let rejected = fixture.mongo(TlsMode::Disabled, None);
-    tablepro_driver_tls_tests::assert_connection_rejected(&MongodbDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&MongodbDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -34,7 +34,7 @@ async fn verifying_modes_reject_an_ip_endpoint_absent_from_the_certificate() {
     let fixture = DriverTlsFixture::from_env();
     for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
         let options = fixture.mongo(mode, Some(fixture.ca_cert.clone()));
-        tablepro_driver_tls_tests::assert_endpoint_identity_rejected(&MongodbDriver, options).await;
+        bookie_driver_tls_tests::assert_endpoint_identity_rejected(&MongodbDriver, options).await;
     }
 }
 
@@ -45,7 +45,7 @@ async fn a_verifying_mode_without_an_authority_is_refused() {
     for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
         let accepted = fixture.mongo(mode, Some(fixture.ca_cert.clone()));
         let rejected = fixture.mongo(mode, None);
-        tablepro_driver_tls_tests::assert_certificate_rejected(&MongodbDriver, accepted, rejected).await;
+        bookie_driver_tls_tests::assert_certificate_rejected(&MongodbDriver, accepted, rejected).await;
     }
 }
 
@@ -56,6 +56,6 @@ async fn a_verifying_mode_naming_the_wrong_authority_is_refused() {
     for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
         let accepted = fixture.mongo(mode, Some(fixture.ca_cert.clone()));
         let rejected = fixture.mongo(mode, Some(fixture.other_ca_cert.clone()));
-        tablepro_driver_tls_tests::assert_certificate_rejected(&MongodbDriver, accepted, rejected).await;
+        bookie_driver_tls_tests::assert_certificate_rejected(&MongodbDriver, accepted, rejected).await;
     }
 }

@@ -4,10 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-if [[ "${TABLEPRO_GTK_MONGODB_DBUS_ACTIVE:-0}" != "1" ]]; then
+if [[ "${BOOKIE_GTK_MONGODB_DBUS_ACTIVE:-0}" != "1" ]]; then
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
-  runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk-mongodb.XXXXXX")"
+  runtime="$(mktemp -d "${TMPDIR:-/tmp}/bookie-gtk-mongodb.XXXXXX")"
   mkdir -p "$runtime"/{home,config,data,cache,state,runtime}
   chmod 0700 "$runtime/runtime"
   cleanup_runtime() {
@@ -19,7 +19,7 @@ if [[ "${TABLEPRO_GTK_MONGODB_DBUS_ACTIVE:-0}" != "1" ]]; then
     rm -rf -- "$runtime"
   }
   trap cleanup_runtime EXIT
-  TABLEPRO_GTK_MONGODB_DBUS_ACTIVE=1 \
+  BOOKIE_GTK_MONGODB_DBUS_ACTIVE=1 \
     ATSPI_DBUS_IMPLEMENTATION=dbus-daemon \
     XDG_CURRENT_DESKTOP=GNOME \
     HOME="$runtime/home" \
@@ -41,7 +41,7 @@ for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool rg;
   fi
 done
 
-container="$(docker run --rm --detach --label "com.tablepro.test-run=${TABLEPRO_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::27017 mongo:7 --bind_ip_all)"
+container="$(docker run --rm --detach --label "com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}" --publish 127.0.0.1::27017 mongo:7 --bind_ip_all)"
 cleanup() {
   docker rm --force "$container" >/dev/null 2>&1 || true
 }
@@ -63,8 +63,8 @@ done
 docker exec "$container" mongosh --quiet bookie_test --eval \
   'db.people.insertMany([{_id: 1, name: "Ada Lovelace", note: "keep"}, {_id: 2, name: "Grace Hopper", note: "untouched"}])' >/dev/null
 
-TABLEPRO_GTK_MONGODB_CONTAINER="$container" \
-  TABLEPRO_GTK_MONGODB_HOST=127.0.0.1 \
-  TABLEPRO_GTK_MONGODB_PORT="$port" \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row}" \
+BOOKIE_GTK_MONGODB_CONTAINER="$container" \
+  BOOKIE_GTK_MONGODB_HOST=127.0.0.1 \
+  BOOKIE_GTK_MONGODB_PORT="$port" \
+  BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

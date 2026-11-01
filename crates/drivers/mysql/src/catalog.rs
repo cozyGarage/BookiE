@@ -1,5 +1,5 @@
+use bookie_core::{DriverError, TableInfo};
 use sqlx::{MySql, Pool, Row};
-use tablepro_core::{DriverError, TableInfo};
 
 pub(super) async fn list_relations(pool: &Pool<MySql>, kind: Option<&str>) -> Result<Vec<TableInfo>, DriverError> {
     let rows = sqlx::query(

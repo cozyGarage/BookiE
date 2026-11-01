@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::sql_lex::split_statements;
-use tablepro_core::{Value, extract_named_parameters};
-use tablepro_release_tests::Fixture;
+use bookie_core::sql_lex::split_statements;
+use bookie_core::{Value, extract_named_parameters};
+use bookie_release_tests::Fixture;
 
 #[tokio::test]
 #[ignore = "requires the postgres release fixture"]
@@ -134,7 +134,7 @@ async fn a_copied_insert_round_trips_a_value_holding_a_backslash_and_a_quote() {
         })
         .collect();
 
-    let sql = tablepro_core::sql_literal::build_insert_literal("postgres", None, "copy_probe", &columns, &row)
+    let sql = bookie_core::sql_literal::build_insert_literal("postgres", None, "copy_probe", &columns, &row)
         .expect("render the insert");
     connection.execute(&sql).await.expect("the copied insert must execute");
 

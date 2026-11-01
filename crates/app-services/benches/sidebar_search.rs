@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use tablepro_app_services::sidebar_tree::{CollapseState, build_nodes, visible_nodes_with_hidden_schemas};
-use tablepro_core::TableInfo;
+use bookie_app_services::sidebar_tree::{CollapseState, build_nodes, visible_nodes_with_hidden_schemas};
+use bookie_core::TableInfo;
 
 const SAMPLES: usize = 101;
 
@@ -27,7 +27,7 @@ fn percentile(sorted: &[u128], percentile: usize) -> u128 {
     sorted[(sorted.len() - 1) * percentile / 100]
 }
 
-fn profile_query(nodes: &[tablepro_app_services::sidebar_tree::TreeNode], query: &str) -> String {
+fn profile_query(nodes: &[bookie_app_services::sidebar_tree::TreeNode], query: &str) -> String {
     let mut samples = Vec::with_capacity(SAMPLES);
     let hidden = HashSet::new();
     let collapsed = CollapseState::default();
@@ -59,8 +59,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     let source_commit = std::env::var("BOOKIE_PROFILE_SOURCE_COMMIT").unwrap_or_default();
     let output_path = std::path::PathBuf::from(
-        std::env::var_os("TABLEPRO_SIDEBAR_PROFILE_OUTPUT")
-            .ok_or_else(|| std::io::Error::other("TABLEPRO_SIDEBAR_PROFILE_OUTPUT is required"))?,
+        std::env::var_os("BOOKIE_SIDEBAR_PROFILE_OUTPUT")
+            .ok_or_else(|| std::io::Error::other("BOOKIE_SIDEBAR_PROFILE_OUTPUT is required"))?,
     );
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent)?;

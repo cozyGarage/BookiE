@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
+use bookie_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 fn identity<'a>(driver_id: &'a str, opts: &'a ConnectOptions, file_based: bool) -> ConnectionIdentity<'a> {
     ConnectionIdentity {
@@ -109,7 +109,7 @@ fn network_entries_distinguish_tls_client_identities() {
     entry.tls_client_key = Some(std::path::PathBuf::from("/certs/old.key"));
 
     let same_identity = ConnectOptions {
-        tls: tablepro_core::TlsConfig {
+        tls: bookie_core::TlsConfig {
             client_cert: entry.tls_client_cert.clone(),
             client_key: entry.tls_client_key.clone(),
             ..Default::default()
@@ -117,7 +117,7 @@ fn network_entries_distinguish_tls_client_identities() {
         ..opts("reader", AuthMode::Password)
     };
     let rotated_identity = ConnectOptions {
-        tls: tablepro_core::TlsConfig {
+        tls: bookie_core::TlsConfig {
             client_cert: Some(std::path::PathBuf::from("/certs/new.crt")),
             client_key: Some(std::path::PathBuf::from("/certs/new.key")),
             ..Default::default()

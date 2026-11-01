@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::filter::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
-use tablepro_core::{ColumnInfo, QualifiedTypeName, Value};
+use bookie_core::filter::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+use bookie_core::{ColumnInfo, QualifiedTypeName, Value};
 
 fn column(name: &str, data_type: &str) -> ColumnInfo {
     ColumnInfo {

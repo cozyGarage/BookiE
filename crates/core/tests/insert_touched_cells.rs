@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_dialect::{build_insert_from_draft, build_insert_from_draft_touched};
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::sql_dialect::{build_insert_from_draft, build_insert_from_draft_touched};
+use bookie_core::{ColumnInfo, Value};
 
 fn column(name: &str, auto_increment: bool, default: Option<&str>) -> ColumnInfo {
     ColumnInfo {

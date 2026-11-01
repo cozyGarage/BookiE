@@ -1,6 +1,6 @@
 #[tokio::test]
 async fn sqlite_json_each_typed_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -63,7 +63,7 @@ async fn sqlite_json_each_typed_csv_round_trip_preserves_runtime_storage_classes
 
 #[tokio::test]
 async fn sqlite_json_each_object_typed_csv_round_trip_preserves_text_keys() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -127,7 +127,7 @@ async fn sqlite_json_each_object_typed_csv_round_trip_preserves_text_keys() {
 
 #[tokio::test]
 async fn sqlite_json_operators_typed_csv_round_trip_preserves_json_and_sql_values() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -223,7 +223,7 @@ async fn sqlite_json_operators_typed_csv_round_trip_preserves_json_and_sql_value
 
 #[tokio::test]
 async fn sqlite_json_constructors_typed_csv_round_trip_preserves_json_text() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -280,7 +280,7 @@ async fn sqlite_json_constructors_typed_csv_round_trip_preserves_json_text() {
 
 #[tokio::test]
 async fn sqlite_jsonb_typed_csv_round_trip_preserves_blob_bytes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {

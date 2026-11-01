@@ -1,5 +1,5 @@
 use super::parse_input_for_driver;
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 fn column(data_type: &str, nullable: bool) -> ColumnInfo {
     ColumnInfo {
@@ -51,8 +51,8 @@ fn value_contract_mongodb_integer_parser_preserves_int32_and_int64_widths() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_int32_grid_edit_preserves_integer_width() {
+    use bookie_core::{ConnectOptions, DatabaseDriver};
     use mongodb::bson::{doc, oid::ObjectId};
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
     use testcontainers::ImageExt;
     use testcontainers_modules::mongo::Mongo;
     use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -98,7 +98,7 @@ async fn value_contract_mongodb_int32_grid_edit_preserves_integer_width() {
     assert_eq!(unchanged.get("small"), Some(&mongodb::bson::Bson::Int32(41)));
     let small = parse_input_for_driver("42", Some(&before.columns[small_index]), "mongodb").unwrap();
     let wide = parse_input_for_driver("9007199254740995", Some(&before.columns[wide_index]), "mongodb").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "integer_width_edits",

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_app_services::workspace_state::{ConnectionWorkspaceState, WorkspaceStore, WorkspaceTabRecord};
+use bookie_app_services::workspace_state::{ConnectionWorkspaceState, WorkspaceStore, WorkspaceTabRecord};
 use uuid::Uuid;
 
 fn state(a: Uuid, b: Uuid, first: &str, second: &str) -> ConnectionWorkspaceState {
@@ -21,7 +21,7 @@ fn state(a: Uuid, b: Uuid, first: &str, second: &str) -> ConnectionWorkspaceStat
     }
 }
 
-fn flush(store: &WorkspaceStore) -> Result<(), tablepro_app_services::workspace_state::WorkspaceFlushError> {
+fn flush(store: &WorkspaceStore) -> Result<(), bookie_app_services::workspace_state::WorkspaceFlushError> {
     store.flush().recv_timeout(std::time::Duration::from_secs(20)).unwrap()
 }
 

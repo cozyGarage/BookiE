@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use bookie_core::AttachedDatabase;
 use secrecy::{ExposeSecret, SecretString};
-use tablepro_core::AttachedDatabase;
 
 use super::*;
 use crate::connections::{KNOWN_CONNECTION_FIELDS, SavedSshAuth};
@@ -409,6 +409,7 @@ fn a_version_one_encrypted_bundle_remains_readable() {
     let mut plaintext = Zeroizing::new(Vec::new());
     serde_json::to_writer(&mut *plaintext, &legacy_body).expect("serialize legacy body");
     let envelope = EnvelopeHeader {
+        format: crate::connection_bundle::BUNDLE_FORMAT,
         version: 1,
         producer: export.producer.clone(),
         exported_at: export.exported_at.clone(),
@@ -1163,4 +1164,14 @@ async fn importing_a_bundle_keeps_existing_hop_credentials_until_replacement_is_
     );
 
     forget_imported_bundle_secrets(target, &carried).await;
+}
+
+#[test]
+fn a_plaintext_bundle_exported_under_the_legacy_format_still_parses() {
+    let exported = export_plaintext(&export_of(Vec::new(), Vec::new())).expect("export");
+    let legacy = String::from_utf8(exported)
+        .unwrap()
+        .replace(BUNDLE_FORMAT, crate::connection_bundle::LEGACY_BUNDLE_FORMAT);
+
+    assert!(parse_bundle(legacy.as_bytes()).is_ok());
 }

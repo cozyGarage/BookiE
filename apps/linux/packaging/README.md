@@ -4,17 +4,17 @@ See [platforms](../../../docs/platforms.md) for released artifacts, native requi
 
 ## Arch package candidate
 
-The recipe in [`arch/PKGBUILD`](arch/PKGBUILD) accepts only an immutable commit archive and a real SHA-256 checksum. It installs `bookie`, `bookie-agentd`, `tablepro-askpass`, compatibility aliases `tablepro` and `tablepro-agentd`, desktop/AppStream/icon metadata, the license, the example policy, and any compiled translation catalogs. It deliberately does not ship a systemd unit: stdio agentd is launched on demand by its MCP client.
+The recipe in [`arch/PKGBUILD`](arch/PKGBUILD) accepts only an immutable commit archive and a real SHA-256 checksum. It installs `bookie`, `bookie-agentd`, `bookie-askpass`, desktop/AppStream/icon metadata, the license, the example policy, and any compiled translation catalogs. It deliberately does not ship a systemd unit: stdio agentd is launched on demand by its MCP client.
 
 After committing and validating the candidate (no published tag required), from the repository root:
 
 ```bash
-TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" \
-TABLEPRO_RC_VERSION="$(python3 scripts/check-release-version.py --print)" \
-TABLEPRO_RC_DATE="$(date -u +%F)" bash scripts/build-arch-rc.sh
+BOOKIE_RC_COMMIT="$(git rev-parse HEAD)" \
+BOOKIE_RC_VERSION="$(python3 scripts/check-release-version.py --print)" \
+BOOKIE_RC_DATE="$(date -u +%F)" bash scripts/build-arch-rc.sh
 ```
 
-The example builds the workspace release version from the committed tree. The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives that exact local commit, computes the checksum, builds with `makepkg`, and runs `namcap` and package-content validation. Set `TABLEPRO_RC_TAG=linux-v…` instead of `TABLEPRO_RC_COMMIT` to verify an already published tag against the remote. The Arch package replaces/conflicts with `tablepro`; it retains production paths, application ID, gettext domain, keyring records, and legacy commands. Publication remains a separate decision.
+The example builds the workspace release version from the committed tree. The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives that exact local commit, computes the checksum, builds with `makepkg`, and runs `namcap` and package-content validation. Set `BOOKIE_RC_TAG=linux-v…` instead of `BOOKIE_RC_COMMIT` to verify an already published tag against the remote. The Arch package replaces/conflicts with `bookie`; it retains production paths, application ID, gettext domain, keyring records, and legacy commands. Publication remains a separate decision.
 
 The standalone build, upgrade and removal wrapper runs in an isolated Arch container:
 
@@ -22,13 +22,13 @@ The standalone build, upgrade and removal wrapper runs in an isolated Arch conta
 bash scripts/test-arch-package-container.sh
 ```
 
-Its version defaults to the workspace version and must match it. The candidate date uses `ARCH_CANDIDATE_DATE`, then an inherited `TABLEPRO_RC_DATE`, then the current UTC date. Pin `ARCH_CANDIDATE_DATE` when repeating a dated candidate. Invalid versions and calendar dates are refused before Docker starts. `ARCH_RELEASED_URL` selects the published upgrade fixture.
+Its version defaults to the workspace version and must match it. The candidate date uses `ARCH_CANDIDATE_DATE`, then an inherited `BOOKIE_RC_DATE`, then the current UTC date. Pin `ARCH_CANDIDATE_DATE` when repeating a dated candidate. Invalid versions and calendar dates are refused before Docker starts. `ARCH_RELEASED_URL` selects the published upgrade fixture.
 
 Package-content checks can run in a clean Arch VM or container. To check installed behavior, use a target Arch or Omarchy system running Hyprland on native Wayland. Run the UI smoke in that graphical session:
 
 ```bash
-desktop-file-validate /usr/share/applications/com.tablepro.linux.desktop
-appstreamcli validate --no-net /usr/share/metainfo/com.tablepro.linux.metainfo.xml
+desktop-file-validate /usr/share/applications/com.bookie.linux.desktop
+appstreamcli validate --no-net /usr/share/metainfo/com.bookie.linux.metainfo.xml
 dbus-run-session -- bookie
 bookie-agentd --help
 ```
@@ -46,11 +46,11 @@ DEB_VERSION=0.2.0-1 ./scripts/build-deb.sh
 sudo apt install ./apps/linux/packaging/out/bookie_0.2.0-1_amd64.deb
 ```
 
-The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-agentd`, and `/usr/bin/tablepro-askpass`, with legacy `tablepro` / `tablepro-agentd` aliases. It does not install or enable a user service.
+The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-agentd`, and `/usr/bin/bookie-askpass`. It replaces and conflicts with the legacy `tablepro` package. It does not install or enable a user service.
 
 ## Flatpak builds
 
-The local helper builds `apps/linux/flatpak/com.tablepro.linux.json` with GNOME 51 and writes `/tmp/bookie.flatpak`. For an isolated development install, build `apps/linux/flatpak/com.tablepro.linux.Devel.json` directly. Published artifacts are listed in [platforms](../../../docs/platforms.md). From the repository root:
+The local helper builds `apps/linux/flatpak/com.bookie.linux.json` with GNOME 51 and writes `/tmp/bookie.flatpak`. For an isolated development install, build `apps/linux/flatpak/com.bookie.linux.Devel.json` directly. Published artifacts are listed in [platforms](../../../docs/platforms.md). From the repository root:
 
 ```bash
 ./scripts/build-flatpak.sh
@@ -59,7 +59,7 @@ The local helper builds `apps/linux/flatpak/com.tablepro.linux.json` with GNOME 
 The isolated development build is:
 
 ```bash
-flatpak-builder --user --install build-dir apps/linux/flatpak/com.tablepro.linux.Devel.json
+flatpak-builder --user --install build-dir apps/linux/flatpak/com.bookie.linux.Devel.json
 ```
 
 A local manifest build does not publish a release or Flathub listing.

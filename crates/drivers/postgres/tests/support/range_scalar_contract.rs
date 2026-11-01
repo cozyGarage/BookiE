@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -144,7 +144,7 @@ async fn value_contract_builtin_range_scalars_refuse_lossy_writes_and_preserve_r
                 .await
                 .unwrap();
         } else {
-            assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+            assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
             assert!(
                 connection
                     .query_params("SELECT $1", std::slice::from_ref(&refusal))

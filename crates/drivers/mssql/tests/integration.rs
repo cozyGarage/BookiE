@@ -7,11 +7,11 @@ use std::str::FromStr;
 use chrono::{NaiveDate, NaiveTime};
 use rust_decimal::Decimal;
 
-use drivers_mssql::MssqlDriver;
-use shared_container::{assert_tmpfs_data_dir, start_mssql, start_mssql_durable};
-use tablepro_core::{
+use bookie_core::{
     CatalogObjectKind, ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value,
 };
+use drivers_mssql::MssqlDriver;
+use shared_container::{assert_tmpfs_data_dir, start_mssql, start_mssql_durable};
 
 #[path = "support/catalog_objects.rs"]
 mod catalog_objects;
@@ -201,7 +201,7 @@ async fn ddl_batch_commits_and_rolls_back_as_a_unit() {
         .unwrap_err();
     assert!(matches!(
         err,
-        tablepro_core::DriverError::Transaction { statement_index: 1, .. }
+        bookie_core::DriverError::Transaction { statement_index: 1, .. }
     ));
     let cols = conn.fetch_columns(None, "tx_demo").await.unwrap();
     assert_eq!(cols.len(), 2, "the failed batch must roll back the first statement");
@@ -222,7 +222,7 @@ async fn alter_column_keeps_its_collation() {
     )
     .await
     .unwrap();
-    let mut column = tablepro_core::sql_ddl::DraftColumn::from_info(
+    let mut column = bookie_core::sql_ddl::DraftColumn::from_info(
         conn.fetch_columns(None, "collation_demo")
             .await
             .unwrap()
@@ -232,7 +232,7 @@ async fn alter_column_keeps_its_collation() {
     );
     assert_eq!(column.collation.as_deref(), Some("Latin1_General_100_BIN2"));
     column.nullable = false;
-    for sql in tablepro_core::sql_ddl::build_alter_column("mssql", None, "collation_demo", &column).unwrap() {
+    for sql in bookie_core::sql_ddl::build_alter_column("mssql", None, "collation_demo", &column).unwrap() {
         conn.execute(&sql).await.unwrap();
     }
     let altered = conn.fetch_columns(None, "collation_demo").await.unwrap();
@@ -256,7 +256,7 @@ async fn foreign_key_actions_round_trip() {
         .await
         .unwrap();
 
-    let fk = tablepro_core::ForeignKeyInfo {
+    let fk = bookie_core::ForeignKeyInfo {
         name: "fk_child_parent".into(),
         columns: vec!["parent_id".into()],
         ref_schema: None,
@@ -265,7 +265,7 @@ async fn foreign_key_actions_round_trip() {
         on_delete: Some("CASCADE".into()),
         on_update: Some("NO ACTION".into()),
     };
-    let sql = tablepro_core::sql_ddl::build_add_foreign_key("mssql", None, "fk_child", &fk).unwrap();
+    let sql = bookie_core::sql_ddl::build_add_foreign_key("mssql", None, "fk_child", &fk).unwrap();
     conn.execute(&sql).await.unwrap();
 
     let fks = conn.fetch_foreign_keys(None, "fk_child").await.unwrap();
@@ -279,7 +279,7 @@ async fn foreign_key_actions_round_trip() {
     let mut restricted = fk.clone();
     restricted.name = "fk_restrict".into();
     restricted.on_delete = Some("RESTRICT".into());
-    assert!(tablepro_core::sql_ddl::build_add_foreign_key("mssql", None, "fk_child", &restricted).is_err());
+    assert!(bookie_core::sql_ddl::build_add_foreign_key("mssql", None, "fk_child", &restricted).is_err());
 }
 
 /// An index's INCLUDE columns are not part of its key and carry
@@ -329,7 +329,7 @@ async fn a_result_cut_at_the_row_limit_still_finishes_the_batch() {
     let (_c, opts) = start_mssql().await;
     let conn = connect(opts).await;
 
-    let over_limit = tablepro_core::MAX_QUERY_ROWS + 5;
+    let over_limit = bookie_core::MAX_QUERY_ROWS + 5;
     let sql = format!(
         "SELECT TOP ({over_limit}) 1 AS one FROM sys.all_columns a CROSS JOIN sys.all_columns b; SELECT 1/0 AS c"
     );
@@ -358,14 +358,11 @@ async fn an_interrupted_statement_retires_the_connection_instead_of_stranding_it
     let connection: std::sync::Arc<dyn Connection> = MssqlDriver.connect(opts).await.expect("connect").into();
 
     let token = tokio_util::sync::CancellationToken::new();
-    let control = tablepro_core::OperationControl::new(token.clone(), None);
+    let control = bookie_core::OperationControl::new(token.clone(), None);
     let running = connection.clone();
     let task = tokio::spawn(async move {
         running
-            .query_controlled(
-                "WAITFOR DELAY '00:00:30'; SELECT 1 /* tablepro_mssql_retire */",
-                &control,
-            )
+            .query_controlled("WAITFOR DELAY '00:00:30'; SELECT 1 /* bookie_mssql_retire */", &control)
             .await
     });
     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
@@ -376,7 +373,7 @@ async fn an_interrupted_statement_retires_the_connection_instead_of_stranding_it
         .expect("query task")
         .expect_err("an interrupted query must not succeed");
     assert!(
-        matches!(error, tablepro_core::DriverError::OperationOutcomeUnknown { .. }),
+        matches!(error, bookie_core::DriverError::OperationOutcomeUnknown { .. }),
         "the statement may still be running, so the outcome must be unknown: {error:?}"
     );
 
@@ -384,7 +381,7 @@ async fn an_interrupted_statement_retires_the_connection_instead_of_stranding_it
     let reused = tokio::time::timeout(std::time::Duration::from_secs(5), connection.query("SELECT 1")).await;
     let reused = reused.expect("a retired connection must answer instead of hanging");
     assert!(
-        matches!(reused, Err(tablepro_core::DriverError::Disconnected)),
+        matches!(reused, Err(bookie_core::DriverError::Disconnected)),
         "a retired connection must report itself disconnected: {reused:?}"
     );
 }
@@ -394,7 +391,7 @@ async fn an_interrupted_statement_retires_the_connection_instead_of_stranding_it
 async fn a_completed_controlled_statement_leaves_the_connection_usable() {
     let (_c, opts) = start_mssql().await;
     let connection = connect(opts).await;
-    let control = tablepro_core::OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
+    let control = bookie_core::OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
 
     let first = connection
         .query_controlled("SELECT 1", &control)
@@ -432,8 +429,8 @@ async fn a_column_comment_round_trips_from_its_extended_property() {
     assert_eq!(id.comment, None);
 }
 
-async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+async fn session_value(session: &mut Box<dyn bookie_core::Session>, sql: &str) -> Value {
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
     session.query_params_controlled(sql, &[], &control).await.unwrap().rows[0][0].clone()
 }
 
@@ -444,7 +441,7 @@ async fn a_session_keeps_temp_tables_and_its_transaction_between_statements() {
     let conn = connect(opts).await;
     conn.execute("CREATE TABLE ledger (id int)").await.unwrap();
     let mut session = conn.open_session().await.unwrap();
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
 
     for sql in ["CREATE TABLE #scratch (n int)", "INSERT INTO #scratch VALUES (7)"] {
         session.query_params_controlled(sql, &[], &control).await.unwrap();
@@ -470,7 +467,7 @@ async fn an_interrupted_session_statement_retires_the_session_but_not_the_shared
     let conn = connect(opts).await;
     let mut session = conn.open_session().await.unwrap();
     let token = tokio_util::sync::CancellationToken::new();
-    let control = tablepro_core::OperationControl::new(token.clone(), None);
+    let control = bookie_core::OperationControl::new(token.clone(), None);
     let canceller = tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         token.cancel();
@@ -483,7 +480,7 @@ async fn an_interrupted_session_statement_retires_the_session_but_not_the_shared
     canceller.await.unwrap();
 
     assert!(
-        matches!(error, tablepro_core::DriverError::OperationOutcomeUnknown { .. }),
+        matches!(error, bookie_core::DriverError::OperationOutcomeUnknown { .. }),
         "{error:?}"
     );
     assert!(!session.is_usable());
@@ -523,7 +520,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
     let before = notes_in(conn, table).await;
     let others: Vec<String> = before.iter().filter(|n| *n != "target").cloned().collect();
 
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         driver_id,
         None,
         table,
@@ -545,7 +542,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
         "{table} update touched only the keyed row"
     );
 
-    let delete = tablepro_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
+    let delete = bookie_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
     assert_eq!(
         conn.execute_in_transaction(&[delete]).await.unwrap(),
         vec![1],
@@ -590,7 +587,7 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
     let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
     for (id, value) in values.iter().enumerate() {
-        let statement = tablepro_core::sql_literal::build_insert_literal(
+        let statement = bookie_core::sql_literal::build_insert_literal(
             "mssql",
             None,
             "binary_exports",
@@ -620,8 +617,7 @@ async fn sql_exports_preserve_unicode_and_boolean_values() {
         .unwrap();
     let columns = conn.fetch_columns(None, "literal_exports").await.unwrap();
     let row = vec![Value::Text("漢字 😀 O'Brien \\".into()), Value::Bool(true)];
-    let sql =
-        tablepro_core::sql_literal::build_insert_literal("mssql", None, "literal_exports", &columns, &row).unwrap();
+    let sql = bookie_core::sql_literal::build_insert_literal("mssql", None, "literal_exports", &columns, &row).unwrap();
     conn.execute(&sql).await.unwrap();
     assert_eq!(
         conn.query("SELECT label, enabled FROM literal_exports")
@@ -685,7 +681,7 @@ async fn inexact_legacy_datetime_uses_exact_text_and_supported_temporals_round_t
         .unwrap();
     let legacy_columns = conn.fetch_columns(None, "temporal_legacy_exported").await.unwrap();
     for row in &rows {
-        let statement = tablepro_core::sql_literal::build_insert_literal(
+        let statement = bookie_core::sql_literal::build_insert_literal(
             "mssql",
             None,
             "temporal_legacy_exported",
@@ -736,7 +732,7 @@ async fn inexact_legacy_datetime_uses_exact_text_and_supported_temporals_round_t
         .rows;
     for row in &supported_rows {
         let statement =
-            tablepro_core::sql_literal::build_insert_literal("mssql", None, "temporal_exported", &columns, row)
+            bookie_core::sql_literal::build_insert_literal("mssql", None, "temporal_exported", &columns, row)
                 .expect("supported temporal columns should be exportable");
         conn.execute(&statement)
             .await
@@ -883,16 +879,15 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
         ]]
     );
 
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let mapping = (0..result.columns.len()).map(Some).collect::<Vec<_>>();
-    let imported =
-        tablepro_core::import::row_to_values(&sheet.rows[0], &mapping, &result.columns, &options, 2).unwrap();
+    let imported = bookie_core::import::row_to_values(&sheet.rows[0], &mapping, &result.columns, &options, 2).unwrap();
     assert_eq!(imported, result.rows[0]);
 
     conn.execute(
@@ -1065,7 +1060,7 @@ async fn value_contract_datetimeoffset_keeps_its_offset_through_results_paramete
             .await
             .unwrap();
         let statement =
-            tablepro_core::sql_literal::build_insert_literal("mssql", None, "zoned_exported", &columns, row).unwrap();
+            bookie_core::sql_literal::build_insert_literal("mssql", None, "zoned_exported", &columns, row).unwrap();
         conn.execute(&statement).await.unwrap();
     }
     let total = Value::Int(ZONED_STAMPS.len() as i64);

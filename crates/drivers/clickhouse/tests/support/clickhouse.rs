@@ -1,5 +1,5 @@
+use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig};
 use drivers_clickhouse::ClickhouseDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
 use testcontainers::core::wait::HttpWaitStrategy;
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
@@ -14,7 +14,7 @@ pub async fn start_clickhouse() -> (ContainerAsync<GenericImage>, ConnectOptions
                 .with_expected_status_code(200u16),
         ))
         .with_env_var("CLICKHOUSE_USER", "default")
-        .with_env_var("CLICKHOUSE_PASSWORD", "tablepro")
+        .with_env_var("CLICKHOUSE_PASSWORD", "bookie")
         .with_env_var("CLICKHOUSE_DB", "default")
         .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
         .with_startup_timeout(std::time::Duration::from_secs(180))
@@ -28,7 +28,7 @@ pub async fn start_clickhouse() -> (ContainerAsync<GenericImage>, ConnectOptions
         port,
         database: "default".into(),
         username: "default".into(),
-        password: secrecy::SecretString::new("tablepro".to_string().into()),
+        password: secrecy::SecretString::new("bookie".to_string().into()),
         tls: TlsConfig::disabled(),
         ..Default::default()
     };
@@ -51,6 +51,6 @@ async fn wait_until_queryable(opts: &ConnectOptions) {
     panic!("clickhouse accepted /ping but never answered SELECT 1 within 60s: {last_error}");
 }
 
-pub async fn connect(opts: ConnectOptions) -> Box<dyn tablepro_core::Connection> {
+pub async fn connect(opts: ConnectOptions) -> Box<dyn bookie_core::Connection> {
     ClickhouseDriver.connect(opts).await.expect("connect")
 }

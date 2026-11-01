@@ -6,8 +6,8 @@ import pyatspi
 
 
 def window_y_offset():
-    if "TABLEPRO_GTK_Y_OFFSET" in os.environ:
-        return int(os.environ["TABLEPRO_GTK_Y_OFFSET"])
+    if "BOOKIE_GTK_Y_OFFSET" in os.environ:
+        return int(os.environ["BOOKIE_GTK_Y_OFFSET"])
     return 19
 
 

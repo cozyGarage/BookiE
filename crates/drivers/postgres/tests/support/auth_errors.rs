@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError};
 use secrecy::SecretString;
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError};
 
 use crate::start_pg;
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::*;
-use tablepro_app_services::completion_proposals::Candidates;
+use bookie_app_services::completion_proposals::Candidates;
 
 struct Data {
     candidates: Candidates,

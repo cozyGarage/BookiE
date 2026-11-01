@@ -15,8 +15,8 @@ pub(in crate::ui) enum Input {
         generation: u64,
         index: u64,
         identity: StatementIdentity,
-        spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
-        columns: Vec<tablepro_core::ColumnInfo>,
+        spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+        columns: Vec<bookie_core::ColumnInfo>,
     },
     PageLoaded {
         generation: u64,
@@ -35,7 +35,7 @@ pub(in crate::ui) struct StreamStart {
     pub(super) identity: StatementIdentity,
     pub(super) sql_preview: String,
     pub(super) export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
-    pub(super) spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
+    pub(super) spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
 }
 
@@ -44,7 +44,7 @@ pub(super) struct ActiveStream {
     identity: StatementIdentity,
     sql_preview: String,
     export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
-    spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
+    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     cache: StreamPageCache,
     error: Option<String>,
 }
@@ -314,8 +314,8 @@ fn load_stream_page(
     generation: u64,
     index: u64,
     identity: StatementIdentity,
-    spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
-    columns: Vec<tablepro_core::ColumnInfo>,
+    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+    columns: Vec<bookie_core::ColumnInfo>,
 ) {
     let loader = sender.clone();
     sender.command(move |_, shutdown| {
@@ -355,7 +355,7 @@ mod tests {
             identity: StatementIdentity::default(),
             sql_preview: "SELECT 2".into(),
             export_query: None,
-            spool: tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+            spool: bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
                 .create()
                 .expect("test spool"),
             cache: StreamPageCache::default(),
