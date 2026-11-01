@@ -78,7 +78,8 @@ def gate(tasks, initial_status='failure'):
         token.write_text('fixture-token')
         env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
                    GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
-                   FORGEJO_GATE_LOCK=str(root / 'gate.lock'), FORGEJO_GATE_TIMEOUT_MINUTES='1')
+                   FORGEJO_GATE_LOCK=str(root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(root / 'locks'),
+                   FORGEJO_GATE_TIMEOUT_MINUTES='1')
         return subprocess.run(['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject'],
                               cwd=root, env=env, capture_output=True, text=True, timeout=10)
 
@@ -146,6 +147,60 @@ class ForgejoGateTests(unittest.TestCase):
                 stdout, stderr = process.communicate(timeout=10)
                 self.assertEqual(process.returncode, 0, stdout + stderr)
             self.assertEqual(active.read_text().split()[1], '2')
+
+    def test_waiting_gate_uses_slot_one_when_only_slot_two_stays_busy(self):
+        import fcntl
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_root = root / 'run'
+            tools = run_root / 'bin'
+            tools.mkdir(parents=True)
+            for name, source in [('git', GIT), ('curl', f'#!{sys.executable}\n' + CURL), ('sleep', '#!/bin/sh\nexit 0\n')]:
+                path = tools / name
+                path.write_text(source)
+                path.chmod(0o755)
+            fixture = run_root / 'fixture.json'
+            fixture.write_text(json.dumps({
+                'run': {'id': 928, 'index_in_repo': 927, 'commit_sha': HEAD, 'workflow_id': 'ci.yml'},
+                'initial_status': 'success', 'tasks': [], 'logs': '',
+            }))
+            token = run_root / 'token'
+            token.write_text('fixture-token')
+            lock_dir = root / 'locks'
+            lock_dir.mkdir()
+            held = []
+            for slot in (1, 2):
+                handle = (lock_dir / f'slot-{slot}.lock').open('w')
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                held.append(handle)
+            env = dict(os.environ, PATH=str(tools) + os.pathsep + os.environ['PATH'],
+                       GATE_TEST_HEAD=HEAD, GATE_TEST_FIXTURE=str(fixture), FORGEJO_TOKEN_FILE=str(token),
+                       FORGEJO_GATE_LOCK=str(run_root / 'gate.lock'), FORGEJO_GATE_LOCK_DIR=str(lock_dir),
+                       FORGEJO_GATE_TIMEOUT_MINUTES='1')
+            process = subprocess.Popen(
+                ['bash', str(ROOT / 'scripts/forgejo-gate.sh'), 'subject'],
+                cwd=run_root, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            try:
+                self.assertIn('two Forgejo gates are already running', process.stdout.readline())
+                fcntl.flock(held[0], fcntl.LOCK_UN)
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    fcntl.flock(held[1], fcntl.LOCK_UN)
+                    stdout, stderr = process.communicate(timeout=5)
+                    self.fail(f'gate did not take free slot 1 while slot 2 stayed busy:\n{stdout}\n{stderr}')
+                stdout, stderr = process.communicate()
+                self.assertEqual(process.returncode, 0, stdout + stderr)
+                self.assertIn('passed', stdout)
+            finally:
+                if process.poll() is None:
+                    fcntl.flock(held[1], fcntl.LOCK_UN)
+                    process.communicate(timeout=5)
+                for handle in held:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
+                    handle.close()
 
 
 if __name__ == '__main__':

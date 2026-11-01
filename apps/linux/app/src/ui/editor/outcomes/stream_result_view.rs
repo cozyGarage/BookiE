@@ -1,6 +1,9 @@
 use super::*;
 pub(in crate::ui::editor) use super::{build_stream_page_widget, result_view_key};
 
+#[cfg(test)]
+thread_local! { pub(super) static PAGE_ROW_INDEX_LOOKUPS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
+
 pub(in crate::ui::editor) fn build_streamed_result_widget(
     outcome: &StatementOutcome,
     result: &StreamedResult,
@@ -127,33 +130,47 @@ pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> St
     let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages)
         .replace("{pages}", &result.total_pages.to_string());
     let received = format!("{rows} · {pages}");
-    let retained: usize = result.pages.iter().map(|page| page.rows.len()).sum();
-    if retained == result.total_rows {
+    if stream_retained_rows(result) == result.total_rows {
         return received;
     }
     let notice = crate::tr!("Earlier pages can be loaded from temporary storage.");
     format!("{received}\n{notice}")
 }
 
+fn stream_retained_rows(result: &StreamedResult) -> usize {
+    #[cfg(test)]
+    RETAINED_ROW_COUNT_LOOKUPS.with(|visits| visits.set(visits.get() + 1));
+    result.retained_rows
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(super) static RETAINED_ROW_COUNT_LOOKUPS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 pub(in crate::ui::editor) fn stream_page_label(result: &StreamedResult, page_index: usize) -> String {
-    let Some(count) = result
-        .page_row_counts
-        .get(page_index)
-        .copied()
-        .filter(|count| *count > 0)
-    else {
+    let Some(count) = stream_page_row_count(result, page_index).filter(|count| *count > 0) else {
         return crate::tr!("Rows 0");
     };
-    let start = result
-        .page_row_counts
-        .iter()
-        .take(page_index)
-        .sum::<usize>()
-        .saturating_add(1);
+    let Some(start) = stream_page_row_start(result, page_index) else {
+        return crate::tr!("Rows 0");
+    };
     let end = start.saturating_add(count.saturating_sub(1));
     crate::tr!("Rows {start}-{end}")
         .replace("{start}", &start.to_string())
         .replace("{end}", &end.to_string())
+}
+
+fn stream_page_row_count(result: &StreamedResult, page_index: usize) -> Option<usize> {
+    #[cfg(test)]
+    PAGE_ROW_INDEX_LOOKUPS.with(|visits| visits.set(visits.get() + 1));
+    result.page_row_counts.get(page_index).copied()
+}
+
+fn stream_page_row_start(result: &StreamedResult, page_index: usize) -> Option<usize> {
+    #[cfg(test)]
+    PAGE_ROW_INDEX_LOOKUPS.with(|visits| visits.set(visits.get() + 1));
+    result.page_row_starts.get(page_index).copied()
 }
 
 fn stream_terminal_notice(result: &StreamedResult) -> Option<String> {

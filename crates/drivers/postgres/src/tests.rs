@@ -12,6 +12,12 @@ fn pooler_symptoms_get_a_hint_and_other_errors_are_left_alone() {
         assert!(message.starts_with("prepared statement"), "{message}");
         assert!(message.contains("max_prepared_statements"), "{message}");
     }
+    let binary_bind = with_pooler_hint("incorrect binary data format in bind parameter 1", Some("22P03"));
+    assert!(binary_bind.contains("max_prepared_statements"), "{binary_bind}");
+    assert_eq!(
+        with_pooler_hint("invalid binary representation", Some("22P03")),
+        "invalid binary representation"
+    );
     assert_eq!(
         with_pooler_hint("relation \"t\" does not exist", Some("42P01")),
         "relation \"t\" does not exist"

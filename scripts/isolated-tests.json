@@ -63,6 +63,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::pinned::tests::closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width"
     ],
     [
@@ -541,6 +546,11 @@
       "tablepro-app",
       "--lib",
       "ui::editor::stream_view::tests::live_progress_lookup_does_not_walk_result_pages"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::stream_view::tests::live_eviction_visits_only_pages_evicted_since_the_previous_update"
     ],
     [
       "tablepro-app",
