@@ -14,9 +14,10 @@ class DistroFloorShardTests(unittest.TestCase):
     def test_distro_floor_scenarios_use_six_shards_and_unique_mcp_slots(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         scenarios = workflow.split("  distro-floor-scenarios:\n", 1)[1].split("  driver:\n", 1)[0]
-        self.assertIn("shard: [1, 2, 3, 4, 5, 6]", scenarios)
-        self.assertIn('scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"', scenarios)
-        self.assertIn("TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6", scenarios)
+        self.assertIn("shard_group: [1, 2]", scenarios)
+        self.assertIn('for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do', scenarios)
+        self.assertIn('scripts/ci-mcp-port.py "$((10 + shard))"', scenarios)
+        self.assertIn('TABLEPRO_GTK_SHARD="${shard}/6"', scenarios)
 
     def test_package_test_containers_receive_the_worker_compiler_limit(self):
         with tempfile.TemporaryDirectory() as temporary:
