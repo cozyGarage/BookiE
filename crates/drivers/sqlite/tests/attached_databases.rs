@@ -9,6 +9,8 @@ async fn multi_database_attachment_and_schema_listing() {
     let dir = TempDir::new().unwrap();
     let main_path = dir.path().join("main.db").to_string_lossy().to_string();
     let aux_path = dir.path().join("aux.db").to_string_lossy().to_string();
+    let _ = std::fs::File::create(&main_path);
+    let _ = std::fs::File::create(&aux_path);
 
     let aux_conn = SqliteDriver
         .connect(ConnectOptions {
@@ -71,6 +73,8 @@ async fn cross_schema_query_and_row_fetching() {
     let dir = TempDir::new().unwrap();
     let main_path = dir.path().join("main.db").to_string_lossy().to_string();
     let aux_path = dir.path().join("aux.db").to_string_lossy().to_string();
+    let _ = std::fs::File::create(&main_path);
+    let _ = std::fs::File::create(&aux_path);
 
     let aux_conn = SqliteDriver
         .connect(ConnectOptions {
@@ -129,6 +133,8 @@ async fn attached_schema_metadata() {
     let dir = TempDir::new().unwrap();
     let main_path = dir.path().join("main.db").to_string_lossy().to_string();
     let aux_path = dir.path().join("aux.db").to_string_lossy().to_string();
+    let _ = std::fs::File::create(&main_path);
+    let _ = std::fs::File::create(&aux_path);
 
     let aux_conn = SqliteDriver
         .connect(ConnectOptions {
@@ -183,6 +189,8 @@ async fn session_inherits_attached_databases() {
     let dir = TempDir::new().unwrap();
     let main_path = dir.path().join("main.db").to_string_lossy().to_string();
     let aux_path = dir.path().join("aux.db").to_string_lossy().to_string();
+    let _ = std::fs::File::create(&main_path);
+    let _ = std::fs::File::create(&aux_path);
 
     let aux_conn = SqliteDriver
         .connect(ConnectOptions {
@@ -225,6 +233,7 @@ async fn missing_attached_database_skipped_without_error() {
     let dir = TempDir::new().unwrap();
     let main_path = dir.path().join("main.db").to_string_lossy().to_string();
     let missing_path = dir.path().join("does_not_exist.db").to_string_lossy().to_string();
+    let _ = std::fs::File::create(&main_path);
 
     let conn = SqliteDriver
         .connect(ConnectOptions {

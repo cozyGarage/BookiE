@@ -292,3 +292,40 @@ fn mysql_empty_text_is_written_and_compared_as_a_server_expression() {
     );
     assert_eq!(params, vec![Value::Int(7)]);
 }
+
+#[test]
+fn original_text_keys_are_guarded_without_changing_the_key_lookup() {
+    let columns = [column("id", true), column("payload", false)];
+    for driver in ["postgres", "sqlite", "mysql", "mssql"] {
+        let (sql, params) = build_optimistic_keyed_update(
+            driver,
+            None,
+            "records",
+            &columns,
+            &[(1, Value::Null, Value::Text("edited".into()))],
+            &[Value::Text("Ada".into())],
+        )
+        .unwrap();
+        assert_eq!(params[1], Value::Text("Ada".into()));
+        assert_eq!(params[2], Value::Text("Ada".into()));
+        assert!(!sql.contains("Ada"));
+    }
+}
+
+#[test]
+fn original_postgres_json_text_keeps_source_identity() {
+    let mut columns = [column("id", true), column("payload", false)];
+    columns[1].data_type = "json".into();
+    let original = Value::JsonText("{\"a\":1,\"a\":2}".into());
+    let (sql, params) = build_optimistic_keyed_update(
+        "postgres",
+        None,
+        "records",
+        &columns,
+        &[(1, original.clone(), Value::JsonText("{}".into()))],
+        &[Value::Int(7)],
+    )
+    .unwrap();
+    assert!(!sql.contains("jsonb"));
+    assert_eq!(params.last(), Some(&original));
+}

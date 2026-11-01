@@ -2,7 +2,7 @@
 
 These documents record the reasons behind major technical choices. Accepted decisions stay stable. A later decision may supersede an earlier one by linking to it explicitly.
 
-Proposed decisions are listed in the [proposal index](../proposals/README.md). Closures and decisions that were later corrected are recorded in [decision lessons](lessons.md).
+This index contains accepted decisions.
 
 ## Lifecycle
 
@@ -74,11 +74,10 @@ Other options and why they were rejected.
 | [0023](0023-system-openssh-transport-boundaries.md) | System OpenSSH transport boundaries | Accepted | Askpass answers only exact prompts, forced client options, no global state, and no `core` dependency in the ssh crate. |
 | [0024](0024-keyed-grid-writes-check-what-they-overwrite.md) | Keyed grid writes check what they overwrite | Accepted | Relational updates compare edited columns' original values and must affect exactly one row; MongoDB guards by field and row; deletes and ABA are limits. |
 | [0025](0025-transient-result-page-spool.md) | Keep fetched result pages in a transient spool | Accepted | A private, bounded, encrypted spool makes every fetched PostgreSQL page revisitable without retaining all rows in RAM or rerunning SQL. |
-| [0026](0026-audit-journal-segments.md) | Rotate the audit journal into verified segments | Proposed | A size-rotated, hash-chained set of segments bounds start-up and verification cost without dropping audit records. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 
-Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted means the architecture choice is recorded. What has been built, and runtime acceptance, are tracked in [implementation status](implementation-status.md) and on the owning issues, never inside an ADR.
+Decisions 0007–0009 extract established product and compatibility rules. Accepted means the architecture choice is recorded; implementation and acceptance remain separate from the decision itself.
 
 ## Adding a decision
 
@@ -89,4 +88,4 @@ Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepte
 5. Submit it through the normal review process.
 6. Record every rejected alternative with its reason under **Alternatives considered**. A dated review that declines something is not a decision record until it is here.
 7. A limitation entry never overrides an accepted ADR. If shipped behaviour differs from an ADR, fix the behaviour or record a new ADR that supersedes it.
-8. After acceptance, edit an ADR only to clarify its wording. Progress, partial implementation, measurements and acceptance results go in [implementation status](implementation-status.md) or on the owning issue. Do not add an "Implementation status" section to an ADR.
+8. After acceptance, edit an ADR only to clarify its wording. Keep progress in the project tracker and run-specific measurements or acceptance evidence in private verification records, not in an ADR.

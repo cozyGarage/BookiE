@@ -24,7 +24,7 @@ bash scripts/test-arch-package-container.sh
 
 Its version defaults to the workspace version and must match it. The candidate date uses `ARCH_CANDIDATE_DATE`, then an inherited `TABLEPRO_RC_DATE`, then the current UTC date. Pin `ARCH_CANDIDATE_DATE` when repeating a dated candidate. Invalid versions and calendar dates are refused before Docker starts. `ARCH_RELEASED_URL` selects the published upgrade fixture.
 
-Package-content checks can run in a clean Arch VM or container; they do not qualify PKG-1. Install, upgrade, rollback and removal acceptance requires the target Arch or Omarchy system running Hyprland on native Wayland. Run the UI smoke in that graphical session:
+Package-content checks can run in a clean Arch VM or container. To check installed behavior, use a target Arch or Omarchy system running Hyprland on native Wayland. Run the UI smoke in that graphical session:
 
 ```bash
 desktop-file-validate /usr/share/applications/com.tablepro.linux.desktop
@@ -39,7 +39,7 @@ Test install, upgrade, downgrade, and removal. Package operations must leave the
 
 For native-library and toolchain requirements, see [platforms](../../../docs/platforms.md).
 
-The Debian builder and validator use the workspace release version with Debian revision `-1` by default. `DEB_VERSION` can select another packaging revision. The commands below build and install a local package from the current workspace; they do not establish Debian desktop acceptance, which remains tracked under [PKG-2](../../../docs/bookie-0.2-sprint.md#delivery-boundary).
+The Debian builder and validator use the workspace release version with Debian revision `-1` by default. `DEB_VERSION` can select another packaging revision. The commands below build and install a local package from the current workspace; they do not replace the manual scenarios in the [verification checklist](../../../docs/manual-verification-0.2-features.md).
 
 ```bash
 DEB_VERSION=0.2.0-1 ./scripts/build-deb.sh
@@ -50,7 +50,7 @@ The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-ag
 
 ## Flatpak builds
 
-The local helper builds `apps/linux/flatpak/com.tablepro.linux.json` with GNOME 51 and writes `/tmp/bookie.flatpak`. For an isolated development install, build `apps/linux/flatpak/com.tablepro.linux.Devel.json` directly. Published Flatpak and Flathub status is in [platforms](../../../docs/platforms.md#published-020-release). From the repository root:
+The local helper builds `apps/linux/flatpak/com.tablepro.linux.json` with GNOME 51 and writes `/tmp/bookie.flatpak`. For an isolated development install, build `apps/linux/flatpak/com.tablepro.linux.Devel.json` directly. Published artifacts are listed in [platforms](../../../docs/platforms.md). From the repository root:
 
 ```bash
 ./scripts/build-flatpak.sh
@@ -62,7 +62,7 @@ The isolated development build is:
 flatpak-builder --user --install build-dir apps/linux/flatpak/com.tablepro.linux.Devel.json
 ```
 
-Flathub submission still needs offline Cargo sources; portal permissions and public update-channel behavior remain under PKG-8 review. A local manifest build does not establish release or Flathub acceptance.
+A local manifest build does not publish a release or Flathub listing.
 
 ## Release versions
 

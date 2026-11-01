@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-24
-- **Origin**: Extracted from the 2026-09-25 system OpenSSH port; the code was checked on the extraction date. [ADR 0008](0008-connection-and-session-ownership.md) sets the trust rules (ask before accepting a host key, no silent backend switch); this record covers how the transport is built.
+[ADR 0008](0008-connection-and-session-ownership.md) sets the trust rules (ask before accepting a host key, no silent backend switch); this record covers how the transport is built.
 
 ## Context
 
@@ -13,7 +13,7 @@ BookiE can reach a database through a saved `ssh` tunnel handled by the system O
 1. **Askpass answers only an exact match.** A stored password answers only a prompt naming exactly the configured `user@host`. A stored passphrase answers only a prompt naming exactly the configured key path. Keyboard-interactive text is classified before the password suffix, so a server-supplied prompt cannot pose as a password prompt.
 2. **Everything else goes to a `Prompter`.** Every other prompt, and every host-key confirmation, is passed to a `Prompter` trait object. `UnattendedPrompter` (used by `bookie-agentd`) declines all of it. A confirmation needs an explicit accept, a secret prompt needs a secret, and a mismatched answer cancels.
 3. **The askpass bridge is hardened.** It rejects a peer with another uid as an error, bounds each frame to 64 KiB, times out a peer that never sends a prompt, and builds replies in `Zeroizing` buffers.
-4. **The client's options cannot be turned off from `~/.ssh/config`.** The transport forces `StrictHostKeyChecking=ask`, `StreamLocalBindUnlink=no`, `SessionType=none` and `GatewayPorts=no`. Host-key checking applies to the destination and to every `ProxyJump` hop, which closed the gap tracked in #970.
+4. **The client's options cannot be turned off from `~/.ssh/config`.** The transport forces `StrictHostKeyChecking=ask`, `StreamLocalBindUnlink=no`, `SessionType=none` and `GatewayPorts=no`. Host-key checking applies to the destination and to every `ProxyJump` hop,  for the destination and every `ProxyJump` hop.
 5. **No process-global state.** An explicit `OpenSshContext` holds the runtime, program paths and timeouts. There are no global task trackers or runtime cells.
 6. **The ssh crate does not depend on `core`.** It returns its own `OpenSshError` and takes an `OpenSshTimeouts` value. A forward returns its local endpoint and the original target, so the caller keeps the service host for TLS verification.
 

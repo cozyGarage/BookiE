@@ -634,3 +634,20 @@ fn the_batches_a_plan_offers_are_bounded_and_cover_every_row() {
     assert_eq!(batches, vec![3, 3, 1]);
     assert_eq!(batches.iter().sum::<usize>(), 7);
 }
+
+#[test]
+fn a_table_name_containing_values_is_not_rewritten_by_the_override_clause() {
+    let mut columns = vec![column("id", "bigint"), column("name", "text")];
+    columns[0].is_auto_increment = true;
+    let mapping = vec![Some(0), Some(1)];
+    let sheet = sheet(&[&["901", "ada"]], &["id", "name"]);
+    let mut target = target(&columns, &mapping);
+    target.table = "my VALUES t";
+
+    let plan = build_insert_plan(&target, &sheet, &CsvImportOptions::default()).expect("plan");
+
+    assert_eq!(
+        plan.statement,
+        "INSERT INTO \"my VALUES t\" (\"id\", \"name\") OVERRIDING SYSTEM VALUE VALUES ($1, $2)"
+    );
+}

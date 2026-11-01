@@ -1,2 +1,0 @@
-Command: git diff --check
-Result: passed.

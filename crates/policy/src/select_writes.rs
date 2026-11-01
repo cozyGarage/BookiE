@@ -8,6 +8,7 @@ use sqlparser::keywords::Keyword;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
 use crate::classify::{StatementClass, StatementFacts, classify_query};
+use crate::effects::Effects;
 
 pub(crate) fn select_writes(select: &Select) -> bool {
     select.into.is_some()
@@ -32,6 +33,7 @@ pub(crate) fn select_writes(select: &Select) -> bool {
 pub(crate) fn with_locking_backstop(mut facts: StatementFacts, sql: &str, dialect: &dyn Dialect) -> StatementFacts {
     if facts.class == StatementClass::Select && has_locking_clause(sql, dialect) {
         facts.class = StatementClass::Other;
+        facts.effects = facts.effects.union(Effects::WRITES_ROWS);
     }
     facts
 }

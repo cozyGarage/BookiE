@@ -1,2 +1,0 @@
-rtk python3 scripts/inventory-ignored-tests.py --check
-ignored-test inventory and isolated registrations: OK
