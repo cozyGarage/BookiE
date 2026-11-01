@@ -46,14 +46,13 @@ run_full() {
   cargo fmt --all -- --check
 
   echo "==> cargo clippy"
-  cargo clippy --workspace --exclude bookie-driver-duckdb --all-targets -- -D warnings
+  cargo clippy --workspace --all-targets -- -D warnings
 
   echo "==> nextest --workspace --lib --bins"
   # Compiling tests already builds the crates; a separate `cargo build`
   # beforehand doubles wall time for little signal.
-  # The DuckDB driver crate has its own CI job; the app build already includes it.
   NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-  "$NEXTEST" nextest run --workspace --exclude bookie-driver-duckdb --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+  "$NEXTEST" nextest run --workspace --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
 
   echo "==> sandbox integration tier"
   "$ROOT/scripts/test-sandbox.sh"

@@ -107,7 +107,6 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
-| DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus the app build |
 | Mutation | The configured mutation workflow | Review selected, caught, missed, timed-out and unviable mutants for the exact source revision |
 | Coverage | The configured coverage workflow | Review the report and configured coverage floor for the exact source revision |
 | Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |

@@ -19,7 +19,7 @@ report = {
     "commit": capture("git", "rev-parse", "HEAD"),
     "working_tree": capture("git", "status", "--porcelain"),
     "rustc": capture("rustc", "--version"), "cargo": capture("cargo", "--version"),
-    "features": "default; release tier also checks duckdb",
+    "features": "default",
     "status": "running", "test_summaries": [],
     "manual_gates": ["installed Wayland", "package upgrade/rollback", "exact-candidate soak"],
 }

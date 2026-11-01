@@ -448,7 +448,7 @@ Config and history live under `$XDG_CONFIG_HOME/bookie/` (or `bookie-devel` in d
 
 ## Build and validation
 
-Default workspace Clippy/unit checks exclude the DuckDB driver crate, which has its own CI job; the app build includes it. Required checks and local commands are listed in [AGENTS.md](./AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
+Workspace Clippy and unit checks include the DuckDB driver like every other crate. Required checks and local commands are listed in [AGENTS.md](./AGENTS.md) and the [validation playbook](docs/validation-playbook.md#ci-tiers).
 
 ## Deliberate limits
 
