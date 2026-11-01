@@ -556,14 +556,14 @@ jobs:
     runs-on: any-host
     needs: [distro-floor]
     if: github.event_name != 'pull_request'
-    timeout-minutes: 30
+    timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard_group: [1, 2]
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -597,11 +597,15 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
-      - name: Select isolated MCP HTTP port
-        run: cd src && python3 scripts/ci-mcp-port.py "$((10 + ${{ matrix.shard }}))"
-      - name: Distro-floor scenario shard
+      - name: Distro-floor scenario shards
+        env:
+          SHARD_GROUP: ${{ matrix.shard_group }}
         run: |
-          cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/6 bash scripts/test-distro-floor.sh debian:testing
+          cd src
+          for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do
+            python3 scripts/ci-mcp-port.py "$((10 + shard))"
+            TABLEPRO_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing
+          done
 
       - name: Finalize runner job
         if: always()
