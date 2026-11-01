@@ -3,7 +3,7 @@ use gtk4::prelude::*;
 use libadwaita as adw;
 use std::io::{self, Write};
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use super::display::{readonly_null_sentinel, value_to_full_edit_text};
 

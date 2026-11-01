@@ -1,12 +1,12 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::os::unix::fs::PermissionsExt;
 
-use sha2::{Digest, Sha256};
-use tablepro_policy::{
+use bookie_policy::{
     AuditAdministrativeAction, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditTerminalStatus,
     AuditTransactionOutcome, Principal,
 };
-use tablepro_storage::{AuditJournal, StorageError, sample_event};
+use bookie_storage::{AuditJournal, StorageError, sample_event};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 const GENESIS_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -439,7 +439,7 @@ async fn a_cursor_whose_first_page_reported_pending_recovers_as_unknown() {
     assert_eq!(last.terminal_status, AuditTerminalStatus::Unknown);
 }
 
-fn intent_event(operation_id: Uuid, operation_class: AuditOperationClass) -> tablepro_policy::AuditEvent {
+fn intent_event(operation_id: Uuid, operation_class: AuditOperationClass) -> bookie_policy::AuditEvent {
     let mut event = sample_event(Principal::human_gui());
     event.operation_id = operation_id;
     event.phase = AuditRecordPhase::Intent;

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, Value};
+use bookie_core::{Connection, Value};
 
 pub async fn assert_vector_contract(conn: &dyn Connection) {
     for table in ["vector_source", "vector_bound", "vector_exported"] {
@@ -37,8 +37,7 @@ pub async fn assert_vector_contract(conn: &dyn Connection) {
         .await
         .unwrap();
         let insert =
-            tablepro_core::sql_literal::build_insert_literal("postgres", None, "vector_exported", &columns, row)
-                .unwrap();
+            bookie_core::sql_literal::build_insert_literal("postgres", None, "vector_exported", &columns, row).unwrap();
         conn.execute(&insert).await.unwrap();
     }
     for copy in ["vector_bound", "vector_exported"] {

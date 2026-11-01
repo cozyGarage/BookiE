@@ -1,7 +1,7 @@
 use super::database_service::{ConnectionIdentity, DatabaseService};
+use bookie_core::{Connection, TableInfo};
+use bookie_policy::{PolicyGuard, Principal};
 use std::sync::Arc;
-use tablepro_core::{Connection, TableInfo};
-use tablepro_policy::{PolicyGuard, Principal};
 use uuid::Uuid;
 
 pub type Catalog = (Vec<TableInfo>, Vec<TableInfo>);
@@ -12,7 +12,7 @@ pub struct CatalogOrigin {
     pub identity: ConnectionIdentity,
 }
 
-pub use tablepro_app_services::catalog_changes::CatalogChanges;
+pub use bookie_app_services::catalog_changes::CatalogChanges;
 
 impl CatalogOrigin {
     pub fn capture(id: Option<Uuid>, database: &DatabaseService) -> Option<Self> {
@@ -44,12 +44,12 @@ mod tests {
     use super::*;
 
     fn session() -> (Arc<dyn Connection>, ConnectionIdentity) {
-        use tablepro_core::DatabaseDriver;
+        use bookie_core::DatabaseDriver;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap();
-        let options = tablepro_core::ConnectOptions {
+        let options = bookie_core::ConnectOptions {
             database: ":memory:".into(),
             ..Default::default()
         };

@@ -1,6 +1,6 @@
+use bookie_core::Value;
 use sqlx::postgres::{PgTypeInfo, PgTypeKind, PgValueFormat, PgValueRef};
 use sqlx::{TypeInfo, ValueRef};
-use tablepro_core::Value;
 
 pub(super) const MAX_ARRAY_TEXT_BYTES: usize = 16 * 1024 * 1024;
 // PostgreSQL sends int2vector and oidvector in array wire format, but their text input accepts only

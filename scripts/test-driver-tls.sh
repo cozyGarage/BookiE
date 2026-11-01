@@ -16,7 +16,7 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-KEEP_UP="${TABLEPRO_FIXTURE_KEEP_UP:-0}"
+KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
 XDG_CONFIG_HOME="$(mktemp -d)"
 export XDG_CONFIG_HOME
 trap teardown EXIT
@@ -27,7 +27,7 @@ compose() {
 
 teardown() {
   if [[ "$KEEP_UP" == "1" ]]; then
-    echo "leaving the driver-tls fixture running (TABLEPRO_FIXTURE_KEEP_UP=1)"
+    echo "leaving the driver-tls fixture running (BOOKIE_FIXTURE_KEEP_UP=1)"
   else
     compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   fi
@@ -50,10 +50,10 @@ else
   exit "$startup_status"
 fi
 
-export TABLEPRO_FIXTURE_DRIVER_TLS=1
-export TABLEPRO_DRIVER_TLS_MATERIALS="$FIXTURE/materials"
-export TABLEPRO_DRIVER_TLS_SSH_KEY="$FIXTURE/materials/ssh_client"
+export BOOKIE_FIXTURE_DRIVER_TLS=1
+export BOOKIE_DRIVER_TLS_MATERIALS="$FIXTURE/materials"
+export BOOKIE_DRIVER_TLS_SSH_KEY="$FIXTURE/materials/ssh_client"
 
-bash scripts/run-rust-tests.sh --locked -p tablepro-driver-tls-tests --tests -- --include-ignored --test-threads=1 --skip system_store_
+bash scripts/run-rust-tests.sh --locked -p bookie-driver-tls-tests --tests -- --include-ignored --test-threads=1 --skip system_store_
 SSL_CERT_FILE="$FIXTURE/materials/ca.crt" SSL_CERT_DIR="$FIXTURE/materials/empty-system-store" \
-  bash scripts/run-rust-tests.sh --locked -p tablepro-driver-tls-tests --test system_trust -- --include-ignored --test-threads=1
+  bash scripts/run-rust-tests.sh --locked -p bookie-driver-tls-tests --test system_trust -- --include-ignored --test-threads=1

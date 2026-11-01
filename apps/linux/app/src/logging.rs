@@ -8,7 +8,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::config::Profile;
 
-pub const LOG_FORMAT_ENV: &str = "TABLEPRO_LOG_FORMAT";
+pub const LOG_FORMAT_ENV: &str = "BOOKIE_LOG_FORMAT";
 
 #[derive(Debug, ThisError)]
 pub enum LoggingError {
@@ -103,7 +103,7 @@ pub fn init(profile: Profile) -> Result<(), LoggingError> {
 mod tests {
     use super::*;
 
-    const UNWRITABLE_STDERR_CHILD: &str = "TABLEPRO_LOG_UNWRITABLE_STDERR_CHILD";
+    const UNWRITABLE_STDERR_CHILD: &str = "BOOKIE_LOG_UNWRITABLE_STDERR_CHILD";
 
     #[test]
     fn logging_survives_a_stderr_that_can_no_longer_be_written() {

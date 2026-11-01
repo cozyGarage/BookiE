@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::Environment;
-use tablepro_policy::{Decision, PolicyConfig, Principal, StatementClass, classify, evaluate};
+use bookie_core::Environment;
+use bookie_policy::{Decision, PolicyConfig, Principal, StatementClass, classify, evaluate};
 
 fn agent_is_denied(sql: &str, driver_id: &str) -> bool {
     let facts = classify(sql, driver_id);

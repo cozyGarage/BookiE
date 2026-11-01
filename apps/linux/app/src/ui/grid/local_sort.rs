@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashSet;
 
-use tablepro_core::{QueryResult, Value};
+use bookie_core::{QueryResult, Value};
 
 pub(super) fn sorted_source_indices(result: &QueryResult, column: usize, ascending: bool) -> Option<Vec<usize>> {
     let values = sortable_values(result, column)?;
@@ -217,9 +217,9 @@ fn compare_non_null(left: &Value, right: &Value) -> Option<Ordering> {
 
 #[cfg(test)]
 mod tests {
+    use bookie_core::{ColumnInfo, QueryResult, Value};
     use chrono::NaiveDate;
     use rust_decimal::Decimal;
-    use tablepro_core::{ColumnInfo, QueryResult, Value};
 
     use super::{sorted_source_indices, sorted_source_indices_for_subset};
 
@@ -375,7 +375,7 @@ mod tests {
 
 #[cfg(test)]
 mod duplicate_name_tests {
-    use tablepro_core::{ColumnInfo, QueryResult, Value};
+    use bookie_core::{ColumnInfo, QueryResult, Value};
 
     use super::sorted_source_indices;
 

@@ -6,7 +6,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 
 **BookiE** is a Linux-only native database client. The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `linux` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`).
 
-- The rename covers the display name, packaging install names (`bookie`, `bookie-agentd`, with `tablepro*` aliases) and branding assets only. Cargo package and binary names stay `tablepro-app` / `tablepro-agentd`. App ID, config and data paths, keyring schema, UUIDs, audit format and protocol contracts stay `tablepro` / `com.tablepro.linux`. Crate names stay `tablepro-*`. Check the relevant ADR and compatibility documentation before renaming any of them.
+- The rename is complete ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)): Cargo packages, binaries, crates, environment variables, application ID, paths and keyring schema are `bookie-*` / `BOOKIE_*` / `com.bookie.linux`. Legacy `tablepro` names appear only for upstream attribution and for reading old state. Do not reintroduce `tablepro` identifiers.
 - The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. No cross-platform UI layers, web views or source for another operating system.
 - Every shipped feature works without an account, license key, subscription, paid tier or remote entitlement check.
 - The root [LICENSE](LICENSE) applies. User-facing changes carry a `Release-Note:` line ([changelog and commits](#changelog-and-commits)).
@@ -95,7 +95,7 @@ Dependencies point toward `core`. Domain and driver crates never import GTK or R
 
 ## Security invariants
 
-These apply to the GUI, the MCP server and `tablepro-agentd`.
+These apply to the GUI, the MCP server and `bookie-agentd`.
 
 - Every connection exposed to a consumer is wrapped by `PolicyGuard`. MCP and agent code never sees a raw driver connection.
 - MCP token scopes say who may call a tool, connection allowlists say which connections a token may use, `PolicyGuard` says what SQL may run. All three are required.
@@ -104,7 +104,7 @@ These apply to the GUI, the MCP server and `tablepro-agentd`.
 - Denied, failed, cancelled and timed-out operations produce their terminal audit state. Audit failure never opens a path around policy.
 - MCP input, saved connection files, imported files, environment variables and database metadata are untrusted.
 - Bind values through driver parameters. Validate and dialect-quote identifiers. Never build SQL by joining untrusted text.
-- Database passwords and SSH secrets live in Secret Service through `tablepro-storage`. GUI-issued MCP token plaintext is returned once and Secret Service storage is attempted; issuance still succeeds if that save fails. Headless `bookie-agentd` issuance emits the token once to stdout or an explicitly selected owner-only file. Never put secrets in connection JSON, command-line arguments, traces, errors or audit fields. Keep database and SSH secrets in `secrecy` types until their consumer boundary.
+- Database passwords and SSH secrets live in Secret Service through `bookie-storage`. GUI-issued MCP token plaintext is returned once and Secret Service storage is attempted; issuance still succeeds if that save fails. Headless `bookie-agentd` issuance emits the token once to stdout or an explicitly selected owner-only file. Never put secrets in connection JSON, command-line arguments, traces, errors or audit fields. Keep database and SSH secrets in `secrecy` types until their consumer boundary.
 - Bound request sizes, query limits, timeouts and rate limits at external interfaces. No unbounded queues or collections controlled by callers.
 - MCP tools use least-privilege scopes and deny access when a token, scope, allowlist entry or policy decision is missing.
 - New dependencies need a license and advisory review against `deny.toml`.
@@ -155,7 +155,7 @@ Every test belongs to one tier with one script and one gate. Use the [validation
 
 | Tier | Contents | Script |
 |---|---|---|
-| unit | `--lib --bins` on the non-GTK crate list in `preflight.sh` (skips `tablepro-app`), run by nextest | `scripts/preflight.sh` |
+| unit | `--lib --bins` on the non-GTK crate list in `preflight.sh` (skips `bookie-app`), run by nextest | `scripts/preflight.sh` |
 | sandbox | integration targets needing no Docker, database or display, run by nextest | `scripts/test-sandbox.sh` |
 | driver | `crates/drivers/*/tests/integration.rs`, SSH and socket fixtures | `scripts/ci-local.sh integration` |
 | driver-tls | `tests/driver-tls` | `scripts/test-driver-tls.sh` |

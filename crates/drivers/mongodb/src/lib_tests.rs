@@ -67,7 +67,7 @@ async fn a_timed_out_read_reports_an_unknown_outcome() {
         client,
         database_name: "test".into(),
     };
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(50));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_millis(50));
 
     let result = conn.list_tables_controlled(&control).await;
 
@@ -94,7 +94,7 @@ async fn value_contract_mongodb_cancelled_inflight_read_is_unknown_not_disconnec
         database_name: "test".into(),
     };
     let token = tokio_util::sync::CancellationToken::new();
-    let control = tablepro_core::OperationControl::new(token.clone(), None);
+    let control = bookie_core::OperationControl::new(token.clone(), None);
     let operation = tokio::spawn(async move { conn.list_tables_controlled(&control).await });
 
     // Hold the accepted socket open so this is an in-flight operation,
@@ -235,8 +235,8 @@ async fn a_tunneled_connection_verifies_tls_against_the_service_hostname() {
         host: "127.0.0.1".into(),
         port: 54321,
         service_endpoint: Some(("mongo.internal.example".into(), 27017)),
-        tls: tablepro_core::TlsConfig {
-            mode: tablepro_core::TlsMode::VerifyFull,
+        tls: bookie_core::TlsConfig {
+            mode: bookie_core::TlsMode::VerifyFull,
             ..Default::default()
         },
         ..Default::default()

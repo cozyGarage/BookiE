@@ -7,11 +7,11 @@ The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/Bo
 ### Independence and stable system identifiers
 
 BookiE is completely decoupled from any external projects and operates independently. To ensure seamless continuity for users, desktop environments, and Linux package maintainers, low-level system and storage identifiers remain stable:
-- **Crate & binary names**: Workspace crates and Cargo binaries use `tablepro-*`, `tablepro-app`, and `tablepro-agentd`.
-- **Packaging names**: The user-facing binaries installed by Meson and distro packages are `bookie` and `bookie-agentd` (with `tablepro*` symlink aliases for launcher compatibility).
-- **Application ID & D-Bus**: `com.tablepro.linux`
-- **XDG storage paths**: `$XDG_CONFIG_HOME/tablepro/` and `$XDG_DATA_HOME/tablepro/`
-- **Secret Service schema**: `com.tablepro.linux.Password`
+- **Crate & binary names**: Workspace crates and Cargo binaries use `bookie-*`, `bookie-app`, and `bookie-agentd`.
+- **Packaging names**: The user-facing binaries installed by Meson and distro packages are `bookie` and `bookie-agentd`.
+- **Application ID & D-Bus**: `com.bookie.linux`
+- **XDG storage paths**: `$XDG_CONFIG_HOME/bookie/` and `$XDG_DATA_HOME/bookie/`
+- **Secret Service schema**: `com.bookie.linux.Password`
 
 These identifiers are retained strictly for on-disk persistence stability, keyring continuity, and rollback safety across upgrades.
 
@@ -48,9 +48,9 @@ This page is the one-page map. Accepted [ADRs](docs/decisions/README.md) constra
 
 | Mode | Process | Notes |
 |---|---|---|
-| Desktop | `bookie` (`tablepro-app`) | GTK on the GLib main context; DB work on Tokio via Relm4 commands |
-| Headless MCP | `bookie-agentd` (`tablepro-agentd`) | Same static drivers and `PolicyGuard` path; no GTK |
-| Development profile | Either binary with `TABLEPRO_PROFILE=development` | Uses `tablepro-devel` XDG paths and a separate keyring schema |
+| Desktop | `bookie` (`bookie-app`) | GTK on the GLib main context; DB work on Tokio via Relm4 commands |
+| Headless MCP | `bookie-agentd` (`bookie-agentd`) | Same static drivers and `PolicyGuard` path; no GTK |
+| Development profile | Either binary with `BOOKIE_PROFILE=development` | Uses `bookie-devel` XDG paths and a separate keyring schema |
 | Validation | Scripts under `scripts/` | Local checks and required CI checks ([playbook](docs/validation-playbook.md#ci-tiers)) |
 
 The native library floor (GTK 4.24, libadwaita 1.10, GtkSourceView 5.22) is in [ADR 0021](docs/decisions/0021-toolkit-floor.md) and [platforms](docs/platforms.md).
@@ -84,39 +84,39 @@ Both processes register the same static drivers and must obtain a `PolicyGuard` 
 
 ## Containers (crates)
 
-Production dependencies point downward. `tablepro-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; in production, only the two composition roots (`app` and `agentd`) depend on driver crates. Crate tests also use selected drivers to verify real engine behavior.
+Production dependencies point downward. `bookie-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; in production, only the two composition roots (`app` and `agentd`) depend on driver crates. Crate tests also use selected drivers to verify real engine behavior.
 
 ```mermaid
 flowchart TB
     subgraph roots["Composition roots"]
-        app["tablepro-app<br/>bookie"]
-        agentd["tablepro-agentd<br/>bookie-agentd"]
+        app["bookie-app<br/>bookie"]
+        agentd["bookie-agentd<br/>bookie-agentd"]
     end
 
     subgraph surfaces["Surfaces"]
-        mcp["tablepro-mcp<br/>scopes, allowlists, tools"]
+        mcp["bookie-mcp<br/>scopes, allowlists, tools"]
     end
 
     subgraph app_logic["GTK-free application logic"]
-        app_services["tablepro-app-services<br/>state and service logic"]
+        app_services["bookie-app-services<br/>state and service logic"]
     end
 
     subgraph governance["Governance"]
-        policy["tablepro-policy<br/>PolicyGuard, classify, rules,<br/>approval, mask, audit types"]
+        policy["bookie-policy<br/>PolicyGuard, classify, rules,<br/>approval, mask, audit types"]
     end
 
     subgraph route["Route"]
-        transport["tablepro-transport"]
-        ssh["tablepro-ssh"]
-        storage["tablepro-storage<br/>connections, keyring, history, journal"]
+        transport["bookie-transport"]
+        ssh["bookie-ssh"]
+        storage["bookie-storage<br/>connections, keyring, history, journal"]
     end
 
     subgraph tooling["Vendor client tooling"]
-        dump["tablepro-dump<br/>supervised PostgreSQL dump/restore"]
+        dump["bookie-dump<br/>supervised PostgreSQL dump/restore"]
     end
 
     subgraph contracts["Contracts"]
-        core["tablepro-core<br/>DatabaseDriver, Connection,<br/>Value, OperationControl"]
+        core["bookie-core<br/>DatabaseDriver, Connection,<br/>Value, OperationControl"]
     end
 
     subgraph drivers["Static drivers"]
@@ -158,18 +158,18 @@ flowchart TB
 
 | Crate | Role |
 |---|---|
-| `tablepro-app` | GTK composition root. Cargo binary `tablepro-app`; installed as `bookie`. |
-| `tablepro-agentd` | Headless MCP composition root. Cargo binary `tablepro-agentd`; installed as `bookie-agentd`. |
-| `tablepro-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
-| `tablepro-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Production dependency: `core`. |
-| `tablepro-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core`, `dump`, `policy`, `storage` and `transport`. |
-| `tablepro-storage` | Saved connections, Secret Service, query history, audit journal. |
-| `tablepro-ssh` | Built-in `russh` tunnels and optional system OpenSSH backend. |
-| `tablepro-transport` | Saved-connection → dial options, SSH chain, tunnel, TLS service identity. |
-| `tablepro-dump` | GTK-free vendor-tool supervision, private password files and PostgreSQL dump/restore requests. Application services run backup and restore through `PolicyGuard::run_administrative`. Depends on `core`; [ADR 0019](docs/decisions/0019-database-tooling-without-sidecars.md) governs the feature. |
-| `tablepro-mcp` | MCP auth, scopes, connection allowlists, rate limits, tools. Never exposes a raw driver connection. |
-| `tablepro-driver-*` | One static crate per engine. |
-| `tablepro-driver-tls-tests` / `tablepro-release-tests` | Test-only fixtures. |
+| `bookie-app` | GTK composition root. Cargo binary `bookie-app`; installed as `bookie`. |
+| `bookie-agentd` | Headless MCP composition root. Cargo binary `bookie-agentd`; installed as `bookie-agentd`. |
+| `bookie-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
+| `bookie-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Production dependency: `core`. |
+| `bookie-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core`, `dump`, `policy`, `storage` and `transport`. |
+| `bookie-storage` | Saved connections, Secret Service, query history, audit journal. |
+| `bookie-ssh` | Built-in `russh` tunnels and optional system OpenSSH backend. |
+| `bookie-transport` | Saved-connection → dial options, SSH chain, tunnel, TLS service identity. |
+| `bookie-dump` | GTK-free vendor-tool supervision, private password files and PostgreSQL dump/restore requests. Application services run backup and restore through `PolicyGuard::run_administrative`. Depends on `core`; [ADR 0019](docs/decisions/0019-database-tooling-without-sidecars.md) governs the feature. |
+| `bookie-mcp` | MCP auth, scopes, connection allowlists, rate limits, tools. Never exposes a raw driver connection. |
+| `bookie-driver-*` | One static crate per engine. |
+| `bookie-driver-tls-tests` / `bookie-release-tests` | Test-only fixtures. |
 
 `crates/drivers/shared/` holds shared test helpers and is not a workspace member. Domain and driver crates never import GTK or Relm4.
 
@@ -244,21 +244,21 @@ sequenceDiagram
 Nothing points back up. Cycles are forbidden. Composition roots sit at the top; `core` is the leaf.
 
 ```text
-tablepro-app ────────┬──► app-services, mcp, policy, storage, transport, ssh, drivers, core
-tablepro-agentd ────┘
+bookie-app ────────┬──► app-services, mcp, policy, storage, transport, ssh, drivers, core
+bookie-agentd ────┘
 
-tablepro-release-tests ──► mcp, policy, storage, transport, ssh, drivers, core
-tablepro-driver-tls-tests ──► transport, ssh, drivers, core
-tablepro-app-services ──► dump, policy, storage, transport, core
+bookie-release-tests ──► mcp, policy, storage, transport, ssh, drivers, core
+bookie-driver-tls-tests ──► transport, ssh, drivers, core
+bookie-app-services ──► dump, policy, storage, transport, core
 
-tablepro-mcp        ──► policy, storage, core
-tablepro-transport  ──► storage, ssh, policy, core
-tablepro-storage    ──► policy (audit types), core
-tablepro-policy     ──► core
-tablepro-dump       ──► core
-tablepro-ssh        ──► (leaf for tunnels; saved SSH config types live in storage)
-tablepro-driver-*   ──► core
-tablepro-core       ──► (no workspace crate)
+bookie-mcp        ──► policy, storage, core
+bookie-transport  ──► storage, ssh, policy, core
+bookie-storage    ──► policy (audit types), core
+bookie-policy     ──► core
+bookie-dump       ──► core
+bookie-ssh        ──► (leaf for tunnels; saved SSH config types live in storage)
+bookie-driver-*   ──► core
+bookie-core       ──► (no workspace crate)
 ```
 
 Rules that keep this sound:
@@ -301,9 +301,9 @@ Three MCP checks answer different questions. None replaces another:
 
 | Boundary | Answers | Owner |
 |---|---|---|
-| MCP token scopes | Who may call which tools? | `tablepro-mcp` |
-| Connection allowlists | Which saved connections may that token use? | `tablepro-mcp` |
-| `PolicyGuard` | What SQL may run, how is it masked, and what is audited? | `tablepro-policy` |
+| MCP token scopes | Who may call which tools? | `bookie-mcp` |
+| Connection allowlists | Which saved connections may that token use? | `bookie-mcp` |
+| `PolicyGuard` | What SQL may run, how is it masked, and what is audited? | `bookie-policy` |
 
 ```mermaid
 flowchart LR
@@ -329,13 +329,13 @@ MCP may ask policy whether a statement needs write capability for a scope check;
 
 | State | Owner |
 |---|---|
-| Saved connections + Secret Service refs | `tablepro-storage` |
-| Live tunnel / dial target + TLS identity | `tablepro-transport` / `tablepro-ssh` |
-| Policy decision + audit terminal outcome | `tablepro-policy` + audit journal |
-| MCP token hash, scopes, allowlist | `tablepro-mcp` |
-| GTK widgets / Relm4 component state | `tablepro-app` (main context only) |
-| Tab UUID, dirty rows, result generation | `tablepro-app` tab controllers |
-| Browse pages (`RowStore`) | `tablepro-app` UI + bounded fetch plans |
+| Saved connections + Secret Service refs | `bookie-storage` |
+| Live tunnel / dial target + TLS identity | `bookie-transport` / `bookie-ssh` |
+| Policy decision + audit terminal outcome | `bookie-policy` + audit journal |
+| MCP token hash, scopes, allowlist | `bookie-mcp` |
+| GTK widgets / Relm4 component state | `bookie-app` (main context only) |
+| Tab UUID, dirty rows, result generation | `bookie-app` tab controllers |
+| Browse pages (`RowStore`) | `bookie-app` UI + bounded fetch plans |
 | Driver protocol connection | Inner `Connection` behind `PolicyGuard` |
 
 ## Transport and service identity
@@ -359,7 +359,7 @@ PostgreSQL uses the socket form so the certificate is checked against the real d
 
 ## Driver contract
 
-Each engine exports a type implementing `tablepro_core::DatabaseDriver`. Connect returns a boxed `Connection` covering query execution, parameters, schema inspection, transactions, server activity and controlled cancellation where supported.
+Each engine exports a type implementing `bookie_core::DatabaseDriver`. Connect returns a boxed `Connection` covering query execution, parameters, schema inspection, transactions, server activity and controlled cancellation where supported.
 
 | Engine | Library | Notes |
 |---|---|---|
@@ -444,7 +444,7 @@ flowchart TD
 
 ## Persistence
 
-Config and history live under `$XDG_CONFIG_HOME/tablepro/` (or `tablepro-devel` in development builds). The audit journal is under `$XDG_DATA_HOME/tablepro/`. Passwords and SSH secrets stay in Secret Service through `oo7`. Schema id: `com.tablepro.linux`. Details: [storage.md](docs/storage.md), [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md).
+Config and history live under `$XDG_CONFIG_HOME/bookie/` (or `bookie-devel` in development builds). The audit journal is under `$XDG_DATA_HOME/bookie/`. Passwords and SSH secrets stay in Secret Service through `oo7`. Schema id: `com.bookie.linux`. Details: [storage.md](docs/storage.md), [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md).
 
 ## Build and validation
 

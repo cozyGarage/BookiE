@@ -1,5 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_policy::{StatementClass, classify};
+use bookie_policy::{StatementClass, classify};
 
 #[test]
 fn a_redis_select_switches_databases_and_is_not_a_read() {

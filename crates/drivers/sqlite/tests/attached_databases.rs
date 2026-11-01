@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{AttachedDatabase, ConnectOptions, DatabaseDriver, Value};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{AttachedDatabase, ConnectOptions, DatabaseDriver, Value};
 use tempfile::TempDir;
 
 #[tokio::test]
@@ -219,7 +219,7 @@ async fn session_inherits_attached_databases() {
         .unwrap();
 
     let mut session = main_conn.open_session().await.unwrap();
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
     let result = session
         .query_params_controlled("SELECT sku FROM aux.items", &[], &control)
         .await

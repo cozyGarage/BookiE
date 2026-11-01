@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::sql_dialect::build_optimistic_keyed_update;
+use bookie_core::{ColumnInfo, ConnectOptions, DatabaseDriver, Value};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::sql_dialect::build_optimistic_keyed_update;
-use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, Value};
 
 fn memory_options() -> ConnectOptions {
     ConnectOptions {

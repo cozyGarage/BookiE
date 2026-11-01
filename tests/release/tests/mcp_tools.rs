@@ -2,12 +2,12 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bookie_core::{Connection, Environment, Value};
+use bookie_mcp::{ConnectionProvider, McpBridge, McpToken, TokenPermissions, TokenStore, dispatch};
+use bookie_policy::{AuditSink, AuditState, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
+use bookie_release_tests::Fixture;
+use bookie_storage::{AuditJournal, SavedConnection};
 use serde_json::json;
-use tablepro_core::{Connection, Environment, Value};
-use tablepro_mcp::{ConnectionProvider, McpBridge, McpToken, TokenPermissions, TokenStore, dispatch};
-use tablepro_policy::{AuditSink, AuditState, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
-use tablepro_release_tests::Fixture;
-use tablepro_storage::{AuditJournal, SavedConnection};
 use uuid::Uuid;
 
 struct FixtureProvider {
@@ -51,8 +51,8 @@ impl ConnectionProvider for FixtureProvider {
             port: 5433,
             socket_dir: None,
             socket_path: None,
-            database: "tablepro".into(),
-            username: "tablepro".into(),
+            database: "bookie".into(),
+            username: "bookie".into(),
             use_tls: true,
             tls_mode: None,
             tls_root_cert: None,

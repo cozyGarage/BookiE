@@ -4,20 +4,20 @@
 
 use std::path::PathBuf;
 
+use bookie_core::{ConnectOptions, DriverError, TlsConfig, TlsMode};
+use bookie_ssh::{SshAuth, SshConfig, SshTunnel, UnknownHostKey};
 use secrecy::SecretString;
-use tablepro_core::{ConnectOptions, DriverError, TlsConfig, TlsMode};
-use tablepro_ssh::{SshAuth, SshConfig, SshTunnel, UnknownHostKey};
 
 /// A negative identity test must fail for certificate verification, not because
 /// the fixture is down or credentials are wrong. Exercise a verified control first.
-pub async fn assert_endpoint_identity_rejected(driver: &dyn tablepro_core::DatabaseDriver, options: ConnectOptions) {
+pub async fn assert_endpoint_identity_rejected(driver: &dyn bookie_core::DatabaseDriver, options: ConnectOptions) {
     let mut rejected = options.clone();
     rejected.host = "127.0.0.1".into();
     assert_certificate_rejected(driver, options, rejected).await;
 }
 
 pub async fn assert_connection_rejected(
-    driver: &dyn tablepro_core::DatabaseDriver,
+    driver: &dyn bookie_core::DatabaseDriver,
     accepted: ConnectOptions,
     rejected: ConnectOptions,
 ) -> DriverError {
@@ -31,7 +31,7 @@ pub async fn assert_connection_rejected(
 }
 
 pub async fn assert_certificate_rejected(
-    driver: &dyn tablepro_core::DatabaseDriver,
+    driver: &dyn bookie_core::DatabaseDriver,
     accepted: ConnectOptions,
     rejected: ConnectOptions,
 ) {
@@ -89,34 +89,34 @@ pub struct DriverTlsFixture {
 impl DriverTlsFixture {
     /// Every test binary here links several drivers, so it is a composition
     /// root and has to choose the rustls provider exactly as the application
-    /// does. See `tablepro_transport::install_crypto_provider`.
+    /// does. See `bookie_transport::install_crypto_provider`.
     pub fn from_env() -> Self {
-        tablepro_transport::install_crypto_provider();
-        let materials = std::env::var("TABLEPRO_DRIVER_TLS_MATERIALS")
+        bookie_transport::install_crypto_provider();
+        let materials = std::env::var("BOOKIE_DRIVER_TLS_MATERIALS")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/driver-tls/materials")
             });
         Self {
-            host: env_or("TABLEPRO_DRIVER_TLS_HOST", "localhost"),
-            mongo_port: env_port("TABLEPRO_DRIVER_TLS_MONGO_PORT", 27018),
-            mongo_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_MONGO_PLAINTEXT_PORT", 27019),
-            redis_port: env_port("TABLEPRO_DRIVER_TLS_REDIS_PORT", 6380),
-            redis_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_REDIS_PLAINTEXT_PORT", 6381),
-            mysql_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PORT", 3307),
-            mysql_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PLAINTEXT_PORT", 3308),
-            mysql_mtls_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_MTLS_PORT", 3309),
-            postgres_port: env_port("TABLEPRO_DRIVER_TLS_POSTGRES_PORT", 5436),
-            clickhouse_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PORT", 8444),
-            clickhouse_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PLAINTEXT_PORT", 8445),
-            mssql_port: env_port("TABLEPRO_DRIVER_TLS_MSSQL_PORT", 1434),
-            mssql_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_MSSQL_PLAINTEXT_PORT", 1435),
-            ssh_host: env_or("TABLEPRO_DRIVER_TLS_SSH_HOST", "127.0.0.1"),
-            ssh_port: env_port("TABLEPRO_DRIVER_TLS_SSH_PORT", 2224),
+            host: env_or("BOOKIE_DRIVER_TLS_HOST", "localhost"),
+            mongo_port: env_port("BOOKIE_DRIVER_TLS_MONGO_PORT", 27018),
+            mongo_plaintext_port: env_port("BOOKIE_DRIVER_TLS_MONGO_PLAINTEXT_PORT", 27019),
+            redis_port: env_port("BOOKIE_DRIVER_TLS_REDIS_PORT", 6380),
+            redis_plaintext_port: env_port("BOOKIE_DRIVER_TLS_REDIS_PLAINTEXT_PORT", 6381),
+            mysql_port: env_port("BOOKIE_DRIVER_TLS_MYSQL_PORT", 3307),
+            mysql_plaintext_port: env_port("BOOKIE_DRIVER_TLS_MYSQL_PLAINTEXT_PORT", 3308),
+            mysql_mtls_port: env_port("BOOKIE_DRIVER_TLS_MYSQL_MTLS_PORT", 3309),
+            postgres_port: env_port("BOOKIE_DRIVER_TLS_POSTGRES_PORT", 5436),
+            clickhouse_port: env_port("BOOKIE_DRIVER_TLS_CLICKHOUSE_PORT", 8444),
+            clickhouse_plaintext_port: env_port("BOOKIE_DRIVER_TLS_CLICKHOUSE_PLAINTEXT_PORT", 8445),
+            mssql_port: env_port("BOOKIE_DRIVER_TLS_MSSQL_PORT", 1434),
+            mssql_plaintext_port: env_port("BOOKIE_DRIVER_TLS_MSSQL_PLAINTEXT_PORT", 1435),
+            ssh_host: env_or("BOOKIE_DRIVER_TLS_SSH_HOST", "127.0.0.1"),
+            ssh_port: env_port("BOOKIE_DRIVER_TLS_SSH_PORT", 2224),
             ssh_key: materials.join("ssh_client"),
-            database: env_or("TABLEPRO_DRIVER_TLS_DB", "tablepro"),
-            username: env_or("TABLEPRO_DRIVER_TLS_USER", "tablepro"),
-            password: env_or("TABLEPRO_DRIVER_TLS_PASSWORD", "tablepro"),
+            database: env_or("BOOKIE_DRIVER_TLS_DB", "bookie"),
+            username: env_or("BOOKIE_DRIVER_TLS_USER", "bookie"),
+            password: env_or("BOOKIE_DRIVER_TLS_PASSWORD", "bookie"),
             ca_cert: materials.join("ca.crt"),
             other_ca_cert: materials.join("other-ca.crt"),
             client_cert: materials.join("client.crt"),
@@ -187,7 +187,7 @@ impl DriverTlsFixture {
         client_key: Option<PathBuf>,
     ) -> ConnectOptions {
         let mut options = self.options(self.mysql_mtls_port, mode, Some(self.ca_cert.clone()));
-        options.username = "tablepro_mtls".into();
+        options.username = "bookie_mtls".into();
         options.tls.client_cert = client_cert;
         options.tls.client_key = client_key;
         options
@@ -202,7 +202,7 @@ impl DriverTlsFixture {
         client_key: Option<PathBuf>,
     ) -> ConnectOptions {
         let mut options = self.options(3306, mode, Some(self.ca_cert.clone()));
-        options.username = "tablepro_mtls".into();
+        options.username = "bookie_mtls".into();
         options.host = identity_host.to_string();
         options.service_endpoint = Some((identity_host.to_string(), 3306));
         options.forwarded_socket_dir = Some(
@@ -219,7 +219,7 @@ impl DriverTlsFixture {
     pub async fn open_mysql_ssh_tunnel(&self) -> SshTunnel {
         SshTunnel::open_chain_socket(
             &[self.ssh_config()],
-            "mysql-ssh.tablepro.test".into(),
+            "mysql-ssh.bookie.test".into(),
             3306,
             "mysqld.sock",
             UnknownHostKey::Learn,
@@ -231,7 +231,7 @@ impl DriverTlsFixture {
     pub async fn open_mysql_mtls_ssh_tunnel(&self) -> SshTunnel {
         SshTunnel::open_chain_socket(
             &[self.ssh_config()],
-            "mysql-mtls-ssh.tablepro.test".into(),
+            "mysql-mtls-ssh.bookie.test".into(),
             3306,
             "mysqld.sock",
             UnknownHostKey::Learn,
@@ -243,7 +243,7 @@ impl DriverTlsFixture {
     pub async fn open_mssql_ssh_tunnel(&self) -> SshTunnel {
         SshTunnel::open(
             self.ssh_config(),
-            "mssql-ssh.tablepro.test".into(),
+            "mssql-ssh.bookie.test".into(),
             1433,
             UnknownHostKey::Learn,
         )

@@ -112,7 +112,7 @@ async fn value_contract_enum_multi_array_unnest_pads_nulls_under_shadowed_path()
             .await
             .expect_err("multi-array unnest needs typed polymorphic array arguments");
         assert!(
-            matches!(&untyped, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42725"),
+            matches!(&untyped, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42725"),
             "expected ambiguous-function SQLSTATE 42725, got {untyped:?}"
         );
         transaction
@@ -175,7 +175,7 @@ async fn value_contract_enum_multi_array_unnest_pads_nulls_under_shadowed_path()
         .await
         .expect_err("a shadow-only enum label must not resolve for the target array");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
     );
     transaction

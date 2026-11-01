@@ -1,5 +1,5 @@
 use super::parse_input_for_driver;
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 fn col(data_type: &str, nullable: bool) -> ColumnInfo {
     ColumnInfo {
@@ -49,14 +49,14 @@ fn value_contract_mysql_temporal_parser_keeps_fractional_input_typed() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings() {
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
     use chrono::{TimeZone, Utc};
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -68,7 +68,7 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
             port: container.get_host_port_ipv4(3306).await.unwrap(),
             database: "test".into(),
             username: "root".into(),
-            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            password: secrecy::SecretString::new("bookie_test".to_string().into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })
@@ -120,7 +120,7 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
     let timestamp_value =
         parse_input_for_driver("2024-01-02 03:04:05.123456", Some(&columns[instant]), "mysql").unwrap();
     assert!(matches!(&timestamp_value, Value::DateTime(_)));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "mysql",
         None,
         "temporal_grid_edit",
@@ -202,8 +202,8 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
         )
         .await
         .unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
-    let csv = tablepro_core::export::render_csv(&export.columns, &export.rows, &csv_options);
+    let csv_options = bookie_core::export::CsvOptions::default();
+    let csv = bookie_core::export::render_csv(&export.columns, &export.rows, &csv_options);
     assert_eq!(
         csv,
         "id,clock,local_at,instant\n\
@@ -211,18 +211,18 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
          2,04:05:06.987654,2024-02-03 04:05:06.987654,2024-02-03T04:05:06.987654+00:00\n"
     );
     let json: serde_json::Value =
-        serde_json::from_str(&tablepro_core::export::render_json(&export.columns, &export.rows)).unwrap();
+        serde_json::from_str(&bookie_core::export::render_json(&export.columns, &export.rows)).unwrap();
     assert_eq!(json[0]["clock"], "12:34:56.123456");
     assert_eq!(json[0]["local_at"], "2024-01-02 03:04:05.123456");
     assert_eq!(json[0]["instant"], "2024-01-02T03:04:05.123456+00:00");
 
     let directory = tempfile::tempdir().unwrap();
     let workbook_path = directory.path().join("mysql-temporal.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &workbook_path,
         &export,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -254,25 +254,21 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
         .await
         .unwrap();
     let import_columns = connection.fetch_columns(None, "temporal_grid_imported").await.unwrap();
-    let sheet = tablepro_core::import::read_csv(
-        csv.as_bytes(),
-        &tablepro_core::import::CsvImportOptions::default(),
-        None,
-    )
-    .unwrap();
+    let sheet =
+        bookie_core::import::read_csv(csv.as_bytes(), &bookie_core::import::CsvImportOptions::default(), None).unwrap();
     let mapping = vec![Some(0), Some(1), Some(2), Some(3)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "mysql",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "temporal_grid_imported",
             columns: &import_columns,
             mapping: &mapping,
         },
         &sheet,
-        &tablepro_core::import::CsvImportOptions::default(),
+        &bookie_core::import::CsvImportOptions::default(),
     )
     .unwrap();
     assert_eq!(

@@ -3,12 +3,12 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, TlsConfig};
+use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use bookie_policy::Principal;
+use bookie_storage::SavedConnection;
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Binary, Bson, DateTime, Document, doc, spec::BinarySubtype};
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment, TlsConfig};
-use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
-use tablepro_policy::Principal;
-use tablepro_storage::SavedConnection;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::{mongo::Mongo, testcontainers::runners::AsyncRunner};
 use uuid::Uuid;
@@ -142,7 +142,7 @@ async fn mongodb_extended_json_survives_the_mcp_query_tool_round_trip() {
     let bridge = McpBridge::new(provider, tokens);
     let token = bridge.authenticate(&plaintext).expect("authenticate MCP token");
 
-    let response = tablepro_mcp::dispatch(
+    let response = bookie_mcp::dispatch(
         &bridge,
         &token,
         "browse_table",

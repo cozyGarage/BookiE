@@ -34,7 +34,7 @@ Use the [packaging guide](../apps/linux/packaging/README.md) to build Arch, Debi
 
 The current Flatpak manifests use the GNOME 51 runtime. Use `scripts/build-flatpak.sh` to produce a local bundle.
 
-The Arch package installs `bookie` and `bookie-agentd`, with `tablepro` compatibility aliases. The Debian package installs the same commands. Both preserve the existing application ID, configuration and data paths, keyring schema and protocol identifiers.
+The Arch package installs `bookie`, `bookie-agentd` and `bookie-askpass`. The Debian package installs the same commands. Both replace the legacy `tablepro` package; the first start copies legacy state, as described in the [storage guide](storage.md).
 
 ## Accessibility
 

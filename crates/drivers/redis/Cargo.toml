@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-driver-redis"
+name = "bookie-driver-redis"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ name = "drivers_redis"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../../core" }
+bookie-core = { path = "../../core" }
 async-trait.workspace = true
 redis = { version = "1.5", default-features = false, features = ["num-bigint", "tokio-comp", "connection-manager", "tls-rustls", "tls-rustls-insecure", "tokio-rustls-comp"] }
 serde_json.workspace = true

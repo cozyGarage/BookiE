@@ -1,4 +1,4 @@
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn value_contract_query_preserves_uuid_kinds_in_mixed_multirow_projection() {

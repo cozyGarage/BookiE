@@ -367,7 +367,7 @@ fn tokens_path() -> Result<PathBuf, String> {
             })
         })
         .ok_or_else(|| "neither XDG_CONFIG_HOME nor HOME is set".to_string())?;
-    Ok(base.join("tablepro").join("mcp-tokens.json"))
+    Ok(base.join("bookie").join("mcp-tokens.json"))
 }
 
 #[cfg(test)]

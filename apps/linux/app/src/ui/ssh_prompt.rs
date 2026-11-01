@@ -1,8 +1,8 @@
 use async_trait::async_trait;
+use bookie_ssh::openssh::{AskpassPrompt, PromptAnswer, Prompter};
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use secrecy::SecretString;
-use tablepro_ssh::openssh::{AskpassPrompt, PromptAnswer, Prompter};
 
 pub(crate) struct GtkPrompter;
 

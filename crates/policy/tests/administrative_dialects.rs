@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::Environment;
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
-use tablepro_policy::{Decision, PolicyConfig, Principal, StatementClass, classify, evaluate};
+use bookie_core::Environment;
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
+use bookie_policy::{Decision, PolicyConfig, Principal, StatementClass, classify, evaluate};
 
 fn agent() -> Principal {
     Principal::Agent {
@@ -92,7 +92,7 @@ fn corrected_lexer_keeps_reads_intact_and_following_mutations_denied() {
         ("postgres", "SELECT 1 /* outer /* inner */ ; outer */"),
     ] {
         let sql = format!("{read}; DELETE FROM protected_items");
-        let statements = tablepro_core::sql_lex::split_statements(&sql, driver);
+        let statements = bookie_core::sql_lex::split_statements(&sql, driver);
         assert_eq!(statements, vec![read, "DELETE FROM protected_items"]);
         assert_eq!(classify(&statements[0], driver).class, StatementClass::Select);
         let decision = evaluate(
@@ -124,12 +124,12 @@ fn postgres_script_consumers_agree_across_crlf_comments_and_formatting() {
     let expected_names = [vec!["shown"], vec!["name", "id"]];
     let expected_classes = [StatementClass::Select, StatementClass::Update];
     for (index, statement) in original_statements.iter().enumerate() {
-        let parameters = tablepro_core::extract_named_parameters(statement, "postgres");
+        let parameters = bookie_core::extract_named_parameters(statement, "postgres");
         assert_eq!(parameters.names, expected_names[index]);
         assert_eq!(classify(&parameters.sql, "postgres").class, expected_classes[index]);
     }
 
-    let formatted = tablepro_core::sql_format::format_script(source, grammar, settings);
+    let formatted = bookie_core::sql_format::format_script(source, grammar, settings);
     for comment in [
         "-- lead :ignored ;",
         "/* :hidden ; */",
@@ -147,7 +147,7 @@ fn postgres_script_consumers_agree_across_crlf_comments_and_formatting() {
     assert_eq!(reformatted.statements().len(), 2);
     for (index, statement) in reformatted.statements().iter().enumerate() {
         let sql = statement.text(&formatted);
-        let parameters = tablepro_core::extract_named_parameters(sql, "postgres");
+        let parameters = bookie_core::extract_named_parameters(sql, "postgres");
         assert_eq!(parameters.names, expected_names[index]);
         let facts = classify(&parameters.sql, "postgres");
         assert_eq!(facts.class, expected_classes[index]);

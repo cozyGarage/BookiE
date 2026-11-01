@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::Value;
 use serde_json::json;
-use tablepro_core::Value;
 
 use crate::{connect, start_pg};
 

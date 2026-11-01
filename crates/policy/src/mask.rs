@@ -1,4 +1,4 @@
-use tablepro_core::{QueryResult, Value};
+use bookie_core::{QueryResult, Value};
 
 pub const DEFAULT_SENSITIVE_PATTERNS: &[&str] = &[
     "*pan*",
@@ -122,7 +122,7 @@ pub fn apply_masking(result: QueryResult, patterns: &[String], sensitive_positio
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::ColumnInfo;
+    use bookie_core::ColumnInfo;
 
     #[test]
     fn matches_pan_column() {

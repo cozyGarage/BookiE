@@ -1,6 +1,6 @@
+use bookie_core::{DatabaseDriver, Value};
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Document, doc, oid::ObjectId};
-use tablepro_core::{DatabaseDriver, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -55,7 +55,7 @@ async fn value_contract_mongodb_grid_value_comparison_does_not_detect_aba() {
             .expect("restore the original value before the grid write");
     }
 
-    let (update, update_params) = tablepro_core::sql_dialect::build_mongodb_keyed_update(
+    let (update, update_params) = bookie_core::sql_dialect::build_mongodb_keyed_update(
         Some("appdb"),
         "aba_grid",
         &before.columns,
@@ -76,7 +76,7 @@ async fn value_contract_mongodb_grid_value_comparison_does_not_detect_aba() {
         "value comparison accepts the row after it returns to the materialized value"
     );
 
-    let (delete, delete_params) = tablepro_core::sql_dialect::build_mongodb_keyed_delete(
+    let (delete, delete_params) = bookie_core::sql_dialect::build_mongodb_keyed_delete(
         Some("appdb"),
         "aba_grid",
         &before.columns,
@@ -192,7 +192,7 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
         .await
         .expect("change the explicit-NULL field to an array containing NULL after the grid read");
 
-    let (statement, params) = tablepro_core::sql_dialect::build_mongodb_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_mongodb_keyed_update(
         Some("appdb"),
         "stale_grid_edits",
         &before.columns,
@@ -204,7 +204,7 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
         &[row[key_index].clone()],
     )
     .expect("build keyed update from the stale grid result");
-    let (null_statement, null_params) = tablepro_core::sql_dialect::build_mongodb_keyed_update(
+    let (null_statement, null_params) = bookie_core::sql_dialect::build_mongodb_keyed_update(
         Some("appdb"),
         "stale_grid_edits",
         &before.columns,
@@ -216,7 +216,7 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
         &[null_row[key_index].clone()],
     )
     .expect("build keyed update from the stale explicit-NULL result");
-    let (null_array_statement, null_array_params) = tablepro_core::sql_dialect::build_mongodb_keyed_update(
+    let (null_array_statement, null_array_params) = bookie_core::sql_dialect::build_mongodb_keyed_update(
         Some("appdb"),
         "stale_grid_edits",
         &before.columns,

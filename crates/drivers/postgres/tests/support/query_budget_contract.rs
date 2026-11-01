@@ -20,7 +20,7 @@ async fn a_query_truncated_at_the_shared_byte_budget_preserves_order_and_pool_re
     assert!(result.truncated, "omitted server rows must be reported");
     assert!(!result.rows.is_empty());
     assert!(result.rows.len() < 20_000);
-    assert!(result.rows.len() * payload.len() <= tablepro_core::MAX_QUERY_RESULT_BYTES);
+    assert!(result.rows.len() * payload.len() <= bookie_core::MAX_QUERY_RESULT_BYTES);
     assert!(result.rows.iter().enumerate().all(|(index, row)| {
         row.first() == Some(&Value::Int(index as i64 + 1))
             && matches!(row.get(1), Some(Value::Text(value)) if value == &payload)
@@ -92,7 +92,7 @@ async fn a_byte_capped_query_aborts_its_transaction_until_rollback_then_reuses_t
         .query("SELECT 42")
         .await
         .expect_err("cancelled statement aborts the PostgreSQL transaction");
-    assert!(matches!(aborted, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
+    assert!(matches!(aborted, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "25P02"));
     transaction.rollback().await.expect("rollback aborted transaction");
     let next = connection
         .query("SELECT 42::bigint")

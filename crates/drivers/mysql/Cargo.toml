@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-driver-mysql"
+name = "bookie-driver-mysql"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ name = "drivers_mysql"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../../core" }
+bookie-core = { path = "../../core" }
 async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
@@ -24,7 +24,7 @@ tracing.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-tablepro-app-services = { path = "../../app-services" }
+bookie-app-services = { path = "../../app-services" }
 secrecy.workspace = true
 tempfile.workspace = true
 testcontainers.workspace = true
@@ -36,7 +36,7 @@ uuid.workspace = true
 
 # The shared exact-grid test is included by path and imports this crate.
 [package.metadata.cargo-shear]
-ignored = ["tablepro-app-services"]
+ignored = ["bookie-app-services"]
 
 [lints]
 workspace = true

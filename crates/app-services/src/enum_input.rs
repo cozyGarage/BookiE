@@ -1,4 +1,4 @@
-use tablepro_core::{ColumnInfo, EnumInputStyle, Value};
+use bookie_core::{ColumnInfo, EnumInputStyle, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnumInputError {
@@ -142,7 +142,7 @@ fn parse_single_quoted(text: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use tablepro_core::{ColumnInfo, EnumInputStyle, QualifiedTypeName, Value};
+    use bookie_core::{ColumnInfo, EnumInputStyle, QualifiedTypeName, Value};
 
     use super::{EnumInputError, parse_enum_input};
 

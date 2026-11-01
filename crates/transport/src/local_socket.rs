@@ -1,6 +1,6 @@
 use std::os::unix::fs::FileTypeExt;
 
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsMode};
+use bookie_core::{ConnectOptions, DatabaseDriver, TlsMode};
 
 use crate::TransportError;
 

@@ -78,8 +78,8 @@ impl OpenSshRuntime {
 
 fn resolve_base(xdg_runtime_dir: Option<OsString>, temp_dir: &Path) -> Result<PathBuf, OpenSshError> {
     let base = match xdg_runtime_dir.map(PathBuf::from) {
-        Some(dir) if dir.is_absolute() && dir.is_dir() => dir.join("tablepro"),
-        _ => temp_dir.join(format!("tablepro-{}", current_uid(temp_dir)?)),
+        Some(dir) if dir.is_absolute() && dir.is_dir() => dir.join("bookie"),
+        _ => temp_dir.join(format!("bookie-{}", current_uid(temp_dir)?)),
     };
     private_dir(&base)?;
     Ok(base)
@@ -195,7 +195,7 @@ mod tests {
         let runtime = tempfile::tempdir().unwrap();
         let temp = tempfile::tempdir().unwrap();
         let base = resolve_base(Some(runtime.path().into()), temp.path()).unwrap();
-        assert_eq!(base, runtime.path().join("tablepro"));
+        assert_eq!(base, runtime.path().join("bookie"));
         assert_eq!(mode(&base), 0o700);
     }
 
@@ -209,7 +209,7 @@ mod tests {
         ] {
             let base = resolve_base(unusable, temp.path()).unwrap();
             assert_eq!(base.parent(), Some(temp.path()));
-            assert!(base.file_name().unwrap().to_string_lossy().starts_with("tablepro-"));
+            assert!(base.file_name().unwrap().to_string_lossy().starts_with("bookie-"));
             assert_eq!(mode(&base), 0o700);
         }
     }

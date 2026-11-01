@@ -67,7 +67,7 @@ fn export_destination(outcome: Result<gio::File, glib::Error>) -> Result<Option<
 }
 
 fn write_export(path: &Path, content: &str) -> Result<(), String> {
-    tablepro_core::export::write_atomically(path, |output| output.write_all(content.as_bytes()))
+    bookie_core::export::write_atomically(path, |output| output.write_all(content.as_bytes()))
         .map_err(|error| error.to_string())
 }
 

@@ -15,7 +15,7 @@ async fn session_identity_survives_new_guards_but_changes_on_reconnect() {
     assert!(origin.guard(&service).is_some());
     assert!(origin.matches(Some(id), Some(&second)));
     assert!(!origin.matches(Some(Uuid::new_v4()), Some(&second)));
-    let mut index = tablepro_app_services::completion::SchemaIndex::default();
+    let mut index = bookie_app_services::completion::SchemaIndex::default();
     assert!(index.sync_connection(&first));
     index.set_columns("items", vec!["id".into()]);
     let request = index.request("items".into());

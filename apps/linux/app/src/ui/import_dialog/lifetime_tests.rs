@@ -41,7 +41,7 @@ fn import_format_controls_release_their_source_bytes() {
 fn dismissing_import_setup_releases_its_callback() {
     adw::init().unwrap();
     let application = adw::Application::builder()
-        .application_id("com.tablepro.linux.import-lifetime-test")
+        .application_id("com.bookie.linux.import-lifetime-test")
         .build();
     application.register(None::<&gtk::gio::Cancellable>).unwrap();
     let window = adw::ApplicationWindow::new(&application);

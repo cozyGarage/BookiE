@@ -1,4 +1,4 @@
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[derive(Debug, Clone)]
 pub struct DraftRow {

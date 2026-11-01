@@ -1,5 +1,5 @@
 use super::{connect, no_timeout, start_pg};
-use tablepro_core::{DriverError, OperationControl, Value};
+use bookie_core::{DriverError, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 #[tokio::test]

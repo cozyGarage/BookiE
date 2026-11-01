@@ -1,8 +1,8 @@
 use std::future::Future;
 
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError};
 use drivers_mssql::MssqlDriver;
 use secrecy::SecretString;
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError};
 use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
 use testcontainers::core::Mount;
@@ -28,7 +28,7 @@ pub(crate) async fn start_mssql(durable: bool) -> (ContainerAsync<MssqlServer>, 
         database: "master".into(),
         username: "sa".into(),
         password: SecretString::new(MssqlServer::DEFAULT_SA_PASSWORD.to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     };
     if let Err(error) = wait_for_authenticated_login(|| async {

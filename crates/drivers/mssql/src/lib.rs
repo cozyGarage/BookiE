@@ -9,8 +9,8 @@ use tokio::net::TcpStream;
 use tokio::sync::{MappedMutexGuard, Mutex, Notify};
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
-use tablepro_core::sql_dialect::build_order_and_pagination;
-use tablepro_core::{
+use bookie_core::sql_dialect::build_order_and_pagination;
+use bookie_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
     ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
     QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
@@ -86,7 +86,7 @@ impl DatabaseDriver for MssqlDriver {
         true
     }
 
-    fn catalog_object_kinds(&self) -> &'static [tablepro_core::CatalogObjectKind] {
+    fn catalog_object_kinds(&self) -> &'static [bookie_core::CatalogObjectKind] {
         catalog::SUPPORTED_KINDS
     }
 
@@ -116,7 +116,7 @@ fn build_target(opts: &ConnectOptions) -> Result<MssqlTarget, DriverError> {
     config.port(service_port);
     config.database(&opts.database);
     config.authentication(auth_method(opts)?);
-    use tablepro_core::TlsMode;
+    use bookie_core::TlsMode;
     match opts.tls.mode {
         TlsMode::Disabled => {
             config.encryption(EncryptionLevel::Off);
@@ -362,7 +362,7 @@ impl Connection for MssqlConnection {
         *self.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(notify);
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         session::open(&self.session_options).await
     }
 
@@ -396,7 +396,7 @@ impl Connection for MssqlConnection {
         schema: Option<&str>,
         control: &OperationControl,
     ) -> Result<Vec<CatalogObject>, DriverError> {
-        let mut client = tablepro_core::run_controlled_setup(self.client(), control).await??;
+        let mut client = bookie_core::run_controlled_setup(self.client(), control).await??;
         self.run_abandonable(catalog::list_objects(&mut client, kind, schema), control)
             .await
     }

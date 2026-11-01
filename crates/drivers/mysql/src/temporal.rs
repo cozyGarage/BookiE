@@ -1,7 +1,7 @@
+use bookie_core::Value;
 use sqlx::Decode;
 use sqlx::mysql::types::MySqlTime;
 use sqlx::mysql::{MySql, MySqlValueRef};
-use tablepro_core::Value;
 
 pub(crate) fn time_value(raw: MySqlValueRef<'_>) -> Option<Value> {
     let time = <MySqlTime as Decode<MySql>>::decode(raw).ok()?;

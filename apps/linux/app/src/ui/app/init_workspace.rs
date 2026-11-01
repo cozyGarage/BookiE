@@ -130,7 +130,7 @@ mod tests {
     fn saved_connections_popover_stays_inside_narrow_windows() {
         adw::init().unwrap();
         let app = adw::Application::builder()
-            .application_id("com.tablepro.linux.popover-test")
+            .application_id("com.bookie.linux.popover-test")
             .build();
         app.register(None::<&gtk::gio::Cancellable>).unwrap();
         let header = adw::HeaderBar::new();

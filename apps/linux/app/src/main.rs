@@ -11,6 +11,6 @@ fn main() {
                 "Usage: bookie [--help] [--version] [FILE|URI...]"
             );
         }
-        _ => tablepro_app::run(),
+        _ => bookie_app::run(),
     }
 }

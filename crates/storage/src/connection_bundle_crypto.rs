@@ -50,6 +50,7 @@ pub struct CipherHeader {
 /// are bound to the ciphertext through the AAD, so downgrading
 /// `memory_kib` or swapping the producer invalidates the tag.
 pub(crate) struct EnvelopeHeader {
+    pub format: &'static str,
     pub version: u32,
     pub producer: String,
     pub exported_at: String,
@@ -166,7 +167,7 @@ fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], BundleError> {
 /// JSON is not byte-stable: `serde_json` runs with `preserve_order`,
 /// so a rewritten document can reorder keys and break the tag.
 ///
-/// `b"tablepro.connection-bundle\x00"` || u32_le(version)
+/// `format || b"\x00"` || u32_le(version)
 ///   || len(producer) || producer
 ///   || len(exported_at) || exported_at
 ///   || len("argon2id") || "argon2id" || salt
@@ -174,7 +175,7 @@ fn decode_fixed<const N: usize>(encoded: &str) -> Result<[u8; N], BundleError> {
 ///   || len("aes-256-gcm") || "aes-256-gcm" || nonce
 fn associated_data(envelope: &EnvelopeHeader, kdf: &KdfHeader, salt: &[u8], nonce: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
-    out.extend_from_slice(crate::connection_bundle::BUNDLE_FORMAT.as_bytes());
+    out.extend_from_slice(envelope.format.as_bytes());
     out.push(0);
     out.extend_from_slice(&envelope.version.to_le_bytes());
     push_len_prefixed(&mut out, envelope.producer.as_bytes());

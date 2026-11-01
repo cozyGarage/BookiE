@@ -1,13 +1,13 @@
-use tablepro_core::{DriverError, looks_like_tls_failure};
+use bookie_core::{DriverError, looks_like_tls_failure};
 
 /// The mongodb crate boxes the transport error inside `ErrorKind::Io`
 /// rather than exposing it through `source()`, so the handshake cause is
 /// only reachable by walking that box as a second chain.
 fn error_chain_text(err: &mongodb::error::Error) -> String {
-    let mut text = tablepro_core::error_chain_text(err);
+    let mut text = bookie_core::error_chain_text(err);
     if let mongodb::error::ErrorKind::Io(io) = &*err.kind {
         text.push(' ');
-        text.push_str(&tablepro_core::error_chain_text(io.as_ref()));
+        text.push_str(&bookie_core::error_chain_text(io.as_ref()));
     }
     text
 }
@@ -148,7 +148,7 @@ mod tests {
             "the nested handshake cause must survive into the chain: {text}"
         );
         assert!(
-            !looks_like_tls_failure(&tablepro_core::error_chain_text(&err)),
+            !looks_like_tls_failure(&bookie_core::error_chain_text(&err)),
             "this case is only reachable by walking the Io box"
         );
     }

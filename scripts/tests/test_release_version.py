@@ -16,7 +16,7 @@ SPEC.loader.exec_module(VERSION)
 class ReleaseVersionTests(unittest.TestCase):
     def test_published_release_metadata_matches_record_after_newer_release(self):
         root = Path(__file__).resolve().parents[2]
-        metadata = ET.parse(root / "apps/linux/flatpak/com.tablepro.linux.metainfo.xml")
+        metadata = ET.parse(root / "apps/linux/flatpak/com.bookie.linux.metainfo.xml")
         releases = metadata.find("releases")
 
         self.assertIsNotNone(releases)
@@ -39,7 +39,7 @@ class ReleaseVersionTests(unittest.TestCase):
         crate.parent.mkdir(parents=True)
         crate.write_text('[package]\nname = "fixture"\nversion.workspace = true\n')
         (root / "meson.build").write_text("project('bookie', version: '0.2.0')\n")
-        metadata = root / "apps/linux/flatpak/com.tablepro.linux.metainfo.xml"
+        metadata = root / "apps/linux/flatpak/com.bookie.linux.metainfo.xml"
         metadata.parent.mkdir(parents=True)
         metadata.write_text('<component><releases><release version="0.2.0" type="development"/><release version="0.1.5"/></releases></component>')
         return crate, metadata

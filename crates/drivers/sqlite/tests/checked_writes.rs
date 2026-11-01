@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::sync::Arc;
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Value};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, Value};
 use tempfile::TempDir;
 
 async fn connect(directory: &TempDir) -> Arc<dyn Connection> {
@@ -137,7 +137,7 @@ async fn a_failing_statement_reports_its_index_and_rolls_the_batch_back() {
 
 #[tokio::test]
 async fn browse_filter_contains_matches_literal_percent_and_underscore() {
-    use tablepro_core::{ColumnInfo, FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+    use bookie_core::{ColumnInfo, FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
     let directory = TempDir::new().unwrap();
     let connection = connect(&directory).await;

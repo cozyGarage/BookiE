@@ -188,12 +188,42 @@ async fn load_secret_with_attrs(attrs: &HashMap<&'static str, String>) -> Result
         return Ok(None);
     };
     let items = keyring.search_items(attrs).await.map_err(map_err)?;
-    let Some(item) = items.into_iter().next() else {
+    if let Some(item) = items.into_iter().next() {
+        return read_secret(&item).await.map(Some);
+    }
+    let legacy = legacy_attrs(attrs);
+    let Some(item) = keyring.search_items(&legacy).await.map_err(map_err)?.into_iter().next() else {
         return Ok(None);
     };
+    let value = read_secret(&item).await?;
+    let label = item.label().await.map_err(map_err)?;
+    if let Err(error) = keyring
+        .create_item(
+            &label,
+            attrs,
+            secrecy::ExposeSecret::expose_secret(&value).as_bytes(),
+            true,
+        )
+        .await
+    {
+        tracing::warn!(%error, "credential could not be copied to the current keyring schema");
+    }
+    Ok(Some(value))
+}
+
+async fn read_secret(item: &oo7::Item) -> Result<SecretString, StorageError> {
     let secret = item.secret().await.map_err(map_err)?;
     let s = String::from_utf8(secret.to_vec()).map_err(|e| StorageError::Schema(format!("secret utf8: {e}")))?;
-    Ok(Some(SecretString::new(s.into())))
+    Ok(SecretString::new(s.into()))
+}
+
+fn legacy_attrs(attrs: &HashMap<&'static str, String>) -> HashMap<&'static str, String> {
+    let mut legacy = attrs.clone();
+    legacy.insert(
+        "xdg:schema",
+        crate::legacy_state::legacy_secret_schema(crate::secret_schema()),
+    );
+    legacy
 }
 
 async fn delete_secret(id: Uuid, kind: &str) -> Result<(), StorageError> {
@@ -205,6 +235,7 @@ async fn delete_secret_with_attrs(attrs: &HashMap<&'static str, String>) -> Resu
         return Ok(());
     };
     keyring.delete(attrs).await.map_err(map_err)?;
+    keyring.delete(&legacy_attrs(attrs)).await.map_err(map_err)?;
     Ok(())
 }
 

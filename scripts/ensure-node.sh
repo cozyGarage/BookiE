@@ -4,7 +4,7 @@ set -euo pipefail
 VERSION="24.22.1"
 SHA256="6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6"
 BINARY_SHA256="e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb"
-TOOL_DIR="${TABLEPRO_TOOL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/bookie-tools}/node-$VERSION"
+TOOL_DIR="${BOOKIE_TOOL_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/bookie-tools}/node-$VERSION"
 BIN="$TOOL_DIR/node"
 
 if [ "$(uname -m)" != "x86_64" ]; then

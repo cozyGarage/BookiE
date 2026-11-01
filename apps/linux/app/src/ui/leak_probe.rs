@@ -14,7 +14,7 @@ thread_local! {
 
 fn report_path() -> Option<&'static PathBuf> {
     static PATH: OnceLock<Option<PathBuf>> = OnceLock::new();
-    PATH.get_or_init(|| std::env::var_os("TABLEPRO_GTK_LEAK_REPORT").map(PathBuf::from))
+    PATH.get_or_init(|| std::env::var_os("BOOKIE_GTK_LEAK_REPORT").map(PathBuf::from))
         .as_ref()
 }
 

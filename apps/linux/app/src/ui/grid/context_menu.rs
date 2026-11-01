@@ -1,12 +1,12 @@
 mod keyboard_menu;
 mod pointer_menu;
 
+use bookie_core::sql_literal::RowStatement;
 use std::rc::Rc;
-use tablepro_core::sql_literal::RowStatement;
 
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio};
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::GridMsg;
 use super::display::{FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
@@ -247,7 +247,7 @@ pub(super) fn install_grid_context_menus(
             move |columns, rows| export::render_value_list(&driver_id, columns, rows),
         )
     };
-    let supports_sql = tablepro_core::export::supports_sql_literals(&driver_id);
+    let supports_sql = bookie_core::export::supports_sql_literals(&driver_id);
     let copy_in_clause_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -1018,7 +1018,7 @@ pub(crate) struct LoadedCellEdit<'a> {
     pub(crate) col_index: usize,
     pub(crate) row_position: u32,
     pub(crate) row_key: Vec<Value>,
-    pub(crate) column: &'a tablepro_core::ColumnInfo,
+    pub(crate) column: &'a bookie_core::ColumnInfo,
     pub(crate) value: Value,
     pub(crate) sender: relm4::Sender<GridMsg>,
 }
