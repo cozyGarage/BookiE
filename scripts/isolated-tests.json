@@ -1375,6 +1375,11 @@
       "secrets::tests::round_trip_via_secret_service"
     ],
     [
+      "bookie-storage",
+      "--lib",
+      "secrets::tests::a_credential_saved_under_the_legacy_schema_is_found_copied_forward_and_deleted_with_it"
+    ],
+    [
       "bookie-transport",
       "--lib",
       "tests::hop_zero_password_auth_still_works"
