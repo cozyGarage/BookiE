@@ -260,6 +260,15 @@ def scenarios(ui):
             assert items, "the menu has no items"
             target = len(items) - 1
         elif isinstance(position, str):
+            wait_until(
+                lambda: any(
+                    ui.node_name(node) == position
+                    for node in ui.descendants(menu)
+                    if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM
+                ),
+                f"menu item {position!r} did not appear",
+            )
+            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
             target = next(index for index, node in enumerate(items) if ui.node_name(node) == position)
         else:
             target = (-1 if start is None else start) + position
