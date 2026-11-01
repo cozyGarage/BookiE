@@ -3,11 +3,11 @@ use super::*;
 struct FailingCursorConnection;
 
 #[derive(Default)]
-struct CapturedAuditEvents(std::sync::Mutex<Vec<tablepro_policy::AuditEvent>>);
+struct CapturedAuditEvents(std::sync::Mutex<Vec<bookie_policy::AuditEvent>>);
 
 #[async_trait::async_trait]
-impl tablepro_policy::AuditSink for CapturedAuditEvents {
-    async fn record(&self, event: tablepro_policy::AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+impl bookie_policy::AuditSink for CapturedAuditEvents {
+    async fn record(&self, event: bookie_policy::AuditEvent) -> Result<(), bookie_policy::AuditError> {
         self.0.lock().unwrap().push(event);
         Ok(())
     }
@@ -16,32 +16,32 @@ impl tablepro_policy::AuditSink for CapturedAuditEvents {
 struct ImmediateApproval;
 
 #[async_trait::async_trait]
-impl tablepro_policy::ApprovalSink for ImmediateApproval {
-    async fn request(&self, _request: tablepro_policy::ApprovalRequest) -> tablepro_policy::ApprovalOutcome {
-        tablepro_policy::ApprovalOutcome::AllowOnce
+impl bookie_policy::ApprovalSink for ImmediateApproval {
+    async fn request(&self, _request: bookie_policy::ApprovalRequest) -> bookie_policy::ApprovalOutcome {
+        bookie_policy::ApprovalOutcome::AllowOnce
     }
 }
 
-async fn audited_sqlite_guard() -> std::sync::Arc<tablepro_policy::PolicyGuard> {
+async fn audited_sqlite_guard() -> std::sync::Arc<bookie_policy::PolicyGuard> {
     audited_guard(sqlite_connection().await).await
 }
 
 async fn audited_guard(
-    connection: std::sync::Arc<dyn tablepro_core::Connection>,
-) -> std::sync::Arc<tablepro_policy::PolicyGuard> {
-    std::sync::Arc::new(tablepro_policy::PolicyGuard::new(
+    connection: std::sync::Arc<dyn bookie_core::Connection>,
+) -> std::sync::Arc<bookie_policy::PolicyGuard> {
+    std::sync::Arc::new(bookie_policy::PolicyGuard::new(
         connection,
-        tablepro_policy::GuardContext {
+        bookie_policy::GuardContext {
             connection_id: uuid::Uuid::new_v4(),
             connection_name: "audit receipt test".into(),
             driver_id: "sqlite".into(),
-            environment: tablepro_core::Environment::Local,
+            environment: bookie_core::Environment::Local,
             read_only: false,
-            principal: tablepro_policy::Principal::human_gui(),
-            policy: std::sync::Arc::new(tablepro_policy::PolicyConfig::default()),
+            principal: bookie_policy::Principal::human_gui(),
+            policy: std::sync::Arc::new(bookie_policy::PolicyConfig::default()),
             approval: std::sync::Arc::new(ImmediateApproval),
             audit: std::sync::Arc::new(super::QuietAudit),
-            audit_state: std::sync::Arc::new(tablepro_policy::AuditState::new()),
+            audit_state: std::sync::Arc::new(bookie_policy::AuditState::new()),
         },
     ))
 }
@@ -72,21 +72,21 @@ async fn fail_one_statement(target: StatementTarget, sql: &str) -> Vec<uuid::Uui
 }
 
 fn audited_cursor_target() -> (StatementTarget, std::sync::Arc<CapturedAuditEvents>) {
-    let connection: std::sync::Arc<dyn tablepro_core::Connection> = std::sync::Arc::new(FailingCursorConnection);
+    let connection: std::sync::Arc<dyn bookie_core::Connection> = std::sync::Arc::new(FailingCursorConnection);
     let audit = std::sync::Arc::new(CapturedAuditEvents::default());
-    let guard = tablepro_policy::PolicyGuard::new(
+    let guard = bookie_policy::PolicyGuard::new(
         connection,
-        tablepro_policy::GuardContext {
+        bookie_policy::GuardContext {
             connection_id: uuid::Uuid::new_v4(),
             connection_name: "cursor receipt test".into(),
             driver_id: "postgres".into(),
-            environment: tablepro_core::Environment::Local,
+            environment: bookie_core::Environment::Local,
             read_only: false,
-            principal: tablepro_policy::Principal::human_gui(),
-            policy: std::sync::Arc::new(tablepro_policy::PolicyConfig::default()),
+            principal: bookie_policy::Principal::human_gui(),
+            policy: std::sync::Arc::new(bookie_policy::PolicyConfig::default()),
             approval: std::sync::Arc::new(ImmediateApproval),
             audit: audit.clone(),
-            audit_state: std::sync::Arc::new(tablepro_policy::AuditState::new()),
+            audit_state: std::sync::Arc::new(bookie_policy::AuditState::new()),
         },
     );
     (StatementTarget::GuardedPool(std::sync::Arc::new(guard)), audit)
@@ -111,7 +111,7 @@ async fn a_manual_session_failure_keeps_its_audit_operation_id() {
     let database = directory.path().join("session.sqlite");
     std::fs::File::create(&database).unwrap();
     let connection = drivers_sqlite::SqliteDriver
-        .connect(tablepro_core::ConnectOptions {
+        .connect(bookie_core::ConnectOptions {
             database: database.to_string_lossy().into_owned(),
             ..Default::default()
         })
@@ -160,7 +160,7 @@ async fn a_streamed_cursor_failure_keeps_its_recorded_audit_operation_ids() {
         .lock()
         .unwrap()
         .iter()
-        .find(|event| event.terminal_status == tablepro_policy::AuditTerminalStatus::Failed)
+        .find(|event| event.terminal_status == bookie_policy::AuditTerminalStatus::Failed)
         .map(|event| event.operation_id)
         .expect("failed cursor fetch has a terminal audit record");
 
@@ -168,8 +168,8 @@ async fn a_streamed_cursor_failure_keeps_its_recorded_audit_operation_ids() {
 }
 
 #[async_trait::async_trait]
-impl tablepro_core::Connection for FailingCursorConnection {
-    async fn list_tables(&self) -> Result<Vec<tablepro_core::TableInfo>, tablepro_core::DriverError> {
+impl bookie_core::Connection for FailingCursorConnection {
+    async fn list_tables(&self) -> Result<Vec<bookie_core::TableInfo>, bookie_core::DriverError> {
         Ok(Vec::new())
     }
 
@@ -177,7 +177,7 @@ impl tablepro_core::Connection for FailingCursorConnection {
         &self,
         _schema: Option<&str>,
         _table: &str,
-    ) -> Result<Vec<tablepro_core::ColumnInfo>, tablepro_core::DriverError> {
+    ) -> Result<Vec<bookie_core::ColumnInfo>, bookie_core::DriverError> {
         Ok(Vec::new())
     }
 
@@ -187,52 +187,52 @@ impl tablepro_core::Connection for FailingCursorConnection {
         _table: &str,
         _offset: u64,
         _limit: u64,
-    ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
-        Ok(tablepro_core::QueryResult {
+    ) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
+        Ok(bookie_core::QueryResult {
             columns: Vec::new(),
             rows: Vec::new(),
             truncated: false,
         })
     }
 
-    async fn query(&self, _sql: &str) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
-        Ok(tablepro_core::QueryResult {
+    async fn query(&self, _sql: &str) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
+        Ok(bookie_core::QueryResult {
             columns: Vec::new(),
             rows: Vec::new(),
             truncated: false,
         })
     }
 
-    async fn execute(&self, _sql: &str) -> Result<tablepro_core::ExecResult, tablepro_core::DriverError> {
-        Ok(tablepro_core::ExecResult { rows_affected: 0 })
+    async fn execute(&self, _sql: &str) -> Result<bookie_core::ExecResult, bookie_core::DriverError> {
+        Ok(bookie_core::ExecResult { rows_affected: 0 })
     }
 
     async fn execute_params(
         &self,
         _sql: &str,
-        _params: &[tablepro_core::Value],
-    ) -> Result<tablepro_core::ExecResult, tablepro_core::DriverError> {
+        _params: &[bookie_core::Value],
+    ) -> Result<bookie_core::ExecResult, bookie_core::DriverError> {
         self.execute("").await
     }
 
     async fn execute_in_transaction(
         &self,
-        statements: &[(String, Vec<tablepro_core::Value>)],
-    ) -> Result<Vec<u64>, tablepro_core::DriverError> {
+        statements: &[(String, Vec<bookie_core::Value>)],
+    ) -> Result<Vec<u64>, bookie_core::DriverError> {
         Ok(vec![0; statements.len()])
     }
 
-    async fn ping(&self) -> Result<(), tablepro_core::DriverError> {
+    async fn ping(&self) -> Result<(), bookie_core::DriverError> {
         Ok(())
     }
 
-    async fn close(self: Box<Self>) -> Result<(), tablepro_core::DriverError> {
+    async fn close(self: Box<Self>) -> Result<(), bookie_core::DriverError> {
         Ok(())
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, tablepro_core::DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, bookie_core::DriverError> {
         Ok(Box::new(super::CursorSession {
-            pages: std::collections::VecDeque::from([Err(tablepro_core::DriverError::Query {
+            pages: std::collections::VecDeque::from([Err(bookie_core::DriverError::Query {
                 message: "cursor fetch failed".into(),
                 sqlstate: Some("XX000".into()),
                 position: None,

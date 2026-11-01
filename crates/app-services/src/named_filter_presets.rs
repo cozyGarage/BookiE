@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use bookie_core::FilterSet;
 use serde::{Deserialize, Serialize};
-use tablepro_core::FilterSet;
 use uuid::Uuid;
 
 use super::config_io::xdg_config_path;

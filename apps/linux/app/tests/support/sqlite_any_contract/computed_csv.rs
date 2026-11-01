@@ -1,6 +1,6 @@
 #[tokio::test]
 async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -53,12 +53,12 @@ async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
     let directory = tempfile::tempdir().unwrap();
     let workbook_path = directory.path().join("sqlite-case-any.xlsx");
     std::fs::write(&workbook_path, b"existing workbook").unwrap();
-    let error = tablepro_core::export::write_result_file(
+    let error = bookie_core::export::write_result_file(
         &workbook_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -68,7 +68,7 @@ async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
     assert!(
         matches!(
             error,
-            tablepro_core::export::ExportError::WorkbookEmptyText { row: 6, column: 2 }
+            bookie_core::export::ExportError::WorkbookEmptyText { row: 6, column: 2 }
         ),
         "{error:?}"
     );
@@ -105,7 +105,7 @@ async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -156,12 +156,12 @@ async fn sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes() 
     );
     let directory = tempfile::tempdir().unwrap();
     let workbook_path = directory.path().join("sqlite-coalesce-any.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &workbook_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -189,12 +189,12 @@ async fn sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes() 
     assert!(!sheet.contains("<f>"), "{sheet}");
 
     let json_path = directory.path().join("sqlite-coalesce-any.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -242,7 +242,7 @@ async fn sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes() 
 
 #[tokio::test]
 async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
-    use tablepro_core::{
+    use bookie_core::{
         ConnectOptions, DatabaseDriver,
         import::{CsvImportOptions, ImportTarget, PlanError, build_insert_plan, read_csv},
     };
@@ -271,7 +271,7 @@ async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
             &ImportTarget {
                 driver_id: "sqlite",
 
-                capabilities: tablepro_core::DriverCapabilities::default(),
+                capabilities: bookie_core::DriverCapabilities::default(),
                 schema: None,
                 table: "flexible",
                 columns: &columns,
@@ -286,14 +286,14 @@ async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
     assert!(matches!(
         blank,
         PlanError::Rows { first, total: 1 }
-            if first[0].reason == tablepro_core::import::CellError::AmbiguousSqliteAnyNullOrEmpty
+            if first[0].reason == bookie_core::import::CellError::AmbiguousSqliteAnyNullOrEmpty
     ));
 
     let malformed = import(b"value\nbookie:sqlite-any:v1:blob:0xz1\n", "\\N".into()).unwrap_err();
     assert!(matches!(
         malformed,
         PlanError::Rows { first, total: 1 }
-            if first[0].reason == tablepro_core::import::CellError::InvalidSqliteAnyCsvValue
+            if first[0].reason == bookie_core::import::CellError::InvalidSqliteAnyCsvValue
     ));
 
     let untagged_text = import(b"value\n42\n", "\\N".into()).unwrap();
@@ -306,7 +306,7 @@ async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
 
 #[tokio::test]
 async fn sqlite_nullif_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -406,7 +406,7 @@ async fn sqlite_nullif_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_max_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -509,7 +509,7 @@ async fn sqlite_max_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_min_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -619,7 +619,7 @@ async fn sqlite_min_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_substr_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -712,7 +712,7 @@ async fn sqlite_substr_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_abs_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -819,7 +819,7 @@ async fn sqlite_abs_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_round_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -896,7 +896,7 @@ async fn sqlite_round_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_hex_any_csv_round_trip_keeps_hex_results_as_text() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -975,7 +975,7 @@ async fn sqlite_hex_any_csv_round_trip_keeps_hex_results_as_text() {
 
 #[tokio::test]
 async fn sqlite_quote_any_csv_round_trip_keeps_literal_text_and_null_distinct() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -1054,7 +1054,7 @@ async fn sqlite_quote_any_csv_round_trip_keeps_literal_text_and_null_distinct() 
 
 #[tokio::test]
 async fn sqlite_instr_any_csv_round_trip_preserves_integer_and_null_results() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {

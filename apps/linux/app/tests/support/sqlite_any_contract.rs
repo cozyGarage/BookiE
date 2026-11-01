@@ -1,13 +1,13 @@
 use super::parse_input_for_grid_cell;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 async fn sqlite_result_csv_round_trip(
-    connection: &dyn tablepro_core::Connection,
-    result: &tablepro_core::QueryResult,
+    connection: &dyn bookie_core::Connection,
+    result: &bookie_core::QueryResult,
     target_table: &str,
     mapping: &[Option<usize>],
 ) {
-    use tablepro_core::{
+    use bookie_core::{
         export::{CsvOptions, ResultExport, ResultFormat, unique_csv_null_marker, write_result_file},
         import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
     };
@@ -49,7 +49,7 @@ async fn sqlite_result_csv_round_trip(
         &ImportTarget {
             driver_id: "sqlite",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: target_table,
             columns: &target_columns,
@@ -75,7 +75,7 @@ include!("sqlite_any_contract/aggregate_csv.rs");
 include!("sqlite_any_contract/json_each_csv.rs");
 #[tokio::test]
 async fn sqlite_cast_blob_any_csv_round_trip_preserves_computed_bytes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -173,12 +173,12 @@ async fn sqlite_cast_blob_any_csv_round_trip_preserves_computed_bytes() {
         .unwrap();
     let directory = tempfile::tempdir().unwrap();
     let json_path = directory.path().join("sqlite-cast-blob-any.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &consumer_result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -202,12 +202,12 @@ async fn sqlite_cast_blob_any_csv_round_trip_preserves_computed_bytes() {
     assert_eq!(json[6]["storage_class"], "null");
 
     let xlsx_path = directory.path().join("sqlite-cast-blob-any.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &consumer_result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,

@@ -15,7 +15,7 @@ fn config_path_in(
     let base = xdg
         .map(PathBuf::from)
         .or_else(|| home.map(|h| PathBuf::from(h).join(".config")))?;
-    Some(base.join(tablepro_storage::storage_dir_name()).join(filename))
+    Some(base.join(bookie_storage::storage_dir_name()).join(filename))
 }
 
 pub fn backup_file_if_exists(path: &Path, backup: &Path) -> std::io::Result<()> {
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn the_config_directory_prefers_xdg_then_falls_back_to_home() {
-        let name = tablepro_storage::storage_dir_name();
+        let name = bookie_storage::storage_dir_name();
         assert_eq!(
             config_path_in(Some("/xdg".into()), Some("/home/me".into()), "f.json"),
             Some(PathBuf::from("/xdg").join(name).join("f.json"))

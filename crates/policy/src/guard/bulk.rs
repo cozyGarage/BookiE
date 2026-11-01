@@ -155,10 +155,10 @@ fn qualified_target(schema: Option<&str>, table: &str) -> String {
 }
 
 fn valid_sequence_columns(driver_id: &str, columns: &[String]) -> bool {
-    columns.len() <= tablepro_core::import::MAX_COLUMNS
+    columns.len() <= bookie_core::import::MAX_COLUMNS
         && (columns.is_empty() || driver_id.eq_ignore_ascii_case("postgres"))
         && columns.iter().enumerate().all(|(index, column)| {
-            tablepro_core::sql_dialect::validate_ident(column).is_ok() && !columns[..index].contains(column)
+            bookie_core::sql_dialect::validate_ident(column).is_ok() && !columns[..index].contains(column)
         })
 }
 

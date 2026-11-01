@@ -1,4 +1,4 @@
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 use super::display::value_is_inline_editable;
 use super::types::{is_bool_type, is_bytes_type};

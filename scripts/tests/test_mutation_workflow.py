@@ -17,9 +17,9 @@ class MutationWorkflowTests(unittest.TestCase):
         self.assertIn("timeout-minutes: 90", mutation)
         self.assertIn("timeout-minutes: 120", mutation)
         for shard in range(4):
-            self.assertIn(f"package: tablepro-core, shard: {shard}/4", mutation)
+            self.assertIn(f"package: bookie-core, shard: {shard}/4", mutation)
         for shard in range(2):
-            self.assertIn(f"package: tablepro-policy, shard: {shard}/2", mutation)
+            self.assertIn(f"package: bookie-policy, shard: {shard}/2", mutation)
         self.assertIn("name: mutants-${{ matrix.label }}-${{ github.run_id }}", mutation)
         self.assertIn("if-no-files-found: error", mutation)
         triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]

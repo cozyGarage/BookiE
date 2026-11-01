@@ -1,4 +1,4 @@
-use tablepro_core::{ColumnInfo, QualifiedTypeName};
+use bookie_core::{ColumnInfo, QualifiedTypeName};
 
 use super::*;
 
@@ -61,7 +61,7 @@ mod tests {
         for name in ["date_format", "timestamp_source", "json_kind", "uuid_style"] {
             let parsed = super::super::value_parse::parse_input_for_column("iso", Some(&column("c", name, Some(name))));
             assert!(
-                matches!(parsed, Ok(tablepro_core::Value::Text(ref text)) if text == "iso"),
+                matches!(parsed, Ok(bookie_core::Value::Text(ref text)) if text == "iso"),
                 "{name}"
             );
         }

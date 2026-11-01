@@ -16,32 +16,32 @@ import subprocess
 import sys
 from pathlib import Path
 
-APP = "tablepro-app"
+APP = "bookie-app"
 GUI = {
     "gtk4", "gtk4-sys", "gdk4", "gdk4-sys", "gdk-pixbuf", "gio", "gio-sys", "glib", "glib-sys",
     "pango", "cairo-rs", "libadwaita", "libadwaita-sys", "sourceview5", "relm4", "relm4-macros",
 }
 DRIVERS = {
-    f"tablepro-driver-{engine}"
+    f"bookie-driver-{engine}"
     for engine in ("clickhouse", "duckdb", "mongodb", "mssql", "mysql", "postgres", "redis", "sqlite")
 }
-TEST_CRATES = {"tablepro-driver-tls-tests", "tablepro-release-tests"}
+TEST_CRATES = {"bookie-driver-tls-tests", "bookie-release-tests"}
 ALLOWED = {
-    "tablepro-core": set(),
-    "tablepro-ssh": set(),
-    "tablepro-dump": {"tablepro-core"},
-    "tablepro-policy": {"tablepro-core"},
-    "tablepro-storage": {"tablepro-core", "tablepro-policy"},
-    "tablepro-transport": {"tablepro-core", "tablepro-policy", "tablepro-ssh", "tablepro-storage"},
-    "tablepro-app-services": {
-        "tablepro-core", "tablepro-dump", "tablepro-policy", "tablepro-storage", "tablepro-transport",
+    "bookie-core": set(),
+    "bookie-ssh": set(),
+    "bookie-dump": {"bookie-core"},
+    "bookie-policy": {"bookie-core"},
+    "bookie-storage": {"bookie-core", "bookie-policy"},
+    "bookie-transport": {"bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage"},
+    "bookie-app-services": {
+        "bookie-core", "bookie-dump", "bookie-policy", "bookie-storage", "bookie-transport",
     },
-    "tablepro-mcp": {"tablepro-core", "tablepro-policy", "tablepro-storage"},
-    "tablepro-agentd": {
-        "tablepro-core", "tablepro-policy", "tablepro-ssh", "tablepro-storage", "tablepro-transport",
-        "tablepro-mcp", *DRIVERS,
+    "bookie-mcp": {"bookie-core", "bookie-policy", "bookie-storage"},
+    "bookie-agentd": {
+        "bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage", "bookie-transport",
+        "bookie-mcp", *DRIVERS,
     },
-    **{driver: {"tablepro-core"} for driver in DRIVERS},
+    **{driver: {"bookie-core"} for driver in DRIVERS},
 }
 
 
@@ -78,7 +78,7 @@ def unlisted_in_preflight(metadata, preflight):
     workspace = {names[member] for member in metadata["workspace_members"]}
     block = re.search(r"CRATES=\((.*?)\)", preflight, re.S)
     listed = set(block.group(1).split()) if block else set()
-    exempt = {APP, "tablepro-driver-duckdb"}
+    exempt = {APP, "bookie-driver-duckdb"}
     return [
         f"{name} is missing from CRATES in scripts/preflight.sh" for name in sorted(workspace - listed - exempt)
     ]

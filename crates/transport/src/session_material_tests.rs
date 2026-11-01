@@ -1,8 +1,8 @@
 use super::*;
 use std::path::PathBuf;
 
-use tablepro_core::{AuthMode, Environment, TlsMode};
-use tablepro_storage::{SavedSshAuth, SavedSshConfig};
+use bookie_core::{AuthMode, Environment, TlsMode};
+use bookie_storage::{SavedSshAuth, SavedSshConfig};
 use uuid::Uuid;
 
 fn sqlite_saved() -> SavedConnection {
@@ -150,7 +150,7 @@ async fn rotating_ssh_key_bytes_changes_the_digest() {
 #[tokio::test]
 async fn missing_tls_ca_file_fails_closed() {
     let mut saved = sqlite_saved();
-    saved.tls_root_cert = Some(PathBuf::from("/no/such/tablepro-ca.pem"));
+    saved.tls_root_cert = Some(PathBuf::from("/no/such/bookie-ca.pem"));
     let error = session_material_digest(&saved).await.expect_err("missing ca must fail");
     assert!(matches!(error, TransportError::Secret(_)));
 }

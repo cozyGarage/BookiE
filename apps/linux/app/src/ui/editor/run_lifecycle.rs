@@ -40,7 +40,7 @@ impl SqlEditor {
             let planned = PlannedStatements {
                 statements: vec![sql.clone()],
                 source_ranges: std::iter::once(0..sql.len()).collect(),
-                error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy::StopScript,
+                error_policy: bookie_core::sql_syntax::script::BatchErrorPolicy::StopScript,
                 settings_check: None,
             };
             self.run_planned(sql, anchor, planned, sender);
@@ -204,7 +204,7 @@ impl SqlEditor {
             duration_ms: Some(duration_ms),
             rows_affected,
             outcome,
-            source: tablepro_storage::query_history::Source::Editor,
+            source: bookie_storage::query_history::Source::Editor,
         };
         relm4::spawn(async move {
             if let Err(e) = history.record(entry).await {

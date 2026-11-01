@@ -28,7 +28,7 @@ fn page_label_lookup_uses_a_constant_number_of_page_index_lookups() {
 
 #[test]
 fn progress_text_reads_the_cached_retained_row_count_once() {
-    let page = std::sync::Arc::new(tablepro_core::QueryResult {
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
         columns: Vec::new(),
         rows: vec![Vec::new()],
         truncated: false,

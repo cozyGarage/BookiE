@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_policy::{StatementClass, classify};
+use bookie_policy::{StatementClass, classify};
 
 fn class(sql: &str) -> StatementClass {
     classify(sql, "postgres").class

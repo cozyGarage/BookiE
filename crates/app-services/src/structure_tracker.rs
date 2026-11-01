@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use uuid::Uuid;
 
-use tablepro_core::sql_ddl::{BuildDdlError, StructureOp, materialize_ops};
+use bookie_core::sql_ddl::{BuildDdlError, StructureOp, materialize_ops};
 
 /// Per-tab cache. Holds the current pending-op list emitted by the
 /// tab's diff. `materialize` re-runs SQL emission on demand; the
@@ -144,7 +144,7 @@ pub fn pending_tabs_for(tab_ids: &std::collections::HashSet<Uuid>) -> Vec<Uuid> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::sql_ddl::DraftColumn;
+    use bookie_core::sql_ddl::DraftColumn;
 
     fn dc(name: &str, ty: &str) -> DraftColumn {
         DraftColumn {

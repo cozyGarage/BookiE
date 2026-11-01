@@ -1,6 +1,6 @@
 use tempfile::TempDir;
 
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use bookie_core::{AuthMode, Environment, TlsMode};
 
 use super::*;
 

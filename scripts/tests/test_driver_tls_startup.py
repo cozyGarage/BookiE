@@ -52,7 +52,7 @@ if any(action in args for action in ["ps", "inspect", "logs"]):
                 ["bash", str(root / "scripts/test-driver-tls.sh")],
                 env=dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}",
                          TLS_COMMAND_LOG=str(log), TLS_DIAGNOSTIC_EXIT=str(diagnostic_exit),
-                         TABLEPRO_FIXTURE_KEEP_UP="0"),
+                         BOOKIE_FIXTURE_KEEP_UP="0"),
                 text=True, capture_output=True,
             )
             self.assertTrue(log.exists(), result.stderr)
@@ -102,7 +102,7 @@ if "up" in sys.argv:
             result = subprocess.run(
                 ["bash", str(root / "scripts/test-driver-tls.sh")],
                 env=dict(os.environ, PATH=f"{binary}:{os.environ['PATH']}",
-                         TLS_FIXTURE_ROOT=str(fixture), TABLEPRO_FIXTURE_KEEP_UP="0"),
+                         TLS_FIXTURE_ROOT=str(fixture), BOOKIE_FIXTURE_KEEP_UP="0"),
                 umask=0o077, text=True, capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)

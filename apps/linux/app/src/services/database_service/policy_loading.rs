@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use tablepro_policy::{PolicyConfig, load_from_path};
+use bookie_policy::{PolicyConfig, load_from_path};
 
 use crate::services::config_io::xdg_config_path;
 

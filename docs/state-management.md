@@ -1,12 +1,12 @@
 # State management with Relm4
 
-The `tablepro-app` crate (`apps/linux/app`) uses [Relm4](https://relm4.org) on top of gtk4-rs. The choice is recorded in [decisions/0003-relm4-architecture.md](decisions/0003-relm4-architecture.md). This file describes the patterns used inside the codebase. Read the official Relm4 book first; this document only covers the conventions specific to BookiE.
+The `bookie-app` crate (`apps/linux/app`) uses [Relm4](https://relm4.org) on top of gtk4-rs. The choice is recorded in [decisions/0003-relm4-architecture.md](decisions/0003-relm4-architecture.md). This file describes the patterns used inside the codebase. Read the official Relm4 book first; this document only covers the conventions specific to BookiE.
 
-GTK-free service modules are moving incrementally into `tablepro-app-services` under [ADR 0018](decisions/0018-headless-app-services-crate.md). The app re-exports those modules from `services` so callers keep their paths; services that own GTK or application wiring stay in the app.
+GTK-free service modules are moving incrementally into `bookie-app-services` under [ADR 0018](decisions/0018-headless-app-services-crate.md). The app re-exports those modules from `services` so callers keep their paths; services that own GTK or application wiring stay in the app.
 
 Scoped filter presets and import mappings, preference data, quick-switcher ranking and reconnect classification/backoff also live in app-services. GSettings access, style application, translated labels, registered actions and connection-monitor runtime wiring stay in the app.
 
-`tablepro-app-services::driver_error_presentation` classifies `DriverError` values into a typed, GTK-free model, including TLS guidance and transaction outcome details. The GTK adapter keeps `crate::tr!` localization and renders that model into user-facing text; error classification does not depend on GTK or localization.
+`bookie-app-services::driver_error_presentation` classifies `DriverError` values into a typed, GTK-free model, including TLS guidance and transaction outcome details. The GTK adapter keeps `crate::tr!` localization and renders that model into user-facing text; error classification does not depend on GTK or localization.
 
 ## When to use which component flavour
 
@@ -81,9 +81,9 @@ Editor failures carry only audit receipts returned by the exact guarded statemen
 
 Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons before explicit ownership was introduced, and the `Arc` handles replaced them.
 
-`tablepro-app-services::workspace` owns each window's tab membership, preview status, open-table decisions and save-before-close counters. The collection accepts app-owned payloads; it has no GUI dependency. The GTK adapter owns controllers, page order, dialogs and the `AdwTabView` close handshake. The app adapter writes the existing `services::workspace_state` record format and identifiers.
+`bookie-app-services::workspace` owns each window's tab membership, preview status, open-table decisions and save-before-close counters. The collection accepts app-owned payloads; it has no GUI dependency. The GTK adapter owns controllers, page order, dialogs and the `AdwTabView` close handshake. The app adapter writes the existing `services::workspace_state` record format and identifiers.
 
-Workspace serialization, restoration, draft files and the background writer live in `tablepro-app-services::workspace_state`. The app supplies configuration and draft-directory paths through its `workspace_state` adapter. GTK page ordering, snapshot collection and persistence timers remain in the app; the saved format and directory names are unchanged.
+Workspace serialization, restoration, draft files and the background writer live in `bookie-app-services::workspace_state`. The app supplies configuration and draft-directory paths through its `workspace_state` adapter. GTK page ordering, snapshot collection and persistence timers remain in the app; the saved format and directory names are unchanged.
 
 Per-tab editing state is the deliberate exception. The headless `change_tracker` and `structure_tracker` modules and the app-owned `window_registry` keep a `thread_local!` registry keyed by tab or window id. The app bridges change-tracker events into Relm4 through an event sink. That is sound because each is confined to the GTK main thread by the Relm4 contract, which is also why they use `RefCell` rather than `Mutex`. Threading a registry handle through every grid cell binding would cost more in the hot `connect_bind` path than it buys. Tests construct a fresh registry rather than sharing the thread-local one.
 
@@ -121,7 +121,7 @@ Relm4 ships test helpers but they require a running GTK main loop, which require
 
 ## Regression cases: browse planning and metadata identity
 
-Browse SQL planning is pure and shared between counts and pages. A validation error clears the count through the existing request-generation failure path and surfaces the error; it cannot fall back to an unfiltered total. Delayed sidebar metadata is accepted only for the same connection allocation, so reconnecting the same saved UUID does not make an old response current. The planner and its pure tests live in `tablepro-app-services::browse_query`; real-database fixtures stay in the app test tier. Connection identity tests remain in `services/database_service.rs`.
+Browse SQL planning is pure and shared between counts and pages. A validation error clears the count through the existing request-generation failure path and surfaces the error; it cannot fall back to an unfiltered total. Delayed sidebar metadata is accepted only for the same connection allocation, so reconnecting the same saved UUID does not make an old response current. The planner and its pure tests live in `bookie-app-services::browse_query`; real-database fixtures stay in the app test tier. Connection identity tests remain in `services/database_service.rs`.
 
 Completion identity and reconnect behavior are described in [architecture](../ARCHITECTURE.md) and constrained by ADR 0008.
 

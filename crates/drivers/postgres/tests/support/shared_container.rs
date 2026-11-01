@@ -1,7 +1,7 @@
 use std::sync::{LazyLock, Mutex as StdMutex};
 
+use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use drivers_postgres::PgDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
 use testcontainers::core::{ExecCommand, Mount};
@@ -44,7 +44,7 @@ pub(crate) async fn start_pg_durable() -> (TestDatabase, ConnectOptions) {
 async fn start_pg_with_durability(durable: bool) -> (TestDatabase, ConnectOptions) {
     if can_reuse_server(
         &std::env::args().skip(1).collect::<Vec<_>>(),
-        std::env::var_os("TABLEPRO_TEST_RUN_ID").is_some(),
+        std::env::var_os("BOOKIE_TEST_RUN_ID").is_some(),
     ) && !durable
     {
         let test_lock = TEST_LOCK.lock().await;
@@ -113,8 +113,8 @@ async fn create_server(durable: bool) -> (ContainerAsync<Postgres>, Server) {
             ])
             .with_mount(Mount::tmpfs_mount("/var/lib/postgresql/data"))
     };
-    let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
-        Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
+    let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
         Err(_) => image,
     };
     let container = image

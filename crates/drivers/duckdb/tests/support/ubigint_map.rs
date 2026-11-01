@@ -1,5 +1,5 @@
 use super::native_connection;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn value_contract_nested_ubigint_map_refuses_lossy_consumers() {
@@ -22,7 +22,7 @@ async fn value_contract_nested_ubigint_map_refuses_lossy_consumers() {
     let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
     let value = &result.rows[0][0];
     assert!(matches!(value, Value::Undecodable(_)), "{value:?}");
-    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("duckdb", value).is_err());
     assert!(
         connection
             .query_params("SELECT ?", std::slice::from_ref(value))

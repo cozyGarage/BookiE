@@ -1,5 +1,5 @@
 use super::{BoundQuery, BrowseTarget};
-use tablepro_core::Value;
+use bookie_core::Value;
 
 pub(super) fn value_query(
     target: &BrowseTarget<'_>,
@@ -35,7 +35,7 @@ pub(super) fn value_query(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::{ColumnInfo, FilterSet};
+    use bookie_core::{ColumnInfo, FilterSet};
 
     #[test]
     fn redis_value_query_binds_text_and_binary_keys() {

@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use relm4::gtk::glib;
 
-pub const STALL_MS_ENV: &str = "TABLEPRO_UI_STALL_MS";
+pub const STALL_MS_ENV: &str = "BOOKIE_UI_STALL_MS";
 const TICK: Duration = Duration::from_millis(16);
 
 pub fn install_from_env() {

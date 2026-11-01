@@ -1,6 +1,6 @@
+use bookie_core::{DatabaseDriver, Value};
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::{Decimal128, Document, doc};
-use tablepro_core::{DatabaseDriver, Value};
 use testcontainers::ImageExt;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 

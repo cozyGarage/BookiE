@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{ConnectOptions, DriverError};
+use bookie_core::{ConnectOptions, DriverError};
 
 use crate::{connect, start_mysql};
 
@@ -46,7 +46,7 @@ async fn a_read_only_connection_is_refused_writes_by_the_server() {
         .query_params_controlled(
             "INSERT INTO jobs VALUES (9)",
             &[],
-            &tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(5)),
+            &bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5)),
         )
         .await
         .expect_err("a session on a read-only connection must be read-only too");

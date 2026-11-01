@@ -42,12 +42,12 @@ impl EditorTabSlot {
 
 pub struct EditorFile {
     pub path: std::path::PathBuf,
-    pub version: tablepro_core::text_file::FileVersion,
+    pub version: bookie_core::text_file::FileVersion,
     pub saved_text: String,
 }
 
 impl EditorFile {
-    pub fn from_disk(file: tablepro_core::text_file::TextFile) -> Self {
+    pub fn from_disk(file: bookie_core::text_file::TextFile) -> Self {
         Self {
             path: file.path,
             version: file.version,
@@ -127,7 +127,7 @@ impl WorkspaceTab {
     }
 }
 
-pub use tablepro_app_services::workspace::OpenMode;
+pub use bookie_app_services::workspace::OpenMode;
 
 fn workspace_tab_id_quark() -> glib::Quark {
     static QUARK: std::sync::OnceLock<glib::Quark> = std::sync::OnceLock::new();
@@ -183,7 +183,7 @@ impl StatusKind {
     }
 }
 
-impl tablepro_app_services::workspace::TabContent for WorkspaceTab {
+impl bookie_app_services::workspace::TabContent for WorkspaceTab {
     fn table_target(&self) -> Option<(Option<&str>, &str)> {
         match self {
             Self::Table(slot) => Some((slot.schema.as_deref(), &slot.table)),

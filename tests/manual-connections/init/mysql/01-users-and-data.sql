@@ -1,7 +1,7 @@
-CREATE DATABASE IF NOT EXISTS tablepro_extra;
-CREATE USER IF NOT EXISTS 'tablepro_ro'@'%' IDENTIFIED BY 'tablepro_ro_password';
-GRANT SELECT ON tablepro_lab.* TO 'tablepro_ro'@'%';
-GRANT ALL PRIVILEGES ON tablepro_extra.* TO 'tablepro_rw'@'%';
+CREATE DATABASE IF NOT EXISTS bookie_extra;
+CREATE USER IF NOT EXISTS 'bookie_ro'@'%' IDENTIFIED BY 'bookie_ro_password';
+GRANT SELECT ON bookie_lab.* TO 'bookie_ro'@'%';
+GRANT ALL PRIVILEGES ON bookie_extra.* TO 'bookie_rw'@'%';
 
 CREATE TABLE people (
     id BIGINT PRIMARY KEY,
@@ -14,5 +14,5 @@ INSERT INTO people (id, name, email, active) VALUES
     (1, 'Ada Lovelace', 'ada@example.test', true),
     (2, 'Grace Hopper', 'grace@example.test', false);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON tablepro_lab.* TO 'tablepro_rw'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON bookie_lab.* TO 'bookie_rw'@'%';
 FLUSH PRIVILEGES;

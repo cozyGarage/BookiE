@@ -3,7 +3,7 @@ use relm4::gtk::gio;
 use uuid::Uuid;
 
 use super::{App, OpenMode, WorkspaceTab};
-use tablepro_app_services::workspace::{TableOpenPlan, TableOpenRequest};
+use bookie_app_services::workspace::{TableOpenPlan, TableOpenRequest};
 
 impl App {
     pub(super) fn dispatch_select_table(

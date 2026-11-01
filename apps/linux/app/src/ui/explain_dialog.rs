@@ -44,7 +44,7 @@ pub fn present(
     let explain_sql = if trimmed.to_ascii_uppercase().starts_with("EXPLAIN") {
         trimmed.to_string()
     } else {
-        match tablepro_core::sql_dialect::explain_statement(&driver_id, trimmed) {
+        match bookie_core::sql_dialect::explain_statement(&driver_id, trimmed) {
             Some(statement) => statement,
             None => {
                 let toast_parent = parent.clone().upcast::<gtk::Window>();
@@ -152,7 +152,7 @@ fn add_explain_pages(
     (tree_page, text_page)
 }
 
-fn format_explain_result(result: &tablepro_core::QueryResult) -> String {
+fn format_explain_result(result: &bookie_core::QueryResult) -> String {
     if result.rows.is_empty() {
         return String::from("(empty plan)");
     }
@@ -182,7 +182,7 @@ fn format_explain_result(result: &tablepro_core::QueryResult) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::{ColumnInfo, QueryResult, Value};
+    use bookie_core::{ColumnInfo, QueryResult, Value};
 
     fn column(name: &str) -> ColumnInfo {
         ColumnInfo {

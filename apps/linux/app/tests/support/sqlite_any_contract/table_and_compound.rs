@@ -1,6 +1,6 @@
 #[tokio::test]
 async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -28,7 +28,7 @@ async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class()
             .unwrap();
         let current = current.rows[0][0].clone();
         let edit = parse_input_for_grid_cell(input, Some(&columns[value_index]), "sqlite", Some(&current)).unwrap();
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "sqlite",
             None,
             "flexible",
@@ -47,7 +47,7 @@ async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class()
         .rows[0][0]
         .clone();
     let clear = parse_input_for_grid_cell("", Some(&columns[value_index]), "sqlite", Some(&current)).unwrap();
-    let clear_update = tablepro_core::sql_dialect::build_keyed_update(
+    let clear_update = bookie_core::sql_dialect::build_keyed_update(
         "sqlite",
         None,
         "flexible",
@@ -76,7 +76,7 @@ async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class()
 
 #[tokio::test]
 async fn sqlite_strict_any_null_and_new_cells_use_text_unless_blank() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -102,7 +102,7 @@ async fn sqlite_strict_any_null_and_new_cells_use_text_unless_blank() {
     let null = Value::Null;
     let edit = parse_input_for_grid_cell("42", Some(&columns[value_index]), "sqlite", Some(&null)).unwrap();
     assert_eq!(edit, Value::Text("42".into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "sqlite",
         None,
         "flexible",
@@ -115,7 +115,7 @@ async fn sqlite_strict_any_null_and_new_cells_use_text_unless_blank() {
 
     let blank = parse_input_for_grid_cell("", Some(&columns[value_index]), "sqlite", Some(&null)).unwrap();
     assert_eq!(blank, Value::Null);
-    let blank_update = tablepro_core::sql_dialect::build_keyed_update(
+    let blank_update = bookie_core::sql_dialect::build_keyed_update(
         "sqlite",
         None,
         "flexible",
@@ -130,7 +130,7 @@ async fn sqlite_strict_any_null_and_new_cells_use_text_unless_blank() {
     draft[value_index] = parse_input_for_grid_cell("007", Some(&columns[value_index]), "sqlite", Some(&null)).unwrap();
     assert_eq!(draft[value_index], Value::Text("007".into()));
     let (insert_sql, insert_params) =
-        tablepro_core::sql_dialect::build_insert_from_draft("sqlite", None, "flexible", &columns, &draft).unwrap();
+        bookie_core::sql_dialect::build_insert_from_draft("sqlite", None, "flexible", &columns, &draft).unwrap();
     connection.execute_params(&insert_sql, &insert_params).await.unwrap();
 
     let saved = connection
@@ -149,7 +149,7 @@ async fn sqlite_strict_any_null_and_new_cells_use_text_unless_blank() {
 
 #[tokio::test]
 async fn sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -197,7 +197,7 @@ async fn sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes() {
 
 #[tokio::test]
 async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{
+    use bookie_core::{
         ConnectOptions, DatabaseDriver,
         export::{CsvOptions, render_csv, unique_csv_null_marker},
         import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
@@ -259,7 +259,7 @@ async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
         &ImportTarget {
             driver_id: "sqlite",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "restored",
             columns: &target_columns,
@@ -311,7 +311,7 @@ async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_attached_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -348,7 +348,7 @@ async fn sqlite_attached_any_csv_round_trip_preserves_runtime_storage_classes() 
     assert_eq!(source.columns[1].data_type, "ANY");
     transaction.commit().await.unwrap();
 
-    use tablepro_core::{
+    use bookie_core::{
         export::{CsvOptions, render_csv, unique_csv_null_marker},
         import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
     };
@@ -370,7 +370,7 @@ async fn sqlite_attached_any_csv_round_trip_preserves_runtime_storage_classes() 
         &ImportTarget {
             driver_id: "sqlite",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "restored",
             columns: &target_columns,
@@ -404,7 +404,7 @@ async fn sqlite_attached_any_csv_round_trip_preserves_runtime_storage_classes() 
 
 #[tokio::test]
 async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
-    use tablepro_core::{
+    use bookie_core::{
         ConnectOptions, DatabaseDriver,
         export::{CsvOptions, ResultExport, ResultFormat, render_csv, write_result_file},
     };
@@ -528,7 +528,7 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
 
 #[tokio::test]
 async fn sqlite_compound_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {

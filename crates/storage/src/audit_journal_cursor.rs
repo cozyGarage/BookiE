@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::os::unix::fs::MetadataExt;
 
-use tablepro_policy::AuditEvent;
+use bookie_policy::AuditEvent;
 use uuid::Uuid;
 
 use super::{GENESIS_HASH, JournalTail, VerifiedJournal};

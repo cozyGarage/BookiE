@@ -1,8 +1,8 @@
 use std::io;
 use std::time::{Duration, Instant};
 
+use bookie_app_services::workspace_state::{ConnectionWorkspaceState, WorkspaceStore, WorkspaceTabRecord};
 use serde::Serialize;
-use tablepro_app_services::workspace_state::{ConnectionWorkspaceState, WorkspaceStore, WorkspaceTabRecord};
 use uuid::Uuid;
 
 #[derive(Serialize)]

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 fn dismissing_export_setup_releases_its_dialog() {
     adw::init().unwrap();
     let application = adw::Application::builder()
-        .application_id("com.tablepro.linux.export-lifetime-test")
+        .application_id("com.bookie.linux.export-lifetime-test")
         .build();
     application.register(None::<&gio::Cancellable>).unwrap();
     let window = adw::ApplicationWindow::new(&application);
@@ -21,7 +21,7 @@ fn dismissing_export_setup_releases_its_dialog() {
             paged: None,
             result: std::sync::Arc::new(QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![tablepro_core::Value::Bytes(vec![7; 8 * 1024 * 1024])]],
+                rows: vec![vec![bookie_core::Value::Bytes(vec![7; 8 * 1024 * 1024])]],
                 truncated: false,
             }),
             suggested_name: "synthetic".into(),

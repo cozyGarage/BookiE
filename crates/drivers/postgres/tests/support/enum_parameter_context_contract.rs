@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{DriverError, OperationControl, QueryResult, Session, Value};
+use bookie_core::{DriverError, OperationControl, QueryResult, Session, Value};
 use tokio_util::sync::CancellationToken;
 
 use crate::{connect, start_pg};
@@ -14,7 +14,7 @@ async fn session_query(
     session.query_params_controlled(sql, params, control).await.unwrap()
 }
 
-async fn create_shadowed_enum_fixture(connection: &dyn tablepro_core::Connection) {
+async fn create_shadowed_enum_fixture(connection: &dyn bookie_core::Connection) {
     connection.execute("CREATE SCHEMA enum_session_target").await.unwrap();
     connection.execute("CREATE SCHEMA enum_session_shadow").await.unwrap();
     connection

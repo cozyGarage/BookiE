@@ -16,8 +16,8 @@ if ! python3 -c "import pyatspi" >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
-  gtk_runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk.XXXXXX")"
+if [[ "${BOOKIE_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
+  gtk_runtime="$(mktemp -d "${TMPDIR:-/tmp}/bookie-gtk.XXXXXX")"
   chmod 700 "$gtk_runtime"
   cleanup_gtk_runtime() {
     if command -v fusermount3 >/dev/null 2>&1; then
@@ -28,26 +28,26 @@ if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
     rm -rf -- "$gtk_runtime"
   }
   trap cleanup_gtk_runtime EXIT
-  env -u NO_AT_BRIDGE -u DISPLAY TABLEPRO_GTK_DBUS_ACTIVE=1 XDG_RUNTIME_DIR="$gtk_runtime" \
+  env -u NO_AT_BRIDGE -u DISPLAY BOOKIE_GTK_DBUS_ACTIVE=1 XDG_RUNTIME_DIR="$gtk_runtime" \
     ATSPI_DBUS_IMPLEMENTATION=dbus-daemon XDG_CURRENT_DESKTOP=GNOME XDG_SESSION_TYPE=wayland \
     dbus-run-session -- "$ROOT/scripts/test-gtk-wayland.sh" "$@"
   exit $?
 fi
 
 export GDK_BACKEND=wayland
-export WAYLAND_DISPLAY=wayland-tablepro
+export WAYLAND_DISPLAY=wayland-bookie
 export GSK_RENDERER=cairo
 export GTK_A11Y=atspi
 unset NO_AT_BRIDGE DISPLAY
 
-if [[ "${TABLEPRO_GTK_KEYRING_READY:-0}" != "1" ]] && command -v gnome-keyring-daemon >/dev/null 2>&1; then
+if [[ "${BOOKIE_GTK_KEYRING_READY:-0}" != "1" ]] && command -v gnome-keyring-daemon >/dev/null 2>&1; then
   keyring_home="$XDG_RUNTIME_DIR/keyring-home"
   mkdir -p "$keyring_home/data"
-  eval "$(printf 'tablepro-test' | HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/data" \
+  eval "$(printf 'bookie-test' | HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/data" \
     gnome-keyring-daemon --daemonize --unlock --components=secrets)"
 fi
 
-gnome-shell --headless --wayland --virtual-monitor "${TABLEPRO_GTK_MONITOR:-1280x1024}" \
+gnome-shell --headless --wayland --virtual-monitor "${BOOKIE_GTK_MONITOR:-1280x1024}" \
   --wayland-display "$WAYLAND_DISPLAY" >"$XDG_RUNTIME_DIR/gnome-shell.log" 2>&1 &
 shell_pid=$!
 trap 'kill -KILL "$shell_pid" 2>/dev/null || true' EXIT
@@ -67,7 +67,7 @@ gdbus call --session \
   --object-path /org/a11y/bus \
   --method org.a11y.Bus.GetAddress >/dev/null
 
-test_binary="${TABLEPRO_GTK_BINARY:-$(command -v bookie || true)}"
+test_binary="${BOOKIE_GTK_BINARY:-$(command -v bookie || true)}"
 if [[ -z "$test_binary" || ! -x "$test_binary" ]]; then
   echo "installed GTK test binary is not executable: ${test_binary:-bookie}" >&2
   exit 1

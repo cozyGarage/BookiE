@@ -1,1 +1,1 @@
-pub use tablepro_app_services::named_filter_presets::NamedFilterPresetsStore;
+pub use bookie_app_services::named_filter_presets::NamedFilterPresetsStore;

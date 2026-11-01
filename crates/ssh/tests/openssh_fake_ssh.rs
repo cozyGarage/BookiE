@@ -5,12 +5,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use secrecy::SecretString;
-use tablepro_ssh::openssh::{
+use bookie_ssh::openssh::{
     ForwardRoute, ForwardTarget, LocalEndpoint, OpenSshAuth, OpenSshConfig, OpenSshContext, OpenSshError,
     OpenSshRuntime, OpenSshSession, OpenSshTimeouts, SshDestination, TimeoutPhase, UnattendedPrompter,
     sweep_stale_masters,
 };
+use secrecy::SecretString;
 use tokio_util::sync::CancellationToken;
 
 const FAKE_SSH: &str = r#"#!/bin/sh
@@ -32,7 +32,7 @@ case " $* " in
 esac
 echo "$$" > "$dir/master.pid"
 {
-  printf '%s\n' "$SSH_ASKPASS_REQUIRE" "$TABLEPRO_ASKPASS_SOCKET"
+  printf '%s\n' "$SSH_ASKPASS_REQUIRE" "$BOOKIE_ASKPASS_SOCKET"
   readlink "/proc/$$/fd/0"
 } > "$dir/env"
 if [ -f "$dir/fail-auth" ]; then
@@ -64,8 +64,8 @@ impl Fake {
             runtime: OpenSshRuntime::acquire(&base).unwrap(),
             ssh_program: script,
             askpass_program: PathBuf::from(
-                std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
-                    .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+                std::env::var_os("CARGO_BIN_EXE_bookie-askpass")
+                    .unwrap_or_else(|| env!("CARGO_BIN_EXE_bookie-askpass").into()),
             ),
             timeouts: OpenSshTimeouts {
                 handshake: Duration::from_secs(10),
@@ -150,7 +150,7 @@ async fn the_master_starts_with_forced_options_null_stdin_and_the_askpass_socket
     assert!(calls[2].contains(" -o ForwardAgent=no "));
     assert!(calls[2].contains(" -J ops@jump1 "), "{}", calls[2]);
     assert!(calls[2].ends_with(" -p 2222 -l deploy -- bastion"), "{}", calls[2]);
-    assert!(calls[3].starts_with("-F none ") && calls[3].contains(" -O check -- tablepro"));
+    assert!(calls[3].starts_with("-F none ") && calls[3].contains(" -O check -- bookie"));
 
     let env = fake.read("env");
     let lines: Vec<&str> = env.lines().collect();
@@ -338,7 +338,7 @@ async fn each_forward_gets_its_own_socket_and_is_cancelled_on_drop() {
     };
     assert_ne!(first_socket, second_socket);
     assert_eq!(first.target().host(), "db.internal");
-    let spec = format!("-O forward -L {}:db.internal:5432 -- tablepro", first_socket.display());
+    let spec = format!("-O forward -L {}:db.internal:5432 -- bookie", first_socket.display());
     assert!(
         fake.calls().iter().any(|call| call.ends_with(&spec)),
         "{:?}",
@@ -350,14 +350,11 @@ async fn each_forward_gets_its_own_socket_and_is_cancelled_on_drop() {
         panic!("expected a loopback port");
     };
     assert!(address.ip().is_loopback());
-    let spec = format!(
-        "-O forward -L 127.0.0.1:{}:db.internal:5432 -- tablepro",
-        address.port()
-    );
+    let spec = format!("-O forward -L 127.0.0.1:{}:db.internal:5432 -- bookie", address.port());
     assert!(fake.calls().iter().any(|call| call.ends_with(&spec)));
 
     drop(first);
-    let cancel = format!("-O cancel -L {}:db.internal:5432 -- tablepro", first_socket.display());
+    let cancel = format!("-O cancel -L {}:db.internal:5432 -- bookie", first_socket.display());
     for _ in 0..100 {
         if fake.calls().iter().any(|call| call.ends_with(&cancel)) {
             return;

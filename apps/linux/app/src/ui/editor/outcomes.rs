@@ -6,13 +6,13 @@ pub(super) mod stream_result_view;
 use super::{StatementIdentity, StatementOutcome, StatementOutcomeKind};
 use crate::ui::grid::local_filter::{LocalResultSettingsStore, ResultViewKey};
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
+use bookie_app_services::stream_result_spool::{StreamResultSpool, StreamResultSpoolManager};
+use bookie_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings};
+use bookie_core::{DriverError, OperationControl, QueryResult};
+use bookie_policy::AuditReceipt;
 use sha2::{Digest, Sha256};
 use std::future::Future;
 use stream_result_view::build_streamed_result_widget;
-use tablepro_app_services::stream_result_spool::{StreamResultSpool, StreamResultSpoolManager};
-use tablepro_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings};
-use tablepro_core::{DriverError, OperationControl, QueryResult};
-use tablepro_policy::AuditReceipt;
 
 pub(crate) fn clear_box(b: &gtk::Box) {
     while let Some(child) = b.first_child() {
@@ -42,10 +42,10 @@ impl RunTotals {
         (self.rows > 0).then_some(self.rows)
     }
 
-    pub(super) fn history_outcome(&self) -> tablepro_storage::query_history::Outcome {
+    pub(super) fn history_outcome(&self) -> bookie_storage::query_history::Outcome {
         match &self.first_error {
-            Some(message) => tablepro_storage::query_history::Outcome::Error(message.clone()),
-            None => tablepro_storage::query_history::Outcome::Success,
+            Some(message) => bookie_storage::query_history::Outcome::Error(message.clone()),
+            None => bookie_storage::query_history::Outcome::Success,
         }
     }
 
@@ -93,7 +93,7 @@ pub(crate) enum StreamUpdate {
         identity: StatementIdentity,
         sql_preview: String,
         sql: String,
-        params: Vec<tablepro_core::Value>,
+        params: Vec<bookie_core::Value>,
         spool: StreamResultSpool,
     },
     Page {
@@ -107,7 +107,7 @@ pub(crate) struct StatementRun<'a, S> {
     pub(crate) target: super::session_mode::StatementTarget,
     pub(crate) statements: Vec<String>,
     pub(crate) driver_id: &'a str,
-    pub(crate) parameter_values: &'a std::collections::HashMap<String, tablepro_core::Value>,
+    pub(crate) parameter_values: &'a std::collections::HashMap<String, bookie_core::Value>,
     pub(crate) control: &'a OperationControl,
     pub(crate) error_policy: BatchErrorPolicy,
     pub(crate) settings_check: Option<LexicalSettings>,
@@ -119,7 +119,7 @@ pub(crate) async fn run_statements(
     target: super::session_mode::StatementTarget,
     statements: Vec<String>,
     driver_id: &str,
-    parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
+    parameter_values: &std::collections::HashMap<String, bookie_core::Value>,
     control: &OperationControl,
     error_policy: BatchErrorPolicy,
     succeeded: impl Fn(&str),
@@ -342,7 +342,7 @@ fn elapsed_without_approval_wait(started: std::time::Instant, waited_before: std
 fn bind_statement_for_run(
     sql: &str,
     driver_id: &str,
-    parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
+    parameter_values: &std::collections::HashMap<String, bookie_core::Value>,
     identity: StatementIdentity,
     preview: String,
 ) -> Result<crate::services::query_parameters::BoundStatement, Box<StatementOutcome>> {
@@ -360,7 +360,7 @@ fn bind_statement_for_run(
 async fn query_statement(
     target: &super::session_mode::StatementTarget,
     bound_sql: &str,
-    bound_params: &[tablepro_core::Value],
+    bound_params: &[bookie_core::Value],
     sql: &str,
     control: &OperationControl,
     succeeded: &impl Fn(&str),
@@ -386,7 +386,7 @@ struct StreamAttempt<'a> {
     single_statement: bool,
     driver_id: &'a str,
     bound_sql: &'a str,
-    bound_params: &'a [tablepro_core::Value],
+    bound_params: &'a [bookie_core::Value],
     identity: StatementIdentity,
     preview: String,
     sql: &'a str,
@@ -459,7 +459,7 @@ fn stream_candidate(sql: &str, driver_id: &str) -> bool {
     if driver_id != "postgres" {
         return false;
     }
-    tablepro_policy::classify(sql, driver_id).is_single_read()
+    bookie_policy::classify(sql, driver_id).is_single_read()
         && super::stream_functions::calls_only_read_only_functions(sql)
 }
 
@@ -469,7 +469,7 @@ struct StreamExecution<'a> {
     identity: StatementIdentity,
     preview: String,
     bound_sql: String,
-    bound_params: Vec<tablepro_core::Value>,
+    bound_params: Vec<bookie_core::Value>,
     sql: &'a str,
     control: &'a OperationControl,
     spool: StreamResultSpool,
@@ -705,7 +705,7 @@ fn build_outcome_widget(
 
 fn build_multi_result_widget(
     outcome: &StatementOutcome,
-    result_sets: &[std::sync::Arc<tablepro_core::QueryResult>],
+    result_sets: &[std::sync::Arc<bookie_core::QueryResult>],
     grid_sender: &relm4::Sender<GridMsg>,
     connection_id: Option<uuid::Uuid>,
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
@@ -828,7 +828,7 @@ fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &sup
 }
 
 pub(in crate::ui::editor) fn build_stream_page_widget(
-    result: &std::sync::Arc<tablepro_core::QueryResult>,
+    result: &std::sync::Arc<bookie_core::QueryResult>,
     grid_sender: &relm4::Sender<GridMsg>,
     connection_id: Option<uuid::Uuid>,
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
@@ -872,7 +872,7 @@ pub(in crate::ui::editor) fn build_stream_page_widget(
 }
 
 pub(super) fn build_result_set_widget(
-    result: &std::sync::Arc<tablepro_core::QueryResult>,
+    result: &std::sync::Arc<bookie_core::QueryResult>,
     grid_sender: &relm4::Sender<GridMsg>,
     connection_id: Option<uuid::Uuid>,
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
@@ -1005,7 +1005,7 @@ fn pinned_tab_label(o: &StatementOutcome) -> String {
         .replace("{rows}", &rows)
 }
 
-fn result_rows(result_sets: &[std::sync::Arc<tablepro_core::QueryResult>]) -> usize {
+fn result_rows(result_sets: &[std::sync::Arc<bookie_core::QueryResult>]) -> usize {
     result_sets.iter().map(|result| result.rows.len()).sum()
 }
 

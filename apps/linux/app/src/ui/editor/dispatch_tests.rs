@@ -5,14 +5,14 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 
+use bookie_core::{
+    ColumnInfo, ConnectOptions, Connection, DriverError, Environment, ExecResult, OperationControl, QueryResult,
+    QueryResultBatch, TableInfo, Value,
+};
 use relm4::adw::prelude::*;
 use relm4::{Component, ComponentController, Controller};
 use relm4::{adw, gtk};
 use sourceview5::prelude::*;
-use tablepro_core::{
-    ColumnInfo, ConnectOptions, Connection, DriverError, Environment, ExecResult, OperationControl, QueryResult,
-    QueryResultBatch, TableInfo, Value,
-};
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -60,7 +60,7 @@ impl Connection for HeldConnection {
         true
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         let wait = self.sessions.open_wait.lock().unwrap().take();
         if let Some(wait) = wait {
             wait.await.unwrap();
@@ -159,7 +159,7 @@ impl EditorFixture {
                 driver: Arc::new(drivers_sqlite::SqliteDriver),
                 opts: ConnectOptions::default(),
                 ssh: None,
-                environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse),
+                environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse),
             },
         ));
         let (output_sender, outputs) = mpsc::channel();
@@ -290,7 +290,7 @@ fn parameter_response() -> SqlEditorInput {
         planned: super::PlannedStatements {
             statements: vec!["SELECT :value;".into()],
             source_ranges: std::iter::once(0.."SELECT :value;".len()).collect(),
-            error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy::StopScript,
+            error_policy: bookie_core::sql_syntax::script::BatchErrorPolicy::StopScript,
             settings_check: None,
         },
         values: [("value".into(), Value::Int(2))].into(),
@@ -615,7 +615,7 @@ struct HeldSession {
 }
 
 #[async_trait::async_trait]
-impl tablepro_core::Session for HeldSession {
+impl bookie_core::Session for HeldSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,
@@ -960,7 +960,7 @@ fn confirmed_session_rollbacks_retire_gutter_marks_and_stale_callbacks_do_not() 
             .send(if commit_reply {
                 SqlEditorInput::SessionCommitFinished {
                     session_id: stale,
-                    result: Ok(tablepro_core::SessionCommitOutcome::RolledBack),
+                    result: Ok(bookie_core::SessionCommitOutcome::RolledBack),
                 }
             } else {
                 SqlEditorInput::SessionRollbackFinished {
@@ -978,7 +978,7 @@ fn confirmed_session_rollbacks_retire_gutter_marks_and_stale_callbacks_do_not() 
             .send(if commit_reply {
                 SqlEditorInput::SessionCommitFinished {
                     session_id: id,
-                    result: Ok(tablepro_core::SessionCommitOutcome::RolledBack),
+                    result: Ok(bookie_core::SessionCommitOutcome::RolledBack),
                 }
             } else {
                 SqlEditorInput::SessionRollbackFinished {
@@ -1007,7 +1007,7 @@ fn running_a_query_dismisses_the_visible_completion_popup() {
     window.present();
     let model = fixture.controller.model();
     let mut index = model.schema_index.borrow_mut();
-    index.grammar = Some(tablepro_core::sql_syntax::SqlGrammar::Sqlite);
+    index.grammar = Some(bookie_core::sql_syntax::SqlGrammar::Sqlite);
     index.set_tables(vec!["customers".into()]);
     drop(index);
     let view = model.source_view.clone();

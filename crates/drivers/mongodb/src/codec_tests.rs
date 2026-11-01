@@ -64,7 +64,7 @@ fn mixed_scalar_bson_column_keeps_canonical_type_markers() {
         ]
     );
 
-    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(&columns, &rows)).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&bookie_core::export::render_json(&columns, &rows)).unwrap();
     let json_rows = json.as_array().unwrap();
     assert_eq!(json_rows[0]["value"], "12345678901234567890.1234567890123");
     assert_eq!(
@@ -72,7 +72,7 @@ fn mixed_scalar_bson_column_keeps_canonical_type_markers() {
         serde_json::json!({"$numberDecimal": "12345678901234567890.1234567890123"})
     );
 
-    let csv_text = tablepro_core::export::render_csv(&columns, &rows, &tablepro_core::export::CsvOptions::default());
+    let csv_text = bookie_core::export::render_csv(&columns, &rows, &bookie_core::export::CsvOptions::default());
     let mut csv = csv::Reader::from_reader(csv_text.as_bytes());
     let csv_values = csv
         .records()
@@ -255,7 +255,7 @@ fn uncommon_top_level_bson_kinds_keep_extended_json_type_markers() {
         (Bson::Timestamp(Timestamp { time: 42, increment: 7 }), "$timestamp"),
         (
             Bson::RegularExpression(Regex {
-                pattern: "^tablepro".into(),
+                pattern: "^bookie".into(),
                 options: "i".into(),
             }),
             "$regularExpression",

@@ -1,4 +1,4 @@
-use tablepro_core::{ConnectOptions, DatabaseDriver};
+use bookie_core::{ConnectOptions, DatabaseDriver};
 
 fn armed_towards(port: u16) -> Result<bool, String> {
     let table = std::fs::read_to_string("/proc/self/net/tcp").map_err(|error| error.to_string())?;

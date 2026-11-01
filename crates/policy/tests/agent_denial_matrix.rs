@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::Environment;
-use tablepro_policy::{Decision, EnvPolicy, PolicyConfig, Principal, WritePolicy, classify, evaluate};
+use bookie_core::Environment;
+use bookie_policy::{Decision, EnvPolicy, PolicyConfig, Principal, WritePolicy, classify, evaluate};
 
 fn agent() -> Principal {
     Principal::Agent {

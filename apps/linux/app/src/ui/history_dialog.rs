@@ -6,7 +6,7 @@ use relm4::gtk::{gio, glib};
 use relm4::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_storage::query_history::{Entry, HistoryStore, SearchFilter, Source};
+use bookie_storage::query_history::{Entry, HistoryStore, SearchFilter, Source};
 
 use crate::services::database_service::ConnectionMetadata;
 use crate::ui::popover::keep_inside_window;
@@ -963,9 +963,9 @@ impl HistoryDialog {
             return;
         }
         let suggested = if kind == "sql" {
-            "tablepro-history.sql".to_string()
+            "bookie-history.sql".to_string()
         } else {
-            "tablepro-history.csv".to_string()
+            "bookie-history.csv".to_string()
         };
         let history = self.history.clone();
         sender.command(move |out, shutdown| {

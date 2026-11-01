@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-mcp"
+name = "bookie-mcp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,13 +7,13 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_mcp"
+name = "bookie_mcp"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../core" }
-tablepro-policy = { path = "../policy" }
-tablepro-storage = { path = "../storage" }
+bookie-core = { path = "../core" }
+bookie-policy = { path = "../policy" }
+bookie-storage = { path = "../storage" }
 async-trait.workspace = true
 chrono.workspace = true
 serde.workspace = true
@@ -34,9 +34,9 @@ rmcp-prototype = ["dep:rmcp"]
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 tempfile.workspace = true
-tablepro-driver-mongodb = { path = "../drivers/mongodb" }
-tablepro-driver-postgres = { path = "../drivers/postgres" }
-tablepro-driver-mysql = { path = "../drivers/mysql" }
+bookie-driver-mongodb = { path = "../drivers/mongodb" }
+bookie-driver-postgres = { path = "../drivers/postgres" }
+bookie-driver-mysql = { path = "../drivers/mysql" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mongo", "postgres", "mysql"] }
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }

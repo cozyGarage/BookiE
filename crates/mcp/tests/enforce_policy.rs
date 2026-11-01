@@ -2,15 +2,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverError, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl, QueryResult,
     QueryResultBatch, TableInfo, Value,
 };
-use tablepro_policy::Principal;
-use tablepro_storage::SavedConnection;
+use bookie_policy::Principal;
+use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
-use tablepro_mcp::{ConnectionProvider, McpBridge, McpLimits, TokenPermissions, TokenStore};
+use bookie_mcp::{ConnectionProvider, McpBridge, McpLimits, TokenPermissions, TokenStore};
 
 /// Integration-style test: every tool path that touches a connection must
 /// go through the provider (which in production wraps PolicyGuard) and
@@ -180,7 +180,7 @@ async fn execute_query_preserves_additional_result_sets_in_order() {
     ]));
     let bridge = McpBridge::new(provider, store);
     let token = bridge.authenticate(&plaintext).unwrap();
-    let output = tablepro_mcp::dispatch(
+    let output = bookie_mcp::dispatch(
         &bridge,
         &token,
         "execute_query",
@@ -220,7 +220,7 @@ async fn serialized_mcp_numeric_values_survive_javascript_json_parse() {
     }));
     let bridge = McpBridge::new(provider, store);
     let token = bridge.authenticate(&plaintext).unwrap();
-    let output = tablepro_mcp::dispatch(
+    let output = bookie_mcp::dispatch(
         &bridge,
         &token,
         "execute_query",
@@ -288,7 +288,7 @@ async fn mcp_row_cap_is_shared_across_result_sets() {
         },
     );
     let token = bridge.authenticate(&plaintext).unwrap();
-    let output = tablepro_mcp::dispatch(
+    let output = bookie_mcp::dispatch(
         &bridge,
         &token,
         "execute_query",
@@ -329,7 +329,7 @@ async fn a_capped_export_says_it_was_truncated_in_every_format() {
     );
     let token = bridge.authenticate(&plaintext).unwrap();
     for format in ["json", "csv"] {
-        let output = tablepro_mcp::dispatch(
+        let output = bookie_mcp::dispatch(
             &bridge,
             &token,
             "export_data",
@@ -370,7 +370,7 @@ async fn json_export_keeps_multiple_result_sets_and_csv_refuses_them() {
             "format": format,
         })
     };
-    let json = tablepro_mcp::dispatch(&bridge, &token, "export_data", args("json"))
+    let json = bookie_mcp::dispatch(&bridge, &token, "export_data", args("json"))
         .await
         .expect("JSON represents every set");
     assert_eq!(
@@ -378,7 +378,7 @@ async fn json_export_keeps_multiple_result_sets_and_csv_refuses_them() {
         serde_json::json!([[{"$type": "int64", "value": "2"}]])
     );
 
-    let csv_error = tablepro_mcp::dispatch(&bridge, &token, "export_data", args("csv"))
+    let csv_error = bookie_mcp::dispatch(&bridge, &token, "export_data", args("csv"))
         .await
         .unwrap_err();
     assert!(csv_error.contains("multiple result sets"), "{csv_error}");
@@ -386,9 +386,9 @@ async fn json_export_keeps_multiple_result_sets_and_csv_refuses_them() {
 
 #[tokio::test]
 async fn guarded_tool_path_journals_policy_decision() {
-    use tablepro_core::Environment;
-    use tablepro_policy::{AuditSink, AuditState, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
-    use tablepro_storage::AuditJournal;
+    use bookie_core::Environment;
+    use bookie_policy::{AuditSink, AuditState, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
+    use bookie_storage::AuditJournal;
 
     let dir = tempfile::TempDir::new().unwrap();
     let journal_path = dir.path().join("audit.jsonl");
@@ -480,7 +480,7 @@ async fn explain_uses_the_connection_engine_plan_form() {
     let bridge = McpBridge::new(provider.clone(), store);
     let token = bridge.authenticate(&plaintext).unwrap();
 
-    tablepro_mcp::dispatch(
+    bookie_mcp::dispatch(
         &bridge,
         &token,
         "explain_query",
@@ -504,7 +504,7 @@ async fn explain_analyze_still_requires_write_scope() {
     let bridge = McpBridge::new(provider.clone(), store);
     let token = bridge.authenticate(&plaintext).unwrap();
 
-    let error = tablepro_mcp::dispatch(
+    let error = bookie_mcp::dispatch(
         &bridge,
         &token,
         "explain_query",
@@ -529,7 +529,7 @@ async fn explain_is_refused_for_engines_without_a_plan_statement() {
     let bridge = McpBridge::new(provider.clone(), store);
     let token = bridge.authenticate(&plaintext).unwrap();
 
-    let error = tablepro_mcp::dispatch(
+    let error = bookie_mcp::dispatch(
         &bridge,
         &token,
         "explain_query",
@@ -558,7 +558,7 @@ async fn csv_export_escapes_separators_quotes_and_newlines() {
     let bridge = McpBridge::new(provider, store);
     let token = bridge.authenticate(&plaintext).unwrap();
 
-    let out = tablepro_mcp::dispatch(
+    let out = bookie_mcp::dispatch(
         &bridge,
         &token,
         "export_data",
@@ -577,7 +577,7 @@ async fn read_only_harness(
 ) -> (
     Arc<RecordingProvider>,
     McpBridge,
-    tablepro_mcp::McpToken,
+    bookie_mcp::McpToken,
     tempfile::TempDir,
 ) {
     let dir = tempfile::TempDir::new().unwrap();
@@ -595,7 +595,7 @@ async fn read_only_harness(
 async fn table_schema_reads_columns_keys_and_indexes_with_read_scope_only() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
-    let out = tablepro_mcp::dispatch(
+    let out = bookie_mcp::dispatch(
         &bridge,
         &token,
         "table_schema",
@@ -615,7 +615,7 @@ async fn table_schema_reads_columns_keys_and_indexes_with_read_scope_only() {
 async fn describe_table_refuses_an_invalid_identifier_without_opening_a_connection() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
-    let error = tablepro_mcp::dispatch(
+    let error = bookie_mcp::dispatch(
         &bridge,
         &token,
         "describe_table",
@@ -632,7 +632,7 @@ async fn describe_table_refuses_an_invalid_identifier_without_opening_a_connecti
 async fn table_schema_is_denied_for_a_connection_outside_the_allowlist() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
-    let error = tablepro_mcp::dispatch(
+    let error = bookie_mcp::dispatch(
         &bridge,
         &token,
         "table_schema",
@@ -649,7 +649,7 @@ async fn table_schema_is_denied_for_a_connection_outside_the_allowlist() {
 async fn count_rows_counts_a_quoted_target_with_read_scope_only() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
-    let out = tablepro_mcp::dispatch(
+    let out = bookie_mcp::dispatch(
         &bridge,
         &token,
         "count_rows",
@@ -671,7 +671,7 @@ async fn count_rows_counts_a_quoted_target_with_read_scope_only() {
 async fn count_rows_is_denied_for_a_token_with_an_empty_allowlist() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![]).await;
 
-    let error = tablepro_mcp::dispatch(
+    let error = bookie_mcp::dispatch(
         &bridge,
         &token,
         "count_rows",
@@ -689,7 +689,7 @@ async fn count_rows_is_denied_for_a_token_with_an_empty_allowlist() {
 async fn browse_table_pages_within_the_row_limit() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
-    let page = tablepro_mcp::dispatch(
+    let page = bookie_mcp::dispatch(
         &bridge,
         &token,
         "browse_table",
@@ -709,7 +709,7 @@ async fn browse_table_pages_within_the_row_limit() {
     );
     assert_eq!(page["truncated"], false);
 
-    let capped = tablepro_mcp::dispatch(
+    let capped = bookie_mcp::dispatch(
         &bridge,
         &token,
         "browse_table",
@@ -727,7 +727,7 @@ async fn browse_table_pages_within_the_row_limit() {
 async fn browse_table_refuses_a_negative_page_and_an_unlisted_connection() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
-    let bad_offset = tablepro_mcp::dispatch(
+    let bad_offset = bookie_mcp::dispatch(
         &bridge,
         &token,
         "browse_table",
@@ -737,7 +737,7 @@ async fn browse_table_refuses_a_negative_page_and_an_unlisted_connection() {
     .unwrap_err();
     assert!(bad_offset.contains("non-negative"), "{bad_offset}");
 
-    let denied = tablepro_mcp::dispatch(
+    let denied = bookie_mcp::dispatch(
         &bridge,
         &token,
         "browse_table",
@@ -756,7 +756,7 @@ async fn browse_table_refuses_an_offset_beyond_the_ceiling_before_reaching_the_d
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
     for offset in [100_001_u64, 1_000_000_000_000, u64::MAX] {
-        let error = tablepro_mcp::dispatch(
+        let error = bookie_mcp::dispatch(
             &bridge,
             &token,
             "browse_table",
@@ -768,7 +768,7 @@ async fn browse_table_refuses_an_offset_beyond_the_ceiling_before_reaching_the_d
     }
     assert!(provider.requested_pages().is_empty());
 
-    tablepro_mcp::dispatch(
+    bookie_mcp::dispatch(
         &bridge,
         &token,
         "browse_table",
@@ -984,7 +984,7 @@ impl ConnectionProvider for RecordingProvider {
 async fn list_objects_is_denied_for_a_token_with_an_empty_allowlist() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![]).await;
 
-    let error = tablepro_mcp::dispatch(
+    let error = bookie_mcp::dispatch(
         &bridge,
         &token,
         "list_objects",
@@ -1001,7 +1001,7 @@ async fn list_objects_is_denied_for_a_token_with_an_empty_allowlist() {
 async fn list_objects_rejects_an_unknown_kind_and_a_hostile_schema_before_connecting() {
     let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
 
-    let unknown = tablepro_mcp::dispatch(
+    let unknown = bookie_mcp::dispatch(
         &bridge,
         &token,
         "list_objects",
@@ -1011,7 +1011,7 @@ async fn list_objects_rejects_an_unknown_kind_and_a_hostile_schema_before_connec
     .unwrap_err();
     assert!(unknown.contains("unknown kind"), "{unknown}");
 
-    let hostile = tablepro_mcp::dispatch(
+    let hostile = bookie_mcp::dispatch(
         &bridge,
         &token,
         "list_objects",
@@ -1041,11 +1041,11 @@ async fn every_tool_refuses_a_connection_outside_a_nonempty_allowlist() {
         "kind": "sequence",
     });
 
-    for tool in tablepro_mcp::TOOL_NAMES
+    for tool in bookie_mcp::TOOL_NAMES
         .iter()
         .filter(|tool| **tool != "list_connections")
     {
-        let error = tablepro_mcp::dispatch(&bridge, &token, tool, outside.clone())
+        let error = bookie_mcp::dispatch(&bridge, &token, tool, outside.clone())
             .await
             .expect_err(tool);
         assert!(

@@ -5,7 +5,7 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
-use tablepro_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError};
+use bookie_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError};
 
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
