@@ -30,6 +30,7 @@ The 1 GiB process quota places a hard bound on aggregate spool storage while all
 ## Consequences
 
 - Query results may consume temporary disk space up to the process-wide quota in addition to the existing memory cache.
+- After a stream ends, pages stored in the spool are released from the resident page cache. Pins keep the same spool owner and reload pages on demand; a page that could not be spooled remains in memory.
 - A loaded page temporarily occupies memory while it is decoded and displayed. The existing byte estimate remains a cache bound, not a process-memory ceiling.
 - During append, the original page remains alive until the editor acknowledges it. Additional encoding memory is bounded to one encryption chunk plus any temporary JSON text for the current JSON cell.
 - AES-GCM and the Serde wire format become implementation dependencies of the service and require license, advisory and exact-value review.
