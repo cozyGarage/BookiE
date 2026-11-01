@@ -44,6 +44,8 @@ struct WorkspaceWriter {
 struct WorkspaceQueue {
     forgotten: HashSet<Uuid>,
     save_tokens: HashMap<Uuid, Weak<AtomicBool>>,
+    wake_pending: bool,
+    active_sequence: Option<u64>,
     next_sequence: u64,
     persisted_sequence: u64,
     pending: HashMap<Uuid, PendingWorkspace>,
@@ -85,6 +87,13 @@ impl WorkspaceQueue {
         self.pending.drain().collect()
     }
 
+    fn begin_attempt(&mut self) -> Vec<(Uuid, PendingWorkspace)> {
+        self.wake_pending = false;
+        let pending = self.take_pending();
+        self.active_sequence = pending.iter().map(|(_, entry)| entry.sequence).max();
+        pending
+    }
+
     fn restore_pending(&mut self, pending: Vec<(Uuid, PendingWorkspace)>) {
         for (id, entry) in pending {
             if self
@@ -98,6 +107,7 @@ impl WorkspaceQueue {
     }
 
     fn complete_attempt(&mut self, sequence: u64, result: Result<(), WorkspaceFlushError>) {
+        self.active_sequence = None;
         if result.is_ok() {
             self.persisted_sequence = self.persisted_sequence.max(sequence);
         }
@@ -657,11 +667,23 @@ fn save_connection_coordinated(
 }
 
 fn wake_writer(writer: &WorkspaceWriter) -> bool {
-    if let Err(mpsc::TrySendError::Disconnected(())) = writer.wake.try_send(()) {
-        tracing::warn!("workspace_state: writer unavailable");
-        return false;
+    let mut queue = writer.queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if queue.wake_pending
+        || queue
+            .active_sequence
+            .is_some_and(|sequence| sequence >= queue.next_sequence)
+    {
+        return true;
     }
-    true
+    queue.wake_pending = true;
+    match writer.wake.try_send(()) {
+        Ok(()) | Err(mpsc::TrySendError::Full(())) => true,
+        Err(mpsc::TrySendError::Disconnected(())) => {
+            queue.wake_pending = false;
+            tracing::warn!("workspace_state: writer unavailable");
+            false
+        }
+    }
 }
 
 fn run_writer(
@@ -674,7 +696,7 @@ fn run_writer(
         let pending = queue
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .take_pending();
+            .begin_attempt();
         if pending.is_empty() {
             continue;
         }

@@ -1,15 +1,21 @@
 use super::*;
 
 #[test]
-fn loaded_export_keeps_the_existing_row_allocation() {
+fn loaded_export_keeps_the_shared_result_and_truncation() {
     let result = std::sync::Arc::new(QueryResult {
         columns: Vec::new(),
-        rows: vec![vec![tablepro_core::Value::Text("exact export value".into())]],
+        rows: vec![vec![
+            tablepro_core::Value::Null,
+            tablepro_core::Value::Text(String::new()),
+            tablepro_core::Value::Text("\\N".into()),
+            tablepro_core::Value::Bytes(vec![0, 255]),
+        ]],
         truncated: true,
     });
     let file::JobSource::Loaded(loaded) = job_source(&None, &result) else {
         panic!("expected loaded export");
     };
+    assert!(std::sync::Arc::ptr_eq(&loaded, &result));
     assert_eq!(loaded.rows.as_ptr(), result.rows.as_ptr());
     assert_eq!(loaded.rows, result.rows);
     assert!(loaded.truncated);
@@ -39,11 +45,11 @@ fn a_full_export_shows_a_refusal_without_opening_its_source() {
                 PageFetcher::new(|| Ok(None), || Ok(()))
             }),
         }),
-        result: QueryResult {
+        result: std::sync::Arc::new(QueryResult {
             columns: Vec::new(),
             rows: Vec::new(),
             truncated: false,
-        },
+        }),
         suggested_name: "table.csv".into(),
         driver_id: "postgres".into(),
     };
