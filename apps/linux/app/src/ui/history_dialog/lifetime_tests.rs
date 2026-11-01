@@ -18,7 +18,7 @@ fn closing_history_releases_its_rows_and_popovers() {
 fn history_filter_popover_stays_inside_narrow_windows() {
     adw::init().unwrap();
     let app = adw::Application::builder()
-        .application_id("com.tablepro.linux.history-popover-test")
+        .application_id("com.bookie.linux.history-popover-test")
         .build();
     app.register(None::<&gtk::gio::Cancellable>).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -68,7 +68,7 @@ fn assert_rows_released(close: bool) {
         .block_on(HistoryStore::open(directory.path().join("history.db")))
         .unwrap();
     runtime
-        .block_on(history.record(tablepro_storage::query_history::NewEntry {
+        .block_on(history.record(bookie_storage::query_history::NewEntry {
             query: "SELECT 1728".into(),
             driver_id: "sqlite".into(),
             connection_id: uuid::Uuid::new_v4(),
@@ -76,7 +76,7 @@ fn assert_rows_released(close: bool) {
             executed_at: SystemTime::now(),
             duration_ms: Some(1),
             rows_affected: Some(1),
-            outcome: tablepro_storage::query_history::Outcome::Success,
+            outcome: bookie_storage::query_history::Outcome::Success,
             source: Source::Editor,
         }))
         .unwrap();

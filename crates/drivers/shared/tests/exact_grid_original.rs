@@ -1,5 +1,5 @@
-use tablepro_app_services::change_tracker::{RowKey, TabChangeTracker};
-use tablepro_core::{Connection, DriverError, Value, sql_dialect::build_keyed_update};
+use bookie_app_services::change_tracker::{RowKey, TabChangeTracker};
+use bookie_core::{Connection, DriverError, Value, sql_dialect::build_keyed_update};
 
 pub async fn assert_conflict(
     connection: &dyn Connection,
@@ -10,7 +10,7 @@ pub async fn assert_conflict(
 ) {
     let columns = connection.fetch_columns(None, "exact_grid").await.unwrap();
     for id in [1, 2] {
-        let seed = tablepro_core::sql_dialect::build_insert_from_draft(
+        let seed = bookie_core::sql_dialect::build_insert_from_draft(
             driver,
             None,
             "exact_grid",
@@ -104,20 +104,18 @@ async fn native_values(connection: &dyn Connection, driver: &str) -> Vec<Vec<Val
 async fn assert_search_behavior(
     connection: &dyn Connection,
     driver: &str,
-    columns: &[tablepro_core::ColumnInfo],
+    columns: &[bookie_core::ColumnInfo],
     old: &Value,
     expected: Option<usize>,
 ) {
     let Some(expected) = expected else {
         return;
     };
-    let set = tablepro_core::FilterSet {
-        rules: vec![tablepro_core::equality_rule("v", old).unwrap()],
+    let set = bookie_core::FilterSet {
+        rules: vec![bookie_core::equality_rule("v", old).unwrap()],
         ..Default::default()
     };
-    let (clause, params) = tablepro_core::build_filter_where(driver, columns, &set)
-        .unwrap()
-        .unwrap();
+    let (clause, params) = bookie_core::build_filter_where(driver, columns, &set).unwrap().unwrap();
     let result = connection
         .query_params(
             &format!("SELECT id FROM exact_grid WHERE {clause} ORDER BY id"),

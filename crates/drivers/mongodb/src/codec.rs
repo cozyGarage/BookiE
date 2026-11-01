@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use mongodb::bson::{Bson, Document};
 
-use tablepro_core::{ColumnInfo, DriverError, Value};
+use bookie_core::{ColumnInfo, DriverError, Value};
 
 pub(super) fn value_to_bson(value: &Value) -> Result<Bson, DriverError> {
     use mongodb::bson::{Binary, DateTime, spec::BinarySubtype};

@@ -1,8 +1,8 @@
 use super::*;
+use bookie_core::{ColumnInfo, QueryResult};
 use gtk4::glib::object::CastNone;
 use gtk4::prelude::ListModelExt;
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult};
 
 #[test]
 fn json_preview_writer_counts_all_bytes_without_growing_past_its_sample() {
@@ -141,7 +141,7 @@ fn row_identity_keeps_unreadable_key_values_but_refuses_a_persisted_key() {
 
 #[test]
 fn a_server_cut_cell_shows_its_prefix_and_blocks_row_copy_and_export() {
-    let partial = tablepro_core::partial_value(2_097_152, "begin");
+    let partial = bookie_core::partial_value(2_097_152, "begin");
     let row = RowObject::new(vec![Value::Int(7), partial.clone()]);
     row.preview_long_values(&[0]);
 

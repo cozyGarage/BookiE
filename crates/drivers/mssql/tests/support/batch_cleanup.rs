@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::{connect, start_mssql};
-use tablepro_core::DriverError;
+use bookie_core::DriverError;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -26,8 +26,8 @@ async fn failed_batch_rollback_is_explicit_and_retires_the_connection() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_queued_query_cannot_use_a_client_retired_by_failed_cleanup() {
+    use bookie_core::{Connection, Value};
     use std::sync::Arc;
-    use tablepro_core::{Connection, Value};
     let (_container, options) = start_mssql().await;
     let admin = connect(options.clone()).await;
     let connection: Arc<dyn Connection> = connect(options).await.into();
@@ -66,7 +66,7 @@ async fn a_queued_query_cannot_use_a_client_retired_by_failed_cleanup() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn confirmed_rollback_keeps_the_parameter_failure_and_client_usable() {
-    use tablepro_core::Value;
+    use bookie_core::Value;
     let (_container, options) = start_mssql().await;
     let connection = connect(options).await;
     let result = connection

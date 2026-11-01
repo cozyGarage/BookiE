@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::sql_ddl::{DraftColumn, StructureOp, diff_to_ops, materialize_ops};
-use tablepro_core::{ColumnInfo, Connection, ForeignKeyInfo, IndexInfo, Value};
-use tablepro_release_tests::Fixture;
+use bookie_core::sql_ddl::{DraftColumn, StructureOp, diff_to_ops, materialize_ops};
+use bookie_core::{ColumnInfo, Connection, ForeignKeyInfo, IndexInfo, Value};
+use bookie_release_tests::Fixture;
 
 const PARENT: &str = "ddl_parent";
 const CHILD: &str = "ddl_child";

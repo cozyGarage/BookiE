@@ -29,9 +29,9 @@ pub(super) fn metadata_notice_row(title: &str, description: &str) -> relm4::adw:
 mod tests {
     use super::{MetadataAvailability, metadata_availability};
     use crate::ui::structure_tab::StructureMode;
+    use bookie_app_services::structure_metadata::StructureMetadata;
     use relm4::adw::prelude::*;
     use relm4::{Component, ComponentController};
-    use tablepro_app_services::structure_metadata::StructureMetadata;
 
     use super::super::{StructureTab, StructureTabInit, StructureTabInput};
 
@@ -67,7 +67,7 @@ mod tests {
         assert!(!redis.supports_foreign_key_metadata);
         assert_eq!(
             super::super::driver_capabilities_for(&registry, "missing"),
-            tablepro_core::DriverCapabilities::default()
+            bookie_core::DriverCapabilities::default()
         );
     }
 

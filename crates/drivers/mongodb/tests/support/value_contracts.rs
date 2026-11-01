@@ -1,5 +1,5 @@
+use bookie_core::{DatabaseDriver, Value};
 use drivers_mongodb::MongodbDriver;
-use tablepro_core::{DatabaseDriver, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -178,7 +178,7 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
     );
 
     let exported: serde_json::Value =
-        serde_json::from_str(&tablepro_core::export::render_json(&result.columns, &result.rows))
+        serde_json::from_str(&bookie_core::export::render_json(&result.columns, &result.rows))
             .expect("parse JSON export");
     assert_eq!(
         exported[0]["nested"],
@@ -198,10 +198,10 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
         "JSON export must keep the UUID binary subtype"
     );
 
-    let csv_output = tablepro_core::export::render_csv(
+    let csv_output = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
     let mut csv_reader = csv::Reader::from_reader(csv_output.as_bytes());
     let headers = csv_reader.headers().expect("CSV headers").clone();
@@ -243,12 +243,12 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
 
     let directory = tempfile::tempdir().expect("temporary export directory");
     let workbook_path = directory.path().join("mongo-values.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &workbook_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -271,8 +271,8 @@ fn missing_nested_xlsx_marker(cell: &str) -> Option<&'static str> {
         .into_iter()
         .find(|marker| !cell.contains(marker))
 }
-fn json_column(name: &str) -> tablepro_core::ColumnInfo {
-    tablepro_core::ColumnInfo {
+fn json_column(name: &str) -> bookie_core::ColumnInfo {
+    bookie_core::ColumnInfo {
         name: name.into(),
         data_type: "json".into(),
         nullable: true,
@@ -309,7 +309,7 @@ fn nested_extended_json(include_date: bool, include_binary: bool) -> serde_json:
 }
 
 fn write_nested_xlsx(nested: serde_json::Value) -> (tempfile::TempDir, std::path::PathBuf) {
-    let result = tablepro_core::QueryResult {
+    let result = bookie_core::QueryResult {
         columns: ["date_max", "uuid_binary", "user_binary", "nested"]
             .into_iter()
             .map(json_column)
@@ -330,12 +330,12 @@ fn write_nested_xlsx(nested: serde_json::Value) -> (tempfile::TempDir, std::path
     };
     let directory = tempfile::tempdir().expect("temporary export directory");
     let path = directory.path().join("mongo-values.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -505,7 +505,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
     let edited_uuid_binary = serde_json::json!({
         "$binary": { "base64": "EBESExQVFhcYGRobHB0eHw==", "subType": "04" }
     });
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "nested_edits",
@@ -629,7 +629,7 @@ async fn value_contract_undefined_grid_edit_preserves_native_bson() {
     let marker = Value::Json(Box::new(serde_json::json!({ "$undefined": true })));
     assert_eq!(before.rows[0][value_index], marker);
 
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "undefined_edits",
@@ -692,7 +692,7 @@ async fn value_contract_javascript_code_grid_edit_preserves_native_bson() {
         Value::Json(Box::new(serde_json::json!({ "$code": "return before;" })))
     );
 
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "javascript_edits",
@@ -776,7 +776,7 @@ async fn value_contract_db_pointer_grid_edit_preserves_native_bson() {
     );
 
     let edited_marker = Value::Json(Box::new(after_pointer.clone().into_canonical_extjson()));
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "dbpointer_edits",
@@ -842,7 +842,7 @@ async fn value_contract_generic_binary_grid_edit_preserves_native_bson() {
     assert_eq!(before.rows[0][payload_index], Value::Bytes(vec![0, 255, 65]));
 
     let edited = vec![255, 0, 66, 128];
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "binary_grid_edits",
@@ -941,7 +941,7 @@ async fn value_contract_binary_subtypes_survive_native_grid_edits() {
             (index, value)
         })
         .collect();
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "binary_subtype_grid_edits",
@@ -1060,7 +1060,7 @@ async fn value_contract_server_generated_bson_column_survives_grid_edit() {
         .position(|column| column.name == "payload")
         .unwrap();
     let edited_marker = Bson::Binary(replacement.clone()).into_canonical_extjson();
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "column_grid_edits",
@@ -1125,7 +1125,7 @@ async fn value_contract_object_id_grid_edit_preserves_native_bson() {
     );
 
     let edited = Value::Json(Box::new(serde_json::json!({"$oid": after_value.to_hex()})));
-    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (statement, params) = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "object_id_edits",

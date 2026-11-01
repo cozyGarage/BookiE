@@ -4,17 +4,17 @@ use std::time::Duration;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
-use tablepro_core::Connection;
-use tablepro_transport::Tunnel;
+use bookie_core::Connection;
+use bookie_transport::Tunnel;
 
 use super::connection_service;
 use super::database_service::{ConnectionHealth, EntryInner, ReconnectParams};
 #[cfg(test)]
-use tablepro_policy::AuditState;
+use bookie_policy::AuditState;
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const TUNNEL_POLL_INTERVAL: Duration = Duration::from_secs(1);
-use tablepro_app_services::reconnect::{BACKOFF_INITIAL, next_delay};
+use bookie_app_services::reconnect::{BACKOFF_INITIAL, next_delay};
 
 pub(super) async fn run(
     inner: Arc<Mutex<EntryInner>>,
@@ -78,7 +78,7 @@ enum Wake {
 }
 
 enum PingFailure {
-    Driver(tablepro_core::DriverError),
+    Driver(bookie_core::DriverError),
     Reported,
     TunnelClosed,
 }

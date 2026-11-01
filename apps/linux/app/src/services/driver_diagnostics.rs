@@ -1,4 +1,4 @@
-use tablepro_core::DriverError;
+use bookie_core::DriverError;
 
 pub(crate) fn warn_driver_cleanup(error: &DriverError, operation: &'static str) {
     tracing::warn!(
@@ -8,8 +8,8 @@ pub(crate) fn warn_driver_cleanup(error: &DriverError, operation: &'static str) 
     );
 }
 
-pub(crate) fn warn_export_cleanup(error: &tablepro_core::export::ExportError, operation: &'static str) {
-    use tablepro_core::export::ExportError;
+pub(crate) fn warn_export_cleanup(error: &bookie_core::export::ExportError, operation: &'static str) {
+    use bookie_core::export::ExportError;
 
     let error_code = match error {
         ExportError::Write(_) => "write",

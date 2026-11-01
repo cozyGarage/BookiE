@@ -1,5 +1,5 @@
+use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
 use sha2::Digest;
-use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
 use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mssql_server::MssqlServer;
 
@@ -165,13 +165,13 @@ async fn value_contract_mssql_max_values_survive_connection_session_and_consumer
         "<65534 bytes>"
     );
 
-    let mut csv_options = tablepro_core::export::CsvOptions::default();
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&ordinary.rows);
+    let mut csv_options = bookie_core::export::CsvOptions::default();
+    let null_marker = bookie_core::export::unique_csv_null_marker(&ordinary.rows);
     csv_options.null_marker = Some(null_marker.clone());
-    let csv = tablepro_core::export::render_csv(&ordinary.columns[..4], &ordinary.rows, &csv_options);
-    let sheet = tablepro_core::import::read_csv(
+    let csv = bookie_core::export::render_csv(&ordinary.columns[..4], &ordinary.rows, &csv_options);
+    let sheet = bookie_core::import::read_csv(
         csv.as_bytes(),
-        &tablepro_core::import::CsvImportOptions {
+        &bookie_core::import::CsvImportOptions {
             null_marker,
             ..Default::default()
         },
@@ -184,11 +184,11 @@ async fn value_contract_mssql_max_values_survive_connection_session_and_consumer
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            tablepro_core::import::row_to_values(
+            bookie_core::import::row_to_values(
                 row,
                 &[Some(0), Some(1), Some(2), Some(3)],
                 &import_columns,
-                &tablepro_core::import::CsvImportOptions {
+                &bookie_core::import::CsvImportOptions {
                     null_marker: csv_options.null_marker.clone().unwrap(),
                     ..Default::default()
                 },
@@ -202,7 +202,7 @@ async fn value_contract_mssql_max_values_survive_connection_session_and_consumer
         ordinary.rows.iter().map(|row| row[..4].to_vec()).collect::<Vec<_>>()
     );
 
-    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+    let json: serde_json::Value = serde_json::from_str(&bookie_core::export::render_json(
         &ordinary.columns[..4],
         &ordinary.rows,
     ))
@@ -225,25 +225,25 @@ async fn value_contract_mssql_max_values_survive_connection_session_and_consumer
     );
 
     let directory = tempfile::tempdir().unwrap();
-    let export = tablepro_core::export::ResultExport {
-        format: tablepro_core::export::ResultFormat::Xlsx,
+    let export = bookie_core::export::ResultExport {
+        format: bookie_core::export::ResultFormat::Xlsx,
         csv: &csv_options,
         sql: None,
     };
     let xlsx_path = directory.path().join("mssql-max-boundary.xlsx");
-    let boundary = tablepro_core::QueryResult {
+    let boundary = bookie_core::QueryResult {
         columns: vec![ordinary.columns[1].clone()],
         rows: vec![vec![cases[0].1.clone()]],
         truncated: false,
     };
-    tablepro_core::export::write_result_file(&xlsx_path, &boundary, &export, || false, |_| {}).unwrap();
-    let over_limit = tablepro_core::QueryResult {
+    bookie_core::export::write_result_file(&xlsx_path, &boundary, &export, || false, |_| {}).unwrap();
+    let over_limit = bookie_core::QueryResult {
         columns: boundary.columns.clone(),
         rows: vec![vec![cases[1].1.clone()]],
         truncated: false,
     };
     assert!(
-        tablepro_core::export::write_result_file(&xlsx_path, &over_limit, &export, || false, |_| {}).is_err(),
+        bookie_core::export::write_result_file(&xlsx_path, &over_limit, &export, || false, |_| {}).is_err(),
         "XLSX must report its cell-length limit instead of silently truncating max values"
     );
     session.close().await.unwrap();

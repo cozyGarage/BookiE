@@ -1,17 +1,17 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use bookie_core::import::{
+    CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportError, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError,
+    build_insert_plan, detect_format, read_csv, read_import_file,
+};
+use bookie_core::sql_ddl::build_create_table;
+use bookie_core::{ColumnInfo, Connection, DriverCapabilities, DriverError, OperationControl};
+use bookie_policy::{BulkBatch, BulkInsertEnd, BulkInsertRequest, PolicyGuard};
 use relm4::adw::prelude::*;
 use relm4::gtk;
 use relm4::gtk::gio;
 use relm4::{ComponentController, ComponentSender};
-use tablepro_core::import::{
-    CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportError, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError,
-    build_insert_plan, detect_format, read_csv, read_import_file,
-};
-use tablepro_core::sql_ddl::build_create_table;
-use tablepro_core::{ColumnInfo, Connection, DriverCapabilities, DriverError, OperationControl};
-use tablepro_policy::{BulkBatch, BulkInsertEnd, BulkInsertRequest, PolicyGuard};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -101,7 +101,7 @@ impl App {
     }
 
     pub(super) fn on_create_table_from_csv(&self, schema: Option<String>, sender: ComponentSender<Self>) {
-        if !tablepro_core::import::supports_table_creation(self.driver_id()) {
+        if !bookie_core::import::supports_table_creation(self.driver_id()) {
             self.show_error_alert(
                 &crate::tr!("Can't create a table"),
                 &crate::tr!(
@@ -364,7 +364,7 @@ impl App {
         }
         let Some(guard) = self
             .database
-            .guard(preparation.connection_id, tablepro_policy::Principal::human_gui())
+            .guard(preparation.connection_id, bookie_policy::Principal::human_gui())
         else {
             self.close_csv_import_progress();
             self.show_error_alert(&crate::tr!("Can't import"), &crate::tr!("No active connection."));
@@ -598,7 +598,7 @@ impl ImportRun {
 
     async fn run_batches(
         &self,
-        scope: &mut tablepro_policy::BulkInsertScope,
+        scope: &mut bookie_policy::BulkInsertScope,
         sender: &ComponentSender<App>,
     ) -> Result<(), BatchStop> {
         let mut committed = 0;
@@ -733,8 +733,8 @@ fn read_file(path: &std::path::Path) -> Result<Vec<u8>, String> {
             .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()),
         _ => crate::tr!("The file could not be read."),
     })?;
-    if tablepro_core::import::is_xlsx(&bytes) {
-        return tablepro_core::import::xlsx_to_csv(&bytes).map_err(|error| error.to_string());
+    if bookie_core::import::is_xlsx(&bytes) {
+        return bookie_core::import::xlsx_to_csv(&bytes).map_err(|error| error.to_string());
     }
     Ok(bytes)
 }

@@ -12,8 +12,8 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender, adw};
 use uuid::Uuid;
 
-use tablepro_core::{ColumnInfo, Value};
-use tablepro_storage::query_history::{Outcome, Source};
+use bookie_core::{ColumnInfo, Value};
+use bookie_storage::query_history::{Outcome, Source};
 
 use crate::services::read_scopes::ReadScope;
 
@@ -85,7 +85,7 @@ impl App {
             return;
         };
         let driver_id = self.driver_id().to_string();
-        if let Err(e) = tablepro_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
+        if let Err(e) = bookie_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
             self.show_error_alert(&crate::tr!("Cannot truncate table"), &format!("{e}"));
             return;
         }
@@ -125,7 +125,7 @@ impl App {
         let Some(driver_id) = self.current_driver_id.clone() else {
             return;
         };
-        let sql = match tablepro_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
+        let sql = match bookie_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
             Ok(sql) => sql,
             Err(e) => {
                 self.show_error_alert(&crate::tr!("Cannot truncate table"), &format!("{e}"));
@@ -218,7 +218,7 @@ impl App {
         let Some(driver_id) = self.current_driver_id.clone() else {
             return;
         };
-        let sql = match tablepro_core::sql_ddl::build_rename_table(&driver_id, schema.as_deref(), &table, &new_name) {
+        let sql = match bookie_core::sql_ddl::build_rename_table(&driver_id, schema.as_deref(), &table, &new_name) {
             Ok(sql) => sql,
             Err(e) => {
                 self.show_error_alert(&crate::tr!("Cannot rename table"), &format!("{e}"));
@@ -309,7 +309,7 @@ impl App {
         let Some(driver_id) = self.current_driver_id.clone() else {
             return;
         };
-        let sql = match tablepro_core::sql_ddl::build_drop_table(&driver_id, schema.as_deref(), &table, true, false) {
+        let sql = match bookie_core::sql_ddl::build_drop_table(&driver_id, schema.as_deref(), &table, true, false) {
             Ok(s) => s,
             Err(e) => {
                 self.show_error_alert(&crate::tr!("Cannot drop table"), &format!("{e}"));
@@ -489,7 +489,7 @@ impl App {
         let new_table_name = if matches!(mode, StructureMode::New) {
             structure_tracker::with_tab_ref(tab_id, |t| {
                 t.ops().iter().find_map(|op| {
-                    if let tablepro_core::sql_ddl::StructureOp::CreateTable { table, .. } = op {
+                    if let bookie_core::sql_ddl::StructureOp::CreateTable { table, .. } = op {
                         Some(table.clone())
                     } else {
                         None
@@ -728,7 +728,7 @@ impl App {
                         ));
                         return;
                     }
-                    if let Err(e) = tablepro_core::check_pre_dispatch(&control) {
+                    if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
                             crate::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")),
                         ));
@@ -746,7 +746,7 @@ impl App {
                             return;
                         }
                     };
-                    if let Err(e) = tablepro_core::check_pre_dispatch(&control) {
+                    if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
                             crate::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")),
                         ));
@@ -769,17 +769,17 @@ impl App {
                     // the original ColumnInfo so materialise emits the
                     // right type / nullability / default per driver
                     // dialect.
-                    let op = tablepro_core::sql_ddl::StructureOp::CreateTable {
+                    let op = bookie_core::sql_ddl::StructureOp::CreateTable {
                         schema: schema_for_cmd.clone(),
                         table: table_for_cmd.clone(),
                         columns: columns
                             .into_iter()
-                            .map(tablepro_core::sql_ddl::DraftColumn::from_info)
+                            .map(bookie_core::sql_ddl::DraftColumn::from_info)
                             .collect(),
                         indexes,
                         fks,
                     };
-                    match tablepro_core::sql_ddl::materialize_ops(&[op], &driver_id) {
+                    match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {
                             // Multi-statement output (CreateTable + N
                             // CREATE INDEX + N ALTER ... ADD FK) joins
@@ -848,11 +848,11 @@ impl App {
                             return;
                         }
                     };
-                    if let Err(e) = tablepro_core::check_pre_dispatch(&control) {
+                    if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         fail(format!("{e}"));
                         return;
                     }
-                    let metadata = match tablepro_app_services::structure_metadata::load_structure_metadata(
+                    let metadata = match bookie_app_services::structure_metadata::load_structure_metadata(
                         conn.as_ref(),
                         schema.as_deref(),
                         &table,
@@ -884,7 +884,7 @@ impl App {
         &self,
         tab_id: Uuid,
         columns: Vec<ColumnInfo>,
-        metadata: tablepro_app_services::structure_metadata::StructureMetadata,
+        metadata: bookie_app_services::structure_metadata::StructureMetadata,
     ) {
         if let Some(controller) = self
             .workspace_tabs
@@ -956,7 +956,7 @@ impl App {
                     let result = async {
                         let tables = conn.list_tables_controlled(&control).await?;
                         let views = conn.list_views_controlled(&control).await?;
-                        Ok::<_, tablepro_core::DriverError>((tables, views))
+                        Ok::<_, bookie_core::DriverError>((tables, views))
                     }
                     .await
                     .map_err(|error| error_text::driver_message(&error));

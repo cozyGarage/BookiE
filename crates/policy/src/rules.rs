@@ -1,4 +1,4 @@
-use tablepro_core::Environment;
+use bookie_core::Environment;
 
 use crate::classify::{StatementClass, StatementFacts};
 use crate::config::EnvPolicy;

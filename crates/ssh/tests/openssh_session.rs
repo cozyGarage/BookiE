@@ -7,11 +7,11 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use secrecy::SecretString;
-use tablepro_ssh::openssh::{
+use bookie_ssh::openssh::{
     AskpassPrompt, ForwardRoute, ForwardTarget, LocalEndpoint, OpenSshAuth, OpenSshConfig, OpenSshContext,
     OpenSshError, OpenSshRuntime, OpenSshSession, OpenSshTimeouts, PromptAnswer, Prompter, SshDestination,
 };
+use secrecy::SecretString;
 use testcontainers::core::{ExecCommand, IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
@@ -106,8 +106,8 @@ async fn start() -> TestResult<Fixture> {
         runtime: OpenSshRuntime::acquire(&base)?,
         ssh_program: wrapper,
         askpass_program: PathBuf::from(
-            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
-                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+            std::env::var_os("CARGO_BIN_EXE_bookie-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_bookie-askpass").into()),
         ),
         timeouts: OpenSshTimeouts::default(),
     };
@@ -337,8 +337,8 @@ async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResul
         runtime: OpenSshRuntime::acquire(&base)?,
         ssh_program: wrapper,
         askpass_program: PathBuf::from(
-            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
-                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+            std::env::var_os("CARGO_BIN_EXE_bookie-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_bookie-askpass").into()),
         ),
         timeouts: OpenSshTimeouts::default(),
     };
@@ -383,7 +383,7 @@ async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResul
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
-    let network = format!("tablepro-ssh-test-{}", uuid::Uuid::new_v4());
+    let network = format!("bookie-ssh-test-{}", uuid::Uuid::new_v4());
     let jump = GenericImage::new("alpine", "3.22")
         .with_exposed_port(2222.tcp())
         .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
@@ -432,8 +432,8 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
         runtime: OpenSshRuntime::acquire(&base).unwrap(),
         ssh_program: wrapper,
         askpass_program: PathBuf::from(
-            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
-                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+            std::env::var_os("CARGO_BIN_EXE_bookie-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_bookie-askpass").into()),
         ),
         timeouts: OpenSshTimeouts::default(),
     };
@@ -598,8 +598,8 @@ async fn start_with_authorized_key(public_key: &str, agent_socket: Option<&Path>
         runtime: OpenSshRuntime::acquire(&base)?,
         ssh_program: wrapper,
         askpass_program: PathBuf::from(
-            std::env::var_os("CARGO_BIN_EXE_tablepro-askpass")
-                .unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into()),
+            std::env::var_os("CARGO_BIN_EXE_bookie-askpass")
+                .unwrap_or_else(|| env!("CARGO_BIN_EXE_bookie-askpass").into()),
         ),
         timeouts: OpenSshTimeouts::default(),
     };

@@ -14,10 +14,10 @@ pub const TOOL_NAMES: &[&str] = &[
     "browse_table",
 ];
 
-use serde_json::{Value as JsonValue, json};
-use tablepro_core::export::{
+use bookie_core::export::{
     CsvOptions, unique_csv_null_marker, write_csv_header_with_options, write_csv_row_with_columns_and_options,
 };
+use serde_json::{Value as JsonValue, json};
 
 use uuid::Uuid;
 
@@ -311,13 +311,10 @@ fn parse_u64(args: &JsonValue, key: &str, default: u64) -> Result<u64, String> {
     }
 }
 
-fn parse_catalog_kind(args: &JsonValue) -> Result<tablepro_core::CatalogObjectKind, String> {
+fn parse_catalog_kind(args: &JsonValue) -> Result<bookie_core::CatalogObjectKind, String> {
     let raw = args.get("kind").and_then(|v| v.as_str()).ok_or("missing kind")?;
-    tablepro_core::CatalogObjectKind::parse(raw).ok_or_else(|| {
-        let known: Vec<&str> = tablepro_core::CatalogObjectKind::ALL
-            .iter()
-            .map(|k| k.as_str())
-            .collect();
+    bookie_core::CatalogObjectKind::parse(raw).ok_or_else(|| {
+        let known: Vec<&str> = bookie_core::CatalogObjectKind::ALL.iter().map(|k| k.as_str()).collect();
         format!("unknown kind {raw:?}; expected one of {}", known.join(", "))
     })
 }
@@ -330,23 +327,23 @@ fn parse_uuid(args: &JsonValue, key: &str) -> Result<Uuid, String> {
     Uuid::parse_str(s).map_err(|e| e.to_string())
 }
 
-fn value_to_json(v: &tablepro_core::Value) -> JsonValue {
+fn value_to_json(v: &bookie_core::Value) -> JsonValue {
     match v {
-        tablepro_core::Value::Null => json!({"$type": "null"}),
-        tablepro_core::Value::Bool(value) => tagged_value("bool", json!(value)),
-        tablepro_core::Value::Int(value) => tagged_value("int64", json!(value.to_string())),
-        tablepro_core::Value::Float(value) => tagged_value("float64", json!(value.to_string())),
-        tablepro_core::Value::Text(value) => tagged_value("text", json!(value)),
-        tablepro_core::Value::Bytes(value) => tagged_value("bytes_hex", json!(hex::encode(value))),
-        tablepro_core::Value::Date(value) => tagged_value("date", json!(value.to_string())),
-        tablepro_core::Value::Time(value) => tagged_value("time", json!(value.to_string())),
-        tablepro_core::Value::DateTime(value) => tagged_value("datetime", json!(value.to_string())),
-        tablepro_core::Value::TimestampTz(value) => tagged_value("timestamp_tz", json!(value.to_rfc3339())),
-        tablepro_core::Value::Decimal(value) => tagged_value("decimal", json!(value.to_string())),
-        tablepro_core::Value::Uuid(value) => tagged_value("uuid", json!(value.to_string())),
-        tablepro_core::Value::Json(value) => tagged_value("json", json_value_to_tagged(value)),
-        tablepro_core::Value::JsonText(value) => tagged_value("json_text", json!(value)),
-        tablepro_core::Value::Undecodable(value) => tagged_value("undecodable", json!(value)),
+        bookie_core::Value::Null => json!({"$type": "null"}),
+        bookie_core::Value::Bool(value) => tagged_value("bool", json!(value)),
+        bookie_core::Value::Int(value) => tagged_value("int64", json!(value.to_string())),
+        bookie_core::Value::Float(value) => tagged_value("float64", json!(value.to_string())),
+        bookie_core::Value::Text(value) => tagged_value("text", json!(value)),
+        bookie_core::Value::Bytes(value) => tagged_value("bytes_hex", json!(hex::encode(value))),
+        bookie_core::Value::Date(value) => tagged_value("date", json!(value.to_string())),
+        bookie_core::Value::Time(value) => tagged_value("time", json!(value.to_string())),
+        bookie_core::Value::DateTime(value) => tagged_value("datetime", json!(value.to_string())),
+        bookie_core::Value::TimestampTz(value) => tagged_value("timestamp_tz", json!(value.to_rfc3339())),
+        bookie_core::Value::Decimal(value) => tagged_value("decimal", json!(value.to_string())),
+        bookie_core::Value::Uuid(value) => tagged_value("uuid", json!(value.to_string())),
+        bookie_core::Value::Json(value) => tagged_value("json", json_value_to_tagged(value)),
+        bookie_core::Value::JsonText(value) => tagged_value("json_text", json!(value)),
+        bookie_core::Value::Undecodable(value) => tagged_value("undecodable", json!(value)),
     }
 }
 
@@ -388,18 +385,18 @@ mod tests {
     fn value_contract_nonfinite_numbers_remain_distinct_from_sql_null() {
         for number in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert_eq!(
-                value_to_json(&tablepro_core::Value::Float(number)),
+                value_to_json(&bookie_core::Value::Float(number)),
                 json!({"$type": "float64", "value": number.to_string()})
             );
         }
-        assert_eq!(value_to_json(&tablepro_core::Value::Null), json!({"$type": "null"}));
+        assert_eq!(value_to_json(&bookie_core::Value::Null), json!({"$type": "null"}));
     }
 
     #[test]
     fn tagged_mcp_values_preserve_integer_kind_and_wide_digits() {
         for value in [i64::MIN, -9_007_199_254_740_993, 9_007_199_254_740_993, i64::MAX] {
             assert_eq!(
-                value_to_json(&tablepro_core::Value::Int(value)),
+                value_to_json(&bookie_core::Value::Int(value)),
                 json!({"$type": "int64", "value": value.to_string()})
             );
         }
@@ -411,7 +408,7 @@ mod tests {
             serde_json::from_str("[9007199254740993,-9007199254740993,{\"fraction\":1.234567890123456789}]").unwrap();
 
         assert_eq!(
-            value_to_json(&tablepro_core::Value::Json(Box::new(value))),
+            value_to_json(&bookie_core::Value::Json(Box::new(value))),
             json!({
                 "$type": "json",
                 "value": {
@@ -436,7 +433,7 @@ mod tests {
         let source = r#"{ "wide": 9007199254740993, "duplicate": 1, "duplicate": 2, "fraction": 1.2300e+20 }"#;
 
         assert_eq!(
-            value_to_json(&tablepro_core::Value::JsonText(source.into())),
+            value_to_json(&bookie_core::Value::JsonText(source.into())),
             json!({"$type": "json_text", "value": source})
         );
     }
@@ -469,7 +466,7 @@ mod tests {
 
     #[test]
     fn an_undecodable_value_is_reported_to_mcp_clients_not_hidden_as_null() {
-        let json = value_to_json(&tablepro_core::Value::Undecodable("NUMERIC".into()));
+        let json = value_to_json(&bookie_core::Value::Undecodable("NUMERIC".into()));
         assert_ne!(json, JsonValue::Null);
         assert_eq!(json, json!({"$type": "undecodable", "value": "NUMERIC"}));
     }
@@ -482,7 +479,7 @@ mod tests {
             "when": {"$date": {"$numberLong": "9223372036854775807"}},
         });
         assert_eq!(
-            value_to_json(&tablepro_core::Value::Json(Box::new(extended.clone()))),
+            value_to_json(&bookie_core::Value::Json(Box::new(extended.clone()))),
             json!({
                 "$type": "json",
                 "value": json_value_to_tagged(&extended)

@@ -1,5 +1,5 @@
 use super::clickhouse::{connect, start_clickhouse};
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]

@@ -5,7 +5,7 @@ use super::value_parse::parse_pasted_cell_with_style;
 use super::*;
 
 const MAX_PASTE_CELLS: usize = 5_000;
-const MAX_PASTE_BYTES: usize = tablepro_core::import::MAX_FIELD_BYTES;
+const MAX_PASTE_BYTES: usize = bookie_core::import::MAX_FIELD_BYTES;
 
 fn paste_size_allowed(size: usize) -> bool {
     size <= MAX_PASTE_BYTES

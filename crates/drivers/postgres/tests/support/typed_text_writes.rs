@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_dialect::{build_insert_from_draft, build_keyed_delete, build_optimistic_keyed_update};
-use tablepro_core::{Connection, Value};
+use bookie_core::sql_dialect::{build_insert_from_draft, build_keyed_delete, build_optimistic_keyed_update};
+use bookie_core::{Connection, Value};
 
 use crate::{connect, start_pg};
 

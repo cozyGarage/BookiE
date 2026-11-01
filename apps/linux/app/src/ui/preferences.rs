@@ -14,10 +14,10 @@ const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
 
 pub fn present(
     parent: &impl IsA<gtk::Widget>,
-    history: Option<tablepro_storage::query_history::HistoryStore>,
+    history: Option<bookie_storage::query_history::HistoryStore>,
     database: &crate::services::database_service::DatabaseService,
     preferences: &PreferencesStore,
-    mcp_bridge: Option<std::sync::Arc<tablepro_mcp::McpBridge>>,
+    mcp_bridge: Option<std::sync::Arc<bookie_mcp::McpBridge>>,
 ) {
     let window = adw::PreferencesDialog::builder()
         .title(crate::tr!("Preferences"))

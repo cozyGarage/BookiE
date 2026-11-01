@@ -43,8 +43,8 @@ use relm4::gtk::{gio, glib};
 use relm4::prelude::*;
 use relm4::{Controller, adw, gtk};
 
-use tablepro_core::DriverRegistry;
-use tablepro_storage::{ConnectionOrganizationIndex, SavedConnection};
+use bookie_core::DriverRegistry;
+use bookie_storage::{ConnectionOrganizationIndex, SavedConnection};
 use uuid::Uuid;
 
 use super::browse_tab::BrowseTabInput;
@@ -73,25 +73,25 @@ pub struct AppInit {
     pub registry: Arc<DriverRegistry>,
     pub persistence: crate::services::persistence_stores::PersistenceStores,
     pub workspace: crate::services::workspace_state::WorkspaceStore,
-    pub history: Option<tablepro_storage::query_history::HistoryStore>,
+    pub history: Option<bookie_storage::query_history::HistoryStore>,
     pub database: Arc<crate::services::database_service::DatabaseService>,
     pub preferences: crate::services::preferences::PreferencesStore,
-    pub mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
+    pub mcp_bridge: Option<Arc<bookie_mcp::McpBridge>>,
 }
 
-use tablepro_app_services::workspace::{CloseAfterSave, WorkspaceTabs};
+use bookie_app_services::workspace::{CloseAfterSave, WorkspaceTabs};
 
 pub struct App {
     registry: Arc<DriverRegistry>,
     persistence: crate::services::persistence_stores::PersistenceStores,
     workspace: crate::services::workspace_state::WorkspaceStore,
-    history: Option<tablepro_storage::query_history::HistoryStore>,
+    history: Option<bookie_storage::query_history::HistoryStore>,
     database: Arc<crate::services::database_service::DatabaseService>,
     window_state: std::rc::Rc<std::cell::RefCell<crate::services::window_state::WindowState>>,
     window_close_state_saved: std::rc::Rc<std::cell::Cell<bool>>,
     window_close_state_pending: std::rc::Rc<std::cell::Cell<bool>>,
     preferences: crate::services::preferences::PreferencesStore,
-    mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
+    mcp_bridge: Option<Arc<bookie_mcp::McpBridge>>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
     sidebar_toggle: gtk::ToggleButton,
@@ -109,8 +109,8 @@ pub struct App {
     schema_filter_button: gtk::MenuButton,
     sidebar_fold_button: gtk::Button,
     schema_filter_list: gtk::Box,
-    sidebar_views: Vec<tablepro_core::TableInfo>,
-    sidebar_tables: Vec<tablepro_core::TableInfo>,
+    sidebar_views: Vec<bookie_core::TableInfo>,
+    sidebar_tables: Vec<bookie_core::TableInfo>,
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     catalog_dialog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
@@ -155,7 +155,7 @@ pub struct App {
     /// `tab_view.pages()` since HashMap is unordered.
     workspace_tabs: std::rc::Rc<std::cell::RefCell<WorkspaceTabs<WorkspaceTab>>>,
     dialog: Option<Controller<ConnectDialog>>,
-    favorites: Vec<tablepro_storage::SavedQuery>,
+    favorites: Vec<bookie_storage::SavedQuery>,
     favorites_order: crate::services::request_generation::LatestApplied,
     /// Tables and their columns for schema-aware editor completion.
     schema_index: std::rc::Rc<std::cell::RefCell<crate::ui::editor::SchemaIndex>>,
@@ -181,7 +181,7 @@ pub struct App {
     /// disk until the user confirms the plan it holds.
     pending_import: Option<Box<bundle::PendingImport>>,
     /// An encrypted bundle waiting on its passphrase.
-    pending_bundle: Option<tablepro_storage::EncryptedBundle>,
+    pending_bundle: Option<bookie_storage::EncryptedBundle>,
     connected: bool,
     /// The connection this window owns. Activation is process-wide and
     /// additive, so a window must resolve its own connection rather than

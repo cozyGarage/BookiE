@@ -1,5 +1,5 @@
-use tablepro_core::ConnectOptions;
-use tablepro_storage::{SavedConnection, SavedSshConfig};
+use bookie_core::ConnectOptions;
+use bookie_storage::{SavedConnection, SavedSshConfig};
 use uuid::Uuid;
 
 use crate::ui::ssh_section::SshInputs;
@@ -46,14 +46,14 @@ fn derived_connection_name(driver_id: &str, opts: &ConnectOptions) -> String {
     if let Some(path) = &opts.local_socket_path {
         return format!("{}@{}", opts.username, path.display());
     }
-    if opts.auth_mode == tablepro_core::AuthMode::Kerberos {
+    if opts.auth_mode == bookie_core::AuthMode::Kerberos {
         return opts.host.clone();
     }
     format!("{}@{}", opts.username, opts.host)
 }
 
 pub(super) async fn find_existing(identity: &ConnectionIdentity<'_>) -> Option<SavedConnection> {
-    let existing = tablepro_storage::load_connections().await.ok()?;
+    let existing = bookie_storage::load_connections().await.ok()?;
     select_existing(&existing, identity).cloned()
 }
 

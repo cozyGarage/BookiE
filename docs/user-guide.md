@@ -13,7 +13,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 ### Connection options
 
 - **Socket connections**: For MySQL, MariaDB, or PostgreSQL, specify a local Unix socket file (e.g. `mysql://user@/db?socket=/run/mysqld/mysqld.sock`).
-- **SSH tunneling**: Configure an SSH bastion host. BookiE verifies host keys against `$XDG_CONFIG_HOME/tablepro/known_hosts` and prompts before trusting unknown keys.
+- **SSH tunneling**: Configure an SSH bastion host. BookiE verifies host keys against `$XDG_CONFIG_HOME/bookie/known_hosts` and prompts before trusting unknown keys.
 - **TLS verification**: Select verification strictness, up to **Verify full** (validates certificate authority and host identity).
 - **Environment markers**: Tag connections as **Local**, **Dev**, **Staging**, or **Production**. Production connections display a red badge, a tinted header, and `[Production]` in the window title.
 - **Keyring security**: Passwords stay in the desktop keyring (Secret Service via `oo7`). Plaintext connection files never store credentials.

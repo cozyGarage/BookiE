@@ -15,7 +15,7 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-KEEP_UP="${TABLEPRO_FIXTURE_KEEP_UP:-0}"
+KEEP_UP="${BOOKIE_FIXTURE_KEEP_UP:-0}"
 
 compose() {
   docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
@@ -23,7 +23,7 @@ compose() {
 
 teardown() {
   if [[ "$KEEP_UP" == "1" ]]; then
-    echo "leaving the fixture running (TABLEPRO_FIXTURE_KEEP_UP=1)"
+    echo "leaving the fixture running (BOOKIE_FIXTURE_KEEP_UP=1)"
     return
   fi
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
@@ -47,7 +47,7 @@ chmod 0755 "$FIXTURE/seed"
 chmod 0644 "$FIXTURE/seed/01-seed.sql"
 
 mkdir -p "$STATE/config"
-rm -f "$STATE/config/tablepro/known_hosts"
+rm -f "$STATE/config/bookie/known_hosts"
 
 trap teardown EXIT
 compose down --volumes --remove-orphans >/dev/null 2>&1 || true
@@ -68,7 +68,7 @@ wait_for_port 127.0.0.1 2223 "bastion path"
 # 100 bytes, so the isolated runtime dir has to stay short -- the
 # fixture's own state directory, deep under the checked-out repo, is
 # already too long for that once a socket name is appended.
-secret_root="$(mktemp -d "${TMPDIR:-/tmp}/tablepro.XXXXXX")"
+secret_root="$(mktemp -d "${TMPDIR:-/tmp}/bookie.XXXXXX")"
 mkdir -p "$secret_root/home" "$secret_root/data" "$secret_root/cache" "$secret_root/state" "$secret_root/runtime"
 chmod 0700 "$secret_root/runtime"
 
@@ -82,49 +82,49 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   XDG_CACHE_HOME="$secret_root/cache" \
   XDG_STATE_HOME="$secret_root/state" \
   XDG_RUNTIME_DIR="$secret_root/runtime" \
-  TABLEPRO_FIXTURE_POSTGRES_RELEASE=1 \
-  TABLEPRO_FIXTURE_MATERIALS="$FIXTURE/materials" \
-  TABLEPRO_TARGET_DIR="$target_dir" \
-  TABLEPRO_GTK_POSTGRES_CONTAINER="$(compose ps -q db)" \
+  BOOKIE_FIXTURE_POSTGRES_RELEASE=1 \
+  BOOKIE_FIXTURE_MATERIALS="$FIXTURE/materials" \
+  BOOKIE_TARGET_DIR="$target_dir" \
+  BOOKIE_GTK_POSTGRES_CONTAINER="$(compose ps -q db)" \
   dbus-run-session -- bash -c '
     set -euo pipefail
-    eval "$(printf "tablepro-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+    eval "$(printf "bookie-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
     if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
       export PATH="$BOOKIE_TEST_BUNDLE/bin:$PATH"
-      export TABLEPRO_GTK_BINARY="$BOOKIE_TEST_BUNDLE/bin/tablepro-app"
+      export BOOKIE_GTK_BINARY="$BOOKIE_TEST_BUNDLE/bin/bookie-app"
     elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
       echo "a source-matched prebuilt test bundle is required" >&2
       exit 1
     else
-      cargo build --locked -p tablepro-ssh --bin tablepro-askpass
-      cargo build --locked -p tablepro-app --bin tablepro-app
+      cargo build --locked -p bookie-ssh --bin bookie-askpass
+      cargo build --locked -p bookie-app --bin bookie-app
     fi
-    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" bash scripts/run-rust-tests.sh --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
-    bash scripts/run-rust-tests.sh --locked -p tablepro-agentd --test mtls -- --include-ignored --test-threads=1
-    bash scripts/run-rust-tests.sh --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
-    TABLEPRO_GTK_DBUS_ACTIVE=0 \
-      TABLEPRO_GTK_POSTGRES_DB=tablepro \
-      TABLEPRO_GTK_POSTGRES_USER=tablepro \
-      TABLEPRO_GTK_POSTGRES_MTLS_PASSWORD=tablepro \
-      TABLEPRO_GTK_BINARY="${TABLEPRO_GTK_BINARY:-$TABLEPRO_TARGET_DIR/debug/tablepro-app}" \
-      TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_mtls_connection_authenticates_and_queries,postgres_structure_tabs_keep_backend_count_bounded,postgres_ssh_unknown_host_key_decline_is_durably_audited,postgres_ssh_multihop_trusts_both_hops_and_queries,postgres_ssh_second_hop_decline_does_not_learn_key,postgres_ssh_changed_second_hop_key_is_refused,postgres_ssh_setup_failure_is_durably_audited,postgres_ssh_tunnel_loss_retires_session_and_reconnects}" \
-      TABLEPRO_GTK_POSTGRES_MTLS_PORT=5433 \
-      TABLEPRO_GTK_POSTGRES_MTLS_HOST=localhost \
-      TABLEPRO_GTK_POSTGRES_MTLS_DB=tablepro \
-      TABLEPRO_GTK_POSTGRES_MTLS_USER=tablepro_mtls \
-      TABLEPRO_GTK_POSTGRES_MTLS_CA="$TABLEPRO_FIXTURE_MATERIALS/ca.crt" \
-      TABLEPRO_GTK_POSTGRES_MTLS_CERT="$TABLEPRO_FIXTURE_MATERIALS/client.crt" \
-      TABLEPRO_GTK_POSTGRES_MTLS_KEY="$TABLEPRO_FIXTURE_MATERIALS/client.key" \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PORT=2223 \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_HOST=127.0.0.1 \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST=relay \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT=22 \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_USER=tunnel \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_READ_ONLY=false \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_DB_HOST=db.tablepro.test \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_DB_PORT=5432 \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_KEY="$TABLEPRO_FIXTURE_MATERIALS/client_ed25519_key" \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_CA="$TABLEPRO_FIXTURE_MATERIALS/ca.crt" \
-      TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PASSWORD=tablepro \
+    PATH="$BOOKIE_TARGET_DIR/debug:$PATH" bash scripts/run-rust-tests.sh --locked -p bookie-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
+    bash scripts/run-rust-tests.sh --locked -p bookie-agentd --test mtls -- --include-ignored --test-threads=1
+    bash scripts/run-rust-tests.sh --locked -p bookie-release-tests --tests -- --include-ignored --test-threads=1
+    BOOKIE_GTK_DBUS_ACTIVE=0 \
+      BOOKIE_GTK_POSTGRES_DB=bookie \
+      BOOKIE_GTK_POSTGRES_USER=bookie \
+      BOOKIE_GTK_POSTGRES_MTLS_PASSWORD=bookie \
+      BOOKIE_GTK_BINARY="${BOOKIE_GTK_BINARY:-$BOOKIE_TARGET_DIR/debug/bookie-app}" \
+      BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-postgres_saved_mtls_connection_authenticates_and_queries,postgres_structure_tabs_keep_backend_count_bounded,postgres_ssh_unknown_host_key_decline_is_durably_audited,postgres_ssh_multihop_trusts_both_hops_and_queries,postgres_ssh_second_hop_decline_does_not_learn_key,postgres_ssh_changed_second_hop_key_is_refused,postgres_ssh_setup_failure_is_durably_audited,postgres_ssh_tunnel_loss_retires_session_and_reconnects}" \
+      BOOKIE_GTK_POSTGRES_MTLS_PORT=5433 \
+      BOOKIE_GTK_POSTGRES_MTLS_HOST=localhost \
+      BOOKIE_GTK_POSTGRES_MTLS_DB=bookie \
+      BOOKIE_GTK_POSTGRES_MTLS_USER=bookie_mtls \
+      BOOKIE_GTK_POSTGRES_MTLS_CA="$BOOKIE_FIXTURE_MATERIALS/ca.crt" \
+      BOOKIE_GTK_POSTGRES_MTLS_CERT="$BOOKIE_FIXTURE_MATERIALS/client.crt" \
+      BOOKIE_GTK_POSTGRES_MTLS_KEY="$BOOKIE_FIXTURE_MATERIALS/client.key" \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT=2223 \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST=127.0.0.1 \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST=relay \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT=22 \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_USER=tunnel \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_READ_ONLY=false \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_DB_HOST=db.bookie.test \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_DB_PORT=5432 \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_KEY="$BOOKIE_FIXTURE_MATERIALS/client_ed25519_key" \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_CA="$BOOKIE_FIXTURE_MATERIALS/ca.crt" \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_PASSWORD=bookie \
       bash scripts/test-gtk-safety.sh
   '

@@ -53,7 +53,7 @@ pub fn panic_description(location: Option<(&str, u32)>) -> String {
 }
 
 pub fn withhold_panic_messages() {
-    let debug_panics = std::env::var_os("TABLEPRO_DEBUG_PANICS").is_some();
+    let debug_panics = std::env::var_os("BOOKIE_DEBUG_PANICS").is_some();
     std::panic::set_hook(Box::new(move |info| {
         let location = info.location().map(|location| (location.file(), location.line()));
         let description = panic_description(location);

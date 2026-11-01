@@ -1,4 +1,4 @@
-use tablepro_core::{DatabaseDriver, Value};
+use bookie_core::{DatabaseDriver, Value};
 #[path = "../../../shared/tests/exact_grid_original.rs"]
 mod contract;
 
@@ -18,7 +18,7 @@ async fn exact_grid_original_detects_concurrent_mariadb_text_changes() {
     assert_mysql_collations(connection.as_ref()).await;
 }
 
-async fn assert_mysql_collations(connection: &dyn tablepro_core::Connection) {
+async fn assert_mysql_collations(connection: &dyn bookie_core::Connection) {
     for (kind, old, concurrent, search_matches) in [
         (
             "varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci",

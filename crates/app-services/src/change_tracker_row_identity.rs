@@ -1,4 +1,4 @@
-use tablepro_core::{Value, sql_dialect::BuildSqlError};
+use bookie_core::{Value, sql_dialect::BuildSqlError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RowKey {

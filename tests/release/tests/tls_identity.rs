@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{DatabaseDriver, DriverError, TlsMode};
-use tablepro_release_tests::Fixture;
+use bookie_core::{DatabaseDriver, DriverError, TlsMode};
+use bookie_release_tests::Fixture;
 
 use drivers_postgres::PgDriver;
 
@@ -124,7 +124,7 @@ async fn verify_full_through_ssh_rejects_a_hostname_outside_the_certificate() {
     let tunnel = fixture.open_socket_tunnel(&socket_name).await;
     let options = fixture.socket_options(
         &tunnel,
-        "wrong.tablepro.test",
+        "wrong.bookie.test",
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );

@@ -1,4 +1,4 @@
-//! Headless TablePro agent process. Serves MCP on demand over stdio with a
+//! Headless BookiE agent process. Serves MCP on demand over stdio with a
 //! required policy file and no GTK dependency.
 
 use std::collections::HashSet;
@@ -6,6 +6,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bookie_agentd::DaemonProvider;
+use bookie_core::DriverRegistry;
+use bookie_mcp::{McpBridge, TokenPermissions, TokenStore, serve_stdio};
+use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AuditState, DenyApprovalSink, load_from_path};
+use bookie_storage::{AuditJournal, SavedConnection, load_connections};
 use clap::{Parser, ValueEnum};
 use drivers_clickhouse::ClickhouseDriver;
 #[cfg(feature = "duckdb")]
@@ -16,11 +21,6 @@ use drivers_mysql::MysqlDriver;
 use drivers_postgres::PgDriver;
 use drivers_redis::RedisDriver;
 use drivers_sqlite::SqliteDriver;
-use tablepro_agentd::DaemonProvider;
-use tablepro_core::DriverRegistry;
-use tablepro_mcp::{McpBridge, TokenPermissions, TokenStore, serve_stdio};
-use tablepro_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AuditState, DenyApprovalSink, load_from_path};
-use tablepro_storage::{AuditJournal, SavedConnection, load_connections};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
@@ -237,9 +237,9 @@ fn build_registry() -> DriverRegistry {
 }
 
 async fn daemon_provider(
-    policy: Arc<tablepro_policy::PolicyConfig>,
-    audit: Arc<dyn tablepro_policy::AuditSink>,
-    approval: Arc<dyn tablepro_policy::ApprovalSink>,
+    policy: Arc<bookie_policy::PolicyConfig>,
+    audit: Arc<dyn bookie_policy::AuditSink>,
+    approval: Arc<dyn bookie_policy::ApprovalSink>,
 ) -> DaemonProvider {
     let provider = DaemonProvider::new(
         Arc::new(build_registry()),
@@ -248,7 +248,7 @@ async fn daemon_provider(
         Arc::new(AuditState::new()),
         approval,
     );
-    match tablepro_transport::system_openssh(Arc::new(tablepro_ssh::openssh::UnattendedPrompter)).await {
+    match bookie_transport::system_openssh(Arc::new(bookie_ssh::openssh::UnattendedPrompter)).await {
         Ok(openssh) => provider.with_system_openssh(openssh),
         Err(error) => {
             tracing::info!(error = %error, "system OpenSSH connections are unavailable");
@@ -259,13 +259,16 @@ async fn daemon_provider(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tablepro_transport::install_crypto_provider();
+    bookie_transport::install_crypto_provider();
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_writer(std::io::stderr)
         .log_internal_errors(false)
         .init();
-    tablepro_policy::withhold_panic_messages();
+    bookie_policy::withhold_panic_messages();
+    if let Err(error) = bookie_storage::migrate_legacy_state() {
+        tracing::error!(%error, "legacy tablepro state could not be copied; it was left untouched");
+    }
 
     let args = Args::parse();
     if !args.policy.exists() {
@@ -294,7 +297,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let approval: Arc<dyn tablepro_policy::ApprovalSink> = match args.approval {
+    let approval: Arc<dyn bookie_policy::ApprovalSink> = match args.approval {
         ApprovalMode::Deny => Arc::new(DenyApprovalSink),
         ApprovalMode::Tty => Arc::new(TtyApprovalSink),
     };
@@ -307,7 +310,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .into());
     }
-    let audit: Arc<dyn tablepro_policy::AuditSink> = Arc::new(journal);
+    let audit: Arc<dyn bookie_policy::AuditSink> = Arc::new(journal);
 
     let provider = Arc::new(daemon_provider(policy, audit, approval).await);
     let bridge = Arc::new(McpBridge::new(provider, tokens));

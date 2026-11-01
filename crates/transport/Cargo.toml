@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-transport"
+name = "bookie-transport"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,14 +7,14 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_transport"
+name = "bookie_transport"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../core" }
-tablepro-policy = { path = "../policy" }
-tablepro-ssh = { path = "../ssh" }
-tablepro-storage = { path = "../storage" }
+bookie-core = { path = "../core" }
+bookie-policy = { path = "../policy" }
+bookie-ssh = { path = "../ssh" }
+bookie-storage = { path = "../storage" }
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std"] }
 secrecy.workspace = true
 libc.workspace = true

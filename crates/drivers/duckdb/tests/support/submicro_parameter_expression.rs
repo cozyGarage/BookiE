@@ -1,5 +1,5 @@
 use super::native_connection;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn value_contract_submicro_text_parameters_keep_precision_after_explicit_casts() {
@@ -19,7 +19,7 @@ async fn value_contract_submicro_text_parameters_keep_precision_after_explicit_c
     assert!(
         matches!(
             time_expression,
-            Err(tablepro_core::DriverError::Query { message, .. })
+            Err(bookie_core::DriverError::Query { message, .. })
                 if message.contains("TIME_NS") && message.contains("INTERVAL")
         ),
         "the native TIME_NS/INTERVAL binder refusal must stay visible"

@@ -21,20 +21,20 @@ impl Connection for ViewConnection {
         }])
     }
     async fn list_views_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
-        tablepro_core::check_pre_dispatch(control)?;
+        bookie_core::check_pre_dispatch(control)?;
         self.controlled.store(true, std::sync::atomic::Ordering::SeqCst);
         self.list_views().await
     }
 
     async fn list_objects(
         &self,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<&str>,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         if self.fail {
             return Err(DriverError::Disconnected);
         }
-        Ok(vec![tablepro_core::CatalogObject {
+        Ok(vec![bookie_core::CatalogObject {
             kind,
             schema: schema.map(str::to_string),
             name: "audit_row".into(),
@@ -44,11 +44,11 @@ impl Connection for ViewConnection {
 
     async fn list_objects_controlled(
         &self,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<&str>,
         control: &OperationControl,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
-        tablepro_core::check_pre_dispatch(control)?;
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
+        bookie_core::check_pre_dispatch(control)?;
         self.controlled.store(true, std::sync::atomic::Ordering::SeqCst);
         self.list_objects(kind, schema).await
     }
@@ -67,7 +67,7 @@ impl Connection for ViewConnection {
         table: &str,
         control: &OperationControl,
     ) -> Result<Vec<IndexInfo>, DriverError> {
-        tablepro_core::check_pre_dispatch(control)?;
+        bookie_core::check_pre_dispatch(control)?;
         assert_eq!((schema, table), (Some("public"), "orders"));
         self.controlled.store(true, Ordering::SeqCst);
         if self.fail {
@@ -91,7 +91,7 @@ impl Connection for ViewConnection {
         table: &str,
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
-        tablepro_core::check_pre_dispatch(control)?;
+        bookie_core::check_pre_dispatch(control)?;
         assert_eq!((schema, table), (Some("public"), "orders"));
         self.controlled.store(true, Ordering::SeqCst);
         if self.fail {
@@ -183,7 +183,7 @@ async fn session_forwards_catalog_listing_errors_and_controlled_dispatch() {
             }),
             _tunnel: None,
         };
-        let kind = tablepro_core::CatalogObjectKind::Trigger;
+        let kind = bookie_core::CatalogObjectKind::Trigger;
         let control = OperationControl::with_timeout(Duration::from_secs(1));
         let ordinary = session.list_objects(kind, Some("public")).await;
         let bounded = session.list_objects_controlled(kind, Some("public"), &control).await;
@@ -251,7 +251,7 @@ async fn session_preserves_controlled_constraint_metadata() {
 
 #[tokio::test]
 async fn session_forwards_checked_writes_and_result_sets_to_the_driver() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let inner: Arc<dyn Connection> = Arc::from(
         drivers_sqlite::SqliteDriver

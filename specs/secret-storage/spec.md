@@ -39,7 +39,7 @@ flowchart TD
 ```
 
 - **Absent vs failed.** `Ok(None)` means no matching item. `Err(StorageError::Keyring(_))` means the service could not be used.
-- **Profile identity.** Development builds use `com.tablepro.linux.Devel.Password`; release builds use `com.tablepro.linux.Password`.
+- **Profile identity.** Development builds use `com.bookie.linux.Devel.Password`; release builds use `com.bookie.linux.Password`.
 
 ## Data contracts
 
@@ -109,7 +109,7 @@ An absent item (`Ok(None)`) is not a keyring failure. `connect_options_for` then
 - An absent item MUST return `Ok(None)`.
 - Unavailable, locked or cancelled keyring access MUST return `StorageError::Keyring` with the matching `KeyringFailure`.
 - Saved connection assembly MUST propagate keyring failure and MUST NOT treat it as a missing password.
-- Development and release builds MUST use distinct secret schemas when `TABLEPRO_PROFILE=development` is compiled in.
+- Development and release builds MUST use distinct secret schemas when `BOOKIE_PROFILE=development` is compiled in.
 
 ## Invariants
 
@@ -121,7 +121,7 @@ An absent item (`Ok(None)`) is not a keyring failure. `connect_options_for` then
 
 | Flag | Effect |
 |------|--------|
-| `TABLEPRO_PROFILE=development` (compile-time) | `com.tablepro.linux.Devel.Password` and `tablepro-devel` XDG dir name. |
+| `BOOKIE_PROFILE=development` (compile-time) | `com.bookie.linux.Devel.Password` and `bookie-devel` XDG dir name. |
 | Desktop Secret Service | Required for persistent credentials. |
 
 ## Edge cases
@@ -144,7 +144,7 @@ Transport loads hop and legacy SSH secrets here, then opens the tunnel. Host-key
 
 ### governed-sql
 
-GUI-issued MCP token plaintext is returned once and best-effort stored here; issuance still succeeds if keyring storage fails. `bookie-agentd` instead emits plaintext once to stdout or an explicitly selected owner-only file. In both paths `tablepro-mcp` authenticates against the stored hash. Policy and audit never log the plaintext.
+GUI-issued MCP token plaintext is returned once and best-effort stored here; issuance still succeeds if keyring storage fails. `bookie-agentd` instead emits plaintext once to stdout or an explicitly selected owner-only file. In both paths `bookie-mcp` authenticates against the stored hash. Policy and audit never log the plaintext.
 
 ## Acceptance criteria
 
@@ -153,4 +153,4 @@ GUI-issued MCP token plaintext is returned once and best-effort stored here; iss
 - **Unavailable / locked / cancelled.** GIVEN those D-Bus errors WHEN `keyring_failure` runs THEN the variants are `Unavailable`, `Locked` and `UnlockCancelled`.
 - **Transport fail-closed.** GIVEN `StorageError::Keyring(_)` WHEN `secret_error` runs THEN the result is `TransportError::Keyring`.
 - **Hop revision.** GIVEN hop attributes for revision N WHEN compared with revision N+1 THEN the attribute maps differ.
-- **Devel schema.** GIVEN `TABLEPRO_PROFILE=development` WHEN `secret_schema()` is read THEN it is `com.tablepro.linux.Devel.Password`.
+- **Devel schema.** GIVEN `BOOKIE_PROFILE=development` WHEN `secret_schema()` is read THEN it is `com.bookie.linux.Devel.Password`.

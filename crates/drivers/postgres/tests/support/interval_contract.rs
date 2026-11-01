@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, OperationControl, Value};
+use bookie_core::{Connection, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 fn cases() -> Vec<(i32, i32, i64)> {
@@ -72,7 +72,7 @@ pub async fn assert_interval_contract(connection: &dyn Connection) {
                 &wire,
             )
             .await;
-            let json = tablepro_core::export::row_to_json(&result.columns, &result.rows[0]);
+            let json = bookie_core::export::row_to_json(&result.columns, &result.rows[0]);
             assert_eq!(
                 json["value"].as_str(),
                 match value {

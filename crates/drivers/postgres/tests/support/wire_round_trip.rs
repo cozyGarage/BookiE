@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{ColumnInfo, OperationControl, Session, Value};
+use bookie_core::{ColumnInfo, OperationControl, Session, Value};
 
 pub async fn assert_wire_round_trip(
     session: &mut dyn Session,
@@ -15,7 +15,7 @@ pub async fn assert_wire_round_trip(
     } else {
         format!("{kind}_send")
     };
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", value).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", value).unwrap();
     let sql = format!("SELECT encode({send}({literal}::{kind}), 'hex')");
     assert_eq!(
         &first_cell(session, control, &sql, &[]).await,
@@ -36,7 +36,7 @@ pub async fn assert_wire_round_trip(
     ] {
         session.query_params_controlled(&sql, &[], control).await.unwrap();
     }
-    let insert = tablepro_core::sql_literal::build_insert_literal(
+    let insert = bookie_core::sql_literal::build_insert_literal(
         "postgres",
         None,
         "wire_export_target",

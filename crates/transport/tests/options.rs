@@ -1,10 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::path::PathBuf;
 
-use tablepro_core::{AuthMode, Environment, TlsMode, Transport};
-use tablepro_ssh::SshAuth;
-use tablepro_storage::{SavedConnection, SavedSshAuth, SavedSshConfig};
-use tablepro_transport::{SshRoute, connect_options_for, saved_ssh_route};
+use bookie_core::{AuthMode, Environment, TlsMode, Transport};
+use bookie_ssh::SshAuth;
+use bookie_storage::{SavedConnection, SavedSshAuth, SavedSshConfig};
+use bookie_transport::{SshRoute, connect_options_for, saved_ssh_route};
 use uuid::Uuid;
 
 fn saved(tls_mode: Option<TlsMode>, use_tls: bool) -> SavedConnection {
@@ -79,11 +79,11 @@ async fn file_connections_do_not_require_secret_service() {
     connection.driver_id = "sqlite".into();
     connection.auth_mode = AuthMode::Password;
     connection.username.clear();
-    connection.database = "/tmp/tablepro.db".into();
+    connection.database = "/tmp/bookie.db".into();
 
     let opts = connect_options_for(&connection).await.expect("build file options");
 
-    assert_eq!(opts.database, "/tmp/tablepro.db");
+    assert_eq!(opts.database, "/tmp/bookie.db");
 }
 
 #[tokio::test]
@@ -101,14 +101,14 @@ async fn saved_client_certificate_and_key_reach_the_driver_options() {
 #[tokio::test]
 async fn a_saved_certificate_authority_reaches_the_driver() {
     let mut connection = saved(Some(TlsMode::VerifyFull), false);
-    connection.tls_root_cert = Some(PathBuf::from("/etc/tablepro/corp-ca.crt"));
+    connection.tls_root_cert = Some(PathBuf::from("/etc/bookie/corp-ca.crt"));
 
     let opts = connect_options_for(&connection).await.expect("build connect options");
 
     assert_eq!(opts.tls.mode, TlsMode::VerifyFull);
     assert_eq!(
         opts.tls.root_cert.as_deref(),
-        Some(std::path::Path::new("/etc/tablepro/corp-ca.crt"))
+        Some(std::path::Path::new("/etc/bookie/corp-ca.crt"))
     );
 }
 
@@ -123,7 +123,7 @@ async fn a_saved_local_socket_reaches_gui_and_agent_connection_options() {
     assert!(matches!(
         opts.transport(),
         Transport::Socket {
-            origin: tablepro_core::SocketOrigin::Local,
+            origin: bookie_core::SocketOrigin::Local,
             ..
         }
     ));
@@ -201,7 +201,7 @@ async fn a_tunnelled_connection_still_starts_from_the_database_hostname() {
 async fn an_openssh_connection_becomes_a_single_destination_and_refuses_a_saved_jump_chain() {
     let mut connection = saved(Some(TlsMode::VerifyFull), false);
     let mut single = hop("bastion.corp.example", 2222, "deploy", None);
-    single.client = tablepro_storage::SshClient::OpenSsh;
+    single.client = bookie_storage::SshClient::OpenSsh;
     connection.ssh = Some(single.clone());
 
     let Some(SshRoute::OpenSsh(config)) = saved_ssh_route(&connection).await.expect("resolve route") else {
@@ -233,12 +233,12 @@ async fn an_agent_hop_uses_the_agent_on_either_client_and_needs_no_keyring() {
     };
     assert!(matches!(chain[0].auth, SshAuth::Agent));
 
-    agent_hop.client = tablepro_storage::SshClient::OpenSsh;
+    agent_hop.client = bookie_storage::SshClient::OpenSsh;
     connection.ssh = Some(agent_hop);
     let Some(SshRoute::OpenSsh(config)) = saved_ssh_route(&connection).await.expect("resolve route") else {
         panic!("an OpenSSH route is configured");
     };
-    assert!(matches!(config.auth, tablepro_ssh::openssh::OpenSshAuth::Agent));
+    assert!(matches!(config.auth, bookie_ssh::openssh::OpenSshAuth::Agent));
 }
 
 #[tokio::test]

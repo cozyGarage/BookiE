@@ -2,8 +2,8 @@
 use std::io::Write;
 use std::path::Path;
 
-use tablepro_policy::Principal;
-use tablepro_storage::{AuditJournal, sample_event};
+use bookie_policy::Principal;
+use bookie_storage::{AuditJournal, sample_event};
 
 fn rewrite_hash_digit_of_first_record(path: &Path) {
     let text = std::fs::read_to_string(path).unwrap();

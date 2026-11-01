@@ -102,7 +102,7 @@ def scenarios(ui):
         time.sleep(ui.SETTLE_SECONDS)
         assert export.read_bytes() == b"existing file must survive"
         assert sorted(path.name for path in (base / "home").glob("*.xlsx")) == ["keep.xlsx"]
-        assert not list((base / "home").glob(".tablepro-export-*")), "cancel left a temporary export"
+        assert not list((base / "home").glob(".bookie-export-*")), "cancel left a temporary export"
         assert database_rows(database) == before, "cancel changed the source values"
 
     def workbook_empty_text_shows_error_without_creating_file(database, base):
@@ -120,7 +120,7 @@ def scenarios(ui):
         error = "Workbook export cannot preserve empty text at row 4, column 2. Export as CSV or JSON to keep empty text distinct from NULL"
         ui.wait_for_node(name=f"Writing {export} failed: {error}")
         assert not export.exists(), "lossy workbook was published"
-        assert not list((base / "home").glob(".tablepro-export-*")), "failure left a temporary export"
+        assert not list((base / "home").glob(".bookie-export-*")), "failure left a temporary export"
         assert database_rows(database) == before, "failed export changed the source values"
 
     result = [current_page_workbook_preserves_typed_values, cancelled_workbook_export_preserves_existing_file,

@@ -1,5 +1,5 @@
+use bookie_core::Value;
 use chrono::NaiveDate;
-use tablepro_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -44,7 +44,7 @@ async fn second_precision_datetime64_beyond_nanosecond_limit_round_trips() {
             .unwrap_or_else(|error| panic!("bound DateTime64({precision}) value: {error:?}"));
         assert_eq!(bound.rows, expected, "bound scale {precision} is exact");
 
-        let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(stamp))
+        let literal = bookie_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(stamp))
             .expect("representable DateTime64 value has a SQL literal");
         let exported = connection
             .query(&format!(

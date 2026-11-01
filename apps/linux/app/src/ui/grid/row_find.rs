@@ -1,9 +1,9 @@
 use std::io::{self, Write};
 use std::rc::Rc;
 
+use bookie_core::Value;
 use gtk4 as gtk;
 use libadwaita::{self as adw, prelude::*};
-use tablepro_core::Value;
 
 use super::display::{value_to_display_text, value_to_search_text};
 use crate::ui::row_object::RowObject;

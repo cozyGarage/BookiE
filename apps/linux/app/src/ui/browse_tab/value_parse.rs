@@ -1,5 +1,5 @@
+use bookie_core::{ColumnInfo, EnumInputStyle, Value};
 use chrono::{Datelike, Timelike};
-use tablepro_core::{ColumnInfo, EnumInputStyle, Value};
 
 pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Value, String> {
     let Some(col) = col else {
@@ -43,16 +43,16 @@ fn is_character_type(dt: &str) -> bool {
 
 pub(crate) fn mysql_enum_set_labels(data_type: &str) -> Option<(bool, Vec<String>)> {
     let is_set = data_type.trim().to_ascii_lowercase().starts_with("set");
-    tablepro_app_services::enum_input::declared_member_labels(data_type.trim()).map(|labels| (is_set, labels))
+    bookie_app_services::enum_input::declared_member_labels(data_type.trim()).map(|labels| (is_set, labels))
 }
 
 fn parse_enum_input(text: &str, col: Option<&ColumnInfo>, style: EnumInputStyle) -> Option<Result<Value, String>> {
-    tablepro_app_services::enum_input::parse_enum_input(text, col, style).map(|result| {
+    bookie_app_services::enum_input::parse_enum_input(text, col, style).map(|result| {
         result.map_err(|error| match error {
-            tablepro_app_services::enum_input::EnumInputError::InvalidMemberDeclaration => {
+            bookie_app_services::enum_input::EnumInputError::InvalidMemberDeclaration => {
                 crate::tr!("Could not safely read ENUM or SET members")
             }
-            tablepro_app_services::enum_input::EnumInputError::UndeclaredMember => {
+            bookie_app_services::enum_input::EnumInputError::UndeclaredMember => {
                 crate::tr!("Value is not a declared ENUM or SET member")
             }
         })
@@ -63,7 +63,7 @@ fn parse_enum_input(text: &str, col: Option<&ColumnInfo>, style: EnumInputStyle)
 fn registered_enum_input_style(driver_id: &str) -> EnumInputStyle {
     use std::sync::OnceLock;
 
-    static REGISTRY: OnceLock<tablepro_core::DriverRegistry> = OnceLock::new();
+    static REGISTRY: OnceLock<bookie_core::DriverRegistry> = OnceLock::new();
     REGISTRY
         .get_or_init(crate::build_registry)
         .get(driver_id)
@@ -106,13 +106,13 @@ pub(super) fn parse_input_for_driver_with_style(
     if driver_id == "sqlite"
         && col.is_some_and(|column| {
             classify_type(&column.data_type.to_ascii_lowercase()) == TypeKind::Text
-                && tablepro_core::sqlite_declared_type_has_numeric_affinity(&column.data_type)
+                && bookie_core::sqlite_declared_type_has_numeric_affinity(&column.data_type)
         })
     {
-        if let Some(value) = tablepro_core::sqlite_affinity_decimal(text) {
+        if let Some(value) = bookie_core::sqlite_affinity_decimal(text) {
             return Ok(Value::Decimal(value));
         }
-        return if tablepro_core::is_numeric_input(text) {
+        return if bookie_core::is_numeric_input(text) {
             Err(crate::tr!("Invalid number"))
         } else {
             Ok(Value::Text(text.to_owned()))
@@ -138,10 +138,10 @@ fn sqlite_numeric_affinity_fallback(text: &str, col: Option<&ColumnInfo>, driver
     {
         return None;
     }
-    if let Some(decimal) = tablepro_core::sqlite_affinity_decimal(text) {
+    if let Some(decimal) = bookie_core::sqlite_affinity_decimal(text) {
         return Some(Value::Decimal(decimal));
     }
-    (!tablepro_core::is_numeric_input(text)).then(|| Value::Text(text.to_owned()))
+    (!bookie_core::is_numeric_input(text)).then(|| Value::Text(text.to_owned()))
 }
 
 fn parse_special_driver_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
@@ -368,7 +368,7 @@ fn parse_postgres_extended_temporal_input(
             return None;
         }
         return Some(
-            tablepro_core::import::duckdb_extended_timestamptz_nanos(text)
+            bookie_core::import::duckdb_extended_timestamptz_nanos(text)
                 .filter(|nanos| nanos % 1_000 == 0)
                 .map(|_| Value::Text(text.replace('T', " ")))
                 .ok_or_else(|| crate::tr!("Invalid timestamp with time zone.")),
@@ -513,7 +513,7 @@ fn parse_duckdb_timestamptz_input(
             }
             return Ok(Value::TimestampTz(timestamp));
         }
-        let Some(nanos) = tablepro_core::import::duckdb_extended_timestamptz_nanos(text) else {
+        let Some(nanos) = bookie_core::import::duckdb_extended_timestamptz_nanos(text) else {
             return Err(crate::tr!("Invalid timestamp with time zone."));
         };
         if nanos % 1_000 != 0 {
@@ -818,7 +818,7 @@ pub(super) fn parse_int_value(text: &str) -> Result<Value, String> {
 }
 
 pub(super) fn parse_float_value(text: &str) -> Result<Value, String> {
-    tablepro_core::parse_float_input(text)
+    bookie_core::parse_float_input(text)
         .map(Value::Float)
         .map_err(|_| crate::tr!("Invalid number"))
 }

@@ -574,7 +574,7 @@ async fn list_objects_reports_an_unsupported_kind_and_audits_the_read_with_its_t
     );
 
     let error = guard
-        .list_objects(tablepro_core::CatalogObjectKind::Routine, Some("public"))
+        .list_objects(bookie_core::CatalogObjectKind::Routine, Some("public"))
         .await
         .expect_err("the mock driver declares no catalog kinds");
     assert!(matches!(error, DriverError::Unsupported(_)), "{error:?}");
@@ -608,7 +608,7 @@ async fn list_objects_is_denied_when_the_agent_read_intent_cannot_be_recorded() 
     );
 
     let error = guard
-        .list_objects(tablepro_core::CatalogObjectKind::Role, None)
+        .list_objects(bookie_core::CatalogObjectKind::Role, None)
         .await
         .expect_err("a failed read intent must deny the listing");
 
@@ -631,7 +631,7 @@ async fn list_objects_audit_target_leaves_out_the_schema_for_unscoped_kinds() {
     );
 
     let _ = guard
-        .list_objects(tablepro_core::CatalogObjectKind::Role, Some("public"))
+        .list_objects(bookie_core::CatalogObjectKind::Role, Some("public"))
         .await;
 
     let events = audit.events.lock().expect("event lock");

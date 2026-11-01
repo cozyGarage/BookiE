@@ -39,7 +39,7 @@ flowchart TD
 
 - **Dial target.** Where bytes are sent (forwarded socket or `127.0.0.1:ephemeral`).
 - **TLS service identity.** The hostname the certificate must match (the saved database host).
-- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/tablepro/known_hosts`, or `~/.config/tablepro/known_hosts` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend.
+- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/bookie/known_hosts`, or `~/.config/bookie/known_hosts` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend.
 
 ## Data contracts
 
@@ -175,7 +175,7 @@ Transport returns a driver connection. Policy starts after that handle is wrappe
 - **Refuse unknown.** GIVEN `UnknownHostKey::Refuse` AND no matching line WHEN verify_or_learn runs THEN the outcome is `HostKeyOutcome::Unknown` AND the file is unchanged.
 - **Changed key.** GIVEN a stored key that does not match WHEN verify runs THEN the outcome is `Changed` and the old line is not overwritten.
 - **Revoked key.** GIVEN a key marked `@revoked` for the host WHEN built-in verification runs THEN the connection is refused even if the key also appears in a normal entry, and no prompt or learn path runs.
-- **Relative XDG config path.** GIVEN `XDG_CONFIG_HOME` is relative WHEN the built-in known-host path is resolved THEN the path falls back to `$HOME/.config/tablepro/known_hosts`.
+- **Relative XDG config path.** GIVEN `XDG_CONFIG_HOME` is relative WHEN the built-in known-host path is resolved THEN the path falls back to `$HOME/.config/bookie/known_hosts`.
 - **Learn new.** GIVEN `UnknownHostKey::Learn` AND no matching line WHEN verify_or_learn succeeds THEN the outcome is `LearnedNew` AND a new line exists.
 - **Prompt decline.** GIVEN verify_or_prompt AND the prompter does not accept WHEN the key is unknown THEN the outcome is `Unknown` AND no line is added.
 - **TLS identity.** GIVEN SSH plus certificate verification WHEN transport assembles options THEN the TLS hostname is the saved database host, not the local forward.

@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_dialect::build_optimistic_keyed_update;
-use tablepro_core::{ColumnInfo, DriverError, Value};
+use bookie_core::sql_dialect::build_optimistic_keyed_update;
+use bookie_core::{ColumnInfo, DriverError, Value};
 
 fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
