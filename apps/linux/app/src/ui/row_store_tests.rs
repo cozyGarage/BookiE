@@ -1,6 +1,8 @@
 use super::*;
 use std::cell::Cell;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Instant;
 use tablepro_core::Value;
 
 fn rows(count: i64) -> Vec<Vec<Value>> {
@@ -264,6 +266,33 @@ fn projected_store_keeps_sql_null_distinct_from_an_unfetched_cell() {
 }
 
 #[test]
+fn projected_store_uses_sparse_reordered_column_mappings_for_rows_and_search() {
+    let result = Arc::new(QueryResult {
+        columns: vec![column("first"), column("second"), column("third")],
+        rows: vec![vec![Value::Int(11), Value::Int(22), Value::Int(33)]],
+        truncated: false,
+    });
+    let store = RowStore::from_projected(result, vec![3, 0, 2], 5).unwrap();
+    let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+    assert_eq!(row.cell_value(0), Value::Int(22));
+    assert_eq!(row.cell_value(1), Value::Undecodable("not fetched".into()));
+    assert_eq!(row.cell_value(2), Value::Int(33));
+    assert_eq!(row.cell_value(3), Value::Int(11));
+    assert_eq!(row.cell_value(4), Value::Undecodable("not fetched".into()));
+
+    let mut searched = Vec::new();
+    store.visit_search_cells(0, |column, value| {
+        searched.push((column, value.clone()));
+        false
+    });
+    assert_eq!(
+        searched,
+        vec![(0, Value::Int(22)), (2, Value::Int(33)), (3, Value::Int(11))]
+    );
+}
+
+#[test]
 fn search_visits_projected_cells_at_their_visible_columns() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("name")],
@@ -486,4 +515,62 @@ fn column(name: &str) -> tablepro_core::ColumnInfo {
         enum_type: None,
         domain_type: None,
     }
+}
+
+#[test]
+#[ignore]
+fn profile_projected_row_materialization_and_reads() {
+    let narrow = profile_projected_rows(100_000, 32, 13);
+    let wide = profile_projected_rows(1_000, 256, 73);
+    assert_profile_checksum(&narrow, 100_000, 32);
+    assert_profile_checksum(&wide, 1_000, 256);
+    println!("projected-row-profile narrow={narrow:?} wide={wide:?}");
+}
+
+fn profile_projected_rows(row_count: u32, column_count: usize, mapping_step: usize) -> Vec<(f64, i64)> {
+    let column_count_i64 = i64::try_from(column_count).unwrap();
+    let columns = (0..column_count)
+        .map(|index| column(&format!("column_{index}")))
+        .collect();
+    let rows = (0..row_count)
+        .map(|row| {
+            (0..column_count)
+                .map(|column| Value::Int(i64::from(row) * column_count_i64 + i64::try_from(column).unwrap()))
+                .collect()
+        })
+        .collect();
+    let result = Arc::new(QueryResult {
+        columns,
+        rows,
+        truncated: false,
+    });
+    let indices = (0..column_count)
+        .map(|source| (source * mapping_step) % column_count)
+        .collect::<Vec<_>>();
+    let mut samples = Vec::new();
+
+    for _ in 0..5 {
+        let store = RowStore::from_projected(Arc::clone(&result), indices.clone(), column_count).unwrap();
+        let started = Instant::now();
+        let mut total = 0i64;
+        for _ in 0..8 {
+            for position in 0..row_count {
+                let row = store.item(position).and_downcast::<RowObject>().unwrap();
+                for column in 0..column_count {
+                    if let Value::Int(value) = row.cell_value(column) {
+                        total = total.wrapping_add(value);
+                    }
+                }
+            }
+        }
+        samples.push((started.elapsed().as_secs_f64(), total));
+    }
+
+    samples
+}
+
+fn assert_profile_checksum(samples: &[(f64, i64)], row_count: u32, column_count: usize) {
+    let values = i64::from(row_count) * i64::try_from(column_count).unwrap();
+    let expected = values * (values - 1) / 2 * 8;
+    assert!(samples.iter().all(|(_, total)| *total == expected));
 }
