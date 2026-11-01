@@ -440,7 +440,7 @@ define_widget_slot!(
 );
 define_widget_slot!(POSITION_SLOT, PositionKey, u32, "tp-position");
 define_widget_slot!(SNAPSHOT_SLOT, SnapshotKey, EditSnapshot, "tp-snapshot");
-define_widget_slot!(ROW_KEY_SLOT, RowKeyKey, Vec<Value>, "tp-row-key");
+define_widget_slot!(ROW_KEY_SLOT, RowKeyKey, std::sync::Arc<[Value]>, "tp-row-key");
 define_widget_slot!(COLUMN_SLOT, ColumnKey, usize, "tp-column");
 define_widget_slot!(SUPPRESS_SLOT, SuppressKey, bool, "tp-suppress-toggle");
 define_widget_slot!(POPOVER_SLOT, PopoverKey, gtk4::Popover, "tp-popover");
@@ -473,7 +473,7 @@ pub(super) fn remember_clicked_cell(widget: &gtk4::Widget) {
         widget: widget.downgrade(),
         position,
         column,
-        row_key: ROW_KEY_SLOT.cloned(widget).unwrap_or_default(),
+        row_key: ROW_KEY_SLOT.cloned(widget).map_or_else(Vec::new, |key| key.to_vec()),
     };
     LAST_CLICKED_CELL.with(|slot| *slot.borrow_mut() = Some(clicked));
 }
@@ -494,7 +494,7 @@ pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, us
     let focused = gtk4::prelude::GtkWindowExt::focus(&window)?;
     let position = POSITION_SLOT.get(&focused)?;
     let column = COLUMN_SLOT.get(&focused)?;
-    let row_key = ROW_KEY_SLOT.cloned(&focused).unwrap_or_default();
+    let row_key = ROW_KEY_SLOT.cloned(&focused).map_or_else(Vec::new, |key| key.to_vec());
     Some((position, column, row_key))
 }
 

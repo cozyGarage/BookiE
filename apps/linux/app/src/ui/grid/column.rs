@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use gtk4::prelude::*;
 
 use tablepro_core::{ColumnInfo, Value};
@@ -241,12 +243,18 @@ fn bind_row_cell(
     context: &TabGridContext,
 ) {
     row.with_cell_value(index, |source_value| {
-        let pk_values = if context.tab_id.is_some() {
-            context.pk_col_indices.iter().map(|&i| row.cell_value(i)).collect()
+        let identity = if context.tab_id.is_some() {
+            Some(row.row_identity(&context.pk_col_indices))
         } else {
-            Vec::new()
+            None
         };
-        let (edited, updated_value, pending_classes) = state_for_bind(context, row, index, &pk_values, source_value);
+        let (edited, updated_value, pending_classes) = state_for_bind(
+            context,
+            row,
+            index,
+            identity.as_deref().and_then(|identity| identity.key.as_ref()),
+            source_value,
+        );
         let preview = preview_for_bind(row, index, edited);
         let value = value_for_bind(source_value, preview.as_ref(), updated_value.as_ref());
         let view = match (preview.as_ref(), value) {
@@ -260,7 +268,7 @@ fn bind_row_cell(
             value,
             CellBinding {
                 editable,
-                pk_values,
+                pk_values: identity.map_or_else(|| Arc::<[Value]>::from([]), |identity| identity.pk_values.clone()),
                 pending_classes,
                 column,
             },
@@ -272,7 +280,7 @@ fn state_for_bind(
     context: &TabGridContext,
     row: &crate::ui::row_object::RowObject,
     index: usize,
-    pk_values: &[Value],
+    key: Option<&crate::services::change_tracker::RowKey>,
     source_value: &Value,
 ) -> (bool, Option<Value>, Vec<&'static str>) {
     let Some(tab_id) = context.tab_id else {
@@ -281,7 +289,7 @@ fn state_for_bind(
     if row.draft_id().is_some() {
         return (false, None, vec!["tp-row-pending-insert"]);
     }
-    let Some(key) = crate::services::change_tracker::RowKey::from_pk_values(pk_values) else {
+    let Some(key) = key else {
         return (false, None, Vec::new());
     };
     crate::services::change_tracker::with_tab_ref(tab_id, |tracker| {
@@ -322,7 +330,7 @@ fn value_for_bind<'a>(
 
 struct CellBinding<'a> {
     editable: bool,
-    pk_values: Vec<Value>,
+    pk_values: std::sync::Arc<[Value]>,
     pending_classes: Vec<&'static str>,
     column: &'a ColumnInfo,
 }
