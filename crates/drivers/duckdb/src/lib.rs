@@ -17,6 +17,7 @@ use bookie_core::{
 use tempfile::TempDir;
 
 mod temporal;
+mod type_name;
 
 pub struct DuckdbDriver;
 
@@ -667,11 +668,7 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
                     .column_name(i)
                     .map(|s| s.to_string())
                     .unwrap_or_else(|_| format!("col{i}")),
-                data_type: if stmt_ref.column_logical_type(i).id() == LogicalTypeId::Uuid {
-                    "UUID".into()
-                } else {
-                    format!("{:?}", stmt_ref.column_type(i))
-                },
+                data_type: type_name::of(&stmt_ref.column_logical_type(i)),
                 nullable: true,
                 primary_key: false,
                 is_auto_increment: false,
