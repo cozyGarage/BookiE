@@ -161,7 +161,7 @@ pub enum AppMsg {
     ExportAllJson,
     ExportResults {
         scope: crate::ui::export_dialog::ExportScope,
-        result: QueryResult,
+        result: std::sync::Arc<QueryResult>,
         name: String,
     },
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
@@ -318,7 +318,9 @@ pub enum AppMsg {
         path: std::path::PathBuf,
     },
     CsvImportPrepared(Box<super::import::CsvImportPreparation>),
+    CsvImportPreparationFailed(Box<super::import::CsvImportPreparationFailure>),
     StartCsvImport(Box<crate::ui::import_dialog::ImportChoice>),
+    CsvImportPlanPrepared(Box<super::import::CsvImportPlanPreparation>),
     CsvImportProgress(u64),
     CsvImportFinished(Box<super::import::CsvImportReport>),
     BackUpDatabase,

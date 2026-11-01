@@ -7,7 +7,7 @@ use tablepro_core::{ColumnInfo, Value};
 use super::context_menu::GridMenus;
 use super::display::{
     COLUMN_SLOT, CellView, FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT,
-    ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view, value_to_full_edit_text,
+    ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view_with_column_editability, value_to_full_edit_text,
 };
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
@@ -138,6 +138,7 @@ pub(super) fn build_column(
 
     let editable_for_bind = editable && sender.is_some();
     let column_info = info.clone();
+    let column_is_editable = is_cell_editable(info);
     let tab_ctx_for_bind = tab_ctx.clone();
     factory.connect_bind(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
@@ -146,7 +147,15 @@ pub(super) fn build_column(
         let Some(row) = item.item().and_downcast::<crate::ui::row_object::RowObject>() else {
             return;
         };
-        bind_row_cell(item, &row, idx, editable_for_bind, &column_info, &tab_ctx_for_bind);
+        bind_row_cell(
+            item,
+            &row,
+            idx,
+            editable_for_bind,
+            &column_info,
+            &tab_ctx_for_bind,
+            column_is_editable,
+        );
     });
 
     factory.connect_unbind(|_, item| {
@@ -241,6 +250,7 @@ fn bind_row_cell(
     editable: bool,
     column: &ColumnInfo,
     context: &TabGridContext,
+    column_is_editable: bool,
 ) {
     row.with_cell_value(index, |source_value| {
         let identity = if context.tab_id.is_some() {
@@ -259,7 +269,7 @@ fn bind_row_cell(
         let value = value_for_bind(source_value, preview.as_ref(), updated_value.as_ref());
         let view = match (preview.as_ref(), value) {
             (Some(preview), _) => CellView::from_preview(preview),
-            (None, Some(value)) => cell_view(value, column),
+            (None, Some(value)) => cell_view_with_column_editability(value, column, column_is_editable),
             (None, None) => return,
         };
         bind_cell(
