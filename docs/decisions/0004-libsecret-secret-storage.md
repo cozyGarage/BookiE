@@ -13,7 +13,7 @@ Available choices include the Secret Service D-Bus API, desktop-specific keyring
 
 BookiE stores credentials through the Secret Service D-Bus API using the `oo7` Rust crate.
 
-Items use the schema `com.tablepro.linux.Password` with connection and secret-kind attributes. The storage crate exposes typed functions for database passwords, SSH passwords, SSH key passphrases, and GUI MCP tokens.
+Items use the schema `com.bookie.linux.Password` with connection and secret-kind attributes. The storage crate exposes typed functions for database passwords, SSH passwords, SSH key passphrases, and GUI MCP tokens.
 
 An absent keyring item returns `Ok(None)`. Unavailable, locked or cancelled Secret Service access returns a typed `StorageError`; saved transport assembly propagates the error and refuses connection assembly. Callers may offer recovery or an explicit credential prompt, but must not disguise failed access as an absent item. The application never falls back to a plain credential file.
 
@@ -21,7 +21,7 @@ An absent keyring item returns `Ok(None)`. Unavailable, locked or cancelled Secr
 
 Secret Service is supported by GNOME Keyring and KWallet compatibility services. It gives the application one desktop-neutral API and lets users inspect or remove credentials with their normal keyring tools.
 
-`oo7` provides an async Rust interface that fits the storage crate. Keeping access behind `tablepro-storage` prevents UI and driver code from creating inconsistent schemas or fallback behavior.
+`oo7` provides an async Rust interface that fits the storage crate. Keeping access behind `bookie-storage` prevents UI and driver code from creating inconsistent schemas or fallback behavior.
 
 ## Consequences
 
