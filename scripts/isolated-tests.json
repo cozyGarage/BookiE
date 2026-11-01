@@ -63,6 +63,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::pinned::tests::closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width"
     ],
     [
@@ -545,6 +550,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::stream_view::tests::live_eviction_visits_only_pages_evicted_since_the_previous_update"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
     ],
     [
@@ -586,6 +596,11 @@
       "tablepro-app",
       "--lib",
       "ui::import_dialog::tests::finishing_an_import_force_closes_the_non_user_closable_progress_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::import_dialog::tests::csv_preparation_progress_changes_from_spinner_to_row_count"
     ],
     [
       "tablepro-app",
