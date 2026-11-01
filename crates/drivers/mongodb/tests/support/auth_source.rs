@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::{MONGO_TAG, MongodbDriver, opts};
-use tablepro_core::{DatabaseDriver, DriverError};
+use bookie_core::{DatabaseDriver, DriverError};
 use testcontainers::ImageExt;
 use testcontainers_modules::mongo::Mongo;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -11,7 +11,7 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 async fn a_user_defined_in_admin_connects_to_another_database_through_the_auth_source() {
     let container = Mongo::default()
         .with_tag(MONGO_TAG)
-        .with_env_var("MONGO_INITDB_ROOT_USERNAME", "tablepro")
+        .with_env_var("MONGO_INITDB_ROOT_USERNAME", "bookie")
         .with_env_var("MONGO_INITDB_ROOT_PASSWORD", "correct-password")
         .start()
         .await
@@ -19,7 +19,7 @@ async fn a_user_defined_in_admin_connects_to_another_database_through_the_auth_s
     let host = container.get_host().await.expect("host").to_string();
     let port = container.get_host_port_ipv4(27017).await.expect("port");
     let mut options = opts(&host, port, "appdb");
-    options.username = "tablepro".into();
+    options.username = "bookie".into();
     options.password = secrecy::SecretString::new("correct-password".to_string().into());
     options.auth_source = Some("admin".into());
 

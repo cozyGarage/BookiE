@@ -9,7 +9,7 @@ use relm4::adw;
 use super::config_io::{atomic_write_bytes, atomic_write_json, xdg_config_path};
 use super::state_file::StateFile;
 
-pub use tablepro_app_services::preferences::{ColorSchemePref, NullDisplayPref, Preferences, ThemePref};
+pub use bookie_app_services::preferences::{ColorSchemePref, NullDisplayPref, Preferences, ThemePref};
 
 pub fn color_scheme_style(scheme: ColorSchemePref) -> adw::ColorScheme {
     match scheme {
@@ -20,7 +20,7 @@ pub fn color_scheme_style(scheme: ColorSchemePref) -> adw::ColorScheme {
 }
 
 #[cfg(test)]
-const SETTINGS_SCHEMA: &str = "com.tablepro.linux";
+const SETTINGS_SCHEMA: &str = "com.bookie.linux";
 const SETTINGS_MIGRATION_VERSION: u32 = 1;
 
 /// Preferences are shared explicitly rather than through a global. GSettings
@@ -137,9 +137,9 @@ fn settings_path() -> &'static str {
 
 fn settings_path_for_profile(profile: crate::config::Profile) -> &'static str {
     if profile == crate::config::Profile::Development {
-        "/com/tablepro/linux/Devel/"
+        "/com/bookie/linux/Devel/"
     } else {
-        "/com/tablepro/linux/"
+        "/com/bookie/linux/"
     }
 }
 
@@ -151,7 +151,7 @@ fn schema_directory() -> PathBuf {
     std::env::var_os("GSETTINGS_SCHEMA_DIR")
         .filter(|directory| !directory.is_empty())
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("TABLEPRO_GSETTINGS_SCHEMA_DIR")))
+        .unwrap_or_else(|| PathBuf::from(env!("BOOKIE_GSETTINGS_SCHEMA_DIR")))
 }
 
 fn open_settings() -> Result<gio::Settings, String> {

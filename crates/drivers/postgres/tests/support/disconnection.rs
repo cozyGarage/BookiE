@@ -316,7 +316,7 @@ async fn a_restarted_postgres_server_restores_the_existing_pool() {
         database: "postgres".into(),
         username: "postgres".into(),
         password: secrecy::SecretString::new("postgres".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     };
     let connection: std::sync::Arc<dyn Connection> = PgDriver.connect(opts).await.expect("connect").into();

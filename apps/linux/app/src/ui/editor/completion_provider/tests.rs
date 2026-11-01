@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::SqlGrammar;
 
 fn fixture(
     sql: &str,

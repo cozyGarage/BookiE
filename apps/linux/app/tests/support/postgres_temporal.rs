@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn postgres_extended_temporal_grid_edits_preserve_native_values() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -69,7 +69,7 @@ async fn postgres_extended_temporal_grid_edits_preserve_native_values() {
         let value_index = columns.iter().position(|column| column.name == "value").unwrap();
         let parsed = parse_input_for_driver(text, Some(&columns[value_index]), "postgres").unwrap();
         assert_eq!(parsed, Value::Text(text.into()));
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "postgres",
             None,
             table,

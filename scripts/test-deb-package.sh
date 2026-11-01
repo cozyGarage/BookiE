@@ -44,9 +44,9 @@ for base in "${images[@]}"; do
       deb=$(ls /work/out/bookie_*.deb)
     fi
     dpkg-deb --info "$deb" | sed -n "1,12p"
-    mkdir -p ~/.config/tablepro ~/.local/share/tablepro
-    echo keep > ~/.config/tablepro/connections.json
-    echo keep > ~/.local/share/tablepro/history.db
+    mkdir -p ~/.config/bookie ~/.local/share/bookie
+    echo keep > ~/.config/bookie/connections.json
+    echo keep > ~/.local/share/bookie/history.db
     older=$deb
     older_version=$(dpkg-deb -f "$older" Version)
     newer_version="${older_version}+bookietest1"
@@ -56,8 +56,8 @@ for base in "${images[@]}"; do
     dpkg-deb --root-owner-group --build /work/repack "$newer" >/dev/null
     installed_version() { dpkg-query -W -f="\${Version}" bookie; }
     keeps_user_data() {
-      test "$(cat ~/.config/tablepro/connections.json)" = keep
-      test "$(cat ~/.local/share/tablepro/history.db)" = keep
+      test "$(cat ~/.config/bookie/connections.json)" = keep
+      test "$(cat ~/.local/share/bookie/history.db)" = keep
     }
     apt-get install -y -qq "$older" >/dev/null
     bash /src/scripts/check-installed-deb.sh
@@ -90,6 +90,6 @@ for base in "${images[@]}"; do
     apt-get purge -y -qq bookie >/dev/null
     test ! -e /usr/bin/bookie
     keeps_user_data
-    echo "install, reinstall, upgrade, downgrade and purge keep the user data under the tablepro paths"
+    echo "install, reinstall, upgrade, downgrade and purge keep the user data under the bookie paths"
   '
 done

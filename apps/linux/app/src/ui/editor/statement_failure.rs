@@ -14,9 +14,9 @@ pub struct StatementFailure {
 }
 
 impl StatementFailure {
-    pub(super) fn located(error: &tablepro_core::DriverError, written: &str, sent: &str) -> Self {
+    pub(super) fn located(error: &bookie_core::DriverError, written: &str, sent: &str) -> Self {
         let position = match error {
-            tablepro_core::DriverError::Query { position, .. } if sent == written => {
+            bookie_core::DriverError::Query { position, .. } if sent == written => {
                 position.filter(|position| super::error_location::line_and_column(written, *position).is_some())
             }
             _ => None,
@@ -32,7 +32,7 @@ impl StatementFailure {
 
     pub(super) fn with_audit_receipts(
         mut self,
-        receipts: impl IntoIterator<Item = tablepro_policy::AuditReceipt>,
+        receipts: impl IntoIterator<Item = bookie_policy::AuditReceipt>,
     ) -> Self {
         self.audit_operation_ids = receipts.into_iter().map(|receipt| receipt.operation_id).collect();
         self

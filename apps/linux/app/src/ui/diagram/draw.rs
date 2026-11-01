@@ -4,8 +4,8 @@ use relm4::gtk::prelude::*;
 use relm4::gtk::{self, gdk, graphene, gsk, pango};
 
 use super::card_text::{CardText, PAD_X, size};
-use tablepro_app_services::er_diagram::SchemaDiagram;
-use tablepro_app_services::er_diagram::scene::{Card, EdgePath, Rect};
+use bookie_app_services::er_diagram::SchemaDiagram;
+use bookie_app_services::er_diagram::scene::{Card, EdgePath, Rect};
 
 use super::palette::Palette;
 

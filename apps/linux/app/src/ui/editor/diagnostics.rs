@@ -1,10 +1,10 @@
 use adw::prelude::*;
+use bookie_core::sql_diagnostics::{character_range, scan};
 use relm4::{adw, gtk};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
 };
-use tablepro_core::sql_diagnostics::{character_range, scan};
 
 pub(super) struct Diagnostics {
     buffer: gtk::TextBuffer,

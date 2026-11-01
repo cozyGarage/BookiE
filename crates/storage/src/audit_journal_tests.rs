@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_policy::Principal;
+use bookie_policy::Principal;
 use tempfile::TempDir;
 
 #[tokio::test]

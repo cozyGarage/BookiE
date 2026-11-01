@@ -148,7 +148,7 @@ fn null_binary_and_undecodable_values_keep_their_search_labels() {
 fn a_long_cell_remains_searchable_beyond_its_visible_preview() {
     let text = format!("{}needle", "😀".repeat(10_001));
     assert!(!crate::ui::grid::display::value_to_display_text(&Value::Text(text.clone())).contains("needle"));
-    let result = std::sync::Arc::new(tablepro_core::QueryResult {
+    let result = std::sync::Arc::new(bookie_core::QueryResult {
         columns: Vec::new(),
         rows: vec![vec![Value::Int(1), Value::Text(text)]],
         truncated: false,
@@ -195,7 +195,7 @@ fn large_shared_value_search_has_bounded_temporary_memory() {
             "json" => Value::Json(Box::new(serde_json::Value::String(text))),
             _ => panic!("unknown row search fixture kind"),
         };
-        let result = std::sync::Arc::new(tablepro_core::QueryResult {
+        let result = std::sync::Arc::new(bookie_core::QueryResult {
             columns: Vec::new(),
             rows: vec![vec![value]],
             truncated: false,

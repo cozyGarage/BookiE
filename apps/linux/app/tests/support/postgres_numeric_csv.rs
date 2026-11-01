@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn postgres_numeric_parser_outputs_round_trip_through_server() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -47,7 +47,7 @@ async fn postgres_numeric_parser_outputs_round_trip_through_server() {
         }
         let parsed = parse_input_for_driver(VALUE, Some(&columns[amount]), "postgres").unwrap();
         assert_eq!(parsed, Value::Text(VALUE.into()));
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "postgres",
             None,
             table,
@@ -74,7 +74,7 @@ async fn postgres_numeric_parser_outputs_round_trip_through_server() {
             for special in ["NaN", "Infinity", "-Infinity"] {
                 let parsed = parse_input_for_driver(special, Some(&columns[amount]), "postgres").unwrap();
                 assert_eq!(parsed, Value::Text(special.into()));
-                let update = tablepro_core::sql_dialect::build_keyed_update(
+                let update = bookie_core::sql_dialect::build_keyed_update(
                     "postgres",
                     None,
                     table,
@@ -126,7 +126,7 @@ async fn postgres_numeric_parser_outputs_round_trip_through_server() {
     let value = columns.iter().position(|column| column.name == "value").unwrap();
     let literal = r#"{"a  b"," c "}"#;
     let parsed = parse_input_for_grid_cell(literal, Some(&columns[value]), "postgres", None).unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "parser_text_array_edit",
@@ -178,7 +178,7 @@ async fn postgres_numeric_parser_outputs_round_trip_through_server() {
     let amount = columns.iter().position(|column| column.name == "amount").unwrap();
     let parsed = parse_input_for_driver(&maximum_scale_value, Some(&columns[amount]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(maximum_scale_value.clone()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "parser_numeric_max_scale",
@@ -225,7 +225,7 @@ async fn postgres_numeric_parser_outputs_round_trip_through_server() {
     let amount = columns.iter().position(|column| column.name == "amount").unwrap();
     let parsed = parse_input_for_driver(&maximum_integer_value, Some(&columns[amount]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(maximum_integer_value.clone()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "parser_numeric_max_integer",

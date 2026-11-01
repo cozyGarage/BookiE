@@ -90,13 +90,13 @@ async fn sqlite_real_binding_refuses_negative_zero_and_nan() {
             .await
             .expect_err(boundary);
         assert!(
-            matches!(error, tablepro_core::DriverError::Unsupported(_)),
+            matches!(error, bookie_core::DriverError::Unsupported(_)),
             "{boundary}: {error:?}"
         );
     }
 
     let columns = connection.fetch_columns(None, "float_edges").await.unwrap();
-    let literal_error = tablepro_core::sql_literal::build_insert_literal(
+    let literal_error = bookie_core::sql_literal::build_insert_literal(
         "sqlite",
         None,
         "float_edges",
@@ -106,7 +106,7 @@ async fn sqlite_real_binding_refuses_negative_zero_and_nan() {
     .expect_err("SQLite SQL export must not erase negative zero");
     assert!(matches!(
         literal_error,
-        tablepro_core::sql_dialect::BuildSqlError::UnrepresentableValue { column } if column == "value"
+        bookie_core::sql_dialect::BuildSqlError::UnrepresentableValue { column } if column == "value"
     ));
 
     let after_refusal = connection.query("SELECT count(*) FROM float_edges").await.unwrap();

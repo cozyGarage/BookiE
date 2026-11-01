@@ -47,7 +47,7 @@ async fn server_loss_during_multi_result_stream_rejects_the_whole_query() {
     let (container, opts) = start_mssql_durable().await;
     let streaming_connection = connect(opts.clone()).await;
     let admin_connection = connect(opts.clone()).await;
-    let sql = "/* tablepro_disconnect_stream_probe */ SELECT CAST(1 AS int) AS n; WAITFOR DELAY '00:00:20'; SELECT CAST(2 AS int) AS n";
+    let sql = "/* bookie_disconnect_stream_probe */ SELECT CAST(1 AS int) AS n; WAITFOR DELAY '00:00:20'; SELECT CAST(2 AS int) AS n";
     let query = tokio::spawn(async move { streaming_connection.query(sql).await });
 
     let mut active = false;
@@ -57,7 +57,7 @@ async fn server_loss_during_multi_result_stream_rejects_the_whole_query() {
                 "SELECT COUNT(*) AS active_count FROM sys.dm_exec_requests r \
                  CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t \
                  WHERE r.session_id <> @@SPID \
-                   AND t.text LIKE N'%tablepro_disconnect_stream_probe%'",
+                   AND t.text LIKE N'%bookie_disconnect_stream_probe%'",
             )
             .await
             .expect("inspect SQL Server active requests");
@@ -192,7 +192,7 @@ async fn a_disconnected_session_is_retired_after_server_loss() {
     let connection = connect(opts.clone()).await;
     let observer = connect(opts).await;
     let mut session = connection.open_session().await.expect("open session");
-    let tag = "tablepro_session_disconnect_probe";
+    let tag = "bookie_session_disconnect_probe";
     let query = tokio::spawn(async move {
         let result = session
             .query_params_controlled(

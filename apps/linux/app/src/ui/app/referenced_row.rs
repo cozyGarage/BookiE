@@ -60,7 +60,7 @@ impl App {
         &mut self,
         schema: Option<String>,
         table: String,
-        filter: tablepro_core::FilterSet,
+        filter: bookie_core::FilterSet,
         sender: ComponentSender<Self>,
     ) {
         let existing = self.workspace_tabs.borrow().iter().find_map(|(id, tab)| match tab {

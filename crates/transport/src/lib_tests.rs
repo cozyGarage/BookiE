@@ -1,6 +1,6 @@
 use super::*;
 use crate::credential_tests::key_hop;
-use tablepro_policy::{AuditEvent, AuditTerminalStatus, AuditTransportClient};
+use bookie_policy::{AuditEvent, AuditTerminalStatus, AuditTransportClient};
 
 #[path = "tests/../tool_endpoint_tests.rs"]
 mod tool_endpoint_tests;
@@ -10,7 +10,7 @@ struct RecordingAudit(std::sync::Mutex<Vec<AuditEvent>>);
 
 #[async_trait::async_trait]
 impl AuditSink for RecordingAudit {
-    async fn record(&self, event: AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+    async fn record(&self, event: AuditEvent) -> Result<(), bookie_policy::AuditError> {
         self.0.lock().expect("audit events").push(event);
         Ok(())
     }
@@ -20,13 +20,13 @@ struct FailingAudit;
 
 #[async_trait::async_trait]
 impl AuditSink for FailingAudit {
-    async fn record(&self, _event: AuditEvent) -> Result<(), tablepro_policy::AuditError> {
-        Err(tablepro_policy::AuditError::Persistence("disk full".into()))
+    async fn record(&self, _event: AuditEvent) -> Result<(), bookie_policy::AuditError> {
+        Err(bookie_policy::AuditError::Persistence("disk full".into()))
     }
 }
 
 fn audit_environment(sink: Arc<dyn AuditSink>, state: Arc<AuditState>) -> SshEnvironment {
-    SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse).with_audit(TransportAuditContext::new(
+    SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse).with_audit(TransportAuditContext::new(
         sink,
         state,
         Principal::Agent {
@@ -123,7 +123,7 @@ async fn cancelled_ssh_attempt_writes_one_terminal_redacted_record() {
     assert!(matches!(result, Err(TransportError::Cancelled)));
     let events = sink.0.lock().expect("audit events");
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].phase, tablepro_policy::AuditRecordPhase::Outcome);
+    assert_eq!(events[0].phase, bookie_policy::AuditRecordPhase::Outcome);
     assert_eq!(events[0].terminal_status, AuditTerminalStatus::Cancelled);
     assert_eq!(
         events[0].transport_attempt.unwrap().client,
@@ -438,17 +438,17 @@ fn socket_forwarding_keeps_the_service_hostname_for_tls() {
     forward_through_socket(
         &mut opts,
         ("db.corp.example".into(), 5432),
-        std::path::PathBuf::from("/run/user/1000/tablepro-ssh-abc"),
+        std::path::PathBuf::from("/run/user/1000/bookie-ssh-abc"),
     );
 
     assert_eq!(opts.service_address(), ("db.corp.example", 5432));
     assert_eq!(
         opts.transport(),
-        tablepro_core::Transport::Socket {
-            directory: std::path::Path::new("/run/user/1000/tablepro-ssh-abc"),
+        bookie_core::Transport::Socket {
+            directory: std::path::Path::new("/run/user/1000/bookie-ssh-abc"),
             identity_host: "db.corp.example",
             identity_port: 5432,
-            origin: tablepro_core::SocketOrigin::Forwarded,
+            origin: bookie_core::SocketOrigin::Forwarded,
         }
     );
 }
@@ -467,7 +467,7 @@ fn tcp_forwarding_clears_any_earlier_socket_directory() {
     assert!(opts.forwarded_socket_dir.is_none());
     assert_eq!(
         opts.transport(),
-        tablepro_core::Transport::Tcp {
+        bookie_core::Transport::Tcp {
             host: "127.0.0.1",
             port: 54321
         }
@@ -487,7 +487,7 @@ async fn establish_never_reuses_a_socket_directory_from_an_earlier_attempt() {
         &SocketDriver,
         opts,
         None,
-        &SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        &SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     )
     .await
     .err()
@@ -586,7 +586,7 @@ async fn password_auth_uses_the_secret_bound_to_each_hop() {
         ..key_hop("root.example")
     };
     let hops = root.flatten_hops();
-    tablepro_storage::store_ssh_hop_password(
+    bookie_storage::store_ssh_hop_password(
         connection_id,
         hops[0].hop_id,
         hops[0].credential_revision,
@@ -595,7 +595,7 @@ async fn password_auth_uses_the_secret_bound_to_each_hop() {
     )
     .await
     .unwrap();
-    tablepro_storage::store_ssh_hop_password(
+    bookie_storage::store_ssh_hop_password(
         connection_id,
         hops[1].hop_id,
         hops[1].credential_revision,
@@ -615,7 +615,7 @@ async fn password_auth_uses_the_secret_bound_to_each_hop() {
         .collect::<Vec<_>>();
 
     for hop in hops {
-        tablepro_storage::delete_ssh_hop_password(connection_id, hop.hop_id, hop.credential_revision)
+        bookie_storage::delete_ssh_hop_password(connection_id, hop.hop_id, hop.credential_revision)
             .await
             .unwrap();
     }
@@ -629,7 +629,7 @@ mod ssh_passphrase_tests;
 #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
 async fn legacy_jump_key_passphrase_is_refused_before_keyring_access() {
     let connection_id = Uuid::new_v4();
-    tablepro_storage::store_ssh_passphrase(connection_id, "root-passphrase", "BookiE test legacy SSH passphrase")
+    bookie_storage::store_ssh_passphrase(connection_id, "root-passphrase", "BookiE test legacy SSH passphrase")
         .await
         .unwrap();
     let bastion = SavedSshConfig {
@@ -646,7 +646,7 @@ async fn legacy_jump_key_passphrase_is_refused_before_keyring_access() {
     let error = resolve_saved_ssh_chain(connection_id, &bastion)
         .await
         .expect_err("legacy root passphrase must not be reused for a jump key");
-    tablepro_storage::delete_ssh_passphrase(connection_id).await.unwrap();
+    bookie_storage::delete_ssh_passphrase(connection_id).await.unwrap();
 
     let message = error.to_string();
     assert!(message.contains("hop 1"), "unexpected error: {message}");

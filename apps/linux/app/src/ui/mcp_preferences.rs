@@ -5,7 +5,7 @@ use relm4::{adw, gtk};
 
 use std::sync::Arc;
 
-use tablepro_mcp::{McpBridge, TokenPermissions};
+use bookie_mcp::{McpBridge, TokenPermissions};
 
 use crate::services::mcp_service;
 use crate::tr;
@@ -96,7 +96,7 @@ pub fn build_page(
         let parent = page_for_dialog.clone();
         let bridge = bridge_for_issue.clone();
         glib::spawn_future_local(async move {
-            let allowlist = match tablepro_storage::load_connections().await {
+            let allowlist = match bookie_storage::load_connections().await {
                 Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
                 Err(e) => {
                     let msg = format!("could not load connections: {e}");

@@ -1,12 +1,12 @@
 //! Host timing for one completion lookup. Prints one JSON array; run it several times and compare medians.
-//!   cargo run --release -p tablepro-app-services --example completion_benchmark
+//!   cargo run --release -p bookie-app-services --example completion_benchmark
 use std::error::Error;
 use std::io::Write;
 use std::time::Instant;
 
-use tablepro_app_services::completion::SchemaIndex;
-use tablepro_app_services::completion_proposals::candidates;
-use tablepro_core::sql_syntax::SqlGrammar;
+use bookie_app_services::completion::SchemaIndex;
+use bookie_app_services::completion_proposals::candidates;
+use bookie_core::sql_syntax::SqlGrammar;
 
 const CATALOG_SIZES: [usize; 3] = [1_000, 10_000, 100_000];
 const SCRIPT_STATEMENTS: [usize; 3] = [100, 2_000, 20_000];

@@ -77,8 +77,8 @@ fn an_unverified_paged_export_never_opens_its_source_or_replaces_a_file() {
 fn a_loaded_result_still_exports_successfully() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("result.csv");
-    let source = JobSource::Loaded(Arc::new(tablepro_core::QueryResult {
-        columns: vec![tablepro_core::ColumnInfo {
+    let source = JobSource::Loaded(Arc::new(bookie_core::QueryResult {
+        columns: vec![bookie_core::ColumnInfo {
             name: "label".into(),
             data_type: "text".into(),
             nullable: true,
@@ -91,7 +91,7 @@ fn a_loaded_result_still_exports_successfully() {
             enum_type: None,
             domain_type: None,
         }],
-        rows: vec![vec![tablepro_core::Value::Text("hello, export".into())]],
+        rows: vec![vec![bookie_core::Value::Text("hello, export".into())]],
         truncated: false,
     }));
     write_export(
@@ -111,7 +111,7 @@ fn a_guarded_query_export_finishes_its_source_after_writing() {
     let finished_source = finished.clone();
     let source = JobSource::Paged {
         mode: super::super::PagedExportMode::GuardedQuery,
-        columns: vec![tablepro_core::ColumnInfo {
+        columns: vec![bookie_core::ColumnInfo {
             name: "id".into(),
             data_type: "BIGINT".into(),
             nullable: false,
@@ -134,7 +134,7 @@ fn a_guarded_query_export_finishes_its_source_after_writing() {
                         return Ok(None);
                     }
                     sent = true;
-                    Ok(Some(vec![vec![tablepro_core::Value::Int(42)]]))
+                    Ok(Some(vec![vec![bookie_core::Value::Int(42)]]))
                 },
                 move || {
                     finished.store(true, Ordering::SeqCst);
@@ -164,7 +164,7 @@ fn a_cancelled_guarded_query_export_still_finishes_its_source() {
     let finished_source = finished.clone();
     let source = JobSource::Paged {
         mode: super::super::PagedExportMode::GuardedQuery,
-        columns: vec![tablepro_core::ColumnInfo {
+        columns: vec![bookie_core::ColumnInfo {
             name: "id".into(),
             data_type: "BIGINT".into(),
             nullable: false,
@@ -188,7 +188,7 @@ fn a_cancelled_guarded_query_export_still_finishes_its_source() {
                     }
                     sent = true;
                     cancel.cancel();
-                    Ok(Some(vec![vec![tablepro_core::Value::Int(42)]]))
+                    Ok(Some(vec![vec![bookie_core::Value::Int(42)]]))
                 },
                 move || {
                     finished.store(true, Ordering::SeqCst);

@@ -5,7 +5,7 @@
 //! Run it through `scripts/smoke-postgres.sh`, or directly:
 //!
 //! ```text
-//! cargo test -p tablepro-driver-postgres --test smoke_local -- --include-ignored
+//! cargo test -p bookie-driver-postgres --test smoke_local -- --include-ignored
 //! ```
 //!
 //! Env: SMOKE_PG_HOST, SMOKE_PG_PORT, SMOKE_PG_USER, SMOKE_PG_PASS, SMOKE_PG_DB.
@@ -15,24 +15,24 @@
 //! The test creates, truncates and drops its own table, so point it at a
 //! scratch database.
 
+use bookie_core::{ConnectOptions, DatabaseDriver, Value};
 use drivers_postgres::PgDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, Value};
 
-const TABLE: &str = "tablepro_smoke_items";
+const TABLE: &str = "bookie_smoke_items";
 const DEFAULT_PORT: u16 = 54329;
 
 fn opts_from_env() -> ConnectOptions {
     ConnectOptions {
         host: std::env::var("SMOKE_PG_HOST").unwrap_or_else(|_| "127.0.0.1".into()),
         port: port_from_env(),
-        database: std::env::var("SMOKE_PG_DB").unwrap_or_else(|_| "tablepro".into()),
-        username: std::env::var("SMOKE_PG_USER").unwrap_or_else(|_| "tablepro".into()),
+        database: std::env::var("SMOKE_PG_DB").unwrap_or_else(|_| "bookie".into()),
+        username: std::env::var("SMOKE_PG_USER").unwrap_or_else(|_| "bookie".into()),
         password: secrecy::SecretString::new(
             std::env::var("SMOKE_PG_PASS")
-                .unwrap_or_else(|_| "tablepro".into())
+                .unwrap_or_else(|_| "bookie".into())
                 .into(),
         ),
-        tls: tablepro_core::TlsConfig::disabled(),
+        tls: bookie_core::TlsConfig::disabled(),
         ..Default::default()
     }
 }

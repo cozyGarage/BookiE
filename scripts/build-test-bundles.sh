@@ -15,9 +15,9 @@ output=$(realpath "$output")
 export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-8}
 export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"
 for group in "${groups[@]}"; do
-  selection=(--workspace --exclude tablepro-driver-duckdb)
+  selection=(--workspace --exclude bookie-driver-duckdb)
   if [[ "$group" == duckdb ]]; then
-    selection=(-p tablepro-driver-duckdb -p tablepro-app --features tablepro-app/duckdb)
+    selection=(-p bookie-driver-duckdb -p bookie-app --features bookie-app/duckdb)
   fi
   cargo test --locked "${selection[@]}" --lib --bins --tests --no-run --message-format=json > "$output/$group-build.jsonl"
   nextest="$(bash scripts/ensure-nextest.sh)"

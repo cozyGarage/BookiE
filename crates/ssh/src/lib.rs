@@ -179,7 +179,7 @@ impl LocalSocketDir {
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|elapsed| elapsed.as_nanos())
                     .unwrap_or_default();
-                let path = base.join(format!("tablepro-ssh-{}-{unique}", std::process::id()));
+                let path = base.join(format!("bookie-ssh-{}-{unique}", std::process::id()));
                 if !socket_dir_path_fits(path.as_os_str().len(), socket_name_len) {
                     break;
                 }

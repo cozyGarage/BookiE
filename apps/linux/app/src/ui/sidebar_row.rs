@@ -7,7 +7,7 @@ use relm4::gtk::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use tablepro_core::TableInfo;
+use bookie_core::TableInfo;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarObjectKind {
@@ -483,7 +483,7 @@ impl FactoryComponent for SidebarRow {
 
     fn update(&mut self, msg: Self::Input, sender: FactorySender<Self>) {
         tracing::trace!(
-            target: "tablepro_app::sidebar_row",
+            target: "bookie_app::sidebar_row",
             table = %self.info.name,
             ?msg,
             "input"

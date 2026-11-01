@@ -5,8 +5,8 @@ use relm4::{adw, gtk};
 
 use std::sync::Arc;
 
-use tablepro_core::DriverRegistry;
-use tablepro_storage::{ConnectionOrganizationIndex, SavedConnection, arrange_connections};
+use bookie_core::DriverRegistry;
+use bookie_storage::{ConnectionOrganizationIndex, SavedConnection, arrange_connections};
 use uuid::Uuid;
 
 use super::connection_row::{ConnectionRow, ConnectionRowInit, ConnectionRowOutput};
@@ -265,7 +265,7 @@ const FILTER_REVEAL_THRESHOLD: usize = 6;
 impl WelcomeView {
     fn rebuild_rows(&mut self, sender: &ComponentSender<Self>) {
         // Favourites first, then group, then name — the ordering lives
-        // in tablepro-storage so the same arrangement is testable
+        // in bookie-storage so the same arrangement is testable
         // without a GTK main context. Recency is a deliberate casualty:
         // an explicit favourite outranks "whatever I opened last".
         let arranged = arrange_connections(&self.connections, &self.organization, &self.filter);
@@ -390,8 +390,8 @@ fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::{AuthMode, Environment, TlsMode};
-    use tablepro_storage::ConnectionOrganization;
+    use bookie_core::{AuthMode, Environment, TlsMode};
+    use bookie_storage::ConnectionOrganization;
 
     fn saved(name: &str) -> SavedConnection {
         SavedConnection {

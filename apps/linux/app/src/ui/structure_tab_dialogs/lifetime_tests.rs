@@ -29,7 +29,7 @@ fn submitting_foreign_key_setup_updates_preview_and_releases_its_dialog() {
 fn assert_form_released(title: &str, submit: bool) {
     adw::init().unwrap();
     let application = adw::Application::builder()
-        .application_id("com.tablepro.linux.structure-lifetime-test")
+        .application_id("com.bookie.linux.structure-lifetime-test")
         .build();
     application.register(None::<&gtk::gio::Cancellable>).unwrap();
     let window = adw::ApplicationWindow::new(&application);

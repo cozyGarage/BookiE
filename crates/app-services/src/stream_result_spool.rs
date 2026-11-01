@@ -6,10 +6,10 @@ use std::sync::{Arc, Mutex};
 
 use aes_gcm::aead::{Aead, KeyInit, Payload, consts::U12};
 use aes_gcm::{Aes256Gcm, Nonce};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use secrecy::{ExposeSecret, SecretBox};
 use serde::ser::{SerializeSeq, SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 use thiserror::Error;
 
 const FRAME_VERSION: u8 = 1;

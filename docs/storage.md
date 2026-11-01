@@ -1,12 +1,16 @@
 # Storage
 
-BookiE uses XDG files for local state, SQLite for query history, a JSONL audit journal, and Secret Service for credentials. Paths and schemas stay under the `tablepro` / `com.tablepro.linux` rename boundary. The code is split between `tablepro-storage` and focused application services.
+BookiE uses XDG files for local state, SQLite for query history, a JSONL audit journal, and Secret Service for credentials. Paths and schemas use `bookie` / `com.bookie.linux`; state from the former `tablepro` names is copied forward on first start. The code is split between `bookie-storage` and focused application services.
+
+## Legacy `tablepro` state
+
+On start, `bookie` and `bookie-agentd` copy `tablepro` and `tablepro-devel` under `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME` and `$XDG_STATE_HOME` to `bookie` and `bookie-devel`. The copy is staged then renamed, skips symlinks and does nothing when the new directory exists. The legacy directory is never modified, so a package rollback finds its data intact. A credential missing under the `com.bookie.linux` keyring schema is copied from `com.tablepro.linux` on first read. Connection bundles exported by earlier builds still import. GSettings values stored only under the old schema path are not copied; `preferences.json` carries the rest. Flatpak data under `~/.var/app/com.tablepro.linux` must be moved by hand. Decision: [ADR 0027](decisions/0027-complete-bookie-rename.md).
 
 ## Locations
 
 ```mermaid
 graph TD
-    subgraph XDG_CONFIG ["$XDG_CONFIG_HOME/tablepro/ (or tablepro-devel)"]
+    subgraph XDG_CONFIG ["$XDG_CONFIG_HOME/bookie/ (or bookie-devel)"]
         Conn["connections.json<br/>(No Credentials)"]
         Prefs["preferences.json<br/>+ GSettings"]
         History["history.db<br/>(SQLite + FTS5)"]
@@ -16,7 +20,7 @@ graph TD
         KnownHosts["known_hosts<br/>(SSH keys)"]
     end
 
-    subgraph XDG_DATA ["$XDG_DATA_HOME/tablepro/"]
+    subgraph XDG_DATA ["$XDG_DATA_HOME/bookie/"]
         Audit["audit.jsonl<br/>(Hash-chained journal)"]
     end
 
@@ -32,33 +36,33 @@ graph TD
 
 | Data | Format | Default path |
 |---|---|---|
-| Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/connections.json` |
-| Preferences | GSettings with JSON rollback mirror | `com.tablepro.linux` and `$XDG_CONFIG_HOME/tablepro/preferences.json` |
-| Window state | GSettings geometry with JSON rollback mirror | `com.tablepro.linux` and `$XDG_CONFIG_HOME/tablepro/window.json` |
-| Workspace tabs | JSON | `$XDG_CONFIG_HOME/tablepro/workspace_state.json` |
-| Column widths | JSON | `$XDG_CONFIG_HOME/tablepro/column_widths.json` |
-| Table filters | JSON | `$XDG_CONFIG_HOME/tablepro/filter_settings.json` |
-| Hidden columns, column order | JSON | `$XDG_CONFIG_HOME/tablepro/hidden_columns.json`, `$XDG_CONFIG_HOME/tablepro/column_order.json` |
-| Named filter presets | JSON | `$XDG_CONFIG_HOME/tablepro/named_filter_presets.json` |
-| CSV import column mappings | JSON | `$XDG_CONFIG_HOME/tablepro/csv_import_mappings.json` |
-| Connection organization (groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/tablepro/connection-organization.json` |
-| Query favorites | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/favorites.json` |
-| Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/tablepro/history.db` |
-| Policy | TOML | `$XDG_CONFIG_HOME/tablepro/policy.toml` |
-| Audit journal | Hash-chained JSONL | `$XDG_DATA_HOME/tablepro/audit.jsonl` |
-| MCP token registry (token hashes only) | JSON | `$XDG_CONFIG_HOME/tablepro/mcp-tokens.json` |
-| Built-in SSH known hosts | OpenSSH `known_hosts` format | `$XDG_CONFIG_HOME/tablepro/known_hosts` |
+| Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/bookie/connections.json` |
+| Preferences | GSettings with JSON rollback mirror | `com.bookie.linux` and `$XDG_CONFIG_HOME/bookie/preferences.json` |
+| Window state | GSettings geometry with JSON rollback mirror | `com.bookie.linux` and `$XDG_CONFIG_HOME/bookie/window.json` |
+| Workspace tabs | JSON | `$XDG_CONFIG_HOME/bookie/workspace_state.json` |
+| Column widths | JSON | `$XDG_CONFIG_HOME/bookie/column_widths.json` |
+| Table filters | JSON | `$XDG_CONFIG_HOME/bookie/filter_settings.json` |
+| Hidden columns, column order | JSON | `$XDG_CONFIG_HOME/bookie/hidden_columns.json`, `$XDG_CONFIG_HOME/bookie/column_order.json` |
+| Named filter presets | JSON | `$XDG_CONFIG_HOME/bookie/named_filter_presets.json` |
+| CSV import column mappings | JSON | `$XDG_CONFIG_HOME/bookie/csv_import_mappings.json` |
+| Connection organization (groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/bookie/connection-organization.json` |
+| Query favorites | Versioned JSON | `$XDG_CONFIG_HOME/bookie/favorites.json` |
+| Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/bookie/history.db` |
+| Policy | TOML | `$XDG_CONFIG_HOME/bookie/policy.toml` |
+| Audit journal | Hash-chained JSONL | `$XDG_DATA_HOME/bookie/audit.jsonl` |
+| MCP token registry (token hashes only) | JSON | `$XDG_CONFIG_HOME/bookie/mcp-tokens.json` |
+| Built-in SSH known hosts | OpenSSH `known_hosts` format | `$XDG_CONFIG_HOME/bookie/known_hosts` |
 | Database passwords, SSH passwords, SSH key passphrases | Secret Service through `oo7` | Desktop keyring |
 | GUI-issued MCP token plaintext | Returned once; storage is attempted through Secret Service | Desktop keyring, when the save succeeds |
 | `bookie-agentd` MCP token plaintext | Printed once to stdout, or written to the explicitly selected token file with owner-only permissions | Issuance output; the token registry stores only its hash |
 
-If `XDG_CONFIG_HOME` is unset, config storage falls back to `~/.config/tablepro/`. If `XDG_DATA_HOME` is unset, the audit journal falls back to `~/.local/share/tablepro/`. A development build uses `tablepro-devel` in place of `tablepro` for every path above that goes through the storage crate, the policy file included. The MCP token registry and the built-in SSH `known_hosts` file are the exceptions: their code builds the path itself and always uses `tablepro`, so a development build shares them with an installed release.
+If `XDG_CONFIG_HOME` is unset, config storage falls back to `~/.config/bookie/`. If `XDG_DATA_HOME` is unset, the audit journal falls back to `~/.local/share/bookie/`. A development build uses `bookie-devel` in place of `bookie` for every path above that goes through the storage crate, the policy file included. The MCP token registry and the built-in SSH `known_hosts` file are the exceptions: their code builds the path itself and always uses `bookie`, so a development build shares them with an installed release.
 
 The current history database is under XDG config because that is what `query_history::db_path()` implements. Do not document or migrate it to XDG data without a code change and a tested migration.
 
 ## Saved connections
 
-`tablepro-storage` exposes `load_connections`, `save_connections`, `delete_connection`, and `touch_last_opened`. The file has a top-level version and a connection array. Loading rejects unsupported versions.
+`bookie-storage` exposes `load_connections`, `save_connections`, `delete_connection`, and `touch_last_opened`. The file has a top-level version and a connection array. Loading rejects unsupported versions.
 
 Connection records contain host, port, database, username, TLS mode, read-only state, authentication mode, environment, optional SSH configuration, and optional last-opened time. Passwords and SSH secrets are not part of the JSON record.
 
@@ -66,7 +70,7 @@ Connection records contain host, port, database, username, TLS mode, read-only s
 
 ## Preferences and UI state
 
-Application services own preferences, window state, workspace state, column widths, and table filters. They read from the XDG config directory. Failure behavior varies by store; unreadable persisted state must not be assumed to reset safely to defaults. Preferences and window geometry use GSettings when its schema is installed; the development build has a separate `com.tablepro.linux.Devel` schema. The last connection id remains in `window.json`. On first use, legacy `preferences.json` and `window.json` are copied to private `*.before-gsettings.json` files before migration. Every later save also writes the JSON files, so an older package can read current values after rollback. Preferences validate migration writes by reading them back, refuse future migration versions, and block edits when a legacy source is malformed. A failed JSON mirror write rolls back the preferences update. Cargo compiles the same schema used by packages for source-tree runs. If the schema is unavailable, the JSON files remain the source of both settings. To restore the original pre-migration values, copy `preferences.before-gsettings.json` over `preferences.json` after closing BookiE, then restart the newer package; it imports the restored JSON values. For window state, use the matching `window.before-gsettings.json` backup and reset `window-migrated`.
+Application services own preferences, window state, workspace state, column widths, and table filters. They read from the XDG config directory. Failure behavior varies by store; unreadable persisted state must not be assumed to reset safely to defaults. Preferences and window geometry use GSettings when its schema is installed; the development build has a separate `com.bookie.linux.Devel` schema. The last connection id remains in `window.json`. On first use, legacy `preferences.json` and `window.json` are copied to private `*.before-gsettings.json` files before migration. Every later save also writes the JSON files, so an older package can read current values after rollback. Preferences validate migration writes by reading them back, refuse future migration versions, and block edits when a legacy source is malformed. A failed JSON mirror write rolls back the preferences update. Cargo compiles the same schema used by packages for source-tree runs. If the schema is unavailable, the JSON files remain the source of both settings. To restore the original pre-migration values, copy `preferences.before-gsettings.json` over `preferences.json` after closing BookiE, then restart the newer package; it imports the restored JSON values. For window state, use the matching `window.before-gsettings.json` backup and reset `window-migrated`.
 
 Window state stores size, maximize flag, and the last connection id. Closing a window keeps that id so the next launch can reopen the same connection. An explicit disconnect or deleting that saved connection clears it. Geometry writes do not drop the last connection id.
 
@@ -77,7 +81,7 @@ Workspace state is keyed by connection UUID and limited before it is written. Un
 `HistoryStore::open()` rejects a database whose `user_version` is newer than the migrations this build supports, before applying migrations; the refusal leaves that database version unchanged. For supported older schemas, migrations use SQLite transactions. Before changing an existing database, the store makes a private SQLite snapshot at `history.before-migrations.db` while holding its storage lock. To roll back the history format, close BookiE, move the upgraded `history.db` and its `-wal`/`-shm` companions aside, then copy `history.before-migrations.db` to `history.db` with mode `0600`. History entries added after the snapshot will not be in the restored file.
 
 
-`tablepro_storage::query_history::HistoryStore` owns a single SQLite pool. `HistoryStore::open()` creates `history.db` when needed, enables WAL mode, applies the schema migrations, and creates an FTS5 virtual table with triggers that follow inserts, deletes, and query text updates.
+`bookie_storage::query_history::HistoryStore` owns a single SQLite pool. `HistoryStore::open()` creates `history.db` when needed, enables WAL mode, applies the schema migrations, and creates an FTS5 virtual table with triggers that follow inserts, deletes, and query text updates.
 
 History records include query text, driver and connection identity, execution time, duration, affected rows, success, cancellation, pin state, and an optional error. Search supports text, connection, outcome, time, and limit filters. Unpinned entries can be pruned by age.
 
@@ -87,17 +91,17 @@ History export from the GUI writes through a temporary sibling file and a rename
 
 ## Policy
 
-The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A genuinely absent file uses the built-in defaults. A dangling symlink, inaccessible path, unreadable file or invalid policy leaves policy unavailable. The application refuses connection bootstrap and active guarded handles; CSV imports and MCP remain disabled. The connection error gives repair and restart instructions. A valid symlink loads its target normally.
+The GUI loads `$XDG_CONFIG_HOME/bookie/policy.toml` at startup. A genuinely absent file uses the built-in defaults. A dangling symlink, inaccessible path, unreadable file or invalid policy leaves policy unavailable. The application refuses connection bootstrap and active guarded handles; CSV imports and MCP remain disabled. The connection error gives repair and restart instructions. A valid symlink loads its target normally.
 
-A failed reload preserves the last successfully loaded policy. Repair the file and reopen Preferences to reload it, or restart BookiE. A successful reload restores guarded connection access. MCP disabled at startup requires an application restart to start its server. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `tablepro-agentd` requires a readable `--policy` path and does not start without one.
+A failed reload preserves the last successfully loaded policy. Repair the file and reopen Preferences to reload it, or restart BookiE. A successful reload restores guarded connection access. MCP disabled at startup requires an application restart to start its server. An explicit empty `mask_patterns` list is treated as the default sensitive-field patterns. `bookie-agentd` requires a readable `--policy` path and does not start without one.
 
 ## Audit journal
 
-`AuditJournal::open_default()` opens `$XDG_DATA_HOME/tablepro/audit.jsonl`. Initialization creates the parent directory, sets the journal mode to `0600`, verifies the hash chain, recovers safe trailing fragments, and reports unresolved operation IDs.
+`AuditJournal::open_default()` opens `$XDG_DATA_HOME/bookie/audit.jsonl`. Initialization creates the parent directory, sets the journal mode to `0600`, verifies the hash chain, recovers safe trailing fragments, and reports unresolved operation IDs.
 
 Each record contains a sequence number, previous hash, current hash, and audit event. Mutation intents and transaction commit records use the durable append path. File locks serialize initialization and appends across processes.
 
-The GUI and `tablepro-agentd` may hold the journal at the same time. Each live owner holds a shared process lock; startup recovery requires the exclusive lock, so a second process does not record another process's in-flight mutation as `Unknown`. It validates the chain without recovery. New write intents are still refused while an earlier write remains pending. After all owners exit, the next opener recovers any intents left pending by a crash. A query cursor that has delivered its first page is not yet covered: a crash mid-stream leaves its operation pending ([#1719](https://github.com/cozyGarage/BookiE/issues/1719)).
+The GUI and `bookie-agentd` may hold the journal at the same time. Each live owner holds a shared process lock; startup recovery requires the exclusive lock, so a second process does not record another process's in-flight mutation as `Unknown`. It validates the chain without recovery. New write intents are still refused while an earlier write remains pending. After all owners exit, the next opener recovers any intents left pending by a crash. A query cursor that has delivered its first page is not yet covered: a crash mid-stream leaves its operation pending ([#1719](https://github.com/cozyGarage/BookiE/issues/1719)).
 
 The full chain is verified when the journal opens, by `verify_chain()`, and by `recent(limit)`, which streams the file once and retains only the requested tail. An append verifies only the records written since the same process last verified or appended, starting from the hash it last verified. That still checks records written by another process and repairs a trailing fragment left by a crashed writer. When the file was replaced or became shorter, the append verifies the full chain again. A change to records that this process had already verified is therefore found at the next open or on-demand verification, not at the next append. This keeps normal append work independent of journal age. There is no retention or compaction policy; do not prune audit history as a performance shortcut.
 
@@ -105,7 +109,7 @@ Journal integrity or availability failures fail closed. If the required journal 
 
 ## Secrets
 
-The secrets module uses `oo7::Keyring`, which talks to the Linux Secret Service API. Items use the schema `com.tablepro.linux.Password` and attributes for `connection-id` and `kind`.
+The secrets module uses `oo7::Keyring`, which talks to the Linux Secret Service API. Items use the schema `com.bookie.linux.Password` and attributes for `connection-id` and `kind`.
 
 The implemented kinds are:
 
@@ -130,14 +134,14 @@ When changing storage behavior:
 
 ## Query favorites
 
-`$XDG_CONFIG_HOME/tablepro/favorites.json` holds saved queries as `{version, favorites[]}`, written through a temporary file and a rename. Each entry keeps an id, name, statement, optional driver and connection ids, a creation time, and a last-used time. Saving a name that already exists replaces that entry's statement and keeps its id. The file is capped at 500 entries, and a name or statement that is only whitespace is rejected.
+`$XDG_CONFIG_HOME/bookie/favorites.json` holds saved queries as `{version, favorites[]}`, written through a temporary file and a rename. Each entry keeps an id, name, statement, optional driver and connection ids, a creation time, and a last-used time. Saving a name that already exists replaces that entry's statement and keeps its id. The file is capped at 500 entries, and a name or statement that is only whitespace is rejected.
 
 ## Connection bundles
 
 A connection bundle is a single JSON document a user exports and another machine imports. It is not a storage location: nothing reads or writes it automatically.
 
 ```json
-{"format": "tablepro.connection-bundle", "version": 3, "producer": "...", "exported_at": "...", "payload": {...}}
+{"format": "bookie.connection-bundle", "version": 3, "producer": "...", "exported_at": "...", "payload": {...}}
 ```
 
 Version 3 is written by current exports. Imports continue to accept versions 1 and 2; version 1 bundles carry only legacy connection-level SSH secrets when encrypted.

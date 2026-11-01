@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashMap};
 
-use tablepro_core::{ColumnInfo, ForeignKeyInfo};
+use bookie_core::{ColumnInfo, ForeignKeyInfo};
 
 #[derive(Debug, Clone)]
 pub struct TableRead {

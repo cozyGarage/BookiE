@@ -220,7 +220,7 @@ async fn an_import_cannot_request_more_sequence_columns_than_the_csv_limit() {
     let (connection, batches) = BulkConn::open(usize::MAX);
     let (guard, audit, _state) = approved_guard(connection, Uuid::new_v4());
     let mut request = request(1);
-    request.sequence_columns = vec!["id".into(); tablepro_core::import::MAX_COLUMNS + 1];
+    request.sequence_columns = vec!["id".into(); bookie_core::import::MAX_COLUMNS + 1];
 
     assert!(matches!(
         guard.begin_bulk_insert(request).await,

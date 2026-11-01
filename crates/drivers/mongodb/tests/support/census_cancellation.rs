@@ -1,8 +1,8 @@
 use std::time::Duration;
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl};
 use drivers_mongodb::MongodbDriver;
 use mongodb::bson::doc;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl};
 use testcontainers::ImageExt;
 use testcontainers_modules::mongo::Mongo;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;

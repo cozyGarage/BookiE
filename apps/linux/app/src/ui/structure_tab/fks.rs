@@ -4,7 +4,7 @@
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 
-use tablepro_core::ForeignKeyInfo;
+use bookie_core::ForeignKeyInfo;
 
 use super::{StructureMode, StructureTab, StructureTabInput};
 

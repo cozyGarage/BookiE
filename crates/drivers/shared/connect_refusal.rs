@@ -1,4 +1,4 @@
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig};
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig};
 
 /// Exercise the driver's real setup path against a local TCP endpoint with no
 /// listener and require setup refusal to remain distinct from connection loss.

@@ -205,7 +205,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let update = tablepro_storage::update_connection(id, |connection| connection.database = name).await;
+                    let update = bookie_storage::update_connection(id, |connection| connection.database = name).await;
                     if let Err(error) = update {
                         tracing::warn!(%error, "the switched database was not saved");
                     }

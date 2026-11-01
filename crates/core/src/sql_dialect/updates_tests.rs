@@ -79,7 +79,7 @@ fn mongodb_delete_guards_every_non_key_value_including_null_and_missing() {
     .unwrap();
     assert_eq!(
         sql,
-        "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ? AND tablepro_mongodb_exact_field_set(?)"
+        "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ? AND bookie_mongodb_exact_field_set(?)"
     );
     assert_eq!(
         params,

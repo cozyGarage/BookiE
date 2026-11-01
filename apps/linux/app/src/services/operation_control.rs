@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tablepro_core::OperationControl;
+use bookie_core::OperationControl;
 use tokio_util::sync::CancellationToken;
 
 use crate::services::preferences::PreferencesStore;

@@ -59,34 +59,34 @@ async fn value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed
         .query("SELECT id, state FROM enum_csv_shadow_b.source_rows ORDER BY id")
         .await
         .unwrap();
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let csv_options = tablepro_core::export::CsvOptions {
+    let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = bookie_core::export::CsvOptions {
         null_to_empty: false,
         null_marker: Some(null_marker.clone()),
         ..Default::default()
     };
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(Some("enum_csv_shadow_b"), "target_rows")
         .await
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "enum_csv_shadow_b".into(),
             name: "state".into(),
         })
     );
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("enum_csv_shadow_b"),
             table: "target_rows",
             columns: &columns,

@@ -7,11 +7,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, OperationControl, QueryResult, QueryResultBatch,
     TableInfo, Value,
 };
-use tablepro_policy::{
+use bookie_policy::{
     AuditError, AuditEvent, AuditSink, AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig,
     PolicyGuard, Principal,
 };
@@ -181,7 +181,7 @@ fn a_guard_does_not_invent_server_cancellation_the_driver_lacks() {
 
 #[tokio::test]
 async fn an_agent_guard_masks_sensitive_columns_in_every_result_set() {
-    use tablepro_policy::{AutoApproveSink, Principal};
+    use bookie_policy::{AutoApproveSink, Principal};
     use tokio_util::sync::CancellationToken;
 
     let inner: Arc<dyn Connection> = Arc::new(StubConnection {
@@ -235,7 +235,7 @@ async fn a_human_guard_preserves_results_that_agent_masking_would_hide() {
 
 #[tokio::test]
 async fn an_agent_guard_masks_json_aggregates_that_serialize_a_record() {
-    use tablepro_policy::{AutoApproveSink, Principal};
+    use bookie_policy::{AutoApproveSink, Principal};
     use tokio_util::sync::CancellationToken;
 
     let inner: Arc<dyn Connection> = Arc::new(StubConnection {
@@ -274,7 +274,7 @@ async fn an_agent_guard_masks_json_aggregates_that_serialize_a_record() {
 
 #[tokio::test]
 async fn an_agent_guard_masks_a_named_derived_projection() {
-    use tablepro_policy::{AutoApproveSink, Principal};
+    use bookie_policy::{AutoApproveSink, Principal};
     use tokio_util::sync::CancellationToken;
 
     let inner: Arc<dyn Connection> = Arc::new(StubConnection {

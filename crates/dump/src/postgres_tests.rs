@@ -1,8 +1,8 @@
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
 
+use bookie_core::TlsConfig;
 use secrecy::SecretString;
-use tablepro_core::TlsConfig;
 
 use super::*;
 

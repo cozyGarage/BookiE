@@ -1,7 +1,7 @@
 use super::*;
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 fn settle() {
     let context = gtk4::glib::MainContext::default();

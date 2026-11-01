@@ -120,7 +120,7 @@ Audit intent is written before driver execution when `intent_is_required` is tru
 
 ### Connection provider
 
-`ConnectionProvider::connection` must return a policy-gated handle. `tablepro-mcp` documents that there is no path to a raw driver connection from that crate (`crates/mcp/src/lib.rs`).
+`ConnectionProvider::connection` must return a policy-gated handle. `bookie-mcp` documents that there is no path to a raw driver connection from that crate (`crates/mcp/src/lib.rs`).
 
 | Endpoint | Status | errorCode | Message / condition |
 |----------|--------|-----------|---------------------|
@@ -215,7 +215,7 @@ Terminal audit states: `succeeded`, `failed`, `denied`, `cancelled`, `timed_out`
 - MCP input, saved connection files, imported files, environment variables and database metadata are untrusted.
 - Token plaintext is returned once at issuance; `TokenStore` persists only `token_hash`. GUI issuance attempts Secret Service storage, while `bookie-agentd` emits the token once to stdout or an explicitly selected owner-only file.
 - SQL parameters are bound, not concatenated. Identifiers are dialect-quoted.
-- Policy decisions are evaluated inside `tablepro-policy`. MCP may ask whether a statement needs write scope; it does not evaluate rules or write audit records itself.
+- Policy decisions are evaluated inside `bookie-policy`. MCP may ask whether a statement needs write scope; it does not evaluate rules or write audit records itself.
 
 ## Cross-capability interactions
 

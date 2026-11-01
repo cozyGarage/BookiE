@@ -112,14 +112,14 @@ fn quote_ident_doubles_embedded_backticks() {
     assert_eq!(quote_ident("evil`; DROP TABLE x; --"), "`evil``; DROP TABLE x; --`");
 }
 
-fn connect_opts_with_client_tls(mode: tablepro_core::TlsMode) -> ConnectOptions {
+fn connect_opts_with_client_tls(mode: bookie_core::TlsMode) -> ConnectOptions {
     ConnectOptions {
         host: "db.corp.example".into(),
         port: 3306,
-        tls: tablepro_core::TlsConfig {
+        tls: bookie_core::TlsConfig {
             mode,
-            client_cert: Some(std::path::PathBuf::from("/tmp/tablepro-client.crt")),
-            client_key: Some(std::path::PathBuf::from("/tmp/tablepro-client.key")),
+            client_cert: Some(std::path::PathBuf::from("/tmp/bookie-client.crt")),
+            client_key: Some(std::path::PathBuf::from("/tmp/bookie-client.key")),
             ..Default::default()
         },
         ..Default::default()
@@ -143,7 +143,7 @@ fn mysql_url_has_client_tls_material(mysql_opts: &MySqlConnectOptions) -> bool {
 
 #[test]
 fn disabled_tls_ignores_saved_client_cert_and_key() {
-    let mysql_opts = mysql_connect_options(&connect_opts_with_client_tls(tablepro_core::TlsMode::Disabled));
+    let mysql_opts = mysql_connect_options(&connect_opts_with_client_tls(bookie_core::TlsMode::Disabled));
     let query = mysql_url_query(&mysql_opts);
     assert!(
         query
@@ -155,7 +155,7 @@ fn disabled_tls_ignores_saved_client_cert_and_key() {
 
 #[test]
 fn prefer_and_require_tls_still_apply_saved_client_cert_and_key() {
-    for mode in [tablepro_core::TlsMode::Prefer, tablepro_core::TlsMode::Require] {
+    for mode in [bookie_core::TlsMode::Prefer, bookie_core::TlsMode::Require] {
         let mysql_opts = mysql_connect_options(&connect_opts_with_client_tls(mode));
         assert!(mysql_url_has_client_tls_material(&mysql_opts));
     }
@@ -166,7 +166,7 @@ fn prefer_and_require_tls_still_apply_saved_client_cert_and_key() {
 /// -- exactly the pattern PostgreSQL's driver already uses.
 #[test]
 fn a_tunnelled_connection_dials_the_forwarded_socket_and_verifies_the_service_hostname() {
-    let directory = std::path::PathBuf::from("/tmp/tablepro-ssh-abc123");
+    let directory = std::path::PathBuf::from("/tmp/bookie-ssh-abc123");
     let opts = ConnectOptions {
         host: "127.0.0.1".into(),
         port: 54321,

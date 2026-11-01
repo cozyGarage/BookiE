@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-driver-mongodb"
+name = "bookie-driver-mongodb"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ name = "drivers_mongodb"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../../core" }
+bookie-core = { path = "../../core" }
 async-trait.workspace = true
 futures.workspace = true
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }

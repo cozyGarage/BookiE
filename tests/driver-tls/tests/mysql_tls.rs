@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{DatabaseDriver, TlsMode};
-use tablepro_driver_tls_tests::DriverTlsFixture;
+use bookie_core::{DatabaseDriver, TlsMode};
+use bookie_driver_tls_tests::DriverTlsFixture;
 
 use drivers_mysql::MysqlDriver;
 
@@ -32,7 +32,7 @@ async fn a_plaintext_mode_is_refused_by_a_tls_only_server() {
     let fixture = DriverTlsFixture::from_env();
     let accepted = fixture.mysql(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
     let rejected = fixture.mysql(TlsMode::Disabled, None);
-    tablepro_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -40,7 +40,7 @@ async fn a_plaintext_mode_is_refused_by_a_tls_only_server() {
 async fn verify_full_rejects_an_ip_endpoint_absent_from_the_certificate() {
     let fixture = DriverTlsFixture::from_env();
     let options = fixture.mysql(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
-    tablepro_driver_tls_tests::assert_endpoint_identity_rejected(&MysqlDriver, options).await;
+    bookie_driver_tls_tests::assert_endpoint_identity_rejected(&MysqlDriver, options).await;
 }
 
 #[tokio::test]
@@ -50,7 +50,7 @@ async fn a_verifying_mode_without_an_authority_is_refused() {
     for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
         let accepted = fixture.mysql(mode, Some(fixture.ca_cert.clone()));
         let rejected = fixture.mysql(mode, None);
-        tablepro_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
+        bookie_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
     }
 }
 
@@ -61,7 +61,7 @@ async fn a_verifying_mode_naming_the_wrong_authority_is_refused() {
     for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
         let accepted = fixture.mysql(mode, Some(fixture.ca_cert.clone()));
         let rejected = fixture.mysql(mode, Some(fixture.other_ca_cert.clone()));
-        tablepro_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
+        bookie_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
     }
 }
 
@@ -83,7 +83,7 @@ async fn verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query
     let tunnel = fixture.open_mysql_ssh_tunnel().await;
     let connection = MysqlDriver
         .connect(fixture.mysql_ssh(
-            "mysql-ssh.tablepro.test",
+            "mysql-ssh.bookie.test",
             &tunnel,
             TlsMode::VerifyFull,
             Some(fixture.ca_cert.clone()),
@@ -103,18 +103,18 @@ async fn verify_full_through_ssh_rejects_an_untrusted_authority() {
     let fixture = DriverTlsFixture::from_env();
     let tunnel = fixture.open_mysql_ssh_tunnel().await;
     let accepted = fixture.mysql_ssh(
-        "mysql-ssh.tablepro.test",
+        "mysql-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );
     let rejected = fixture.mysql_ssh(
-        "mysql-ssh.tablepro.test",
+        "mysql-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.other_ca_cert.clone()),
     );
-    tablepro_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -123,18 +123,18 @@ async fn verify_full_through_ssh_rejects_a_wrong_or_local_identity() {
     let fixture = DriverTlsFixture::from_env();
     let tunnel = fixture.open_mysql_ssh_tunnel().await;
     let accepted = fixture.mysql_ssh(
-        "mysql-ssh.tablepro.test",
+        "mysql-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );
     let wrong_host = fixture.mysql_ssh(
-        "wrong.tablepro.test",
+        "wrong.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );
-    tablepro_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted.clone(), wrong_host).await;
+    bookie_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted.clone(), wrong_host).await;
 
     let local_identity = fixture.mysql_ssh("127.0.0.1", &tunnel, TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
     let error = MysqlDriver
@@ -143,7 +143,7 @@ async fn verify_full_through_ssh_rejects_a_wrong_or_local_identity() {
         .err()
         .expect("verify full must not use the local tunnel address as the TLS identity");
     assert!(
-        matches!(error, tablepro_core::DriverError::Tls(_)),
+        matches!(error, bookie_core::DriverError::Tls(_)),
         "expected TLS identity rejection, got {error}"
     );
 }
@@ -155,13 +155,13 @@ async fn a_tls_rejection_does_not_fall_back_to_plaintext_and_dropping_tunnel_cle
     let tunnel = fixture.open_mysql_ssh_tunnel().await;
     let socket_dir = tunnel.socket_dir().expect("socket tunnel directory").to_path_buf();
     let accepted = fixture.mysql_ssh(
-        "mysql-ssh.tablepro.test",
+        "mysql-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.ca_cert.clone()),
     );
-    let rejected = fixture.mysql_ssh("mysql-ssh.tablepro.test", &tunnel, TlsMode::Disabled, None);
-    tablepro_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
+    let rejected = fixture.mysql_ssh("mysql-ssh.bookie.test", &tunnel, TlsMode::Disabled, None);
+    bookie_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
     drop(tunnel);
     assert!(
         !socket_dir.exists(),
@@ -195,7 +195,7 @@ async fn a_server_requiring_a_client_certificate_rejects_a_missing_identity() {
         Some(fixture.client_key.clone()),
     );
     let rejected = fixture.mysql_mtls(TlsMode::VerifyFull, None, None);
-    tablepro_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -212,7 +212,7 @@ async fn a_server_requiring_a_client_certificate_rejects_an_untrusted_identity()
         Some(fixture.wrong_client_cert.clone()),
         Some(fixture.wrong_client_key.clone()),
     );
-    tablepro_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
+    bookie_driver_tls_tests::assert_connection_rejected(&MysqlDriver, accepted, rejected).await;
 }
 
 #[tokio::test]
@@ -237,7 +237,7 @@ async fn a_server_requiring_a_client_certificate_accepts_the_identity_through_ss
     let fixture = DriverTlsFixture::from_env();
     let tunnel = fixture.open_mysql_mtls_ssh_tunnel().await;
     let options = fixture.mysql_mtls_ssh(
-        "mysql-mtls-ssh.tablepro.test",
+        "mysql-mtls-ssh.bookie.test",
         &tunnel,
         TlsMode::VerifyFull,
         Some(fixture.client_cert.clone()),

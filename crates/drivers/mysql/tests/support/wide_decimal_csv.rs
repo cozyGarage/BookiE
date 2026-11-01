@@ -1,4 +1,4 @@
-use tablepro_core::{Connection, Value};
+use bookie_core::{Connection, Value};
 
 pub(super) async fn assert_csv_bound_and_literal_round_trips(connection: &dyn Connection) {
     const WIDE_INTEGER: &str = "12345678901234567890123456789012345678901234567890123456789012345";
@@ -33,21 +33,20 @@ pub(super) async fn assert_csv_bound_and_literal_round_trips(connection: &dyn Co
     assert_eq!(source.rows, expected);
 
     let json: serde_json::Value =
-        serde_json::from_str(&tablepro_core::export::render_json(&source.columns, &source.rows)).unwrap();
+        serde_json::from_str(&bookie_core::export::render_json(&source.columns, &source.rows)).unwrap();
     assert_eq!(json[0]["whole"], serde_json::Value::String(WIDE_INTEGER.into()));
     assert_eq!(json[0]["scaled"], serde_json::Value::String(WIDE_SCALE.into()));
 
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let target_columns = connection.fetch_columns(None, "wide_decimal_bound").await.unwrap();
     let mapping = (0..target_columns.len()).map(Some).collect::<Vec<_>>();
-    let imported =
-        tablepro_core::import::row_to_values(&sheet.rows[0], &mapping, &target_columns, &options, 2).unwrap();
+    let imported = bookie_core::import::row_to_values(&sheet.rows[0], &mapping, &target_columns, &options, 2).unwrap();
     assert_eq!(
         imported, source.rows[0],
         "typed CSV import must retain decimals wider than Rust Decimal"
@@ -59,7 +58,7 @@ pub(super) async fn assert_csv_bound_and_literal_round_trips(connection: &dyn Co
         .unwrap();
     let columns = connection.fetch_columns(None, "wide_decimal_literal").await.unwrap();
     let literal =
-        tablepro_core::sql_literal::build_insert_literal("mysql", None, "wide_decimal_literal", &columns, &imported)
+        bookie_core::sql_literal::build_insert_literal("mysql", None, "wide_decimal_literal", &columns, &imported)
             .unwrap();
     connection.execute(&literal).await.unwrap();
 

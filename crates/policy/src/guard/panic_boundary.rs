@@ -2,8 +2,8 @@ use std::any::Any;
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
 
+use bookie_core::DriverError;
 use futures::FutureExt;
-use tablepro_core::DriverError;
 
 use super::PolicyGuard;
 

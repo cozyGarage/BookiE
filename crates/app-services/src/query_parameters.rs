@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use tablepro_core::{ParameterKind, Value, extract_named_parameters, parse_parameter_value};
+use bookie_core::{ParameterKind, Value, extract_named_parameters, parse_parameter_value};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum QueryParameterError {
@@ -57,7 +57,7 @@ pub fn collect_values(
 mod tests {
     use std::collections::HashMap;
 
-    use tablepro_core::{ParameterKind, Value};
+    use bookie_core::{ParameterKind, Value};
 
     use super::{QueryParameterError, bind_statement, collect_values, statement_names};
 

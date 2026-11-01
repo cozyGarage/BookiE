@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_app_services::browse_query::{BrowseTarget, PageQuery, mark_partial_cells, parse_partial};
+use bookie_core::{ColumnInfo, ConnectOptions, Connection, DatabaseDriver, FilterSet, TlsConfig, Value};
 use secrecy::SecretString;
-use tablepro_app_services::browse_query::{BrowseTarget, PageQuery, mark_partial_cells, parse_partial};
-use tablepro_core::{ColumnInfo, ConnectOptions, Connection, DatabaseDriver, FilterSet, TlsConfig, Value};
 use testcontainers::ImageExt;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
@@ -128,7 +128,7 @@ async fn sqlite_previews_a_huge_text_cell() {
 async fn mysql_previews_a_huge_longtext_cell() {
     let container = testcontainers_modules::mysql::Mysql::default()
         .with_tag("8.4")
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .start()
         .await
         .unwrap();
@@ -138,7 +138,7 @@ async fn mysql_previews_a_huge_longtext_cell() {
             port: container.get_host_port_ipv4(3306).await.unwrap(),
             database: "test".into(),
             username: "root".into(),
-            password: SecretString::from("tablepro_test"),
+            password: SecretString::from("bookie_test"),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })

@@ -4,7 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use tablepro_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
+use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
 
 /// GTK approval sink. Posts a modal `adw::AlertDialog` on the glib main
 /// context and parks the async caller until the user responds.
@@ -253,12 +253,12 @@ mod tests {
     #[test]
     fn approval_body_omits_empty_table_preview_but_keeps_meaningful_previews() {
         let mut req = ApprovalRequest {
-            principal: tablepro_policy::Principal::human_gui(),
-            environment: tablepro_core::Environment::Prod,
+            principal: bookie_policy::Principal::human_gui(),
+            environment: bookie_core::Environment::Prod,
             connection_id: uuid::Uuid::new_v4(),
             connection_name: "db".into(),
             sql: "SET @x = 5".into(),
-            facts: tablepro_policy::StatementFacts::unparseable("test"),
+            facts: bookie_policy::StatementFacts::unparseable("test"),
             rule: "test".into(),
             reason: "test".into(),
             preview: Some("tables: ".into()),

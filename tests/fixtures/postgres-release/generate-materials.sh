@@ -3,7 +3,7 @@ set -euo pipefail
 
 FIXTURE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MATERIALS="$FIXTURE/materials"
-DB_HOSTNAME="${TABLEPRO_FIXTURE_DB_HOSTNAME:-db.tablepro.test}"
+DB_HOSTNAME="${BOOKIE_FIXTURE_DB_HOSTNAME:-db.bookie.test}"
 
 if [[ "${1:-}" == "--force" ]]; then
   rm -rf "$MATERIALS" "$FIXTURE/state"
@@ -32,12 +32,12 @@ cd "$MATERIALS"
 
 openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
   -keyout ca.key -out ca.crt \
-  -subj "/CN=TablePro release fixture CA" \
+  -subj "/CN=BookiE release fixture CA" \
   -addext "basicConstraints=critical,CA:TRUE" >/dev/null 2>&1
 
 openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
   -keyout other-ca.key -out other-ca.crt \
-  -subj "/CN=TablePro unrelated CA" \
+  -subj "/CN=BookiE unrelated CA" \
   -addext "basicConstraints=critical,CA:TRUE" >/dev/null 2>&1
 
 cat > server.ext <<EXT
@@ -77,9 +77,9 @@ rm -f server.csr client.csr rotated-client.csr wrong-client.csr server.ext clien
 chmod 600 server.key ca.key other-ca.key client.key rotated-client.key wrong-client.key
 chmod 644 server.crt ca.crt other-ca.crt client.crt rotated-client.crt wrong-client.crt
 
-ssh-keygen -q -t ed25519 -N "" -C "tablepro-fixture-host" -f ssh_host_ed25519_key
-ssh-keygen -q -t ed25519 -N "" -C "tablepro-fixture-relay" -f ssh_relay_host_ed25519_key
-ssh-keygen -q -t ed25519 -N "" -C "tablepro-fixture-client" -f client_ed25519_key
+ssh-keygen -q -t ed25519 -N "" -C "bookie-fixture-host" -f ssh_host_ed25519_key
+ssh-keygen -q -t ed25519 -N "" -C "bookie-fixture-relay" -f ssh_relay_host_ed25519_key
+ssh-keygen -q -t ed25519 -N "" -C "bookie-fixture-client" -f client_ed25519_key
 
 echo "wrote fixture materials to $MATERIALS"
 echo "the SSH host key changed; the release script uses a fixture-local known_hosts file"

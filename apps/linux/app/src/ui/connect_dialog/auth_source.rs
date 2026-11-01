@@ -17,6 +17,6 @@ pub(super) fn value(row: &adw::EntryRow) -> Option<String> {
     (row.is_visible() && !text.is_empty()).then(|| text.to_string())
 }
 
-pub(super) fn set(row: &adw::EntryRow, saved: &tablepro_storage::SavedConnection) {
+pub(super) fn set(row: &adw::EntryRow, saved: &bookie_storage::SavedConnection) {
     row.set_text(saved.auth_source.as_deref().unwrap_or_default());
 }

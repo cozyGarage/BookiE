@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use bookie_core::{ColumnInfo, TableInfo};
 use relm4::factory::FactorySender;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
-use tablepro_core::{ColumnInfo, TableInfo};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 
@@ -60,7 +60,7 @@ impl ColumnSource {
             .fetch_columns_controlled(info.schema.as_deref(), &info.name, &control)
             .await
             .map_err(|error| crate::services::error_text::driver_message(&error))?;
-        tablepro_core::check_pre_dispatch(&control)
+        bookie_core::check_pre_dispatch(&control)
             .map_err(|error| crate::services::error_text::driver_message(&error))?;
         LoadedColumns::retain(columns, &self.visible)
     }
