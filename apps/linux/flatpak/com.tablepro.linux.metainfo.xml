@@ -71,7 +71,7 @@
   <content_rating type="oars-1.1" />
   <releases>
     <release version="0.2.3" type="stable" date="2026-11-01">
-      <description><p>Patch after 0.2.2: large SQL scripts and wide editable result grids use less memory, row inspector values with markup characters display correctly, restore failure alerts drop the internal error prefix, and MySQL Explain text plans show column names.</p></description>
+      <description><p>Patch after 0.2.2: large SQL scripts, wide editable grids and pinned streamed results use less memory; sidebars build row menus on demand; SQL completion closes when a query runs; row inspector markup and restore alerts read cleanly; MySQL Explain text plans show column names.</p></description>
     </release>
     <release version="0.2.2" type="stable" date="2026-11-01">
       <description><p>Patch after 0.2.0: streamed PostgreSQL results can revisit earlier pages; ER diagrams, Referencing Rows, SQLite attachments and richer Copy as formats; clearer editor Results/Errors chrome; SSH agent certificates and history caps; plus a large fix and security pass across policy, MCP, SSH, import and drivers.</p></description>
