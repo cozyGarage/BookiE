@@ -2027,16 +2027,44 @@ GLib.MainLoop().run()
                 time.sleep(ui.POLL_SECONDS)
         assert first_run_marker is not None, "the first streamed page never exposed its run marker"
         ui.wait_for_node_containing(f"Rows 1-{page_size}", timeout=120)
-        ui.wait_for_node(name="1")
+        wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
         scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
         ui.invoke(ui.wait_for_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 5001-10000", timeout=30)
+        wait_for_node_showing("Rows 5001-10000")
+        wait_for_visible_cell_value("5001")
         wait_for_visible_marker(first_run_marker)
         ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 1-5000", timeout=30)
+        wait_for_node_showing("Rows 1-5000")
+        wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
+
+    def wait_for_node_showing(name):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            if app is not None and any(
+                ui.node_name(node) == name and node.getState().contains(pyatspi.STATE_SHOWING)
+                for node in ui.descendants(app)
+            ):
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"{name!r} was not visible")
+
+    def wait_for_visible_cell_value(value):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            if app is not None and any(
+                ui.node_name(node) == value
+                and ui.node_role(node) == pyatspi.ROLE_LABEL
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+                for node in ui.descendants(app)
+            ):
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"cell value {value!r} was not visible")
 
     def wait_for_visible_marker(name):
         deadline = time.monotonic() + 30
