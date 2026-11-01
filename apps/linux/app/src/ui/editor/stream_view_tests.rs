@@ -412,7 +412,7 @@ fn a_terminal_status_keeps_retained_grids_unbuilt_until_selected() {
         None,
     );
     let root = holder.clone().upcast::<gtk::Widget>();
-    let pages = named::<gtk::Stack>(&root, "GtkStack").unwrap();
+    let pages = named::<gtk::Stack>(&root, &completed_page_stack_name(0)).unwrap();
     let data = pages.first_child().unwrap();
     let window = gtk::Window::builder()
         .default_width(900)
@@ -528,7 +528,7 @@ fn a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice() {
         None,
     );
     let root = holder.clone().upcast::<gtk::Widget>();
-    let pages = named::<gtk::Stack>(&root, "GtkStack").unwrap();
+    let pages = named::<gtk::Stack>(&root, &completed_page_stack_name(0)).unwrap();
     assert_eq!(pages.pages().n_items(), 2, "the timeout is not a third page");
     assert_eq!(pages.visible_child(), pages.last_child());
     let title = pages.page(&pages.visible_child().unwrap()).title();

@@ -1846,6 +1846,14 @@ impl Connection {
                     return Err(err.into());
                 }
                 Value::Array(vec) => {
+                    // Messages that were published before the unsubscribe took effect, but
+                    // weren't read, arrive ahead of the confirmations. Like the RESP3 branch,
+                    // skip them instead of reading them as confirmations.
+                    if let Some(Value::BulkString(kind)) = vec.first()
+                        && matches!(kind.as_slice(), b"message" | b"pmessage")
+                    {
+                        continue;
+                    }
                     let res: (Vec<u8>, (), isize) = from_redis_value(Value::Array(vec))?;
                     if resp2_is_pub_sub_state_cleared(
                         &mut received_unsub,
@@ -1943,7 +1951,8 @@ impl Connection {
             self.try_send(&result);
 
             let Err(err) = &result else {
-                if self.messages_to_skip > 0 {
+                // Push messages aren't replies, so they must not stand in for a late response.
+                if self.messages_to_skip > 0 && !matches!(result, Ok(Value::Push { .. })) {
                     self.messages_to_skip -= 1;
                     continue;
                 }
