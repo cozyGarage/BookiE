@@ -129,6 +129,15 @@ pub(super) fn install_page_loader(
             .visible_child()
             .and_then(|child| page_index_from_name(&child, generation)),
     ));
+    let initial_context = VisiblePageLoadContext {
+        generation,
+        identity,
+        resident_pages: &resident_pages,
+        spool: spool.as_ref(),
+        columns: &columns,
+        sender: &sender,
+    };
+    handle_visible_child_change(pages, &initial_context, &previous_index);
     pages.connect_visible_child_notify(move |pages| {
         let context = VisiblePageLoadContext {
             generation,

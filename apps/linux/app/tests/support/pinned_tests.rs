@@ -80,7 +80,7 @@ fn nothing_is_pinned_until_asked() {
 }
 
 #[test]
-fn live_stream_updates_store_latest_and_only_clone_when_a_display_list_is_needed() {
+fn live_stream_display_lists_do_not_clone_the_page_payload() {
     let mut cache = super::super::stream_pages::StreamPageCache::default();
     let page = page(&[1]);
     cache.append(0, page.clone()).unwrap();
@@ -99,7 +99,7 @@ fn live_stream_updates_store_latest_and_only_clone_when_a_display_list_is_needed
     assert!(!pins.has_results());
 
     let displayed = pins.displayed();
-    assert_eq!(Arc::strong_count(&page), page_owners_before + 1);
+    assert_eq!(Arc::strong_count(&page), page_owners_before);
     drop(displayed);
 
     assert_eq!(Arc::strong_count(&page), page_owners_before);
@@ -201,7 +201,7 @@ fn an_empty_streamed_result_can_be_pinned_without_losing_its_metadata() {
     };
     assert_eq!(result.total_rows, 0);
     assert_eq!(result.pages.len(), 1);
-    assert_eq!(result.pages[0].columns[0].name, "id");
+    assert_eq!(result.pages[0].upgrade().unwrap().columns[0].name, "id");
     assert_eq!(shown[1].sql_preview, "SELECT 2");
 }
 
@@ -223,7 +223,7 @@ fn a_stream_with_prior_pages_remains_pinnable_after_a_later_fetch_failure() {
         result.terminal,
         super::super::stream_pages::StreamTerminal::Failed(_)
     ));
-    assert_eq!(result.pages[0].rows[0][0], Value::Int(7));
+    assert_eq!(result.pages[0].upgrade().unwrap().rows[0][0], Value::Int(7));
 }
 
 #[test]
