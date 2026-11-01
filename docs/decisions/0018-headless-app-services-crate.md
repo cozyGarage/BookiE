@@ -11,7 +11,7 @@ Application state and database-facing logic sit beside GTK widgets. The UI needs
 
 ## Decision
 
-The workspace crate for application logic has no GUI dependency. It may depend on `tablepro-core`, `tablepro-policy`, `tablepro-storage` and `tablepro-transport`; it must not depend on `gtk4`, `libadwaita`, `glib` or `relm4`.
+The workspace crate for application logic has no GUI dependency. It may depend on `bookie-core`, `bookie-policy`, `bookie-storage` and `bookie-transport`; it must not depend on `gtk4`, `libadwaita`, `glib` or `relm4`.
 
 The crate holds only `PolicyGuard`-wrapped connections and adds no second way to execute SQL. Persisted formats, paths, keyring schema, application ID and connection identifiers remain owned by their existing contracts. GTK event handling and widget lifecycle remain in the application.
 
