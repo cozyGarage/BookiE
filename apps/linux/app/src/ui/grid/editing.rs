@@ -648,7 +648,7 @@ mod tests {
                 String,
                 (bool, Vec<String>),
             >::new())),
-            "value".into(),
+            std::rc::Rc::from("value"),
         );
         let editor = item
             .child()
