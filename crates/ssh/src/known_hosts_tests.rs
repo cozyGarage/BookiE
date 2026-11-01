@@ -469,3 +469,10 @@ fn the_scratch_file_is_private_and_removed_when_dropped() {
     drop(scratch);
     assert!(!path.exists());
 }
+
+#[test]
+fn development_builds_keep_their_own_known_hosts_directory() {
+    assert_eq!(config_dir_name(Some("development")), "bookie-devel");
+    assert_eq!(config_dir_name(None), "bookie");
+    assert_eq!(config_dir_name(Some("default")), "bookie");
+}
