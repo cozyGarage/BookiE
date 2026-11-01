@@ -187,7 +187,7 @@ mod tests {
     fn column(name: &str) -> ColumnInfo {
         ColumnInfo {
             name: name.into(),
-            data_type: "text".into(),
+            data_type: "TEXT".into(),
             nullable: true,
             primary_key: false,
             is_auto_increment: false,
@@ -201,7 +201,7 @@ mod tests {
     }
 
     #[test]
-    fn a_mysql_explain_text_plan_starts_with_a_column_header_line() {
+    fn mysql_explain_text_starts_with_a_column_header_line() {
         let result = QueryResult {
             columns: vec![
                 column("id"),
@@ -230,19 +230,20 @@ mod tests {
             Some("id | select_type | table | type | key | rows | Extra")
         );
         assert_eq!(lines.next(), Some("1 | SIMPLE | c | const | PRIMARY | 1 | Using index"));
+        assert_eq!(lines.next(), None);
     }
 
     #[test]
-    fn a_single_column_text_plan_keeps_rows_only() {
+    fn a_single_column_plan_keeps_rows_without_a_header_line() {
         let result = QueryResult {
             columns: vec![column("QUERY PLAN")],
-            rows: vec![vec![Value::Text("Seq Scan on t  (cost=0.00..1.00 rows=1)".into())]],
+            rows: vec![vec![Value::Text(
+                "Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4)".into(),
+            )]],
             truncated: false,
         };
-        assert_eq!(
-            format_explain_result(&result),
-            "Seq Scan on t  (cost=0.00..1.00 rows=1)"
-        );
+        let text = format_explain_result(&result);
+        assert_eq!(text, "Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4)");
     }
 
     #[test]
