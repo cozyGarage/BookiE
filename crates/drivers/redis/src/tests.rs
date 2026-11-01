@@ -25,8 +25,8 @@ fn a_tunneled_connection_verifies_tls_against_the_service_hostname() {
         host: "127.0.0.1".into(),
         port: 6380,
         service_endpoint: Some(("cache.internal.example".into(), 6379)),
-        tls: tablepro_core::TlsConfig {
-            mode: tablepro_core::TlsMode::VerifyFull,
+        tls: bookie_core::TlsConfig {
+            mode: bookie_core::TlsMode::VerifyFull,
             ..Default::default()
         },
         ..Default::default()
@@ -43,8 +43,8 @@ fn an_encrypt_only_connection_does_not_verify_a_hostname() {
         host: "127.0.0.1".into(),
         port: 6380,
         service_endpoint: Some(("cache.internal.example".into(), 6379)),
-        tls: tablepro_core::TlsConfig {
-            mode: tablepro_core::TlsMode::Require,
+        tls: bookie_core::TlsConfig {
+            mode: bookie_core::TlsMode::Require,
             ..Default::default()
         },
         ..Default::default()
@@ -525,7 +525,7 @@ fn redis_stream_commands_are_refused() {
 #[test]
 fn a_certificate_authority_path_is_read_only_when_the_connection_verifies() {
     let missing = std::env::temp_dir().join(format!("redis-missing-ca-{}.pem", std::process::id()));
-    let config = tablepro_core::TlsConfig {
+    let config = bookie_core::TlsConfig {
         root_cert: Some(missing.clone()),
         ..Default::default()
     };
@@ -541,7 +541,7 @@ fn a_certificate_authority_path_is_read_only_when_the_connection_verifies() {
         "{error:?}"
     );
     assert_eq!(
-        root_certificate(&tablepro_core::TlsConfig::default(), true).unwrap(),
+        root_certificate(&bookie_core::TlsConfig::default(), true).unwrap(),
         None,
         "no path means the system roots"
     );
@@ -551,7 +551,7 @@ fn a_certificate_authority_path_is_read_only_when_the_connection_verifies() {
 fn a_named_certificate_authority_is_read_when_the_connection_verifies() {
     let path = std::env::temp_dir().join(format!("redis-present-ca-{}.pem", std::process::id()));
     std::fs::write(&path, b"-----BEGIN CERTIFICATE-----\n").unwrap();
-    let config = tablepro_core::TlsConfig {
+    let config = bookie_core::TlsConfig {
         root_cert: Some(path.clone()),
         ..Default::default()
     };

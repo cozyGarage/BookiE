@@ -47,15 +47,15 @@ struct CompletionColumnsConnection;
 struct CompletionAudit;
 
 #[async_trait::async_trait]
-impl tablepro_policy::AuditSink for CompletionAudit {
-    async fn record(&self, _event: tablepro_policy::AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+impl bookie_policy::AuditSink for CompletionAudit {
+    async fn record(&self, _event: bookie_policy::AuditEvent) -> Result<(), bookie_policy::AuditError> {
         Ok(())
     }
 }
 
 #[async_trait::async_trait]
 impl Connection for CompletionColumnsConnection {
-    async fn list_tables(&self) -> Result<Vec<tablepro_core::TableInfo>, DriverError> {
+    async fn list_tables(&self) -> Result<Vec<bookie_core::TableInfo>, DriverError> {
         Ok(Vec::new())
     }
 
@@ -63,7 +63,7 @@ impl Connection for CompletionColumnsConnection {
         Ok(Box::new(CompletionColumnsSession))
     }
 
-    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<tablepro_core::ColumnInfo>, DriverError> {
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<bookie_core::ColumnInfo>, DriverError> {
         Ok(Vec::new())
     }
 
@@ -75,11 +75,11 @@ impl Connection for CompletionColumnsConnection {
         Err(DriverError::Unsupported("querying test connection".into()))
     }
 
-    async fn execute(&self, _: &str) -> Result<tablepro_core::ExecResult, DriverError> {
+    async fn execute(&self, _: &str) -> Result<bookie_core::ExecResult, DriverError> {
         Err(DriverError::Unsupported("executing test connection".into()))
     }
 
-    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<tablepro_core::ExecResult, DriverError> {
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<bookie_core::ExecResult, DriverError> {
         Err(DriverError::Unsupported("executing test parameters".into()))
     }
 
@@ -529,13 +529,13 @@ async fn a_session_handle_forwards_completion_metadata_to_its_session() {
     let shared = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::plain(Box::new(
         CompletionColumnsSession,
     )))));
-    let (_, columns) = tablepro_app_services::completion::fetch_session_column_names(
+    let (_, columns) = bookie_app_services::completion::fetch_session_column_names(
         shared,
-        tablepro_app_services::completion::SchemaRequest {
+        bookie_app_services::completion::SchemaRequest {
             generation: 1,
             table: "public.users".into(),
         },
-        Some(tablepro_core::sql_syntax::SqlGrammar::PostgreSql),
+        Some(bookie_core::sql_syntax::SqlGrammar::PostgreSql),
         1,
         tokio_util::sync::CancellationToken::new(),
     )
@@ -548,28 +548,28 @@ async fn a_session_handle_forwards_completion_metadata_to_its_session() {
 async fn an_audited_session_handle_forwards_completion_metadata_to_its_session() {
     let guard = PolicyGuard::new(
         Arc::new(CompletionColumnsConnection),
-        tablepro_policy::GuardContext {
+        bookie_policy::GuardContext {
             connection_id: Uuid::new_v4(),
             connection_name: "completion forwarding".into(),
             driver_id: "postgres".into(),
-            environment: tablepro_core::Environment::Local,
+            environment: bookie_core::Environment::Local,
             read_only: false,
             principal: Principal::human_gui(),
-            policy: Arc::new(tablepro_policy::PolicyConfig::default()),
-            approval: Arc::new(tablepro_policy::AutoApproveSink),
+            policy: Arc::new(bookie_policy::PolicyConfig::default()),
+            approval: Arc::new(bookie_policy::AutoApproveSink),
             audit: Arc::new(CompletionAudit),
-            audit_state: Arc::new(tablepro_policy::AuditState::new()),
+            audit_state: Arc::new(bookie_policy::AuditState::new()),
         },
     );
     let session = guard.open_session_with_audit().await.expect("open guarded session");
     let shared = Arc::new(tokio::sync::Mutex::new(Some(SessionHandle::Audited(session))));
-    let (_, columns) = tablepro_app_services::completion::fetch_session_column_names(
+    let (_, columns) = bookie_app_services::completion::fetch_session_column_names(
         shared,
-        tablepro_app_services::completion::SchemaRequest {
+        bookie_app_services::completion::SchemaRequest {
             generation: 1,
             table: "public.users".into(),
         },
-        Some(tablepro_core::sql_syntax::SqlGrammar::PostgreSql),
+        Some(bookie_core::sql_syntax::SqlGrammar::PostgreSql),
         1,
         tokio_util::sync::CancellationToken::new(),
     )

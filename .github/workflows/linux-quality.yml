@@ -39,15 +39,15 @@ jobs:
       max-parallel: 3
       matrix:
         include:
-          - {label: core-1, package: tablepro-core, shard: 0/4}
-          - {label: core-2, package: tablepro-core, shard: 1/4}
-          - {label: core-3, package: tablepro-core, shard: 2/4}
-          - {label: core-4, package: tablepro-core, shard: 3/4}
-          - {label: policy-1, package: tablepro-policy, shard: 0/2}
-          - {label: policy-2, package: tablepro-policy, shard: 1/2}
-          - {label: ssh, package: tablepro-ssh, shard: 0/1}
-          - {label: redis, package: tablepro-driver-redis, shard: 0/1}
-          - {label: postgres, package: tablepro-driver-postgres, shard: 0/1}
+          - {label: core-1, package: bookie-core, shard: 0/4}
+          - {label: core-2, package: bookie-core, shard: 1/4}
+          - {label: core-3, package: bookie-core, shard: 2/4}
+          - {label: core-4, package: bookie-core, shard: 3/4}
+          - {label: policy-1, package: bookie-policy, shard: 0/2}
+          - {label: policy-2, package: bookie-policy, shard: 1/2}
+          - {label: ssh, package: bookie-ssh, shard: 0/1}
+          - {label: redis, package: bookie-driver-redis, shard: 0/1}
+          - {label: postgres, package: bookie-driver-postgres, shard: 0/1}
     env:
       MUTATION_LABEL: ${{ matrix.label }}
       MUTATION_PACKAGE: ${{ matrix.package }}
@@ -86,7 +86,7 @@ jobs:
         run: |
           args=(--package "$MUTATION_PACKAGE" --test-tool cargo --shard "$MUTATION_SHARD"
                 --output "mutants-$MUTATION_LABEL" --timeout 60 --build-timeout 900 --no-shuffle)
-          if [[ "$MUTATION_PACKAGE" == tablepro-driver-postgres ]]; then
+          if [[ "$MUTATION_PACKAGE" == bookie-driver-postgres ]]; then
             cargo mutants "${args[@]}" \
               --file crates/drivers/postgres/src/array.rs \
               --file crates/drivers/postgres/src/numeric.rs \
@@ -115,7 +115,7 @@ jobs:
             timeout="$report/timeout.txt"
             unviable="$report/unviable.txt"
             echo
-            echo "#### tablepro-$crate"
+            echo "#### bookie-$crate"
             echo
             if [[ ! -f "$caught" || ! -f "$missed" || ! -f "$timeout" || ! -f "$unviable" ]]; then
               echo "Measurement unavailable: missing report files; inspect the step log."
@@ -183,7 +183,7 @@ jobs:
       - name: Measure
         run: |
           cargo llvm-cov --no-report --workspace \
-            --exclude tablepro-driver-duckdb --exclude tablepro-app \
+            --exclude bookie-driver-duckdb --exclude bookie-app \
             --lib --bins --tests
           cargo llvm-cov report --lcov --output-path lcov.info
           cargo llvm-cov report --summary-only | tee coverage.txt

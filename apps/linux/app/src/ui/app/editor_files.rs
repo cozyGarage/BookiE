@@ -1,7 +1,7 @@
+use bookie_core::text_file::{TextFile, TextFileError};
 use relm4::ComponentSender;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
-use tablepro_core::text_file::{TextFile, TextFileError};
 use uuid::Uuid;
 
 use crate::ui::editor::open_file::{choose_save_path, file_error_message, read_sql_file, save_sql_file};
@@ -167,7 +167,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("report.sql");
         std::fs::write(&path, text).unwrap();
-        let file = tablepro_core::text_file::read_text_file(&path, 1024).unwrap();
+        let file = bookie_core::text_file::read_text_file(&path, 1024).unwrap();
         (directory, EditorFile::from_disk(file))
     }
 

@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use super::*;
 use async_trait::async_trait;
-use tablepro_core::{AuthMode, ColumnInfo, Environment, ExecResult, QueryResult, TableInfo, TlsMode};
-use tablepro_policy::{ApprovalOutcome, ApprovalRequest, AuditError, AuditEvent};
+use bookie_core::{AuthMode, ColumnInfo, Environment, ExecResult, QueryResult, TableInfo, TlsMode};
+use bookie_policy::{ApprovalOutcome, ApprovalRequest, AuditError, AuditEvent};
 use tokio::sync::Notify;
 
 struct WriteProbe {
@@ -66,7 +66,7 @@ impl Connection for WriteProbe {
 struct AcceptingAudit;
 
 #[async_trait]
-impl tablepro_policy::AuditSink for AcceptingAudit {
+impl bookie_policy::AuditSink for AcceptingAudit {
     async fn record(&self, _event: AuditEvent) -> Result<(), AuditError> {
         Ok(())
     }
@@ -77,7 +77,7 @@ struct FailOutcomeAudit {
 }
 
 #[async_trait]
-impl tablepro_policy::AuditSink for FailOutcomeAudit {
+impl bookie_policy::AuditSink for FailOutcomeAudit {
     async fn record(&self, _event: AuditEvent) -> Result<(), AuditError> {
         if self.records.fetch_add(1, Ordering::SeqCst) == 1 {
             Err(AuditError::Persistence("fixture outcome failure".into()))
@@ -90,7 +90,7 @@ impl tablepro_policy::AuditSink for FailOutcomeAudit {
 struct AllowAll;
 
 #[async_trait]
-impl tablepro_policy::ApprovalSink for AllowAll {
+impl bookie_policy::ApprovalSink for AllowAll {
     async fn request(&self, _request: ApprovalRequest) -> ApprovalOutcome {
         ApprovalOutcome::AllowOnce
     }
@@ -299,7 +299,7 @@ async fn a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_h
         started: None,
         executed: Arc::new(AtomicUsize::new(0)),
     });
-    let material = tablepro_transport::session_material_digest(&saved)
+    let material = bookie_transport::session_material_digest(&saved)
         .await
         .expect("material digest");
     let session = provider.new_session(SessionKey::from_saved(&saved, material), connection.clone());

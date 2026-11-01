@@ -7,7 +7,7 @@ use gtk4::subclass::prelude::*;
 
 use std::sync::Arc;
 
-use tablepro_core::{QueryResult, Value};
+use bookie_core::{QueryResult, Value};
 
 use crate::services::change_tracker::{KeyValue, RowKey};
 
@@ -48,7 +48,7 @@ mod imp {
 
     #[glib::object_subclass]
     impl ObjectSubclass for RowStore {
-        const NAME: &str = "TableProRowStore";
+        const NAME: &str = "BookiERowStore";
         type Type = super::RowStore;
         type Interfaces = (gio::ListModel,);
     }
@@ -350,7 +350,7 @@ impl RowStore {
         }
     }
 
-    pub fn source_value_at(&self, position: u32, column: usize) -> Option<tablepro_core::Value> {
+    pub fn source_value_at(&self, position: u32, column: usize) -> Option<bookie_core::Value> {
         let source_index = {
             let slots = self.imp().slots.borrow();
             match slots.get(position as usize)? {

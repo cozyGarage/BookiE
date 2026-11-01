@@ -2,10 +2,10 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 
+use bookie_core::DriverError;
 use libsqlite3_sys::{sqlite3, sqlite3_interrupt};
 use sqlx::Sqlite;
 use sqlx::pool::PoolConnection;
-use tablepro_core::DriverError;
 
 /// A pointer to the open SQLite database, used only to call
 /// `sqlite3_interrupt`. SQLite documents that call as safe from a thread

@@ -1,6 +1,6 @@
 #[tokio::test]
 async fn sqlite_iif_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {

@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use bookie_core::sql_literal::render_sql_literal;
+use bookie_core::{ConnectOptions, DatabaseDriver, Value};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::sql_literal::render_sql_literal;
-use tablepro_core::{ConnectOptions, DatabaseDriver, Value};
 use tempfile::TempDir;
 
 #[tokio::test]

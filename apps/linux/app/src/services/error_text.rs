@@ -1,6 +1,6 @@
-use tablepro_app_services::driver_error_presentation::{DriverFailurePresentation, SaveFailure, TlsAdvice};
-use tablepro_core::DriverError;
-use tablepro_core::sql_dialect::BuildSqlError;
+use bookie_app_services::driver_error_presentation::{DriverFailurePresentation, SaveFailure, TlsAdvice};
+use bookie_core::DriverError;
+use bookie_core::sql_dialect::BuildSqlError;
 
 pub fn build_sql_message(error: &BuildSqlError) -> String {
     match error {
@@ -26,7 +26,7 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
 }
 
 pub fn driver_message(error: &DriverError) -> String {
-    let presentation = tablepro_app_services::driver_error_presentation::classify(error);
+    let presentation = bookie_app_services::driver_error_presentation::classify(error);
     driver_presentation_message(&presentation)
 }
 
@@ -119,8 +119,8 @@ fn save_failure_message(failure: &SaveFailure) -> String {
     }
 }
 
-pub fn keyring_message(failure: &tablepro_storage::KeyringFailure) -> String {
-    use tablepro_storage::KeyringFailure;
+pub fn keyring_message(failure: &bookie_storage::KeyringFailure) -> String {
+    use bookie_storage::KeyringFailure;
     match failure {
         KeyringFailure::Unavailable => crate::tr!(
             "No keyring is running, so saved passwords can't be read. Start GNOME Keyring, KeePassXC with Secret Service, or another Secret Service provider, then try again."

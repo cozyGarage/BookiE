@@ -79,7 +79,7 @@ async fn savepoint_words_in_a_value_do_not_clear_an_aborted_transaction() {
 
 #[tokio::test]
 async fn typed_commit_distinguishes_a_committed_transaction_from_an_aborted_rollback() {
-    use tablepro_core::SessionCommitOutcome;
+    use bookie_core::SessionCommitOutcome;
 
     for (abort, expected) in [
         (false, SessionCommitOutcome::Committed),

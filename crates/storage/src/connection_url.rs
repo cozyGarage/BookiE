@@ -1,7 +1,7 @@
 use secrecy::SecretString;
 use uuid::Uuid;
 
-use tablepro_core::{AuthMode, Environment, TlsMode};
+use bookie_core::{AuthMode, Environment, TlsMode};
 
 use crate::connections::SavedConnection;
 use crate::error::StorageError;
@@ -54,7 +54,7 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     };
     let scheme = scheme.to_ascii_lowercase();
     let Some(&(_, driver_id, default_port)) = SCHEMES.iter().find(|(alias, _, _)| *alias == scheme) else {
-        return Err(invalid(&format!("{scheme} is not a database scheme TablePro knows")));
+        return Err(invalid(&format!("{scheme} is not a database scheme BookiE knows")));
     };
 
     if remainder.contains('#') {

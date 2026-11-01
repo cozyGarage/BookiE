@@ -9,7 +9,7 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
-use tablepro_core::{ActivityQuery, ActivityUnsupported, Value, activity_kinds, activity_sql, parse_session_id};
+use bookie_core::{ActivityQuery, ActivityUnsupported, Value, activity_kinds, activity_sql, parse_session_id};
 
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;

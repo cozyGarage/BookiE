@@ -1,5 +1,5 @@
 {
-    "app-id": "com.tablepro.linux",
+    "app-id": "com.bookie.linux",
     "runtime": "org.gnome.Platform",
     "runtime-version": "51",
     "sdk": "org.gnome.Sdk",
@@ -25,38 +25,36 @@
         "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm22/bin",
         "prepend-ld-library-path": "/usr/lib/sdk/llvm22/lib",
         "env": {
-            "CARGO_HOME": "/run/build/tablepro-app/cargo",
+            "CARGO_HOME": "/run/build/bookie-app/cargo",
             "LIBCLANG_PATH": "/usr/lib/sdk/llvm22/lib"
         }
     },
     "modules": [
         {
-            "name": "tablepro-app",
+            "name": "bookie-app",
             "buildsystem": "simple",
             "build-options": {
                 "build-args": [
                     "--share=network"
                 ],
                 "env": {
-                    "RUSTUP_HOME": "/run/build/tablepro-app/rustup",
-                    "CARGO_HOME": "/run/build/tablepro-app/cargo"
+                    "RUSTUP_HOME": "/run/build/bookie-app/rustup",
+                    "CARGO_HOME": "/run/build/bookie-app/cargo"
                 }
             },
             "build-commands": [
                 "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.98.0 --profile minimal",
                 "export PATH=\"${CARGO_HOME}/bin:${PATH}\"; rustc --version; cargo --version",
-                "export PATH=\"${CARGO_HOME}/bin:${PATH}\"; cargo build --release -p tablepro-app -p tablepro-agentd --locked",
-                "export PATH=\"${CARGO_HOME}/bin:${PATH}\"; cargo build --release -p tablepro-ssh --bin tablepro-askpass --locked",
-                "install -Dm755 target/release/tablepro-app /app/bin/bookie",
-                "install -Dm755 target/release/tablepro-agentd /app/bin/bookie-agentd",
-                "install -Dm755 target/release/tablepro-askpass /app/bin/tablepro-askpass",
-                "ln -s bookie-agentd /app/bin/tablepro-agentd",
-                "ln -s bookie /app/bin/tablepro",
-                "install -Dm644 apps/linux/data/com.tablepro.linux.gschema.xml /app/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml",
+                "export PATH=\"${CARGO_HOME}/bin:${PATH}\"; cargo build --release -p bookie-app -p bookie-agentd --locked",
+                "export PATH=\"${CARGO_HOME}/bin:${PATH}\"; cargo build --release -p bookie-ssh --bin bookie-askpass --locked",
+                "install -Dm755 target/release/bookie-app /app/bin/bookie",
+                "install -Dm755 target/release/bookie-agentd /app/bin/bookie-agentd",
+                "install -Dm755 target/release/bookie-askpass /app/bin/bookie-askpass",
+                "install -Dm644 apps/linux/data/com.bookie.linux.gschema.xml /app/share/glib-2.0/schemas/com.bookie.linux.gschema.xml",
                 "glib-compile-schemas /app/share/glib-2.0/schemas",
-                "install -Dm644 apps/linux/flatpak/com.tablepro.linux.desktop /app/share/applications/com.tablepro.linux.desktop",
-                "install -Dm644 apps/linux/flatpak/com.tablepro.linux.metainfo.xml /app/share/metainfo/com.tablepro.linux.metainfo.xml",
-                "install -Dm644 apps/linux/flatpak/icons/scalable/com.tablepro.linux.svg /app/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg",
+                "install -Dm644 apps/linux/flatpak/com.bookie.linux.desktop /app/share/applications/com.bookie.linux.desktop",
+                "install -Dm644 apps/linux/flatpak/com.bookie.linux.metainfo.xml /app/share/metainfo/com.bookie.linux.metainfo.xml",
+                "install -Dm644 apps/linux/flatpak/icons/scalable/com.bookie.linux.svg /app/share/icons/hicolor/scalable/apps/com.bookie.linux.svg",
                 "if [ -f apps/linux/po/LINGUAS ]; then for lang in $(grep -v '^#' apps/linux/po/LINGUAS | grep -v '^$' || true); do mkdir -p /app/share/locale/$lang/LC_MESSAGES && msgfmt apps/linux/po/$lang.po -o /app/share/locale/$lang/LC_MESSAGES/bookie.mo; done; fi"
             ],
             "sources": [

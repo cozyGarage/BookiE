@@ -1,6 +1,6 @@
+use bookie_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError};
 use sqlx::postgres::PgRow;
 use sqlx::{Pool, Postgres, Row};
-use tablepro_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError};
 
 use crate::map_sqlx_error;
 

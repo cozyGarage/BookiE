@@ -1,5 +1,5 @@
+use bookie_app_services::workspace::WorkspaceTabs;
 use std::time::Duration;
-use tablepro_app_services::workspace::WorkspaceTabs;
 
 use relm4::ComponentController;
 use relm4::adw::prelude::*;

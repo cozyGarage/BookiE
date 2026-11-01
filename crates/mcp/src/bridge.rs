@@ -1,13 +1,13 @@
 use std::{future::Future, sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use tablepro_core::sql_dialect::{explain_statement, quote_ident};
-use tablepro_core::{
+use bookie_core::sql_dialect::{explain_statement, quote_ident};
+use bookie_core::{
     ColumnInfo, Connection, DriverError, ForeignKeyInfo, IndexInfo, OperationControl, QueryResult, QueryResultBatch,
     TableInfo, Value, check_pre_dispatch,
 };
-use tablepro_policy::Principal;
-use tablepro_storage::SavedConnection;
+use bookie_policy::Principal;
+use bookie_storage::SavedConnection;
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -18,7 +18,7 @@ use crate::rate_limit::RateLimiter;
 use crate::tokens::{McpToken, TokenStore};
 
 /// Supplies policy-gated connections. Implementations must never return a
-/// raw driver connection that bypasses [`tablepro_policy::PolicyGuard`].
+/// raw driver connection that bypasses [`bookie_policy::PolicyGuard`].
 #[async_trait]
 pub trait ConnectionProvider: Send + Sync {
     async fn list_saved_connections(&self) -> Result<Vec<SavedConnection>, String>;
@@ -254,9 +254,9 @@ impl McpBridge {
         &self,
         token: &McpToken,
         connection_id: Uuid,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<String>,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, String> {
+    ) -> Result<Vec<bookie_core::CatalogObject>, String> {
         let schema = match schema {
             Some(schema) => Some(validated_identifier(&schema)?),
             None => None,
@@ -556,7 +556,7 @@ pub(crate) fn nontransactional_engine_query(driver_id: &str, sql: &str) -> Optio
     if driver_id != "mysql" {
         return None;
     }
-    let tables: Vec<String> = tablepro_policy::classify(sql, driver_id)
+    let tables: Vec<String> = bookie_policy::classify(sql, driver_id)
         .tables
         .iter()
         .map(|table| {
@@ -583,7 +583,7 @@ pub(crate) fn nontransactional_engine_query(driver_id: &str, sql: &str) -> Optio
 }
 
 async fn touches_nontransactional_table(
-    transaction: &mut dyn tablepro_core::Transaction,
+    transaction: &mut dyn bookie_core::Transaction,
     driver_id: &str,
     sql: &str,
     control: &OperationControl,
@@ -664,7 +664,7 @@ fn operation_control_for(cancellation: CancellationToken, timeout: Duration) -> 
 }
 
 fn sql_looks_like_write(sql: &str, driver_id: &str) -> bool {
-    let facts = tablepro_policy::classify(sql, driver_id);
+    let facts = bookie_policy::classify(sql, driver_id);
     facts.writes()
 }
 

@@ -29,7 +29,7 @@ async fn renaming_a_table_in_another_database_keeps_it_there() {
         .await
         .unwrap();
 
-    let rename = tablepro_core::sql_ddl::build_rename_table("mysql", Some(&other), "old_name", "new_name").unwrap();
+    let rename = bookie_core::sql_ddl::build_rename_table("mysql", Some(&other), "old_name", "new_name").unwrap();
     conn.execute(&rename).await.unwrap();
 
     let moved = conn
@@ -38,6 +38,6 @@ async fn renaming_a_table_in_another_database_keeps_it_there() {
         ))
         .await
         .unwrap();
-    assert_eq!(moved.rows, vec![vec![tablepro_core::Value::Text(other.clone())]]);
+    assert_eq!(moved.rows, vec![vec![bookie_core::Value::Text(other.clone())]]);
     conn.execute(&format!("DROP DATABASE `{other}`")).await.unwrap();
 }

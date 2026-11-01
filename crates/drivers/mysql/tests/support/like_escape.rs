@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::{connect, start_mysql};
-use tablepro_core::{ColumnInfo, FilterOp, FilterRule, FilterSet, FilterValue, Value, build_filter_where};
+use bookie_core::{ColumnInfo, FilterOp, FilterRule, FilterSet, FilterValue, Value, build_filter_where};
 
 fn text_column() -> ColumnInfo {
     ColumnInfo {

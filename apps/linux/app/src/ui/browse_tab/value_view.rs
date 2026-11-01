@@ -1,5 +1,5 @@
+use bookie_core::Value;
 use relm4::ComponentSender;
-use tablepro_core::Value;
 
 use super::{BrowseTab, BrowseTabOutput};
 

@@ -212,11 +212,11 @@ fn token_subprocess(
 ) -> std::process::Child {
     Command::new(executable)
         .args(["--exact", "tokens::tests::subprocess_mutates_token_store", "--ignored"])
-        .env("TABLEPRO_TOKEN_TEST_ACTION", action)
-        .env("TABLEPRO_TOKEN_TEST_PATH", path)
-        .env("TABLEPRO_TOKEN_TEST_ID", token_id.to_string())
-        .env("TABLEPRO_TOKEN_TEST_ISSUER_READY", issuer_ready)
-        .env("TABLEPRO_TOKEN_TEST_REVOKE_COMPLETE", revoke_complete)
+        .env("BOOKIE_TOKEN_TEST_ACTION", action)
+        .env("BOOKIE_TOKEN_TEST_PATH", path)
+        .env("BOOKIE_TOKEN_TEST_ID", token_id.to_string())
+        .env("BOOKIE_TOKEN_TEST_ISSUER_READY", issuer_ready)
+        .env("BOOKIE_TOKEN_TEST_REVOKE_COMPLETE", revoke_complete)
         .spawn()
         .unwrap()
 }
@@ -232,11 +232,11 @@ fn wait_for_path(path: &Path) {
 #[test]
 #[ignore = "helper process spawned by other tests through --exact --ignored, not a standalone test"]
 fn subprocess_mutates_token_store() {
-    let action = std::env::var("TABLEPRO_TOKEN_TEST_ACTION").unwrap();
-    let path = PathBuf::from(std::env::var_os("TABLEPRO_TOKEN_TEST_PATH").unwrap());
-    let token_id = std::env::var("TABLEPRO_TOKEN_TEST_ID").unwrap().parse().unwrap();
-    let issuer_ready = PathBuf::from(std::env::var_os("TABLEPRO_TOKEN_TEST_ISSUER_READY").unwrap());
-    let revoke_complete = PathBuf::from(std::env::var_os("TABLEPRO_TOKEN_TEST_REVOKE_COMPLETE").unwrap());
+    let action = std::env::var("BOOKIE_TOKEN_TEST_ACTION").unwrap();
+    let path = PathBuf::from(std::env::var_os("BOOKIE_TOKEN_TEST_PATH").unwrap());
+    let token_id = std::env::var("BOOKIE_TOKEN_TEST_ID").unwrap().parse().unwrap();
+    let issuer_ready = PathBuf::from(std::env::var_os("BOOKIE_TOKEN_TEST_ISSUER_READY").unwrap());
+    let revoke_complete = PathBuf::from(std::env::var_os("BOOKIE_TOKEN_TEST_REVOKE_COMPLETE").unwrap());
 
     if action == "issue" {
         let store = TokenStore::open(path).unwrap();

@@ -1,4 +1,4 @@
-use tablepro_core::{Connection, DriverCapabilities, DriverError, OperationControl, TableInfo, check_pre_dispatch};
+use bookie_core::{Connection, DriverCapabilities, DriverError, OperationControl, TableInfo, check_pre_dispatch};
 
 use super::model::TableRead;
 

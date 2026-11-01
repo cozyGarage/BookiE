@@ -4,8 +4,8 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use secrecy::{ExposeSecret, SecretString};
 
-use tablepro_ssh::{SshAuth, SshConfig};
-use tablepro_storage::{SavedSshAuth, SavedSshConfig};
+use bookie_ssh::{SshAuth, SshConfig};
+use bookie_storage::{SavedSshAuth, SavedSshConfig};
 
 const SSH_AUTH_PASSWORD: u32 = 0;
 const SSH_AUTH_KEY: u32 = 1;
@@ -112,7 +112,7 @@ impl SshSection {
         self.port.set_value(f64::from(saved.port));
         self.user.set_text(&saved.username);
         self.system_client
-            .set_active(saved.client == tablepro_storage::SshClient::OpenSsh);
+            .set_active(saved.client == bookie_storage::SshClient::OpenSsh);
         match &saved.auth {
             _ if saved.agent => self.auth_combo.set_selected(SSH_AUTH_AGENT),
             SavedSshAuth::Password => self.auth_combo.set_selected(SSH_AUTH_PASSWORD),
@@ -225,9 +225,9 @@ impl SshSection {
                 jump: None,
                 agent,
                 client: if self.system_client.is_active() {
-                    tablepro_storage::SshClient::OpenSsh
+                    bookie_storage::SshClient::OpenSsh
                 } else {
-                    tablepro_storage::SshClient::Builtin
+                    bookie_storage::SshClient::Builtin
                 },
                 agent_identity: None,
             },
@@ -237,11 +237,11 @@ impl SshSection {
 }
 
 impl SshInputs {
-    pub fn route(&self) -> Result<tablepro_transport::SshRoute, String> {
+    pub fn route(&self) -> Result<bookie_transport::SshRoute, String> {
         match self.saved.client {
-            tablepro_storage::SshClient::Builtin => Ok(tablepro_transport::SshRoute::Builtin(vec![self.cfg.clone()])),
-            tablepro_storage::SshClient::OpenSsh => tablepro_transport::openssh_config_for(&self.cfg)
-                .map(tablepro_transport::SshRoute::OpenSsh)
+            bookie_storage::SshClient::Builtin => Ok(bookie_transport::SshRoute::Builtin(vec![self.cfg.clone()])),
+            bookie_storage::SshClient::OpenSsh => bookie_transport::openssh_config_for(&self.cfg)
+                .map(bookie_transport::SshRoute::OpenSsh)
                 .map_err(|error| error.to_string()),
         }
     }

@@ -8,7 +8,7 @@ use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
 
 use super::codec::value_to_bson;
-use tablepro_core::{DriverError, Value};
+use bookie_core::{DriverError, Value};
 
 pub(super) struct KeyedUpdate {
     pub(super) collection: String,
@@ -749,7 +749,7 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
             Ok(explicit_null_selector(field))
         }
         Expr::Function(function)
-            if single_identifier(&function.name).as_deref() == Some("tablepro_mongodb_exact_field_set") =>
+            if single_identifier(&function.name).as_deref() == Some("bookie_mongodb_exact_field_set") =>
         {
             exact_field_set_selector(function, params, index)
         }

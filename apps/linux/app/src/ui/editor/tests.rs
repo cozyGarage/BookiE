@@ -70,7 +70,7 @@ fn dropped_sql_completion_requires_latest_drop_and_unchanged_editor() {
 
 #[test]
 fn dropped_sql_reader_enforces_the_exact_byte_limit() {
-    let path = std::env::temp_dir().join(format!("tablepro-drop-{}.sql", uuid::Uuid::new_v4()));
+    let path = std::env::temp_dir().join(format!("bookie-drop-{}.sql", uuid::Uuid::new_v4()));
     let mut file = std::fs::File::create(&path).unwrap();
     file.write_all(b"SELECT 1;").unwrap();
     drop(file);

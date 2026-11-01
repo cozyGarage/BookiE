@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-driver-clickhouse"
+name = "bookie-driver-clickhouse"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,7 +11,7 @@ name = "drivers_clickhouse"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../../core" }
+bookie-core = { path = "../../core" }
 async-trait.workspace = true
 chrono.workspace = true
 clickhouse.workspace = true

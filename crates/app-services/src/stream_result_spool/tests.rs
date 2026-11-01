@@ -1,4 +1,5 @@
 use super::*;
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
@@ -7,7 +8,6 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::AsRawFd;
 use std::str::FromStr;
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 struct CountingSequence {
     items: usize,

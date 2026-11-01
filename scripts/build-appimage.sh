@@ -46,8 +46,8 @@ export PATH="$TOOLS:$PATH"
 IBUS_LIBRARY="$(ldconfig -p | awk '/libibus-1.0.so.5 .*x86-64/ {print $NF; exit}')"
 "$TOOLS/linuxdeploy-x86_64.AppImage" \
   --appdir "$APPDIR" \
-  --desktop-file "$APPDIR/usr/share/applications/com.tablepro.linux.desktop" \
-  --icon-file "$APPDIR/usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg" \
+  --desktop-file "$APPDIR/usr/share/applications/com.bookie.linux.desktop" \
+  --icon-file "$APPDIR/usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg" \
   --executable "$APPDIR/usr/bin/bookie" \
   --executable "$APPDIR/usr/bin/bookie-agentd" \
   ${IBUS_LIBRARY:+--library "$IBUS_LIBRARY"} \

@@ -42,7 +42,7 @@ async fn value_contract_domain_over_enum_projection_preserves_labels_and_null() 
         {"label": "東京", "native_type": "value_contract_domain_enum_label"},
         {"label": null, "native_type": "value_contract_domain_enum_label"}
     ]);
-    let rendered = tablepro_core::export::render_json(&result.columns, &result.rows);
+    let rendered = bookie_core::export::render_json(&result.columns, &result.rows);
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&rendered).unwrap(),
         expected_json
@@ -50,12 +50,12 @@ async fn value_contract_domain_over_enum_projection_preserves_labels_and_null() 
 
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("domain-enum.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -108,30 +108,30 @@ async fn value_contract_domain_enum_array_csv_import_uses_target_type_under_shad
         .query("SELECT 1 AS id, ARRAY['target'::domain_array_shadow_b.label] AS labels")
         .await
         .unwrap();
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(Some("domain_array_shadow_b"), "target")
         .await
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "domain_array_shadow_b".into(),
             name: "label".into(),
         })
     );
     let mapping = [Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("domain_array_shadow_b"),
             table: "target",
             columns: &columns,
@@ -409,7 +409,7 @@ async fn value_contract_domain_over_enum_nullif_infers_parameter_type() {
         .await
         .expect_err("raw domain-to-unknown NULLIF must retain PostgreSQL's refusal");
     assert!(
-        matches!(&raw_domain_parameter, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+        matches!(&raw_domain_parameter, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
         "expected native domain operator SQLSTATE 42883, got {raw_domain_parameter:?}"
     );
 
@@ -464,7 +464,7 @@ async fn value_contract_domain_over_enum_nullif_infers_parameter_type() {
         .await
         .expect_err("invalid enum label must reach PostgreSQL validation");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected native enum SQLSTATE 22P02, got {invalid:?}"
     );
 
@@ -538,7 +538,7 @@ async fn value_contract_domain_over_enum_query_comparison_infers_parameter_type(
         .expect_err("raw domain equality has no domain-to-unknown operator");
     assert!(matches!(
         uncast,
-        tablepro_core::DriverError::Query {
+        bookie_core::DriverError::Query {
             sqlstate: Some(code), ..
         } if code == "42883"
     ));
@@ -986,7 +986,7 @@ async fn value_contract_domain_over_enum_coalesce_infers_parameter_type() {
             .await
             .expect_err("parameter must resolve against the target enum, not its shadow");
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
         );
         transaction.execute("ROLLBACK TO SAVEPOINT invalid_domain_case").await.unwrap();

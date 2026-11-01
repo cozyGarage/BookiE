@@ -1,4 +1,4 @@
-pub use tablepro_app_services::{
+pub use bookie_app_services::{
     approval_wait, column_widths, config_io, connection_form, filter_settings, ordered_refresh, read_scopes,
     recent_tabs, request_generation, single_flight, state_file, structure_tracker,
 };

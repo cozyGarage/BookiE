@@ -1,6 +1,6 @@
 use super::tests::page;
 use super::*;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 fn byte_page(bytes: usize) -> Arc<QueryResult> {
     let mut result = page(&["payload"], &[]).as_ref().clone();
@@ -29,7 +29,7 @@ fn sustained_small_streams_keep_all_pages_within_the_byte_budget() {
 
 #[test]
 fn snapshots_share_payloads_and_release_evicted_pages_after_the_last_owner() {
-    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
     let mut cache = StreamPageCache::default();
@@ -58,7 +58,7 @@ fn snapshots_share_payloads_and_release_evicted_pages_after_the_last_owner() {
 #[test]
 fn completed_spooled_snapshots_release_resident_pages_and_reload_from_the_spool() {
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
     let mut cache = StreamPageCache::default();
@@ -94,7 +94,7 @@ fn terminal_snapshot_keeps_the_page_whose_spool_write_failed() {
     let last = page(&["id"], &[2]);
     let last_ref = Arc::downgrade(&last);
     cache.append_with_storage_status(1, last, false).unwrap();
-    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
 

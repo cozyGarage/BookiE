@@ -33,7 +33,7 @@ fn value_contract_postgres_scalar_named_array_types_stay_text_in_the_grid_parser
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -126,7 +126,7 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
         let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres")
             .unwrap_or_else(|error| panic!("{data_type}[] parser: {error}"));
         assert_eq!(parsed, Value::Text(literal.into()), "{data_type}[] remains exact text");
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "postgres",
             None,
             table,
@@ -193,7 +193,7 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
         .unwrap();
     let value_index = columns.iter().position(|column| column.name == "value").unwrap();
     let invalid = parse_input_for_driver("{not-a-date}", Some(&columns[value_index]), "postgres").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "date_array_grid",
@@ -209,8 +209,8 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
     assert!(
         matches!(
             &error,
-            tablepro_core::DriverError::Transaction { source, .. }
-                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22007")
+            bookie_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22007")
         ),
         "invalid date[] should retain PostgreSQL's invalid datetime SQLSTATE: {error:?}"
     );
@@ -229,7 +229,7 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values_and_sibling() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -285,7 +285,7 @@ async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values
     let parsed = parse_input_for_driver(ARRAY, Some(&columns[value_index]), "postgres")
         .expect("float4[] array text should pass through app grid parsing");
     assert_eq!(parsed, Value::Text(ARRAY.into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "float4_array_grid",
@@ -327,7 +327,7 @@ async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values
 
     let invalid = parse_input_for_driver("{0.1,not-a-float}", Some(&columns[value_index]), "postgres")
         .expect("malformed float4[] remains text for server validation");
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "float4_array_grid",
@@ -343,8 +343,8 @@ async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values
     assert!(
         matches!(
             &error,
-            tablepro_core::DriverError::Transaction { source, .. }
-                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
+            bookie_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
         ),
         "invalid float4[] should retain PostgreSQL's invalid-text SQLSTATE: {error:?}"
     );
@@ -362,7 +362,7 @@ async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_siblings() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -434,7 +434,7 @@ async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_sib
 
         let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres").unwrap();
         assert_eq!(parsed, Value::Text(literal.into()), "{data_type}[] input text");
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "postgres",
             None,
             table,
@@ -494,7 +494,7 @@ async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_sib
         .unwrap();
     let value_index = columns.iter().position(|column| column.name == "value").unwrap();
     let invalid = parse_input_for_driver("{32768}", Some(&columns[value_index]), "postgres").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "smallint_array_grid",
@@ -510,8 +510,8 @@ async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_sib
     assert!(
         matches!(
             &error,
-            tablepro_core::DriverError::Transaction { source, .. }
-                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22003")
+            bookie_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22003")
         ),
         "smallint[] overflow should retain PostgreSQL's numeric-range SQLSTATE: {error:?}"
     );
@@ -530,7 +530,7 @@ async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_sib
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_and_siblings() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -581,7 +581,7 @@ async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_a
 
     let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "text_array_grid_contract",
@@ -620,7 +620,7 @@ async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_a
         .unwrap();
     assert_eq!(after.rows[0][1..], native.rows[0][..]);
     assert_eq!(after.rows[1], sibling_before);
-    let tablepro_core::Value::Text(json_text) = &after.rows[0][3] else {
+    let bookie_core::Value::Text(json_text) = &after.rows[0][3] else {
         panic!("text[] JSON oracle was not text: {:?}", after.rows[0][3]);
     };
     let json: serde_json::Value = serde_json::from_str(json_text).unwrap();
@@ -630,7 +630,7 @@ async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_a
     );
 
     let invalid = parse_input_for_driver("{\"unterminated}", Some(&columns[value_index]), "postgres").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "text_array_grid_contract",
@@ -646,8 +646,8 @@ async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_a
     assert!(
         matches!(
             &error,
-            tablepro_core::DriverError::Transaction { source, .. }
-                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
+            bookie_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
         ),
         "malformed text[] should retain PostgreSQL's input SQLSTATE: {error:?}"
     );
@@ -661,7 +661,7 @@ async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_a
         .unwrap();
     assert_eq!(saved.rows, after.rows);
 }
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 #[test]
 fn value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_zero_text() {
@@ -696,7 +696,7 @@ fn value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "float8_array_grid",
@@ -742,7 +742,7 @@ fn value_contract_postgres_boolean_array_grid_literal_stays_text_through_the_key
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "bool_array_grid",
@@ -788,7 +788,7 @@ fn value_contract_postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "bytea_array_grid",
@@ -834,7 +834,7 @@ fn value_contract_postgres_uuid_array_grid_literal_stays_text_through_the_keyed_
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "uuid_array_grid",
@@ -880,7 +880,7 @@ fn value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "timestamptz_array_grid",
@@ -906,7 +906,7 @@ fn value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qual
         is_generated: false,
         comment: None,
         collation: None,
-        enum_type: Some(tablepro_core::QualifiedTypeName {
+        enum_type: Some(bookie_core::QualifiedTypeName {
             schema: "enum_array_schema".into(),
             name: "label".into(),
         }),
@@ -938,7 +938,7 @@ fn value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qual
         },
         column,
     ];
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some("enum_array_schema"),
         "items",
@@ -964,7 +964,7 @@ fn value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain
         is_generated: false,
         comment: None,
         collation: None,
-        enum_type: Some(tablepro_core::QualifiedTypeName {
+        enum_type: Some(bookie_core::QualifiedTypeName {
             schema: "public".into(),
             name: "value_contract_domain_array_label".into(),
         }),
@@ -988,7 +988,7 @@ fn value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain
         },
         column,
     ];
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "items",

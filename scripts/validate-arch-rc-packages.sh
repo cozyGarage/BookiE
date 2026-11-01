@@ -83,14 +83,14 @@ if [[ "$source_sha256" != "${fields[1]}" || "$vendor_sha256" != "${fields[2]}" |
   exit 1
 fi
 archived_recipe="$validation_dir/source-PKGBUILD"
-tar -xOf "$source_archive" "TablePro-$commit/apps/linux/packaging/arch/PKGBUILD" > "$archived_recipe"
+tar -xOf "$source_archive" "BookiE-$commit/apps/linux/packaging/arch/PKGBUILD" > "$archived_recipe"
 cmp "$recipe" "$archived_recipe"
 
-TABLEPRO_RC_VERSION="$package_version" TABLEPRO_RC_PKGREL="$package_release" \
-TABLEPRO_RC_COMMIT="$commit" TABLEPRO_RC_SHA256="$source_sha256" \
-TABLEPRO_RC_ARCHIVE="$source_archive" TABLEPRO_RC_VENDOR_SHA256="$vendor_sha256" \
-TABLEPRO_RC_VENDOR_ARCHIVE="$vendor_archive" TABLEPRO_RC_METADATA="$metadata" \
-TABLEPRO_RC_METADATA_SHA256="$(sha256sum "$metadata" | awk '{print $1}')" \
+BOOKIE_RC_VERSION="$package_version" BOOKIE_RC_PKGREL="$package_release" \
+BOOKIE_RC_COMMIT="$commit" BOOKIE_RC_SHA256="$source_sha256" \
+BOOKIE_RC_ARCHIVE="$source_archive" BOOKIE_RC_VENDOR_SHA256="$vendor_sha256" \
+BOOKIE_RC_VENDOR_ARCHIVE="$vendor_archive" BOOKIE_RC_METADATA="$metadata" \
+BOOKIE_RC_METADATA_SHA256="$(sha256sum "$metadata" | awk '{print $1}')" \
 python3 "$root/scripts/resolve-arch-rc-pkgbuild.py" "$recipe" "$validation_dir/PKGBUILD"
 namcap "$validation_dir/PKGBUILD" "${packages[@]}"
 for package in "${app_packages[@]}"; do

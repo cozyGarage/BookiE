@@ -1,9 +1,9 @@
 use super::*;
+use bookie_core::Value;
 use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
-use tablepro_core::Value;
 
 fn rows(count: i64) -> Vec<Vec<Value>> {
     (0..count).map(|n| vec![Value::Int(n)]).collect()
@@ -501,8 +501,8 @@ fn projected_key_lookups_map_columns_and_reject_unfetched_keys() {
     assert_eq!(store.requested(), 0);
 }
 
-fn column(name: &str) -> tablepro_core::ColumnInfo {
-    tablepro_core::ColumnInfo {
+fn column(name: &str) -> bookie_core::ColumnInfo {
+    bookie_core::ColumnInfo {
         name: name.into(),
         data_type: "text".into(),
         nullable: true,

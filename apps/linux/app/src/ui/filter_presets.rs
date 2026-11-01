@@ -1,9 +1,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bookie_core::FilterSet;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
-use tablepro_core::FilterSet;
 use uuid::Uuid;
 
 use crate::services::named_filter_presets::NamedFilterPresetsStore;
@@ -27,7 +27,7 @@ pub struct FilterPresetBar {
 pub fn build(
     context: FilterPresetContext,
     state: Rc<RefCell<FilterSet>>,
-    columns: Rc<RefCell<Vec<tablepro_core::ColumnInfo>>>,
+    columns: Rc<RefCell<Vec<bookie_core::ColumnInfo>>>,
     on_apply: Rc<dyn Fn(FilterSet)>,
 ) -> FilterPresetBar {
     let names = Rc::new(RefCell::new(context.store.list(
@@ -122,7 +122,7 @@ pub fn build(
             status_for_apply.set_text(&crate::tr!("That saved filter is no longer available"));
             return;
         };
-        if tablepro_core::build_filter_where(&driver_for_apply, &columns_for_apply.borrow(), &filter).is_err() {
+        if bookie_core::build_filter_where(&driver_for_apply, &columns_for_apply.borrow(), &filter).is_err() {
             status_for_apply.set_text(&crate::tr!(
                 "This saved filter no longer matches the table columns or types. Edit and save it again."
             ));
@@ -231,7 +231,7 @@ fn selected_name(selector: &gtk::DropDown, names: &Rc<RefCell<Vec<String>>>) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::{ColumnInfo, FilterOp, FilterRule, FilterValue};
+    use bookie_core::{ColumnInfo, FilterOp, FilterRule, FilterValue};
 
     fn filter(value: &str) -> FilterSet {
         FilterSet {

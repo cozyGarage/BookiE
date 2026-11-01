@@ -56,7 +56,7 @@ body:
         - Import and export
         - Policy and approvals
         - Audit records
-        - MCP and tablepro-agentd
+        - MCP and bookie-agentd
         - Packaging and installation
         - Accessibility and desktop integration
         - Other

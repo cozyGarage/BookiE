@@ -17,7 +17,6 @@ def _stage_package(
     source: Path,
     root: Path,
     *,
-    include_aliases: bool,
     include_schema: bool = True,
     include_askpass: bool = True,
     package_name: str = "bookie",
@@ -42,23 +41,20 @@ def _stage_package(
         "#!/bin/sh\necho 'usage: bookie-agentd --policy PATH'\n",
     )
     if include_askpass:
-        _write_executable(stage / "usr/bin/tablepro-askpass", "#!/bin/sh\nexit 0\n")
-    if include_aliases:
-        (stage / "usr/bin/tablepro").symlink_to("bookie")
-        (stage / "usr/bin/tablepro-agentd").symlink_to("bookie-agentd")
-    (stage / "usr/share/applications/com.tablepro.linux.desktop").write_text(
-        (source / "apps/linux/flatpak/com.tablepro.linux.desktop").read_text()
+        _write_executable(stage / "usr/bin/bookie-askpass", "#!/bin/sh\nexit 0\n")
+    (stage / "usr/share/applications/com.bookie.linux.desktop").write_text(
+        (source / "apps/linux/flatpak/com.bookie.linux.desktop").read_text()
     )
-    (stage / "usr/share/metainfo/com.tablepro.linux.metainfo.xml").write_text(
-        (source / "apps/linux/flatpak/com.tablepro.linux.metainfo.xml").read_text()
+    (stage / "usr/share/metainfo/com.bookie.linux.metainfo.xml").write_text(
+        (source / "apps/linux/flatpak/com.bookie.linux.metainfo.xml").read_text()
     )
-    (stage / "usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg").write_text(
-        (source / "apps/linux/flatpak/icons/scalable/com.tablepro.linux.svg").read_text()
+    (stage / "usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg").write_text(
+        (source / "apps/linux/flatpak/icons/scalable/com.bookie.linux.svg").read_text()
     )
     if include_schema:
         shutil.copyfile(
-            source / "apps/linux/data/com.tablepro.linux.gschema.xml",
-            stage / "usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml",
+            source / "apps/linux/data/com.bookie.linux.gschema.xml",
+            stage / "usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml",
         )
     (stage / "usr/share/doc/bookie/LICENSE.md").write_text((source / "LICENSE.md").read_text())
     (stage / "usr/share/doc/bookie/policy.example.toml").write_text(
@@ -70,9 +66,9 @@ def _stage_package(
         "Section: database\n"
         "Priority: optional\n"
         "Architecture: amd64\n"
-        "Maintainer: BookiE Contributors <noreply@tablepro.app>\n"
+        "Maintainer: BookiE Contributors <noreply@bookie.app>\n"
         "Homepage: https://github.com/cozyGarage/BookiE\n"
-        + ("Replaces: tablepro\nConflicts: tablepro\nProvides: tablepro\n" if include_relations else "")
+        + ("Replaces: tablepro\nConflicts: tablepro\n" if include_relations else "")
         + "Description: Native Linux database client\n"
         " BookiE test fixture\n"
     )
@@ -88,15 +84,10 @@ def _stage_package(
     return package
 
 
-def _listing_last_fields(package: Path) -> set[str]:
-    listing = subprocess.check_output(["dpkg-deb", "-c", str(package)], text=True)
-    return {line.split()[-1] for line in listing.splitlines() if line.strip()}
-
-
 def check_builder_builds_and_installs_the_askpass_helper(source: Path) -> None:
     builder = (source / "scripts/build-deb.sh").read_text()
-    assert "--bin tablepro-askpass" in builder, "build-deb.sh does not build the SSH askpass helper"
-    assert "usr/bin/tablepro-askpass" in builder, "build-deb.sh does not install the SSH askpass helper"
+    assert "--bin bookie-askpass" in builder, "build-deb.sh does not build the SSH askpass helper"
+    assert "usr/bin/bookie-askpass" in builder, "build-deb.sh does not install the SSH askpass helper"
 
 
 def check_package_test_reports_the_failing_command(source: Path) -> None:
@@ -120,7 +111,7 @@ def check_deb_build_failure_reports_stderr(source: Path) -> None:
 
         with patch("subprocess.run", side_effect=run_failed_build):
             try:
-                _stage_package(source, Path(temporary), include_aliases=True)
+                _stage_package(source, Path(temporary))
             except RuntimeError as error:
                 assert "dpkg-deb: fixture failure" in str(error), str(error)
             else:
@@ -140,38 +131,27 @@ def main() -> None:
         root = Path(temporary)
         old_umask = os.umask(0o077)
         try:
-            valid = _stage_package(source, root / "valid", include_aliases=True)
+            valid = _stage_package(source, root / "valid")
         finally:
             os.umask(old_umask)
-        last_fields = _listing_last_fields(valid)
-        assert "./usr/bin/tablepro" not in last_fields
-        assert "bookie" in last_fields
         subprocess.run(["bash", str(validator), str(valid)], check=True)
-        missing = _stage_package(source, root / "missing", include_aliases=False)
-        result = subprocess.run(
-            ["bash", str(validator), str(missing)],
-            capture_output=True,
-            text=True,
-        )
-        assert result.returncode != 0
-        assert "package is missing /usr/bin/tablepro" in result.stderr, result.stderr
-        missing_askpass = _stage_package(source, root / "missing-askpass", include_aliases=True, include_askpass=False)
+        missing_askpass = _stage_package(source, root / "missing-askpass", include_askpass=False)
         result = subprocess.run(["bash", str(validator), str(missing_askpass)], capture_output=True, text=True)
         assert result.returncode != 0
-        assert "package is missing /usr/bin/tablepro-askpass" in result.stderr, result.stderr
-        missing_schema = _stage_package(source, root / "missing-schema", include_aliases=True, include_schema=False)
+        assert "package is missing /usr/bin/bookie-askpass" in result.stderr, result.stderr
+        missing_schema = _stage_package(source, root / "missing-schema", include_schema=False)
         result = subprocess.run(["bash", str(validator), str(missing_schema)], capture_output=True, text=True)
         assert result.returncode != 0
-        assert "package is missing /usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml" in result.stderr, result.stderr
-        old_name = _stage_package(source, root / "old-name", include_aliases=True, package_name="tablepro")
+        assert "package is missing /usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml" in result.stderr, result.stderr
+        old_name = _stage_package(source, root / "old-name", package_name="tablepro")
         result = subprocess.run(["bash", str(validator), str(old_name)], capture_output=True, text=True)
         assert result.returncode != 0
         assert "Debian package name must be bookie" in result.stderr, result.stderr
-        no_relations = _stage_package(source, root / "no-relations", include_aliases=True, include_relations=False)
+        no_relations = _stage_package(source, root / "no-relations", include_relations=False)
         result = subprocess.run(["bash", str(validator), str(no_relations)], capture_output=True, text=True)
         assert result.returncode != 0
         assert "must declare Replaces: tablepro" in result.stderr, result.stderr
-    print("Debian package symlink validation passed")
+    print("Debian package validation passed")
 
 
 if __name__ == "__main__":

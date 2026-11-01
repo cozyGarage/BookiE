@@ -1,13 +1,13 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Consumer-level tests for the pipelines the application composes out
-//! of `tablepro-core`. Each helper has unit tests of its own; these
+//! of `bookie-core`. Each helper has unit tests of its own; these
 //! cover the seams between them, where a mismatch produces SQL whose
 //! placeholders and parameters disagree.
 
-use tablepro_core::sql_dialect::{build_order_and_pagination, placeholder_for, quote_ident};
-use tablepro_core::sql_lex::{split_statements, statement_at_cursor};
-use tablepro_core::sql_literal::build_insert_literal;
-use tablepro_core::{
+use bookie_core::sql_dialect::{build_order_and_pagination, placeholder_for, quote_ident};
+use bookie_core::sql_lex::{split_statements, statement_at_cursor};
+use bookie_core::sql_literal::build_insert_literal;
+use bookie_core::{
     ColumnInfo, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, Value, build_filter_where,
     extract_named_parameters, keyset_before_where_clause, keyset_order_by, keyset_where_clause,
 };
@@ -265,7 +265,7 @@ fn a_copied_row_and_a_drafted_row_agree_on_which_columns_are_writable() {
             !copied.contains(&quote_ident(driver_id, "computed")),
             "{driver_id} offered to insert a generated column: {copied}"
         );
-        let drafted = tablepro_core::sql_dialect::build_insert_from_draft(driver_id, None, "people", &columns, &row)
+        let drafted = bookie_core::sql_dialect::build_insert_from_draft(driver_id, None, "people", &columns, &row)
             .expect("build the draft insert");
         assert!(!drafted.0.contains(&quote_ident(driver_id, "computed")), "{driver_id}");
     }

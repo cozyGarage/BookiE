@@ -2,7 +2,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use rust_decimal::Decimal;
 use tiberius::{Column, ColumnData, ColumnType, FromSql};
 
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 use crate::zoned;
 
@@ -43,7 +43,7 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
         ColumnData::I32(v) => (*v).map(|n| Value::Int(i64::from(n))).unwrap_or(Value::Null),
         ColumnData::I64(v) => (*v).map(Value::Int).unwrap_or(Value::Null),
         ColumnData::F32(v) => (*v)
-            .map(|n| Value::Float(tablepro_core::single_precision_as_f64(n)))
+            .map(|n| Value::Float(bookie_core::single_precision_as_f64(n)))
             .unwrap_or(Value::Null),
         ColumnData::F64(v) => (*v).map(Value::Float).unwrap_or(Value::Null),
         ColumnData::String(v) => v.as_ref().map(|s| Value::Text(s.to_string())).unwrap_or(Value::Null),

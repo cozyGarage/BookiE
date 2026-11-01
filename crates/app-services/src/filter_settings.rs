@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tablepro_core::FilterSet;
+use bookie_core::FilterSet;
 use uuid::Uuid;
 
 use super::config_io::xdg_config_path;
@@ -83,7 +83,7 @@ impl FilterSettingsStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::{Combinator, FilterOp, FilterRule, FilterValue};
+    use bookie_core::{Combinator, FilterOp, FilterRule, FilterValue};
 
     fn sample_set() -> FilterSet {
         FilterSet {

@@ -1,5 +1,5 @@
 use crate::{connect, start_pg};
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -34,7 +34,7 @@ async fn value_contract_postgres_copy_insert_regenerates_identity_values() {
             .unwrap()
             .rows
             .remove(0);
-        let insert = tablepro_core::sql_literal::build_insert_literal("postgres", None, table, &columns, &row).unwrap();
+        let insert = bookie_core::sql_literal::build_insert_literal("postgres", None, table, &columns, &row).unwrap();
         assert_eq!(insert, format!("INSERT INTO \"{table}\" (\"note\") VALUES ('source');"));
         connection.execute(&insert).await.unwrap();
 
@@ -67,8 +67,7 @@ async fn value_contract_postgres_copy_insert_regenerates_identity_values() {
         .rows
         .remove(0);
     let insert =
-        tablepro_core::sql_literal::build_insert_literal("postgres", None, "identity_only_copy", &columns, &row)
-            .unwrap();
+        bookie_core::sql_literal::build_insert_literal("postgres", None, "identity_only_copy", &columns, &row).unwrap();
     assert_eq!(insert, "INSERT INTO \"identity_only_copy\" DEFAULT VALUES;");
     connection.execute(&insert).await.unwrap();
     assert_eq!(
@@ -195,7 +194,7 @@ async fn sequence_sync_preserves_ahead_sequences_and_negative_increments() {
         connection
             .synchronize_auto_increment_sequences(None, "unowned_sequence_table", &["id".into()])
             .await,
-        Err(tablepro_core::DriverError::Unsupported(_))
+        Err(bookie_core::DriverError::Unsupported(_))
     ));
 }
 

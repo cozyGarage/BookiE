@@ -45,29 +45,29 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
     );
 
     let directory = tempfile::tempdir().unwrap();
-    let options = tablepro_core::export::CsvOptions::default();
+    let options = bookie_core::export::CsvOptions::default();
     for (extension, format, marker) in [
         (
             "xml",
-            tablepro_core::export::ResultFormat::Xml,
+            bookie_core::export::ResultFormat::Xml,
             "&lt;/value&gt;&lt;injected",
         ),
         (
             "html",
-            tablepro_core::export::ResultFormat::Html,
+            bookie_core::export::ResultFormat::Html,
             "&lt;/value&gt;&lt;injected",
         ),
         (
             "md",
-            tablepro_core::export::ResultFormat::Markdown,
+            bookie_core::export::ResultFormat::Markdown,
             "&lt;/value&gt;&lt;injected",
         ),
     ] {
         let path = directory.path().join(format!("array.{extension}"));
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             &path,
             &result,
-            &tablepro_core::export::ResultExport {
+            &bookie_core::export::ResultExport {
                 format,
                 csv: &options,
                 sql: None,
@@ -89,11 +89,11 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &options,
             sql: None,
         },
@@ -131,13 +131,13 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
         .await
         .unwrap();
     let path = directory.path().join("array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "array_filewriter_target",
@@ -201,16 +201,16 @@ async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimpor
     assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let Value::Text(driver_text) = &result.rows[0][0] else {
         panic!("uuid[] result must remain text: {:?}", result.rows[0][0]);
     };
     let json_path = directory.path().join("uuid-array.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -222,11 +222,11 @@ async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimpor
     assert_eq!(json_file[0]["value"], *driver_text);
 
     let csv_path = directory.path().join("uuid-array.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -241,11 +241,11 @@ async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimpor
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("uuid-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -289,13 +289,13 @@ async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimpor
         .await
         .unwrap();
     let sql_path = directory.path().join("uuid-array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "uuid_array_filewriter_target",
@@ -365,12 +365,12 @@ async fn value_contract_date_array_file_exports_preserve_boundaries_for_calc_rei
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("date-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -445,13 +445,13 @@ async fn value_contract_date_array_csv_and_sql_replay_preserve_sql_dmy_style() {
     assert_eq!(rebound.rows[0][1], native.rows[0][4]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let csv_path = directory.path().join("date-array-sql-dmy.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -468,13 +468,13 @@ async fn value_contract_date_array_csv_and_sql_replay_preserve_sql_dmy_style() {
         .await
         .unwrap();
     let sql_path = directory.path().join("date-array-sql-dmy.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "date_array_sql_dmy_target",
@@ -543,12 +543,12 @@ async fn value_contract_timestamp_array_file_exports_preserve_boundaries_for_cal
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("timestamp-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -622,12 +622,12 @@ async fn value_contract_time_array_file_exports_preserve_boundaries_for_calc_rei
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("time-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -713,13 +713,13 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         panic!("timetz[] result must remain text: {:?}", result.rows[0][0]);
     };
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let json_path = directory.path().join("timetz-array.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -731,11 +731,11 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
     assert_eq!(json_file[0]["value"], *driver_text);
 
     let csv_path = directory.path().join("timetz-array.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -762,17 +762,17 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         .await
         .unwrap();
     let csv_text = std::fs::read(csv_path).unwrap();
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(&csv_text, &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(&csv_text, &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(None, "timetz_array_csv_import_target")
         .await
         .unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "timetz_array_csv_import_target",
             columns: &columns,
@@ -820,13 +820,13 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         .await
         .unwrap();
     let sql_path = directory.path().join("timetz-array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "timetz_array_filewriter_target",
@@ -858,11 +858,11 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("timetz-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -927,22 +927,22 @@ async fn value_contract_boolean_array_file_exports_preserve_values_for_calc_reim
     assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let Value::Text(driver_text) = &result.rows[0][0] else {
         panic!("boolean[] result must remain text: {:?}", result.rows[0][0]);
     };
     for (format, extension) in [
-        (tablepro_core::export::ResultFormat::Json, "json"),
-        (tablepro_core::export::ResultFormat::Csv, "csv"),
-        (tablepro_core::export::ResultFormat::Xml, "xml"),
-        (tablepro_core::export::ResultFormat::Html, "html"),
-        (tablepro_core::export::ResultFormat::Markdown, "md"),
+        (bookie_core::export::ResultFormat::Json, "json"),
+        (bookie_core::export::ResultFormat::Csv, "csv"),
+        (bookie_core::export::ResultFormat::Xml, "xml"),
+        (bookie_core::export::ResultFormat::Html, "html"),
+        (bookie_core::export::ResultFormat::Markdown, "md"),
     ] {
         let path = directory.path().join(format!("boolean-array.{extension}"));
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             &path,
             &result,
-            &tablepro_core::export::ResultExport {
+            &bookie_core::export::ResultExport {
                 format,
                 csv: &csv_options,
                 sql: None,
@@ -953,28 +953,28 @@ async fn value_contract_boolean_array_file_exports_preserve_values_for_calc_reim
         .unwrap();
         let output = std::fs::read_to_string(path).unwrap();
         let validated = match format {
-            tablepro_core::export::ResultFormat::Json => {
+            bookie_core::export::ResultFormat::Json => {
                 let json: serde_json::Value = serde_json::from_str(&output).unwrap();
                 assert_eq!(json[0]["value"], *driver_text);
                 true
             }
-            tablepro_core::export::ResultFormat::Csv => {
+            bookie_core::export::ResultFormat::Csv => {
                 let mut csv = csv::Reader::from_reader(output.as_bytes());
                 assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
                 assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
                 true
             }
-            tablepro_core::export::ResultFormat::Xml => {
+            bookie_core::export::ResultFormat::Xml => {
                 let escaped = driver_text.replace('"', "&quot;");
                 assert!(output.contains(&format!("<value>{escaped}</value>")), "{output}");
                 true
             }
-            tablepro_core::export::ResultFormat::Html => {
+            bookie_core::export::ResultFormat::Html => {
                 let escaped = driver_text.replace('"', "&quot;");
                 assert!(output.contains(&format!("<td>{escaped}</td>")), "{output}");
                 true
             }
-            tablepro_core::export::ResultFormat::Markdown => {
+            bookie_core::export::ResultFormat::Markdown => {
                 let escaped = serde_json::Value::String(driver_text.clone())
                     .to_string()
                     .replace('\\', "&#92;");
@@ -989,11 +989,11 @@ async fn value_contract_boolean_array_file_exports_preserve_values_for_calc_reim
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("boolean-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -1058,12 +1058,12 @@ async fn value_contract_int8_array_file_exports_preserve_precision_for_calc_reim
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("int8-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -1142,12 +1142,12 @@ async fn value_contract_integer_arrays_file_exports_preserve_bounds_for_calc_rei
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("integer-arrays.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,

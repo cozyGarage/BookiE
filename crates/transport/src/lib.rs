@@ -1,13 +1,13 @@
+use bookie_core::Environment;
+use bookie_core::{AuthMode, ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
+use bookie_policy::{AuditSink, AuditState, Principal};
+use bookie_ssh::{SshAuth, SshConfig, SshTunnel};
+use bookie_storage::{
+    SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, load_password, load_ssh_passphrase, load_ssh_password,
+};
 use secrecy::SecretString;
 use std::sync::Arc;
 use std::time::Duration;
-use tablepro_core::Environment;
-use tablepro_core::{AuthMode, ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
-use tablepro_policy::{AuditSink, AuditState, Principal};
-use tablepro_ssh::{SshAuth, SshConfig, SshTunnel};
-use tablepro_storage::{
-    SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, load_password, load_ssh_passphrase, load_ssh_password,
-};
 use uuid::Uuid;
 
 mod route;
@@ -115,7 +115,7 @@ pub enum TransportError {
     #[error("{0}")]
     Secret(String),
     #[error("{0}")]
-    Keyring(tablepro_storage::KeyringFailure),
+    Keyring(bookie_storage::KeyringFailure),
     #[error("integrated authentication is not supported by the {0} driver")]
     IntegratedAuthUnsupported(String),
     #[error("local Unix sockets are not supported by the {0} driver")]
@@ -346,10 +346,10 @@ async fn open_tunnel_with(
             redirect_through_tunnel(opts, remote, (tun.local_host().to_string(), tun.local_port()))
         }
         (Tunnel::OpenSsh(forward), None) => match forward.local_endpoint() {
-            tablepro_ssh::openssh::LocalEndpoint::Tcp(address) => {
+            bookie_ssh::openssh::LocalEndpoint::Tcp(address) => {
                 redirect_through_tunnel(opts, remote, (address.ip().to_string(), address.port()))
             }
-            tablepro_ssh::openssh::LocalEndpoint::Unix(_) => {
+            bookie_ssh::openssh::LocalEndpoint::Unix(_) => {
                 return Err(TransportError::Ssh("the forwarded socket has no directory".into()));
             }
         },
@@ -379,9 +379,9 @@ async fn open_builtin(
         (None, None) => SshTunnel::open_chain(hops, remote.0.clone(), remote.1, unknown).await,
     }
     .map_err(|error| match error {
-        error @ tablepro_ssh::SshError::UnknownHostKey { .. } => TransportError::HostKeyRefused(error.to_string()),
-        error @ tablepro_ssh::SshError::HostKeyMismatch { .. } => TransportError::HostKeyChanged(error.to_string()),
-        error @ tablepro_ssh::SshError::Timeout { .. } => TransportError::SshTimeout(error.to_string()),
+        error @ bookie_ssh::SshError::UnknownHostKey { .. } => TransportError::HostKeyRefused(error.to_string()),
+        error @ bookie_ssh::SshError::HostKeyMismatch { .. } => TransportError::HostKeyChanged(error.to_string()),
+        error @ bookie_ssh::SshError::Timeout { .. } => TransportError::SshTimeout(error.to_string()),
         error => TransportError::Ssh(error.to_string()),
     })
 }
@@ -478,9 +478,9 @@ pub(crate) async fn resolve_saved_ssh_hop(
     })
 }
 
-pub(crate) fn secret_error(context: &str, error: tablepro_storage::StorageError) -> TransportError {
+pub(crate) fn secret_error(context: &str, error: bookie_storage::StorageError) -> TransportError {
     match error {
-        tablepro_storage::StorageError::Keyring(failure) => TransportError::Keyring(failure),
+        bookie_storage::StorageError::Keyring(failure) => TransportError::Keyring(failure),
         other => TransportError::Secret(format!("{context}: {other}")),
     }
 }
@@ -491,7 +491,7 @@ async fn saved_ssh_password(id: Uuid, hop: &SavedSshConfig, hop_index: usize) ->
             .await
             .map_err(|e| secret_error("load ssh password", e))?
     } else {
-        tablepro_storage::load_ssh_hop_password(id, hop.hop_id, hop.credential_revision)
+        bookie_storage::load_ssh_hop_password(id, hop.hop_id, hop.credential_revision)
             .await
             .map_err(|e| secret_error("load ssh hop password", e))?
     };
@@ -517,7 +517,7 @@ async fn saved_ssh_passphrase(
             .await
             .map_err(|e| secret_error("load ssh passphrase", e));
     }
-    tablepro_storage::load_ssh_hop_passphrase(id, hop.hop_id, hop.credential_revision)
+    bookie_storage::load_ssh_hop_passphrase(id, hop.hop_id, hop.credential_revision)
         .await
         .map_err(|e| secret_error("load ssh hop passphrase", e))
 }

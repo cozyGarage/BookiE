@@ -49,7 +49,7 @@ jobs:
       - name: Line coverage of the unit tier
         run: |
           cd src
-          cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage.json"
+          cargo llvm-cov --workspace --exclude bookie-driver-duckdb --lib --bins --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage.json"
           python3 scripts/check-coverage-floor.py "$GITHUB_WORKSPACE/coverage.json"
 
       - name: Finalize runner job
@@ -69,7 +69,7 @@ jobs:
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-docker-cov-${{ matrix.driver }}
       RUSTC_WRAPPER: ""
-      TABLEPRO_TEST_RUN_ID: nightly-${{ github.run_id }}-${{ matrix.driver }}
+      BOOKIE_TEST_RUN_ID: nightly-${{ github.run_id }}-${{ matrix.driver }}
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -100,12 +100,12 @@ jobs:
         run: |
           cd src
           cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
+            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
           }
           trap cleanup_testcontainers EXIT
           targets=(--lib --tests)
           [ "${{ matrix.driver }}" = postgres ] && targets=(--lib --test integration)
-          cargo llvm-cov --no-report --locked -p "tablepro-driver-${{ matrix.driver }}" "${targets[@]}" -- --include-ignored --test-threads=1
+          cargo llvm-cov --no-report --locked -p "bookie-driver-${{ matrix.driver }}" "${targets[@]}" -- --include-ignored --test-threads=1
           cargo llvm-cov report --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage-${{ matrix.driver }}.json"
           python3 scripts/check-crate-coverage-floors.py "$GITHUB_WORKSPACE/coverage-${{ matrix.driver }}.json" --only "crates/drivers/${{ matrix.driver }}"
 
@@ -131,18 +131,18 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - {label: core-1, package: tablepro-core, shard: 0/4}
-          - {label: core-2, package: tablepro-core, shard: 1/4}
-          - {label: core-3, package: tablepro-core, shard: 2/4}
-          - {label: core-4, package: tablepro-core, shard: 3/4}
-          - {label: policy-1, package: tablepro-policy, shard: 0/2}
-          - {label: policy-2, package: tablepro-policy, shard: 1/2}
-          - {label: ssh, package: tablepro-ssh, shard: 0/1}
-          - {label: redis, package: tablepro-driver-redis, shard: 0/1}
-          - {label: postgres, package: tablepro-driver-postgres, shard: 0/1}
-          - {label: agentd, package: tablepro-agentd, shard: 0/1}
-          - {label: transport, package: tablepro-transport, shard: 0/1}
-          - {label: app-services, package: tablepro-app-services, shard: 0/1}
+          - {label: core-1, package: bookie-core, shard: 0/4}
+          - {label: core-2, package: bookie-core, shard: 1/4}
+          - {label: core-3, package: bookie-core, shard: 2/4}
+          - {label: core-4, package: bookie-core, shard: 3/4}
+          - {label: policy-1, package: bookie-policy, shard: 0/2}
+          - {label: policy-2, package: bookie-policy, shard: 1/2}
+          - {label: ssh, package: bookie-ssh, shard: 0/1}
+          - {label: redis, package: bookie-driver-redis, shard: 0/1}
+          - {label: postgres, package: bookie-driver-postgres, shard: 0/1}
+          - {label: agentd, package: bookie-agentd, shard: 0/1}
+          - {label: transport, package: bookie-transport, shard: 0/1}
+          - {label: app-services, package: bookie-app-services, shard: 0/1}
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -166,13 +166,13 @@ jobs:
           cd src
           args=(--package "${{ matrix.package }}" --test-tool cargo --shard "${{ matrix.shard }}"
                 --output "$GITHUB_WORKSPACE/mutants-${{ matrix.label }}" --timeout 60 --build-timeout 900 --no-shuffle)
-          if [ "${{ matrix.package }}" = tablepro-driver-postgres ]; then
+          if [ "${{ matrix.package }}" = bookie-driver-postgres ]; then
             args+=(--file crates/drivers/postgres/src/array.rs --file crates/drivers/postgres/src/numeric.rs
                    --file crates/drivers/postgres/src/temporal.rs --file crates/drivers/postgres/src/decode.rs)
           fi
           status=0
           test_args=(--lib)
-          [ "${{ matrix.package }}" = tablepro-agentd ] && test_args+=(--bins --tests)
+          [ "${{ matrix.package }}" = bookie-agentd ] && test_args+=(--bins --tests)
           cargo mutants "${args[@]}" -- "${test_args[@]}" || status=$?
           partial=()
           [ "${{ matrix.shard }}" = 0/1 ] || partial=(--partial)
@@ -219,12 +219,12 @@ jobs:
       - name: Five retry-free installed GTK attempts
         run: |
           cd src
-          cargo build --release --locked -p tablepro-app --bin tablepro-app
-          binary="$PWD/target-soak-${{ matrix.run }}/usr/bin/tablepro"
-          install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-app" "$binary"
+          cargo build --release --locked -p bookie-app --bin bookie-app
+          binary="$PWD/target-soak-${{ matrix.run }}/usr/bin/bookie"
+          install -Dm755 "$CARGO_TARGET_DIR/release/bookie-app" "$binary"
           for attempt in 1 2 3 4 5; do
             echo "soak run ${{ matrix.run }} attempt $attempt at $(git rev-parse HEAD)"
-            TABLEPRO_GTK_BINARY="$binary" bash scripts/test-gtk-safety.sh >"$GITHUB_WORKSPACE/soak-${{ matrix.run }}-$attempt.log" 2>&1 || {
+            BOOKIE_GTK_BINARY="$binary" bash scripts/test-gtk-safety.sh >"$GITHUB_WORKSPACE/soak-${{ matrix.run }}-$attempt.log" 2>&1 || {
               grep -aE "^passed:|^FAILED|scenario.s. failed|AssertionError" "$GITHUB_WORKSPACE/soak-${{ matrix.run }}-$attempt.log" | tail -20
               exit 1
             }

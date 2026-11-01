@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 SOURCE = Path(__file__).resolve().parents[2]
-BINARIES = ("tablepro-app", "tablepro-agentd", "tablepro-askpass")
+BINARIES = ("bookie-app", "bookie-agentd", "bookie-askpass")
 
 FAKE_CARGO = """#!/bin/bash
 set -eu
@@ -21,7 +21,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 mkdir -p "$CARGO_TARGET_DIR/$profile"
-for bin in tablepro-app tablepro-agentd tablepro-askpass; do
+for bin in bookie-app bookie-agentd bookie-askpass; do
   printf '#!/bin/sh\\necho %s\\n' "$profile" > "$CARGO_TARGET_DIR/$profile/$bin"
   chmod +x "$CARGO_TARGET_DIR/$profile/$bin"
 done
@@ -53,10 +53,10 @@ def _deb_checkout(root: Path) -> Path:
     for relative in (
         "Cargo.toml",
         "LICENSE.md",
-        "apps/linux/flatpak/com.tablepro.linux.desktop",
-        "apps/linux/flatpak/com.tablepro.linux.metainfo.xml",
-        "apps/linux/flatpak/icons/scalable/com.tablepro.linux.svg",
-        "apps/linux/data/com.tablepro.linux.gschema.xml",
+        "apps/linux/flatpak/com.bookie.linux.desktop",
+        "apps/linux/flatpak/com.bookie.linux.metainfo.xml",
+        "apps/linux/flatpak/icons/scalable/com.bookie.linux.svg",
+        "apps/linux/data/com.bookie.linux.gschema.xml",
         "apps/linux/packaging/policy.example.toml",
     ):
         (checkout / relative).parent.mkdir(parents=True, exist_ok=True)
@@ -93,9 +93,9 @@ def _pkgbuild_build(profile: str | None) -> tuple[subprocess.CompletedProcess, P
     if profile is not None:
         env["BOOKIE_BUILD_PROFILE"] = profile
     for name in ("VERSION", "COMMIT", "SHA256", "ARCHIVE", "VENDOR_SHA256", "VENDOR_ARCHIVE", "METADATA", "METADATA_SHA256"):
-        env[f"TABLEPRO_RC_{name}"] = "fixture"
+        env[f"BOOKIE_RC_{name}"] = "fixture"
     srcdir = root / "src"
-    (srcdir / "TablePro-fixture").mkdir(parents=True)
+    (srcdir / "BookiE-fixture").mkdir(parents=True)
     script = (
         f'source "{SOURCE}/apps/linux/packaging/arch/PKGBUILD"\n'
         f'srcdir="{srcdir}"\n_commit=fixture\n'

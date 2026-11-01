@@ -3,18 +3,18 @@ use std::path::PathBuf;
 use crate::StorageError;
 
 pub fn storage_dir_name() -> &'static str {
-    if option_env!("TABLEPRO_PROFILE") == Some("development") {
-        "tablepro-devel"
+    if option_env!("BOOKIE_PROFILE") == Some("development") {
+        "bookie-devel"
     } else {
-        "tablepro"
+        "bookie"
     }
 }
 
 pub fn secret_schema() -> &'static str {
-    if option_env!("TABLEPRO_PROFILE") == Some("development") {
-        "com.tablepro.linux.Devel.Password"
+    if option_env!("BOOKIE_PROFILE") == Some("development") {
+        "com.bookie.linux.Devel.Password"
     } else {
-        "com.tablepro.linux.Password"
+        "com.bookie.linux.Password"
     }
 }
 
@@ -54,12 +54,12 @@ mod tests {
 
     #[test]
     fn profile_paths_and_secrets_share_an_identity() {
-        if option_env!("TABLEPRO_PROFILE") == Some("development") {
-            assert_eq!(storage_dir_name(), "tablepro-devel");
-            assert_eq!(secret_schema(), "com.tablepro.linux.Devel.Password");
+        if option_env!("BOOKIE_PROFILE") == Some("development") {
+            assert_eq!(storage_dir_name(), "bookie-devel");
+            assert_eq!(secret_schema(), "com.bookie.linux.Devel.Password");
         } else {
-            assert_eq!(storage_dir_name(), "tablepro");
-            assert_eq!(secret_schema(), "com.tablepro.linux.Password");
+            assert_eq!(storage_dir_name(), "bookie");
+            assert_eq!(secret_schema(), "com.bookie.linux.Password");
         }
     }
 

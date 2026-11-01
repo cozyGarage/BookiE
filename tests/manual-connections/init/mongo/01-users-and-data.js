@@ -1,13 +1,13 @@
-const lab = db.getSiblingDB('tablepro_lab');
+const lab = db.getSiblingDB('bookie_lab');
 lab.createUser({
-  user: 'tablepro_rw',
-  pwd: 'tablepro_rw_password',
-  roles: [{ role: 'readWrite', db: 'tablepro_lab' }],
+  user: 'bookie_rw',
+  pwd: 'bookie_rw_password',
+  roles: [{ role: 'readWrite', db: 'bookie_lab' }],
 });
 lab.createUser({
-  user: 'tablepro_ro',
-  pwd: 'tablepro_ro_password',
-  roles: [{ role: 'read', db: 'tablepro_lab' }],
+  user: 'bookie_ro',
+  pwd: 'bookie_ro_password',
+  roles: [{ role: 'read', db: 'bookie_lab' }],
 });
 lab.people.insertMany([
   { _id: 1, name: 'Ada Lovelace', email: 'ada@example.test', active: true },

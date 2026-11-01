@@ -2,11 +2,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, OperationControl};
-use tablepro_dump::{ClientTool, DumpError, DumpFormat, PgDumpRequest, PgRestoreRequest, pg_dump, pg_restore};
-use tablepro_policy::{AdministrativeOperation, PolicyGuard};
-use tablepro_storage::SavedConnection;
-use tablepro_transport::{
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, OperationControl};
+use bookie_dump::{ClientTool, DumpError, DumpFormat, PgDumpRequest, PgRestoreRequest, pg_dump, pg_restore};
+use bookie_policy::{AdministrativeOperation, PolicyGuard};
+use bookie_storage::SavedConnection;
+use bookie_transport::{
     SshEnvironment, SshRoute, TransportError, connect_options_for, open_tool_endpoint, saved_ssh_route,
 };
 

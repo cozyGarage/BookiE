@@ -1,4 +1,4 @@
-use tablepro_core::{ConnectOptions, DatabaseDriver, Value, import::build_insert_plan};
+use bookie_core::{ConnectOptions, DatabaseDriver, Value, import::build_insert_plan};
 use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
@@ -24,8 +24,8 @@ async fn value_contract_postgres_csv_import_preserves_explicit_identity_values()
         )
         .await
         .unwrap();
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(
         b"id,note,doubled\n900,alpha,ignored\n901,beta,ignored\n",
         &options,
         None,
@@ -33,12 +33,12 @@ async fn value_contract_postgres_csv_import_preserves_explicit_identity_values()
     .unwrap();
     let columns = connection.fetch_columns(None, "csv_identity").await.unwrap();
     let plan = build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities {
+            capabilities: bookie_core::DriverCapabilities {
                 supports_explicit_auto_increment_values: true,
-                ..tablepro_core::DriverCapabilities::default()
+                ..bookie_core::DriverCapabilities::default()
             },
             schema: None,
             table: "csv_identity",

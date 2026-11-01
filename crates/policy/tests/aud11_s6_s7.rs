@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Environment;
-use tablepro_policy::{Decision, PolicyConfig, Principal, classify, evaluate};
+use bookie_core::Environment;
+use bookie_policy::{Decision, PolicyConfig, Principal, classify, evaluate};
 
-fn human_decision(sql: &str, environment: Environment, policy: &tablepro_policy::EnvPolicy) -> Decision {
+fn human_decision(sql: &str, environment: Environment, policy: &bookie_policy::EnvPolicy) -> Decision {
     evaluate(
         &Principal::human_gui(),
         environment,
