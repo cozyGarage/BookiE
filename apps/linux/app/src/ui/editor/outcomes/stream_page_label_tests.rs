@@ -28,13 +28,14 @@ fn page_label_lookup_uses_a_constant_number_of_page_index_lookups() {
 
 #[test]
 fn progress_text_reads_the_cached_retained_row_count_once() {
-    let page = std::sync::Arc::new(tablepro_core::QueryResult {
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
         columns: Vec::new(),
         rows: vec![Vec::new()],
         truncated: false,
     });
+    let page_ref = std::sync::Arc::downgrade(&page);
     let result = StreamedResult {
-        pages: vec![page; 10_000],
+        pages: vec![page_ref; 10_000],
         page_indices: (0..10_000).collect(),
         page_row_counts: vec![1; 10_000],
         page_row_starts: (1..=10_000).collect(),

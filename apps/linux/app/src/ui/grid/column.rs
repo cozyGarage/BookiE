@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use gtk4::prelude::*;
+use std::rc::Rc;
 
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
-use super::context_menu::GridMenus;
 use super::display::{
     COLUMN_SLOT, CellView, FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT,
     ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view_with_column_editability, value_to_full_edit_text,
@@ -85,7 +87,6 @@ pub(super) fn build_column(
     tab_ctx: TabGridContext,
     sort_enabled: bool,
     default_min_width: Option<i32>,
-    grid_menus: Option<GridMenus>,
     column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
 ) -> gtk4::ColumnViewColumn {
     let factory = gtk4::SignalListItemFactory::new();
@@ -95,42 +96,27 @@ pub(super) fn build_column(
 
     let column_data_type = info.data_type.clone();
     let choices_for_setup = tab_ctx.choices.clone();
-    let column_name = info.name.clone();
-    let grid_menus_for_setup = grid_menus.clone();
+    let column_name: Rc<str> = Rc::from(info.name.as_str());
     factory.connect_setup(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
             return;
         };
         if let Some(edit_sender) = edit_sender.clone() {
             if is_bool_type(&column_data_type) {
-                setup_bool_cell(
-                    item,
-                    idx,
-                    column_name.clone(),
-                    edit_sender,
-                    grid_menus_for_setup.as_ref(),
-                );
+                setup_bool_cell(item, idx, edit_sender);
             } else {
                 let editor_kind = classify_editor_kind(&column_data_type);
                 setup_editable_cell(
                     item,
                     idx,
-                    column_name.clone(),
-                    super::full_value_editor::is_full_value_column(&column_data_type),
                     edit_sender,
                     editor_kind,
                     choices_for_setup.clone(),
-                    grid_menus_for_setup.as_ref(),
+                    column_name.clone(),
                 );
             }
         } else {
-            setup_readonly_cell(
-                item,
-                idx,
-                column_name.clone(),
-                readonly_sender.clone(),
-                grid_menus_for_setup.as_ref(),
-            );
+            setup_readonly_cell(item, idx, readonly_sender.clone());
         }
     });
 
@@ -251,12 +237,18 @@ fn bind_row_cell(
     column_is_editable: bool,
 ) {
     row.with_cell_value(index, |source_value| {
-        let pk_values = if context.tab_id.is_some() {
-            context.pk_col_indices.iter().map(|&i| row.cell_value(i)).collect()
+        let identity = if context.tab_id.is_some() {
+            Some(row.row_identity(&context.pk_col_indices))
         } else {
-            Vec::new()
+            None
         };
-        let (edited, updated_value, pending_classes) = state_for_bind(context, row, index, &pk_values, source_value);
+        let (edited, updated_value, pending_classes) = state_for_bind(
+            context,
+            row,
+            index,
+            identity.as_deref().and_then(|identity| identity.key.as_ref()),
+            source_value,
+        );
         let preview = preview_for_bind(row, index, edited);
         let value = value_for_bind(source_value, preview.as_ref(), updated_value.as_ref());
         let view = match (preview.as_ref(), value) {
@@ -270,7 +262,7 @@ fn bind_row_cell(
             value,
             CellBinding {
                 editable,
-                pk_values,
+                pk_values: identity.map_or_else(|| Arc::<[Value]>::from([]), |identity| identity.pk_values.clone()),
                 pending_classes,
                 column,
             },
@@ -282,7 +274,7 @@ fn state_for_bind(
     context: &TabGridContext,
     row: &crate::ui::row_object::RowObject,
     index: usize,
-    pk_values: &[Value],
+    key: Option<&crate::services::change_tracker::RowKey>,
     source_value: &Value,
 ) -> (bool, Option<Value>, Vec<&'static str>) {
     let Some(tab_id) = context.tab_id else {
@@ -291,22 +283,22 @@ fn state_for_bind(
     if row.draft_id().is_some() {
         return (false, None, vec!["tp-row-pending-insert"]);
     }
-    let Some(key) = crate::services::change_tracker::RowKey::from_pk_values(pk_values) else {
+    let Some(key) = key else {
         return (false, None, Vec::new());
     };
     crate::services::change_tracker::with_tab_ref(tab_id, |tracker| {
         use crate::services::change_tracker::{CellState, RowState};
-        let cell_state = tracker.cell_state(&key, index);
+        let cell_state = tracker.cell_state(key, index);
         let updated =
-            (cell_state == CellState::Modified).then(|| tracker.current_cell_value(&key, index, source_value).clone());
+            (cell_state == CellState::Modified).then(|| tracker.current_cell_value(key, index, source_value).clone());
         let mut classes = Vec::new();
-        match (tracker.row_state(&key), cell_state) {
+        match (tracker.row_state(key), cell_state) {
             (RowState::PendingDelete, _) => classes.push("tp-row-pending-delete"),
             (RowState::InsertDraft, _) => classes.push("tp-row-pending-insert"),
             (_, CellState::Modified) => classes.push("tp-cell-modified"),
             _ => {}
         }
-        if index == 0 && tracker.is_error_row(&key) {
+        if index == 0 && tracker.is_error_row(key) {
             classes.push("tp-row-leftmost-error-flash");
         }
         (cell_state == CellState::Modified, updated, classes)
@@ -332,7 +324,7 @@ fn value_for_bind<'a>(
 
 struct CellBinding<'a> {
     editable: bool,
-    pk_values: Vec<Value>,
+    pk_values: std::sync::Arc<[Value]>,
     pending_classes: Vec<&'static str>,
     column: &'a ColumnInfo,
 }

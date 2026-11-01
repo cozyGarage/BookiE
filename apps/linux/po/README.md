@@ -5,7 +5,7 @@ localisation. Source strings are wrapped at the call site with the `tr!`
 macro defined in `apps/linux/app/src/i18n.rs`; at runtime
 `bindtextdomain("bookie", …)` points gettext at the locale directory
 shipped by the package (`/app/share/locale` under Flatpak,
-`/usr/share/locale` for system installs, or `$TABLEPRO_LOCALEDIR` for
+`/usr/share/locale` for system installs, or `$BOOKIE_LOCALEDIR` for
 ad-hoc testing).
 
 ## Adding a new translation
@@ -24,7 +24,7 @@ ad-hoc testing).
    ```sh
    mkdir -p ~/.local/share/locale/xx/LC_MESSAGES
    msgfmt apps/linux/po/xx.po -o ~/.local/share/locale/xx/LC_MESSAGES/bookie.mo
-   TABLEPRO_LOCALEDIR=~/.local/share/locale cargo run -p tablepro-app
+   BOOKIE_LOCALEDIR=~/.local/share/locale cargo run -p bookie-app
    ```
 
 ## The template, bookie.pot

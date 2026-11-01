@@ -1,4 +1,4 @@
-use tablepro_core::DriverError;
+use bookie_core::DriverError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DriverFailurePresentation {

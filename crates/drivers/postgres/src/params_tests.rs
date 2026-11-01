@@ -1,5 +1,5 @@
 use super::{encode_pg_lsn, encode_pg_mac_address, encode_pg_network, parse_text_array_text};
-use tablepro_core::DriverError;
+use bookie_core::DriverError;
 
 #[test]
 fn inferred_text_array_text_rejects_nesting_beyond_postgres_dimension_limit() {
@@ -176,8 +176,8 @@ fn text_array_parsing_keeps_empty_and_multidimensional_shapes() {
 #[test]
 fn every_value_kind_is_described_to_the_server_with_its_own_type() {
     use super::pg_parameter_type_infos;
+    use bookie_core::Value;
     use sqlx::TypeInfo;
-    use tablepro_core::Value;
     let values = [
         Value::Null,
         Value::Bool(true),

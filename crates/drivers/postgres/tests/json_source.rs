@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{DatabaseDriver, Value};
 use drivers_postgres::PgDriver;
-use tablepro_core::{DatabaseDriver, Value};
 
 #[path = "support/shared_container.rs"]
 #[allow(dead_code)]

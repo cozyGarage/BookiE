@@ -1,5 +1,5 @@
 use super::{connect, start_mariadb, start_mysql};
-use tablepro_core::Connection;
+use bookie_core::Connection;
 
 #[tokio::test]
 #[ignore = "requires docker"]

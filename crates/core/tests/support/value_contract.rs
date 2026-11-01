@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, Value};
+use bookie_core::{Connection, Value};
 
 pub async fn assert_scalar_contract(connection: &dyn Connection, driver: &str) {
     let corpus: serde_json::Value =
@@ -64,12 +64,12 @@ async fn assert_long_text(connection: &dyn Connection, driver: &str, length: usi
         .query_params("SELECT CAST(? AS Nullable(String))", std::slice::from_ref(&expected))
         .await;
     assert!(
-        matches!(bound, Err(tablepro_core::DriverError::Query { message, .. }) if message.contains("Max query size exceeded"))
+        matches!(bound, Err(bookie_core::DriverError::Query { message, .. }) if message.contains("Max query size exceeded"))
     );
-    let literal = tablepro_core::sql_literal::render_sql_literal(driver, &expected).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal(driver, &expected).unwrap();
     let exported = connection.query(&format!("SELECT {literal}")).await;
     assert!(
-        matches!(exported, Err(tablepro_core::DriverError::Query { message, .. }) if message.contains("Max query size exceeded"))
+        matches!(exported, Err(bookie_core::DriverError::Query { message, .. }) if message.contains("Max query size exceeded"))
     );
 }
 
@@ -88,7 +88,7 @@ async fn assert_scalar(connection: &dyn Connection, driver: &str, kind: &str, ex
     assert_eq!(bound.rows.len(), 1, "{driver} bound {kind}");
     assert_eq!(bound.rows[0].len(), 1, "{driver} bound {kind}");
     assert_value(&bound.rows[0][0], &expected, driver, &format!("bound {kind}"));
-    let literal = tablepro_core::sql_literal::render_sql_literal(driver, &expected).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal(driver, &expected).unwrap();
     let exported = connection
         .query(&format!("SELECT CAST({literal} AS {sql_type}) AS value"))
         .await
@@ -132,7 +132,7 @@ fn scalar_type(driver: &str, kind: &str) -> &'static str {
 }
 
 async fn assert_named_parameter_order(connection: &dyn Connection, driver: &str) {
-    use tablepro_core::{ParameterKind, extract_named_parameters, parse_parameter_value};
+    use bookie_core::{ParameterKind, extract_named_parameters, parse_parameter_value};
     let integer = scalar_type(driver, "integer");
     let text = scalar_type(driver, "text");
     let source = format!(

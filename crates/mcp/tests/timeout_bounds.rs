@@ -5,13 +5,13 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo,
     Transaction, Value,
 };
-use tablepro_mcp::{ConnectionProvider, McpBridge, McpLimits, McpToken, TokenPermissions, TokenStore, dispatch};
-use tablepro_policy::Principal;
-use tablepro_storage::SavedConnection;
+use bookie_mcp::{ConnectionProvider, McpBridge, McpLimits, McpToken, TokenPermissions, TokenStore, dispatch};
+use bookie_policy::Principal;
+use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

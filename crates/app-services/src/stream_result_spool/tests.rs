@@ -1,4 +1,5 @@
 use super::*;
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use serde::ser::SerializeSeq;
@@ -7,7 +8,6 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::fd::AsRawFd;
 use std::str::FromStr;
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 struct CountingSequence {
     items: usize,
@@ -247,6 +247,7 @@ async fn dropping_the_last_spool_owner_returns_its_process_quota() {
 
     let owner = spool.clone();
     let raw_fd = spool.inner.file.lock().expect("spool file").file.as_raw_fd();
+    let spool_path = std::fs::read_link(format!("/proc/self/fd/{raw_fd}")).expect("spool descriptor");
     drop(spool);
 
     assert_eq!(manager.reserved_bytes(), reserved);
@@ -254,7 +255,10 @@ async fn dropping_the_last_spool_owner_returns_its_process_quota() {
     drop(owner);
 
     assert_eq!(manager.reserved_bytes(), 0);
-    assert!(std::fs::read_link(format!("/proc/self/fd/{raw_fd}")).is_err());
+    assert_ne!(
+        std::fs::read_link(format!("/proc/self/fd/{raw_fd}")).ok(),
+        Some(spool_path)
+    );
 }
 
 #[tokio::test]

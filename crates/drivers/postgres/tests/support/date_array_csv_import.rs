@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -21,12 +21,12 @@ async fn value_contract_date_array_csv_import_survives_datestyle_change() {
     assert!(matches!(&result.rows[0][0], Value::Text(_)));
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("date-array.csv");
-    let csv_options = tablepro_core::export::CsvOptions::default();
-    tablepro_core::export::write_result_file(
+    let csv_options = bookie_core::export::CsvOptions::default();
+    bookie_core::export::write_result_file(
         &path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -40,14 +40,14 @@ async fn value_contract_date_array_csv_import_survives_datestyle_change() {
         .unwrap();
     let sibling = tx.query("SELECT pg_typeof(value)::text, array_to_json(value)::text, encode(array_send(value), 'hex') FROM date_array_csv_target").await.unwrap();
     let native = tx.query(&format!("SELECT pg_typeof({expression}::date[])::text, array_to_json({expression}::date[])::text, encode(array_send({expression}::date[]), 'hex')")).await.unwrap();
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(&std::fs::read(path).unwrap(), &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(&std::fs::read(path).unwrap(), &import_options, None).unwrap();
     let columns = connection.fetch_columns(None, "date_array_csv_target").await.unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "date_array_csv_target",
             columns: &columns,

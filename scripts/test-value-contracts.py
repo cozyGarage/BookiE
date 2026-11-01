@@ -18,9 +18,9 @@ SUITE_TIMEOUT_SECONDS = 900
 
 def expected_suites(gtk=False, duckdb=False):
     suites = {f"crates/drivers/{name}/Cargo.toml": "integration" for name in DRIVERS}
-    suites.update({"crates/core/Cargo.toml": "tablepro_core", "crates/mcp/Cargo.toml": "tablepro_mcp"})
+    suites.update({"crates/core/Cargo.toml": "bookie_core", "crates/mcp/Cargo.toml": "bookie_mcp"})
     if gtk:
-        suites["apps/linux/app/Cargo.toml"] = "tablepro_app"
+        suites["apps/linux/app/Cargo.toml"] = "bookie_app"
     if duckdb:
         suites["crates/drivers/duckdb/Cargo.toml"] = "integration"
     return suites
@@ -29,11 +29,11 @@ def expected_suites(gtk=False, duckdb=False):
 def build_command(gtk=False, duckdb=False):
     command = ["cargo", "test", "--locked", "--workspace"]
     if not gtk:
-        command += ["--exclude", "tablepro-app"]
+        command += ["--exclude", "bookie-app"]
     if not duckdb:
-        command += ["--exclude", "tablepro-driver-duckdb"]
+        command += ["--exclude", "bookie-driver-duckdb"]
     if gtk and duckdb:
-        command += ["--features", "tablepro-app/duckdb"]
+        command += ["--features", "bookie-app/duckdb"]
     return command + ["--lib", "--test", "integration", "--no-run", "--message-format=json"]
 
 
@@ -88,7 +88,7 @@ def run_suite(manifest, executable, directory, run_id=None):
         log_path.write_text(listing.stdout + listing.stderr)
         return {"tests": count, "exit_code": listing.returncode or 1, "error": "value contract test missing", "log": log_path.name}
     started = time.monotonic()
-    environment = dict(os.environ, TABLEPRO_TEST_RUN_ID=run_id) if run_id else None
+    environment = dict(os.environ, BOOKIE_TEST_RUN_ID=run_id) if run_id else None
     with log_path.open("w") as log:
         try:
             result = subprocess.run(

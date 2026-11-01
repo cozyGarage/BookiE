@@ -41,13 +41,13 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
     assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let json_path = directory.path().join("xml-array.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -59,11 +59,11 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
     assert_eq!(json[0]["value"], *driver_text);
 
     let csv_path = directory.path().join("xml-array.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -76,7 +76,7 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
 
     for (format, extension, escaped) in [
         (
-            tablepro_core::export::ResultFormat::Xml,
+            bookie_core::export::ResultFormat::Xml,
             "xml",
             driver_text
                 .replace('&', "&amp;")
@@ -86,7 +86,7 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
                 .replace('\'', "&apos;"),
         ),
         (
-            tablepro_core::export::ResultFormat::Html,
+            bookie_core::export::ResultFormat::Html,
             "html",
             driver_text
                 .replace('&', "&amp;")
@@ -97,10 +97,10 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
         ),
     ] {
         let path = directory.path().join(format!("xml-array.{extension}"));
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             &path,
             &result,
-            &tablepro_core::export::ResultExport {
+            &bookie_core::export::ResultExport {
                 format,
                 csv: &csv_options,
                 sql: None,
@@ -115,11 +115,11 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
     }
 
     let markdown_path = directory.path().join("xml-array.md");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &markdown_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Markdown,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Markdown,
             csv: &csv_options,
             sql: None,
         },
@@ -132,11 +132,11 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
     assert!(markdown.contains("東京"), "{markdown}");
 
     let xlsx_path = directory.path().join("xml-array.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -162,13 +162,13 @@ async fn value_contract_xml_array_file_exports_preserve_native_text() {
         .await
         .unwrap();
     let sql_path = directory.path().join("xml-array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "xml_array_filewriter_target",

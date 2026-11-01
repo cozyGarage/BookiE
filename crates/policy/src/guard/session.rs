@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use tablepro_core::{QueryCursorId, QueryCursorPage, QueryResultBatch, Session, SessionCommitOutcome};
+use bookie_core::{QueryCursorId, QueryCursorPage, QueryResultBatch, Session, SessionCommitOutcome};
 
 use super::*;
 use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control};
@@ -329,7 +329,7 @@ impl Session for PolicySession {
     async fn lexical_settings_controlled(
         &mut self,
         control: &OperationControl,
-    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+    ) -> Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, DriverError> {
         if self.retired.get() {
             return Err(DriverError::Unsupported("the session was retired".into()));
         }

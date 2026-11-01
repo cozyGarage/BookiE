@@ -2,7 +2,7 @@ use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_storage::SavedQuery;
+use bookie_storage::SavedQuery;
 use uuid::Uuid;
 
 pub struct SavedQueriesDialog {
@@ -37,9 +37,9 @@ pub enum SavedQueriesCmd {
 }
 
 pub fn visible_saved_queries(saved: &[SavedQuery], needle: &str) -> Vec<SavedQuery> {
-    tablepro_storage::rank_favorites(saved)
+    bookie_storage::rank_favorites(saved)
         .into_iter()
-        .filter(|candidate| tablepro_storage::matches_filter(candidate, needle))
+        .filter(|candidate| bookie_storage::matches_filter(candidate, needle))
         .collect()
 }
 
@@ -163,7 +163,7 @@ impl SavedQueriesDialog {
 
     fn reload(&self, sender: &ComponentSender<Self>) {
         sender.oneshot_command(async move {
-            match tablepro_storage::load_favorites().await {
+            match bookie_storage::load_favorites().await {
                 Ok(saved) => SavedQueriesCmd::Loaded(saved),
                 Err(error) => SavedQueriesCmd::Failed(error.to_string()),
             }
@@ -172,7 +172,7 @@ impl SavedQueriesDialog {
 
     fn persist_rename(&self, favorite: SavedQuery, sender: &ComponentSender<Self>) {
         sender.oneshot_command(async move {
-            match tablepro_storage::save_favorite(favorite).await {
+            match bookie_storage::save_favorite(favorite).await {
                 Ok(saved) => SavedQueriesCmd::Loaded(saved),
                 Err(error) => SavedQueriesCmd::Failed(error.to_string()),
             }
@@ -181,7 +181,7 @@ impl SavedQueriesDialog {
 
     fn persist_delete(&self, id: Uuid, sender: &ComponentSender<Self>) {
         sender.oneshot_command(async move {
-            match tablepro_storage::delete_favorite(id).await {
+            match bookie_storage::delete_favorite(id).await {
                 Ok(saved) => SavedQueriesCmd::Loaded(saved),
                 Err(error) => SavedQueriesCmd::Failed(error.to_string()),
             }

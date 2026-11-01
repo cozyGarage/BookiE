@@ -2,7 +2,7 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tablepro_core::{ConnectOptions, Connection, DriverError};
+use bookie_core::{ConnectOptions, Connection, DriverError};
 
 pub async fn a_ping_does_not_report_a_disconnect_while_every_pooled_connection_is_busy<
     Guard,

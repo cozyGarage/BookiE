@@ -1,8 +1,8 @@
 use super::*;
+use bookie_core::{ColumnInfo, QueryResult};
 use gtk4::glib::object::CastNone;
 use gtk4::prelude::ListModelExt;
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult};
 
 #[test]
 fn json_preview_writer_counts_all_bytes_without_growing_past_its_sample() {
@@ -104,8 +104,44 @@ fn shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects() {
 }
 
 #[test]
+fn row_identity_is_shared_per_key_projection_and_invalidated_by_key_edits() {
+    let row = RowObject::new(vec![Value::Text("before".into()), Value::Int(1)]);
+    let first = row.row_identity(&[0]);
+    let repeated = row.row_identity(&[0]);
+    assert!(Arc::ptr_eq(&first, &repeated));
+    assert_eq!(first.pk_values.as_ref(), &[Value::Text("before".into())]);
+    assert_eq!(
+        first.key,
+        crate::services::change_tracker::RowKey::from_pk_values(&[Value::Text("before".into())])
+    );
+
+    row.set_cell(1, Value::Int(2));
+    assert!(Arc::ptr_eq(&first, &row.row_identity(&[0])));
+
+    row.set_cell(0, Value::Text("after".into()));
+    let updated = row.row_identity(&[0]);
+    assert!(!Arc::ptr_eq(&first, &updated));
+    assert_eq!(updated.pk_values.as_ref(), &[Value::Text("after".into())]);
+    assert_eq!(
+        updated.key,
+        crate::services::change_tracker::RowKey::from_pk_values(&[Value::Text("after".into())])
+    );
+
+    let other_projection = row.row_identity(&[1]);
+    assert_eq!(other_projection.pk_values.as_ref(), &[Value::Int(2)]);
+}
+
+#[test]
+fn row_identity_keeps_unreadable_key_values_but_refuses_a_persisted_key() {
+    let row = RowObject::new(vec![Value::Undecodable("INTERVAL".into())]);
+    let identity = row.row_identity(&[0]);
+    assert_eq!(identity.pk_values.as_ref(), &[Value::Undecodable("INTERVAL".into())]);
+    assert!(identity.key.is_none());
+}
+
+#[test]
 fn a_server_cut_cell_shows_its_prefix_and_blocks_row_copy_and_export() {
-    let partial = tablepro_core::partial_value(2_097_152, "begin");
+    let partial = bookie_core::partial_value(2_097_152, "begin");
     let row = RowObject::new(vec![Value::Int(7), partial.clone()]);
     row.preview_long_values(&[0]);
 

@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use crate::{MongodbDriver, opts, start_mongo};
-use tablepro_core::DatabaseDriver;
+use bookie_core::DatabaseDriver;
 
 #[tokio::test]
 #[ignore = "requires docker"]

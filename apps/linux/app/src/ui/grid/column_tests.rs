@@ -1,6 +1,6 @@
 use super::super::display::{POSITION_SLOT, value_is_inline_editable};
 use super::*;
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 fn col(data_type: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
@@ -81,7 +81,8 @@ fn bind_state_reads_a_modified_value_once_for_display_and_editing() {
         pk_col_indices: vec![0],
         ..Default::default()
     };
-    let state = state_for_bind(&context, &row, 1, &[Value::Int(7)], &original);
+    let key = crate::services::change_tracker::RowKey::from_pk_values(&[Value::Int(7)]);
+    let state = state_for_bind(&context, &row, 1, key.as_ref(), &original);
     crate::services::change_tracker::close_tab(tab_id);
     assert_eq!(state, (true, Some(updated), vec!["tp-cell-modified"]));
 }
@@ -277,7 +278,7 @@ fn boolean_affinity_mismatch_cannot_emit_an_edit() {
     }
     gtk4::init().unwrap();
     let columns = vec![col("BOOLEAN", false)];
-    let result = tablepro_core::QueryResult {
+    let result = bookie_core::QueryResult {
         columns: columns.clone(),
         rows: vec![vec![Value::Bool(false)]],
         truncated: false,
@@ -356,7 +357,7 @@ fn mysql_bit_one_grid_shows_numeric_values_and_emits_boolean_edits() {
 
     gtk4::init().unwrap();
     let columns = vec![col("bit(1)", false)];
-    let result = tablepro_core::QueryResult {
+    let result = bookie_core::QueryResult {
         columns: columns.clone(),
         rows: vec![vec![Value::Int(0)]],
         truncated: false,
@@ -413,7 +414,7 @@ fn bind_does_not_open_binary_bytes_in_a_text_column_for_editing() {
     use gtk4::prelude::*;
     gtk4::init().unwrap();
     let columns = vec![col("TEXT", false)];
-    let result = tablepro_core::QueryResult {
+    let result = bookie_core::QueryResult {
         columns: columns.clone(),
         rows: vec![
             vec![Value::Text("hello".into())],
@@ -467,12 +468,12 @@ fn bind_does_not_open_binary_bytes_in_a_text_column_for_editing() {
     utf8_bytes_cell.start_editing();
     assert!(!utf8_bytes_cell.is_editing());
 
-    let artifact_dir = std::env::var_os("TABLEPRO_GTK_ARTIFACT_DIR")
+    let artifact_dir = std::env::var_os("BOOKIE_GTK_ARTIFACT_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
     let _ = std::fs::create_dir_all(&artifact_dir);
     let png = capture_bind_visual(&editors, &artifact_dir);
-    if std::env::var_os("TABLEPRO_GTK_REQUIRE_SCREENSHOT").is_some() {
+    if std::env::var_os("BOOKIE_GTK_REQUIRE_SCREENSHOT").is_some() {
         assert!(
             png.is_file(),
             "scrot should capture the bound TEXT/binary grid to {png:?}"
@@ -543,7 +544,7 @@ fn mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits() {
         Value::Bytes(vec![0, 0, 0, 1, 1, 1, 0, 0, 0]),
         Value::Bytes(vec![0, 0, 0, 1, 1, 1, 0, 0, 0]),
     ];
-    let result = tablepro_core::QueryResult {
+    let result = bookie_core::QueryResult {
         columns: columns.clone(),
         rows: vec![values.to_vec()],
         truncated: false,
@@ -593,7 +594,7 @@ fn entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value() {
     gtk4::init().unwrap();
     let columns = vec![col("TEXT", false)];
     let long = "a".repeat(50_000);
-    let result = tablepro_core::QueryResult {
+    let result = bookie_core::QueryResult {
         columns: columns.clone(),
         rows: vec![vec![Value::Text(long.clone())]],
         truncated: false,
@@ -636,7 +637,7 @@ fn editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null() {
     use gtk4::prelude::*;
     gtk4::init().unwrap();
     let columns = vec![col("TEXT", false), col("TEXT", false)];
-    let result = tablepro_core::QueryResult {
+    let result = bookie_core::QueryResult {
         columns: columns.clone(),
         rows: vec![vec![Value::Text("<NULL>".into()), Value::Null]],
         truncated: false,

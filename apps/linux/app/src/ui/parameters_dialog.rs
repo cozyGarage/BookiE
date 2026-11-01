@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use bookie_core::{ParameterKind, Value};
 use gtk::prelude::IsA;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
-use tablepro_core::{ParameterKind, Value};
 
 use crate::services::query_parameters::{self, QueryParameterError};
 use crate::tr;
@@ -109,7 +109,7 @@ fn present_form(window: &gtk::Window, names: Vec<String>, on_values: ValueSink, 
 
 #[cfg(test)]
 mod tests {
-    use tablepro_app_services::query_parameters::QueryParameterError;
+    use bookie_app_services::query_parameters::QueryParameterError;
 
     use super::error_message;
 

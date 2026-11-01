@@ -21,8 +21,8 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw, gtk};
 
-use tablepro_core::sql_ddl::DraftColumn;
-use tablepro_core::{ForeignKeyInfo, IndexInfo};
+use bookie_core::sql_ddl::DraftColumn;
+use bookie_core::{ForeignKeyInfo, IndexInfo};
 
 use super::structure_tab::{StructureTab, StructureTabInput, StructureTabOutput};
 
@@ -192,7 +192,7 @@ pub(super) fn present_fk_dialog(
     driver_id: &str,
     sender: ComponentSender<StructureTab>,
 ) {
-    let fk_actions = tablepro_core::sql_ddl::supported_fk_actions(driver_id);
+    let fk_actions = bookie_core::sql_ddl::supported_fk_actions(driver_id);
     let (dialog, body, submit_btn) = build_form_dialog(&crate::tr!("Add Foreign Key"), &crate::tr!("Add"));
 
     // Name in its own AdwPreferencesGroup at the top — matches the

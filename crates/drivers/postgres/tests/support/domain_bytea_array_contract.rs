@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -144,7 +144,7 @@ async fn value_contract_domain_over_bytea_array_preserves_binary_values_and_wire
         .unwrap()
         .rows[0][0]
         .clone();
-    let edit = tablepro_core::sql_dialect::build_keyed_update(
+    let edit = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -189,7 +189,7 @@ async fn value_contract_domain_over_bytea_array_preserves_binary_values_and_wire
     assert!(
         matches!(
             &shadow_rejection,
-            tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
+            bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
         ),
         "{shadow_rejection:?}"
     );
@@ -210,7 +210,7 @@ async fn value_contract_domain_over_bytea_array_preserves_binary_values_and_wire
     assert_eq!(shadowed_path_stored.rows, stored.rows);
     transaction.commit().await.unwrap();
 
-    let invalid = tablepro_core::sql_dialect::build_keyed_update(
+    let invalid = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -221,12 +221,12 @@ async fn value_contract_domain_over_bytea_array_preserves_binary_values_and_wire
     .unwrap();
     let error = connection.execute_in_transaction(&[invalid]).await.unwrap_err();
     let cause = match &error {
-        tablepro_core::DriverError::Transaction { source, .. }
-        | tablepro_core::DriverError::TransactionRollbackFailed { source, .. } => source.as_ref(),
+        bookie_core::DriverError::Transaction { source, .. }
+        | bookie_core::DriverError::TransactionRollbackFailed { source, .. } => source.as_ref(),
         other => other,
     };
     assert!(
-        matches!(cause, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"),
+        matches!(cause, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"),
         "{error:?}"
     );
     let after_refusal = connection

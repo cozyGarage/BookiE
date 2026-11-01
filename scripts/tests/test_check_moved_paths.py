@@ -20,7 +20,7 @@ class MovedPathTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             old, new = Path(tmp, "a.md"), Path(tmp, "b.md")
             old.write_text("see linux/crates/core\n")
-            new.write_text("tag linux-v0.1.5 and com.tablepro.linux and crates/core\n")
+            new.write_text("tag linux-v0.1.5 and com.bookie.linux and crates/core\n")
             self.assertEqual([hit[0] for hit in moved.stale([str(old), str(new)])], [str(old)])
 
     def test_scanning_text_and_invalid_utf8_closes_input_files(self):

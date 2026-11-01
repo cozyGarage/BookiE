@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::Arc;
 
-use tablepro_core::{ColumnInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 
 fn rows(sql: &str) -> StatementOutcome {
     StatementOutcome {
@@ -80,7 +80,7 @@ fn nothing_is_pinned_until_asked() {
 }
 
 #[test]
-fn live_stream_updates_store_latest_and_only_clone_when_a_display_list_is_needed() {
+fn live_stream_display_lists_do_not_clone_the_page_payload() {
     let mut cache = super::super::stream_pages::StreamPageCache::default();
     let page = page(&[1]);
     cache.append(0, page.clone()).unwrap();
@@ -99,7 +99,7 @@ fn live_stream_updates_store_latest_and_only_clone_when_a_display_list_is_needed
     assert!(!pins.has_results());
 
     let displayed = pins.displayed();
-    assert_eq!(Arc::strong_count(&page), page_owners_before + 1);
+    assert_eq!(Arc::strong_count(&page), page_owners_before);
     drop(displayed);
 
     assert_eq!(Arc::strong_count(&page), page_owners_before);
@@ -121,19 +121,26 @@ fn pinned_results_stay_ahead_of_the_next_run() {
 
 #[test]
 #[ignore = "app-server isolated regression"]
-fn an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin() {
+fn a_pinned_spooled_page_reloads_without_retaining_its_payload() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
     let mut cache = super::super::stream_pages::StreamPageCache::default();
     let first_page = page(&[1]);
     let first_page_weak = Arc::downgrade(&first_page);
+    let columns = first_page.columns.clone();
+    runtime.block_on(spool.append_page(0, first_page.clone())).unwrap();
     assert!(cache.append(0, first_page.clone()).is_ok());
     drop(first_page);
 
-    let first_result = cache.snapshot(super::super::stream_pages::StreamTerminal::Complete, None);
-    let mut wide_page = page(&[]).as_ref().clone();
-    wide_page.rows = vec![vec![Value::Text("x".repeat(65 * 1024 * 1024))]];
-    assert!(cache.append(1, Arc::new(wide_page)).is_ok());
-    assert_eq!(cache.first_page(), 1);
-    assert!(first_page_weak.upgrade().is_some());
+    let first_result = cache.snapshot_with_spool(
+        super::super::stream_pages::StreamTerminal::Complete,
+        None,
+        0,
+        Some(spool.clone()),
+    );
+    assert!(first_page_weak.upgrade().is_none());
 
     let first_outcome = StatementOutcome {
         kind: StatementOutcomeKind::Streamed(Box::new(first_result)),
@@ -149,7 +156,9 @@ fn an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin() {
         &[2],
         super::super::stream_pages::StreamTerminal::Complete,
     )]);
-    assert!(first_page_weak.upgrade().is_some());
+    assert!(first_page_weak.upgrade().is_none());
+    let reloaded_page = runtime.block_on(spool.load_page(0, columns)).unwrap();
+    assert_eq!(reloaded_page.rows, vec![vec![Value::Int(1)]]);
     drop(next_render);
 
     drop(pins.unpin_all());
@@ -201,7 +210,7 @@ fn an_empty_streamed_result_can_be_pinned_without_losing_its_metadata() {
     };
     assert_eq!(result.total_rows, 0);
     assert_eq!(result.pages.len(), 1);
-    assert_eq!(result.pages[0].columns[0].name, "id");
+    assert_eq!(result.pages[0].upgrade().unwrap().columns[0].name, "id");
     assert_eq!(shown[1].sql_preview, "SELECT 2");
 }
 
@@ -223,7 +232,7 @@ fn a_stream_with_prior_pages_remains_pinnable_after_a_later_fetch_failure() {
         result.terminal,
         super::super::stream_pages::StreamTerminal::Failed(_)
     ));
-    assert_eq!(result.pages[0].rows[0][0], Value::Int(7));
+    assert_eq!(result.pages[0].upgrade().unwrap().rows[0][0], Value::Int(7));
 }
 
 #[test]

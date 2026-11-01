@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
-use tablepro_core::filter::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+use bookie_core::Value;
+use bookie_core::filter::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
 use crate::{connect, start_pg};
 

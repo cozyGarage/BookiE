@@ -1,8 +1,8 @@
 use super::parse_input_for_driver;
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
-fn operation_control() -> tablepro_core::OperationControl {
-    tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30))
+fn operation_control() -> bookie_core::OperationControl {
+    bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30))
 }
 
 #[test]
@@ -124,13 +124,13 @@ fn value_contract_mysql_enum_metadata_unescapes_mysql_literals() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -142,7 +142,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             port: container.get_host_port_ipv4(3306).await.unwrap(),
             database: "test".into(),
             username: "root".into(),
-            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            password: secrecy::SecretString::new("bookie_test".to_string().into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })
@@ -251,7 +251,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                     columns[mood].data_type
                 )
             });
-            let update = tablepro_core::sql_dialect::build_keyed_update(
+            let update = bookie_core::sql_dialect::build_keyed_update(
                 "mysql",
                 None,
                 "enum_set_grid",
@@ -325,7 +325,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             let blank_perms = parse_input_for_driver("", Some(&columns[perms]), "mysql").unwrap();
             assert_eq!(blank_mood, Value::Null);
             assert_eq!(blank_perms, Value::Null);
-            let blank_update = tablepro_core::sql_dialect::build_keyed_update(
+            let blank_update = bookie_core::sql_dialect::build_keyed_update(
                 "mysql",
                 None,
                 "enum_set_grid",
@@ -356,7 +356,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             let empty_perms = parse_input_for_driver("''", Some(&columns[perms]), "mysql").unwrap();
             assert_eq!(empty_mood, Value::Text(String::new()));
             assert_eq!(empty_perms, Value::Text(String::new()));
-            let empty_update = tablepro_core::sql_dialect::build_keyed_update(
+            let empty_update = bookie_core::sql_dialect::build_keyed_update(
                 "mysql",
                 None,
                 "enum_set_grid",
@@ -393,7 +393,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         }
 
         let literal_null = parse_input_for_driver("NULL", Some(&columns[mood]), "mysql").unwrap();
-        let literal_null_update = tablepro_core::sql_dialect::build_keyed_update(
+        let literal_null_update = bookie_core::sql_dialect::build_keyed_update(
             "mysql",
             None,
             "enum_set_grid",
@@ -428,7 +428,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         let perms_value = parse_input_for_driver("write,slash\\path", Some(&columns[perms]), "mysql").unwrap();
         assert_eq!(mood_value, Value::Text("it's ok".into()));
         assert_eq!(perms_value, Value::Text("write,slash\\path".into()));
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "mysql",
             None,
             "enum_set_grid",
@@ -476,7 +476,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::core::{IntoContainerPort, WaitFor};
     use testcontainers::runners::AsyncRunner;
     use testcontainers::{GenericImage, ImageExt};
@@ -484,7 +484,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
     let container = GenericImage::new("mariadb", "11")
         .with_exposed_port(3306.tcp())
         .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
-        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MARIADB_ROOT_PASSWORD", "bookie_test")
         .with_env_var("MARIADB_DATABASE", "test")
         .start()
         .await
@@ -495,7 +495,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             port: container.get_host_port_ipv4(3306).await.unwrap(),
             database: "test".into(),
             username: "root".into(),
-            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            password: secrecy::SecretString::new("bookie_test".to_string().into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })
@@ -581,7 +581,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             let blank_perms = parse_input_for_driver("", Some(&columns[perms]), "mysql").unwrap();
             assert_eq!(blank_mood, Value::Null);
             assert_eq!(blank_perms, Value::Null);
-            let blank_update = tablepro_core::sql_dialect::build_keyed_update(
+            let blank_update = bookie_core::sql_dialect::build_keyed_update(
                 "mysql",
                 None,
                 "maria_enum_set_grid",
@@ -612,7 +612,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             let empty_perms = parse_input_for_driver("''", Some(&columns[perms]), "mysql").unwrap();
             assert_eq!(empty_mood, Value::Text(String::new()));
             assert_eq!(empty_perms, Value::Text(String::new()));
-            let empty_update = tablepro_core::sql_dialect::build_keyed_update(
+            let empty_update = bookie_core::sql_dialect::build_keyed_update(
                 "mysql",
                 None,
                 "maria_enum_set_grid",
@@ -648,7 +648,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             );
         }
         let literal_null = parse_input_for_driver("NULL", Some(&columns[mood]), "mysql").unwrap();
-        let literal_null_update = tablepro_core::sql_dialect::build_keyed_update(
+        let literal_null_update = bookie_core::sql_dialect::build_keyed_update(
             "mysql",
             None,
             "maria_enum_set_grid",
@@ -681,7 +681,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
 
         let mood_value = parse_input_for_driver("it's ok", Some(&columns[mood]), "mysql").unwrap();
         let perms_value = parse_input_for_driver("read,slash\\path", Some(&columns[perms]), "mysql").unwrap();
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "mysql",
             None,
             "maria_enum_set_grid",

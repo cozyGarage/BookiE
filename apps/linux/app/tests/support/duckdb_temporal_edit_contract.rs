@@ -1,6 +1,6 @@
 use super::{col, parse_input_for_driver};
+use bookie_core::Value;
 use chrono::Timelike;
-use tablepro_core::Value;
 
 #[test]
 fn value_contract_duckdb_extended_calendar_values_parse_as_exact_text() {
@@ -26,7 +26,7 @@ fn value_contract_duckdb_extended_calendar_values_parse_as_exact_text() {
 #[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_extended_calendar_grid_edits_preserve_native_values() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -66,7 +66,7 @@ async fn value_contract_duckdb_extended_calendar_grid_edits_preserve_native_valu
             parse_input_for_driver("280001-03-01 01:02:03.654321", Some(&columns[moment_index]), "duckdb").unwrap(),
         ),
     ];
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "extended_dates",
@@ -92,7 +92,7 @@ async fn value_contract_duckdb_extended_calendar_grid_edits_preserve_native_valu
 #[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -127,7 +127,7 @@ async fn value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants
         "duckdb",
     )
     .unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "extended_zoned",
@@ -150,7 +150,7 @@ async fn value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants
 #[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -254,7 +254,7 @@ async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
 #[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_nanosecond_grid_edits_preserve_native_values_and_sibling() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -317,7 +317,7 @@ async fn value_contract_duckdb_nanosecond_grid_edits_preserve_native_values_and_
             parse_input_for_driver("1969-12-31 23:59:59.123456789", Some(&columns[moment_index]), "duckdb").unwrap(),
         ),
     ];
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "nanosecond_grid",

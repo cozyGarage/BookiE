@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::{connect, start_mssql};
-use tablepro_core::{OperationControl, Value};
+use bookie_core::{OperationControl, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -36,7 +36,7 @@ async fn sql_variant_values_are_undecodable_and_keep_connections_usable() {
         vec![vec![Value::Undecodable("sql_variant".into())]],
         "the heterogeneous base type must not be mislabeled as an ordinary bigint"
     );
-    assert!(tablepro_core::sql_literal::render_sql_literal("mssql", &result.rows[0][0]).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("mssql", &result.rows[0][0]).is_err());
     assert!(
         conn.query_params("SELECT @P1", &[result.rows[0][0].clone()])
             .await

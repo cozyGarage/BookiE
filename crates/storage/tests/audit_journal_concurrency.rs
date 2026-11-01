@@ -2,8 +2,8 @@
 use std::process::Command;
 use std::sync::Arc;
 
-use tablepro_policy::Principal;
-use tablepro_storage::{AuditJournal, sample_event};
+use bookie_policy::Principal;
+use bookie_storage::{AuditJournal, sample_event};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 8)]
 async fn one_thousand_concurrent_appends_produce_one_chain() {
@@ -37,12 +37,12 @@ async fn two_processes_cannot_fork_the_sequence() {
     let executable = std::env::current_exe().unwrap();
     let mut first = Command::new(&executable)
         .args(["--exact", "process_writer", "--nocapture"])
-        .env("TABLEPRO_AUDIT_TEST_PATH", &path)
+        .env("BOOKIE_AUDIT_TEST_PATH", &path)
         .spawn()
         .unwrap();
     let mut second = Command::new(executable)
         .args(["--exact", "process_writer", "--nocapture"])
-        .env("TABLEPRO_AUDIT_TEST_PATH", &path)
+        .env("BOOKIE_AUDIT_TEST_PATH", &path)
         .spawn()
         .unwrap();
 
@@ -53,7 +53,7 @@ async fn two_processes_cannot_fork_the_sequence() {
 
 #[test]
 fn process_writer() {
-    let Some(path) = std::env::var_os("TABLEPRO_AUDIT_TEST_PATH") else {
+    let Some(path) = std::env::var_os("BOOKIE_AUDIT_TEST_PATH") else {
         return;
     };
     let runtime = tokio::runtime::Builder::new_current_thread()

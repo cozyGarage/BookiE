@@ -22,7 +22,7 @@ class BuildManifestTests(unittest.TestCase):
             app.mkdir(parents=True)
             data = app.parent / "data"
             data.mkdir()
-            (data / "com.tablepro.linux.gschema.xml").write_text(content)
+            (data / "com.bookie.linux.gschema.xml").write_text(content)
         source = (ROOT / "apps/linux/app/build.rs").read_text()
         source += "\nmod glib_build_tools { pub fn compile_resources(_: &[&str], _: &str, _: &str) {} }\n"
         script = self.root / "build.rs"

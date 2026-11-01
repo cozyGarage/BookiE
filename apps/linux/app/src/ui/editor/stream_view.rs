@@ -1,10 +1,10 @@
 mod pager;
 pub(super) use pager::build as build_pager;
 
+use bookie_core::QueryResult;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 use std::sync::Arc;
-use tablepro_core::QueryResult;
 
 use super::StatementOutcome;
 use super::outcomes::stream_result_view::{
@@ -163,6 +163,15 @@ pub(super) fn install_page_loader(
             .visible_child()
             .and_then(|child| page_index_from_name(&child, generation)),
     ));
+    let initial_context = VisiblePageLoadContext {
+        generation,
+        identity,
+        resident_pages: &resident_pages,
+        spool: spool.as_ref(),
+        columns: &columns,
+        sender: &sender,
+    };
+    handle_visible_child_change(pages, &initial_context, &previous_index);
     pages.connect_visible_child_notify(move |pages| {
         let context = VisiblePageLoadContext {
             generation,
@@ -180,8 +189,8 @@ struct VisiblePageLoadContext<'a> {
     generation: u64,
     identity: super::StatementIdentity,
     resident_pages: &'a super::stream_pages::ResidentPageStore,
-    spool: Option<&'a tablepro_app_services::stream_result_spool::StreamResultSpool>,
-    columns: &'a [tablepro_core::ColumnInfo],
+    spool: Option<&'a bookie_app_services::stream_result_spool::StreamResultSpool>,
+    columns: &'a [bookie_core::ColumnInfo],
     sender: &'a relm4::ComponentSender<super::SqlEditor>,
 }
 

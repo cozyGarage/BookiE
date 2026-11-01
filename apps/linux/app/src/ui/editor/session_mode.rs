@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use relm4::ComponentSender;
-use relm4::adw::prelude::*;
-use relm4::{adw, gtk};
 #[cfg(test)]
-use tablepro_core::QueryResult;
-use tablepro_core::{
+use bookie_core::QueryResult;
+use bookie_core::{
     Connection, DriverError, OperationControl, QueryCursorId, QueryCursorPage, QueryResultBatch, Session,
     SessionCommitOutcome, Value,
 };
+use relm4::ComponentSender;
+use relm4::adw::prelude::*;
+use relm4::{adw, gtk};
 use uuid::Uuid;
 
 use crate::services::database_service::ConnectionIdentity;
-use tablepro_policy::{AuditReceipt, Audited, AuditedSession, PolicyGuard, Principal};
+use bookie_policy::{AuditReceipt, Audited, AuditedSession, PolicyGuard, Principal};
 
 use super::{SqlEditor, SqlEditorInput};
 
@@ -119,7 +119,7 @@ impl Session for SessionHandle {
         sql: &str,
         params: &[Value],
         control: &OperationControl,
-    ) -> Result<tablepro_core::QueryResult, DriverError> {
+    ) -> Result<bookie_core::QueryResult, DriverError> {
         match self {
             Self::Audited(session) => session.query_params_controlled(sql, params, control).await,
             Self::Plain(session) => session.query_params_controlled(sql, params, control).await,
@@ -190,7 +190,7 @@ impl Session for SessionHandle {
     async fn lexical_settings_controlled(
         &mut self,
         control: &OperationControl,
-    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+    ) -> Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, DriverError> {
         match self {
             Self::Audited(session) => session.lexical_settings_controlled(control).await,
             Self::Plain(session) => session.lexical_settings_controlled(control).await,
@@ -416,7 +416,7 @@ impl StatementTarget {
     pub(crate) async fn lexical_settings(
         &self,
         control: &OperationControl,
-    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+    ) -> Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, DriverError> {
         match self {
             Self::Pool(connection) => connection.lexical_settings_controlled(control).await,
             Self::GuardedPool(guard) => guard.lexical_settings_controlled(control).await,

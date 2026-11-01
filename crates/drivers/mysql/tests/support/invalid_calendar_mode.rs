@@ -1,4 +1,4 @@
-use tablepro_core::{ConnectOptions, Connection, OperationControl, Session, Value};
+use bookie_core::{ConnectOptions, Connection, OperationControl, Session, Value};
 
 use super::{connect, start_mariadb, start_mysql};
 
@@ -85,16 +85,16 @@ async fn assert_invalid_calendar_text(options: &ConnectOptions, engine: &str) {
 async fn assert_invalid_calendar_csv_round_trip(
     connection: &dyn Connection,
     session: &mut dyn Session,
-    source: &tablepro_core::QueryResult,
+    source: &bookie_core::QueryResult,
     control: &OperationControl,
 ) {
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     session
         .query_params_controlled(
             "CREATE TABLE allow_invalid_dates_csv_copy \
@@ -109,11 +109,11 @@ async fn assert_invalid_calendar_csv_round_trip(
         .await
         .unwrap();
     let mapping = (0..columns.len()).map(Some).collect::<Vec<_>>();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "mysql",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "allow_invalid_dates_csv_copy",
             columns: &columns,

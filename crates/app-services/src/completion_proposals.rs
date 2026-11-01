@@ -1,9 +1,7 @@
 use std::ops::Range;
 
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{
-    LexicalSettings, OpenConstruct, ScriptDiagnostic, ScriptPlan, ScriptTokenKind,
-};
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{LexicalSettings, OpenConstruct, ScriptDiagnostic, ScriptPlan, ScriptTokenKind};
 
 use super::completion::{SchemaIndex, Scope, candidate_sql, floor_char_boundary, scope_at};
 use super::completion_identifiers::{normalized, plan_with, split_table_reference};
@@ -146,7 +144,7 @@ mod tests {
             let sql = "SELECT u. FROM users u; SELECT unrelated_editor_word";
             let values = candidates(sql, "SELECT u.".len(), &index).values;
             assert_eq!(values.len(), 1);
-            assert_eq!(values[0].1, tablepro_core::sql_dialect::quote_ident(driver, "a.b\"` ]"));
+            assert_eq!(values[0].1, bookie_core::sql_dialect::quote_ident(driver, "a.b\"` ]"));
         }
     }
 
@@ -189,7 +187,7 @@ mod tests {
         ] {
             let mut index = SchemaIndex::default();
             index.grammar = Some(grammar);
-            let reference = tablepro_core::sql_dialect::quote_ident(driver, "Users");
+            let reference = bookie_core::sql_dialect::quote_ident(driver, "Users");
             index.set_tables(vec![reference.clone()]);
             let partial = format!("{}Us", &reference[..1]);
             let sql = format!("SELECT * FROM {partial}");

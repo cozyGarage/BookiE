@@ -1,12 +1,12 @@
 mod keyboard_menu;
 mod pointer_menu;
 
+use bookie_core::sql_literal::RowStatement;
 use std::rc::Rc;
-use tablepro_core::sql_literal::RowStatement;
 
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio};
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::GridMsg;
 use super::display::{FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
@@ -22,6 +22,7 @@ use super::cell_context::{CellContext, CellContextStore};
 #[derive(Clone)]
 pub(super) struct GridMenus {
     context: CellContextStore,
+    columns: Rc<Vec<ColumnInfo>>,
     cell_menu_trigger: gtk::ShortcutTrigger,
     editable_popover: gtk::PopoverMenu,
     readonly_popover: gtk::PopoverMenu,
@@ -246,7 +247,7 @@ pub(super) fn install_grid_context_menus(
             move |columns, rows| export::render_value_list(&driver_id, columns, rows),
         )
     };
-    let supports_sql = tablepro_core::export::supports_sql_literals(&driver_id);
+    let supports_sql = bookie_core::export::supports_sql_literals(&driver_id);
     let copy_in_clause_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -524,6 +525,7 @@ pub(super) fn install_grid_context_menus(
     });
     let menus = GridMenus {
         context,
+        columns,
         cell_menu_trigger: crate::ui::shortcut::parse(CELL_MENU_TRIGGER),
         editable_popover,
         readonly_popover,
@@ -764,11 +766,31 @@ where
 }
 
 pub(super) struct CellGestureOptions {
-    pub(super) idx: usize,
-    pub(super) column_name: String,
-    pub(super) is_editable: bool,
-    pub(super) is_text_editable: bool,
-    pub(super) supports_full_value: bool,
+    idx: usize,
+    column_name: String,
+    is_editable: bool,
+    is_text_editable: bool,
+    supports_full_value: bool,
+}
+
+pub(super) fn cell_menu_options(menus: &GridMenus, widget: &gtk::Widget) -> Option<CellGestureOptions> {
+    let idx = super::display::COLUMN_SLOT.get(widget)?;
+    let column = menus.columns.get(idx)?;
+    let is_text_editable = widget.is::<crate::ui::cell_editor::CellEditor>();
+    let is_editable = is_text_editable || widget.is::<gtk::CheckButton>();
+    Some(CellGestureOptions {
+        idx,
+        column_name: column.name.clone(),
+        is_editable,
+        is_text_editable,
+        supports_full_value: is_editable && super::full_value_editor::is_full_value_column(&column.data_type),
+    })
+}
+
+pub(super) fn is_cell_menu_widget(menus: &GridMenus, widget: &gtk::Widget) -> bool {
+    super::display::COLUMN_SLOT
+        .get(widget)
+        .is_some_and(|idx| menus.columns.get(idx).is_some())
 }
 
 fn prepare_cell_menu(
@@ -804,10 +826,6 @@ fn prepare_cell_menu(
     } else {
         menus.readonly_popover.clone()
     }
-}
-
-pub(super) fn set_cell_menu_options(widget: &gtk::Widget, options: CellGestureOptions) {
-    super::display::CELL_MENU_OPTIONS_SLOT.set(widget, options);
 }
 
 fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {
@@ -895,7 +913,7 @@ fn has_persisted_row_key(row_key: &[Value]) -> bool {
 fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
     (
         POSITION_SLOT.get(widget).unwrap_or(0),
-        ROW_KEY_SLOT.cloned(widget).unwrap_or_default(),
+        ROW_KEY_SLOT.cloned(widget).map_or_else(Vec::new, |key| key.to_vec()),
     )
 }
 fn pending_cell_value(widget: &gtk::Widget) -> Option<Value> {
@@ -1000,7 +1018,7 @@ pub(crate) struct LoadedCellEdit<'a> {
     pub(crate) col_index: usize,
     pub(crate) row_position: u32,
     pub(crate) row_key: Vec<Value>,
-    pub(crate) column: &'a tablepro_core::ColumnInfo,
+    pub(crate) column: &'a bookie_core::ColumnInfo,
     pub(crate) value: Value,
     pub(crate) sender: relm4::Sender<GridMsg>,
 }

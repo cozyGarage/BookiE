@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::{connect, start_mysql};
-use tablepro_core::Value;
-use tablepro_core::sql_ddl::{DraftColumn, build_alter_column};
+use bookie_core::Value;
+use bookie_core::sql_ddl::{DraftColumn, build_alter_column};
 
 #[tokio::test]
 #[ignore = "requires docker"]

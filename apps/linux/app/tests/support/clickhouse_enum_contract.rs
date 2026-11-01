@@ -1,12 +1,12 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use super::parse_input_for_grid_cell;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::core::wait::HttpWaitStrategy;
     use testcontainers::core::{IntoContainerPort, WaitFor};
     use testcontainers::runners::AsyncRunner;
@@ -20,7 +20,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
                 .with_expected_status_code(200u16),
         ))
         .with_env_var("CLICKHOUSE_USER", "default")
-        .with_env_var("CLICKHOUSE_PASSWORD", "tablepro")
+        .with_env_var("CLICKHOUSE_PASSWORD", "bookie")
         .with_env_var("CLICKHOUSE_DB", "default")
         .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
         .with_startup_timeout(std::time::Duration::from_secs(180))
@@ -33,7 +33,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
             port: container.get_host_port_ipv4(8123).await.expect("HTTP port"),
             database: "default".into(),
             username: "default".into(),
-            password: secrecy::SecretString::new("tablepro".to_string().into()),
+            password: secrecy::SecretString::new("bookie".to_string().into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })
@@ -68,7 +68,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
 
     let high = parse_input_for_grid_cell("high", Some(&columns[state_index]), "clickhouse", None).unwrap();
     assert_eq!(high, Value::Text("high".into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "enum16_grid",
@@ -81,7 +81,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
 
     let clear = parse_input_for_grid_cell("", Some(&columns[state_index]), "clickhouse", None).unwrap();
     assert_eq!(clear, Value::Null);
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "enum16_grid",
@@ -94,7 +94,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
 
     let empty_label = parse_input_for_grid_cell("''", Some(&columns[state_index]), "clickhouse", None).unwrap();
     assert_eq!(empty_label, Value::Text(String::new()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "enum16_grid",
@@ -107,7 +107,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
 
     let empty_enum8 = parse_input_for_grid_cell("''", Some(&columns[state8_index]), "clickhouse", None).unwrap();
     assert_eq!(empty_enum8, Value::Text(String::new()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "enum16_grid",
@@ -121,7 +121,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
     let apostrophe_label =
         parse_input_for_grid_cell("'O''Brien'", Some(&columns[state_index]), "clickhouse", None).unwrap();
     assert_eq!(apostrophe_label, Value::Text("O'Brien".into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "enum16_grid",
@@ -197,7 +197,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
     );
 
     let invalid = parse_input_for_grid_cell("not-a-label", Some(&columns[state_index]), "clickhouse", None).unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "enum16_grid",

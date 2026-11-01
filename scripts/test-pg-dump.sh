@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-IMAGE="${TABLEPRO_PG_DUMP_IMAGE:-postgres:18-alpine}"
+IMAGE="${BOOKIE_PG_DUMP_IMAGE:-postgres:18-alpine}"
 DOCKER="$(command -v docker)"
 SHARED_TMP="${TMPDIR:-/tmp}"
 
@@ -26,7 +26,7 @@ EOF
 done
 
 cd "$ROOT"
-TABLEPRO_TEST_PG_DUMP="$work_root/pg_dump" TABLEPRO_TEST_PG_RESTORE="$work_root/pg_restore" \
-  bash scripts/run-rust-tests.sh --locked -p tablepro-dump --test pg_dump_roundtrip -- --include-ignored --test-threads=1
-TABLEPRO_TEST_PG_DUMP="$work_root/pg_dump" TABLEPRO_TEST_PG_RESTORE="$work_root/pg_restore" \
-  bash scripts/run-rust-tests.sh --locked -p tablepro-app-services --test database_backup_postgres -- --include-ignored --test-threads=1
+BOOKIE_TEST_PG_DUMP="$work_root/pg_dump" BOOKIE_TEST_PG_RESTORE="$work_root/pg_restore" \
+  bash scripts/run-rust-tests.sh --locked -p bookie-dump --test pg_dump_roundtrip -- --include-ignored --test-threads=1
+BOOKIE_TEST_PG_DUMP="$work_root/pg_dump" BOOKIE_TEST_PG_RESTORE="$work_root/pg_restore" \
+  bash scripts/run-rust-tests.sh --locked -p bookie-app-services --test database_backup_postgres -- --include-ignored --test-threads=1

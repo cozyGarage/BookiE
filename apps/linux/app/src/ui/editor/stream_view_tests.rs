@@ -1,8 +1,8 @@
 use super::*;
 use crate::ui::editor::stream_pages::{ResidentPageStore, StreamPageCache, StreamTerminal};
 use crate::ui::editor::{StatementIdentity, StatementOutcomeKind};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 fn wait_for_grid(root: &gtk::Widget) -> gtk::ColumnView {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -69,7 +69,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
     let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let resident_pages = ResidentPageStore::from_pages(indices.iter().copied().zip(pages.iter().cloned()));
     let result = StreamedResult {
-        pages,
+        pages: pages.iter().map(Arc::downgrade).collect(),
         page_indices: indices.to_vec(),
         page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
@@ -305,7 +305,7 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
     cache.append(1, page(&[3, 4])).unwrap();
     let result = cache.snapshot(StreamTerminal::Loading, None);
     let resident_pages = result.resident_pages.clone();
-    let original = result.pages[0].clone();
+    let original = result.pages[0].upgrade().unwrap();
     let original_weak = Arc::downgrade(&original);
     let outcome = StatementOutcome {
         identity: StatementIdentity::default(),
@@ -465,7 +465,7 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
     let retired = Arc::downgrade(&original);
     let columns = original.columns.clone();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
     runtime.block_on(spool.append_page(0, original.clone())).unwrap();

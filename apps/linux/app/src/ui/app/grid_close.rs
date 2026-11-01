@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Duration;
 
+use bookie_app_services::preparation::{Preparation, PreparationStatus};
 use relm4::adw::prelude::*;
 use relm4::gtk::glib;
 use relm4::{ComponentController, ComponentSender, adw};
-use tablepro_app_services::preparation::{Preparation, PreparationStatus};
 use uuid::Uuid;
 
 use super::{App, AppMsg, OpenMode, WorkspaceTab};

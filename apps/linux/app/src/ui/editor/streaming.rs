@@ -15,8 +15,8 @@ pub(in crate::ui) enum Input {
         generation: u64,
         index: u64,
         identity: StatementIdentity,
-        spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
-        columns: Vec<tablepro_core::ColumnInfo>,
+        spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+        columns: Vec<bookie_core::ColumnInfo>,
     },
     PageLoaded {
         generation: u64,
@@ -35,7 +35,7 @@ pub(in crate::ui) struct StreamStart {
     pub(super) identity: StatementIdentity,
     pub(super) sql_preview: String,
     pub(super) export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
-    pub(super) spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
+    pub(super) spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
 }
 
@@ -44,13 +44,13 @@ pub(super) struct ActiveStream {
     identity: StatementIdentity,
     sql_preview: String,
     export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
-    spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
+    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     cache: StreamPageCache,
     error: Option<String>,
 }
 
 impl ActiveStream {
-    fn outcome(&self, terminal: StreamTerminal) -> StatementOutcome {
+    fn outcome(&mut self, terminal: StreamTerminal) -> StatementOutcome {
         StatementOutcome {
             identity: self.identity,
             sql_preview: self.sql_preview.clone(),
@@ -167,7 +167,7 @@ impl SqlEditor {
                 let _ = accepted.send(false);
                 return;
             };
-            if let Err(error) = stream.cache.append(sequence, page) {
+            if let Err(error) = stream.cache.append_with_storage_status(sequence, page, spooled) {
                 let message = match error {
                     stream_pages::PageAppendError::OutOfOrder => {
                         crate::tr!("A streamed result page arrived out of order.")
@@ -250,7 +250,7 @@ impl SqlEditor {
             .and_then(|stream| stream.error.clone())
             .map_or(terminal, |message| StreamTerminal::Failed(message.into()));
         let rows = stream.as_ref().map(|stream| stream.cache.total_rows() as i64);
-        let outcome = stream.map(|stream| {
+        let outcome = stream.map(|mut stream| {
             let mut outcome = stream.outcome(terminal.clone());
             outcome.elapsed_ms = elapsed.max(0) as u128;
             outcome
@@ -302,8 +302,8 @@ fn load_stream_page(
     generation: u64,
     index: u64,
     identity: StatementIdentity,
-    spool: tablepro_app_services::stream_result_spool::StreamResultSpool,
-    columns: Vec<tablepro_core::ColumnInfo>,
+    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+    columns: Vec<bookie_core::ColumnInfo>,
 ) {
     let loader = sender.clone();
     sender.command(move |_, shutdown| {
@@ -343,7 +343,7 @@ mod tests {
             identity: StatementIdentity::default(),
             sql_preview: "SELECT 2".into(),
             export_query: None,
-            spool: tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+            spool: bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
                 .create()
                 .expect("test spool"),
             cache: StreamPageCache::default(),

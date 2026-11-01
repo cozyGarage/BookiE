@@ -3,11 +3,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tablepro_app_services::enum_input::{EnumInputError, declared_member_labels, parse_enum_input};
-use tablepro_app_services::reconnect::next_delay;
-use tablepro_app_services::sql_text::SqlTextLimits;
-use tablepro_app_services::stream_result_spool::StreamResultSpoolManager;
-use tablepro_core::{ColumnInfo, EnumInputStyle, QueryResult, Value};
+use bookie_app_services::enum_input::{EnumInputError, declared_member_labels, parse_enum_input};
+use bookie_app_services::reconnect::next_delay;
+use bookie_app_services::sql_text::SqlTextLimits;
+use bookie_app_services::stream_result_spool::StreamResultSpoolManager;
+use bookie_core::{ColumnInfo, EnumInputStyle, QueryResult, Value};
 
 fn column(name: &str, data_type: &str) -> ColumnInfo {
     ColumnInfo {

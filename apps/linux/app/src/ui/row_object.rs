@@ -4,9 +4,14 @@ use std::sync::{Arc, Weak};
 use gtk4::glib;
 use gtk4::subclass::prelude::*;
 
-use tablepro_core::{QueryResult, Value};
+use bookie_core::{QueryResult, Value};
 
 const PREVIEW_BYTES: usize = 8 * 1024;
+
+pub(super) struct RowIdentity {
+    pub(super) pk_values: Arc<[Value]>,
+    pub(super) key: Option<crate::services::change_tracker::RowKey>,
+}
 
 #[derive(Clone)]
 pub struct SharedRow {
@@ -41,11 +46,12 @@ mod imp {
         /// tracker lookup) from a persisted row whose PK columns
         /// happen to be NULL.
         pub draft_id: Cell<Option<u64>>,
+        pub(super) row_identity: RefCell<Option<(Vec<usize>, Arc<RowIdentity>)>>,
     }
 
     #[glib::object_subclass]
     impl ObjectSubclass for RowObject {
-        const NAME: &str = "TableProRowObject";
+        const NAME: &str = "BookiERowObject";
         type Type = super::RowObject;
     }
 
@@ -113,6 +119,24 @@ impl RowObject {
 
     pub fn draft_id(&self) -> Option<u64> {
         self.imp().draft_id.get()
+    }
+
+    pub(super) fn row_identity(&self, key_indices: &[usize]) -> Arc<RowIdentity> {
+        if let Some((indices, identity)) = self.imp().row_identity.borrow().as_ref()
+            && indices == key_indices
+        {
+            return identity.clone();
+        }
+        let values = key_indices
+            .iter()
+            .map(|&index| self.cell_value(index))
+            .collect::<Vec<_>>();
+        let identity = Arc::new(RowIdentity {
+            key: crate::services::change_tracker::RowKey::from_pk_values(&values),
+            pk_values: Arc::from(values),
+        });
+        *self.imp().row_identity.borrow_mut() = Some((key_indices.to_vec(), identity.clone()));
+        identity
     }
 
     pub fn cell_value(&self, idx: usize) -> Value {
@@ -260,18 +284,27 @@ impl RowObject {
         if idx < cells.len() {
             cells[idx] = Some(value);
             self.imp().previews.borrow_mut()[idx] = None;
+            if self
+                .imp()
+                .row_identity
+                .borrow()
+                .as_ref()
+                .is_some_and(|(indices, _)| indices.contains(&idx))
+            {
+                self.imp().row_identity.borrow_mut().take();
+            }
         }
     }
 }
 
 fn is_partial(value: &Value) -> bool {
-    matches!(value, Value::Undecodable(type_name) if tablepro_app_services::browse_query::parse_partial(type_name).is_some())
+    matches!(value, Value::Undecodable(type_name) if bookie_app_services::browse_query::parse_partial(type_name).is_some())
 }
 
 fn preview_value(value: &Value) -> Option<CellPreview> {
     match value {
         Value::Undecodable(type_name) => {
-            let (bytes, prefix) = tablepro_app_services::browse_query::parse_partial(type_name)?;
+            let (bytes, prefix) = bookie_app_services::browse_query::parse_partial(type_name)?;
             Some(CellPreview {
                 value: Value::Text(prefix.to_owned()),
                 byte_count: usize::try_from(bytes).ok()?,

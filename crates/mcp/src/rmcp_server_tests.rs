@@ -6,14 +6,14 @@ struct NoProvider;
 
 #[async_trait::async_trait]
 impl crate::bridge::ConnectionProvider for NoProvider {
-    async fn list_saved_connections(&self) -> Result<Vec<tablepro_storage::SavedConnection>, String> {
+    async fn list_saved_connections(&self) -> Result<Vec<bookie_storage::SavedConnection>, String> {
         Ok(Vec::new())
     }
     async fn connection(
         &self,
         _connection_id: uuid::Uuid,
-        _principal: tablepro_policy::Principal,
-    ) -> Result<Arc<dyn tablepro_core::Connection>, String> {
+        _principal: bookie_policy::Principal,
+    ) -> Result<Arc<dyn bookie_core::Connection>, String> {
         Err("no connections in this test".into())
     }
 }
@@ -149,8 +149,8 @@ async fn a_tool_call_without_a_token_is_an_error_result_and_runs_nothing() {
 
 #[test]
 fn rmcp_transport_serializes_the_same_structured_outcome() {
-    let error = crate::errors::McpToolError::from_write_error(&tablepro_core::DriverError::OperationOutcomeUnknown {
-        source: Box::new(tablepro_core::DriverError::Disconnected),
+    let error = crate::errors::McpToolError::from_write_error(&bookie_core::DriverError::OperationOutcomeUnknown {
+        source: Box::new(bookie_core::DriverError::Disconnected),
     });
     let result = serde_json::to_value(tool_error_result(&error)).unwrap();
 

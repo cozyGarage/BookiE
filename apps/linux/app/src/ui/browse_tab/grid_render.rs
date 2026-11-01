@@ -1,7 +1,7 @@
 use relm4::gtk::glib;
 use relm4::{ComponentSender, gtk};
 
-use tablepro_core::QueryResult;
+use bookie_core::QueryResult;
 
 use super::*;
 
@@ -506,8 +506,8 @@ mod selection_stats_tests {
         let store = gtk::gio::ListStore::new::<crate::ui::row_object::RowObject>();
         for number in 0..64 {
             store.append(&crate::ui::row_object::RowObject::new(vec![
-                tablepro_core::Value::Int(number),
-                tablepro_core::Value::Text("x".repeat(512 * 1024)),
+                bookie_core::Value::Int(number),
+                bookie_core::Value::Text("x".repeat(512 * 1024)),
             ]));
         }
         let columns = ["number", "payload"].map(|name| ColumnInfo {
@@ -536,7 +536,7 @@ mod selection_stats_tests {
             .unwrap();
         assert_eq!(
             row.with_cell_value(1, |value| match value {
-                tablepro_core::Value::Text(text) => text.len(),
+                bookie_core::Value::Text(text) => text.len(),
                 _ => 0,
             }),
             Some(512 * 1024)

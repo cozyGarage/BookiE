@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use async_trait::async_trait;
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, ExecResult, QueryResult, TableInfo};
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, ExecResult, QueryResult, TableInfo};
 
 use super::*;
 
@@ -117,7 +117,7 @@ async fn a_credential_failure_ends_the_retry_loop_and_reports_the_reason() {
         }),
         opts: ConnectOptions::default(),
         ssh: None,
-        environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     };
 
     let outcome = reconnect_loop(&inner, &params, &CancellationToken::new(), &Arc::new(Notify::new())).await;
@@ -146,7 +146,7 @@ impl Connection for IdleConn {
         Ok(vec![])
     }
 
-    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<tablepro_core::ColumnInfo>, DriverError> {
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<bookie_core::ColumnInfo>, DriverError> {
         Ok(vec![])
     }
 
@@ -162,11 +162,11 @@ impl Connection for IdleConn {
         Err(DriverError::ConnectionRefused)
     }
 
-    async fn execute_params(&self, _: &str, _: &[tablepro_core::Value]) -> Result<ExecResult, DriverError> {
+    async fn execute_params(&self, _: &str, _: &[bookie_core::Value]) -> Result<ExecResult, DriverError> {
         Err(DriverError::ConnectionRefused)
     }
 
-    async fn execute_in_transaction(&self, _: &[(String, Vec<tablepro_core::Value>)]) -> Result<Vec<u64>, DriverError> {
+    async fn execute_in_transaction(&self, _: &[(String, Vec<bookie_core::Value>)]) -> Result<Vec<u64>, DriverError> {
         Err(DriverError::ConnectionRefused)
     }
 
@@ -233,7 +233,7 @@ async fn a_reported_fault_starts_a_reconnect_before_the_next_ping() {
         }),
         opts: ConnectOptions::default(),
         ssh: None,
-        environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     };
     let cancel = CancellationToken::new();
     let fault = Arc::new(Notify::new());
@@ -276,7 +276,7 @@ async fn a_reconnected_connection_reports_faults_before_its_next_ping() {
         }),
         opts: ConnectOptions::default(),
         ssh: None,
-        environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     };
     let cancel = CancellationToken::new();
     let fault = Arc::new(Notify::new());

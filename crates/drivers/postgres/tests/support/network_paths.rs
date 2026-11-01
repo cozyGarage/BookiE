@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, OperationControl, Value};
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, OperationControl, Value};
 use testcontainers::core::WaitFor;
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
@@ -224,11 +224,11 @@ async fn check_pool_cancellation(pool_mode: &'static str, target_sql: &'static s
         "cancelling one client stopped the other client's query"
     );
     assert!(
-        matches!(target_result, Err(tablepro_core::DriverError::Cancelled)),
+        matches!(target_result, Err(bookie_core::DriverError::Cancelled)),
         "{target_result:?}"
     );
     assert!(
-        matches!(blocker_result, Err(tablepro_core::DriverError::Cancelled)),
+        matches!(blocker_result, Err(bookie_core::DriverError::Cancelled)),
         "{blocker_result:?}"
     );
     assert!(target.is_usable());

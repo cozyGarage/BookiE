@@ -11,7 +11,7 @@ fn exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values() {
             origin: origin.clone(),
             driver_id: "sqlite".into(),
             sql: "SELECT id FROM items WHERE id > ?".into(),
-            params: vec![tablepro_core::Value::Int(0)],
+            params: vec![bookie_core::Value::Int(0)],
             timeout_secs: 30,
             suggested_name: "items".into(),
             session: None,
@@ -19,19 +19,19 @@ fn exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values() {
         columns: page.columns.clone(),
     };
     let streamed = StreamedResult {
-        pages: vec![page.clone()],
+        pages: vec![std::sync::Arc::downgrade(&page)],
         page_indices: vec![2],
         page_row_starts: super::super::super::stream_pages::page_row_starts_from_counts(&[1, 1, page.rows.len(), 1]),
         page_row_counts: vec![1, 1, page.rows.len(), 1],
         retained_rows: page.rows.len(),
         columns: page.columns.clone(),
         total_pages: 4,
-        total_rows: tablepro_core::MAX_QUERY_CURSOR_PAGE_ROWS * 3 + 2,
+        total_rows: bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS * 3 + 2,
         terminal: StreamTerminal::Loading,
         export: Some(request.clone()),
         generation: 0,
         spool: None,
-        resident_pages: Default::default(),
+        resident_pages: super::super::super::stream_pages::ResidentPageStore::from_pages([(2, page.clone())]),
     };
     let outcome = super::super::StatementOutcome {
         identity: StatementIdentity {
@@ -62,9 +62,9 @@ fn exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values() {
 
     assert_eq!(export.query.origin, origin);
     assert_eq!(export.query.sql, "SELECT id FROM items WHERE id > ?");
-    assert_eq!(export.query.params, [tablepro_core::Value::Int(0)]);
+    assert_eq!(export.query.params, [bookie_core::Value::Int(0)]);
     assert_eq!(export.query.suggested_name, "items");
     assert_eq!(export.columns[0].name, "id");
     assert_eq!(streamed.pages.len(), 1);
-    assert!(streamed.total_rows > streamed.pages[0].rows.len());
+    assert!(streamed.total_rows > streamed.pages[0].upgrade().unwrap().rows.len());
 }

@@ -28,7 +28,7 @@ def problems(root):
     match = re.search(r"project\([^,]+,\s*version:\s*['\"]([^'\"]+)['\"]", meson)
     if not match or match.group(1) != version:
         errors.append("Meson version differs from the workspace version")
-    metadata = ET.parse(root / "apps/linux/flatpak/com.tablepro.linux.metainfo.xml")
+    metadata = ET.parse(root / "apps/linux/flatpak/com.bookie.linux.metainfo.xml")
     newest = metadata.find("releases/release")
     if newest is None or newest.get("version") != version:
         errors.append("newest AppStream entry differs from the workspace version")

@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::CatalogObjectKind;
+use bookie_core::CatalogObjectKind;
 
 fn info(schema: Option<&str>, name: &str) -> TableInfo {
     TableInfo {

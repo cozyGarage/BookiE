@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{ConnectOptions, DatabaseDriver, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, Value};
 
 async fn table_with(rows: u64) -> (tempfile::TempDir, Arc<dyn Connection>) {
     let directory = tempfile::tempdir().unwrap();
@@ -111,10 +111,10 @@ fn a_filter_limits_the_exported_rows() {
         .unwrap();
     let mut filtered = plan();
     filtered.filter = FilterSet {
-        rules: vec![tablepro_core::FilterRule {
+        rules: vec![bookie_core::FilterRule {
             column: "id".into(),
-            op: tablepro_core::FilterOp::Gt,
-            value: Some(tablepro_core::FilterValue::Single("25".into())),
+            op: bookie_core::FilterOp::Gt,
+            value: Some(bookie_core::FilterValue::Single("25".into())),
         }],
         ..FilterSet::default()
     };
@@ -125,7 +125,7 @@ fn a_filter_limits_the_exported_rows() {
 
 #[test]
 fn a_table_larger_than_one_page_exports_to_a_complete_csv_file() {
-    use tablepro_core::export::{CsvOptions, ResultExport, ResultFormat, write_paged_file};
+    use bookie_core::export::{CsvOptions, ResultExport, ResultFormat, write_paged_file};
     let runtime = runtime();
     let total = EXPORT_PAGE_ROWS * 2 + 3;
     let (directory, connection) = runtime.block_on(table_with(total));

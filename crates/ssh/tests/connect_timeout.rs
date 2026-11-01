@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use tablepro_ssh::{SshAuth, SshConfig, SshError, SshTunnel};
+use bookie_ssh::{SshAuth, SshConfig, SshError, SshTunnel};
 use tokio::net::TcpListener;
 
 async fn silent_listener() -> (u16, tokio::task::JoinHandle<()>) {
@@ -48,7 +48,7 @@ async fn a_host_that_accepts_and_never_answers_times_out() {
         config(port),
         "db.example".into(),
         5432,
-        tablepro_ssh::UnknownHostKey::Learn,
+        bookie_ssh::UnknownHostKey::Learn,
     )
     .await
     {
@@ -85,7 +85,7 @@ async fn a_timeout_names_the_host_it_could_not_reach() {
         config(port),
         "db.example".into(),
         5432,
-        tablepro_ssh::UnknownHostKey::Learn,
+        bookie_ssh::UnknownHostKey::Learn,
     )
     .await
     {

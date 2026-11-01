@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::{connect, start_clickhouse};
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -28,7 +28,7 @@ async fn query_truncates_when_result_memory_budget_is_exceeded() {
 async fn narrow_queries_stop_at_the_row_limit_and_report_truncation() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
-    let cap = tablepro_core::MAX_QUERY_ROWS;
+    let cap = bookie_core::MAX_QUERY_ROWS;
     let result = conn
         .query(&format!("SELECT number FROM numbers({})", cap + 1))
         .await
@@ -50,7 +50,7 @@ async fn a_user_format_clause_that_never_ends_a_row_is_refused_with_bounded_memo
         .await
         .expect_err("a single endless line must not be buffered whole");
 
-    assert!(matches!(error, tablepro_core::DriverError::Unsupported(_)), "{error:?}");
+    assert!(matches!(error, bookie_core::DriverError::Unsupported(_)), "{error:?}");
     assert_eq!(conn.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);
 }
 
@@ -76,7 +76,7 @@ async fn a_readonly_user_can_connect_and_a_grid_save_still_waits_for_its_mutatio
     read_only.username = "ro".into();
     read_only.password = secrecy::SecretString::new("ro-secret".to_string().into());
 
-    let connection = tablepro_core::DatabaseDriver::connect(&drivers_clickhouse::ClickhouseDriver, read_only).await;
+    let connection = bookie_core::DatabaseDriver::connect(&drivers_clickhouse::ClickhouseDriver, read_only).await;
 
     assert!(
         connection.is_ok(),

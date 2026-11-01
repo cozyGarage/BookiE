@@ -1,24 +1,24 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::sync::Arc;
 
-use tablepro_core::{AuthMode, Connection, TlsMode};
-use tablepro_policy::{AuditState, AuditTransportOutcome, Principal};
-use tablepro_release_tests::Fixture;
-use tablepro_ssh::SshConfig;
-use tablepro_storage::AuditJournal;
-use tablepro_transport::{TransportAuditContext, establish};
+use bookie_core::{AuthMode, Connection, TlsMode};
+use bookie_policy::{AuditState, AuditTransportOutcome, Principal};
+use bookie_release_tests::Fixture;
+use bookie_ssh::SshConfig;
+use bookie_storage::AuditJournal;
+use bookie_transport::{TransportAuditContext, establish};
 
 use drivers_postgres::PgDriver;
 
-fn verifying_options(fixture: &Fixture) -> tablepro_core::ConnectOptions {
-    tablepro_core::ConnectOptions {
+fn verifying_options(fixture: &Fixture) -> bookie_core::ConnectOptions {
+    bookie_core::ConnectOptions {
         auth_source: None,
         host: fixture.database_hostname.clone(),
         port: fixture.database_port,
         database: fixture.database.clone(),
         username: fixture.username.clone(),
         password: secrecy::SecretString::new(fixture.password.clone().into()),
-        tls: tablepro_core::TlsConfig {
+        tls: bookie_core::TlsConfig {
             mode: TlsMode::VerifyFull,
             root_cert: Some(fixture.ca_cert.clone()),
             ..Default::default()
@@ -46,8 +46,8 @@ async fn the_shared_transport_verifies_the_database_hostname_through_the_bastion
     let (connection, tunnel) = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
-        &tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        Some(bookie_transport::SshRoute::Builtin(chain(&fixture))),
+        &bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     )
     .await
     .expect("a tunnelled VerifyFull session");
@@ -74,8 +74,8 @@ async fn a_tunnelled_connection_fails_closed_when_the_bastion_is_unreachable() {
     let error = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(tablepro_transport::SshRoute::Builtin(vec![hop])),
-        &tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        Some(bookie_transport::SshRoute::Builtin(vec![hop])),
+        &bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     )
     .await
     .err()
@@ -95,8 +95,8 @@ async fn a_direct_session_and_a_tunnelled_session_reach_the_same_database() {
     let (tunnelled, _tunnel) = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
-        &tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        Some(bookie_transport::SshRoute::Builtin(chain(&fixture))),
+        &bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     )
     .await
     .expect("a tunnelled VerifyFull session");
@@ -126,7 +126,7 @@ async fn a_direct_session_and_a_tunnelled_session_reach_the_same_database() {
 #[ignore = "requires the postgres release fixture"]
 async fn shared_transport_records_builtin_unknown_and_changed_host_key_refusals() {
     let fixture = Fixture::from_env();
-    let known_hosts = tablepro_ssh::default_known_hosts_path().expect("a known_hosts path must be resolvable");
+    let known_hosts = bookie_ssh::default_known_hosts_path().expect("a known_hosts path must be resolvable");
     let backup = known_hosts.with_extension("bak-refuse-test");
     if known_hosts.exists() {
         std::fs::rename(&known_hosts, &backup).expect("set aside any already-learned host keys");
@@ -142,28 +142,28 @@ async fn shared_transport_records_builtin_unknown_and_changed_host_key_refusals(
             .expect("open isolated audit journal"),
     );
     let state = Arc::new(AuditState::new());
-    let environment = tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse).with_audit(
+    let environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse).with_audit(
         TransportAuditContext::new(
             journal.clone(),
             state,
             Principal::human_gui(),
             uuid::Uuid::new_v4(),
             "built-in refusal fixture",
-            tablepro_core::Environment::Local,
+            bookie_core::Environment::Local,
             "postgres",
         ),
     );
     let first = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
+        Some(bookie_transport::SshRoute::Builtin(chain(&fixture))),
         &environment,
     )
     .await;
 
     let known_hosts_written = known_hosts.exists();
     let error = first.err().expect("an unknown host key must be refused, not learned");
-    assert!(matches!(error, tablepro_transport::TransportError::HostKeyRefused(_)));
+    assert!(matches!(error, bookie_transport::TransportError::HostKeyRefused(_)));
     assert!(
         !known_hosts_written,
         "refusing an unknown host key must not write a known_hosts file"
@@ -193,13 +193,13 @@ async fn shared_transport_records_builtin_unknown_and_changed_host_key_refusals(
     let changed = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
+        Some(bookie_transport::SshRoute::Builtin(chain(&fixture))),
         &environment,
     )
     .await
     .err()
     .expect("a changed host key must be refused");
-    assert!(matches!(changed, tablepro_transport::TransportError::HostKeyChanged(_)));
+    assert!(matches!(changed, bookie_transport::TransportError::HostKeyChanged(_)));
     let events = journal.recent(10).await.expect("read audit journal");
     assert_eq!(events.len(), 2, "one terminal record per builtin SSH attempt");
     assert_eq!(

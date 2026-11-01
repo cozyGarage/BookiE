@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{ConnectOptions, Connection, Value};
+use bookie_core::{ConnectOptions, Connection, Value};
 
 use crate::{connect, start_mariadb, start_mysql};
 
@@ -86,16 +86,16 @@ async fn assert_nonempty_enum_set_xlsx(connection: &dyn Connection, suffix: usiz
     );
 
     let path = std::env::temp_dir().join(format!(
-        "tablepro-enum-set-xlsx-{}-{:?}-{suffix}.xlsx",
+        "bookie-enum-set-xlsx-{}-{:?}-{suffix}.xlsx",
         std::process::id(),
         std::thread::current().id()
     ));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -271,7 +271,7 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
             "native ENUM ordinals and labels in sql_mode {mode:?}"
         );
         let json: serde_json::Value =
-            serde_json::from_str(&tablepro_core::export::render_json(&source.columns, &source.rows)).unwrap();
+            serde_json::from_str(&bookie_core::export::render_json(&source.columns, &source.rows)).unwrap();
         assert_eq!(
             json,
             serde_json::json!([
@@ -285,21 +285,21 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
             ]),
             "JSON export under sql_mode {mode:?}"
         );
-        let csv_options = tablepro_core::export::CsvOptions::default();
+        let csv_options = bookie_core::export::CsvOptions::default();
         for (extension, format) in [
-            ("xml", tablepro_core::export::ResultFormat::Xml),
-            ("html", tablepro_core::export::ResultFormat::Html),
-            ("md", tablepro_core::export::ResultFormat::Markdown),
+            ("xml", bookie_core::export::ResultFormat::Xml),
+            ("html", bookie_core::export::ResultFormat::Html),
+            ("md", bookie_core::export::ResultFormat::Markdown),
         ] {
             let path = std::env::temp_dir().join(format!(
-                "tablepro-enum-set-{}-{:?}-{suffix}.{extension}",
+                "bookie-enum-set-{}-{:?}-{suffix}.{extension}",
                 std::process::id(),
                 std::thread::current().id()
             ));
-            tablepro_core::export::write_result_file(
+            bookie_core::export::write_result_file(
                 &path,
                 &source,
-                &tablepro_core::export::ResultExport {
+                &bookie_core::export::ResultExport {
                     format,
                     csv: &csv_options,
                     sql: None,
@@ -316,17 +316,17 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
             std::fs::remove_file(path).unwrap();
         }
         let xlsx_path = std::env::temp_dir().join(format!(
-            "tablepro-enum-xlsx-{}-{:?}-{suffix}.xlsx",
+            "bookie-enum-xlsx-{}-{:?}-{suffix}.xlsx",
             std::process::id(),
             std::thread::current().id()
         ));
         std::fs::write(&xlsx_path, b"previous workbook").unwrap();
-        let csv = tablepro_core::export::CsvOptions::default();
-        let xlsx_error = tablepro_core::export::write_result_file(
+        let csv = bookie_core::export::CsvOptions::default();
+        let xlsx_error = bookie_core::export::write_result_file(
             &xlsx_path,
             &source,
-            &tablepro_core::export::ResultExport {
-                format: tablepro_core::export::ResultFormat::Xlsx,
+            &bookie_core::export::ResultExport {
+                format: bookie_core::export::ResultFormat::Xlsx,
                 csv: &csv,
                 sql: None,
             },
@@ -337,7 +337,7 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         assert!(
             matches!(
                 xlsx_error,
-                tablepro_core::export::ExportError::WorkbookEmptyText { row: 4, column: 3 }
+                bookie_core::export::ExportError::WorkbookEmptyText { row: 4, column: 3 }
             ),
             "sql_mode {mode:?}: {xlsx_error:?}"
         );
@@ -345,25 +345,25 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         std::fs::remove_file(xlsx_path).unwrap();
         assert_nonempty_enum_set_xlsx(connection.as_ref(), suffix, mode).await;
 
-        let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-        let csv_options = tablepro_core::export::CsvOptions {
+        let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+        let csv_options = bookie_core::export::CsvOptions {
             null_to_empty: false,
             null_marker: Some(null_marker.clone()),
-            ..tablepro_core::export::CsvOptions::default()
+            ..bookie_core::export::CsvOptions::default()
         };
-        let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-        let import_options = tablepro_core::import::CsvImportOptions {
+        let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+        let import_options = bookie_core::import::CsvImportOptions {
             null_marker,
-            ..tablepro_core::import::CsvImportOptions::default()
+            ..bookie_core::import::CsvImportOptions::default()
         };
-        let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+        let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
         let columns = connection.fetch_columns(None, "enum_csv_copy").await.unwrap();
         let mapping = [Some(0), Some(1), Some(2), Some(3)];
-        let plan = tablepro_core::import::build_insert_plan(
-            &tablepro_core::import::ImportTarget {
+        let plan = bookie_core::import::build_insert_plan(
+            &bookie_core::import::ImportTarget {
                 driver_id: "mysql",
 
-                capabilities: tablepro_core::DriverCapabilities::default(),
+                capabilities: bookie_core::DriverCapabilities::default(),
                 schema: None,
                 table: "enum_csv_copy",
                 columns: &columns,
@@ -378,18 +378,18 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         }
 
         let path = std::env::temp_dir().join(format!(
-            "tablepro-enum-sql-{}-{:?}-{suffix}.sql",
+            "bookie-enum-sql-{}-{:?}-{suffix}.sql",
             std::process::id(),
             std::thread::current().id()
         ));
-        let csv = tablepro_core::export::CsvOptions::default();
-        tablepro_core::export::write_result_file(
+        let csv = bookie_core::export::CsvOptions::default();
+        bookie_core::export::write_result_file(
             &path,
             &source,
-            &tablepro_core::export::ResultExport {
-                format: tablepro_core::export::ResultFormat::Sql,
+            &bookie_core::export::ResultExport {
+                format: bookie_core::export::ResultFormat::Sql,
                 csv: &csv,
-                sql: Some(tablepro_core::export::SqlTarget {
+                sql: Some(bookie_core::export::SqlTarget {
                     driver_id: "mysql",
                     schema: None,
                     table: "enum_mode_copy",
@@ -554,24 +554,24 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
         ]
     );
 
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let csv_options = tablepro_core::export::CsvOptions {
+    let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = bookie_core::export::CsvOptions {
         null_to_empty: false,
         null_marker: Some(null_marker.clone()),
         ..Default::default()
     };
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection.fetch_columns(None, "enum_empty_mode_target").await.unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "mysql",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "enum_empty_mode_target",
             columns: &columns,
@@ -663,11 +663,11 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
         .fetch_columns(None, "enum_empty_mode_combined_target")
         .await
         .unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "mysql",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "enum_empty_mode_combined_target",
             columns: &columns,
@@ -1017,9 +1017,9 @@ async fn value_contract_mysql_and_mariadb_collated_enum_inputs_preserve_canonica
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn session_string_settings_follow_sql_mode() {
-    use tablepro_core::sql_syntax::SqlGrammar;
-    use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
-    use tablepro_core::{OperationControl, Value};
+    use bookie_core::sql_syntax::SqlGrammar;
+    use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
+    use bookie_core::{OperationControl, Value};
     let (_container, opts) = start_mysql().await;
     let connection = connect(opts).await;
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
