@@ -1125,6 +1125,7 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
         SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
         SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
         SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
+        SqlEditorOutput::ShowToast(message) => AppMsg::ShowToast(message),
         SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
             title: crate::tr!("Row as JSON"),
             body,

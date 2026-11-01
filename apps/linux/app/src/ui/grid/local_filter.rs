@@ -19,9 +19,16 @@ pub(crate) struct ResultViewKey {
 #[derive(Clone, Default)]
 pub(crate) struct LocalResultSettingsStore(Rc<RefCell<HashMap<ResultViewKey, LocalResultSettings>>>);
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LocalCellFilter {
+    pub(crate) column: usize,
+    pub(crate) value: Value,
+    pub(crate) exclude: bool,
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct LocalResultSettings {
-    pub(crate) filter: Option<(usize, Value)>,
+    pub(crate) filter: Option<LocalCellFilter>,
     pub(crate) sort: Option<(usize, bool)>,
     selection: Option<(std::sync::Weak<QueryResult>, HashSet<usize>)>,
 }
@@ -54,7 +61,7 @@ struct LocalResultViewState {
     result: Arc<QueryResult>,
     store: Option<RowStore>,
     selection: Option<gtk4::MultiSelection>,
-    filter: Option<(usize, Value)>,
+    filter: Option<LocalCellFilter>,
     sort: Option<(usize, bool)>,
     controls: gtk4::Box,
     status: gtk4::Label,
@@ -159,12 +166,17 @@ impl LocalResultView {
         });
     }
 
-    pub(crate) fn filter_by_value(&self, column: usize, value: Value) {
-        if self.0.borrow().result.rows.iter().any(|row| row.get(column).is_some()) {
-            self.0.borrow_mut().filter = Some((column, value));
-            self.persist_settings();
-            self.rebuild_visible_rows();
+    pub(crate) fn filter_by_value(&self, column: usize, value: Value, exclude: bool) -> bool {
+        if tablepro_core::equality_rule("_", &value).is_none() {
+            return false;
         }
+        if !self.0.borrow().result.rows.iter().any(|row| row.get(column).is_some()) {
+            return false;
+        }
+        self.0.borrow_mut().filter = Some(LocalCellFilter { column, value, exclude });
+        self.persist_settings();
+        self.rebuild_visible_rows();
+        true
     }
 
     pub(crate) fn clear_filter(&self) {
@@ -205,13 +217,20 @@ impl LocalResultView {
                 .unwrap_or_else(|| (0..result.rows.len()).collect()),
             None => (0..result.rows.len()).collect(),
         };
-        if let Some((column, value)) = filter {
+        if let Some(filter) = filter {
             order.retain(|source_index| {
                 result
                     .rows
                     .get(*source_index)
-                    .and_then(|row| row.get(column))
-                    .is_some_and(|candidate| same_filter_value(candidate, &value))
+                    .and_then(|row| row.get(filter.column))
+                    .is_some_and(|candidate| {
+                        let matches = same_filter_value(candidate, &filter.value);
+                        if filter.exclude {
+                            !matches
+                        } else {
+                            matches
+                        }
+                    })
             });
         }
         let syncing = self.0.borrow().selection_syncing.clone();
@@ -296,14 +315,21 @@ fn same_filter_value(left: &Value, right: &Value) -> bool {
 }
 
 #[cfg(test)]
-fn matching_source_indices(result: &QueryResult, column: usize, value: &Value) -> Vec<usize> {
+fn matching_source_indices(result: &QueryResult, column: usize, value: &Value, exclude: bool) -> Vec<usize> {
     result
         .rows
         .iter()
         .enumerate()
         .filter_map(|(index, row)| {
             row.get(column)
-                .is_some_and(|candidate| same_filter_value(candidate, value))
+                .is_some_and(|candidate| {
+                    let matches = same_filter_value(candidate, value);
+                    if exclude {
+                        !matches
+                    } else {
+                        matches
+                    }
+                })
                 .then_some(index)
         })
         .collect()

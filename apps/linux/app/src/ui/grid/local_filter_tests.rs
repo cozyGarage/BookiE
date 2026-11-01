@@ -54,8 +54,26 @@ fn local_value_filter_matches_native_values_without_display_coercion() {
         Value::Text("NULL".into()),
     ]);
 
-    assert_eq!(matching_source_indices(&result, 0, &Value::Int(1)), vec![1]);
-    assert_eq!(matching_source_indices(&result, 0, &Value::Null), vec![2]);
+    assert_eq!(matching_source_indices(&result, 0, &Value::Int(1), false), vec![1]);
+    assert_eq!(matching_source_indices(&result, 0, &Value::Null, false), vec![2]);
+    assert_eq!(matching_source_indices(&result, 0, &Value::Int(1), true), vec![0, 2, 3]);
+    assert_eq!(matching_source_indices(&result, 0, &Value::Null, true), vec![0, 1, 3]);
+}
+
+#[test]
+fn local_exclude_keeps_null_and_empty_text_distinct() {
+    let result = result(vec![Value::Null, Value::Text(String::new()), Value::Text("x".into())]);
+
+    assert_eq!(matching_source_indices(&result, 0, &Value::Null, false), vec![0]);
+    assert_eq!(
+        matching_source_indices(&result, 0, &Value::Text(String::new()), false),
+        vec![1]
+    );
+    assert_eq!(matching_source_indices(&result, 0, &Value::Null, true), vec![1, 2]);
+    assert_eq!(
+        matching_source_indices(&result, 0, &Value::Text(String::new()), true),
+        vec![0, 2]
+    );
 }
 
 #[test]
@@ -63,17 +81,17 @@ fn local_value_filter_preserves_duplicate_source_order_and_ignores_missing_cells
     let mut result = result(vec![Value::Int(7), Value::Int(2), Value::Int(7)]);
     result.rows[1].clear();
 
-    assert_eq!(matching_source_indices(&result, 0, &Value::Int(7)), vec![0, 2]);
-    assert!(matching_source_indices(&result, 1, &Value::Int(7)).is_empty());
+    assert_eq!(matching_source_indices(&result, 0, &Value::Int(7), false), vec![0, 2]);
+    assert!(matching_source_indices(&result, 1, &Value::Int(7), false).is_empty());
 }
 
 #[test]
 fn local_value_filter_distinguishes_sql_null_from_json_null() {
     let result = result(vec![Value::Null, Value::Json(Box::new(serde_json::Value::Null))]);
 
-    assert_eq!(matching_source_indices(&result, 0, &Value::Null), vec![0]);
+    assert_eq!(matching_source_indices(&result, 0, &Value::Null, false), vec![0]);
     assert_eq!(
-        matching_source_indices(&result, 0, &Value::Json(Box::new(serde_json::Value::Null))),
+        matching_source_indices(&result, 0, &Value::Json(Box::new(serde_json::Value::Null)), false),
         vec![1]
     );
 }
@@ -82,7 +100,10 @@ fn local_value_filter_distinguishes_sql_null_from_json_null() {
 fn local_value_filter_matches_nan_without_formatting_or_coercion() {
     let result = result(vec![Value::Float(f64::NAN), Value::Float(1.0)]);
 
-    assert_eq!(matching_source_indices(&result, 0, &Value::Float(f64::NAN)), vec![0]);
+    assert_eq!(
+        matching_source_indices(&result, 0, &Value::Float(f64::NAN), false),
+        vec![0]
+    );
 }
 
 #[test]
@@ -133,7 +154,7 @@ fn local_filter_and_sort_keep_selection_attached_to_the_source_row() {
     );
     selection.select_item(2, true);
 
-    view.filter_by_value(0, Value::Int(2));
+    assert!(view.filter_by_value(0, Value::Int(2), false));
     view.sort_by(0, false);
 
     assert_eq!(
@@ -192,7 +213,7 @@ fn filtering_a_fully_selected_result_restores_the_selection_in_one_signal() {
     let counter = emissions.clone();
     selection.connect_selection_changed(move |_, _, _| counter.set(counter.get() + 1));
 
-    view.filter_by_value(0, Value::Int(1));
+    assert!(view.filter_by_value(0, Value::Int(1), false));
 
     assert_eq!(store.n_items(), 1000);
     assert_eq!(selection.selection().size(), 1000);

@@ -36,6 +36,24 @@ fn a_local_result_menu_offers_visible_and_all_loaded_row_exports() {
 }
 
 #[test]
+fn filterable_and_local_menus_offer_filter_and_exclude_by_cell_value() {
+    let display_actions = |filterable, local_result| {
+        let menu = build_menu(false, false, true, filterable, local_result);
+        let display = menu.item_link(1, gio::MENU_LINK_SECTION).expect("display section");
+        (0..display.n_items())
+            .filter_map(|index| display.item_attribute_value(index, "action", None))
+            .filter_map(|value| value.get::<String>())
+            .collect::<Vec<_>>()
+    };
+    assert!(display_actions(true, false).contains(&"cell.filter-by-value".into()));
+    assert!(display_actions(true, false).contains(&"cell.exclude-value".into()));
+    assert!(display_actions(false, true).contains(&"cell.filter-by-value".into()));
+    assert!(display_actions(false, true).contains(&"cell.exclude-value".into()));
+    assert!(!display_actions(false, false).contains(&"cell.filter-by-value".into()));
+    assert!(!display_actions(false, false).contains(&"cell.exclude-value".into()));
+}
+
+#[test]
 fn editable_grid_menu_offers_row_mutations_when_the_table_has_a_key() {
     let menu = build_menu(true, true, true, true, false);
     let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
@@ -193,7 +211,7 @@ fn keyboard_reference_state_follows_current_cell() {
     let export = &menus.export_loaded.as_ref().unwrap().0;
     assert!(!export.is_enabled());
     menus.readonly_popover.popdown();
-    local.filter_by_value(0, Value::Int(7));
+    assert!(local.filter_by_value(0, Value::Int(7), false));
     assert!(cell.grab_focus());
     assert!(action.activate(gtk::ShortcutActionFlags::empty(), &view, None));
     assert!(export.is_enabled());

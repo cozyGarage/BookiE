@@ -54,7 +54,8 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::DeleteRowAt { row_position, row_key } => BrowseTabInput::GridDeleteRowAt { row_position, row_key },
         GridMsg::InsertRow => BrowseTabInput::InsertRow,
         GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
-        GridMsg::FilterByValue { column, value } => BrowseTabInput::FilterByValue { column, value },
+        GridMsg::FilterByValue { column, value, exclude } => BrowseTabInput::FilterByValue { column, value, exclude },
+        GridMsg::ShowToast(message) => BrowseTabInput::ShowToast(message),
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
     }

@@ -75,13 +75,15 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] With the referenced table already open, the same action switches to that tab and replaces its filter.
 - [ ] A composite key filters every referenced column from the same row; with one of its columns hidden, a toast says so.
 
-## Filter by This Value
+## Filter by This Value / Exclude This Value
 
 - [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule.
-- [ ] On a NULL cell it filters with IS NULL.
-- [ ] Doing it again on another value of the same column replaces that rule.
+- [ ] Exclude This Value adds a not-equal (or is-not-null) rule through the same filter strip path.
+- [ ] On a NULL cell, Filter uses IS NULL and Exclude uses IS NOT NULL.
+- [ ] Empty-string cells stay distinct from NULL for both actions.
+- [ ] Doing either action again on another value of the same column replaces that column's rule.
 - [ ] A JSON or binary cell shows "Values of this type can't be used as a filter".
-- [ ] The item is absent from SQL editor result grids.
+- [ ] On a SQL editor result grid, both actions filter the loaded rows only; Clear filter restores the prior loaded page.
 
 ## Named browse filters
 

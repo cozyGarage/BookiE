@@ -887,7 +887,12 @@ impl SimpleComponent for BrowseTab {
                 }
                 sel.unselect_all();
             }
-            BrowseTabInput::FilterByValue { column, value } => self.filter_by_value(&column, &value, &sender),
+            BrowseTabInput::FilterByValue { column, value, exclude } => {
+                self.filter_by_value(&column, &value, exclude, &sender)
+            }
+            BrowseTabInput::ShowToast(message) => {
+                let _ = sender.output(BrowseTabOutput::ShowToast(message));
+            }
             BrowseTabInput::GoToReference { column, row } => self.go_to_reference(&column, &row, &sender),
             BrowseTabInput::ShowReferencingRows { row } => self.show_referencing_rows(&row, &sender),
             BrowseTabInput::ToggleFilterStrip => {

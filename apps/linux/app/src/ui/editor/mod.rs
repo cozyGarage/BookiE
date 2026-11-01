@@ -263,6 +263,7 @@ pub enum SqlEditorOutput {
     QueryChanged(String),
     CopyToClipboard(String),
     ShowRowAsJson(String),
+    ShowToast(String),
     ExportResults {
         result: std::sync::Arc<QueryResult>,
         name: String,
@@ -698,6 +699,9 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::Grid(GridMsg::ShowRowAsJson(text)) => {
                 let _ = sender.output(SqlEditorOutput::ShowRowAsJson(text));
+            }
+            SqlEditorInput::Grid(GridMsg::ShowToast(message)) => {
+                let _ = sender.output(SqlEditorOutput::ShowToast(message));
             }
             SqlEditorInput::Grid(GridMsg::ExportResults(result)) => {
                 let _ = sender.output(SqlEditorOutput::ExportResults {
