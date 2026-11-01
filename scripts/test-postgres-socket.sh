@@ -31,14 +31,14 @@ docker run --detach --name "$container_name" \
   postgres:16-alpine >/dev/null
 
 for _ in $(seq 1 60); do
-  if [[ -S "$socket_root/.s.PGSQL.5432" ]]; then
+  if docker exec "$container_name" pg_isready -h /var/run/postgresql -U postgres -d postgres >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-if [[ ! -S "$socket_root/.s.PGSQL.5432" ]]; then
+if ! docker exec "$container_name" pg_isready -h /var/run/postgresql -U postgres -d postgres >/dev/null 2>&1; then
   docker logs "$container_name" >&2
-  echo "PostgreSQL socket did not become ready" >&2
+  echo "PostgreSQL socket server did not become ready" >&2
   exit 1
 fi
 

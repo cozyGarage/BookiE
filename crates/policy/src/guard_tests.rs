@@ -614,6 +614,8 @@ fn allowed_agent_policy() -> PolicyConfig {
 
 #[path = "guard_tests_administrative.rs"]
 mod administrative;
+#[path = "guard_tests_approval_wait.rs"]
+mod approval_wait;
 #[path = "guard_tests_audit.rs"]
 mod audit;
 #[path = "guard_tests_audit_inflight.rs"]

@@ -54,11 +54,19 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('RUSTC_WRAPPER: ""', guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
 
-    def test_postgres_release_uses_a_short_persistent_temp_directory(self):
+    def test_postgres_release_temp_directory_stays_short_for_unix_sockets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("TMPDIR: /var/cache/ci/t\n", job)
+        self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/pg-release\n", job)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp\n", job)
         self.assertIn('mkdir -p "$TMPDIR"', job)
+        control_path = Path("/var/cache/ci/tmp/tablepro.XXXXXX/runtime/tablepro/ssh/0123456789abcdef/01234567/control.0123456789abcdef")
+        self.assertLess(len(os.fsencode(control_path)), 108)
+
+    def test_postgres_socket_fixture_waits_for_server_readiness(self):
+        script = (ROOT / "scripts/test-postgres-socket.sh").read_text()
+        self.assertIn('docker exec "$container_name" pg_isready', script)
+        self.assertIn("for _ in $(seq 1 60); do", script)
 
     def test_actionlint_uses_a_read_only_go_module_lock(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
