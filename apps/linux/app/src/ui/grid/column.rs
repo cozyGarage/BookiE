@@ -1,11 +1,11 @@
 use gtk4::prelude::*;
+use std::rc::Rc;
 
 use tablepro_core::{ColumnInfo, Value};
 
-use super::context_menu::GridMenus;
 use super::display::{
     COLUMN_SLOT, CellView, FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT,
-    ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view, value_to_full_edit_text,
+    ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view_with_column_editability, value_to_full_edit_text,
 };
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
@@ -85,7 +85,6 @@ pub(super) fn build_column(
     tab_ctx: TabGridContext,
     sort_enabled: bool,
     default_min_width: Option<i32>,
-    grid_menus: Option<GridMenus>,
     column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
 ) -> gtk4::ColumnViewColumn {
     let factory = gtk4::SignalListItemFactory::new();
@@ -95,47 +94,33 @@ pub(super) fn build_column(
 
     let column_data_type = info.data_type.clone();
     let choices_for_setup = tab_ctx.choices.clone();
-    let column_name = info.name.clone();
-    let grid_menus_for_setup = grid_menus.clone();
+    let column_name: Rc<str> = Rc::from(info.name.as_str());
     factory.connect_setup(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
             return;
         };
         if let Some(edit_sender) = edit_sender.clone() {
             if is_bool_type(&column_data_type) {
-                setup_bool_cell(
-                    item,
-                    idx,
-                    column_name.clone(),
-                    edit_sender,
-                    grid_menus_for_setup.as_ref(),
-                );
+                setup_bool_cell(item, idx, edit_sender);
             } else {
                 let editor_kind = classify_editor_kind(&column_data_type);
                 setup_editable_cell(
                     item,
                     idx,
-                    column_name.clone(),
-                    super::full_value_editor::is_full_value_column(&column_data_type),
                     edit_sender,
                     editor_kind,
                     choices_for_setup.clone(),
-                    grid_menus_for_setup.as_ref(),
+                    column_name.clone(),
                 );
             }
         } else {
-            setup_readonly_cell(
-                item,
-                idx,
-                column_name.clone(),
-                readonly_sender.clone(),
-                grid_menus_for_setup.as_ref(),
-            );
+            setup_readonly_cell(item, idx, readonly_sender.clone());
         }
     });
 
     let editable_for_bind = editable && sender.is_some();
     let column_info = info.clone();
+    let column_is_editable = is_cell_editable(info);
     let tab_ctx_for_bind = tab_ctx.clone();
     factory.connect_bind(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
@@ -144,7 +129,15 @@ pub(super) fn build_column(
         let Some(row) = item.item().and_downcast::<crate::ui::row_object::RowObject>() else {
             return;
         };
-        bind_row_cell(item, &row, idx, editable_for_bind, &column_info, &tab_ctx_for_bind);
+        bind_row_cell(
+            item,
+            &row,
+            idx,
+            editable_for_bind,
+            &column_info,
+            &tab_ctx_for_bind,
+            column_is_editable,
+        );
     });
 
     factory.connect_unbind(|_, item| {
@@ -239,6 +232,7 @@ fn bind_row_cell(
     editable: bool,
     column: &ColumnInfo,
     context: &TabGridContext,
+    column_is_editable: bool,
 ) {
     row.with_cell_value(index, |source_value| {
         let pk_values = if context.tab_id.is_some() {
@@ -251,7 +245,7 @@ fn bind_row_cell(
         let value = value_for_bind(source_value, preview.as_ref(), updated_value.as_ref());
         let view = match (preview.as_ref(), value) {
             (Some(preview), _) => CellView::from_preview(preview),
-            (None, Some(value)) => cell_view(value, column),
+            (None, Some(value)) => cell_view_with_column_editability(value, column, column_is_editable),
             (None, None) => return,
         };
         bind_cell(

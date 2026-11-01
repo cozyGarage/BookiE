@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -509,6 +510,31 @@ def database_row_count(path):
         return connection.execute("SELECT COUNT(*) FROM safety_items").fetchone()[0]
 
 
+def application_memory_kib():
+    pid = _owned_application.process.pid
+    fields = {"Rss:": "rss", "Pss:": "pss", "Private_Clean:": "private_clean", "Private_Dirty:": "private_dirty"}
+    values = {}
+    for line in Path(f"/proc/{pid}/smaps_rollup").read_text().splitlines():
+        name, *parts = line.split()
+        if name in fields and parts:
+            values[fields[name]] = int(parts[0])
+    return values
+
+
+def application_sidebar_row_construction():
+    process = owned_application().process
+    stderr = process.stderr
+    position = stderr.tell()
+    stderr.seek(0)
+    output = stderr.read()
+    stderr.seek(position)
+    matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
+    if not matches:
+        raise AssertionError("the app did not report sidebar row construction timing")
+    count, elapsed = matches[-1]
+    return int(count), float(elapsed)
+
+
 def wait_for_database_count(path, expected, timeout=WAIT_SECONDS):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -950,6 +976,13 @@ def owned_application():
 def start_application(binary, environment, restored=False):
     global _owned_application
     environment.setdefault("G_DEBUG", "fatal-criticals")
+    heaptrack_preload = os.environ.get("TABLEPRO_GTK_APP_LD_PRELOAD")
+    heaptrack_output = os.environ.get("TABLEPRO_GTK_APP_HEAPTRACK_OUTPUT")
+    if (heaptrack_preload is None) != (heaptrack_output is None):
+        raise AssertionError("Heaptrack requires both an app preload library and output pipe")
+    if heaptrack_preload is not None and heaptrack_output is not None:
+        environment["LD_PRELOAD"] = heaptrack_preload
+        environment["DUMP_HEAPTRACK_OUTPUT"] = heaptrack_output
     stderr_capture = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
     try:
         process = subprocess.Popen(
@@ -1655,6 +1688,46 @@ def expanding_a_sidebar_table_loads_its_columns(database, _base):
 
 
 expanding_a_sidebar_table_loads_its_columns.environment = "local"
+
+
+def postgres_sidebar_catalog_profile(_database, base):
+    target = os.environ["TABLEPRO_GTK_CATALOG_TARGET"]
+    before = application_memory_kib()
+    connect_started = time.monotonic()
+    open_saved_connection(POSTGRES_CONNECTION_NAME)
+    wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
+    frame_ready = time.monotonic()
+    wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
+    catalog_ready = time.monotonic()
+    search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
+    if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
+        invoke(search_toggle)
+    search = wait_for_node(name="Search tables", role=pyatspi.ROLE_ENTRY)
+    filter_started = time.monotonic()
+    search.queryEditableText().setTextContents(target)
+    wait_for_node_showing(target, True, timeout=120)
+    filter_ready = time.monotonic()
+    after = application_memory_kib()
+    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
+    profile = {
+        "scenario": "postgres_sidebar_catalog_profile",
+        "source_commit": os.environ.get("TABLEPRO_GTK_SOURCE_COMMIT"),
+        "created_tables": int(os.environ["TABLEPRO_GTK_CATALOG_TABLES"]),
+        "target": target,
+        "connect_and_catalog_frame_ms": (frame_ready - connect_started) * 1000,
+        "catalog_accessible_ms": (catalog_ready - connect_started) * 1000,
+        "search_filter_ms": (filter_ready - filter_started) * 1000,
+        "sidebar_nodes": sidebar_nodes,
+        "row_construction_ms": row_construction_ms,
+        "memory_before_kib": before,
+        "memory_after_kib": after,
+    }
+    output = Path(os.environ.get("TABLEPRO_GTK_PROFILE_OUTPUT", base / "sidebar-profile.json"))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(profile) + "\n", encoding="utf-8")
+
+
+postgres_sidebar_catalog_profile.environment = "local"
 
 
 def press_x11_text(text):
@@ -2884,6 +2957,8 @@ def main():
         scenarios.append(imported_socket_urls_connect_to_mysql)
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         scenarios.append(mysql_unparseable_routine_dialog_denial_preserves_database)
+    if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT") and os.environ.get("TABLEPRO_GTK_CATALOG_TARGET"):
+        scenarios.append(postgres_sidebar_catalog_profile)
     scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_parameters.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_xml.scenarios(sys.modules[__name__]))

@@ -76,7 +76,17 @@ impl CellView<'static> {
     }
 }
 
+#[cfg(test)]
 pub(super) fn cell_view<'a>(value: &'a Value, column: &ColumnInfo) -> CellView<'a> {
+    let column_is_editable = super::presentation::column_is_editable(column);
+    cell_view_with_column_editability(value, column, column_is_editable)
+}
+
+pub(super) fn cell_view_with_column_editability<'a>(
+    value: &'a Value,
+    column: &ColumnInfo,
+    column_is_editable: bool,
+) -> CellView<'a> {
     let is_null = matches!(value, Value::Null);
     let auto_filled = column.is_auto_increment || column.is_generated;
     let (display_text, truncated) = if is_null && auto_filled {
@@ -88,7 +98,11 @@ pub(super) fn cell_view<'a>(value: &'a Value, column: &ColumnInfo) -> CellView<'
         display_text,
         truncated,
         is_null,
-        inline_editable: super::presentation::cell_allows_inline_edit(column, value),
+        inline_editable: super::presentation::cell_allows_inline_edit_with_column_eligibility(
+            column,
+            value,
+            column_is_editable,
+        ),
         auto_filled,
         checked: match value {
             Value::Bool(checked) => Some(*checked),
@@ -432,12 +446,6 @@ macro_rules! define_widget_slot {
     };
 }
 
-define_widget_slot!(
-    CELL_MENU_OPTIONS_SLOT,
-    CellMenuOptionsKey,
-    super::context_menu::CellGestureOptions,
-    "tp-cell-menu-options"
-);
 define_widget_slot!(POSITION_SLOT, PositionKey, u32, "tp-position");
 define_widget_slot!(SNAPSHOT_SLOT, SnapshotKey, EditSnapshot, "tp-snapshot");
 define_widget_slot!(ROW_KEY_SLOT, RowKeyKey, Vec<Value>, "tp-row-key");

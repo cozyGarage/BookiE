@@ -3748,9 +3748,9 @@ dependencies = [
 
 [[package]]
 name = "ml-kem"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9ba01ebcf90f6aff8e9b9f55bb69b19e6250e4ade5787d0040eaa27dd226238"
+checksum = "84ca78b66f46050d49fa21693ae8adab2081d8101b65d8067316b6b70b64a0d1"
 dependencies = [
  "hybrid-array",
  "kem",
@@ -3763,9 +3763,9 @@ dependencies = [
 
 [[package]]
 name = "module-lattice"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c61b87c9683ab7cb1c6871d261ad5479b6b10ceb52c4352aaca3b5d35a8febe"
+checksum = "c4a1e412c8ee83a1c678f427806219c49c96b2511b9f07497514f0e43fb26155"
 dependencies = [
  "ctutils",
  "hybrid-array",
@@ -6217,7 +6217,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-agentd"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6246,7 +6246,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-app"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-channel",
  "async-trait",
@@ -6296,7 +6296,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-app-services"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -6329,7 +6329,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-core"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "calamine",
@@ -6354,7 +6354,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-clickhouse"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6382,7 +6382,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-duckdb"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6396,7 +6396,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-mongodb"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6417,7 +6417,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-mssql"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6439,7 +6439,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-mysql"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6463,7 +6463,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-postgres"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6489,7 +6489,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-redis"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "redis",
@@ -6503,7 +6503,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-sqlite"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6524,7 +6524,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-driver-tls-tests"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "secrecy",
  "tablepro-core",
@@ -6541,7 +6541,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-dump"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "secrecy",
  "tablepro-core",
@@ -6557,7 +6557,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-mcp"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -6587,7 +6587,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-policy"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6617,7 +6617,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-release-tests"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "secrecy",
@@ -6636,7 +6636,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-ssh"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "libc",
@@ -6654,7 +6654,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-storage"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "argon2",
  "async-trait",
@@ -6681,7 +6681,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-transport"
-version = "0.2.0"
+version = "0.2.2"
 dependencies = [
  "async-trait",
  "libc",
@@ -8085,9 +8085,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "9.2.0"
+version = "9.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f5b58784007ff6e5f280ec82c8596686a3b9b5dd5836c63288d4479f84728b9"
+checksum = "848dad21639597378c3be94c59fd4de683f0f6d8a5387575896e1245737d4f37"
 dependencies = [
  "crc32fast",
  "flate2",

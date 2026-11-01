@@ -53,12 +53,17 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::editor::pinned::tests::an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin"
+      "ui::editor::pinned::tests::a_pinned_spooled_page_reloads_without_retaining_its_payload"
     ],
     [
       "tablepro-app",
       "--lib",
       "ui::editor::pinned::tests::evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::pinned::tests::closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages"
     ],
     [
       "tablepro-app",
@@ -197,6 +202,11 @@
     ]
   ],
   "gtk": [
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::cell_editor::tests::editable_cell_defers_its_text_widget_until_editing"
+    ],
     [
       "tablepro-app",
       "--lib",
@@ -545,6 +555,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::stream_view::tests::live_eviction_visits_only_pages_evicted_since_the_previous_update"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
     ],
     [
@@ -556,6 +571,11 @@
       "tablepro-app",
       "--lib",
       "ui::sidebar_row::tests::a_group_row_shows_a_chevron_that_follows_its_collapse_state"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::sidebar_row::lazy_context_menu_tests::a_table_context_menu_is_created_on_demand_and_resolves_row_actions"
     ],
     [
       "tablepro-app",
@@ -586,6 +606,11 @@
       "tablepro-app",
       "--lib",
       "ui::import_dialog::tests::finishing_an_import_force_closes_the_non_user_closable_progress_dialog"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::import_dialog::tests::csv_preparation_progress_changes_from_spinner_to_row_count"
     ],
     [
       "tablepro-app",

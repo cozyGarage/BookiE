@@ -50,7 +50,7 @@ pub(super) struct ActiveStream {
 }
 
 impl ActiveStream {
-    fn outcome(&self, terminal: StreamTerminal) -> StatementOutcome {
+    fn outcome(&mut self, terminal: StreamTerminal) -> StatementOutcome {
         StatementOutcome {
             identity: self.identity,
             sql_preview: self.sql_preview.clone(),
@@ -141,6 +141,7 @@ impl SqlEditor {
             cache: StreamPageCache::default(),
             error: None,
         });
+        self.stream_eviction_cursor = Default::default();
         if self.results_holder.first_child().is_none() {
             let loading = waiting_for_stream_page();
             self.show_pins_above(&loading, sender);
@@ -166,7 +167,7 @@ impl SqlEditor {
                 let _ = accepted.send(false);
                 return;
             };
-            if let Err(error) = stream.cache.append(sequence, page) {
+            if let Err(error) = stream.cache.append_with_storage_status(sequence, page, spooled) {
                 let message = match error {
                     stream_pages::PageAppendError::OutOfOrder => {
                         crate::tr!("A streamed result page arrived out of order.")
@@ -203,9 +204,13 @@ impl SqlEditor {
             settings_store: self.result_view_settings.clone(),
         };
         let updated = self.pinned.latest().last().is_some_and(|outcome| match &outcome.kind {
-            StatementOutcomeKind::Streamed(result) => {
-                super::stream_view::update_live_stream(&self.results_holder, outcome, result, &target)
-            }
+            StatementOutcomeKind::Streamed(result) => super::stream_view::update_live_stream(
+                &self.results_holder,
+                outcome,
+                result,
+                &target,
+                &mut self.stream_eviction_cursor,
+            ),
             _ => false,
         });
         if !updated {
@@ -245,7 +250,7 @@ impl SqlEditor {
             .and_then(|stream| stream.error.clone())
             .map_or(terminal, |message| StreamTerminal::Failed(message.into()));
         let rows = stream.as_ref().map(|stream| stream.cache.total_rows() as i64);
-        let outcome = stream.map(|stream| {
+        let outcome = stream.map(|mut stream| {
             let mut outcome = stream.outcome(terminal.clone());
             outcome.elapsed_ms = elapsed.max(0) as u128;
             outcome

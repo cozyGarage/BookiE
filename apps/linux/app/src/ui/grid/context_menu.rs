@@ -22,6 +22,7 @@ use super::cell_context::{CellContext, CellContextStore};
 #[derive(Clone)]
 pub(super) struct GridMenus {
     context: CellContextStore,
+    columns: Rc<Vec<ColumnInfo>>,
     cell_menu_trigger: gtk::ShortcutTrigger,
     editable_popover: gtk::PopoverMenu,
     readonly_popover: gtk::PopoverMenu,
@@ -354,7 +355,7 @@ pub(super) fn install_grid_context_menus(
             .activate(move |_, _, _| {
                 let Some(view) = view.upgrade() else { return };
                 if let Some(result) = export_snapshot(&view, &columns, truncated) {
-                    sender.send(GridMsg::ExportResults(result)).ok();
+                    sender.send(GridMsg::ExportResults(std::sync::Arc::new(result))).ok();
                 } else {
                     sender.send(GridMsg::IncompleteRowData).ok();
                 }
@@ -424,9 +425,7 @@ pub(super) fn install_grid_context_menus(
         let sender = sender.clone();
         let view = local_result_view.clone();
         action.connect_activate(move |_, _| {
-            sender
-                .send(GridMsg::ExportResults(view.loaded_result().as_ref().clone()))
-                .ok();
+            sender.send(GridMsg::ExportResults(view.loaded_result())).ok();
         });
         (action, local_result_view)
     });
@@ -526,6 +525,7 @@ pub(super) fn install_grid_context_menus(
     });
     let menus = GridMenus {
         context,
+        columns,
         cell_menu_trigger: crate::ui::shortcut::parse(CELL_MENU_TRIGGER),
         editable_popover,
         readonly_popover,
@@ -766,11 +766,31 @@ where
 }
 
 pub(super) struct CellGestureOptions {
-    pub(super) idx: usize,
-    pub(super) column_name: String,
-    pub(super) is_editable: bool,
-    pub(super) is_text_editable: bool,
-    pub(super) supports_full_value: bool,
+    idx: usize,
+    column_name: String,
+    is_editable: bool,
+    is_text_editable: bool,
+    supports_full_value: bool,
+}
+
+pub(super) fn cell_menu_options(menus: &GridMenus, widget: &gtk::Widget) -> Option<CellGestureOptions> {
+    let idx = super::display::COLUMN_SLOT.get(widget)?;
+    let column = menus.columns.get(idx)?;
+    let is_text_editable = widget.is::<crate::ui::cell_editor::CellEditor>();
+    let is_editable = is_text_editable || widget.is::<gtk::CheckButton>();
+    Some(CellGestureOptions {
+        idx,
+        column_name: column.name.clone(),
+        is_editable,
+        is_text_editable,
+        supports_full_value: is_editable && super::full_value_editor::is_full_value_column(&column.data_type),
+    })
+}
+
+pub(super) fn is_cell_menu_widget(menus: &GridMenus, widget: &gtk::Widget) -> bool {
+    super::display::COLUMN_SLOT
+        .get(widget)
+        .is_some_and(|idx| menus.columns.get(idx).is_some())
 }
 
 fn prepare_cell_menu(
@@ -806,10 +826,6 @@ fn prepare_cell_menu(
     } else {
         menus.readonly_popover.clone()
     }
-}
-
-pub(super) fn set_cell_menu_options(widget: &gtk::Widget, options: CellGestureOptions) {
-    super::display::CELL_MENU_OPTIONS_SLOT.set(widget, options);
 }
 
 fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {

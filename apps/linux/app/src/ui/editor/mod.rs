@@ -110,6 +110,7 @@ pub struct SqlEditor {
     cancel_token: Option<CancellationToken>,
     executions: std::collections::HashMap<u64, ExecutionContext>,
     streaming: Option<ActiveStream>,
+    stream_eviction_cursor: stream_view::EvictionCursor,
     connection_id: Option<Uuid>,
     history: Option<HistoryStore>,
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
@@ -262,7 +263,10 @@ pub enum SqlEditorOutput {
     QueryChanged(String),
     CopyToClipboard(String),
     ShowRowAsJson(String),
-    ExportResults { result: QueryResult, name: String },
+    ExportResults {
+        result: std::sync::Arc<QueryResult>,
+        name: String,
+    },
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
 }
 
@@ -644,6 +648,7 @@ impl SimpleComponent for SqlEditor {
             cancel_token: None,
             executions: std::collections::HashMap::new(),
             streaming: None,
+            stream_eviction_cursor: Default::default(),
             connection_id: init.connection_id,
             history: init.history,
             run_generation: RunGeneration::default(),
