@@ -110,6 +110,37 @@ fn local_result_settings_survive_rerender_and_are_pruned_when_no_longer_visible(
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn attaching_an_unfiltered_result_keeps_the_existing_row_model() {
+    gtk4::init().unwrap();
+    let result = Arc::new(result(vec![Value::Int(3), Value::Int(1), Value::Int(2)]));
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let changes = std::rc::Rc::new(std::cell::Cell::new(0));
+    let observed = changes.clone();
+    store.connect_items_changed(move |_, _, _, _| observed.set(observed.get() + 1));
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [3; 32],
+        },
+        result_set_index: 0,
+    };
+    let view = LocalResultView::new(result.clone(), LocalResultSettingsStore::default(), key);
+
+    view.attach(store.clone(), selection);
+
+    assert_eq!(changes.get(), 0);
+    assert_eq!(store.n_items(), 3);
+    assert_eq!(
+        (0..store.n_items())
+            .map(|position| store.source_index_at(position))
+            .collect::<Vec<_>>(),
+        vec![Some(0), Some(1), Some(2)]
+    );
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn local_filter_and_sort_keep_selection_attached_to_the_source_row() {
     gtk4::init().unwrap();
     let mut result = result(vec![Value::Int(3), Value::Int(1), Value::Int(2), Value::Int(2)]);

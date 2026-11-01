@@ -505,6 +505,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::local_filter::tests::attaching_an_unfiltered_result_keeps_the_existing_row_model"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::local_filter::tests::local_filter_and_sort_keep_selection_attached_to_the_source_row"
     ],
     [

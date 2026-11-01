@@ -133,7 +133,13 @@ impl LocalResultView {
             state.selection = Some(selection.clone());
             update_status(&state);
         }
-        self.rebuild_visible_rows();
+        let has_saved_view_order = {
+            let state = self.0.borrow();
+            state.filter.is_some() || state.sort.is_some()
+        };
+        if has_saved_view_order {
+            self.rebuild_visible_rows();
+        }
         if let Some(selected) = settings_store.selection_for(settings_key, &result) {
             selection_syncing.set(true);
             let positions = gtk4::Bitset::new_empty();
