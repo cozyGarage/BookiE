@@ -75,6 +75,15 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] With the referenced table already open, the same action switches to that tab and replaces its filter.
 - [ ] A composite key filters every referenced column from the same row; with one of its columns hidden, a toast says so.
 
+## Result grid font zoom
+
+Focus a browse or SQL result grid. Editor font size in Preferences must stay unchanged.
+
+- [ ] With the result grid focused, Ctrl+= / Ctrl++ increases the grid value font; Ctrl+- decreases it; Ctrl+0 resets to the default. The same chords leave the SQL editor font unchanged when the editor is focused.
+- [ ] Fixed column widths grow and shrink with the zoom so headers stay aligned with values; user-saved widths are not written during a zoom step.
+- [ ] Zoom persists for the rest of the session across result grids and does not change the SQL editor font. Restart restores the default grid size.
+- [ ] Repeat under Wayland and X11 at 100% and a fractional scale.
+
 ## Filter by This Value / Exclude This Value
 
 - [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule.

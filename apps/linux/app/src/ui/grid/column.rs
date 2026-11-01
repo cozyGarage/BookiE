@@ -212,6 +212,9 @@ pub(super) fn build_column(
         let column_name = info.name.clone();
         let column_widths = column_widths.clone();
         column.connect_fixed_width_notify(move |column| {
+            if super::font_zoom::width_save_suppressed() {
+                return;
+            }
             let width = column.fixed_width();
             if width > 0
                 && let Some(store) = &column_widths
