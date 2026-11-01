@@ -522,7 +522,7 @@ fn statement_range(
         .tokens(current.range.end..current.extent.end)
         .filter(|token| !token.kind.is_trivia())
         .map(|token| token.range.end)
-        .last();
+        .next_back();
     if let Some(terminator_end) = terminator_end.filter(|end| cursor >= *end) {
         return terminator_end..next_end;
     }
@@ -626,8 +626,7 @@ fn trailing_qualifier(prefix: &str, grammar: Option<SqlGrammar>, settings: Optio
     let plan = super::completion_identifiers::plan(word, Some(grammar.unwrap_or(SqlGrammar::Sqlite)));
     let dot = plan
         .tokens(0..word.len())
-        .filter(|token| &word[token.range.clone()] == ".")
-        .last()?;
+        .rfind(|token| &word[token.range.clone()] == ".")?;
     let qualifier = &word[..dot.range.start];
     table_key(qualifier, grammar)?;
     Some(qualifier.to_string())
