@@ -128,11 +128,11 @@ class RegistryExtractionTests(unittest.TestCase):
                     return Response()
                 return io.BytesIO(uploaded[name])
 
-            with patch.object(registry.bundle, 'verify', return_value={'build_group': 'duckdb'}), \
+            with patch.object(registry.bundle, 'verify', return_value={'build_group': 'default'}), \
                     patch.object(registry, 'existing_manifest', return_value=None), \
                     patch.object(registry, 'request', side_effect=request), \
                     patch.object(registry, 'UPLOAD_CHUNK_SIZE', 128, create=True):
-                registry.publish(root, 'a' * 40, 'duckdb', 'https://registry.example/bundle/')
+                registry.publish(root, 'a' * 40, 'default', 'https://registry.example/bundle/')
 
             manifest = json.loads(uploaded['manifest.json'])
             parts = [name for name in uploaded if name.startswith('bundle.tar.gz.part-')]
@@ -142,9 +142,9 @@ class RegistryExtractionTests(unittest.TestCase):
             self.assertEqual(requests[0], ('DELETE', 'bundle'))
             self.assertEqual(requests[-1], ('PUT', 'manifest.json'))
             destination = root / 'destination'
-            with patch.object(registry.bundle, 'verify', return_value={'build_group': 'duckdb'}), \
+            with patch.object(registry.bundle, 'verify', return_value={'build_group': 'default'}), \
                     patch.object(registry, 'request', side_effect=request):
-                registry.fetch(destination, 'a' * 40, 'duckdb', 'https://registry.example/bundle/')
+                registry.fetch(destination, 'a' * 40, 'default', 'https://registry.example/bundle/')
             self.assertEqual((destination / 'program').read_bytes(), bytes(range(256)) * 8)
 
     def test_regular_payload_is_extracted(self):

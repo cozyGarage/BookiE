@@ -39,7 +39,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 | | |
 |---|---|
 | Platform | Linux, with a native GTK4 and libadwaita interface. |
-| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB is experimental and available in optional builds, not the release packages; MongoDB and Redis are experimental. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
+| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB, MongoDB and Redis are experimental and built in. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Every shipped feature is free, with no account, license key, subscription, paid tier or remote entitlement check. |
 | Credentials | Kept in the desktop keyring (Secret Service). |
 | Safety | Database operations pass local policy checks. Audit-intent failures block writes by default; explicit Local/Dev policy can allow a human write without an audit record. |
@@ -134,11 +134,7 @@ From the repository root:
 cargo run -p bookie-app
 ```
 
-Optional DuckDB driver:
-
-```bash
-cargo run -p bookie-app --features duckdb
-```
+The first build compiles the bundled DuckDB engine, which takes several minutes.
 
 A plain `cargo run` shares settings, saved connections, the keyring entries and the single-instance lock with an installed BookiE. To keep test data apart, build with the development profile, which uses `~/.config/bookie-devel` and its own keyring schema:
 

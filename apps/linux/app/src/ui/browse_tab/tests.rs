@@ -30,7 +30,6 @@ fn registered_drivers_declare_enum_input_style_for_grid_parsing() {
             .map(|driver| driver.capabilities().enum_input_style),
         Some(EnumInputStyle::RawValue)
     );
-    #[cfg(feature = "duckdb")]
     assert_eq!(
         registry
             .get("duckdb")

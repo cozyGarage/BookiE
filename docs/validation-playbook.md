@@ -88,7 +88,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |
 | `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox, DuckDB has its own Build job |
 | `b4-rollback` | MySQL failed-batch rollback and PostgreSQL rollback-failure handling | Docker and native TLS build dependencies |
-| `values` | Exact values across eight drivers, core, app and MCP | Docker, GTK build dependencies, optional DuckDB build; strict selected-test counts |
+| `values` | Exact values across eight drivers, core, app and MCP | Docker, GTK build dependencies, DuckDB build; strict selected-test counts |
 | `tls` | CA, hostname, encryption and plaintext refusal against real servers | Docker Compose and generated private fixture certificates |
 | `ssh` | SSH agent authentication and OpenSSH sessions | Docker and OpenSSH client tools |
 | `postgres-release` | Policy, TLS/SSH, lock, cancellation, rollback and reconnect | Docker Compose, keyring/D-Bus and generated materials |
@@ -107,7 +107,6 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 
 | Scope | Entry point | Completion evidence |
 | --- | --- | --- |
-| Optional DuckDB | Build Linux / `duckdb`; commands in [testing](testing.md#optional-features-and-ignored-tests) | Driver tests plus app feature build |
 | Mutation | The configured mutation workflow | Review selected, caught, missed, timed-out and unviable mutants for the exact source revision |
 | Coverage | The configured coverage workflow | Review the report and configured coverage floor for the exact source revision |
 | Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |

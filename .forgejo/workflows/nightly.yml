@@ -49,7 +49,7 @@ jobs:
       - name: Line coverage of the unit tier
         run: |
           cd src
-          cargo llvm-cov --workspace --exclude bookie-driver-duckdb --lib --bins --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage.json"
+          cargo llvm-cov --workspace --lib --bins --json --summary-only --output-path "$GITHUB_WORKSPACE/coverage.json"
           python3 scripts/check-coverage-floor.py "$GITHUB_WORKSPACE/coverage.json"
 
       - name: Finalize runner job

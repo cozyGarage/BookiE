@@ -17,7 +17,6 @@ path = "src/main.rs"
 [features]
 default = ["kerberos"]
 kerberos = ["bookie-driver-mssql/kerberos"]
-duckdb = ["dep:bookie-driver-duckdb"]
 
 [dependencies]
 bookie-core = { path = "../core" }
@@ -27,7 +26,7 @@ bookie-storage = { path = "../storage" }
 bookie-transport = { path = "../transport" }
 bookie-mcp = { path = "../mcp" }
 bookie-driver-clickhouse = { path = "../drivers/clickhouse" }
-bookie-driver-duckdb = { path = "../drivers/duckdb", optional = true }
+bookie-driver-duckdb = { path = "../drivers/duckdb" }
 bookie-driver-mongodb = { path = "../drivers/mongodb" }
 bookie-driver-mssql = { path = "../drivers/mssql" }
 bookie-driver-mysql = { path = "../drivers/mysql" }

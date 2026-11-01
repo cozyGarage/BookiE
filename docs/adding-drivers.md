@@ -36,7 +36,7 @@ These are the dependencies used by the current drivers:
 | ClickHouse | `clickhouse` plus the current dynamic-result implementation |
 | Redis | `redis`, including the workspace's vendored patch |
 | MongoDB | `mongodb`, including the workspace's vendored patch |
-| DuckDB | `duckdb`, behind the optional `duckdb` feature |
+| DuckDB | `duckdb`, built in |
 
 Review engine/library proposals against [driver maturity](adding-drivers.md#order-the-engines-were-added), dependency policy and license requirements. Keep driver registration static unless a new architecture decision explicitly changes that contract.
 
@@ -152,17 +152,17 @@ Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`).
 | ClickHouse | Stable | yes | yes | SQL | yes | yes | no | Waits for asynchronous mutations to finish; no row counts; driver TLS fixture |
 | Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | one bound key for the Value read | no | See [known limitations](known-limitations.md#editing-and-connections) for topology support; driver TLS fixture; Verify CA behaves as Verify Full |
 | MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop; keyed grid edits use bound values | no | no | TLS fixture coverage; Verify CA behaves as Verify Full; integration coverage includes browse, find, aggregate, stale-edit and stale-delete checks |
-| DuckDB | Experimental | yes | yes | SQL | yes | yes | no | Cargo feature `duckdb`; CSV/TSV/JSON/Parquet files; bundled JSON/Parquet; explicit optional CI |
+| DuckDB | Experimental | yes | yes | SQL | yes | yes | no | built in; CSV/TSV/JSON/Parquet files; bundled JSON/Parquet; dedicated CI job |
 
 ### Maturity rules
 
 1. Default maturity is `Stable`. Override only when a path users expect is missing or dialect-limited.
 2. Do not register a driver that always fails at connect.
-3. DuckDB stays behind `--features duckdb` for compile size, not maturity.
+3. Every driver is built in; maturity, not a Cargo feature, tells users how far to trust it.
 4. Raising a driver to Stable means browse, the engine's query dialect, common writes, and CI integration coverage are in place.
 
 Transport and TLS behaviour per driver is tracked in [connections.md](connections.md).
 
 ### Order the engines were added
 
-ClickHouse (Stable), Redis (Experimental), DuckDB (Experimental, `--features duckdb`), MongoDB (Experimental). SSH jump-host chains belong in `crates/ssh` as sequential tunnels, not in drivers.
+ClickHouse (Stable), Redis (Experimental), DuckDB (Experimental), MongoDB (Experimental). SSH jump-host chains belong in `crates/ssh` as sequential tunnels, not in drivers.
