@@ -9,6 +9,8 @@ mod bigint_array;
 mod bigint_map;
 #[path = "support/ubigint_struct.rs"]
 mod bigint_struct;
+#[path = "support/catalog_views.rs"]
+mod catalog_views;
 #[path = "support/extended_timestamptz.rs"]
 mod extended_timestamptz;
 #[path = "support/uhugeint_fixed_array.rs"]

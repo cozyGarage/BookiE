@@ -344,9 +344,8 @@ impl DuckdbConnection {
     }
 }
 
-#[async_trait]
-impl Connection for DuckdbConnection {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+impl DuckdbConnection {
+    async fn list_catalog_objects(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
         let conn = Arc::clone(&self.session);
         blocking(move || {
             let guard = conn
@@ -357,12 +356,12 @@ impl Connection for DuckdbConnection {
                 .prepare(
                     "SELECT table_schema, table_name FROM information_schema.tables \
                      WHERE table_schema NOT IN ('information_schema', 'pg_catalog') \
-                     AND table_type = 'BASE TABLE' \
+                     AND table_type = ? \
                      ORDER BY table_schema, table_name",
                 )
                 .map_err(map_duck_error)?;
             let rows = stmt
-                .query_map([], |row| {
+                .query_map([table_type], |row| {
                     Ok(TableInfo {
                         schema: row.get::<_, Option<String>>(0)?,
                         name: row.get::<_, String>(1)?,
@@ -376,6 +375,17 @@ impl Connection for DuckdbConnection {
             Ok(out)
         })
         .await
+    }
+}
+
+#[async_trait]
+impl Connection for DuckdbConnection {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        self.list_catalog_objects("BASE TABLE").await
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        self.list_catalog_objects("VIEW").await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
