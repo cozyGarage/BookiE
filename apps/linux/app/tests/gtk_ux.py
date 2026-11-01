@@ -2795,7 +2795,7 @@ GLib.MainLoop().run()
         wait_until(lambda: len(page_tab_names()) >= 2, "two result sets did not appear")
         ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
         open_cell_menu("pear")
-        invoke_menu_item(5)
+        invoke_menu_item(3)
         ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
         for item, rows in ((7, "1 loaded rows"), (8, "3 loaded rows")):
@@ -2810,7 +2810,7 @@ GLib.MainLoop().run()
         )
         ui.invoke(second)
         reopen_cell_menu("blue")
-        invoke_menu_item(5)
+        invoke_menu_item(3)
         ui.wait_for_node_containing("Showing 1 of 2 loaded rows", role=pyatspi.ROLE_LABEL)
 
     def filter_by_this_value_narrows_the_browse_rows(database, _base):
