@@ -54,11 +54,11 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('RUSTC_WRAPPER: ""', guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
 
-    def test_postgres_release_temp_directory_uses_its_writable_target(self):
+    def test_postgres_release_temp_directory_stays_short_for_unix_sockets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/pg-release\n", job)
-        self.assertIn("TMPDIR: /var/cache/ci/target/pg-release/tmp\n", job)
+        self.assertIn("TMPDIR: /var/cache/ci/target\n", job)
         self.assertIn('mkdir -p "$TMPDIR"', job)
 
     def test_actionlint_uses_a_read_only_go_module_lock(self):
