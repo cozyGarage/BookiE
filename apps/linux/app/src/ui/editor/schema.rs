@@ -37,7 +37,7 @@ fn editor_font_css(font_size: u32, family: &str) -> String {
         .map(|family| format!(" font-family: \"{family}\", monospace;"))
         .unwrap_or_default();
     format!(
-        ".{EDITOR_FONT_CSS_CLASS}, .{EDITOR_FONT_CSS_CLASS} text {{ font-size: {font_size}pt;{family} line-height: {EDITOR_LINE_HEIGHT}; }}"
+        "textview.{EDITOR_FONT_CSS_CLASS} {{ font-size: {font_size}pt;{family} line-height: {EDITOR_LINE_HEIGHT}; }}"
     )
 }
 
@@ -104,7 +104,7 @@ mod font_tests {
     fn an_empty_family_keeps_the_system_monospace_font() {
         assert_eq!(
             editor_font_css(12, "  "),
-            ".tp-sql-editor-font, .tp-sql-editor-font text { font-size: 12pt; line-height: 1.2; }"
+            "textview.tp-sql-editor-font { font-size: 12pt; line-height: 1.2; }"
         );
     }
 
@@ -114,8 +114,10 @@ mod font_tests {
     }
 
     #[test]
-    fn editor_font_css_sets_a_unitless_line_height_with_the_font_size() {
+    fn editor_font_css_targets_the_textview_node_with_unitless_line_height() {
         let css = editor_font_css(16, "JetBrains Mono");
+        assert!(css.starts_with("textview.tp-sql-editor-font {"), "{css}");
+        assert!(!css.contains(".tp-sql-editor-font text"), "{css}");
         assert!(css.contains("font-size: 16pt;"));
         assert!(css.contains(&format!("line-height: {EDITOR_LINE_HEIGHT};")));
         assert!(!css.contains("line-height: 1.2px"));
