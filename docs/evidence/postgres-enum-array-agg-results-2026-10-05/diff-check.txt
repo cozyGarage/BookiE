@@ -1,2 +1,0 @@
-rtk git diff --check
-passed

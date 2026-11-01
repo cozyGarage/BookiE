@@ -58,6 +58,7 @@ async fn guarded_sqlite_file(
 ) -> std::sync::Arc<dyn tablepro_core::Connection> {
     use crate::services::database_service::{ConnectionMetadata, ReconnectParams};
     let driver: std::sync::Arc<dyn DatabaseDriver> = std::sync::Arc::new(drivers_sqlite::SqliteDriver);
+    std::fs::File::create(path).expect("sqlite file fixture");
     let options = ConnectOptions {
         database: path.to_string_lossy().into_owned(),
         ..Default::default()
@@ -622,7 +623,7 @@ fn streamed_result_pages(
 ) -> gtk::Stack {
     let page_indices = (first_page..first_page.saturating_add(pages.len() as u64)).collect();
     let columns = pages.first().map_or_else(Vec::new, |page| page.columns.clone());
-    let page_row_counts = (0..total_pages)
+    let page_row_counts: Vec<usize> = (0..total_pages)
         .map(|index| {
             if index >= first_page && index < first_page.saturating_add(pages.len() as u64) {
                 pages[(index - first_page) as usize].rows.len()
@@ -631,10 +632,13 @@ fn streamed_result_pages(
             }
         })
         .collect();
+    let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let streamed = StreamedResult {
         pages,
         page_indices,
+        page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
+        retained_rows,
         columns,
         total_pages,
         total_rows,
@@ -1002,6 +1006,8 @@ fn streamed_kind(terminal: StreamTerminal) -> StatementOutcomeKind {
         pages: Vec::new(),
         page_indices: Vec::new(),
         page_row_counts: Vec::new(),
+        page_row_starts: Vec::new(),
+        retained_rows: 0,
         columns: Vec::new(),
         total_pages: 0,
         total_rows: 0,

@@ -10,6 +10,9 @@ use uuid::Uuid;
 use crate::error::StorageError;
 
 const MAX_QUERY_BYTES: usize = 1024 * 1024;
+const MAX_ERROR_BYTES: usize = 16 * 1024;
+const MAX_UNPINNED_ROWS: i64 = 100_000;
+const ROW_CAP_CHECK_INTERVAL: i64 = 1_000;
 
 #[derive(Clone)]
 pub struct HistoryStore {
@@ -298,6 +301,17 @@ async fn backup_before_migration(pool: &SqlitePool, path: &Path) -> Result<(), S
     result
 }
 
+fn truncate_to_bytes(text: &str, limit: usize) -> String {
+    if text.len() <= limit {
+        return text.to_string();
+    }
+    let mut end = limit;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text[..end].to_string()
+}
+
 fn to_unix(t: SystemTime) -> i64 {
     // System clocks before 1970 (clock skew, VM snapshots) should not collapse
     // every record to epoch — preserve the negative offset so timestamps round-trip.
@@ -330,7 +344,7 @@ impl HistoryStore {
         let executed_at = to_unix(entry.executed_at);
         let (success, cancelled, error_text) = match &entry.outcome {
             Outcome::Success => (1_i64, 0_i64, None),
-            Outcome::Error(msg) => (0, 0, Some(msg.clone())),
+            Outcome::Error(msg) => (0, 0, Some(truncate_to_bytes(msg, MAX_ERROR_BYTES))),
             Outcome::Cancelled => (0, 1, None),
         };
         let id = sqlx::query(
@@ -357,7 +371,22 @@ impl HistoryStore {
         .execute(pool)
         .await?
         .last_insert_rowid();
+        if id % ROW_CAP_CHECK_INTERVAL == 0 {
+            self.enforce_row_cap(MAX_UNPINNED_ROWS).await?;
+        }
         Ok(Some(id))
+    }
+
+    async fn enforce_row_cap(&self, keep: i64) -> Result<usize, StorageError> {
+        let affected = sqlx::query(
+            "DELETE FROM history WHERE pinned = 0 AND id <= \
+             (SELECT id FROM history WHERE pinned = 0 ORDER BY id DESC LIMIT 1 OFFSET ?)",
+        )
+        .bind(keep)
+        .execute(&self.pool)
+        .await?
+        .rows_affected();
+        Ok(affected as usize)
     }
 
     pub async fn search(&self, filter: SearchFilter) -> Result<Vec<Entry>, StorageError> {

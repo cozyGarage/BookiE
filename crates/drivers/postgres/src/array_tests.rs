@@ -385,3 +385,14 @@ fn mutated_array_wire_values_are_refused_and_never_panic() {
         }
     }
 }
+
+#[test]
+fn value_contract_vector_text_refuses_output_beyond_the_array_budget() {
+    let count = MAX_ARRAY_TEXT_BYTES / 11 + 1;
+    let mut bytes = words(&[1, 0, 26, count as u32, 0]);
+    for _ in 0..count {
+        bytes.extend_from_slice(&4_u32.to_be_bytes());
+        bytes.extend_from_slice(&u32::MAX.to_be_bytes());
+    }
+    assert!(decode_vector(&bytes, 26).is_none());
+}

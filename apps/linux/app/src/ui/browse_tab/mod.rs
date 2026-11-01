@@ -66,6 +66,7 @@ pub struct BrowseTabInit {
     pub table: String,
     pub driver_id: String,
     pub enum_input_style: EnumInputStyle,
+    pub browse_filters: bool,
     pub connection_id: Option<Uuid>,
     pub read_only: bool,
     pub page_size: u64,
@@ -81,6 +82,7 @@ pub struct BrowseTab {
     table: String,
     driver_id: String,
     enum_input_style: EnumInputStyle,
+    browse_filters: bool,
     connection_id: Option<Uuid>,
     read_only: bool,
     persistence: crate::services::persistence_stores::PersistenceStores,
@@ -198,6 +200,8 @@ mod choices;
 mod chrome;
 #[cfg(test)]
 mod chrome_tests;
+#[cfg(test)]
+mod filter_support_tests;
 mod grid_messages;
 mod grid_render;
 mod messages;
@@ -326,6 +330,7 @@ impl SimpleComponent for BrowseTab {
         // strip start with the same FilterSet.
         let initial_filter = init
             .connection_id
+            .filter(|_| init.browse_filters)
             .and_then(|id| {
                 init.persistence
                     .filter_settings
@@ -364,7 +369,7 @@ impl SimpleComponent for BrowseTab {
         inner_stack.add_named(&initial_loading, Some("loading"));
         inner_stack.set_visible_child_name("loading");
 
-        let paginator = Self::build_paginator(sender.clone(), init.page_size);
+        let paginator = Self::build_paginator(sender.clone(), init.page_size, init.browse_filters);
         let pending = Self::build_pending_revealer(sender.clone());
 
         // Per-HIG banner rule: banners persist hard constraints the
@@ -632,6 +637,7 @@ impl SimpleComponent for BrowseTab {
             table: init.table,
             driver_id: init.driver_id,
             enum_input_style: init.enum_input_style,
+            browse_filters: init.browse_filters,
             connection_id: init.connection_id,
             read_only: init.read_only,
             persistence: init.persistence,
@@ -885,7 +891,7 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::GoToReference { column, row } => self.go_to_reference(&column, &row, &sender),
             BrowseTabInput::ShowReferencingRows { row } => self.show_referencing_rows(&row, &sender),
             BrowseTabInput::ToggleFilterStrip => {
-                if let Some(strip) = self.filter_strip.as_ref() {
+                if let Some(strip) = self.filter_strip.as_ref().filter(|_| self.browse_filters) {
                     strip.toggle();
                 }
             }

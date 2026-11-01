@@ -378,3 +378,39 @@ async fn relay_stops_when_the_local_client_is_dropped_and_the_remote_closes() {
         .unwrap()
         .unwrap();
 }
+
+#[test]
+fn only_resource_exhaustion_and_aborted_connections_are_transient_accept_errors() {
+    use std::io::{Error, ErrorKind};
+    for transient in [
+        Error::from_raw_os_error(libc::EMFILE),
+        Error::from_raw_os_error(libc::ENFILE),
+        Error::from_raw_os_error(libc::ENOBUFS),
+        Error::from_raw_os_error(libc::ENOMEM),
+        Error::from(ErrorKind::ConnectionAborted),
+        Error::from(ErrorKind::Interrupted),
+    ] {
+        assert!(is_transient_accept_error(&transient), "{transient:?}");
+    }
+    for fatal in [
+        Error::from_raw_os_error(libc::EBADF),
+        Error::from_raw_os_error(libc::EINVAL),
+        Error::from(ErrorKind::PermissionDenied),
+    ] {
+        assert!(!is_transient_accept_error(&fatal), "{fatal:?}");
+    }
+}
+
+#[test]
+fn agent_signing_failures_are_not_reported_as_server_attempt_limits() {
+    let error = russh::AgentAuthError::Key(russh::keys::Error::KeyIsEncrypted);
+    assert!(matches!(
+        super::agent_auth_error(error, 2, 8),
+        super::SshError::Agent(_)
+    ));
+    let error = russh::AgentAuthError::Send(russh::SendError {});
+    assert!(matches!(
+        super::agent_auth_error(error, 2, 8),
+        super::SshError::AgentKeyLimit { refused: 2, total: 8 }
+    ));
+}

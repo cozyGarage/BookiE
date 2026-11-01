@@ -41,7 +41,15 @@ pub async fn read_schema(
         let table_schema = table.schema.as_deref().or(schema);
         match read_table(connection, table_schema, &table.name, capabilities, control).await {
             Ok(table) => read.reads.push(table),
-            Err(error @ (DriverError::Cancelled | DriverError::TimedOut)) => return Err(error),
+            Err(
+                error @ (DriverError::Cancelled
+                | DriverError::TimedOut
+                | DriverError::Disconnected
+                | DriverError::ConnectionRefused
+                | DriverError::AuthFailed
+                | DriverError::Tls(_)
+                | DriverError::PolicyDenied(_)),
+            ) => return Err(error),
             Err(_) => read.skipped.push(table.name.clone()),
         }
         progress(done + 1, wanted);

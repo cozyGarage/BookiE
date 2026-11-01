@@ -53,6 +53,7 @@ pub struct DriverCapabilities {
     pub supports_local_socket_directory: bool,
     pub supports_client_tls_auth: bool,
     pub supports_explicit_auto_increment_values: bool,
+    pub supports_browse_filters: bool,
 }
 
 #[async_trait]
@@ -88,6 +89,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_local_socket_directory: self.supports_local_socket_directory(),
             supports_client_tls_auth: self.supports_client_tls_auth(),
             supports_explicit_auto_increment_values: self.supports_explicit_auto_increment_values(),
+            supports_browse_filters: self.supports_browse_filters(),
         }
     }
 
@@ -158,6 +160,10 @@ pub trait DatabaseDriver: Send + Sync {
 
     fn supports_view_metadata(&self) -> bool {
         false
+    }
+
+    fn supports_browse_filters(&self) -> bool {
+        true
     }
 
     fn catalog_object_kinds(&self) -> &'static [crate::CatalogObjectKind] {

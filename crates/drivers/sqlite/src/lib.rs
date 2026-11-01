@@ -77,11 +77,16 @@ impl DatabaseDriver for SqliteDriver {
         let base = if in_memory {
             SqliteConnectOptions::from_str("sqlite::memory:").map_err(map_sqlx_error)?
         } else {
+            let path = std::path::Path::new(&opts.database);
+            if !path.exists() {
+                return Err(DriverError::Internal(format!(
+                    "database file does not exist: {}",
+                    opts.database
+                )));
+            }
             SqliteConnectOptions::new().filename(&opts.database)
         };
-        let connect_opts = base
-            .create_if_missing(!opts.read_only)
-            .read_only(opts.read_only && !in_memory);
+        let connect_opts = base.create_if_missing(false).read_only(opts.read_only && !in_memory);
         let session_options = (!in_memory).then(|| connect_opts.clone());
         let attached_databases = opts.attached_databases.clone();
         let attached_for_pool = attached_databases.clone();

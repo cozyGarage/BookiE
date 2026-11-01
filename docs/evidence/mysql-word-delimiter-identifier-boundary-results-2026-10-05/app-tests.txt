@@ -1,3 +1,0 @@
-rtk proxy cargo test --locked -p tablepro-app
-463 library tests, 3 integration tests and 2 subprocess checks passed; 31 library tests ignored; 0 failures.
-The full Cargo output is in app-tests-full.log.

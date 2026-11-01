@@ -2,7 +2,6 @@
 
 - **Status**: Accepted
 - **Date**: 2026-04-26
-- **Clarified**: 2026-10-03 for the typed-error contract; 2026-10-14 for best-effort GUI MCP token storage and one-time headless output.
 
 ## Context
 
