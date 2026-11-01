@@ -58,8 +58,10 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/pg-release\n", job)
-        self.assertIn("TMPDIR: /var/cache/ci/target\n", job)
+        self.assertIn("TMPDIR: /var/cache/ci/t\n", job)
         self.assertIn('mkdir -p "$TMPDIR"', job)
+        control_path = Path("/var/cache/ci/t/tablepro.XXXXXX/runtime/tablepro/ssh/0123456789abcdef/01234567/control.0123456789abcdef")
+        self.assertLess(len(os.fsencode(control_path)), 108)
 
     def test_actionlint_uses_a_read_only_go_module_lock(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
