@@ -60,7 +60,7 @@ pub(super) fn setup_bool_cell(item: &gtk::ListItem, idx: usize, sender: relm4::S
             return;
         }
         let position = POSITION_SLOT.get(cb).unwrap_or(0);
-        let row_key = ROW_KEY_SLOT.cloned(cb).unwrap_or_default();
+        let row_key = ROW_KEY_SLOT.cloned(cb).map_or_else(Vec::new, |key| key.to_vec());
         let new_value = if cb.is_active() { "true" } else { "false" };
         sender
             .send(GridMsg::CellEdited {
@@ -457,7 +457,7 @@ pub(super) fn commit_popover_value(
     new_value: String,
 ) {
     let row_position = POSITION_SLOT.get(label).unwrap_or(0);
-    let row_key = ROW_KEY_SLOT.cloned(label).unwrap_or_default();
+    let row_key = ROW_KEY_SLOT.cloned(label).map_or_else(Vec::new, |key| key.to_vec());
     label.set_text(&new_value);
     sender
         .send(GridMsg::CellEdited {
@@ -497,7 +497,7 @@ fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: rel
             let original = FULL_EDIT_TEXT_SLOT
                 .cloned(label)
                 .unwrap_or_else(|| label.text().to_string());
-            let row_key = ROW_KEY_SLOT.cloned(label).unwrap_or_default();
+            let row_key = ROW_KEY_SLOT.cloned(label).map_or_else(Vec::new, |key| key.to_vec());
             SNAPSHOT_SLOT.set(
                 label,
                 EditSnapshot {
@@ -560,7 +560,7 @@ mod cell_lifetime_tests {
         gtk::init().unwrap();
         let cell = CellEditor::new();
         POSITION_SLOT.set(&cell, 5);
-        ROW_KEY_SLOT.set(&cell, vec![tablepro_core::Value::Int(23)]);
+        ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([tablepro_core::Value::Int(23)]));
         let (sender, receiver) = relm4::channel();
         commit_popover_value(&cell, 2, &sender, "committed".into());
         assert!(matches!(
