@@ -634,7 +634,7 @@ fn streamed_result_pages(
         .collect();
     let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let streamed = StreamedResult {
-        pages,
+        pages: pages.iter().map(std::sync::Arc::downgrade).collect(),
         page_indices,
         page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
