@@ -10,6 +10,7 @@
 - Large SQL scripts use less memory during completion and avoid scanning token history unrelated to the cursor. (#2187)
 - Completed streamed results use less memory while pinned. (#2191)
 - Large database sidebars construct row context menus only when requested. (#2189)
+- Filtering and sorting large loaded results now sorts only matching rows and uses less temporary memory. (#2200)
 
 ### Fixed
 
