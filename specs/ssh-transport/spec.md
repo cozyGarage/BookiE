@@ -39,7 +39,7 @@ flowchart TD
 
 - **Dial target.** Where bytes are sent (forwarded socket or `127.0.0.1:ephemeral`).
 - **TLS service identity.** The hostname the certificate must match (the saved database host).
-- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/bookie/known_hosts`, or `~/.config/bookie/known_hosts` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend.
+- **BookiE known_hosts.** The built-in backend reads and writes `default_known_hosts_path` (an absolute `$XDG_CONFIG_HOME/bookie/known_hosts`, or `$XDG_CONFIG_HOME/bookie-devel/known_hosts` when the build sets `BOOKIE_PROFILE=development`; falls back to `~/.config/bookie/` or `~/.config/bookie-devel/` when XDG_CONFIG_HOME is absent, empty or relative). System `~/.ssh/known_hosts` is unused by that backend.
 
 ## Data contracts
 
