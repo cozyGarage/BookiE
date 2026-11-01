@@ -1,6 +1,6 @@
 use super::*;
+use bookie_core::{ColumnInfo, FilterSet, Value};
 use std::collections::HashSet;
-use tablepro_core::{ColumnInfo, FilterSet, Value};
 #[path = "browse_query/tests/mongodb_value.rs"]
 mod mongodb_value;
 #[path = "browse_query/tests/redis_value.rs"]
@@ -22,13 +22,13 @@ fn column(name: &str, primary_key: bool) -> ColumnInfo {
 }
 
 async fn guarded_value_refetch(
-    connection: std::sync::Arc<dyn tablepro_core::Connection>,
+    connection: std::sync::Arc<dyn bookie_core::Connection>,
     driver_id: &str,
     query: &BoundQuery,
-    control: &tablepro_core::OperationControl,
-) -> tablepro_core::QueryResult {
-    use tablepro_core::{Connection, Environment};
-    use tablepro_policy::{
+    control: &bookie_core::OperationControl,
+) -> bookie_core::QueryResult {
+    use bookie_core::{Connection, Environment};
+    use bookie_policy::{
         AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal,
     };
 
@@ -54,7 +54,7 @@ async fn guarded_value_refetch(
 
 #[tokio::test]
 async fn sqlite_hidden_projection_keeps_the_primary_key_and_leaves_hidden_values_stored() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("projection.db");
@@ -109,7 +109,7 @@ async fn sqlite_hidden_projection_keeps_the_primary_key_and_leaves_hidden_values
 
 #[tokio::test]
 async fn sqlite_value_query_refetches_the_exact_blob_for_a_composite_key() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("value-fetch.db");
@@ -181,13 +181,13 @@ async fn sqlite_value_query_refetches_the_exact_blob_for_a_composite_key() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -199,7 +199,7 @@ async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
             port: container.get_host_port_ipv4(3306).await.unwrap(),
             database: "test".into(),
             username: "root".into(),
-            password: secrecy::SecretString::new("tablepro_test".into()),
+            password: secrecy::SecretString::new("bookie_test".into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })
@@ -237,7 +237,7 @@ async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
 #[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_guarded_value_query_refetches_exact_blob() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -274,8 +274,8 @@ async fn value_contract_duckdb_guarded_value_query_refetches_exact_blob() {
 
 #[cfg(feature = "duckdb")]
 async fn seed_duckdb_value_preview(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
     tenant: &str,
     bytes: &[u8],
 ) {
@@ -305,8 +305,8 @@ async fn seed_duckdb_value_preview(
 
 #[cfg(feature = "duckdb")]
 async fn assert_duckdb_value_preview_native(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
     tenant: &str,
 ) {
     let native = connection
@@ -330,7 +330,7 @@ async fn assert_duckdb_value_preview_native(
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
     use testcontainers::core::wait::HttpWaitStrategy;
     use testcontainers::core::{IntoContainerPort, WaitFor};
     use testcontainers::runners::AsyncRunner;
@@ -344,7 +344,7 @@ async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
                 .with_expected_status_code(200u16),
         ))
         .with_env_var("CLICKHOUSE_USER", "default")
-        .with_env_var("CLICKHOUSE_PASSWORD", "tablepro")
+        .with_env_var("CLICKHOUSE_PASSWORD", "bookie")
         .with_env_var("CLICKHOUSE_DB", "default")
         .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
         .with_startup_timeout(std::time::Duration::from_secs(180))
@@ -357,7 +357,7 @@ async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
             port: container.get_host_port_ipv4(8123).await.unwrap(),
             database: "default".into(),
             username: "default".into(),
-            password: secrecy::SecretString::new("tablepro".into()),
+            password: secrecy::SecretString::new("bookie".into()),
             tls: TlsConfig::disabled(),
             ..Default::default()
         })
@@ -391,8 +391,8 @@ async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
 }
 
 async fn seed_clickhouse_value_preview(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
     tenant: &str,
     value: &str,
 ) {
@@ -421,8 +421,8 @@ async fn seed_clickhouse_value_preview(
 }
 
 async fn assert_clickhouse_value_preview_native(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
     tenant: &str,
 ) {
     let native = connection
@@ -444,8 +444,8 @@ async fn assert_clickhouse_value_preview_native(
 }
 
 async fn insert_mysql_value_preview_rows(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
     tenant: &[u8],
     bytes: &[u8],
 ) {
@@ -474,8 +474,8 @@ async fn insert_mysql_value_preview_rows(
 }
 
 async fn assert_mysql_value_preview_native(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
     tenant: &[u8],
 ) {
     let native_type = connection
@@ -503,7 +503,7 @@ async fn assert_mysql_value_preview_native(
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn postgres_value_query_refetches_by_enum_and_domain_composite_key() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -581,7 +581,7 @@ async fn postgres_value_query_refetches_by_enum_and_domain_composite_key() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn mssql_value_query_refetches_the_exact_blob_for_a_composite_key() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mssql_server::MssqlServer;
@@ -634,8 +634,8 @@ async fn mssql_value_query_refetches_the_exact_blob_for_a_composite_key() {
 }
 
 async fn insert_mssql_value_preview_rows(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
     tenant: &[u8],
     bytes: &[u8],
 ) {
@@ -664,8 +664,8 @@ async fn insert_mssql_value_preview_rows(
 }
 
 async fn assert_mssql_value_preview_native(
-    connection: &dyn tablepro_core::Connection,
-    control: &tablepro_core::OperationControl,
+    connection: &dyn bookie_core::Connection,
+    control: &bookie_core::OperationControl,
 ) {
     let native = connection
         .query_controlled(

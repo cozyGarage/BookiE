@@ -560,7 +560,7 @@ mod cell_lifetime_tests {
         gtk::init().unwrap();
         let cell = CellEditor::new();
         POSITION_SLOT.set(&cell, 5);
-        ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([tablepro_core::Value::Int(23)]));
+        ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([bookie_core::Value::Int(23)]));
         let (sender, receiver) = relm4::channel();
         commit_popover_value(&cell, 2, &sender, "committed".into());
         assert!(matches!(
@@ -570,7 +570,7 @@ mod cell_lifetime_tests {
                 col_index: 2,
                 new_value,
                 row_key,
-            }) if new_value == "committed" && row_key == vec![tablepro_core::Value::Int(23)]
+            }) if new_value == "committed" && row_key == vec![bookie_core::Value::Int(23)]
         ));
         assert_popover_released(|cell, sender| show_calendar_popover(cell, 0, sender));
         assert_popover_released(|cell, sender| show_exact_text_popover(cell, 0, sender));

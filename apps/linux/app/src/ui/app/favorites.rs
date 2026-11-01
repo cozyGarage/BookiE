@@ -1,7 +1,7 @@
+use bookie_storage::SavedQuery;
 use relm4::ComponentSender;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
-use tablepro_storage::SavedQuery;
 use uuid::Uuid;
 
 use crate::services::quick_switcher::{QuickItem, QuickTarget, favorite_items, relation_items};
@@ -16,7 +16,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    match tablepro_storage::load_favorites().await {
+                    match bookie_storage::load_favorites().await {
                         Ok(favorites) => sender_clone.input(AppMsg::FavoritesLoaded(ticket, favorites)),
                         Err(error) => tracing::warn!(error = %error, "load favorites failed"),
                     }
@@ -80,7 +80,7 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    match tablepro_storage::save_favorite(favorite).await {
+                    match bookie_storage::save_favorite(favorite).await {
                         Ok(favorites) => {
                             sender_clone.input(AppMsg::FavoritesLoaded(ticket, favorites));
                             sender_clone.input(AppMsg::FavoriteSaved);
@@ -114,7 +114,7 @@ impl App {
                 sender.command(move |_, shutdown| {
                     shutdown
                         .register(async move {
-                            if let Err(error) = tablepro_storage::touch_favorite(id).await {
+                            if let Err(error) = bookie_storage::touch_favorite(id).await {
                                 tracing::warn!(error = %error, "touch favorite failed");
                             }
                         })

@@ -1,6 +1,6 @@
-use tablepro_core::sql_dialect::quote_ident;
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
+use bookie_core::sql_dialect::quote_ident;
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
 
 pub(super) fn plan(text: &str, grammar: Option<SqlGrammar>) -> ScriptPlan {
     plan_with(text, grammar, None)

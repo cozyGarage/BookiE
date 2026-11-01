@@ -3,7 +3,7 @@ pub(in crate::ui::browse_tab) mod stats;
 use relm4::gtk;
 use relm4::gtk::glib;
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use super::*;
 
@@ -205,7 +205,7 @@ pub(super) fn selected_positions(selection: &gtk::MultiSelection) -> Vec<u32> {
 mod tests {
     use super::{build_persisted_row_key, row_key_is_unreadable};
     use crate::services::change_tracker::RowKey;
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     #[test]
     fn copied_selection_summary_names_its_loaded_row_scope() {

@@ -8,4 +8,4 @@ The visual assets below are maintained in `docs/images/`:
 4. `structure-light.png`: table schema structure viewer with column types and foreign keys (1400×860)
 5. `connections-light.png`: connection manager with environment badges and SSH tunneling (1400×860)
 
-These assets are wired into `apps/linux/flatpak/com.tablepro.linux.metainfo.xml` via `<screenshots>` referencing source URLs on `raw.githubusercontent.com`.
+These assets are wired into `apps/linux/flatpak/com.bookie.linux.metainfo.xml` via `<screenshots>` referencing source URLs on `raw.githubusercontent.com`.

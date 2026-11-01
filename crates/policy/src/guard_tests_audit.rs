@@ -1102,7 +1102,7 @@ impl<'writer> tracing_subscriber::fmt::MakeWriter<'writer> for CapturedLogs {
 
 #[test]
 fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
-    const CHILD_ENV: &str = "TABLEPRO_PANIC_AUDIT_TEST_CHILD";
+    const CHILD_ENV: &str = "BOOKIE_PANIC_AUDIT_TEST_CHILD";
     const TEST_NAME: &str = "guard::guard_tests::audit::a_driver_panic_message_never_reaches_the_logs_or_the_error";
 
     if std::env::var_os(CHILD_ENV).is_none() {

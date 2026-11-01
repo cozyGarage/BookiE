@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_dialect::{build_insert_from_draft, build_keyed_delete, build_optimistic_keyed_update};
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::sql_dialect::{build_insert_from_draft, build_keyed_delete, build_optimistic_keyed_update};
+use bookie_core::{ColumnInfo, Value};
 
 fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {

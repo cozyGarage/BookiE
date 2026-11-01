@@ -1,12 +1,12 @@
 use async_trait::async_trait;
-use sqlx::mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions};
-use sqlx::pool::PoolConnection;
-use sqlx::{Connection as SqlxConnection, Pool};
-use tablepro_core::sql_syntax::script::LexicalSettings;
-use tablepro_core::{
+use bookie_core::sql_syntax::script::LexicalSettings;
+use bookie_core::{
     DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, Value, check_pre_dispatch,
     run_controlled_setup, run_server_cancellable,
 };
+use sqlx::mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions};
+use sqlx::pool::PoolConnection;
+use sqlx::{Connection as SqlxConnection, Pool};
 
 use crate::{
     confirms_cancellation, connection_id, map_sqlx_error, params_into_result, prepare_session,
@@ -26,7 +26,7 @@ pub(crate) async fn open(
     options: &MySqlConnectOptions,
     cancellation_pool: Pool<MySql>,
     read_only: bool,
-) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+) -> Result<Box<dyn bookie_core::Session>, DriverError> {
     let pool = MySqlPoolOptions::new()
         .max_connections(1)
         .acquire_timeout(SESSION_SETUP_TIMEOUT)
@@ -89,7 +89,7 @@ pub(crate) async fn query_with_text_fallback(
 }
 
 #[async_trait]
-impl tablepro_core::Session for MysqlSession {
+impl bookie_core::Session for MysqlSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,

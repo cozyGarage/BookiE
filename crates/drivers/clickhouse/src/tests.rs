@@ -548,15 +548,15 @@ fn other_statements_are_not_probed() {
 
 #[test]
 fn a_pending_line_beyond_the_result_budget_is_refused() {
-    let mut buffer = vec![b'x'; tablepro_core::MAX_QUERY_RESULT_BYTES];
+    let mut buffer = vec![b'x'; bookie_core::MAX_QUERY_RESULT_BYTES];
     let capacity = buffer.capacity();
     assert!(query::append_chunk(&mut buffer, b"y").is_err());
-    assert_eq!(buffer.len(), tablepro_core::MAX_QUERY_RESULT_BYTES);
+    assert_eq!(buffer.len(), bookie_core::MAX_QUERY_RESULT_BYTES);
     assert_eq!(buffer.capacity(), capacity);
     assert_eq!(buffer.last(), Some(&b'x'));
-    assert!(query::check_line_cap(tablepro_core::MAX_QUERY_RESULT_BYTES).is_ok());
+    assert!(query::check_line_cap(bookie_core::MAX_QUERY_RESULT_BYTES).is_ok());
     assert!(matches!(
-        query::check_line_cap(tablepro_core::MAX_QUERY_RESULT_BYTES + 1),
+        query::check_line_cap(bookie_core::MAX_QUERY_RESULT_BYTES + 1),
         Err(DriverError::Unsupported(_))
     ));
 }

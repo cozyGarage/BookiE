@@ -72,8 +72,8 @@ fn explicit_auto_increment_values_can_be_saved_and_restored() {
         },
     ];
     let mapping = [Some(0), Some(1), None];
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(b"id,name\n901,alpha\n", &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(b"id,name\n901,alpha\n", &options, None).unwrap();
 
     for driver_id in ["postgres", "mysql", "sqlite"] {
         let directory = tempfile::tempdir().unwrap();
@@ -89,8 +89,8 @@ fn explicit_auto_increment_values_can_be_saved_and_restored() {
         let restored = store.restore(&scope, &headers, &columns, true).unwrap().unwrap();
         assert_eq!(restored, mapping, "{driver_id}");
 
-        let plan = tablepro_core::import::build_insert_plan(
-            &tablepro_core::import::ImportTarget {
+        let plan = bookie_core::import::build_insert_plan(
+            &bookie_core::import::ImportTarget {
                 driver_id,
                 capabilities: scope.capabilities,
                 schema: None,
@@ -114,8 +114,8 @@ fn explicit_auto_increment_values_can_be_saved_and_restored() {
         assert_eq!(
             plan.rows,
             [[
-                tablepro_core::Value::Text("901".into()),
-                tablepro_core::Value::Text("alpha".into())
+                bookie_core::Value::Text("901".into()),
+                bookie_core::Value::Text("alpha".into())
             ]],
             "{driver_id}"
         );

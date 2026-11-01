@@ -148,7 +148,7 @@ mod allocated_tests {
     fn an_allocated_divider_preserves_workspace_space_and_moves_through_the_breakpoint() {
         adw::init().unwrap();
         let application = adw::Application::builder()
-            .application_id("com.tablepro.linux.sidebar-layout-test")
+            .application_id("com.bookie.linux.sidebar-layout-test")
             .build();
         application.register(None::<&gtk::gio::Cancellable>).unwrap();
         let sidebar = gtk::Box::new(gtk::Orientation::Vertical, 0);

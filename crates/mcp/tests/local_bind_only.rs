@@ -6,10 +6,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tablepro_core::Connection;
-use tablepro_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenStore, serve_streamable_http};
-use tablepro_policy::Principal;
-use tablepro_storage::SavedConnection;
+use bookie_core::Connection;
+use bookie_mcp::{ConnectionProvider, McpBridge, McpServerConfig, TokenStore, serve_streamable_http};
+use bookie_policy::Principal;
+use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
 struct RefusingProvider;

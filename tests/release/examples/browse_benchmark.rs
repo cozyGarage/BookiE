@@ -1,11 +1,11 @@
 //! Run only against a disposable fixture. One process per scenario makes VmHWM comparable.
+use bookie_core::{Connection, DriverError, MAX_QUERY_ROWS, OperationControl, Value};
+use bookie_release_tests::{Fixture, fixture_enabled};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
 use std::time::{Duration, Instant};
-use tablepro_core::{Connection, DriverError, MAX_QUERY_ROWS, OperationControl, Value};
-use tablepro_release_tests::{Fixture, fixture_enabled};
 
 fn peak_rss_kib() -> Option<u64> {
     std::fs::read_to_string("/proc/self/status")
@@ -48,7 +48,7 @@ async fn sample_server(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !fixture_enabled() {
-        return Err("set TABLEPRO_FIXTURE_POSTGRES_RELEASE=1 for a disposable database".into());
+        return Err("set BOOKIE_FIXTURE_POSTGRES_RELEASE=1 for a disposable database".into());
     }
     let scenario = std::env::args().nth(1).unwrap_or_else(|| "first".into());
     if !["first", "filtered", "deep", "wide", "capped"].contains(&scenario.as_str()) {
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = Fixture::from_env();
     let connection = fixture.connect_verified().await;
     let observer: Arc<dyn Connection> = Arc::from(fixture.connect_verified().await);
-    let name = format!("tablepro_bench_{}", uuid::Uuid::new_v4().simple());
+    let name = format!("bookie_bench_{}", uuid::Uuid::new_v4().simple());
     let control = OperationControl::with_timeout(Duration::from_secs(120));
     connection.execute_controlled(&format!("CREATE TABLE {name} AS SELECT n::bigint AS id, (n % 100)::integer AS bucket, repeat('x', 64) AS payload FROM generate_series(1, 1000000) n"), &control).await?;
     let result = async {
@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => format!("SELECT * FROM {name} ORDER BY id LIMIT 100"),
         };
         for attempt in 0..6 {
-            let marker = format!("tablepro_sample_{}", uuid::Uuid::new_v4().simple());
+            let marker = format!("bookie_sample_{}", uuid::Uuid::new_v4().simple());
             let running = Arc::new(AtomicBool::new(true));
             let task = tokio::spawn(sample_server(observer.clone(), marker.clone(), running.clone()));
             let start = Instant::now();

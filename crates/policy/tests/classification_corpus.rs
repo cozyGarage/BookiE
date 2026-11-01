@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_policy::classify;
+use bookie_policy::classify;
 
 fn describe(driver: &str, sql: &str) -> String {
     let facts = classify(sql, driver);

@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use gtk4::glib;
 use gtk4::prelude::*;
 
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 use crate::services::preferences::NullDisplayPref;
 

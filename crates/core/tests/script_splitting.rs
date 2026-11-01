@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
 
 fn statements(text: &str, grammar: SqlGrammar) -> Vec<String> {
     let plan = ScriptPlan::build(text, grammar, LexicalSettings::default_for(grammar));

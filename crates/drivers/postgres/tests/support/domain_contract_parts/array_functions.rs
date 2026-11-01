@@ -223,7 +223,7 @@ async fn value_contract_domain_over_enum_array_append_prepend_keep_target_under_
             .await
             .expect_err("a label found only in the shadow enum must be rejected by the target enum");
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
         );
         transaction
@@ -654,7 +654,7 @@ async fn value_contract_domain_enum_array_replace_keeps_both_parameters_under_sh
             .await
             .expect_err("a label present only in the shadow enum must be rejected");
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
         );
         transaction
@@ -834,7 +834,7 @@ async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_
             .await
             .expect_err("trim_array alone cannot resolve its polymorphic input");
         assert!(
-            matches!(&trim_untyped, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
+            matches!(&trim_untyped, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
             "expected unresolved polymorphic-type SQLSTATE 42804, got {trim_untyped:?}"
         );
         transaction.execute("ROLLBACK TO SAVEPOINT untyped_trim_array").await.unwrap();
@@ -936,7 +936,7 @@ async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_
             .await
             .expect_err("array labels present only in the shadow enum must be rejected");
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
         );
         transaction.execute("ROLLBACK TO SAVEPOINT invalid_array_input").await.unwrap();
@@ -1162,7 +1162,7 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type_unde
         .await
         .expect_err("invalid array enum labels must be refused by PostgreSQL");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected native invalid-enum SQLSTATE 22P02, got {invalid:?}"
     );
 
@@ -1175,7 +1175,7 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type_unde
         .await
         .expect_err("array bounds inconsistent with the values must be refused before dispatch");
     assert!(
-        matches!(&invalid_bounds, tablepro_core::DriverError::Unsupported(message) if message.contains("bounds")),
+        matches!(&invalid_bounds, bookie_core::DriverError::Unsupported(message) if message.contains("bounds")),
         "expected an explicit unsupported result for inconsistent bounds, got {invalid_bounds:?}"
     );
 }
@@ -1236,7 +1236,7 @@ async fn value_contract_domain_enum_array_unnest_requires_qualified_cast_under_s
             .await
             .expect_err("unnest has no typed argument from which to infer an enum array");
         assert!(
-            matches!(&untyped, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42725"),
+            matches!(&untyped, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42725"),
             "expected PostgreSQL ambiguous-function SQLSTATE 42725, got {untyped:?}"
         );
         transaction
@@ -1297,7 +1297,7 @@ async fn value_contract_domain_enum_array_unnest_requires_qualified_cast_under_s
         .await
         .expect_err("a label defined only by the shadow enum must be rejected");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
     );
     transaction.execute("ROLLBACK TO SAVEPOINT shadow_only_unnest_label").await.unwrap();
@@ -1450,7 +1450,7 @@ async fn value_contract_domain_over_enum_array_operators_infer_parameter_type_in
             .await
             .expect_err("invalid array enum labels must retain PostgreSQL's native error");
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected native invalid-enum SQLSTATE 22P02, got {invalid:?}"
         );
         transaction

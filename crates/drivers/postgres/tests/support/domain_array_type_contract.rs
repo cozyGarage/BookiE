@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -86,7 +86,7 @@ async fn value_contract_domain_over_array_preserves_native_values_and_wire_bytes
     assert_eq!(direct_update.rows[0][0], Value::Text("[0:2]={2,4,NULL}".into()));
 
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
-    let edit = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let edit = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -110,7 +110,7 @@ async fn value_contract_domain_over_array_preserves_native_values_and_wire_bytes
         ]
     );
     connection.execute_params(&edit.0, &edit.1).await.unwrap();
-    let null_to_empty = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let null_to_empty = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -150,7 +150,7 @@ async fn value_contract_domain_over_array_preserves_native_values_and_wire_bytes
     assert_eq!(stored.rows[2][2], Value::Text("{}".into()));
     assert_eq!(stored.rows[1][4], stored.rows[2][4]);
 
-    let invalid = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+    let invalid = bookie_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -165,7 +165,7 @@ async fn value_contract_domain_over_array_preserves_native_values_and_wire_bytes
     .unwrap();
     let error = connection.execute_params(&invalid.0, &invalid.1).await.unwrap_err();
     assert!(
-        matches!(&error, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"),
+        matches!(&error, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"),
         "domain check must refuse an oversized array: {error:?}"
     );
     let after_refusal = connection

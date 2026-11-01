@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use tablepro_storage::SavedConnection;
+use bookie_storage::SavedConnection;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LaunchArgument {
@@ -115,13 +115,13 @@ pub fn file_connection(file: &DatabaseFile) -> SavedConnection {
         database: file.database.clone(),
         username: String::new(),
         use_tls: false,
-        tls_mode: Some(tablepro_core::TlsMode::Disabled),
+        tls_mode: Some(bookie_core::TlsMode::Disabled),
         tls_root_cert: None,
         tls_client_cert: None,
         tls_client_key: None,
         read_only: false,
-        auth_mode: tablepro_core::AuthMode::Password,
-        environment: tablepro_core::Environment::Local,
+        auth_mode: bookie_core::AuthMode::Password,
+        environment: bookie_core::Environment::Local,
         ssh: None,
         last_opened_at: None,
         connect_timeout_secs: None,

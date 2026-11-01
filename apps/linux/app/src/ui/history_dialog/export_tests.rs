@@ -19,7 +19,7 @@ fn a_failed_history_export_shows_a_dismissible_error() {
         })
         .detach();
     let application = adw::Application::builder()
-        .application_id("com.tablepro.linux.history-export-test")
+        .application_id("com.bookie.linux.history-export-test")
         .build();
     application.register(None::<&gio::Cancellable>).unwrap();
     let window = adw::ApplicationWindow::new(&application);

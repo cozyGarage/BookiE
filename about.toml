@@ -22,162 +22,162 @@ ignore-dev-dependencies = true
 targets = ["x86_64-unknown-linux-gnu"]
 workarounds = ["ring", "rustls"]
 
-[tablepro-app.clarify]
+[bookie-app.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-app.clarify.files]]
+[[bookie-app.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-agentd.clarify]
+[bookie-agentd.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-agentd.clarify.files]]
+[[bookie-agentd.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-app-services.clarify]
+[bookie-app-services.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-app-services.clarify.files]]
+[[bookie-app-services.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-core.clarify]
+[bookie-core.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-core.clarify.files]]
+[[bookie-core.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-clickhouse.clarify]
+[bookie-driver-clickhouse.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-clickhouse.clarify.files]]
+[[bookie-driver-clickhouse.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-duckdb.clarify]
+[bookie-driver-duckdb.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-duckdb.clarify.files]]
+[[bookie-driver-duckdb.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-mongodb.clarify]
+[bookie-driver-mongodb.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-mongodb.clarify.files]]
+[[bookie-driver-mongodb.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-mssql.clarify]
+[bookie-driver-mssql.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-mssql.clarify.files]]
+[[bookie-driver-mssql.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-mysql.clarify]
+[bookie-driver-mysql.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-mysql.clarify.files]]
+[[bookie-driver-mysql.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-postgres.clarify]
+[bookie-driver-postgres.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-postgres.clarify.files]]
+[[bookie-driver-postgres.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-redis.clarify]
+[bookie-driver-redis.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-redis.clarify.files]]
+[[bookie-driver-redis.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-sqlite.clarify]
+[bookie-driver-sqlite.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-sqlite.clarify.files]]
+[[bookie-driver-sqlite.clarify.files]]
 path = "../../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-dump.clarify]
+[bookie-dump.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-dump.clarify.files]]
+[[bookie-dump.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-mcp.clarify]
+[bookie-mcp.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-mcp.clarify.files]]
+[[bookie-mcp.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-policy.clarify]
+[bookie-policy.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-policy.clarify.files]]
+[[bookie-policy.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-ssh.clarify]
+[bookie-ssh.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-ssh.clarify.files]]
+[[bookie-ssh.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-storage.clarify]
+[bookie-storage.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-storage.clarify.files]]
+[[bookie-storage.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-transport.clarify]
+[bookie-transport.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-transport.clarify.files]]
+[[bookie-transport.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-driver-tls-tests.clarify]
+[bookie-driver-tls-tests.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-driver-tls-tests.clarify.files]]
+[[bookie-driver-tls-tests.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"
 
-[tablepro-release-tests.clarify]
+[bookie-release-tests.clarify]
 license = "AGPL-3.0-or-later"
 
-[[tablepro-release-tests.clarify.files]]
+[[bookie-release-tests.clarify.files]]
 path = "../../LICENSE.md"
 license = "AGPL-3.0-or-later"
 checksum = "9c9d682d27b24338c01c9b4532bd995f639e593549dce104fa4fd707b94dd4d9"

@@ -66,7 +66,7 @@ fn formatting_with_the_session_settings_keeps_each_statement() {
     let sql = r"select '東京\'s' from t; select 2";
     let lexing = postgres_without_standard_strings();
     let settings = lexing.settings_for(SqlGrammar::PostgreSql);
-    let formatted = tablepro_core::sql_format::format_script(sql, SqlGrammar::PostgreSql, settings);
+    let formatted = bookie_core::sql_format::format_script(sql, SqlGrammar::PostgreSql, settings);
     let planned = script_statements(&formatted, lexing).unwrap();
     assert_eq!(planned.statements.len(), 2, "{formatted}");
     assert!(formatted.contains(r"'東京\'s'"), "{formatted}");
@@ -205,16 +205,16 @@ fn malformed_tail_is_not_accepted_as_a_valid_script_prefix() {
     assert_eq!(plan.statements().len(), 2);
     assert!(script_statements(sql, "postgres").is_err());
 
-    let parameters = tablepro_core::extract_named_parameters(sql, "postgres");
+    let parameters = bookie_core::extract_named_parameters(sql, "postgres");
     assert_eq!(parameters.names, ["safe"]);
     assert!(parameters.sql.ends_with("SELECT 'unfinished :tail"));
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.ends_with("SELECT 'unfinished :tail"));
     assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
 
-    let facts = tablepro_policy::classify(sql, "postgres");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(sql, "postgres");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
 }
 
@@ -233,7 +233,7 @@ fn value_contract_postgres_malformed_dollar_quote_blocks_every_script_consumer()
     );
     assert_eq!(statement_at_cursor(sql, "postgres", sql.find("$tag$").unwrap()), None);
 
-    let parameters = tablepro_core::extract_named_parameters(sql, "postgres");
+    let parameters = bookie_core::extract_named_parameters(sql, "postgres");
     assert_eq!(parameters.names, ["safe"]);
     assert!(
         parameters
@@ -241,28 +241,28 @@ fn value_contract_postgres_malformed_dollar_quote_blocks_every_script_consumer()
             .ends_with("SELECT $tag$unfinished :tail; SELECT :after AS value")
     );
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.ends_with("$tag$unfinished :tail; SELECT :after AS value"));
     assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
 
-    let facts = tablepro_policy::classify(sql, "postgres");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(sql, "postgres");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
-    let decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::Agent {
+    let decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::Agent {
             token: "test".into(),
             client: None,
             model: None,
         },
-        tablepro_core::Environment::Local,
+        bookie_core::Environment::Local,
         &facts,
         false,
-        &tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local),
+        &bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local),
         None,
     );
     assert!(matches!(
         decision,
-        tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        bookie_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
     ));
 }
 
@@ -283,7 +283,7 @@ fn value_contract_sqlite_malformed_tail_blocks_all_script_consumers() {
         None
     );
 
-    let parameters = tablepro_core::extract_named_parameters(sql, "sqlite");
+    let parameters = bookie_core::extract_named_parameters(sql, "sqlite");
     assert_eq!(parameters.names, ["safe"]);
     assert!(
         parameters
@@ -291,21 +291,21 @@ fn value_contract_sqlite_malformed_tail_blocks_all_script_consumers() {
             .ends_with("SELECT 'unfinished :tail; SELECT :after AS value")
     );
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("SELECT 'unfinished :tail"));
     assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
 
-    let facts = tablepro_policy::classify(sql, "sqlite");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(sql, "sqlite");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
-    let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
-    let decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::Agent {
+    let config = bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local);
+    let decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::Agent {
             token: "test".into(),
             client: None,
             model: None,
         },
-        tablepro_core::Environment::Local,
+        bookie_core::Environment::Local,
         &facts,
         false,
         &config,
@@ -313,7 +313,7 @@ fn value_contract_sqlite_malformed_tail_blocks_all_script_consumers() {
     );
     assert!(matches!(
         decision,
-        tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        bookie_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
     ));
 }
 
@@ -327,25 +327,25 @@ fn value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers() {
     assert_eq!(plan.statements().len(), 2);
     assert!(script_statements(sql, "clickhouse").is_err());
 
-    let parameters = tablepro_core::extract_named_parameters(sql, "clickhouse");
+    let parameters = bookie_core::extract_named_parameters(sql, "clickhouse");
     assert_eq!(parameters.names, ["safe"]);
     assert!(parameters.sql.ends_with("SELECT $tag$unfinished :tail"));
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.ends_with("$tag$unfinished :tail"));
     assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
 
-    let facts = tablepro_policy::classify(sql, "clickhouse");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(sql, "clickhouse");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
-    let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
-    let decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::Agent {
+    let config = bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local);
+    let decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::Agent {
             token: "test".into(),
             client: None,
             model: None,
         },
-        tablepro_core::Environment::Local,
+        bookie_core::Environment::Local,
         &facts,
         false,
         &config,
@@ -353,7 +353,7 @@ fn value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers() {
     );
     assert!(matches!(
         decision,
-        tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        bookie_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
     ));
 }
 
@@ -374,7 +374,7 @@ fn value_contract_duckdb_malformed_tail_blocks_all_script_consumers() {
         None
     );
 
-    let parameters = tablepro_core::extract_named_parameters(sql, "duckdb");
+    let parameters = bookie_core::extract_named_parameters(sql, "duckdb");
     assert_eq!(parameters.names, ["safe"]);
     assert!(
         parameters
@@ -382,21 +382,21 @@ fn value_contract_duckdb_malformed_tail_blocks_all_script_consumers() {
             .ends_with("SELECT 'unfinished :tail; SELECT :after AS value")
     );
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("SELECT 'unfinished :tail"));
     assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
 
-    let facts = tablepro_policy::classify(sql, "duckdb");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(sql, "duckdb");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
-    let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
-    let decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::Agent {
+    let config = bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local);
+    let decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::Agent {
             token: "test".into(),
             client: None,
             model: None,
         },
-        tablepro_core::Environment::Local,
+        bookie_core::Environment::Local,
         &facts,
         false,
         &config,
@@ -404,7 +404,7 @@ fn value_contract_duckdb_malformed_tail_blocks_all_script_consumers() {
     );
     assert!(matches!(
         decision,
-        tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        bookie_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
     ));
 }
 
@@ -416,26 +416,26 @@ fn value_contract_mssql_malformed_tail_blocks_the_whole_go_script() {
 
     assert!(!plan.diagnostics().is_empty());
     assert!(script_statements(sql, "mssql").is_err());
-    let parameters = tablepro_core::extract_named_parameters(sql, "mssql");
+    let parameters = bookie_core::extract_named_parameters(sql, "mssql");
     assert_eq!(parameters.names, ["before"]);
     assert!(parameters.sql.contains("SELECT 'unfinished :inside"));
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("SELECT 'unfinished :inside"));
     assert!(formatted.contains("GO"));
     assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
 
-    let facts = tablepro_policy::classify(sql, "mssql");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(sql, "mssql");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
-    let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
-    let decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::Agent {
+    let config = bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local);
+    let decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::Agent {
             token: "test".into(),
             client: None,
             model: None,
         },
-        tablepro_core::Environment::Local,
+        bookie_core::Environment::Local,
         &facts,
         false,
         &config,
@@ -443,7 +443,7 @@ fn value_contract_mssql_malformed_tail_blocks_the_whole_go_script() {
     );
     assert!(matches!(
         decision,
-        tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        bookie_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
     ));
 }
 
@@ -458,13 +458,13 @@ fn mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments() {
     assert_eq!(plan.batches().len(), 3);
     assert_eq!(plan.batch_error_policy(), BatchErrorPolicy::ContinueNextBatch);
 
-    let extracted = tablepro_core::extract_named_parameters(sql, "mssql");
+    let extracted = bookie_core::extract_named_parameters(sql, "mssql");
     assert_eq!(extracted.names, ["read", "name", "id", "last"]);
     let planned = script_statements(sql, "mssql").unwrap();
     assert_eq!(planned.statements.len(), 3);
     assert_eq!(planned.error_policy, BatchErrorPolicy::ContinueNextBatch);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("GO -- :go_comment ;"));
     assert!(formatted.contains("GO -- :next_comment ;"));
     let reformatted = plan_for(&formatted, grammar);
@@ -472,16 +472,16 @@ fn mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments() {
     assert_eq!(reformatted.statements().len(), 3);
 
     let expected_classes = [
-        tablepro_policy::StatementClass::Select,
-        tablepro_policy::StatementClass::Update,
-        tablepro_policy::StatementClass::Select,
+        bookie_policy::StatementClass::Select,
+        bookie_policy::StatementClass::Update,
+        bookie_policy::StatementClass::Select,
     ];
     for (index, statement) in reformatted.statements().iter().enumerate() {
         let sql = statement.text(&formatted);
-        let parameters = tablepro_core::extract_named_parameters(sql, "mssql");
-        let facts = tablepro_policy::classify(&parameters.sql, "mssql");
+        let parameters = bookie_core::extract_named_parameters(sql, "mssql");
+        let facts = bookie_policy::classify(&parameters.sql, "mssql");
         assert_eq!(facts.class, expected_classes[index]);
-        if expected_classes[index] == tablepro_policy::StatementClass::Update {
+        if expected_classes[index] == bookie_policy::StatementClass::Update {
             assert!(facts.has_where);
         }
     }
@@ -498,15 +498,15 @@ fn mssql_go_repetition_is_preserved_and_refused_by_script_execution() {
     assert_eq!(plan.batches()[0].repeat.get(), 2);
     assert!(script_statements(sql, "mssql").is_err());
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("GO 2 -- :repeat_comment"), "{formatted}");
     let reformatted = plan_for(&formatted, grammar);
     assert_eq!(reformatted.batches()[0].repeat.get(), 2);
 
-    let parameters = tablepro_core::extract_named_parameters(&formatted, "mssql");
+    let parameters = bookie_core::extract_named_parameters(&formatted, "mssql");
     assert_eq!(parameters.names, ["id"]);
-    let facts = tablepro_policy::classify(&parameters.sql, "mssql");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(&parameters.sql, "mssql");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
 }
 
@@ -523,10 +523,10 @@ fn mysql_delimiter_directives_agree_across_script_consumers() {
     assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
     assert_eq!(planned.statements[1], "SELECT :after AS value");
 
-    let extracted = tablepro_core::extract_named_parameters(sql, "mysql");
+    let extracted = bookie_core::extract_named_parameters(sql, "mysql");
     assert_eq!(extracted.names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("DELIMITER $$ -- :directive"));
     assert!(formatted.contains("DELIMITER ; -- :reset"));
     let reformatted = plan_for(&formatted, grammar);
@@ -538,28 +538,28 @@ fn mysql_delimiter_directives_agree_across_script_consumers() {
         .statements()
         .iter()
         .map(|statement| {
-            let parameters = tablepro_core::extract_named_parameters(statement.text(&formatted), "mysql");
-            tablepro_policy::classify(&parameters.sql, "mysql")
+            let parameters = bookie_core::extract_named_parameters(statement.text(&formatted), "mysql");
+            bookie_policy::classify(&parameters.sql, "mysql")
         })
         .collect::<Vec<_>>();
-    assert_eq!(facts[0].class, tablepro_policy::StatementClass::Unparseable);
+    assert_eq!(facts[0].class, bookie_policy::StatementClass::Unparseable);
     assert!(facts[0].writes());
-    assert_eq!(facts[1].class, tablepro_policy::StatementClass::Select);
-    let decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::Agent {
+    assert_eq!(facts[1].class, bookie_policy::StatementClass::Select);
+    let decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::Agent {
             token: "test".into(),
             client: None,
             model: None,
         },
-        tablepro_core::Environment::Local,
+        bookie_core::Environment::Local,
         &facts[0],
         false,
-        &tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local),
+        &bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local),
         None,
     );
     assert!(matches!(
         decision,
-        tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        bookie_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
     ));
 }
 
@@ -575,9 +575,9 @@ fn mysql_slash_delimiter_is_preserved_across_planner_editor_and_parameters() {
     assert_eq!(planned.statements.len(), 2);
     assert!(planned.statements[0].starts_with("CREATE PROCEDURE q()"));
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("DELIMITER //"));
     assert!(formatted.contains("DELIMITER ;"));
     let reformatted = plan_for(&formatted, grammar);
@@ -601,9 +601,9 @@ fn mysql_slash_delimiter_inside_comments_does_not_end_routine() {
     assert!(planned.statements[0].contains("'// :literal'"));
     assert!(planned.statements[0].ends_with("END"));
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     let reformatted = plan_for(&formatted, grammar);
     assert!(reformatted.diagnostics().is_empty());
     let reformatted = script_statements(&formatted, "mysql").unwrap();
@@ -613,7 +613,7 @@ fn mysql_slash_delimiter_inside_comments_does_not_end_routine() {
     assert!(reformatted.statements[1].contains("SELECT"));
     assert!(reformatted.statements[1].contains(":after AS value"));
     assert_eq!(
-        tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+        bookie_core::extract_named_parameters(&formatted, "mysql").names,
         ["after"]
     );
 }
@@ -631,9 +631,9 @@ fn value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identi
     assert_eq!(planned.statements.len(), 2);
     assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("\\d //"));
     assert!(formatted.contains("\\d ;"));
     let reformatted = plan_for(&formatted, grammar);
@@ -646,16 +646,16 @@ fn value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identi
     assert!(reformatted_script.statements[1].starts_with("SELECT"));
     assert!(reformatted_script.statements[1].contains(":after AS value"));
     assert_eq!(
-        tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+        bookie_core::extract_named_parameters(&formatted, "mysql").names,
         ["after"]
     );
 
-    let facts = tablepro_policy::classify(&reformatted_script.statements[0], "mysql");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(&reformatted_script.statements[0], "mysql");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
     assert_eq!(
-        tablepro_policy::classify(&reformatted_script.statements[1], "mysql").class,
-        tablepro_policy::StatementClass::Select
+        bookie_policy::classify(&reformatted_script.statements[1], "mysql").class,
+        bookie_policy::StatementClass::Select
     );
 }
 
@@ -672,9 +672,9 @@ fn mysql_colon_delimiter_does_not_leak_into_named_parameters() {
     assert!(planned.statements[0].ends_with("END"), "{:?}", planned.statements[0]);
     assert!(planned.statements[0].contains("':inside'"));
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("DELIMITER :"), "{formatted}");
     let reformatted = plan_for(&formatted, grammar);
     assert!(reformatted.diagnostics().is_empty());
@@ -683,7 +683,7 @@ fn mysql_colon_delimiter_does_not_leak_into_named_parameters() {
     assert!(reformatted_script.statements[0].ends_with("END"));
     assert!(reformatted_script.statements[1].contains(":after AS value"));
     assert_eq!(
-        tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+        bookie_core::extract_named_parameters(&formatted, "mysql").names,
         ["after"]
     );
 }
@@ -701,9 +701,9 @@ fn mysql_repeated_semicolon_delimiter_keeps_body_statements_together() {
     assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
     assert!(planned.statements[0].contains("SELECT 2 AS second;"));
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("DELIMITER ;;"));
     assert!(formatted.contains("DELIMITER ;"));
     let reformatted = plan_for(&formatted, grammar);
@@ -726,9 +726,9 @@ fn mysql_word_character_delimiter_stops_at_keyword_boundary() {
     assert!(planned.statements[0].contains("prefixxyzsuffix AS embedded"));
     assert!(planned.statements[0].ends_with("END"), "{:?}", planned.statements[0]);
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("DELIMITER xyz"), "{formatted}");
     let reformatted = plan_for(&formatted, grammar);
     assert!(reformatted.diagnostics().is_empty());
@@ -737,7 +737,7 @@ fn mysql_word_character_delimiter_stops_at_keyword_boundary() {
     assert_eq!(reformatted_script.statements.len(), 2);
     assert!(reformatted_script.statements[0].contains("prefixxyzsuffix AS embedded"));
     assert_eq!(
-        tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+        bookie_core::extract_named_parameters(&formatted, "mysql").names,
         ["after"]
     );
 }
@@ -755,9 +755,9 @@ fn mysql_quoted_delimiter_agrees_across_script_consumers() {
     assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
     assert!(planned.statements[0].ends_with("END"), "{:?}", planned.statements[0]);
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("DELIMITER '_finish'"), "{formatted}");
     assert!(formatted.contains("DELIMITER ';'"), "{formatted}");
     let reformatted = plan_for(&formatted, grammar);
@@ -765,7 +765,7 @@ fn mysql_quoted_delimiter_agrees_across_script_consumers() {
     assert_eq!(reformatted.statements().len(), 2);
     assert_eq!(script_statements(&formatted, "mysql").unwrap().statements.len(), 2);
     assert_eq!(
-        tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+        bookie_core::extract_named_parameters(&formatted, "mysql").names,
         ["after"]
     );
 }
@@ -784,9 +784,9 @@ fn mysql_punctuation_delimiter_preserves_hash_comments() {
     assert!(planned.statements[0].contains("'inside #! :literal'"));
     assert!(planned.statements[0].ends_with("END"));
     assert_eq!(planned.statements[1], "SELECT :after AS value");
-    assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+    assert_eq!(bookie_core::extract_named_parameters(sql, "mysql").names, ["after"]);
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("DELIMITER #!"), "{formatted}");
     let reformatted = plan_for(&formatted, grammar);
     assert!(reformatted.diagnostics().is_empty());
@@ -796,7 +796,7 @@ fn mysql_punctuation_delimiter_preserves_hash_comments() {
     assert!(reformatted_script.statements[1].starts_with("SELECT"));
     assert!(reformatted_script.statements[1].contains(":after AS value"));
     assert_eq!(
-        tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+        bookie_core::extract_named_parameters(&formatted, "mysql").names,
         ["after"]
     );
 }
@@ -809,40 +809,40 @@ fn malformed_mysql_delimited_routine_blocks_the_whole_script() {
 
     assert!(!plan.diagnostics().is_empty());
     assert!(script_statements(sql, "mysql").is_err());
-    let parameters = tablepro_core::extract_named_parameters(sql, "mysql");
+    let parameters = bookie_core::extract_named_parameters(sql, "mysql");
     assert!(
         parameters.names.is_empty(),
         "malformed tail parameters are not executable"
     );
 
-    let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+    let formatted = bookie_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
     assert!(formatted.contains("'unfinished :inside"));
     assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
-    let facts = tablepro_policy::classify(sql, "mysql");
-    assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+    let facts = bookie_policy::classify(sql, "mysql");
+    assert_eq!(facts.class, bookie_policy::StatementClass::Unparseable);
     assert!(facts.writes());
-    let decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::Agent {
+    let decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::Agent {
             token: "test".into(),
             client: None,
             model: None,
         },
-        tablepro_core::Environment::Local,
+        bookie_core::Environment::Local,
         &facts,
         false,
-        &tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local),
+        &bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local),
         None,
     );
     assert!(matches!(
         decision,
-        tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        bookie_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
     ));
 
-    let mut human_policy = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
+    let mut human_policy = bookie_policy::PolicyConfig::default().for_environment(bookie_core::Environment::Local);
     assert!(human_policy.human_approve_unparseable);
-    let human_decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::human_gui(),
-        tablepro_core::Environment::Local,
+    let human_decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::human_gui(),
+        bookie_core::Environment::Local,
         &facts,
         false,
         &human_policy,
@@ -850,14 +850,14 @@ fn malformed_mysql_delimited_routine_blocks_the_whole_script() {
     );
     assert!(matches!(
         human_decision,
-        tablepro_policy::Decision::RequireApproval { ref rule, .. }
+        bookie_policy::Decision::RequireApproval { ref rule, .. }
             if rule == "fail_closed_unparseable"
     ));
 
     human_policy.human_approve_unparseable = false;
-    let configured_human_decision = tablepro_policy::evaluate(
-        &tablepro_policy::Principal::human_gui(),
-        tablepro_core::Environment::Local,
+    let configured_human_decision = bookie_policy::evaluate(
+        &bookie_policy::Principal::human_gui(),
+        bookie_core::Environment::Local,
         &facts,
         false,
         &human_policy,
@@ -866,7 +866,7 @@ fn malformed_mysql_delimited_routine_blocks_the_whole_script() {
     assert!(
         matches!(
             configured_human_decision,
-            tablepro_policy::Decision::RequireApproval { ref rule, .. }
+            bookie_policy::Decision::RequireApproval { ref rule, .. }
                 if rule == "human_dangerous_effect_approval"
         ),
         "{configured_human_decision:?}"

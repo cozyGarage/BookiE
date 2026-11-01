@@ -60,7 +60,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/pg-release\n", job)
         self.assertIn("TMPDIR: /var/cache/ci/tmp\n", job)
         self.assertIn('mkdir -p "$TMPDIR"', job)
-        control_path = Path("/var/cache/ci/tmp/tablepro.XXXXXX/runtime/tablepro/ssh/0123456789abcdef/01234567/control.0123456789abcdef")
+        control_path = Path("/var/cache/ci/tmp/bookie.XXXXXX/runtime/bookie/ssh/0123456789abcdef/01234567/control.0123456789abcdef")
         self.assertLess(len(os.fsencode(control_path)), 108)
 
     def test_postgres_socket_fixture_waits_for_server_readiness(self):
@@ -141,7 +141,7 @@ class CiWorkflowTests(unittest.TestCase):
         for name in ("e2e", "gtk-server"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-                self.assertIn('TABLEPRO_GTK_SCENARIO_RETRIES: "0"', job)
+                self.assertIn('BOOKIE_GTK_SCENARIO_RETRIES: "0"', job)
 
     def test_cargo_path_covers_runner_service_homes(self):
         for name in ("ci", "nightly"):
@@ -240,7 +240,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
-        self.assertIn("TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
+        self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
         self.assertIn("cleanup-testcontainers.py", driver)
         self.assertIn("trap cleanup_testcontainers EXIT", driver)
         self.assertIn("--test-threads=1", driver)
@@ -249,11 +249,11 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = workflow.split("  socket-ssh:\n", 1)[1].split("  gtk-server:\n", 1)[0]
         script = (ROOT / "scripts/test-postgres-socket.sh").read_text()
-        self.assertIn("TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh", job)
+        self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh", job)
         self.assertIn("cleanup-testcontainers.py", job)
         self.assertIn("trap 'cleanup_testcontainers; exit 143' TERM", job)
         self.assertIn("trap 'cleanup_testcontainers; exit 130' INT", job)
-        self.assertIn('--label "com.tablepro.test-run=$test_run_id"', script)
+        self.assertIn('--label "com.bookie.test-run=$test_run_id"', script)
         self.assertIn("trap 'exit 143' TERM", script)
         self.assertIn("trap 'exit 130' INT", script)
 
@@ -267,10 +267,10 @@ class CiWorkflowTests(unittest.TestCase):
     def test_cross_consumer_server_targets_are_gated_and_documented(self):
         local = (ROOT / "scripts/ci-local.sh").read_text()
         for package, target in [
-            ("tablepro-mcp", "mongodb_extended_json"),
-            ("tablepro-mcp", "postgres_custom_enum"),
-            ("tablepro-policy", "session_postgres"),
-            ("tablepro-policy", "session_mssql"),
+            ("bookie-mcp", "mongodb_extended_json"),
+            ("bookie-mcp", "postgres_custom_enum"),
+            ("bookie-policy", "session_postgres"),
+            ("bookie-policy", "session_mssql"),
         ]:
             self.assertIn(f"-p {package} --test {target} -- --include-ignored --test-threads=1", local)
         registry = json.loads((ROOT / "scripts/isolated-tests.json").read_text())
@@ -331,20 +331,20 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             self.assertIn(required, fast)
         self.assertIn(
-            "cargo test --locked -p tablepro-app --features duckdb --lib value_contract_duckdb",
+            "cargo test --locked -p bookie-app --features duckdb --lib value_contract_duckdb",
             workflow,
         )
         ledger = subprocess.check_output(["python3", str(ROOT / "scripts/inventory-ignored-tests.py")], text=True)
         for package, target in [
-            ("tablepro-mcp", "mongodb_extended_json"),
-            ("tablepro-mcp", "postgres_custom_enum"),
-            ("tablepro-policy", "session_postgres"),
-            ("tablepro-policy", "session_mssql"),
+            ("bookie-mcp", "mongodb_extended_json"),
+            ("bookie-mcp", "postgres_custom_enum"),
+            ("bookie-policy", "session_postgres"),
+            ("bookie-policy", "session_mssql"),
         ]:
             self.assertIn(f"-p {package} --test {target}", ledger)
         self.assertIn("scripts/run-test-layer.py app-server", ledger)
-        self.assertNotIn("tablepro-driver-tests", ledger)
-        self.assertNotIn("tablepro-driver-src", ledger)
+        self.assertNotIn("bookie-driver-tests", ledger)
+        self.assertNotIn("bookie-driver-src", ledger)
 
     def test_ignored_arch_source_does_not_hide_new_nonignored_inventory_tests(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -354,14 +354,14 @@ class CiWorkflowTests(unittest.TestCase):
             crate = root / "crates/core"
             (crate / "src").mkdir(parents=True)
             (crate / "Cargo.toml").write_text(
-                '[package]\nname = "tablepro-core"\nversion = "0.1.0"\nedition = "2024"\n'
+                '[package]\nname = "bookie-core"\nversion = "0.1.0"\nedition = "2024"\n'
             )
             (crate / "src/lib.rs").write_text(
                 '#[ignore = "requires Docker"]\nfn tracked_ignored_test() {}\n'
             )
             untracked = crate / "src/new_test.rs"
             untracked.write_text('#[ignore = "requires Docker"]\nfn untracked_ignored_test() {}\n')
-            generated = root / "apps/linux/packaging/arch/src/TablePro/apps/linux/app/src/copied.rs"
+            generated = root / "apps/linux/packaging/arch/src/BookiE/apps/linux/app/src/copied.rs"
             generated.parent.mkdir(parents=True)
             generated.write_text('#[ignore = "requires Docker"]\nfn copied_ignored_test() {}\n')
             (root / "scripts").mkdir()
@@ -392,11 +392,11 @@ class CiWorkflowTests(unittest.TestCase):
         script = (ROOT / "scripts/ci-local.sh").read_text()
         full = script.split("run_full() {", 1)[1].split("run_integration()", 1)[0]
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        selection = "--workspace --exclude tablepro-driver-duckdb --lib --bins"
+        selection = "--workspace --exclude bookie-driver-duckdb --lib --bins"
         self.assertIn("--archive-file \"$BOOKIE_TEST_BUNDLE/nextest.tar.zst\"", ci)
         self.assertIn("-E 'kind(lib) | kind(bin)'", ci)
         self.assertIn('"$ROOT/scripts/ensure-nextest.sh"', full)
-        self.assertIn(f'nextest run {selection} --profile "${{TABLEPRO_NEXTEST_PROFILE:-default}}" --no-tests=fail', full)
+        self.assertIn(f'nextest run {selection} --profile "${{BOOKIE_NEXTEST_PROFILE:-default}}" --no-tests=fail', full)
         self.assertNotIn("cargo test --workspace", full)
 
     def test_jobs_share_an_immutable_checkout(self):
@@ -564,7 +564,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  duckdb:\n", 1)[0]
         self.assertIn("Build staged release GTK binary", acceptance)
-        self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", acceptance)
+        self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", acceptance)
         self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
@@ -589,9 +589,9 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         release = workflow.split("  postgres-release:\n", 1)[1].split("  duckdb:\n", 1)[0]
         self.assertIn("timeout-minutes: 45", release)
-        self.assertIn("cargo build --locked --release -p tablepro-app", release)
-        self.assertIn("target/release/tablepro-app target/installed/usr/bin/tablepro", release)
-        self.assertIn("TABLEPRO_GTK_BINARY: target/installed/usr/bin/tablepro", release)
+        self.assertIn("cargo build --locked --release -p bookie-app", release)
+        self.assertIn("target/release/bookie-app target/installed/usr/bin/bookie", release)
+        self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", release)
 
     def test_gtk_scripts_reduce_xvfb_display_collisions(self):
         for path in [
@@ -665,7 +665,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
         default_scenarios = next(
-            line for line in script.splitlines() if 'TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-' in line
+            line for line in script.splitlines() if 'BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-' in line
         )
         for scenario in [
             "postgres_ssh_unknown_host_key_decline_is_durably_audited",
@@ -758,7 +758,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_nightly_soak_installs_the_binary_under_usr_bin(self):
         nightly = (ROOT / ".forgejo/workflows/nightly.yml").read_text()
         soak = nightly.split("\n  gtk-soak:\n", 1)[1].split("\n  arch-package:\n", 1)[0]
-        self.assertIn('binary="$PWD/target-soak-${{ matrix.run }}/usr/bin/tablepro"', soak)
+        self.assertIn('binary="$PWD/target-soak-${{ matrix.run }}/usr/bin/bookie"', soak)
 
     def test_forgejo_artifact_actions_are_pinned_and_bootstrap_their_runtime(self):
         allowed = {
@@ -834,7 +834,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         self.assertIn('SHARD_GROUP: ${{ matrix.shard_group }}', scenarios)
         self.assertIn('for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do', scenarios)
-        self.assertIn('TABLEPRO_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing', scenarios)
+        self.assertIn('BOOKIE_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing', scenarios)
         self.assertIn('scripts/ci-mcp-port.py "$((10 + shard))"', scenarios)
         self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
         self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)

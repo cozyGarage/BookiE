@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -81,7 +81,7 @@ async fn value_contract_domain_over_uuid_array_preserves_values_and_wire_bytes()
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: "token".into()
         })
@@ -94,7 +94,7 @@ async fn value_contract_domain_over_uuid_array_preserves_values_and_wire_bytes()
         .unwrap()
         .rows[0][0]
         .clone();
-    let edit = tablepro_core::sql_dialect::build_keyed_update(
+    let edit = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -120,7 +120,7 @@ async fn value_contract_domain_over_uuid_array_preserves_values_and_wire_bytes()
     assert_eq!(stored.rows[0][1..], native.rows[2]);
     assert_eq!(stored.rows[1][3], sibling);
 
-    let invalid = tablepro_core::sql_dialect::build_keyed_update(
+    let invalid = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "rows",
@@ -131,12 +131,12 @@ async fn value_contract_domain_over_uuid_array_preserves_values_and_wire_bytes()
     .unwrap();
     let error = connection.execute_in_transaction(&[invalid]).await.unwrap_err();
     let cause = match &error {
-        tablepro_core::DriverError::Transaction { source, .. }
-        | tablepro_core::DriverError::TransactionRollbackFailed { source, .. } => source.as_ref(),
+        bookie_core::DriverError::Transaction { source, .. }
+        | bookie_core::DriverError::TransactionRollbackFailed { source, .. } => source.as_ref(),
         other => other,
     };
     assert!(
-        matches!(cause, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"),
+        matches!(cause, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"),
         "{error:?}"
     );
     assert_eq!(

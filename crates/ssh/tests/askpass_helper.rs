@@ -7,7 +7,7 @@ use std::process::{Command, Output};
 use std::thread;
 
 fn helper() -> std::ffi::OsString {
-    std::env::var_os("CARGO_BIN_EXE_tablepro-askpass").unwrap_or_else(|| env!("CARGO_BIN_EXE_tablepro-askpass").into())
+    std::env::var_os("CARGO_BIN_EXE_bookie-askpass").unwrap_or_else(|| env!("CARGO_BIN_EXE_bookie-askpass").into())
 }
 
 fn read_frame(stream: &mut UnixStream) -> io::Result<Vec<u8>> {
@@ -33,7 +33,7 @@ fn serve_once(listener: &UnixListener, reply: &[u8]) -> io::Result<Vec<Vec<u8>>>
 
 fn run_helper(socket: &Path, hint: Option<&str>, prompt: &str) -> io::Result<Output> {
     let mut command = Command::new(helper());
-    command.arg(prompt).env("TABLEPRO_ASKPASS_SOCKET", socket);
+    command.arg(prompt).env("BOOKIE_ASKPASS_SOCKET", socket);
     match hint {
         Some(hint) => command.env("SSH_ASKPASS_PROMPT", hint),
         None => command.env_remove("SSH_ASKPASS_PROMPT"),
@@ -92,7 +92,7 @@ fn a_missing_socket_exits_1() {
 fn no_socket_variable_exits_1() {
     let output = Command::new(helper())
         .arg("Password: ")
-        .env_remove("TABLEPRO_ASKPASS_SOCKET")
+        .env_remove("BOOKIE_ASKPASS_SOCKET")
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(1));

@@ -1,5 +1,5 @@
+use bookie_core::{ConnectionFormDefaults, DatabaseDriver, connection_form_defaults};
 use relm4::adw::prelude::*;
-use tablepro_core::{ConnectionFormDefaults, DatabaseDriver, connection_form_defaults};
 
 use crate::services::connection_form::ConnectFormState;
 
@@ -21,7 +21,7 @@ pub(super) fn apply_driver_values(
 }
 
 impl super::ConnectDialog {
-    pub(super) fn collect_options(&self, driver: &dyn tablepro_core::DatabaseDriver) -> tablepro_core::ConnectOptions {
+    pub(super) fn collect_options(&self, driver: &dyn bookie_core::DatabaseDriver) -> bookie_core::ConnectOptions {
         let socket = self.uses_local_socket();
         let (local_socket_dir, local_socket_path) =
             self.selected_socket_options(self.form.local_socket_path_kind(), socket);
@@ -36,7 +36,7 @@ impl super::ConnectDialog {
         } else {
             (String::new(), String::new())
         };
-        tablepro_core::ConnectOptions {
+        bookie_core::ConnectOptions {
             host: self.host.text().trim().to_string(),
             port: self.port.value() as u16,
             database: typed_database(&self.database.text()),
@@ -54,7 +54,7 @@ impl super::ConnectDialog {
         }
     }
 
-    pub(super) fn apply_driver_form_visibility(&mut self, driver: &dyn tablepro_core::DatabaseDriver) {
+    pub(super) fn apply_driver_form_visibility(&mut self, driver: &dyn bookie_core::DatabaseDriver) {
         let capabilities = driver.capabilities();
         self.form = ConnectFormState::from_capabilities(capabilities, self.form.selected);
         if !self.form.endpoint(false).shows_endpoint_choice() {
@@ -150,7 +150,7 @@ mod tests {
         crate::ui::connect_dialog::DriverEntry {
             id: id.to_string(),
             display_name: id.to_string(),
-            maturity: tablepro_core::DriverMaturity::Stable,
+            maturity: bookie_core::DriverMaturity::Stable,
         }
     }
 

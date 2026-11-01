@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverCapabilities, DriverError, ExecResult, OperationControl, QueryResult, TableInfo,
     Value,
 };
@@ -72,7 +72,7 @@ impl Connection for MetadataConnection {
         &self,
         _schema: Option<&str>,
         _table: &str,
-    ) -> Result<Vec<tablepro_core::IndexInfo>, DriverError> {
+    ) -> Result<Vec<bookie_core::IndexInfo>, DriverError> {
         self.0.indexes.fetch_add(1, Ordering::SeqCst);
         if self.0.cancel_after_indexes.load(Ordering::SeqCst) {
             self.0.cancellation.cancel();
@@ -87,7 +87,7 @@ impl Connection for MetadataConnection {
         &self,
         _schema: Option<&str>,
         _table: &str,
-    ) -> Result<Vec<tablepro_core::ForeignKeyInfo>, DriverError> {
+    ) -> Result<Vec<bookie_core::ForeignKeyInfo>, DriverError> {
         self.0.foreign_keys.fetch_add(1, Ordering::SeqCst);
         Ok(Vec::new())
     }

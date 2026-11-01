@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue};
+use bookie_core::{FilterOp, FilterRule, FilterSet, FilterValue};
 use uuid::Uuid;
 
 fn filter(value: &str) -> FilterSet {

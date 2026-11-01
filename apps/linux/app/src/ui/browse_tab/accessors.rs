@@ -29,15 +29,15 @@ impl BrowseTab {
         self.current_sort
     }
 
-    pub fn current_filter(&self) -> &tablepro_core::FilterSet {
+    pub fn current_filter(&self) -> &bookie_core::FilterSet {
         &self.current_filter
     }
 
-    pub fn keyset_cursor(&self) -> Option<&[tablepro_core::Value]> {
+    pub fn keyset_cursor(&self) -> Option<&[bookie_core::Value]> {
         self.keyset_cursor.as_deref()
     }
 
-    pub fn keyset_before_cursor(&self) -> Option<&[tablepro_core::Value]> {
+    pub fn keyset_before_cursor(&self) -> Option<&[bookie_core::Value]> {
         self.keyset_before_cursor.as_deref()
     }
 

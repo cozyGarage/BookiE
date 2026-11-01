@@ -13,7 +13,7 @@ def port_for_run(run_id, slot):
 def main():
     port = port_for_run(int(os.environ["GITHUB_RUN_ID"]), int(sys.argv[1]))
     with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as output:
-        output.write(f"TABLEPRO_TEST_MCP_HTTP_PORT={port}\n")
+        output.write(f"BOOKIE_TEST_MCP_HTTP_PORT={port}\n")
 
 
 if __name__ == "__main__":

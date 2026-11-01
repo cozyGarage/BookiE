@@ -1,7 +1,5 @@
-use tablepro_core::DriverError;
-use tablepro_policy::{
-    AuditErrorCategory, AuditEvent, AuditTerminalStatus, AuditTransportClient, AuditTransportOutcome,
-};
+use bookie_core::DriverError;
+use bookie_policy::{AuditErrorCategory, AuditEvent, AuditTerminalStatus, AuditTransportClient, AuditTransportOutcome};
 use uuid::Uuid;
 
 use crate::{SshEnvironment, SshRoute, TransportError};

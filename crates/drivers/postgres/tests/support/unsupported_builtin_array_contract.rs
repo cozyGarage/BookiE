@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -73,7 +73,7 @@ async fn value_contract_text_search_array_refusal_preserves_target_and_sibling_r
     assert_eq!(before.rows[0][6], source.rows[0][9]);
 
     for refusal in [&vector_refusal, &query_refusal] {
-        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", refusal).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("postgres", refusal).is_err());
         assert!(
             connection
                 .query_params("SELECT $1", std::slice::from_ref(refusal))

@@ -2,7 +2,7 @@
 
 #[test]
 fn a_name_with_a_control_character_is_quoted_exactly_and_never_changed_into_another_name() {
-    use tablepro_core::sql_dialect::quote_ident;
+    use bookie_core::sql_dialect::quote_ident;
     for (driver, expected) in [
         ("postgres", "\"a\nb\""),
         ("sqlite", "\"a\nb\""),

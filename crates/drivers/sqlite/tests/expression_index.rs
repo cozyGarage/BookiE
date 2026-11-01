@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use bookie_core::sql_ddl::{BuildDdlError, build_create_index};
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::sql_ddl::{BuildDdlError, build_create_index};
-use tablepro_core::{ConnectOptions, DatabaseDriver};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_expression_index_is_marked_and_not_rebuilt_as_a_column_index() {

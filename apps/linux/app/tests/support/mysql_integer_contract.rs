@@ -1,5 +1,5 @@
 use super::parse_input_for_driver;
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 fn col(data_type: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
@@ -80,13 +80,13 @@ fn value_contract_mysql_integer_parser_enforces_signed_and_unsigned_widths() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -98,8 +98,8 @@ async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_pr
             port: container.get_host_port_ipv4(3306).await.unwrap(),
             database: "test".into(),
             username: "root".into(),
-            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-            tls: tablepro_core::TlsConfig::disabled(),
+            password: secrecy::SecretString::new("bookie_test".to_string().into()),
+            tls: bookie_core::TlsConfig::disabled(),
             ..Default::default()
         })
         .await
@@ -172,7 +172,7 @@ async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_pr
 
     let tiny = parse_input_for_driver("255", Some(&columns[tiny_index]), "mysql").unwrap();
     let wide = parse_input_for_driver("18446744073709551615", Some(&columns[wide_index]), "mysql").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "mysql",
         None,
         "mysql_integer_edit",

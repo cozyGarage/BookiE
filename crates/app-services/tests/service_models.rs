@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_app_services::{
+use bookie_app_services::{
     preferences::{ColorSchemePref, Preferences},
     quick_switcher::{QuickItem, QuickTarget, filter},
     reconnect::is_permanent_failure,
@@ -28,9 +28,9 @@ fn quick_switching_keeps_commands_out_of_the_empty_search() {
 
 #[test]
 fn reconnect_classification_preserves_permanent_and_retryable_failures() {
-    use tablepro_transport::TransportError;
+    use bookie_transport::TransportError;
     assert!(is_permanent_failure(&TransportError::Driver(
-        tablepro_core::DriverError::AuthFailed
+        bookie_core::DriverError::AuthFailed
     )));
     assert!(!is_permanent_failure(&TransportError::Cancelled));
 }

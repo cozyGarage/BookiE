@@ -1,9 +1,9 @@
-db = db.getSiblingDB('tablepro');
+db = db.getSiblingDB('bookie');
 
 db.createUser({
-  user: 'tablepro',
-  pwd: 'tablepro',
-  roles: [{ role: 'readWrite', db: 'tablepro' }],
+  user: 'bookie',
+  pwd: 'bookie',
+  roles: [{ role: 'readWrite', db: 'bookie' }],
 });
 
 db.createCollection('release_items');

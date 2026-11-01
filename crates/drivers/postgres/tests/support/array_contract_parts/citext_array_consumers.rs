@@ -90,7 +90,7 @@ async fn value_contract_citext_array_decodes_and_rebinds_exact_values() {
         .unwrap();
     assert_eq!(unchanged.rows[0][0], result.rows[0][4]);
 
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &result.columns,
         &result.rows,
         &Default::default(),
@@ -106,27 +106,27 @@ async fn value_contract_citext_array_decodes_and_rebinds_exact_values() {
         .query("SELECT id, labels FROM citext_array_source ORDER BY id")
         .await
         .unwrap();
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let csv = tablepro_core::export::render_csv(
+    let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions {
+        &bookie_core::export::CsvOptions {
             null_marker: Some(null_marker.clone()),
             ..Default::default()
         },
     );
-    let options = tablepro_core::import::CsvImportOptions {
+    let options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection.fetch_columns(None, "citext_array_target").await.unwrap();
     let mapping = (0..columns.len()).map(Some).collect::<Vec<_>>();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "citext_array_target",
             columns: &columns,

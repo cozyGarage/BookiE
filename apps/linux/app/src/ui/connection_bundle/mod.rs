@@ -1,7 +1,7 @@
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_storage::{ImportDisposition, ImportItem, SavedConnection};
+use bookie_storage::{ImportDisposition, ImportItem, SavedConnection};
 use uuid::Uuid;
 
 mod export;
@@ -97,7 +97,7 @@ fn checkbox_row(title: &str, subtitle: &str, active: bool) -> (adw::ActionRow, g
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::{AuthMode, Environment, TlsMode};
+    use bookie_core::{AuthMode, Environment, TlsMode};
 
     fn saved(name: &str) -> SavedConnection {
         SavedConnection {

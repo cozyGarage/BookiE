@@ -56,7 +56,7 @@ async fn assert_enum_array_parameter_depth_boundary(
                 .await
                 .expect_err("64-level enum array parameters must refuse at the depth boundary");
             assert!(
-                matches!(&error, tablepro_core::DriverError::Unsupported(message)
+                matches!(&error, bookie_core::DriverError::Unsupported(message)
                     if message.contains("resolvable depth")),
                 "64-level array parameter {native_array}: {error:?}"
             );
@@ -73,7 +73,7 @@ async fn assert_enum_array_parameter_depth_boundary(
             .await
             .expect_err("invalid labels must reach PostgreSQL at the supported depth");
         assert!(
-            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. }
+            matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. }
                 if code == "22P02"),
             "63-level invalid enum label: {invalid:?}"
         );

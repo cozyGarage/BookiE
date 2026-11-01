@@ -1,6 +1,6 @@
 use super::*;
 use async_trait::async_trait;
-use tablepro_core::{DatabaseDriver, DriverError};
+use bookie_core::{DatabaseDriver, DriverError};
 
 struct CertificateFailure;
 
@@ -36,7 +36,7 @@ async fn connecting_with_a_bad_certificate_keeps_the_certificate_recovery_guidan
         server_version: None,
         query_timeout_secs: None,
     };
-    let environment = tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse);
+    let environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse);
     let failure = open_candidate(
         &CertificateFailure,
         ConnectOptions::default(),

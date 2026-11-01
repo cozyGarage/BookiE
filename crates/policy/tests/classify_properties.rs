@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_policy::classify;
 use proptest::prelude::*;
-use tablepro_policy::classify;
 
 const DRIVERS: [&str; 6] = ["postgres", "mysql", "sqlite", "mssql", "duckdb", "clickhouse"];
 

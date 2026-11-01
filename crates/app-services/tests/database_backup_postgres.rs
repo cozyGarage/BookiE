@@ -4,17 +4,17 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use drivers_postgres::PgDriver;
-use secrecy::SecretString;
-use tablepro_app_services::database_backup::{BackupContext, BackupJob, run_backup_job};
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, Environment, OperationControl, TlsConfig};
-use tablepro_dump::ClientTool;
-use tablepro_policy::{
+use bookie_app_services::database_backup::{BackupContext, BackupJob, run_backup_job};
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, Environment, OperationControl, TlsConfig};
+use bookie_dump::ClientTool;
+use bookie_policy::{
     AuditError, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus,
     AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal,
 };
-use tablepro_ssh::UnknownHostKey;
-use tablepro_transport::SshEnvironment;
+use bookie_ssh::UnknownHostKey;
+use bookie_transport::SshEnvironment;
+use drivers_postgres::PgDriver;
+use secrecy::SecretString;
 use testcontainers::core::{CmdWaitFor, ExecCommand};
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::postgres::Postgres;
@@ -52,7 +52,7 @@ async fn tool(name: &str, variable: &str) -> ClientTool {
 }
 
 fn guard(
-    connection: Arc<dyn tablepro_core::Connection>,
+    connection: Arc<dyn bookie_core::Connection>,
     principal: Principal,
     audit: Arc<RecordingAudit>,
 ) -> PolicyGuard {
@@ -117,14 +117,14 @@ async fn a_guarded_backup_and_restore_bring_back_the_rows_and_are_audited() {
         tls: TlsConfig::disabled(),
         ..Default::default()
     };
-    let connection: Arc<dyn tablepro_core::Connection> =
+    let connection: Arc<dyn bookie_core::Connection> =
         Arc::from(PgDriver.connect(options.clone()).await.expect("connect"));
     let audit = Arc::new(RecordingAudit::default());
     let human = guard(connection.clone(), Principal::human_gui(), audit.clone());
     let dir = tempfile::tempdir().unwrap();
     let archive = dir.path().join("postgres.dump");
 
-    let pg_dump = tool("pg_dump", "TABLEPRO_TEST_PG_DUMP").await;
+    let pg_dump = tool("pg_dump", "BOOKIE_TEST_PG_DUMP").await;
     run(
         &human,
         &pg_dump,
@@ -140,7 +140,7 @@ async fn a_guarded_backup_and_restore_bring_back_the_rows_and_are_audited() {
         "DELETE FROM items WHERE id = 2; INSERT INTO items VALUES (9, 'later');",
     )
     .await;
-    let pg_restore = tool("pg_restore", "TABLEPRO_TEST_PG_RESTORE").await;
+    let pg_restore = tool("pg_restore", "BOOKIE_TEST_PG_RESTORE").await;
     run(
         &human,
         &pg_restore,

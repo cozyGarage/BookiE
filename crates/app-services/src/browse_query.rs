@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use tablepro_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build_filter_where, keyset_where_clause};
+use bookie_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build_filter_where, keyset_where_clause};
 
 use order::resolved_order_by;
 
@@ -46,7 +46,7 @@ enum PageDirection {
 impl BrowseTarget<'_> {
     fn filtered_query(&self, projection: &str) -> Result<BoundQuery, String> {
         let filter = build_filter_where(self.driver_id, self.columns, self.filter).map_err(|e| e.to_string())?;
-        let quote = |s| tablepro_core::sql_dialect::quote_ident(self.driver_id, s);
+        let quote = |s| bookie_core::sql_dialect::quote_ident(self.driver_id, s);
         let target = match self.schema {
             Some(schema) => format!("{}.{}", quote(schema), quote(self.table)),
             None => quote(self.table),
@@ -77,7 +77,7 @@ impl BrowseTarget<'_> {
         if self.driver_id == "redis" {
             return redis::value_query(self, column_index, pk_values);
         }
-        let (sql, params) = tablepro_core::sql_dialect::build_keyed_value_select(
+        let (sql, params) = bookie_core::sql_dialect::build_keyed_value_select(
             self.driver_id,
             self.schema,
             self.table,
@@ -190,7 +190,7 @@ impl BrowseTarget<'_> {
         let order = page_order(self.driver_id, &keys, order, (before && cursor_applied) || seek_last);
         query
             .sql
-            .push_str(&tablepro_core::sql_dialect::build_order_and_pagination(
+            .push_str(&bookie_core::sql_dialect::build_order_and_pagination(
                 self.driver_id,
                 order.as_deref(),
                 limit,
@@ -207,7 +207,7 @@ impl BrowseTarget<'_> {
             |indices| {
                 indices
                     .iter()
-                    .map(|&index| tablepro_core::sql_dialect::quote_ident(self.driver_id, &self.columns[index].name))
+                    .map(|&index| bookie_core::sql_dialect::quote_ident(self.driver_id, &self.columns[index].name))
                     .collect::<Vec<_>>()
                     .join(", ")
             },
@@ -253,7 +253,7 @@ fn page_order(driver_id: &str, keys: &[&str], order: Option<String>, reverse: bo
     if !reverse {
         return order;
     }
-    tablepro_core::keyset_order_by_before(driver_id, keys)
+    bookie_core::keyset_order_by_before(driver_id, keys)
         .trim()
         .strip_prefix("ORDER BY")
         .map(str::trim)
@@ -272,7 +272,7 @@ fn append_keyset_clause(
         return Ok(false);
     };
     let (clause, params) = if before {
-        tablepro_core::keyset_before_where_clause(driver_id, keys, cursor, query.params.len())
+        bookie_core::keyset_before_where_clause(driver_id, keys, cursor, query.params.len())
     } else {
         keyset_where_clause(driver_id, keys, cursor, query.params.len())
     }

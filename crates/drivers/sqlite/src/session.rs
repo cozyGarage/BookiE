@@ -1,10 +1,10 @@
 use async_trait::async_trait;
+use bookie_core::{
+    DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, Value, check_pre_dispatch, run_server_cancellable,
+};
 use sqlx::pool::PoolConnection;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Connection as SqlxConnection, Pool, Sqlite};
-use tablepro_core::{
-    DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, Value, check_pre_dispatch, run_server_cancellable,
-};
 
 use crate::interrupt::InterruptHandle;
 use crate::{confirms_cancellation, map_sqlx_error, params_into_result, request_interrupt};
@@ -18,8 +18,8 @@ pub(crate) struct SqliteSession {
 
 pub(crate) async fn open(
     options: &SqliteConnectOptions,
-    attached: &[tablepro_core::AttachedDatabase],
-) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    attached: &[bookie_core::AttachedDatabase],
+) -> Result<Box<dyn bookie_core::Session>, DriverError> {
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
         .acquire_timeout(SESSION_SETUP_TIMEOUT)
@@ -37,7 +37,7 @@ pub(crate) async fn open(
 }
 
 #[async_trait]
-impl tablepro_core::Session for SqliteSession {
+impl bookie_core::Session for SqliteSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,

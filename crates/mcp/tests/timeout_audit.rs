@@ -8,16 +8,16 @@ use std::{
 };
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl,
     QueryResult, TableInfo, Transaction, Value, check_pre_dispatch,
 };
-use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
-use tablepro_policy::{
+use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use bookie_policy::{
     AuditError, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus,
     AuditTransactionOutcome, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal, WritePolicy,
 };
-use tablepro_storage::SavedConnection;
+use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
 struct RecordingAuditSink {
@@ -310,10 +310,7 @@ async fn confirmed_timeout_records_terminal_event_and_allows_later_write() {
         .await
         .expect_err("write must time out");
     assert_eq!(first.code, "operation_timed_out");
-    assert_eq!(
-        first.operation_outcome,
-        tablepro_mcp::OperationOutcome::ConfirmedFailure
-    );
+    assert_eq!(first.operation_outcome, bookie_mcp::OperationOutcome::ConfirmedFailure);
     assert!(!audit_state.governed_writes_disabled());
 
     bridge
@@ -375,7 +372,7 @@ async fn unknown_interruption_records_unknown_outcome_and_blocks_later_writes() 
         .await
         .expect_err("write outcome must be unknown");
     assert_eq!(first.code, "operation_outcome_unknown");
-    assert_eq!(first.operation_outcome, tablepro_mcp::OperationOutcome::Unknown);
+    assert_eq!(first.operation_outcome, bookie_mcp::OperationOutcome::Unknown);
     assert!(!first.message.contains("secret-sql-value"));
     assert_eq!(connection.committed_writes.load(Ordering::SeqCst), 1);
     assert!(audit_state.governed_writes_disabled());
@@ -385,7 +382,7 @@ async fn unknown_interruption_records_unknown_outcome_and_blocks_later_writes() 
         .await
         .expect_err("later write must be blocked");
     assert_eq!(second.code, "write_refused");
-    assert_eq!(second.operation_outcome, tablepro_mcp::OperationOutcome::NotStarted);
+    assert_eq!(second.operation_outcome, bookie_mcp::OperationOutcome::NotStarted);
     assert_eq!(connection.attempts.load(Ordering::SeqCst), 1);
     assert_eq!(connection.committed_writes.load(Ordering::SeqCst), 1);
 
@@ -484,7 +481,7 @@ async fn delayed_rollback_intent_records_unknown_and_blocks_later_writes() {
         .expect_err("preview rollback must exceed the cleanup deadline before dispatch");
 
     assert_eq!(error.code, "transaction_rollback_failed", "{error:?}");
-    assert_eq!(error.transaction_outcome, tablepro_mcp::TransactionOutcome::Unknown);
+    assert_eq!(error.transaction_outcome, bookie_mcp::TransactionOutcome::Unknown);
     assert!(harness.audit_state.governed_writes_disabled());
 
     let later_error = harness
@@ -498,10 +495,7 @@ async fn delayed_rollback_intent_records_unknown_and_blocks_later_writes() {
         .await
         .expect_err("later governed writes must be blocked");
     assert_eq!(later_error.code, "write_refused", "{later_error:?}");
-    assert_eq!(
-        later_error.operation_outcome,
-        tablepro_mcp::OperationOutcome::NotStarted
-    );
+    assert_eq!(later_error.operation_outcome, bookie_mcp::OperationOutcome::NotStarted);
 
     let events = harness.audit.events.lock().expect("event lock");
     assert_eq!(events.len(), 5);
@@ -531,7 +525,7 @@ async fn hanging_preview_rollback_records_unknown_and_blocks_later_writes() {
         .expect_err("preview rollback must reach the cleanup deadline");
 
     assert_eq!(error.code, "transaction_rollback_failed", "{error:?}");
-    assert_eq!(error.transaction_outcome, tablepro_mcp::TransactionOutcome::Unknown);
+    assert_eq!(error.transaction_outcome, bookie_mcp::TransactionOutcome::Unknown);
     assert!(harness.audit_state.governed_writes_disabled());
 
     let later_error = harness
@@ -545,10 +539,7 @@ async fn hanging_preview_rollback_records_unknown_and_blocks_later_writes() {
         .await
         .expect_err("later governed writes must be blocked");
     assert_eq!(later_error.code, "write_refused", "{later_error:?}");
-    assert_eq!(
-        later_error.operation_outcome,
-        tablepro_mcp::OperationOutcome::NotStarted
-    );
+    assert_eq!(later_error.operation_outcome, bookie_mcp::OperationOutcome::NotStarted);
 
     let events = harness.audit.events.lock().expect("event lock");
     assert_eq!(events.len(), 5);
@@ -564,7 +555,7 @@ async fn hanging_preview_rollback_records_unknown_and_blocks_later_writes() {
 
 struct MetadataHarness {
     bridge: McpBridge,
-    token: tablepro_mcp::McpToken,
+    token: bookie_mcp::McpToken,
     connection_id: Uuid,
     audit: Arc<RecordingAuditSink>,
     audit_state: Arc<AuditState>,
@@ -824,7 +815,7 @@ async fn a_metadata_read_is_denied_when_audit_intent_cannot_be_persisted() {
                 .list_objects(
                     &harness.token,
                     harness.connection_id,
-                    tablepro_core::CatalogObjectKind::Routine,
+                    bookie_core::CatalogObjectKind::Routine,
                     None,
                 )
                 .await

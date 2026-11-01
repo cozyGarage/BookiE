@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, Value};
+use bookie_core::{Connection, Value};
 
 pub async fn assert_grid_edit(connection: &dyn Connection) {
     const VALUE: &str = "1234567890123456789012345678901234567890.1234567890123456789012345678901234567890";
@@ -15,7 +15,7 @@ pub async fn assert_grid_edit(connection: &dyn Connection) {
         .unwrap();
     let mut row = connection.query("SELECT * FROM wide_numeric_grid").await.unwrap();
     row.columns[0].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "wide_numeric_grid",
@@ -56,7 +56,7 @@ async fn value_contract_numeric_domain_preserves_wide_value_across_consumers() {
         vec![vec![Value::Text(VALUE.into()), Value::Text(VALUE.into())]]
     );
 
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]).unwrap();
     let literal_result = connection
         .query(&format!(
             "SELECT {literal}::value_contract_numeric_domain::numeric::text"
@@ -100,7 +100,7 @@ async fn value_contract_rust_decimal_capacity_edges_round_trip_through_postgres(
             "bound decimal {text}"
         );
 
-        let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
         let restored = connection
             .query(&format!("SELECT ({literal})::numeric::text"))
             .await
@@ -139,7 +139,7 @@ async fn value_contract_max_precision_numeric_grid_edit_preserves_exact_value() 
         .unwrap();
     let mut row = connection.query("SELECT * FROM max_numeric_grid").await.unwrap();
     row.columns[0].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "max_numeric_grid",
@@ -179,7 +179,7 @@ async fn value_contract_numeric_special_grid_edits_match_server_text() {
         let id_index = row.columns.iter().position(|column| column.name == "id").unwrap();
         let amount_index = row.columns.iter().position(|column| column.name == "amount").unwrap();
         row.columns[id_index].primary_key = true;
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "postgres",
             None,
             "numeric_special_grid",

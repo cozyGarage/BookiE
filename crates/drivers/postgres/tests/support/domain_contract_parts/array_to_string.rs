@@ -74,7 +74,7 @@ async fn value_contract_enum_array_to_string_preserves_labels_and_nulls_under_sh
             .await
             .expect_err("array_to_string needs a typed enum array argument");
         assert!(
-            matches!(&untyped, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
+            matches!(&untyped, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
             "expected unresolved-polymorphic-type SQLSTATE 42804, got {untyped:?}"
         );
         transaction
@@ -131,7 +131,7 @@ async fn value_contract_enum_array_to_string_preserves_labels_and_nulls_under_sh
         .await
         .expect_err("a shadow-only enum label must not resolve through search_path");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
     );
     transaction

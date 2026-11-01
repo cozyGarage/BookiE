@@ -22,16 +22,16 @@ if ! "$system_python" -c "import pyatspi" >/dev/null 2>&1; then
   exit 1
 fi
 
-if [[ "${TABLEPRO_GTK_XVFB_ACTIVE:-0}" != "1" ]]; then
+if [[ "${BOOKIE_GTK_XVFB_ACTIVE:-0}" != "1" ]]; then
   xvfb_server_num=$((1000 + RANDOM))
-  exec env TABLEPRO_GTK_XVFB_ACTIVE=1 \
+  exec env BOOKIE_GTK_XVFB_ACTIVE=1 \
     xvfb-run --auto-servernum --server-num="$xvfb_server_num" --server-args="-screen 0 1280x1024x24 -nolisten tcp" "$ROOT/scripts/test-gtk-safety.sh" "$@"
 fi
 
 # Start the private bus after Xvfb so D-Bus activated accessibility services
 # inherit the test display instead of the desktop systemd user's display.
-if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
-  gtk_runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk.XXXXXX")"
+if [[ "${BOOKIE_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
+  gtk_runtime="$(mktemp -d "${TMPDIR:-/tmp}/bookie-gtk.XXXXXX")"
   cleanup_gtk_runtime() {
     if command -v fusermount3 >/dev/null 2>&1; then
       for gtk_mount in "$gtk_runtime/doc" "$gtk_runtime/gvfs"; do
@@ -44,7 +44,7 @@ if [[ "${TABLEPRO_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
   mkdir -p "$gtk_runtime/data/dbus-1/services"
   cp "/usr/share/dbus-1/services/org.a11y.Bus.service" \
     "$gtk_runtime/data/dbus-1/services/org.a11y.Bus.service"
-  env -u NO_AT_BRIDGE TABLEPRO_GTK_DBUS_ACTIVE=1 XDG_DATA_HOME="$gtk_runtime/data" XDG_RUNTIME_DIR="$gtk_runtime" \
+  env -u NO_AT_BRIDGE BOOKIE_GTK_DBUS_ACTIVE=1 XDG_DATA_HOME="$gtk_runtime/data" XDG_RUNTIME_DIR="$gtk_runtime" \
     ATSPI_DBUS_IMPLEMENTATION=dbus-daemon XDG_CURRENT_DESKTOP=GNOME \
     dbus-run-session -- "$ROOT/scripts/test-gtk-safety.sh" "$@"
   exit $?
@@ -66,10 +66,10 @@ gdbus call --session \
   --object-path /org/a11y/bus \
   --method org.a11y.Bus.GetAddress >/dev/null
 
-if [[ "${TABLEPRO_GTK_KEYRING_READY:-0}" != "1" ]] && command -v gnome-keyring-daemon >/dev/null 2>&1; then
+if [[ "${BOOKIE_GTK_KEYRING_READY:-0}" != "1" ]] && command -v gnome-keyring-daemon >/dev/null 2>&1; then
   keyring_home="$XDG_RUNTIME_DIR/keyring-home"
   mkdir -p "$keyring_home/data"
-  eval "$(printf 'tablepro-test' | HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/data" \
+  eval "$(printf 'bookie-test' | HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/data" \
     gnome-keyring-daemon --daemonize --unlock --components=secrets)"
 fi
 

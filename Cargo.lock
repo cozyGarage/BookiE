@@ -887,6 +887,490 @@ dependencies = [
 ]
 
 [[package]]
+name = "bookie-agentd"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "bookie-driver-clickhouse",
+ "bookie-driver-duckdb",
+ "bookie-driver-mongodb",
+ "bookie-driver-mssql",
+ "bookie-driver-mysql",
+ "bookie-driver-postgres",
+ "bookie-driver-redis",
+ "bookie-driver-sqlite",
+ "bookie-mcp",
+ "bookie-policy",
+ "bookie-release-tests",
+ "bookie-ssh",
+ "bookie-storage",
+ "bookie-transport",
+ "chrono",
+ "clap",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-app"
+version = "0.2.2"
+dependencies = [
+ "async-channel",
+ "async-trait",
+ "bookie-app-services",
+ "bookie-core",
+ "bookie-driver-clickhouse",
+ "bookie-driver-duckdb",
+ "bookie-driver-mongodb",
+ "bookie-driver-mssql",
+ "bookie-driver-mysql",
+ "bookie-driver-postgres",
+ "bookie-driver-redis",
+ "bookie-driver-sqlite",
+ "bookie-mcp",
+ "bookie-policy",
+ "bookie-ssh",
+ "bookie-storage",
+ "bookie-transport",
+ "chrono",
+ "futures",
+ "gettext-rs",
+ "glib",
+ "glib-build-tools",
+ "gtk4",
+ "libadwaita",
+ "libc",
+ "mongodb",
+ "relm4",
+ "rust_decimal",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sourceview5",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "whoami",
+ "zip",
+]
+
+[[package]]
+name = "bookie-app-services"
+version = "0.2.2"
+dependencies = [
+ "aes-gcm",
+ "async-trait",
+ "bookie-core",
+ "bookie-driver-mssql",
+ "bookie-driver-mysql",
+ "bookie-driver-postgres",
+ "bookie-driver-sqlite",
+ "bookie-dump",
+ "bookie-policy",
+ "bookie-ssh",
+ "bookie-storage",
+ "bookie-transport",
+ "chrono",
+ "getrandom 0.3.4",
+ "rmp-serde",
+ "rust_decimal",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-core"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "calamine",
+ "chrono",
+ "csv",
+ "encoding_rs",
+ "libc",
+ "quick-xml",
+ "rust_decimal",
+ "rust_xlsxwriter",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sqlformat",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "bookie-driver-clickhouse"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "chrono",
+ "clickhouse",
+ "http",
+ "hyper-rustls",
+ "hyper-util",
+ "jiff",
+ "rust_decimal",
+ "rustls",
+ "rustls-native-certs",
+ "rustls-pki-types",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "testcontainers",
+ "tokio",
+ "tokio-util",
+ "uuid",
+ "webpki-roots",
+ "zip",
+]
+
+[[package]]
+name = "bookie-driver-duckdb"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "chrono",
+ "duckdb",
+ "libc",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "bookie-driver-mongodb"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "chrono",
+ "csv",
+ "futures",
+ "mongodb",
+ "secrecy",
+ "serde_json",
+ "sqlparser",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
+ "tokio-util",
+ "zip",
+]
+
+[[package]]
+name = "bookie-driver-mssql"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-app-services",
+ "bookie-core",
+ "chrono",
+ "futures",
+ "rust_decimal",
+ "secrecy",
+ "serde_json",
+ "socket2",
+ "testcontainers",
+ "testcontainers-modules",
+ "tiberius",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-driver-mysql"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-app-services",
+ "bookie-core",
+ "chrono",
+ "futures",
+ "rust_decimal",
+ "secrecy",
+ "serde_json",
+ "sqlparser",
+ "sqlx",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "bookie-driver-postgres"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-app-services",
+ "bookie-core",
+ "chrono",
+ "csv",
+ "futures",
+ "rust_decimal",
+ "secrecy",
+ "serde_json",
+ "sqlx",
+ "sqlx-core",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "bookie-driver-redis"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "redis",
+ "secrecy",
+ "serde_json",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
+]
+
+[[package]]
+name = "bookie-driver-sqlite"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-app-services",
+ "bookie-core",
+ "bookie-policy",
+ "chrono",
+ "futures",
+ "libsqlite3-sys",
+ "rust_decimal",
+ "serde_json",
+ "sqlparser",
+ "sqlx",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-driver-tls-tests"
+version = "0.2.2"
+dependencies = [
+ "bookie-core",
+ "bookie-driver-clickhouse",
+ "bookie-driver-mongodb",
+ "bookie-driver-mssql",
+ "bookie-driver-mysql",
+ "bookie-driver-postgres",
+ "bookie-driver-redis",
+ "bookie-ssh",
+ "bookie-transport",
+ "secrecy",
+ "tokio",
+]
+
+[[package]]
+name = "bookie-dump"
+version = "0.2.2"
+dependencies = [
+ "bookie-core",
+ "secrecy",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "bookie-mcp"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "axum",
+ "bookie-core",
+ "bookie-driver-mongodb",
+ "bookie-driver-mysql",
+ "bookie-driver-postgres",
+ "bookie-policy",
+ "bookie-storage",
+ "chrono",
+ "hex",
+ "libc",
+ "mongodb",
+ "rmcp",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-policy"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "bookie-driver-mssql",
+ "bookie-driver-postgres",
+ "chrono",
+ "futures",
+ "glob",
+ "hex",
+ "proptest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlparser",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-release-tests"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "bookie-driver-postgres",
+ "bookie-mcp",
+ "bookie-policy",
+ "bookie-ssh",
+ "bookie-storage",
+ "bookie-transport",
+ "secrecy",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-ssh"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "libc",
+ "russh",
+ "secrecy",
+ "tempfile",
+ "testcontainers",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "bookie-storage"
+version = "0.2.2"
+dependencies = [
+ "argon2",
+ "async-trait",
+ "aws-lc-rs",
+ "base64 0.22.1",
+ "bookie-core",
+ "bookie-policy",
+ "chrono",
+ "hex",
+ "libc",
+ "oo7",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "sqlx",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "bookie-transport"
+version = "0.2.2"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "bookie-policy",
+ "bookie-ssh",
+ "bookie-storage",
+ "libc",
+ "rustls",
+ "secrecy",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
 name = "borsh"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6213,490 +6697,6 @@ dependencies = [
  "pkg-config",
  "toml",
  "version-compare",
-]
-
-[[package]]
-name = "tablepro-agentd"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "clap",
- "tablepro-core",
- "tablepro-driver-clickhouse",
- "tablepro-driver-duckdb",
- "tablepro-driver-mongodb",
- "tablepro-driver-mssql",
- "tablepro-driver-mysql",
- "tablepro-driver-postgres",
- "tablepro-driver-redis",
- "tablepro-driver-sqlite",
- "tablepro-mcp",
- "tablepro-policy",
- "tablepro-release-tests",
- "tablepro-ssh",
- "tablepro-storage",
- "tablepro-transport",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "tablepro-app"
-version = "0.2.2"
-dependencies = [
- "async-channel",
- "async-trait",
- "chrono",
- "futures",
- "gettext-rs",
- "glib",
- "glib-build-tools",
- "gtk4",
- "libadwaita",
- "libc",
- "mongodb",
- "relm4",
- "rust_decimal",
- "secrecy",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sourceview5",
- "tablepro-app-services",
- "tablepro-core",
- "tablepro-driver-clickhouse",
- "tablepro-driver-duckdb",
- "tablepro-driver-mongodb",
- "tablepro-driver-mssql",
- "tablepro-driver-mysql",
- "tablepro-driver-postgres",
- "tablepro-driver-redis",
- "tablepro-driver-sqlite",
- "tablepro-mcp",
- "tablepro-policy",
- "tablepro-ssh",
- "tablepro-storage",
- "tablepro-transport",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "whoami",
- "zip",
-]
-
-[[package]]
-name = "tablepro-app-services"
-version = "0.2.2"
-dependencies = [
- "aes-gcm",
- "async-trait",
- "chrono",
- "getrandom 0.3.4",
- "rmp-serde",
- "rust_decimal",
- "secrecy",
- "serde",
- "serde_json",
- "tablepro-core",
- "tablepro-driver-mssql",
- "tablepro-driver-mysql",
- "tablepro-driver-postgres",
- "tablepro-driver-sqlite",
- "tablepro-dump",
- "tablepro-policy",
- "tablepro-ssh",
- "tablepro-storage",
- "tablepro-transport",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "tablepro-core"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "calamine",
- "chrono",
- "csv",
- "encoding_rs",
- "libc",
- "quick-xml",
- "rust_decimal",
- "rust_xlsxwriter",
- "secrecy",
- "serde",
- "serde_json",
- "sqlformat",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "tablepro-driver-clickhouse"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "clickhouse",
- "http",
- "hyper-rustls",
- "hyper-util",
- "jiff",
- "rust_decimal",
- "rustls",
- "rustls-native-certs",
- "rustls-pki-types",
- "secrecy",
- "serde",
- "serde_json",
- "tablepro-core",
- "tempfile",
- "testcontainers",
- "tokio",
- "tokio-util",
- "uuid",
- "webpki-roots",
- "zip",
-]
-
-[[package]]
-name = "tablepro-driver-duckdb"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "duckdb",
- "libc",
- "serde_json",
- "tablepro-core",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "tablepro-driver-mongodb"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "csv",
- "futures",
- "mongodb",
- "secrecy",
- "serde_json",
- "sqlparser",
- "tablepro-core",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "tokio",
- "tokio-util",
- "zip",
-]
-
-[[package]]
-name = "tablepro-driver-mssql"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "futures",
- "rust_decimal",
- "secrecy",
- "serde_json",
- "socket2",
- "tablepro-app-services",
- "tablepro-core",
- "testcontainers",
- "testcontainers-modules",
- "tiberius",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "tablepro-driver-mysql"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "futures",
- "rust_decimal",
- "secrecy",
- "serde_json",
- "sqlparser",
- "sqlx",
- "tablepro-app-services",
- "tablepro-core",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "tablepro-driver-postgres"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "csv",
- "futures",
- "rust_decimal",
- "secrecy",
- "serde_json",
- "sqlx",
- "sqlx-core",
- "tablepro-app-services",
- "tablepro-core",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "tablepro-driver-redis"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "redis",
- "secrecy",
- "serde_json",
- "tablepro-core",
- "testcontainers",
- "testcontainers-modules",
- "tokio",
-]
-
-[[package]]
-name = "tablepro-driver-sqlite"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "futures",
- "libsqlite3-sys",
- "rust_decimal",
- "serde_json",
- "sqlparser",
- "sqlx",
- "tablepro-app-services",
- "tablepro-core",
- "tablepro-policy",
- "tempfile",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
-name = "tablepro-driver-tls-tests"
-version = "0.2.2"
-dependencies = [
- "secrecy",
- "tablepro-core",
- "tablepro-driver-clickhouse",
- "tablepro-driver-mongodb",
- "tablepro-driver-mssql",
- "tablepro-driver-mysql",
- "tablepro-driver-postgres",
- "tablepro-driver-redis",
- "tablepro-ssh",
- "tablepro-transport",
- "tokio",
-]
-
-[[package]]
-name = "tablepro-dump"
-version = "0.2.2"
-dependencies = [
- "secrecy",
- "tablepro-core",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "thiserror",
- "tokio",
- "tokio-util",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "tablepro-mcp"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "axum",
- "chrono",
- "hex",
- "libc",
- "mongodb",
- "rmcp",
- "secrecy",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "tablepro-core",
- "tablepro-driver-mongodb",
- "tablepro-driver-mysql",
- "tablepro-driver-postgres",
- "tablepro-policy",
- "tablepro-storage",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "tablepro-policy"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "chrono",
- "futures",
- "glob",
- "hex",
- "proptest",
- "secrecy",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlparser",
- "tablepro-core",
- "tablepro-driver-mssql",
- "tablepro-driver-postgres",
- "tempfile",
- "testcontainers",
- "testcontainers-modules",
- "thiserror",
- "tokio",
- "tokio-util",
- "toml",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "tablepro-release-tests"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "secrecy",
- "serde_json",
- "tablepro-core",
- "tablepro-driver-postgres",
- "tablepro-mcp",
- "tablepro-policy",
- "tablepro-ssh",
- "tablepro-storage",
- "tablepro-transport",
- "tempfile",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "tablepro-ssh"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "libc",
- "russh",
- "secrecy",
- "tempfile",
- "testcontainers",
- "thiserror",
- "tokio",
- "tokio-util",
- "tracing",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "tablepro-storage"
-version = "0.2.2"
-dependencies = [
- "argon2",
- "async-trait",
- "aws-lc-rs",
- "base64 0.22.1",
- "chrono",
- "hex",
- "libc",
- "oo7",
- "secrecy",
- "serde",
- "serde_json",
- "sha2 0.11.1",
- "sqlx",
- "tablepro-core",
- "tablepro-policy",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "tablepro-transport"
-version = "0.2.2"
-dependencies = [
- "async-trait",
- "libc",
- "rustls",
- "secrecy",
- "sha2 0.11.1",
- "tablepro-core",
- "tablepro-policy",
- "tablepro-ssh",
- "tablepro-storage",
- "tempfile",
- "thiserror",
- "tokio",
- "tokio-util",
- "uuid",
 ]
 
 [[package]]

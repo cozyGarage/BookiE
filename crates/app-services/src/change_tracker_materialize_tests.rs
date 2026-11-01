@@ -1,6 +1,6 @@
 use super::*;
-use tablepro_core::ColumnInfo;
-use tablepro_core::sql_dialect::BuildSqlError;
+use bookie_core::ColumnInfo;
+use bookie_core::sql_dialect::BuildSqlError;
 
 fn pk(name: &str) -> ColumnInfo {
     ColumnInfo {

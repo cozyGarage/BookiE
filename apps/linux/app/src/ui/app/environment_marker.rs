@@ -1,7 +1,7 @@
+use bookie_core::Environment;
 use relm4::adw;
 use relm4::adw::prelude::*;
 use relm4::gtk;
-use tablepro_core::Environment;
 
 pub(super) const PRODUCTION_HEADER_CLASS: &str = "tp-production";
 

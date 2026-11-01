@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_ddl::{DraftColumn, build_alter_column};
+use bookie_core::sql_ddl::{DraftColumn, build_alter_column};
 
 use crate::{connect, start_pg};
 

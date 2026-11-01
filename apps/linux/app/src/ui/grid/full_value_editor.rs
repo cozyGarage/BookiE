@@ -1,9 +1,9 @@
+use bookie_core::{ColumnInfo, Value};
 use gtk4::prelude::*;
 use gtk4::{self as gtk};
 use relm4::adw;
 use relm4::adw::prelude::*;
 use serde_json::value::RawValue;
-use tablepro_core::{ColumnInfo, Value};
 
 const MAX_EDIT_BYTES: usize = 1024 * 1024;
 

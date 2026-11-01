@@ -53,13 +53,13 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let json_path = directory.path().join("enum-array.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -71,11 +71,11 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     assert_eq!(json_file[0]["value"], *driver_text);
 
     let csv_path = directory.path().join("enum-array.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -89,7 +89,7 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
 
     for (format, extension, escaped) in [
         (
-            tablepro_core::export::ResultFormat::Xml,
+            bookie_core::export::ResultFormat::Xml,
             "xml",
             driver_text
                 .replace('&', "&amp;")
@@ -99,7 +99,7 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
                 .replace('\'', "&apos;"),
         ),
         (
-            tablepro_core::export::ResultFormat::Html,
+            bookie_core::export::ResultFormat::Html,
             "html",
             driver_text
                 .replace('&', "&amp;")
@@ -110,10 +110,10 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
         ),
     ] {
         let path = directory.path().join(format!("enum-array.{extension}"));
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             &path,
             &result,
-            &tablepro_core::export::ResultExport {
+            &bookie_core::export::ResultExport {
                 format,
                 csv: &csv_options,
                 sql: None,
@@ -128,11 +128,11 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     }
 
     let markdown_path = directory.path().join("enum-array.md");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &markdown_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Markdown,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Markdown,
             csv: &csv_options,
             sql: None,
         },
@@ -148,11 +148,11 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("enum-array.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -197,13 +197,13 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
         .unwrap();
     assert_eq!(sibling.rows.len(), 1);
     let sql_path = directory.path().join("enum-array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "enum_array_filewriter_target",
@@ -319,12 +319,12 @@ async fn value_contract_custom_enum_array_multidimensional_lower_bounds_export_a
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("enum-array-shapes.xlsx"));
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
+            csv: &bookie_core::export::CsvOptions::default(),
             sql: None,
         },
         || false,
@@ -371,13 +371,13 @@ async fn value_contract_custom_enum_array_multidimensional_lower_bounds_export_a
         .rows[0][0]
         .clone();
     let sql_path = directory.path().join("enum-array-shapes.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
-            csv: &tablepro_core::export::CsvOptions::default(),
-            sql: Some(tablepro_core::export::SqlTarget {
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
+            csv: &bookie_core::export::CsvOptions::default(),
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: Some("value_contract_enum_array_workbook_shapes"),
                 table: "target",
@@ -481,10 +481,10 @@ async fn value_contract_custom_enum_array_csv_import_preserves_labels_and_siblin
         native.rows[0][0],
         Value::Text("value_contract_enum_array_import.label[]".into())
     );
-    let csv_options = tablepro_core::export::CsvOptions::default();
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let csv_options = bookie_core::export::CsvOptions::default();
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(Some("value_contract_enum_array_import"), "target")
         .await
@@ -492,17 +492,17 @@ async fn value_contract_custom_enum_array_csv_import_preserves_labels_and_siblin
     assert_eq!(columns[1].data_type, "value_contract_enum_array_import.label[]");
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "value_contract_enum_array_import".into(),
             name: "label".into(),
         })
     );
     let mapping = [Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("value_contract_enum_array_import"),
             table: "target",
             columns: &columns,
@@ -629,20 +629,20 @@ async fn value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape()
     assert_eq!(native.rows[3][2], Value::Text("[0:3]".into()));
     assert_eq!(native.rows[4][2], Value::Text("[1:2][1:2]".into()));
 
-    let csv_options = tablepro_core::export::CsvOptions::default();
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let csv_options = bookie_core::export::CsvOptions::default();
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(Some("value_contract_enum_array_shape"), "target")
         .await
         .unwrap();
     let mapping = [Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("value_contract_enum_array_shape"),
             table: "target",
             columns: &columns,
@@ -706,30 +706,30 @@ async fn value_contract_custom_enum_array_csv_import_uses_target_type_under_shad
         .query("SELECT 1 AS id, ARRAY['paused'::enum_array_shadow_b.label] AS labels")
         .await
         .unwrap();
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(Some("enum_array_shadow_b"), "target")
         .await
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "enum_array_shadow_b".into(),
             name: "label".into(),
         })
     );
     let mapping = [Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("enum_array_shadow_b"),
             table: "target",
             columns: &columns,

@@ -1,4 +1,4 @@
-use tablepro_core::Value;
+use bookie_core::Value;
 
 pub(super) fn parse_datetime(raw: &serde_json::Value, type_name: &str) -> Value {
     let Some(text) = raw.as_str() else {

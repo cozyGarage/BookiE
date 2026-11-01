@@ -1,6 +1,6 @@
+use bookie_core::TableInfo;
 use relm4::adw;
 use relm4::gtk::prelude::*;
-use tablepro_core::TableInfo;
 
 use super::App;
 use super::init_sidebar::refresh_visible;
@@ -208,7 +208,7 @@ impl App {
             .set_visible(!self.sidebar_nodes.borrow().is_empty());
     }
 
-    pub(super) fn show_catalog(&self, kind: Option<tablepro_core::CatalogObjectKind>) {
+    pub(super) fn show_catalog(&self, kind: Option<bookie_core::CatalogObjectKind>) {
         crate::ui::catalog_dialog::present(
             self.window.upcast_ref::<relm4::gtk::Window>(),
             self.connection_id,
@@ -524,14 +524,14 @@ mod sidebar_label_tests {
     fn catalog_entries_get_a_catalog_row_kind_and_the_dialog_label() {
         use crate::services::sidebar_tree::append_catalog_entries;
         let mut nodes = build_nodes(&[], &[]);
-        append_catalog_entries(&mut nodes, &[tablepro_core::CatalogObjectKind::Role]);
+        append_catalog_entries(&mut nodes, &[bookie_core::CatalogObjectKind::Role]);
         let group = nodes
             .iter()
             .find(|node| node.kind == NodeKind::Group(GroupKind::Catalog))
             .unwrap();
         let entry = nodes
             .iter()
-            .find(|node| node.kind == NodeKind::Catalog(tablepro_core::CatalogObjectKind::Role))
+            .find(|node| node.kind == NodeKind::Catalog(bookie_core::CatalogObjectKind::Role))
             .unwrap();
 
         assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
