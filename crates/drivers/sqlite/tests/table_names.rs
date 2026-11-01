@@ -6,8 +6,10 @@ use tempfile::TempDir;
 #[tokio::test]
 async fn tables_named_like_the_internal_prefix_are_listed() {
     let dir = TempDir::new().unwrap();
+    let db_path = dir.path().join("names.db");
+    let _ = std::fs::File::create(&db_path);
     let options = ConnectOptions {
-        database: dir.path().join("names.db").to_string_lossy().to_string(),
+        database: db_path.to_string_lossy().to_string(),
         ..Default::default()
     };
     let conn = SqliteDriver.connect(options).await.unwrap();
