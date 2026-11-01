@@ -239,7 +239,18 @@ fn known_hosts_path_from(xdg_config_home: Option<OsString>, home: Option<OsStrin
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .or_else(|| home.map(|home| PathBuf::from(home).join(".config")))?;
-    Some(base.join("bookie").join("known_hosts"))
+    Some(
+        base.join(config_dir_name(option_env!("BOOKIE_PROFILE")))
+            .join("known_hosts"),
+    )
+}
+
+fn config_dir_name(profile: Option<&str>) -> &'static str {
+    if profile == Some("development") {
+        "bookie-devel"
+    } else {
+        "bookie"
+    }
 }
 
 #[cfg(test)]

@@ -48,7 +48,7 @@ One typed handle covers every consumer. A new surface inherits classify, approva
 ## Consequences
 
 - A consumer that holds a raw driver `Connection` is a defect.
-- MCP scope or allowlist work does not move SQL decisions out of `tablepro-policy`.
+- MCP scope or allowlist work does not move SQL decisions out of `bookie-policy`.
 - Cross-surface features (GUI and agent) change the guarded path once and update both callers.
 - Performance work bounds pages and bytes through the guard. It does not remove classify or audit to go faster.
 
