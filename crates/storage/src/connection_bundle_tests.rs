@@ -293,9 +293,11 @@ fn an_encrypted_v2_bundle_round_trips_credentials_for_each_ssh_hop() {
             jump: None,
             agent: false,
             client: Default::default(),
+            agent_identity: None,
         })),
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     let connection_id = connection.id;
     let mut secrets = BundleSecrets::new(connection_id, None, None, None);
@@ -345,9 +347,11 @@ fn a_bundle_rejects_duplicate_ssh_hop_identities() {
             jump: None,
             agent: false,
             client: Default::default(),
+            agent_identity: None,
         })),
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     let body = BundleBody {
         connections: vec![BundleConnection::from_saved(&connection)],
@@ -374,6 +378,7 @@ fn a_bundle_rejects_per_hop_secrets_for_legacy_credentials() {
         jump: None,
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     let mut secrets = BundleSecrets::new(connection.id, None, None, None);
     secrets.set_ssh_hop_secrets(vec![hop_secret(
@@ -526,6 +531,7 @@ pub(super) fn ssh_chain(depth: usize) -> SavedSshConfig {
         jump: None,
         client: Default::default(),
         agent: false,
+        agent_identity: None,
     };
     for _ in 1..depth {
         hop = SavedSshConfig {
@@ -538,6 +544,7 @@ pub(super) fn ssh_chain(depth: usize) -> SavedSshConfig {
             jump: Some(Box::new(hop)),
             client: Default::default(),
             agent: false,
+            agent_identity: None,
         };
     }
     hop
@@ -654,6 +661,31 @@ fn an_endpoint_match_ignores_host_case_and_settings() {
 
     assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
     assert_eq!(plan.items[0].connection.auth_mode, AuthMode::Kerberos);
+}
+
+#[test]
+fn an_import_cannot_drop_or_swap_a_pinned_certificate_authority() {
+    let mut local = saved("sales");
+    local.tls_mode = Some(TlsMode::VerifyFull);
+    local.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
+    for incoming_root in [None, Some(PathBuf::from("/tmp/other-ca.pem"))] {
+        let mut incoming = local.clone();
+        incoming.tls_root_cert = incoming_root;
+        let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming])).expect("plan");
+
+        assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
+        assert_eq!(plan.items[0].connection.tls_root_cert, local.tls_root_cert);
+    }
+}
+
+#[test]
+fn an_import_may_add_a_certificate_authority_to_a_connection_without_one() {
+    let local = saved("sales");
+    let mut incoming = local.clone();
+    incoming.tls_root_cert = Some(PathBuf::from("/etc/pki/company-ca.pem"));
+    let plan = plan_import(std::slice::from_ref(&local), &body_of(&[incoming.clone()])).expect("plan");
+
+    assert_eq!(plan.items[0].connection.tls_root_cert, incoming.tls_root_cert);
 }
 
 #[test]
@@ -924,6 +956,7 @@ async fn an_export_collects_every_credential_kind_for_a_connection() {
         jump: None,
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     crate::secrets::store_password(id, "db-pw", "bundle-test")
         .await
@@ -983,9 +1016,11 @@ async fn an_export_collects_each_versioned_ssh_hop_secret() {
             jump: None,
             agent: false,
             client: Default::default(),
+            agent_identity: None,
         })),
         agent: false,
         client: Default::default(),
+        agent_identity: None,
     });
     crate::secrets::store_ssh_hop_password(connection_id, root_id, 2, "root-secret", "bundle-test")
         .await

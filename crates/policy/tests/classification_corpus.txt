@@ -10,11 +10,11 @@ postgres|INSERT INTO users (id) VALUES (1) ON CONFLICT (id) DO NOTHING RETURNING
 postgres|INSERT INTO users SELECT * FROM staging|Insert|users|true|false|false|false
 postgres|UPDATE users SET name = 'x' WHERE id = 1|Update|users|true|false|false|false
 postgres|UPDATE users SET name = 'x'|Update|users|false|true|false|false
-postgres|UPDATE users u SET name = o.n FROM other o WHERE u.id = o.id|Update|users|true|false|false|false
+postgres|UPDATE users u SET name = o.n FROM other o WHERE u.id = o.id|Update|users,other|true|false|false|false
 postgres|UPDATE ONLY public.users SET active = false WHERE id < 10 RETURNING id|Unparseable||false|false|false|true
 postgres|DELETE FROM users WHERE id = 1|Delete|users|true|false|false|false
 postgres|DELETE FROM users|Delete|users|false|true|false|false
-postgres|DELETE FROM users USING banned WHERE users.id = banned.id|Delete|users|true|false|false|false
+postgres|DELETE FROM users USING banned WHERE users.id = banned.id|Delete|users,banned|true|false|false|false
 postgres|MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET v = s.v WHEN NOT MATCHED THEN INSERT (id, v) VALUES (s.id, s.v)|Other|t|true|false|false|false
 postgres|TRUNCATE users|Ddl|users|true|true|false|false
 postgres|TRUNCATE TABLE a, b RESTART IDENTITY CASCADE|Ddl|a,b|true|true|false|false
@@ -58,9 +58,9 @@ mysql|INSERT INTO users SET name = 'x'|Insert|users|true|false|false|false
 mysql|INSERT INTO users (id) VALUES (1) ON DUPLICATE KEY UPDATE id = id|Insert|users|true|false|false|false
 mysql|REPLACE INTO users (id) VALUES (1)|Insert|users|true|false|false|false
 mysql|UPDATE users SET name = 'x' WHERE id = 1 LIMIT 1|Update|users|true|false|false|false
-mysql|UPDATE a JOIN b ON a.id = b.id SET a.x = 1 WHERE b.y = 2|Update|a|true|false|false|false
+mysql|UPDATE a JOIN b ON a.id = b.id SET a.x = 1 WHERE b.y = 2|Update|a,b|true|false|false|false
 mysql|DELETE FROM users WHERE id = 1 LIMIT 1|Delete|users|true|false|false|false
-mysql|DELETE a FROM a JOIN b ON a.id = b.id WHERE b.x = 1|Delete|a|true|false|false|false
+mysql|DELETE a FROM a JOIN b ON a.id = b.id WHERE b.x = 1|Delete|a,b|true|false|false|false
 mysql|TRUNCATE TABLE users|Ddl|users|true|true|false|false
 mysql|CREATE TABLE t (id int) ENGINE=InnoDB|Ddl|t|true|false|false|false
 mysql|ALTER TABLE users ADD INDEX i (name)|Ddl|users|true|false|false|false

@@ -218,8 +218,11 @@ fn insert_statement(
         &touched,
     )
     .map_err(|error: BuildSqlError| PlanError::Sql(error.to_string()))?;
-    if target.driver_id.eq_ignore_ascii_case("postgres") && columns.iter().any(|column| column.is_auto_increment) {
-        statement = statement.replacen(" VALUES", " OVERRIDING SYSTEM VALUE VALUES", 1);
+    if target.driver_id.eq_ignore_ascii_case("postgres")
+        && columns.iter().any(|column| column.is_auto_increment)
+        && let Some(position) = statement.rfind(" VALUES (")
+    {
+        statement.insert_str(position, " OVERRIDING SYSTEM VALUE");
     }
     Ok(statement)
 }

@@ -19,4 +19,4 @@ changing a vendored file by hand, run `python3 scripts/vendor-patches.py generat
 | `redis` | 1.7.0 | Let a TLS connection verify a hostname different from the one it dials, so a certificate check survives an SSH tunnel's loopback dial address. Benchmarks, examples, tests, the changelog and `release.toml` are not vendored; the licence file is. |
 
 A released dependency version with these behaviors would let the local copies be dropped; see
-[the dependency patch guide](../docs/proposals/dependency-patches.md).
+[dependency patch guide](../docs/vendor-patches.md).

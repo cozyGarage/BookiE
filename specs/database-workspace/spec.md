@@ -1,6 +1,6 @@
 # Database workspace
 
-Draft behavior extracted from the native GTK implementation. [AGENTS](../../AGENTS.md) and accepted ADRs remain authoritative. Open implementation and acceptance: [UI-44 / #1349](https://github.com/cozyGarage/BookiE/issues/1349).
+Draft behavior extracted from the native GTK implementation. [AGENTS](../../AGENTS.md) and accepted ADRs remain authoritative.
 
 ## Editor
 
@@ -28,7 +28,7 @@ Choosing all matching table rows displays the snapshot refusal and disables Expo
 
 ## Validation
 
-Regression selectors and local results belong to the PR and evidence. The registered GTK tier covers run-scope dispatch, busy/stale transaction actions, sidebar expansion, native divider transitions, stale metadata replies, field budgets, scope-first export and snapshot refusal. Installed Arch/Hyprland and accessibility acceptance remain separate from isolated GTK tests.
+Automated tests cover run-scope dispatch, transaction actions, sidebar expansion, divider transitions, metadata reply ownership, field budgets, export scope and snapshot refusal. Installed desktop and accessibility behavior requires separate manual checks.
 
 ## Editor bottom panel
 
