@@ -572,8 +572,11 @@ fn typed_widget_slots_round_trip_and_keep_same_value_types_apart() {
     assert_eq!(IS_NULL_SLOT.get(&label), Some(true));
 
     let row_key = vec![Value::Int(11), Value::Text("pk".into())];
-    ROW_KEY_SLOT.set(&label, std::sync::Arc::from(row_key.clone()));
-    assert_eq!(ROW_KEY_SLOT.cloned(&label).map(|key| key.to_vec()), Some(row_key));
+    let shared_row_key: std::sync::Arc<[Value]> = std::sync::Arc::from(row_key.clone());
+    ROW_KEY_SLOT.set(&label, shared_row_key.clone());
+    let stored_row_key = ROW_KEY_SLOT.cloned(&label).unwrap();
+    assert!(std::sync::Arc::ptr_eq(&shared_row_key, &stored_row_key));
+    assert_eq!(stored_row_key.to_vec(), row_key);
 
     FULL_EDIT_TEXT_SLOT.set(&label, "pending".into());
     assert_eq!(FULL_EDIT_TEXT_SLOT.cloned(&label), Some("pending".into()));
