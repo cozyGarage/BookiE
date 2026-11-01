@@ -242,10 +242,10 @@ fn restore_selection(
         let positions = gtk4::Bitset::new_empty();
         if !has_saved_view_order && selected.len().saturating_mul(4) < item_count as usize {
             for source in selected {
-                if let Ok(position) = u32::try_from(*source) {
-                    if position < item_count {
-                        positions.add(position);
-                    }
+                if let Ok(position) = u32::try_from(*source)
+                    && position < item_count
+                {
+                    positions.add(position);
                 }
             }
         } else {
