@@ -439,14 +439,8 @@ mod tests {
                 };
                 assert!(!xml.contains("bold=\"true\""), "{id}");
                 for name in ["def:keyword", "def:type", "def:statement", "current-line-number"] {
-                    assert!(
-                        xml.contains(&format!("name=\"{name}\"")),
-                        "{id} missing {name}"
-                    );
-                    assert!(
-                        xml.contains("bold=\"false\""),
-                        "{id} must clear bold for SQL styles"
-                    );
+                    assert!(xml.contains(&format!("name=\"{name}\"")), "{id} missing {name}");
+                    assert!(xml.contains("bold=\"false\""), "{id} must clear bold for SQL styles");
                 }
             }
         }
