@@ -108,6 +108,8 @@ class CiWorkflowTests(unittest.TestCase):
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("mongodb, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
+        prepull = re.search(r"(?ms)^      - name: Pre-pull fixture images\n(.*?)(?=^      - name:|\Z)", driver).group(1)
+        self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", prepull)
 
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
