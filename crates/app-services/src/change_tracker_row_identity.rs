@@ -15,6 +15,26 @@ impl RowKey {
     }
 }
 
+pub fn ambiguous_row_keys(rows: &[Vec<Value>], key_indices: &[usize]) -> std::collections::HashSet<RowKey> {
+    let mut seen = std::collections::HashSet::new();
+    let mut ambiguous = std::collections::HashSet::new();
+    for row in rows {
+        let values: Vec<Value> = key_indices
+            .iter()
+            .filter_map(|&index| row.get(index).cloned())
+            .collect();
+        if values.len() != key_indices.len() {
+            continue;
+        }
+        if let Some(key) = RowKey::from_pk_values(&values)
+            && !seen.insert(key.clone())
+        {
+            ambiguous.insert(key);
+        }
+    }
+    ambiguous
+}
+
 pub fn pk_values_are_unreadable(pk_values: &[Value]) -> bool {
     pk_values.iter().any(|v| matches!(v, Value::Undecodable(_)))
 }
@@ -88,5 +108,49 @@ pub(crate) fn keyvalue_to_value(kv: &KeyValue) -> Value {
             .unwrap_or(Value::Text(s.clone())),
         KeyValue::JsonText(s) => Value::JsonText(s.clone()),
         KeyValue::Undecodable(type_name) => Value::Undecodable(type_name.clone()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(a: i64, b: i64, payload: &str) -> Vec<Value> {
+        vec![Value::Int(a), Value::Int(b), Value::Text(payload.into())]
+    }
+
+    #[test]
+    fn rows_that_share_a_key_are_ambiguous() {
+        let rows = vec![row(1, 1, "x"), row(1, 2, "y"), row(1, 1, "z")];
+
+        let ambiguous = ambiguous_row_keys(&rows, &[0, 1]);
+
+        assert_eq!(ambiguous.len(), 1);
+        assert!(ambiguous.contains(&RowKey::from_pk_values(&[Value::Int(1), Value::Int(1)]).unwrap()));
+    }
+
+    #[test]
+    fn a_partial_key_that_repeats_marks_those_rows() {
+        let rows = vec![row(1, 1, "x"), row(1, 2, "y"), row(2, 1, "z")];
+
+        let ambiguous = ambiguous_row_keys(&rows, &[0]);
+
+        assert_eq!(
+            ambiguous,
+            std::collections::HashSet::from([RowKey::from_pk_values(&[Value::Int(1)]).unwrap()])
+        );
+    }
+
+    #[test]
+    fn unique_keys_unreadable_keys_and_no_key_columns_are_never_ambiguous() {
+        let unique = vec![row(1, 1, "x"), row(1, 2, "y")];
+        let unreadable = vec![
+            vec![Value::Undecodable("a".into())],
+            vec![Value::Undecodable("a".into())],
+        ];
+
+        assert!(ambiguous_row_keys(&unique, &[0, 1]).is_empty());
+        assert!(ambiguous_row_keys(&unreadable, &[0]).is_empty());
+        assert!(ambiguous_row_keys(&unique, &[]).is_empty());
     }
 }
