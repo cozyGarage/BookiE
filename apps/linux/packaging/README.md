@@ -42,8 +42,8 @@ For native-library and toolchain requirements, see [platforms](../../../docs/pla
 The Debian builder and validator use the workspace release version with Debian revision `-1` by default. `DEB_VERSION` can select another packaging revision. The commands below build and install a local package from the current workspace; they do not replace the manual scenarios in the [verification checklist](../../../docs/manual-verification-0.2-features.md).
 
 ```bash
-DEB_VERSION=0.2.2-1 ./scripts/build-deb.sh
-sudo apt install ./apps/linux/packaging/out/bookie_0.2.2-1_amd64.deb
+DEB_VERSION=0.2.3-1 ./scripts/build-deb.sh
+sudo apt install ./apps/linux/packaging/out/bookie_0.2.3-1_amd64.deb
 ```
 
 The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-agentd`, and `/usr/bin/bookie-askpass`. It replaces and conflicts with the legacy `tablepro` package. It does not install or enable a user service.
