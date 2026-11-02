@@ -47,7 +47,7 @@ def create(bundle, messages, revision, group, archive=None):
     index = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
              'build_image': os.environ.get('BOOKIE_BUILD_RUNTIME_ID') or os.environ.get('BOOKIE_BUILD_IMAGE', ''),
              'architecture': platform.machine(), 'rust_version': subprocess.check_output(['rustc', '--version'], text=True).strip(),
-             'features': ['kerberos', 'duckdb'] if group == 'duckdb' else ['kerberos'],
+             'features': ['kerberos'],
              'application_source_commit': revision, 'test_suite_commit': revision, 'ci_recipe_commit': revision,
              'tests': [], 'binaries': {},
              'package_directories': {}, 'files': {}}
@@ -84,7 +84,7 @@ def main():
     parser.add_argument('revision')
     parser.add_argument('--messages', type=Path)
     parser.add_argument('--archive', type=Path)
-    parser.add_argument('--group', choices=['default', 'duckdb'], default='default')
+    parser.add_argument('--group', choices=['default'], default='default')
     args = parser.parse_args()
     if args.operation == 'create':
         if not args.messages:

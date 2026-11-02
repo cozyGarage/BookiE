@@ -214,7 +214,6 @@ fn initialize_ui() -> RelmApp<<ui::App as relm4::Component>::Input> {
 fn build_registry() -> DriverRegistry {
     let mut r = DriverRegistry::new();
     r.register(Arc::new(drivers_clickhouse::ClickhouseDriver));
-    #[cfg(feature = "duckdb")]
     r.register(Arc::new(drivers_duckdb::DuckdbDriver));
     r.register(Arc::new(drivers_mongodb::MongodbDriver));
     r.register(Arc::new(drivers_mssql::MssqlDriver));

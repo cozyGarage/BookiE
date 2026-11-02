@@ -12,28 +12,22 @@ import uuid
 from rust_test_evidence import completed_tests
 
 ROOT = Path(__file__).resolve().parents[1]
-DRIVERS = ("postgres", "mysql", "sqlite", "mssql", "clickhouse", "redis", "mongodb")
+DRIVERS = ("postgres", "mysql", "sqlite", "mssql", "clickhouse", "redis", "mongodb", "duckdb")
 SUITE_TIMEOUT_SECONDS = 900
 
 
-def expected_suites(gtk=False, duckdb=False):
+def expected_suites(gtk=False):
     suites = {f"crates/drivers/{name}/Cargo.toml": "integration" for name in DRIVERS}
     suites.update({"crates/core/Cargo.toml": "bookie_core", "crates/mcp/Cargo.toml": "bookie_mcp"})
     if gtk:
         suites["apps/linux/app/Cargo.toml"] = "bookie_app"
-    if duckdb:
-        suites["crates/drivers/duckdb/Cargo.toml"] = "integration"
     return suites
 
 
-def build_command(gtk=False, duckdb=False):
+def build_command(gtk=False):
     command = ["cargo", "test", "--locked", "--workspace"]
     if not gtk:
         command += ["--exclude", "bookie-app"]
-    if not duckdb:
-        command += ["--exclude", "bookie-driver-duckdb"]
-    if gtk and duckdb:
-        command += ["--features", "bookie-app/duckdb"]
     return command + ["--lib", "--test", "integration", "--no-run", "--message-format=json"]
 
 
@@ -124,7 +118,6 @@ def run_suite(manifest, executable, directory, run_id=None):
 def main():
     parser = argparse.ArgumentParser(description="Compile one Cargo graph, then run every selected value-contract suite.")
     parser.add_argument("--gtk", action="store_true", help="include the grid input parser; requires GTK development libraries")
-    parser.add_argument("--duckdb", action="store_true", help="include the optional native DuckDB driver")
     parser.add_argument("--unit-only", action="store_true", help="reuse the same build graph but run only parser and consumer tests")
     args = parser.parse_args()
     target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
@@ -132,14 +125,14 @@ def main():
         target = ROOT / target
     directory = target / "quality" / (datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%S%fZ") + "-values")
     directory.mkdir(parents=True)
-    expected = expected_suites(args.gtk, args.duckdb)
-    command = build_command(args.gtk, args.duckdb)
+    expected = expected_suites(args.gtk)
+    command = build_command(args.gtk)
     print(f"Value-contract evidence: {directory}", flush=True)
     artifacts, compilation = compile_suites(command, expected, directory)
     missing = sorted(set(expected) - set(artifacts))
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip())
-    report = {"revision": revision, "dirty": dirty, "command": command, "compile": compilation, "missing_suites": missing, "suites": {}, "gtk": args.gtk, "duckdb": args.duckdb, "unit_only": args.unit_only}
+    report = {"revision": revision, "dirty": dirty, "command": command, "compile": compilation, "missing_suites": missing, "suites": {}, "gtk": args.gtk, "unit_only": args.unit_only}
     failed = bool(compilation["exit_code"] or missing)
     if not failed:
         for manifest, executable in sorted(artifacts.items()):

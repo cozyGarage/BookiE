@@ -46,14 +46,13 @@ run_full() {
   cargo fmt --all -- --check
 
   echo "==> cargo clippy"
-  cargo clippy --workspace --exclude bookie-driver-duckdb --all-targets -- -D warnings
+  cargo clippy --workspace --all-targets -- -D warnings
 
   echo "==> nextest --workspace --lib --bins"
   # Compiling tests already builds the crates; a separate `cargo build`
   # beforehand doubles wall time for little signal.
-  # DuckDB is optional (--features duckdb) and expensive to compile.
   NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-  "$NEXTEST" nextest run --workspace --exclude bookie-driver-duckdb --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+  "$NEXTEST" nextest run --workspace --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
 
   echo "==> sandbox integration tier"
   "$ROOT/scripts/test-sandbox.sh"
@@ -103,7 +102,7 @@ run_release() {
   echo "==> MongoDB-backed GTK cursor and edit contract"
   python3 scripts/run-test-layer.py gtk-mongodb
   cargo test --locked -p bookie-driver-duckdb
-  cargo build --locked -p bookie-app --features duckdb
+  cargo build --locked -p bookie-app
   cargo deny check
   cargo audit
   echo "Automated release gates passed. Package install/upgrade/rollback, Wayland and candidate soak remain separate."
