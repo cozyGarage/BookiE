@@ -1,0 +1,21 @@
+{
+  "format": "tablepro.connection-bundle",
+  "version": 3,
+  "producer": "bookie 0.2.0",
+  "exported_at": "2026-09-19T10:00:00Z",
+  "payload": {
+    "kind": "encrypted",
+    "kdf": {
+      "algorithm": "argon2id",
+      "salt": "1SjuWs6rnCFpzkPs1u2dqQ==",
+      "memory_kib": 131072,
+      "iterations": 3,
+      "parallelism": 1
+    },
+    "cipher": {
+      "algorithm": "aes-256-gcm",
+      "nonce": "a5mKL/m6j/J+zpc8"
+    },
+    "ciphertext": "Wm/ZQvZFKdJLeZ6mA9rITjpN4iFyPKQu0ZpSiAf7LIbIl4G5AmSrJfgaAioMLU35UPulV8qRUYM3o8TXdlqJsXvM/0xj51bROLOGI8EsUfYZLYlnjPCey5m7wBRUq4y1BmoYpent3Oyes+pIvHCAjUt52MP8Qe7uKev0nNjMiUQqeV10/BO7iu1FHsFcizj9vzXwPRD6Ccxfo652aSK2A1SKAD77nRuTh2rgrMrTRt5ATPL4gsoMHTAMDVDvfmZMVgGQd1ywejrt6TMFDrspluVCXHkVtFOkyFf6DrfdQZYBavKspY8A6Gfdoj7MObng3viPjwEyMTdIjbFqMPEKUjTilzeTqMUO4bi6xz/TGdu/ZlkaWFUSy/Q++BVuuwUMMGF2uZouvkiO6LvCQNDsgEVNStuUAON9J9Uj99rLklqe+ZmCzTyfZ+dbNOf0d7A44Jk14n0myAomLlD1agGV+NdAGnkMZjxINfEbjTLNKkeJ8gVq+2oAzH6/DFETMj4MswdmaxM7C7Nb1HYwEyUHu9iUKUxRjIRhad2Qs3k1qvFM5eo63pUWsWYG5g98KaNQpFwe4jKLA8o="
+  }
+}

@@ -174,3 +174,35 @@ async fn round_trip_via_secret_service() {
     let after = load_password(id).await.unwrap();
     assert!(after.is_none());
 }
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn a_credential_saved_under_the_legacy_schema_is_found_copied_forward_and_deleted_with_it() {
+    use secrecy::ExposeSecret;
+    let id = Uuid::new_v4();
+    let current = attrs_for(id, KIND_DB_PASSWORD);
+    let legacy = legacy_attrs(&current);
+    assert_eq!(
+        legacy.get("xdg:schema").map(String::as_str),
+        Some("com.tablepro.linux.Password")
+    );
+    let keyring = open().await.unwrap();
+    keyring
+        .create_item("legacy credential", &legacy, b"legacy-secret", true)
+        .await
+        .unwrap();
+
+    let loaded = load_password(id).await.unwrap();
+
+    assert_eq!(
+        loaded.map(|secret| secret.expose_secret().to_string()),
+        Some("legacy-secret".into())
+    );
+    assert_eq!(keyring.search_items(&current).await.unwrap().len(), 1);
+    assert_eq!(keyring.search_items(&legacy).await.unwrap().len(), 1);
+
+    delete_password(id).await.unwrap();
+
+    assert!(keyring.search_items(&current).await.unwrap().is_empty());
+    assert!(keyring.search_items(&legacy).await.unwrap().is_empty());
+}

@@ -1165,13 +1165,3 @@ async fn importing_a_bundle_keeps_existing_hop_credentials_until_replacement_is_
 
     forget_imported_bundle_secrets(target, &carried).await;
 }
-
-#[test]
-fn a_plaintext_bundle_exported_under_the_legacy_format_still_parses() {
-    let exported = export_plaintext(&export_of(Vec::new(), Vec::new())).expect("export");
-    let legacy = String::from_utf8(exported)
-        .unwrap()
-        .replace(BUNDLE_FORMAT, crate::connection_bundle::LEGACY_BUNDLE_FORMAT);
-
-    assert!(parse_bundle(legacy.as_bytes()).is_ok());
-}

@@ -322,16 +322,15 @@
       ]
     },
     "values": {
-      "purpose": "Exact shared values across eight drivers, GTK and DuckDB",
-      "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker; disk space for DuckDB",
-      "hosted_gate": "Build Linux unit/driver/DuckDB jobs; strict combined runner locally",
+      "purpose": "Exact shared values across eight drivers and GTK",
+      "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker; disk space for the bundled DuckDB build",
+      "hosted_gate": "Build Linux unit and driver jobs; strict combined runner locally",
       "steps": [
         {
           "argv": [
             "bash",
             "scripts/test-value-contracts.sh",
-            "--gtk",
-            "--duckdb"
+            "--gtk"
           ],
           "timeout_seconds": 5400,
           "evidence": "exit"

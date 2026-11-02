@@ -266,7 +266,6 @@ async fn value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision() 
     assert_eq!(persisted.get("amount"), Some(&mongodb::bson::Bson::Null));
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_interval_grid_edit_preserves_native_components() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -327,7 +326,6 @@ async fn value_contract_duckdb_interval_grid_edit_preserves_native_components() 
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
