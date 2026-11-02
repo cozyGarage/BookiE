@@ -22,7 +22,7 @@ impl Transaction for CountingTransaction {
     async fn query(&mut self, _: &str) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: vec![vec![Value::Int(0)]],
+            rows: vec![vec![Value::Int(0)]].into(),
             truncated: false,
         })
     }

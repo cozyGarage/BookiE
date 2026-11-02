@@ -4,13 +4,16 @@ use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
+use crate::query_rows::QueryRowSet;
 
-pub fn render_markdown(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
-    let mut lines = Vec::with_capacity(rows.len() + 2);
+pub fn render_markdown<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R) -> String {
+    let mut lines = Vec::with_capacity(rows.row_count() + 2);
     lines.push(markdown_header_line(columns));
     lines.push(markdown_separator_line(columns.len()));
-    for row in rows {
-        lines.push(markdown_row_line(row));
+    for index in 0..rows.row_count() {
+        if let Some(row) = rows.row(index) {
+            lines.push(markdown_row_line(row));
+        }
     }
     lines.join("\n")
 }

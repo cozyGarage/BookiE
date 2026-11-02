@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use aes_gcm::aead::{Aead, KeyInit, Payload, consts::U12};
 use aes_gcm::{Aes256Gcm, Nonce};
-use bookie_core::{ColumnInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, QueryResult, QueryRows, Value};
 use secrecy::{ExposeSecret, SecretBox};
 use serde::ser::{SerializeSeq, SerializeStruct, Serializer};
 use serde::{Deserialize, Serialize};
@@ -97,7 +97,7 @@ struct EncryptedPageWriter<'a> {
 }
 
 struct StoredPageRef<'a> {
-    rows: &'a [Vec<Value>],
+    rows: &'a QueryRows,
     truncated: bool,
 }
 
@@ -126,7 +126,7 @@ enum StoredValue {
     Undecodable(String),
 }
 
-struct StoredRowsRef<'a>(&'a [Vec<Value>]);
+struct StoredRowsRef<'a>(&'a QueryRows);
 
 struct StoredRowRef<'a>(&'a [Value]);
 
@@ -150,7 +150,7 @@ impl Serialize for StoredRowsRef<'_> {
         S: Serializer,
     {
         let mut rows = serializer.serialize_seq(Some(self.0.len()))?;
-        for row in self.0 {
+        for row in self.0.iter() {
             rows.serialize_element(&StoredRowRef(row))?;
         }
         rows.end()
@@ -207,7 +207,7 @@ impl StoredPage {
             .collect::<Result<Vec<Vec<Value>>, _>>()?;
         Ok(QueryResult {
             columns,
-            rows,
+            rows: rows.into(),
             truncated: self.truncated,
         })
     }

@@ -106,7 +106,7 @@ impl Session for CompletionColumnsSession {
     ) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -139,7 +139,7 @@ impl Session for DelayedClose {
     ) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -165,7 +165,7 @@ impl Session for CountedClose {
     ) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -200,7 +200,7 @@ impl Session for FailFirstCommit {
         }
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -228,7 +228,7 @@ impl Session for HealthSession {
         } else {
             Ok(QueryResult {
                 columns: Vec::new(),
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 truncated: false,
             })
         }
@@ -262,7 +262,7 @@ impl Session for DelayedRollback {
         let _ = self.finish_rollback.take().expect("rollback gate").await;
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }

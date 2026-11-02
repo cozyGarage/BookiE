@@ -244,7 +244,7 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
             2,
             "enum[] SQL replay with standard_conforming_strings={standard_conforming_strings}, backslash_quote={backslash_quote}"
         );
-        assert!(restored.rows.contains(&oracle.rows[0][1..].to_vec()));
+        assert!(restored.rows.contains(&oracle.rows[0][1..]));
         assert!(restored.rows.contains(&sibling.rows[0]));
         transaction.rollback().await.unwrap();
     }
@@ -666,7 +666,7 @@ async fn value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape()
         .await
         .unwrap();
     assert_eq!(restored.rows.len(), 6);
-    assert_eq!(&restored.rows[..5], native.rows.as_slice());
+    assert_eq!(restored.rows.iter().take(5).collect::<Vec<_>>(), native.rows.iter().collect::<Vec<_>>());
     assert_eq!(restored.rows[5][0], Value::Int(99));
     assert_eq!(restored.rows[5][3], Value::Text("[\"sibling\"]".into()));
     assert_eq!(restored.rows[5][4], sibling_wire);

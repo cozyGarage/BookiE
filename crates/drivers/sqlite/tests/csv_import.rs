@@ -156,7 +156,12 @@ async fn run_batches(
 }
 
 async fn rows_in(guard: &PolicyGuard, sql: &str) -> Vec<Vec<Value>> {
-    guard.query_controlled(sql, &control()).await.expect("query").rows
+    guard
+        .query_controlled(sql, &control())
+        .await
+        .expect("query")
+        .rows
+        .into_rows()
 }
 
 #[tokio::test]

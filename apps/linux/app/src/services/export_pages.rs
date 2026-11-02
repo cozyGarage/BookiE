@@ -65,7 +65,7 @@ fn page_future(
         if result.truncated {
             return Err(ExportError::Source("a page of rows exceeded the result limits".into()));
         }
-        Ok(result.rows)
+        Ok(result.rows.into_rows())
     }))
 }
 

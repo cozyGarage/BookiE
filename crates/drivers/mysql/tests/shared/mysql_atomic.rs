@@ -108,7 +108,7 @@ async fn mysql_transaction_queries_are_bounded_and_mark_truncation() {
     assert_eq!(result.rows.len(), bookie_core::MAX_QUERY_ROWS);
     assert!(result.truncated);
     assert_eq!(result.columns[0].name, "value");
-    assert!(result.rows.iter().all(|row| row == &[Value::Int(7)]));
+    assert!(result.rows.iter().all(|row| row == [Value::Int(7)]));
 }
 
 #[tokio::test]

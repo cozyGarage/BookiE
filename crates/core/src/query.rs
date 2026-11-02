@@ -3,6 +3,8 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::QueryRows;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableInfo {
     pub schema: Option<String>,
@@ -197,6 +199,30 @@ impl QueryResultBudget {
         Ok(self.admit(&row).then_some(row))
     }
 
+    pub fn decode_and_admit_row_into<E>(
+        &mut self,
+        cell_count: usize,
+        payload_bytes: usize,
+        row: &mut Vec<Value>,
+        decode: impl FnOnce(&mut Vec<Value>) -> Result<(), E>,
+    ) -> Result<bool, E> {
+        if !self.can_admit(cell_count, row_size_from_parts(cell_count, payload_bytes)) {
+            row.clear();
+            return Ok(false);
+        }
+        row.clear();
+        decode(row)?;
+        let row_bytes = row_size(row);
+        if !self.can_admit(row.len(), row_bytes) {
+            row.clear();
+            return Ok(false);
+        }
+        self.rows += 1;
+        self.cells += row.len();
+        self.bytes += row_bytes;
+        Ok(true)
+    }
+
     fn can_admit(&self, cells: usize, row_bytes: usize) -> bool {
         self.rows < MAX_QUERY_ROWS
             && self.cells.saturating_add(cells) <= MAX_QUERY_RESULT_CELLS
@@ -223,7 +249,7 @@ fn row_size(row: &[Value]) -> usize {
 fn row_size_from_parts(cells: usize, payload_bytes: usize) -> usize {
     cells
         .saturating_mul(std::mem::size_of::<Value>())
-        .saturating_add(std::mem::size_of::<Vec<Value>>())
+        .saturating_add(std::mem::size_of::<usize>())
         .saturating_add(payload_bytes)
 }
 
@@ -251,7 +277,7 @@ fn json_heap_size(value: &serde_json::Value) -> usize {
 #[derive(Debug, Clone)]
 pub struct QueryResult {
     pub columns: Vec<ColumnInfo>,
-    pub rows: Vec<Vec<Value>>,
+    pub rows: QueryRows,
     pub truncated: bool,
 }
 
@@ -283,7 +309,7 @@ impl QueryResultBatch {
     pub fn into_first(self) -> QueryResult {
         let first = self.result_sets.into_iter().next().unwrap_or(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: QueryRows::new(),
             truncated: self.truncated,
         });
         QueryResult {

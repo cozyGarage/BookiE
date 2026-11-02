@@ -298,7 +298,7 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
         csv_restored.rows.contains(&expected_utc.rows[0]),
         "CSV import produced {:?}, expected {:?}",
         csv_restored.rows,
-        expected_utc.rows[0]
+        &expected_utc.rows[0]
     );
 
     let xlsx_path = directory.path().join("timestamptz-array-non-utc.xlsx");
@@ -974,7 +974,7 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
     let mut refused_names = Vec::new();
     let mut blocked = Vec::new();
 
-    for row in catalog.rows {
+    for row in catalog.rows.into_rows() {
         let Value::Int(oid) = row[0] else {
             panic!("unexpected catalog OID: {:?}", row[0])
         };

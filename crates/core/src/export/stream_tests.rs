@@ -31,7 +31,7 @@ impl Write for Sink {
 fn render(format: ResultFormat, output: &mut dyn Write) -> Result<(), ExportError> {
     let data = QueryResult {
         columns: vec![column("id"), column("text")],
-        rows: vec![vec![Value::Int(i64::MAX), Value::Text("東京 & 'quote'\nnext".into())]],
+        rows: vec![vec![Value::Int(i64::MAX), Value::Text("東京 & 'quote'\nnext".into())]].into(),
         truncated: false,
     };
     let options = CsvOptions::default();
@@ -92,7 +92,7 @@ fn value_contract_streamed_csv_matches_renderer_with_and_without_header() {
         let expected = render_csv(&columns, &rows, &options);
         let data = QueryResult {
             columns: columns.clone(),
-            rows: rows.clone(),
+            rows: rows.clone().into(),
             truncated: false,
         };
         let export = ResultExport {

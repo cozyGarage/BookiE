@@ -1002,7 +1002,7 @@ mod row_identity_tests {
         let columns = [column("id", true), column("payload", false)];
         let result = std::sync::Arc::new(bookie_core::QueryResult {
             columns: columns.to_vec(),
-            rows: vec![vec![Value::Int(7), Value::Text("payload".into())]],
+            rows: vec![vec![Value::Int(7), Value::Text("payload".into())]].into(),
             truncated: false,
         });
         let row = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();

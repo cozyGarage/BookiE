@@ -214,7 +214,7 @@ async fn gui_read_only_guarded_transactions_deny_insert_update_and_delete() {
         .await
         .unwrap()
         .rows;
-    assert_eq!(rows, [[bookie_core::Value::Text("before".into())]]);
+    assert_eq!(rows, vec![vec![bookie_core::Value::Text("before".into())]]);
     assert_three_denied_mutations_are_audited(&service, id);
     service.close(id);
 }
@@ -259,7 +259,7 @@ async fn gui_local_write_records_successful_terminal_audit_outcome() {
         .await
         .unwrap()
         .rows;
-    assert_eq!(rows, [[bookie_core::Value::Text("saved".into())]]);
+    assert_eq!(rows, vec![vec![bookie_core::Value::Text("saved".into())]]);
     service.close(id);
 }
 

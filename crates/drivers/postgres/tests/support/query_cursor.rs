@@ -79,7 +79,7 @@ async fn query_cursor_returns_ordered_pages_and_an_empty_final_page() {
             columns = Some(page.result.columns.clone());
         }
         let row_count = page.result.rows.len();
-        rows.extend(page.result.rows);
+        rows.extend(page.result.rows.into_rows());
         if expected_has_next {
             assert_eq!(row_count, 5_000);
         } else {
