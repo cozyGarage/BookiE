@@ -45,6 +45,27 @@ async fn a_spooled_page_larger_than_one_encryption_chunk_round_trips() {
 }
 
 #[tokio::test]
+async fn spooled_json_preserves_arbitrary_precision_numbers() {
+    let manager = StreamResultSpoolManager::with_limit(1024 * 1024);
+    let spool = manager.create().unwrap();
+    let columns = vec![column("payload", "json")];
+    let json = serde_json::from_str::<serde_json::Value>(
+        r#"{"positive":18446744073709551617,"negative":-9223372036854775809,"decimal":0.1234567890123456789012345678901234}"#,
+    )
+    .unwrap();
+    let page = Arc::new(QueryResult {
+        columns: columns.clone(),
+        rows: vec![vec![Value::Json(Box::new(json.clone()))]].into(),
+        truncated: false,
+    });
+
+    spool.append_page(0, page).await.unwrap();
+    let loaded = spool.load_page(0, columns).await.unwrap();
+
+    assert_eq!(loaded.rows[0][0], Value::Json(Box::new(json)));
+}
+
+#[tokio::test]
 async fn an_empty_spooled_page_round_trips() {
     let manager = StreamResultSpoolManager::with_limit(1024 * 1024);
     let spool = manager.create().unwrap();
