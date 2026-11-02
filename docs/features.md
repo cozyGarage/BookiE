@@ -1,6 +1,6 @@
 # BookiE features on `linux`
 
-This page describes current behavior on the `linux` branch, including changes made after 0.2.2 was published. It does not certify that every listed feature is present in the [0.2.2 release assets](platforms.md#published-022-artifacts). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
+This page describes current behavior on the `linux` branch. Published artifact versions and package requirements are listed in [platforms](platforms.md). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
 
 ## Databases
 

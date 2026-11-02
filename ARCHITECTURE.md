@@ -368,7 +368,7 @@ Each engine exports a type implementing `bookie_core::DatabaseDriver`. Connect r
 | SQLite | SQLx | Local and GTK tests |
 | SQL Server | Tiberius | Driver + TLS fixtures; BookiE does not yet use the driver's `cancel_query` API; Kerberos optional |
 | ClickHouse | `clickhouse` | Driver + TLS fixtures |
-| Redis | `redis` | Experimental; single host/port in 0.2.0 |
+| Redis | `redis` | Experimental; one host and port. Sentinel and Cluster are unsupported. |
 | MongoDB | `mongodb` | Experimental |
 | DuckDB | DuckDB | Built in |
 
@@ -459,7 +459,7 @@ Workspace Clippy and unit checks include the DuckDB driver like every other crat
 | No embedded browser | Native GTK widgets only. |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
 | Redis topology | Single endpoint; unsupported topologies and release status are in [known limitations](docs/known-limitations.md#editing-and-connections). |
-| Packaging | Arch/Hyprland is the 0.2.0 desktop target. The release also includes a Debian package and a GNOME 50 Flatpak bundle; Debian/GNOME desktop acceptance and Flathub publication remain post-release backlog work. The bundle does not establish support on the current GNOME 51 toolkit floor. |
+| Packaging | GitHub releases provide Arch and Debian packages, a Flatpak bundle using GNOME 51, and an AppImage. Native package requirements are listed in [platforms](docs/platforms.md). |
 
 ## How to read this architecture map
 
