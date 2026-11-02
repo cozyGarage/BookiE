@@ -136,6 +136,7 @@ class CiCacheTests(unittest.TestCase):
         self.assertEqual(result, 0)
 
     def test_pressure_cleanup_evicts_old_bundles_but_preserves_current_and_unrelated_data(self):
+        target = self.target('current-build', 0.1)
         bundle_root = self.directory / 'bundles'
         bundle_root.mkdir()
         oldest = bundle_root / ('a' * 40 + '-default')
@@ -166,6 +167,7 @@ class CiCacheTests(unittest.TestCase):
         self.assertTrue(newest.exists())
         self.assertTrue(current.exists())
         self.assertTrue((unrelated / 'payload').is_file())
+        self.assertTrue((target / 'debug/deps/artifact').exists())
 
     def test_checkout_refuses_to_run_when_cleanup_cannot_restore_the_reserve(self):
         self.target('unit', 0)

@@ -119,9 +119,9 @@ def cleanup(root, reserve):
     if shutil.disk_usage(root).free < reserve:
         prune(root, now - 86400, reserve)
     if shutil.disk_usage(root).free < reserve:
-        prune(root, float('inf'), reserve, least_recent_first=True)
-    if shutil.disk_usage(root).free < reserve:
         prune_bundles(root, reserve, os.environ.get('GITHUB_SHA', ''))
+    if shutil.disk_usage(root).free < reserve:
+        prune(root, float('inf'), reserve, least_recent_first=True)
     after = shutil.disk_usage(root).free
     print(f'free after cleanup: {after} bytes; required reserve: {reserve} bytes', flush=True)
     if after < reserve:
