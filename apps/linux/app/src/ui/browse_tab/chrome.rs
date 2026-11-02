@@ -387,8 +387,14 @@ impl BrowseTab {
         let _ = sender.output(BrowseTabOutput::StateChanged);
     }
 
-    pub(super) fn filter_by_value(&self, column: &str, value: &bookie_core::Value, sender: &ComponentSender<Self>) {
-        match bookie_core::equality_rule(column, value) {
+    pub(super) fn filter_by_value(
+        &self,
+        column: &str,
+        value: &bookie_core::Value,
+        exclude: bool,
+        sender: &ComponentSender<Self>,
+    ) {
+        match bookie_core::cell_filter_rule(column, value, exclude) {
             Some(rule) => sender.input(BrowseTabInput::FilterApplied(self.current_filter.narrowed_to(rule))),
             None => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(

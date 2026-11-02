@@ -13,7 +13,7 @@ This page describes current behavior on the `linux` branch, including changes ma
 | ClickHouse | Stable | Mutations are awaited, so saved edits show up in the grid. |
 | MongoDB | Experimental | Collections, find and aggregate. An optional authentication database can be set. |
 | Redis | Experimental | One host and port. Sentinel and Cluster are not supported. |
-| DuckDB | Experimental | Only in builds made with `--features duckdb`. Not in the released packages. |
+| DuckDB | Experimental | Built in. |
 
 Drivers are linked at build time. There is no plugin system ([ADR 0001](decisions/0001-no-plugin-system.md)).
 

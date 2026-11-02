@@ -234,7 +234,6 @@ async fn mysql_value_query_refetches_the_exact_blob_for_a_composite_key() {
     assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_guarded_value_query_refetches_exact_blob() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -249,8 +248,8 @@ async fn value_contract_duckdb_guarded_value_query_refetches_exact_blob() {
     let control = crate::services::operation_control::bounded(30);
     let tenant = "tenant ' OR 1=1 --";
     let bytes: Vec<u8> = (0..9000).map(|index| (index % 256) as u8).collect();
-    seed_duckdb_value_preview(&*connection, &control, &tenant, &bytes).await;
-    assert_duckdb_value_preview_native(&*connection, &control, &tenant).await;
+    seed_duckdb_value_preview(&*connection, &control, tenant, &bytes).await;
+    assert_duckdb_value_preview_native(&*connection, &control, tenant).await;
     let columns = connection
         .fetch_columns_controlled(None, "value_preview_records", &control)
         .await
@@ -272,7 +271,6 @@ async fn value_contract_duckdb_guarded_value_query_refetches_exact_blob() {
     assert_eq!(guarded.rows, vec![vec![Value::Bytes(bytes)]]);
 }
 
-#[cfg(feature = "duckdb")]
 async fn seed_duckdb_value_preview(
     connection: &dyn bookie_core::Connection,
     control: &bookie_core::OperationControl,
@@ -303,7 +301,6 @@ async fn seed_duckdb_value_preview(
         .unwrap();
 }
 
-#[cfg(feature = "duckdb")]
 async fn assert_duckdb_value_preview_native(
     connection: &dyn bookie_core::Connection,
     control: &bookie_core::OperationControl,
