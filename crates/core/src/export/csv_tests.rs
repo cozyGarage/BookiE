@@ -80,6 +80,144 @@ fn sqlite_any_csv_render_and_column_aware_row_writer_use_type_tags() {
 }
 
 #[test]
+fn paged_csv_writer_preserves_cell_and_formatting_contracts() {
+    let mut any = column("any");
+    any.data_type = "ANY".into();
+    let mut amount = column("amount");
+    amount.data_type = "DECIMAL(8,2)".into();
+    let mut payload = column("payload");
+    payload.data_type = "BYTEA".into();
+    let columns = vec![
+        column("id"),
+        column("formula"),
+        column("nullable"),
+        column("empty"),
+        amount,
+        payload,
+        column("json"),
+        any,
+    ];
+    let rows = vec![vec![
+        Value::Int(42),
+        Value::Text("=SUM(A1)\r\nnext".into()),
+        Value::Null,
+        Value::Text(String::new()),
+        Value::Decimal("12.30".parse().unwrap()),
+        Value::Bytes(vec![0, 255]),
+        Value::Json(Box::new(serde_json::json!({"ok": true}))),
+        Value::Int(7),
+    ]];
+    let options = CsvOptions {
+        null_to_empty: false,
+        null_marker: Some("\\N".into()),
+        line_break_to_space: true,
+        preserve_sqlite_result_types: true,
+        delimiter: CsvDelimiter::Semicolon,
+        line_break: CsvLineBreak::CrLf,
+        decimal: CsvDecimal::Comma,
+        ..CsvOptions::default()
+    };
+    let export = crate::export::ResultExport {
+        format: crate::export::ResultFormat::Csv,
+        csv: &options,
+        sql: None,
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("result.csv");
+    let mut pending = Some(rows);
+
+    crate::export::write_paged_file(&path, &columns, 1, &export, || Ok(pending.take()), || false, |_| {}).unwrap();
+
+    assert_eq!(
+        std::fs::read(path).unwrap(),
+        concat!(
+            "id;formula;nullable;empty;amount;payload;json;any\r\n",
+            "42;\"'=SUM(A1) next\";\\N;\"\";12,30;\\x00ff;\"{\"\"ok\"\":true}\";",
+            "bookie:sqlite-any:v1:integer:7\r\n",
+        )
+        .as_bytes()
+    );
+}
+
+#[test]
+fn paged_csv_writer_matches_rendered_bytes_across_quote_delimiter_and_line_break_modes() {
+    let mut byte_column = column("bytes");
+    byte_column.data_type = "BLOB".into();
+    let mut any_column = column("any");
+    any_column.data_type = "ANY".into();
+    let columns = vec![
+        column("null"),
+        column("empty"),
+        column("formula"),
+        column("line"),
+        column("decimal"),
+        byte_column,
+        column("json"),
+        column("json_text"),
+        any_column,
+        column("plain"),
+    ];
+    let rows = vec![vec![
+        Value::Null,
+        Value::Text(String::new()),
+        Value::Text("=1.20".into()),
+        Value::Text("\r\n=1.20".into()),
+        Value::Text("-12.30".into()),
+        Value::Bytes(vec![0, 9, 10, 13, 255]),
+        Value::Json(Box::new(serde_json::json!({"x": "a,b"}))),
+        Value::JsonText("12.30".into()),
+        Value::Int(7),
+        Value::Text("a,b|c;d\te".into()),
+    ]];
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("result.csv");
+
+    for quote in CsvQuote::ALL {
+        for delimiter in CsvDelimiter::ALL {
+            for line_break in CsvLineBreak::ALL {
+                for spare_plain_numbers in [false, true] {
+                    let options = CsvOptions {
+                        null_to_empty: false,
+                        null_marker: Some("=null\r\n,marker".into()),
+                        line_break_to_space: true,
+                        preserve_sqlite_result_types: true,
+                        spare_plain_numbers,
+                        quote,
+                        delimiter,
+                        line_break,
+                        decimal: CsvDecimal::Comma,
+                        ..CsvOptions::default()
+                    };
+                    let expected = render_csv(&columns, &rows, &options);
+                    let export = crate::export::ResultExport {
+                        format: crate::export::ResultFormat::Csv,
+                        csv: &options,
+                        sql: None,
+                    };
+                    let mut pending = Some(rows.clone());
+                    crate::export::write_paged_file(
+                        &path,
+                        &columns,
+                        rows.len(),
+                        &export,
+                        || Ok(pending.take()),
+                        || false,
+                        |_| {},
+                    )
+                    .unwrap();
+
+                    assert_eq!(
+                        std::fs::read(&path).unwrap(),
+                        expected.as_bytes(),
+                        "{quote:?} {delimiter:?} {line_break:?} {spare_plain_numbers}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn sqlite_result_type_tags_are_opt_in_for_fallback_metadata() {
     let columns = [ColumnInfo {
         data_type: "NULL".into(),
