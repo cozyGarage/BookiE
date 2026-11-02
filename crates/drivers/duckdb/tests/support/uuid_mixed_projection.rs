@@ -20,7 +20,7 @@ async fn value_contract_query_preserves_uuid_kinds_in_mixed_multirow_projection(
             .iter()
             .map(|column| column.data_type.as_str())
             .collect::<Vec<_>>(),
-        vec!["Utf8", "UUID", "UUID", "Utf8"]
+        vec!["VARCHAR", "UUID", "UUID", "VARCHAR"]
     );
     assert_eq!(
         result.rows,

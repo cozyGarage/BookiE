@@ -91,8 +91,13 @@ jobs:
         shell: bash
     env:
       CARGO_HOME: /cargo
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       BOOKIE_TOOL_DIR: /tools
@@ -106,6 +111,7 @@ jobs:
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -135,6 +141,10 @@ jobs:
       - name: Clean builder scratch
         if: always()
         run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
           rm -rf -- "$TMPDIR"
           if [[ -f src/scripts/ci-cache.py ]]; then
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
@@ -157,11 +167,16 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
     steps:
       - name: Check out
@@ -172,6 +187,7 @@ jobs:
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -188,6 +204,10 @@ jobs:
       - name: Clean builder scratch
         if: always()
         run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
           rm -rf -- "$TMPDIR"
           if [[ -f src/scripts/ci-cache.py ]]; then
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
@@ -216,8 +236,13 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
       - name: Check out
@@ -228,6 +253,7 @@ jobs:
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -250,6 +276,10 @@ jobs:
       - name: Clean builder scratch
         if: always()
         run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
           rm -rf -- "$TMPDIR"
           if [[ -f src/scripts/ci-cache.py ]]; then
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
@@ -401,8 +431,13 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Check out
         shell: bash
@@ -412,6 +447,7 @@ jobs:
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -444,6 +480,10 @@ jobs:
       - name: Clean builder scratch
         if: always()
         run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
           rm -rf -- "$TMPDIR"
           if [[ -f src/scripts/ci-cache.py ]]; then
             python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
@@ -630,7 +670,7 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
       - name: Pre-pull fixture images
-        if: matrix.driver != 'duckdb'
+        if: ${{ matrix.driver != 'duckdb' }}
         run: bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"
       - name: Driver integration
         run: |

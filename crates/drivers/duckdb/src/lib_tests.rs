@@ -218,6 +218,24 @@ async fn connect_existing_and_list_tables() {
     let rows = conn.fetch_rows(None, "foo", 0, 10).await.unwrap();
     assert_eq!(rows.rows.len(), 2);
 }
+
+#[tokio::test]
+async fn lists_tables_and_views_separately() {
+    let driver = DuckdbDriver;
+    let conn = driver.connect(ConnectOptions::default()).await.unwrap();
+    conn.execute("CREATE TABLE t (id INTEGER)").await.unwrap();
+    conn.execute("CREATE VIEW v AS SELECT id FROM t").await.unwrap();
+    let tables = conn.list_tables().await.unwrap();
+    let views = conn.list_views().await.unwrap();
+    assert_eq!(
+        tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
+        ["t"]
+    );
+    assert_eq!(
+        views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
+        ["v"]
+    );
+}
 #[tokio::test]
 async fn columns_are_read_for_a_table_whose_name_needs_quoting() {
     let driver = DuckdbDriver;

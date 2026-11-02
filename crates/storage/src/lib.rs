@@ -39,7 +39,7 @@ pub use favorites::{
     SavedQuery, delete_favorite, load_favorites, matches_filter, rank_favorites, save_favorite, touch_favorite,
 };
 pub use legacy_state::migrate_legacy_state;
-pub use paths::{config_path, data_path, secret_schema, storage_dir_name};
+pub use paths::{config_path, connections_config_path, data_path, secret_schema, storage_dir_name};
 pub use secrets::{
     SshHopSecretKind, delete_mcp_token, delete_password, delete_ssh_hop_passphrase, delete_ssh_hop_password,
     delete_ssh_passphrase, delete_ssh_password, load_mcp_token, load_password, load_ssh_hop_passphrase,
