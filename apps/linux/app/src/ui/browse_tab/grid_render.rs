@@ -381,7 +381,7 @@ impl BrowseTab {
                 tracing::error!(%error, "projected browse refresh does not match the table schema");
                 store.replace_shared(std::sync::Arc::new(QueryResult {
                     columns: self.current_columns.clone(),
-                    rows: Vec::new(),
+                    rows: Vec::new().into(),
                     truncated: false,
                 }));
                 return false;

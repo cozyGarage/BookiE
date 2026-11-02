@@ -966,8 +966,7 @@ async fn sqlite_hex_any_csv_round_trip_keeps_hex_results_as_text() {
         .unwrap();
     assert_eq!(
         restored.rows,
-        result.rows[0..]
-            .iter()
+        result.rows.iter()
             .map(|row| vec![Value::Text("text".into()), row[1].clone()])
             .collect::<Vec<_>>()
     );

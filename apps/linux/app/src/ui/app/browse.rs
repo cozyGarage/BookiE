@@ -568,7 +568,7 @@ impl App {
         };
         let result = QueryResult {
             columns: request.columns,
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         };
         let fetcher = crate::ui::editor::query_cursor_export_factory(connection, request.query.clone());
@@ -635,7 +635,7 @@ impl App {
         };
         let columns_only = QueryResult {
             columns: plan.columns.clone(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         };
         crate::ui::export_dialog::present_with_format(
@@ -771,10 +771,13 @@ fn single_cell_value(result: QueryResult) -> Result<bookie_core::Value, String> 
     if result.columns.len() != 1 || result.truncated {
         return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
     }
-    let [row] = result.rows.as_slice() else {
+    let Some(row) = result.rows.first() else {
         return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
     };
-    let [value] = row.as_slice() else {
+    if result.rows.len() != 1 {
+        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+    }
+    let [value] = row else {
         return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
     };
     Ok(value.clone())
@@ -865,7 +868,7 @@ mod tests {
     fn scalar_result(row: Option<Value>) -> QueryResult {
         QueryResult {
             columns: Vec::new(),
-            rows: row.map(|v| vec![vec![v]]).unwrap_or_default(),
+            rows: row.map(|v| vec![vec![v]]).unwrap_or_default().into(),
             truncated: false,
         }
     }
@@ -902,7 +905,7 @@ mod tests {
     fn value_refetch_accepts_only_one_complete_cell() {
         let complete = QueryResult {
             columns: vec![column()],
-            rows: vec![vec![Value::Bytes(vec![0, 255])]],
+            rows: vec![vec![Value::Bytes(vec![0, 255])]].into(),
             truncated: false,
         };
         assert_eq!(single_cell_value(complete), Ok(Value::Bytes(vec![0, 255])));
@@ -910,22 +913,22 @@ mod tests {
         for result in [
             QueryResult {
                 columns: vec![column()],
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 truncated: false,
             },
             QueryResult {
                 columns: vec![column()],
-                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]].into(),
                 truncated: false,
             },
             QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![Value::Int(1)]],
+                rows: vec![vec![Value::Int(1)]].into(),
                 truncated: false,
             },
             QueryResult {
                 columns: vec![column()],
-                rows: vec![vec![Value::Int(1)]],
+                rows: vec![vec![Value::Int(1)]].into(),
                 truncated: true,
             },
         ] {

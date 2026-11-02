@@ -63,7 +63,7 @@ async fn value_contract_enum_range_observes_added_label_order_in_same_session() 
         .unwrap();
     assert_eq!(
         catalog.rows,
-        ["queued", "working", "complete"].map(|label| vec![Value::Text(label.into())])
+        vec![vec![Value::Text("queued".into())], vec![Value::Text("working".into())], vec![Value::Text("complete".into())]]
     );
 
     let result = session
@@ -243,7 +243,7 @@ async fn value_contract_enum_range_observes_renamed_label_in_same_session() {
         .unwrap();
     assert_eq!(
         catalog.rows,
-        ["queued", "in_progress", "complete"].map(|label| vec![Value::Text(label.into())])
+        vec![vec![Value::Text("queued".into())], vec![Value::Text("in_progress".into())], vec![Value::Text("complete".into())]]
     );
 
     let result = session.query_params_controlled(query, &[], &control).await.unwrap();

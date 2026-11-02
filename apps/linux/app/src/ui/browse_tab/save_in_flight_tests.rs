@@ -662,7 +662,7 @@ pub(super) fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed:
             request,
             result: QueryResult {
                 columns,
-                rows,
+                rows: rows.into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -707,7 +707,7 @@ fn load_keyless_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiv
             request,
             result: QueryResult {
                 columns,
-                rows: vec![vec![Value::Text("original".into())]],
+                rows: vec![vec![Value::Text("original".into())]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -737,7 +737,7 @@ fn load_generated_column_row(controller: &relm4::Controller<BrowseTab>, observed
             request,
             result: QueryResult {
                 columns,
-                rows: vec![vec![Value::Int(1), Value::Text("database value".into())]],
+                rows: vec![vec![Value::Int(1), Value::Text("database value".into())]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -767,7 +767,7 @@ fn load_undecodable_cell_row(controller: &relm4::Controller<BrowseTab>, observed
             request,
             result: QueryResult {
                 columns,
-                rows: vec![vec![Value::Int(1), Value::Undecodable("NUMERIC".into())]],
+                rows: vec![vec![Value::Int(1), Value::Undecodable("NUMERIC".into())]].into(),
                 truncated: false,
             },
             projected_columns: None,

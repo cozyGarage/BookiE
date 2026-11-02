@@ -280,7 +280,7 @@ fn boolean_affinity_mismatch_cannot_emit_an_edit() {
     let columns = vec![col("BOOLEAN", false)];
     let result = bookie_core::QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Bool(false)]],
+        rows: vec![vec![Value::Bool(false)]].into(),
         truncated: false,
     };
     let (sender, receiver) = relm4::channel::<GridMsg>();
@@ -359,7 +359,7 @@ fn mysql_bit_one_grid_shows_numeric_values_and_emits_boolean_edits() {
     let columns = vec![col("bit(1)", false)];
     let result = bookie_core::QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Int(0)]],
+        rows: vec![vec![Value::Int(0)]].into(),
         truncated: false,
     };
     let (sender, receiver) = relm4::channel::<GridMsg>();
@@ -420,7 +420,8 @@ fn bind_does_not_open_binary_bytes_in_a_text_column_for_editing() {
             vec![Value::Text("hello".into())],
             vec![Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01])],
             vec![Value::Bytes(b"utf8 blob".to_vec())],
-        ],
+        ]
+        .into(),
         truncated: false,
     };
     let (sender, _receiver) = relm4::channel::<GridMsg>();
@@ -546,7 +547,7 @@ fn mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits() {
     ];
     let result = bookie_core::QueryResult {
         columns: columns.clone(),
-        rows: vec![values.to_vec()],
+        rows: vec![values.to_vec()].into(),
         truncated: false,
     };
     let (sender, receiver) = relm4::channel::<GridMsg>();
@@ -596,7 +597,7 @@ fn entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value() {
     let long = "a".repeat(50_000);
     let result = bookie_core::QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Text(long.clone())]],
+        rows: vec![vec![Value::Text(long.clone())]].into(),
         truncated: false,
     };
     let (sender, _receiver) = relm4::channel::<GridMsg>();
@@ -639,7 +640,7 @@ fn editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null() {
     let columns = vec![col("TEXT", false), col("TEXT", false)];
     let result = bookie_core::QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Text("<NULL>".into()), Value::Null]],
+        rows: vec![vec![Value::Text("<NULL>".into()), Value::Null]].into(),
         truncated: false,
     };
     let (sender, _receiver) = relm4::channel::<GridMsg>();

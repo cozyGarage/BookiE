@@ -17,6 +17,7 @@ mod operation;
 mod pagination;
 mod params;
 mod query;
+mod query_rows;
 mod registry;
 mod session;
 pub mod sql_credentials;
@@ -62,6 +63,7 @@ pub use query::{
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,
     QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, parse_partial, partial_value,
 };
+pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};

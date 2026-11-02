@@ -12,6 +12,7 @@ async fn mask_function(connection: &dyn Connection) -> Vec<Vec<Value>> {
         .await
         .unwrap()
         .rows
+        .into_rows()
 }
 
 #[tokio::test]

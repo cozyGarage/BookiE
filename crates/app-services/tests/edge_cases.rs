@@ -33,7 +33,7 @@ async fn a_spooled_page_larger_than_one_encryption_chunk_round_trips() {
     let big = "x".repeat(200_000);
     let page = Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Text(big.clone())], vec![Value::Text("é".repeat(70_000))]],
+        rows: vec![vec![Value::Text(big.clone())], vec![Value::Text("é".repeat(70_000))]].into(),
         truncated: false,
     });
 
@@ -51,7 +51,7 @@ async fn an_empty_spooled_page_round_trips() {
     let columns = vec![column("a", "int")];
     let page = Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: true,
     });
 
@@ -69,7 +69,7 @@ async fn a_page_appended_out_of_order_is_refused_and_the_spool_stays_usable() {
     let columns = vec![column("a", "int")];
     let page = Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Int(1)]],
+        rows: vec![vec![Value::Int(1)]].into(),
         truncated: false,
     });
 

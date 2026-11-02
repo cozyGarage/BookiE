@@ -47,9 +47,13 @@ async fn assert_failed_batch_keeps_user_variable_side_effect(connection: Box<dyn
     let mut kept = 0;
     for result in [first, second, third, fourth] {
         let result = result.unwrap();
-        let [row] = result.rows.as_slice() else {
-            panic!("expected one session-state row, got {:?}", result.rows);
-        };
+        assert_eq!(
+            result.rows.len(),
+            1,
+            "expected one session-state row, got {:?}",
+            result.rows
+        );
+        let row = &result.rows[0];
         assert!(matches!(row[0], Value::Int(_)), "got {:?}", row[0]);
         if row[1] != Value::Null {
             assert_eq!(row[0], row[1], "a session holds only its own connection ID");

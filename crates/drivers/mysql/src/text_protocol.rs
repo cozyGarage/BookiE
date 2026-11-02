@@ -1,4 +1,6 @@
-use bookie_core::{ColumnInfo, DriverError, MAX_QUERY_ROWS, QueryResult, QueryResultBatch, QueryResultBudget};
+use bookie_core::{
+    ColumnInfo, DriverError, MAX_QUERY_ROWS, QueryResult, QueryResultBatch, QueryResultBudget, QueryRows,
+};
 use futures::TryStreamExt;
 use sqlparser::ast::Statement as SqlStatement;
 use sqlparser::dialect::MySqlDialect;
@@ -23,6 +25,7 @@ pub(crate) async fn text_protocol(
     let mut budget = QueryResultBudget::default();
     let mut retained_rows = 0usize;
     let mut truncated = false;
+    let mut decoded = Vec::new();
     while let Some(item) = stream.try_next().await.map_err(crate::map_sqlx_error)? {
         match item {
             Either::Right(row) => collect_row(
@@ -32,6 +35,7 @@ pub(crate) async fn text_protocol(
                 &mut budget,
                 &mut retained_rows,
                 &mut truncated,
+                &mut decoded,
             )?,
             Either::Left(_) => finish_result_set(&mut current, &mut result_sets, &mut truncated),
         }
@@ -47,6 +51,7 @@ fn collect_row(
     budget: &mut QueryResultBudget,
     retained_rows: &mut usize,
     truncated: &mut bool,
+    decoded: &mut Vec<bookie_core::Value>,
 ) -> Result<(), DriverError> {
     if current.is_none() && result_sets.len() >= MAX_MYSQL_RESULT_SETS {
         mark_truncated(current, truncated);
@@ -55,7 +60,7 @@ fn collect_row(
     if current.is_none() {
         *current = Some(QueryResult {
             columns: statement_columns(row.columns()),
-            rows: Vec::new(),
+            rows: QueryRows::new(),
             truncated: false,
         });
     }
@@ -63,15 +68,15 @@ fn collect_row(
         mark_truncated(current, truncated);
         return Ok(());
     }
-    let Some(values) = budget.decode_and_admit_row(row.len(), mysql_row_payload_bytes(&row), || {
-        Ok::<_, DriverError>((0..row.len()).map(|index| extract_value(&row, index)).collect())
-    })?
-    else {
+    if !budget.decode_and_admit_row_into(row.len(), mysql_row_payload_bytes(&row), decoded, |values| {
+        values.extend((0..row.len()).map(|index| extract_value(&row, index)));
+        Ok(())
+    })? {
         mark_truncated(current, truncated);
         return Ok(());
-    };
+    }
     if let Some(result_set) = current {
-        result_set.rows.push(values);
+        result_set.rows.push_row(decoded);
         *retained_rows += 1;
     }
     Ok(())

@@ -26,7 +26,8 @@ use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
     InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
-    QueryResultBudget, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    QueryResultBudget, QueryRows, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
+    run_server_cancellable,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -702,7 +703,8 @@ async fn params_into_result(
     let mut columns = statement_columns(statement.columns());
     let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
-    let mut rows = Vec::with_capacity(limit.min(1024));
+    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -714,14 +716,14 @@ async fn params_into_result(
         if columns.is_empty() {
             columns = statement_columns(row.columns());
         }
-        let Some(values) = budget.decode_and_admit_row(row.len(), mysql_row_payload_bytes(&row), || {
-            Ok::<_, DriverError>((0..columns.len()).map(|index| extract_value(&row, index)).collect())
-        })?
-        else {
+        if !budget.decode_and_admit_row_into(row.len(), mysql_row_payload_bytes(&row), &mut decoded, |values| {
+            values.extend((0..columns.len()).map(|index| extract_value(&row, index)));
+            Ok(())
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(values);
+        }
+        rows.push_row(&mut decoded);
     }
     Ok(QueryResult {
         columns,

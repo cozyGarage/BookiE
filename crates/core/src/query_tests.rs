@@ -1,6 +1,6 @@
 use super::{
     ColumnInfo, MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult,
-    QueryResultBatch, QueryResultBudget, Value,
+    QueryResultBatch, QueryResultBudget, QueryRows, Value,
 };
 
 #[test]
@@ -37,12 +37,12 @@ fn result_cells_stay_within_four_machine_words() {
 fn result_budget_counts_json_document_storage() {
     let scalar = QueryResult {
         columns: Vec::new(),
-        rows: vec![vec![Value::Int(1)]],
+        rows: vec![vec![Value::Int(1)]].into(),
         truncated: false,
     };
     let json = QueryResult {
         columns: Vec::new(),
-        rows: vec![vec![Value::Json(serde_json::Value::Bool(true).into())]],
+        rows: vec![vec![Value::Json(serde_json::Value::Bool(true).into())]].into(),
         truncated: false,
     };
 
@@ -80,6 +80,60 @@ fn result_budget_tracks_decoded_row_bytes_after_preflight() {
         .unwrap();
 
     assert_eq!(row, Some(vec![Value::Text("x".into())]));
+}
+
+#[test]
+fn result_budget_into_reuses_the_scratch_row_and_preserves_typed_values() {
+    let mut budget = QueryResultBudget::default();
+    let mut row = Vec::with_capacity(4);
+    row.push(Value::Text("discarded".into()));
+    let capacity = row.capacity();
+    let bytes = Value::Bytes(vec![0, 255]);
+    let json = Value::Json(Box::new(serde_json::json!({"number": "1.2300"})));
+
+    assert!(
+        budget
+            .decode_and_admit_row_into(3, 0, &mut row, |values| {
+                values.extend([Value::Int(i64::MIN), bytes.clone(), json.clone()]);
+                Ok::<_, ()>(())
+            })
+            .unwrap()
+    );
+    assert_eq!(row, [Value::Int(i64::MIN), bytes.clone(), json.clone()]);
+    assert_eq!(row.capacity(), capacity);
+
+    assert!(
+        budget
+            .decode_and_admit_row_into(1, 0, &mut row, |values| {
+                values.push(Value::Undecodable("numeric".into()));
+                Ok::<_, ()>(())
+            })
+            .unwrap()
+    );
+    assert_eq!(row, [Value::Undecodable("numeric".into())]);
+    assert_eq!(budget.rows, 2);
+    assert_eq!(budget.cells, 4);
+}
+
+#[test]
+fn result_budget_into_clears_refused_rows_without_changing_counts() {
+    let mut budget = QueryResultBudget {
+        bytes: MAX_QUERY_RESULT_BYTES - 128,
+        ..QueryResultBudget::default()
+    };
+    let mut row = Vec::new();
+    let admitted = budget
+        .decode_and_admit_row_into(1, 1, &mut row, |values| {
+            values.push(Value::Text(String::with_capacity(256)));
+            Ok::<_, ()>(())
+        })
+        .unwrap();
+
+    assert!(!admitted);
+    assert!(row.is_empty());
+    assert_eq!(budget.rows, 0);
+    assert_eq!(budget.cells, 0);
+    assert_eq!(budget.bytes, MAX_QUERY_RESULT_BYTES - 128);
 }
 
 #[test]
@@ -147,7 +201,7 @@ fn first_result_keeps_truncation_from_either_batch_or_result_set() {
         let batch = QueryResultBatch {
             result_sets: vec![QueryResult {
                 columns: Vec::new(),
-                rows: Vec::new(),
+                rows: QueryRows::new(),
                 truncated: result_truncated,
             }],
             truncated: batch_truncated,
@@ -229,12 +283,12 @@ fn result_row_estimate_counts_owned_capacity_and_row_containers() {
     let capacity = text.capacity();
     let result = QueryResult {
         columns: Vec::new(),
-        rows: vec![vec![Value::Text(text)], vec![]],
+        rows: vec![vec![Value::Text(text)], vec![]].into(),
         truncated: false,
     };
     assert_eq!(
         result.estimated_row_bytes(),
-        capacity + std::mem::size_of::<Value>() + 2 * std::mem::size_of::<Vec<Value>>()
+        capacity + std::mem::size_of::<Value>() + 2 * std::mem::size_of::<usize>()
     );
 }
 
@@ -246,7 +300,7 @@ fn row_size_counts_container_and_owned_value_storage() {
 
     assert_eq!(
         super::row_size(&row),
-        std::mem::size_of::<Value>() + std::mem::size_of::<Vec<Value>>() + text_capacity
+        std::mem::size_of::<Value>() + std::mem::size_of::<usize>() + text_capacity
     );
 }
 
@@ -256,12 +310,12 @@ fn retained_rows_sums_all_result_sets() {
         result_sets: vec![
             QueryResult {
                 columns: Vec::new(),
-                rows: vec![Vec::new(), Vec::new()],
+                rows: vec![Vec::new(), Vec::new()].into(),
                 truncated: false,
             },
             QueryResult {
                 columns: Vec::new(),
-                rows: vec![Vec::new()],
+                rows: vec![Vec::new()].into(),
                 truncated: false,
             },
         ],

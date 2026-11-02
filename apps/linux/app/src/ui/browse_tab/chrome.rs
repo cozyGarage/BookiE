@@ -643,7 +643,8 @@ mod tests {
             rows: vec![
                 vec![Value::Int(7), Value::Text("Ada".into())],
                 vec![Value::Int(8), Value::Text("Bea".into())],
-            ],
+            ]
+            .into(),
             truncated: false,
         };
         assert_eq!(
@@ -686,7 +687,7 @@ mod tests {
     fn page(rows: usize, truncated: bool) -> QueryResult {
         QueryResult {
             columns: vec![column("payload", false)],
-            rows: vec![vec![Value::Text("large".into())]; rows],
+            rows: vec![vec![Value::Text("large".into())]; rows].into(),
             truncated,
         }
     }

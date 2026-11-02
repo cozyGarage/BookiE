@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn subset_sort_refuses_a_row_missing_the_column_outside_the_subset() {
         let mut result = result(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
-        result.rows[2].clear();
+        result.rows.truncate_row(2, 0);
 
         assert_eq!(
             sorted_source_indices_for_subset(&result, 0, true, vec![0, 1]),
@@ -403,7 +403,8 @@ mod duplicate_name_tests {
                 vec![Value::Int(1), Value::Int(30)],
                 vec![Value::Int(2), Value::Int(10)],
                 vec![Value::Int(3), Value::Int(20)],
-            ],
+            ]
+            .into(),
             truncated: false,
         };
         assert_eq!(sorted_source_indices(&result, 1, true), Some(vec![1, 2, 0]));

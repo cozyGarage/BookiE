@@ -795,7 +795,7 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         .unwrap();
     assert_eq!(restored.rows.len(), 2);
     assert!(restored.rows.contains(&sibling.rows[0]));
-    assert!(restored.rows.contains(&vec![
+    assert!(restored.rows.contains(&[
         oracle.rows[0][1].clone(),
         oracle.rows[0][2].clone(),
         oracle.rows[0][3].clone(),
@@ -849,7 +849,7 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         .unwrap();
     assert_eq!(restored.rows.len(), 2);
     assert!(restored.rows.contains(&sibling.rows[0]));
-    assert!(restored.rows.contains(&vec![
+    assert!(restored.rows.contains(&[
         oracle.rows[0][1].clone(),
         oracle.rows[0][2].clone(),
         oracle.rows[0][3].clone(),
@@ -1170,7 +1170,7 @@ async fn value_contract_integer_arrays_file_exports_preserve_bounds_for_calc_rei
     let (Value::Text(smallint_text), Value::Text(integer_text)) =
         (&result.rows[0][0], &result.rows[0][1])
     else {
-        panic!("integer array results must remain text: {:?}", result.rows[0]);
+        panic!("integer array results must remain text: {:?}", &result.rows[0]);
     };
     for cell in ["A2", "B2"] {
         assert!(sheet.contains(&format!("<c r=\"{cell}\" t=\"s\">")), "{sheet}");

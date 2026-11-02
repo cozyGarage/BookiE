@@ -108,7 +108,7 @@ impl Connection for ControlledConnection {
     async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -121,7 +121,7 @@ impl Connection for ControlledConnection {
         check_pre_dispatch(control)?;
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: vec![vec![Value::Int(3)]],
+            rows: vec![vec![Value::Int(3)]].into(),
             truncated: false,
         })
     }
@@ -193,7 +193,7 @@ impl Transaction for ControlledTransaction {
     async fn query(&mut self, _: &str) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }

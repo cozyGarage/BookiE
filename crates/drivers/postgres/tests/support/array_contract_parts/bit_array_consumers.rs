@@ -100,7 +100,7 @@ async fn value_contract_bit_arrays_roundtrip_wire_and_csv() {
         &import_options,
     )
     .expect("BIT and VARBIT arrays should have safe native CSV casts");
-    assert_eq!(plan.rows, source.rows);
+    assert_eq!(source.rows, plan.rows);
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }

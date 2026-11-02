@@ -15,8 +15,7 @@ async fn value_contract_rust_decimal_capacity_edges_round_trip_through_duckdb() 
             .await
             .unwrap();
         assert!(
-            bound.rows.len() == 1
-                && matches!(bound.rows[0].as_slice(), [Value::Decimal(actual)] if actual.to_string() == text),
+            bound.rows.len() == 1 && matches!(&bound.rows[0], [Value::Decimal(actual)] if actual.to_string() == text),
             "bound value changed: {text}"
         );
 
@@ -24,7 +23,7 @@ async fn value_contract_rust_decimal_capacity_edges_round_trip_through_duckdb() 
         let restored = connection.query(&format!("SELECT {literal}")).await.unwrap();
         assert!(
             restored.rows.len() == 1
-                && matches!(restored.rows[0].as_slice(), [Value::Decimal(actual)] if actual.to_string() == text),
+                && matches!(&restored.rows[0], [Value::Decimal(actual)] if actual.to_string() == text),
             "SQL literal value changed: {text}: {:?}",
             restored.rows
         );

@@ -150,7 +150,7 @@ fn a_long_cell_remains_searchable_beyond_its_visible_preview() {
     assert!(!crate::ui::grid::display::value_to_display_text(&Value::Text(text.clone())).contains("needle"));
     let result = std::sync::Arc::new(bookie_core::QueryResult {
         columns: Vec::new(),
-        rows: vec![vec![Value::Int(1), Value::Text(text)]],
+        rows: vec![vec![Value::Int(1), Value::Text(text)]].into(),
         truncated: false,
     });
     let store = crate::ui::row_store::RowStore::from_shared_with_previews(result, vec![0]);
@@ -197,7 +197,7 @@ fn large_shared_value_search_has_bounded_temporary_memory() {
         };
         let result = std::sync::Arc::new(bookie_core::QueryResult {
             columns: Vec::new(),
-            rows: vec![vec![value]],
+            rows: vec![vec![value]].into(),
             truncated: false,
         });
         let store = crate::ui::row_store::RowStore::from_shared(result);

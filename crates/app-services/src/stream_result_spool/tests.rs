@@ -48,7 +48,7 @@ fn result(values: Vec<Value>) -> Arc<QueryResult> {
         .collect();
     Arc::new(QueryResult {
         columns,
-        rows: vec![values],
+        rows: vec![values].into(),
         truncated: false,
     })
 }
@@ -100,7 +100,7 @@ async fn round_trips_every_typed_value_without_changing_float_bits() {
     let manager = StreamResultSpoolManager::with_limit(1024 * 1024);
     let spool = manager.create().expect("spool");
     let page = result(typed_values());
-    let expected = page.rows[0].clone();
+    let expected = page.rows[0].to_vec();
     let columns = page.columns.clone();
 
     spool.append_page(0, page).await.expect("append");

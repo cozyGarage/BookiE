@@ -278,7 +278,7 @@ fn spin_until(mut condition: impl FnMut() -> bool) {
 fn success() -> Result<QueryResultBatch, DriverError> {
     Ok(QueryResultBatch::single(QueryResult {
         columns: Vec::new(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     }))
 }
@@ -626,7 +626,7 @@ impl bookie_core::Session for HeldSession {
             self.transaction_open = true;
             return Ok(QueryResult {
                 columns: Vec::new(),
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 truncated: false,
             });
         }
@@ -635,7 +635,7 @@ impl bookie_core::Session for HeldSession {
             self.counts.commits.fetch_add(1, Ordering::SeqCst);
             return Ok(QueryResult {
                 columns: Vec::new(),
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 truncated: false,
             });
         }
@@ -644,7 +644,7 @@ impl bookie_core::Session for HeldSession {
             self.counts.rollbacks.fetch_add(1, Ordering::SeqCst);
             return Ok(QueryResult {
                 columns: Vec::new(),
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 truncated: false,
             });
         }

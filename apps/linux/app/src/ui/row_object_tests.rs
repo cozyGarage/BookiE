@@ -82,7 +82,7 @@ fn shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects() {
             enum_type: None,
             domain_type: None,
         }],
-        rows: vec![vec![Value::Text(payload.clone())]],
+        rows: vec![vec![Value::Text(payload.clone())]].into(),
         truncated: false,
     });
     let source_pointer = match &result.rows[0][0] {

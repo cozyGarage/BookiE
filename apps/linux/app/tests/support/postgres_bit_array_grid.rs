@@ -56,7 +56,7 @@ async fn value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_s
         )
         .await
         .unwrap();
-    let sibling_before = before.rows[1].clone();
+    let sibling_before = before.rows[1].to_vec();
 
     let fixed = parse_input_for_driver(FIXED, Some(&columns[fixed_index]), "postgres").unwrap();
     let variable = parse_input_for_driver(VARIABLE, Some(&columns[variable_index]), "postgres").unwrap();
