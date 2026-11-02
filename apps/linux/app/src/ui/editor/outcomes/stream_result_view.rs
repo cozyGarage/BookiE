@@ -128,13 +128,14 @@ pub(in crate::ui::editor) fn stream_page_placeholder_with_title(title: String) -
 }
 
 pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> String {
-    let rows = crate::trn!("Received {rows} row", "Received {rows} rows", result.total_rows)
-        .replace("{rows}", &crate::ui::count_format::format_thousands(result.total_rows as u128));
-    let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages)
-        .replace(
-            "{pages}",
-            &crate::ui::count_format::format_thousands(result.total_pages as u128),
-        );
+    let rows = crate::trn!("Received {rows} row", "Received {rows} rows", result.total_rows).replace(
+        "{rows}",
+        &crate::ui::count_format::format_thousands(result.total_rows as u128),
+    );
+    let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages).replace(
+        "{pages}",
+        &crate::ui::count_format::format_thousands(result.total_pages as u128),
+    );
     let received = format!("{rows} · {pages}");
     if stream_retained_rows(result) == result.total_rows {
         return received;
