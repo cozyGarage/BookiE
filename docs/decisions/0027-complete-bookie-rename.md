@@ -2,7 +2,7 @@
 
 - **Status**: Accepted (2026-11-01)
 - **Date**: 2026-11-01
-- **Supersedes**: [0009](0009-persistence-and-identity-compatibility.md) where it keeps `tablepro` identifiers
+- **Supersedes**: [0009](0009-persistence-and-identity-compatibility.md) for identifiers
 
 ## Context
 
@@ -15,7 +15,7 @@ Every identifier is `bookie` or `com.bookie.linux`: Cargo packages, crates and b
 Existing installations keep their data through copy-forward, never rewrite:
 
 - On start, the app and `bookie-agentd` copy `tablepro` and `tablepro-devel` under the config, data and state directories to `bookie` and `bookie-devel`. The copy is staged and renamed into place, skips symlinks, preserves permissions, and does nothing when the new directory exists. The legacy directory is left for rollback.
-- A credential missing under the `bookie` keyring schema is read from the legacy `com.tablepro.linux` schema and written under the new one. Deleting a credential removes both copies.
+- A credential missing under `com.bookie.linux.Password` (or `com.bookie.linux.Devel.Password` in a development build) is read from the matching legacy `com.tablepro.linux.Password` / `com.tablepro.linux.Devel.Password` schema and written under the new one. Deleting a credential removes both copies.
 - Connection bundles exported under `tablepro.connection-bundle` still import and decrypt. New exports use `bookie.connection-bundle`.
 - Preferences migrate through the existing `preferences.json` mirror. GSettings values stored only under the old schema path are not carried over.
 - The audit journal is copied, not rewritten.

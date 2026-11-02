@@ -23,7 +23,6 @@ fn value_contract_duckdb_extended_calendar_values_parse_as_exact_text() {
     assert!(parse_input_for_driver("280001-02-29 12:34:56", Some(&timestamp), "duckdb").is_err());
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_extended_calendar_grid_edits_preserve_native_values() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -89,7 +88,6 @@ async fn value_contract_duckdb_extended_calendar_grid_edits_preserve_native_valu
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -147,7 +145,6 @@ async fn value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
     use bookie_core::{ConnectOptions, DatabaseDriver};
@@ -251,7 +248,6 @@ async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_nanosecond_grid_edits_preserve_native_values_and_sibling() {
     use bookie_core::{ConnectOptions, DatabaseDriver};

@@ -153,6 +153,34 @@ fn a_null_cell_filters_with_is_null_and_unfilterable_cells_offer_nothing() {
 }
 
 #[test]
+fn cell_filter_and_exclude_keep_null_and_empty_text_distinct() {
+    let include = cell_filter_rule("age", &Value::Int(42), false).unwrap();
+    assert_eq!(include.op, FilterOp::Eq);
+    assert_eq!(include.value, Some(FilterValue::Single("42".into())));
+
+    let exclude = cell_filter_rule("age", &Value::Int(42), true).unwrap();
+    assert_eq!(exclude.op, FilterOp::NotEq);
+    assert_eq!(exclude.value, Some(FilterValue::Single("42".into())));
+
+    assert_eq!(
+        cell_filter_rule("age", &Value::Null, false).unwrap().op,
+        FilterOp::IsNull
+    );
+    assert_eq!(
+        cell_filter_rule("age", &Value::Null, true).unwrap().op,
+        FilterOp::IsNotNull
+    );
+
+    let empty = cell_filter_rule("name", &Value::Text(String::new()), false).unwrap();
+    assert_eq!(empty.op, FilterOp::Eq);
+    assert_eq!(empty.value, Some(FilterValue::Single(String::new())));
+    assert_ne!(empty.op, cell_filter_rule("name", &Value::Null, false).unwrap().op);
+
+    assert!(cell_filter_rule("blob", &Value::Bytes(vec![1]), true).is_none());
+    assert!(cell_filter_rule("doc", &Value::Json(Box::new(serde_json::json!(1))), false).is_none());
+}
+
+#[test]
 fn narrowing_replaces_the_column_rule_and_keeps_the_others() {
     let mut set = FilterSet::default();
     set = set.narrowed_to(equality_rule("a", &Value::Int(1)).unwrap());
