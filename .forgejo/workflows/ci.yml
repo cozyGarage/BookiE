@@ -17,6 +17,7 @@ defaults:
 env:
   CARGO_TERM_COLOR: never
   CARGO_INCREMENTAL: "0"
+  BOOKIE_BUNDLE_CACHE: /var/cache/ci/bundles
   BOOKIE_GTK_WAIT_SECONDS: "45"
   BOOKIE_GTK_SCENARIO_RETRIES: "1"
   GITHUB_STEP_SUMMARY: /dev/null

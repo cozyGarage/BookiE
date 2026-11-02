@@ -131,7 +131,7 @@ def cleanup(root, reserve):
 
 
 def prune_bundles(root, reserve, revision):
-    bundle_root = root.parent / 'bundles'
+    bundle_root = Path(os.environ.get('BOOKIE_BUNDLE_CACHE', root.parent / 'bundles'))
     try:
         directory = open_directory(bundle_root)
     except FileNotFoundError:

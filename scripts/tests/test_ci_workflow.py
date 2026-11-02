@@ -41,6 +41,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
+        self.assertIn("BOOKIE_BUNDLE_CACHE: /var/cache/ci/bundles", workflow)
         for name in ("gtk-build", "clippy", "test-build", "floor-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)

@@ -137,7 +137,7 @@ class CiCacheTests(unittest.TestCase):
 
     def test_pressure_cleanup_evicts_old_bundles_but_preserves_current_and_unrelated_data(self):
         target = self.target('current-build', 0.1)
-        bundle_root = self.directory / 'bundles'
+        bundle_root = self.directory / 'shared-bundles'
         bundle_root.mkdir()
         oldest = bundle_root / ('a' * 40 + '-default')
         newest = bundle_root / ('b' * 40 + '-duckdb')
@@ -158,7 +158,7 @@ class CiCacheTests(unittest.TestCase):
             return SimpleNamespace(free=100 if recovered else 0)
 
         with patch.object(helper.shutil, 'disk_usage', side_effect=disk_usage), patch.dict(
-            os.environ, {'GITHUB_SHA': 'c' * 40}
+            os.environ, {'GITHUB_SHA': 'c' * 40, 'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
         ):
             result = helper.cleanup(self.cache, 50)
 
