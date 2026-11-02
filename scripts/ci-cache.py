@@ -60,7 +60,7 @@ def prune_job(job, cutoff):
     marker = metadata('.bookie-last-used', job)
     if marker is None or not stat.S_ISREG(marker.st_mode) or marker.st_mtime >= cutoff:
         return
-    for profile in ('debug', 'release', 'ci'):
+    for profile in ('debug', 'release', 'ci', 'dist'):
         entry = metadata(profile, job)
         if entry is None or not stat.S_ISDIR(entry.st_mode):
             continue

@@ -68,7 +68,7 @@ class CiCacheTests(unittest.TestCase):
 
     def test_old_generated_artifacts_removed_but_siblings_preserved(self):
         target = self.target('sandbox', 6)
-        for profile in ('release', 'ci'):
+        for profile in ('release', 'ci', 'dist'):
             (target / profile / 'deps').mkdir(parents=True)
             (target / profile / '.cargo-lock').touch()
             (target / profile / 'deps/artifact').write_text('compiled bytes')
@@ -78,6 +78,7 @@ class CiCacheTests(unittest.TestCase):
         self.assertFalse((target / 'debug').exists())
         self.assertFalse((target / 'release').exists())
         self.assertFalse((target / 'ci').exists())
+        self.assertFalse((target / 'dist').exists())
         self.assertEqual((target / 'evidence.txt').read_text(), 'keep')
 
     def test_recent_nightly_cache_and_unmarked_legacy_cache_survive(self):

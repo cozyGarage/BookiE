@@ -41,13 +41,20 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
-        for name in ("gtk-build", "clippy", "test-build", "floor-build", "supply-chain"):
+        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-                self.assertIn("CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}", job)
-                self.assertIn("TMPDIR: /target/${{ github.run_id }}/${{ github.job }}", job)
+                self.assertIn("CARGO_TARGET_DIR: /target/bookie-${{ github.job }}", job)
+                self.assertIn("TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}", job)
                 self.assertIn('mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"', job)
-                self.assertIn('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"', job)
+                self.assertIn('touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock', job)
+                self.assertIn('exec 9>>/target/.bookie-build-cache.lock', job)
+                self.assertIn('flock --exclusive 9', job)
+                self.assertNotIn('rm -rf -- "$CARGO_TARGET_DIR"', job)
+                self.assertIn('cleanup --min-free-gib 30', job)
+        supply_chain = re.search(r"(?ms)^  supply-chain:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}", supply_chain)
+        self.assertIn('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"', supply_chain)
         guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/bookie-guards-${{ github.run_id }}", guards)
         self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}", guards)
