@@ -2,6 +2,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -10,6 +11,35 @@ BUILD_TREE = ROOT / "apps/linux/packaging/arch/src"
 
 
 class InventoryIgnoredTestsTests(unittest.TestCase):
+    def test_an_isolated_test_cannot_name_a_missing_workspace_package(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = ["crates/core"]\nresolver = "3"\n')
+            crate = root / "crates/core"
+            (crate / "src").mkdir(parents=True)
+            (crate / "Cargo.toml").write_text(
+                '[package]\nname = "bookie-core"\nversion = "0.1.0"\nedition = "2024"\n'
+            )
+            (crate / "src/lib.rs").write_text("")
+            scripts = root / "scripts"
+            scripts.mkdir()
+            inventory = scripts / "inventory-ignored-tests.py"
+            inventory.write_text(SCRIPT.read_text())
+            (scripts / "isolated-tests.json").write_text(
+                '{"gtk": [["tablepro-app", "--lib", "test_name"]]}\n'
+            )
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "add", "Cargo.toml", "crates", "scripts"], check=True
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(inventory), "--check"], capture_output=True, text=True, check=False
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("unknown Cargo package in isolated-test registry: tablepro-app", result.stderr)
+
     def test_a_gitignored_build_tree_is_not_scanned(self):
         existed = BUILD_TREE.exists()
         stray = BUILD_TREE / "regression-probe/apps/linux/app/src/stray.rs"
