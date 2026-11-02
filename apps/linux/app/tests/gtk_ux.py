@@ -2027,17 +2027,17 @@ GLib.MainLoop().run()
             if first_run_marker is None:
                 time.sleep(ui.POLL_SECONDS)
         assert first_run_marker is not None, "the first streamed page never exposed its run marker"
-        ui.wait_for_node_containing(f"Rows 1-{page_size}", timeout=120)
+        ui.wait_for_node_containing(f"Rows 1-{page_size:,}", timeout=120)
         wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
         scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
         ui.invoke(ui.wait_for_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
-        wait_for_node_showing("Rows 5001-10000")
+        wait_for_node_showing(f"Rows {page_size + 1:,}-{2 * page_size:,}")
         wait_for_visible_cell_value("5001")
         wait_for_visible_marker(first_run_marker)
         ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
-        wait_for_node_showing("Rows 1-5000")
+        wait_for_node_showing(f"Rows 1-{page_size:,}")
         wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
 
@@ -2098,17 +2098,17 @@ GLib.MainLoop().run()
             app = ui.application_node()
             labels = list(ui.descendants(app)) if app is not None else []
             current = any(ui.node_name(node) == "page-marker-1" and node.getState().contains(pyatspi.STATE_SHOWING) for node in labels)
-            counts = [re.search(r"Received (\d+) rows", ui.node_name(node)) for node in labels]
-            if current and any(match and 40000 <= int(match.group(1)) < 400000 for match in counts):
+            counts = [re.search(r"Received ([0-9,]+) rows", ui.node_name(node)) for node in labels]
+            if current and any(match and 40000 <= int(match.group(1).replace(",", "")) < 400000 for match in counts):
                 break
             time.sleep(ui.POLL_SECONDS)
         else:
             raise AssertionError("first page was not visible after enough streamed rows to exceed the cache")
         ui.invoke(ui.wait_for_sensitive_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 5001-10000", timeout=30)
+        ui.wait_for_node_containing("Rows 5,001-10,000", timeout=30)
         wait_for_visible_marker("page-marker-5001")
         ui.invoke(ui.wait_for_sensitive_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 1-5000", timeout=30)
+        ui.wait_for_node_containing("Rows 1-5,000", timeout=30)
         wait_for_visible_marker("page-marker-1")
         ui.wait_for_node_containing("done in", timeout=120)
         wait_for_visible_marker("page-marker-1")
