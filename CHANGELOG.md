@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-02
+
+### Added
+
+- Filter by this value and Exclude this value from the cell context menu. (#2220)
+- Zoom the focused result grid font with Ctrl+=, Ctrl+-, and Ctrl+0. (#2223)
+- The DuckDB driver is included in the released packages. (#2246)
+- The SSH section can name the one agent key to offer when the agent holds many keys. (#2254)
+
+### Changed
+
+- Wide editable result grids use less memory. (#2186)
+- Large SQL scripts use less memory during completion and avoid scanning token history unrelated to the cursor. (#2187)
+- Completed streamed results use less memory while pinned. (#2191)
+- Large database sidebars construct row context menus only when requested. (#2189)
+- Filtering and sorting large loaded results now sorts only matching rows and uses less temporary memory. (#2200)
+- Wide result grids and large query loads use less memory. (#2260, #2275)
+- Large sidebar searches do less transient work. (#2263)
+- Streamed result row and page counts use thousands separators like the rest of the grid chrome. (#2234)
+- BookiE now uses bookie names everywhere and copies settings, connections and saved credentials from an earlier tablepro install on first start. (#2239)
+- The About dialog no longer describes BookiE as based on TablePro and credits the TablePro authors for adopted code. (#2245)
+- PostgreSQL connections keep the server or role time zone, so date and time functions match psql. (#2253)
+- ClickHouse rows that share a key with another loaded row are shown as not editable, with a tooltip explaining why. (#2255)
+
+### Fixed
+
+- MySQL Explain Text tab shows column names above the plan rows. (#2181)
+- Restore failure alerts show the pg_restore detail without an Internal driver error prefix. (#2183)
+- Row inspector values containing markup characters display as literal database text. (#2184)
+- SQL editor completion closes when a query starts. (#2227)
+- SQL editor lines no longer clip the tops of highlighted keywords. (#2222)
+- Opening a .sql file from the desktop launches it in the SQL editor. (#2226)
+- A failed PostgreSQL backup no longer deletes another process's partial dump file if the temporary path already exists. (#2228)
+- Statement gutter success and error marks keep at least 3:1 contrast in light, dark and high-contrast themes. (#2230)
+- Streamed results keep the page you selected when the query finishes. (#2240)
+- Redis TLS connections no longer report handshake errors when a connection times out. (#2241)
+- Development builds no longer share MCP tokens or SSH host keys with an installed release. (#2243)
+- The Standard NULL preference label matches the grid marker. (#2234)
+- DuckDB views appear under Views in the sidebar. (#2236)
+- DuckDB result grids show DuckDB type names such as INTEGER and VARCHAR. (#2251)
+- A very large DuckDB value no longer causes a large temporary allocation before the result limit applies. (#2252)
+- Long values in the row inspector wrap without inserting display-only hyphens. (#2256)
+- Leaving a grid cell keeps the word still being composed by the input method. (#2257)
+
 ## [0.2.2] - 2026-11-01
 
 ### Added
@@ -715,7 +759,8 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.2...linux
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.3...linux
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
+[0.2.3]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.3
