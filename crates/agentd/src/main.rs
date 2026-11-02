@@ -13,7 +13,6 @@ use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AuditState, 
 use bookie_storage::{AuditJournal, SavedConnection, load_connections};
 use clap::{Parser, ValueEnum};
 use drivers_clickhouse::ClickhouseDriver;
-#[cfg(feature = "duckdb")]
 use drivers_duckdb::DuckdbDriver;
 use drivers_mongodb::MongodbDriver;
 use drivers_mssql::MssqlDriver;
@@ -225,7 +224,6 @@ fn emit_token(plain: &str) -> std::io::Result<()> {
 fn build_registry() -> DriverRegistry {
     let mut r = DriverRegistry::new();
     r.register(Arc::new(ClickhouseDriver));
-    #[cfg(feature = "duckdb")]
     r.register(Arc::new(DuckdbDriver));
     r.register(Arc::new(MongodbDriver));
     r.register(Arc::new(MssqlDriver));

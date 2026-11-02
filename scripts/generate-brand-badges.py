@@ -15,7 +15,7 @@ ENGINES = [
     ("sqlite", "SQLite", "STABLE", "#003B57", "#1F4F48", "#9EAE9A"),
     ("mssql", "SQL Server", "STABLE", "#CC292B", "#1F4F48", "#9EAE9A"),
     ("clickhouse", "ClickHouse", "STABLE", "#FFCC01", "#1F4F48", "#9EAE9A"),
-    ("duckdb", "DuckDB", "OPTIONAL", "#FFF000", "#163D38", "#C9A24B"),
+    ("duckdb", "DuckDB", "EXPERIMENTAL", "#FFF000", "#163D38", "#C9A24B"),
     ("redis", "Redis", "EXPERIMENTAL", "#D82C20", "#163D38", "#C9A24B"),
     ("mongodb", "MongoDB", "EXPERIMENTAL", "#47A248", "#163D38", "#C9A24B"),
 ]

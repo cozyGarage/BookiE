@@ -73,7 +73,7 @@ def generate() -> str:
     sections: list[str] = [
         "# Third-party software notices",
         "",
-        "BookiE includes the third-party Rust packages listed below. License texts are generated from the locked GUI, agent daemon and askpass dependency graphs with cargo-about. Optional DuckDB support is not enabled in this Arch package.",
+        "BookiE includes the third-party Rust packages listed below. License texts are generated from the locked GUI, agent daemon and askpass dependency graphs with cargo-about.",
         "",
         "This file records the license expressions declared by package authors and the corresponding license text resolved by cargo-about. Review upstream package metadata when redistributing modified builds.",
     ]

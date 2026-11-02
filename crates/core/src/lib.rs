@@ -42,7 +42,7 @@ pub use driver::{
 pub use error::DriverError;
 pub use filter::{
     BuildFilterError, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, FilterValueKind, build_filter_where,
-    equality_rule, filter_value_kind,
+    cell_filter_rule, equality_rule, filter_value_kind,
 };
 pub use numeric_input::{
     FloatInputError, is_numeric_input, parse_float_input, single_precision_as_f64, sqlite_affinity_decimal,

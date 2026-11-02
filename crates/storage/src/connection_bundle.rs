@@ -997,6 +997,10 @@ fn endpoint_key(saved: &SavedConnection) -> EndpointKey {
 mod tests;
 
 #[cfg(test)]
+#[path = "connection_bundle_legacy_tests.rs"]
+mod legacy_tests;
+
+#[cfg(test)]
 pub(crate) fn ssh_chain_for_test(depth: usize) -> SavedSshConfig {
     tests::ssh_chain(depth)
 }

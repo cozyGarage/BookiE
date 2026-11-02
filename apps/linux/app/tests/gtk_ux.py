@@ -231,7 +231,7 @@ def scenarios(ui):
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
-        choose_menu_item(11)
+        choose_menu_item(12)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switch = next(
@@ -246,6 +246,7 @@ def scenarios(ui):
 
     def choose_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
+        items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
 
         def focused_item():
             items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
@@ -256,7 +257,6 @@ def scenarios(ui):
 
         start = focused_item()
         if position == "last":
-            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
             assert items, "the menu has no items"
             target = len(items) - 1
         else:
@@ -289,7 +289,8 @@ def scenarios(ui):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
         assert len(items) >= 12, f"grid menu exposed only {len(items)} actionable items"
-        actions = items[11].queryAction()
+        columns = items[12]
+        actions = columns.queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
         )
@@ -312,7 +313,7 @@ def scenarios(ui):
         ):
             wait_for_focused_grid_row(ui, pyatspi, expected)
             ui.press_x11_key(key, modifiers)
-            choose_menu_item(4)
+            choose_menu_item(5)
             wait_for_adw_dialog("payload")
             deadline = time.monotonic() + ui.WAIT_SECONDS
             while time.monotonic() < deadline:
@@ -339,7 +340,7 @@ def scenarios(ui):
         ui.wait_for_node(name="Search columns", present=False)
         wait_for_focused_grid_row(ui, pyatspi, "pointer-first")
         open_cell_menu("pointer-second")
-        choose_menu_item(4)
+        choose_menu_item(5)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -1459,7 +1460,7 @@ GLib.MainLoop().run()
         wait_for_focused_grid_row(ui, pyatspi, value)
         ui.press_x11_key("Menu")
         ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        choose_menu_item(4)
+        choose_menu_item(5)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -1502,7 +1503,7 @@ GLib.MainLoop().run()
         started = time.monotonic()
         ui.press_x11_key("Menu")
         ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        choose_menu_item(4)
+        choose_menu_item(5)
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON, timeout=10)
         assert time.monotonic() - started < 10, "the large value viewer took too long to open"
 
@@ -1518,7 +1519,7 @@ GLib.MainLoop().run()
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         wait_for_result_column("beta")
         open_cell_menu("1")
-        choose_menu_item(7)
+        choose_menu_item(8)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switches = [
@@ -1991,7 +1992,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         open_cell_menu("Ada Lovelace")
-        choose_menu_item(4)
+        choose_menu_item(5)
         wait_for_adw_dialog("name")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.press_x11_key("Escape")
@@ -2767,8 +2768,8 @@ GLib.MainLoop().run()
 
     def invoke_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        actions = items[position].queryAction()
+        item = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM][position]
+        actions = item.queryAction()
         click = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
         assert actions.doAction(click)
 
@@ -2793,13 +2794,11 @@ GLib.MainLoop().run()
         )
         wait_until(lambda: len(page_tab_names()) >= 2, "two result sets did not appear")
         ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
-        filter_by_this_value = 3
         open_cell_menu("pear")
-        invoke_menu_item(filter_by_this_value)
+        invoke_menu_item(3)
         ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
-        export_visible, export_all_loaded = 6, 7
-        for item, rows in ((export_visible, "1 loaded rows"), (export_all_loaded, "3 loaded rows")):
+        for item, rows in ((7, "1 loaded rows"), (8, "3 loaded rows")):
             reopen_cell_menu("pear")
             invoke_menu_item(item)
             ui.wait_for_node(name=rows, role=pyatspi.ROLE_LABEL)
@@ -2811,7 +2810,7 @@ GLib.MainLoop().run()
         )
         ui.invoke(second)
         reopen_cell_menu("blue")
-        invoke_menu_item(filter_by_this_value)
+        invoke_menu_item(3)
         ui.wait_for_node_containing("Showing 1 of 2 loaded rows", role=pyatspi.ROLE_LABEL)
 
     def filter_by_this_value_narrows_the_browse_rows(database, _base):

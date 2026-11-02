@@ -178,6 +178,25 @@ fn scheme_id(theme: ThemePref, dark: bool) -> String {
     format!("bookie-{}-{}", theme.key(), if dark { "dark" } else { "light" })
 }
 
+fn weight_safe_styles() -> &'static str {
+    r#"  <style name="def:keyword" bold="false"/>
+  <style name="def:type" bold="false"/>
+  <style name="def:statement" bold="false"/>
+  <style name="current-line-number" bold="false"/>
+"#
+}
+
+fn weight_safe_scheme_xml(id: &str, dark: bool) -> String {
+    let parent = if dark { "Adwaita-dark" } else { "Adwaita" };
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<style-scheme id="{id}" name="{id}" version="1.0" parent-scheme="{parent}">
+{weights}</style-scheme>
+"#,
+        weights = weight_safe_styles(),
+    )
+}
+
 fn scheme_xml(id: &str, dark: bool, s: &Surface) -> String {
     let parent = if dark { "Adwaita-dark" } else { "Adwaita" };
     format!(
@@ -186,10 +205,12 @@ fn scheme_xml(id: &str, dark: bool, s: &Surface) -> String {
   <style name="text" foreground="{fg}" background="{view}"/>
   <style name="line-numbers" foreground="{fg}" background="{view}"/>
   <style name="current-line" background="{chrome}"/>
-  <style name="current-line-number" background="{chrome}"/>
+  <style name="current-line-number" background="{chrome}" bold="false"/>
   <style name="selection" foreground="{accent_fg}" background="{accent_bg}"/>
   <style name="cursor" foreground="{accent}"/>
-  <style name="def:keyword" foreground="{accent}" bold="true"/>
+  <style name="def:keyword" foreground="{accent}" bold="false"/>
+  <style name="def:type" bold="false"/>
+  <style name="def:statement" bold="false"/>
 </style-scheme>
 "#,
         fg = s.window_fg,
@@ -211,9 +232,12 @@ fn install_editor_schemes() -> bool {
     }
     for theme in ThemePref::ALL {
         for dark in [true, false] {
-            let Some(surface) = surface(theme, dark) else { continue };
             let id = scheme_id(theme, dark);
-            if let Err(error) = std::fs::write(directory.join(format!("{id}.xml")), scheme_xml(&id, dark, surface)) {
+            let xml = match surface(theme, dark) {
+                Some(surface) => scheme_xml(&id, dark, surface),
+                None => weight_safe_scheme_xml(&id, dark),
+            };
+            if let Err(error) = std::fs::write(directory.join(format!("{id}.xml")), xml) {
                 tracing::warn!(%error, "editor colour scheme could not be written");
                 return false;
             }
@@ -228,13 +252,11 @@ fn install_editor_schemes() -> bool {
 fn editor_scheme() -> Option<sourceview5::StyleScheme> {
     let dark = adw::StyleManager::default().is_dark();
     let manager = sourceview5::StyleSchemeManager::default();
-    let themed = surface(CURRENT.get(), dark).and_then(|_| {
-        SCHEMES_INSTALLED
-            .with(|installed| *installed.get_or_init(install_editor_schemes))
-            .then(|| manager.scheme(&scheme_id(CURRENT.get(), dark)))
-            .flatten()
-    });
-    themed.or_else(|| manager.scheme(if dark { "Adwaita-dark" } else { "Adwaita" }))
+    let installed = SCHEMES_INSTALLED.with(|cell| *cell.get_or_init(install_editor_schemes));
+    installed
+        .then(|| manager.scheme(&scheme_id(CURRENT.get(), dark)))
+        .flatten()
+        .or_else(|| manager.scheme(if dark { "Adwaita-dark" } else { "Adwaita" }))
 }
 
 pub fn style_editor(view: &sourceview5::View) {
@@ -403,6 +425,37 @@ mod tests {
                 assert!(xml.contains(&format!("parent-scheme=\"{parent}\"")), "{id}");
                 assert!(xml.contains(&format!("background=\"{}\"", surface.view_bg)), "{id}");
             }
+        }
+    }
+
+    #[test]
+    fn editor_schemes_keep_sql_styles_at_regular_weight() {
+        for theme in ThemePref::ALL {
+            for dark in [true, false] {
+                let id = scheme_id(theme, dark);
+                let xml = match surface(theme, dark) {
+                    Some(surface) => scheme_xml(&id, dark, surface),
+                    None => weight_safe_scheme_xml(&id, dark),
+                };
+                assert!(!xml.contains("bold=\"true\""), "{id}");
+                for name in ["def:keyword", "def:type", "def:statement", "current-line-number"] {
+                    assert!(xml.contains(&format!("name=\"{name}\"")), "{id} missing {name}");
+                    assert!(xml.contains("bold=\"false\""), "{id} must clear bold for SQL styles");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_default_theme_scheme_only_clears_weight_on_adwaita() {
+        for dark in [true, false] {
+            let id = scheme_id(ThemePref::Default, dark);
+            let xml = weight_safe_scheme_xml(&id, dark);
+            let parent = if dark { "Adwaita-dark" } else { "Adwaita" };
+            assert!(xml.contains(&format!("parent-scheme=\"{parent}\"")), "{id}");
+            assert!(!xml.contains("foreground="), "{id}");
+            assert!(!xml.contains("background="), "{id}");
+            assert!(xml.contains("bold=\"false\""), "{id}");
         }
     }
 

@@ -19,21 +19,16 @@ cleanup_spec.loader.exec_module(cleanup_runner)
 
 class ValueRunnerTests(unittest.TestCase):
     def test_all_drivers_have_required_suites(self):
-        suites = runner.expected_suites(gtk=True, duckdb=True)
+        suites = runner.expected_suites(gtk=True)
         self.assertEqual(sum(target == "integration" for target in suites.values()), 8)
         self.assertEqual(len(suites), 11)
 
     def test_build_selection_is_explicit_and_locked(self):
         self.assertIn("--locked", runner.build_command())
         self.assertIn("bookie-app", runner.build_command())
-        self.assertIn("bookie-driver-duckdb", runner.build_command())
-        self.assertNotIn("--exclude", runner.build_command(gtk=True, duckdb=True))
-
-    def test_combined_gtk_duckdb_run_enables_app_duckdb_consumer_tests(self):
-        command = runner.build_command(gtk=True, duckdb=True)
-        self.assertIn("bookie-app/duckdb", command)
-        self.assertNotIn("bookie-app/duckdb", runner.build_command(gtk=True))
-        self.assertNotIn("bookie-app/duckdb", runner.build_command(duckdb=True))
+        self.assertNotIn("bookie-driver-duckdb", runner.build_command())
+        self.assertNotIn("--exclude", runner.build_command(gtk=True))
+        self.assertNotIn("--features", runner.build_command(gtk=True))
 
     def test_a_suite_with_no_matching_tests_is_a_failure(self):
         with tempfile.TemporaryDirectory() as root:
