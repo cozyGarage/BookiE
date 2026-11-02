@@ -344,7 +344,6 @@ impl DuckdbConnection {
         .await
     }
 
-impl DuckdbConnection {
     async fn list_catalog_objects(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
         let conn = Arc::clone(&self.session);
         blocking(move || {
