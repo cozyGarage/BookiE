@@ -386,7 +386,7 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
     assert!(new_grid.is_mapped());
 
     let mut oversized = page(&[0]).as_ref().clone();
-    oversized.rows = vec![vec![Value::Bytes(vec![0; 65 * 1024 * 1024])]];
+    oversized.rows = vec![vec![Value::Bytes(vec![0; 65 * 1024 * 1024])]].into();
     cache.append(2, Arc::new(oversized)).unwrap();
     assert!(resident_pages.get(0).is_none());
     assert!(resident_pages.get(1).is_none());

@@ -190,7 +190,7 @@ impl bookie_core::Connection for FailingCursorConnection {
     ) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
         Ok(bookie_core::QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -198,7 +198,7 @@ impl bookie_core::Connection for FailingCursorConnection {
     async fn query(&self, _sql: &str) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
         Ok(bookie_core::QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }

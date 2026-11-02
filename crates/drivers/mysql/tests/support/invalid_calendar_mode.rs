@@ -123,7 +123,7 @@ async fn assert_invalid_calendar_csv_round_trip(
         &options,
     )
     .expect("CSV import must retain the native invalid calendar values");
-    let imported = plan.rows[0].clone();
+    let imported = plan.rows[0].to_vec();
     assert_eq!(imported, stored_row());
     session
         .query_params_controlled(&plan.statement, &imported, control)

@@ -134,7 +134,7 @@ pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> St
     );
     let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages).replace(
         "{pages}",
-        &crate::ui::count_format::format_thousands(result.total_pages as u128),
+        &crate::ui::count_format::format_thousands(u128::from(result.total_pages)),
     );
     let received = format!("{rows} · {pages}");
     if stream_retained_rows(result) == result.total_rows {

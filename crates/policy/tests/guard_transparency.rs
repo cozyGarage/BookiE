@@ -49,7 +49,7 @@ impl Connection for StubConnection {
     ) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -57,7 +57,7 @@ impl Connection for StubConnection {
     async fn query(&self, _sql: &str) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -82,7 +82,7 @@ impl Connection for StubConnection {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Text(value.into())]],
+            rows: vec![vec![Value::Text(value.into())]].into(),
             truncated: false,
         };
         let result_sets = if sql.contains("json_agg") {

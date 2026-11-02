@@ -56,7 +56,7 @@ async fn value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and
         )
         .await
         .unwrap();
-    let sibling = before.rows[1].clone();
+    let sibling = before.rows[1].to_vec();
 
     let edited = parse_input_for_driver(EDITED, Some(&columns[labels_index]), "postgres").unwrap();
     assert_eq!(edited, Value::Text(EDITED.into()));

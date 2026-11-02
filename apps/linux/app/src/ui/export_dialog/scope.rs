@@ -67,7 +67,7 @@ mod tests {
         adw::init().unwrap();
         let result = QueryResult {
             columns: Vec::new(),
-            rows: vec![Vec::new()],
+            rows: vec![Vec::new()].into(),
             truncated: true,
         };
         let (group, choice) = build(ExportScope::TablePage { filtered: true }, &result, None);

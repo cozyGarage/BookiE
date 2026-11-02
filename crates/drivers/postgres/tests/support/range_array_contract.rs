@@ -81,7 +81,7 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
     );
     let export_result = bookie_core::QueryResult {
         columns: vec![source.columns[0].clone()],
-        rows: vec![vec![refusal.clone()]],
+        rows: vec![vec![refusal.clone()]].into(),
         truncated: false,
     };
     let directory = tempfile::tempdir().unwrap();

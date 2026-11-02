@@ -271,7 +271,8 @@ fn only_a_well_formed_marker_becomes_a_partial_cell() {
             Value::Json(Box::new(serde_json::json!("\u{1}bookie-partial:5\u{1}{}"))),
             Value::Int(1),
             Value::Int(1),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     };
     mark_partial_cells(&mut result, &[0, 4]);
@@ -297,7 +298,7 @@ fn ordinary_marker_shaped_text_is_preserved() {
     let stored = Value::Text("\u{1}bookie-partial:2097152\u{1}xxxx".into());
     let mut result = bookie_core::QueryResult {
         columns: vec![],
-        rows: vec![vec![stored.clone()]],
+        rows: vec![vec![stored.clone()]].into(),
         truncated: false,
     };
     mark_partial_cells(&mut result, &[]);

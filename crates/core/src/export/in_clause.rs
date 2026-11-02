@@ -1,6 +1,7 @@
 use super::supports_sql_literals;
 use crate::export::value_to_text;
 use crate::query::{ColumnInfo, Value};
+use crate::query_rows::QueryRowSet;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct InClause {
@@ -8,8 +9,11 @@ pub struct InClause {
     pub skipped: usize,
 }
 
-pub fn render_in_clause(driver_id: &str, rows: &[Vec<Value>], column_index: usize) -> InClause {
-    let values = rows.iter().filter_map(|row| row.get(column_index)).collect::<Vec<_>>();
+pub fn render_in_clause<R: QueryRowSet + ?Sized>(driver_id: &str, rows: &R, column_index: usize) -> InClause {
+    let values = (0..rows.row_count())
+        .filter_map(|index| rows.row(index))
+        .filter_map(|row| row.get(column_index))
+        .collect::<Vec<_>>();
     let literals = values
         .iter()
         .filter_map(|value| in_clause_literal(driver_id, value))
@@ -24,12 +28,15 @@ pub fn render_in_clause(driver_id: &str, rows: &[Vec<Value>], column_index: usiz
     }
 }
 
-pub fn render_value_list(driver_id: &str, columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
-    if rows.is_empty() || columns.is_empty() {
+pub fn render_value_list<R: QueryRowSet + ?Sized>(driver_id: &str, columns: &[ColumnInfo], rows: &R) -> String {
+    if rows.row_count() == 0 || columns.is_empty() {
         return String::new();
     }
-    let mut row_tuples = Vec::with_capacity(rows.len());
-    for row in rows {
+    let mut row_tuples = Vec::with_capacity(rows.row_count());
+    for row_index in 0..rows.row_count() {
+        let Some(row) = rows.row(row_index) else {
+            continue;
+        };
         let mut literals = Vec::with_capacity(columns.len());
         for (i, _) in columns.iter().enumerate() {
             let val = row.get(i).unwrap_or(&Value::Null);

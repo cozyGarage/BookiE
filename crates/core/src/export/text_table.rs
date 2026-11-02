@@ -1,5 +1,6 @@
 use crate::export::value_to_text;
 use crate::query::{ColumnInfo, Value};
+use crate::query_rows::QueryRowSet;
 
 fn is_numeric(value: &Value) -> bool {
     matches!(value, Value::Int(_) | Value::Float(_) | Value::Decimal(_))
@@ -23,13 +24,19 @@ fn build_table_separator(widths: &[usize]) -> String {
     )
 }
 
-fn collect_table_data(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> (Vec<usize>, Vec<bool>, Vec<Vec<String>>) {
+fn collect_table_data<R: QueryRowSet + ?Sized>(
+    columns: &[ColumnInfo],
+    rows: &R,
+) -> (Vec<usize>, Vec<bool>, Vec<Vec<String>>) {
     let col_count = columns.len();
     let mut widths: Vec<usize> = columns.iter().map(|c| c.name.chars().count()).collect();
-    let mut formatted_rows = Vec::with_capacity(rows.len());
+    let mut formatted_rows = Vec::with_capacity(rows.row_count());
     let mut numeric_cols = vec![true; col_count];
 
-    for row in rows {
+    for index in 0..rows.row_count() {
+        let Some(row) = rows.row(index) else {
+            continue;
+        };
         let mut formatted_row = Vec::with_capacity(col_count);
         for (i, col_width) in widths.iter_mut().enumerate().take(col_count) {
             let val = row.get(i).unwrap_or(&Value::Null);
@@ -48,7 +55,7 @@ fn collect_table_data(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> (Vec<usize
     (widths, numeric_cols, formatted_rows)
 }
 
-pub fn render_text_table(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
+pub fn render_text_table<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R) -> String {
     if columns.is_empty() {
         return String::new();
     }

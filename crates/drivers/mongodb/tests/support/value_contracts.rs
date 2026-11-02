@@ -325,7 +325,8 @@ fn write_nested_xlsx(nested: serde_json::Value) -> (tempfile::TempDir, std::path
                 serde_json::json!({"$binary": {"base64": "AP9B", "subType": "80"}}),
             )),
             Value::Json(Box::new(nested)),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     };
     let directory = tempfile::tempdir().expect("temporary export directory");

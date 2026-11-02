@@ -315,14 +315,14 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
         .unwrap();
     assert_eq!(
         valid_rows.rows,
-        [
-            all_rows.rows[0].clone(),
-            all_rows.rows[2].clone(),
-            all_rows.rows[3].clone(),
-            all_rows.rows[4].clone(),
-            all_rows.rows[5].clone(),
-            all_rows.rows[6].clone(),
-            all_rows.rows[7].clone()
+        vec![
+            all_rows.rows[0].to_vec(),
+            all_rows.rows[2].to_vec(),
+            all_rows.rows[3].to_vec(),
+            all_rows.rows[4].to_vec(),
+            all_rows.rows[5].to_vec(),
+            all_rows.rows[6].to_vec(),
+            all_rows.rows[7].to_vec()
         ]
     );
 

@@ -175,5 +175,5 @@ async fn value_contract_duckdb_submicro_parameters_round_trip_into_ns_columns() 
         )
         .await
         .unwrap();
-    assert_eq!(rows.rows, vec![updated.rows[0].clone(), nulls.rows[0].clone()]);
+    assert_eq!(rows.rows, vec![updated.rows[0].to_vec(), nulls.rows[0].to_vec()]);
 }

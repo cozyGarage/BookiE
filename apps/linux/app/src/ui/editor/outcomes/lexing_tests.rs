@@ -21,7 +21,7 @@ impl bookie_core::Session for SqlModeSession {
         }
         Ok(bookie_core::QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }

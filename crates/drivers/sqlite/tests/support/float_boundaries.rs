@@ -44,7 +44,7 @@ async fn sqlite_real_storage_preserves_float_edge_bits() {
             .unwrap();
         assert_eq!(
             matched.rows,
-            [[Value::Int(1)]],
+            vec![vec![Value::Int(1)]],
             "SQLite reads {literal} as the stored value"
         );
     }

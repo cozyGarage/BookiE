@@ -134,7 +134,7 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     assert_eq!(csv_restored.rows.len(), 2);
     assert!(csv_restored.rows.contains(&csv_sibling.rows[0]));
     assert!(
-        csv_restored.rows.contains(&vec![
+        csv_restored.rows.contains(&[
             native.rows[0][1].clone(),
             native.rows[0][3].clone(),
             native.rows[0][4].clone(),
@@ -192,7 +192,7 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     assert_eq!(restored.rows.len(), 2);
     assert!(restored.rows.contains(&sibling.rows[0]));
     assert!(
-        restored.rows.contains(&vec![
+        restored.rows.contains(&[
             native.rows[0][1].clone(),
             native.rows[0][3].clone(),
             native.rows[0][4].clone(),

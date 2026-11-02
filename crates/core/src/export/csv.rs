@@ -6,6 +6,7 @@ use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
+use crate::query_rows::QueryRowSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CsvDelimiter {
@@ -104,26 +105,29 @@ impl Default for CsvOptions {
     }
 }
 
-pub fn render_csv(columns: &[ColumnInfo], rows: &[Vec<Value>], options: &CsvOptions) -> String {
+pub fn render_csv<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R, options: &CsvOptions) -> String {
     let mut output = String::new();
     if options.header_row {
         output.push_str(&csv_header_line(columns, options));
         output.push_str(options.line_break.as_str());
     }
-    for row in rows {
-        output.push_str(&csv_row_line_for_columns(row, columns, options));
+    for index in 0..rows.row_count() {
+        if let Some(row) = rows.row(index) {
+            output.push_str(&csv_row_line_for_columns(row, columns, options));
+        }
         output.push_str(options.line_break.as_str());
     }
     output
 }
 
-pub fn unique_csv_null_marker(rows: &[Vec<Value>]) -> String {
+pub fn unique_csv_null_marker<R: QueryRowSet + ?Sized>(rows: &R) -> String {
     let mut marker = "\\N".to_string();
-    while rows
-        .iter()
-        .flatten()
-        .any(|value| value_to_text(value).as_deref() == Some(marker.as_str()))
-    {
+    while (0..rows.row_count()).any(|index| {
+        rows.row(index)
+            .into_iter()
+            .flatten()
+            .any(|value| value_to_text(value).as_deref() == Some(marker.as_str()))
+    }) {
         marker.push('N');
     }
     marker
@@ -167,7 +171,7 @@ fn csv_row_line_with_any_columns(row: &[Value], any_columns: &[bool], options: &
         .join(options.delimiter.as_str())
 }
 
-pub fn render_tsv(columns: &[ColumnInfo], rows: &[Vec<Value>], with_headers: bool) -> String {
+pub fn render_tsv<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R, with_headers: bool) -> String {
     let options = CsvOptions {
         header_row: with_headers,
         null_to_empty: false,
@@ -175,11 +179,14 @@ pub fn render_tsv(columns: &[ColumnInfo], rows: &[Vec<Value>], with_headers: boo
         delimiter: CsvDelimiter::Tab,
         ..CsvOptions::default()
     };
-    let mut lines = Vec::with_capacity(rows.len() + usize::from(with_headers));
+    let mut lines = Vec::with_capacity(rows.row_count() + usize::from(with_headers));
     if with_headers {
         lines.push(csv_header_line(columns, &options));
     }
-    for row in rows {
+    for index in 0..rows.row_count() {
+        let Some(row) = rows.row(index) else {
+            continue;
+        };
         let cells: Vec<String> = row
             .iter()
             .map(|value| match value_to_text(value) {

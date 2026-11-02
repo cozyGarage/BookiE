@@ -131,7 +131,7 @@ impl Connection for CountingConn {
     async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: vec![],
-            rows: vec![vec![Value::Int(1)]],
+            rows: vec![vec![Value::Int(1)]].into(),
             truncated: false,
         })
     }
@@ -184,7 +184,7 @@ impl Connection for QueryCountingConn {
         self.queries.fetch_add(1, Ordering::SeqCst);
         Ok(QueryResult {
             columns: vec![],
-            rows: vec![vec![Value::Int(1)]],
+            rows: vec![vec![Value::Int(1)]].into(),
             truncated: false,
         })
     }
@@ -485,7 +485,7 @@ fn query_error() -> DriverError {
 fn empty_result() -> QueryResult {
     QueryResult {
         columns: vec![],
-        rows: vec![],
+        rows: vec![].into(),
         truncated: false,
     }
 }

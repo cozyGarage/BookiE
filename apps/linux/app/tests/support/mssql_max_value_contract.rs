@@ -233,13 +233,13 @@ async fn value_contract_mssql_max_values_survive_connection_session_and_consumer
     let xlsx_path = directory.path().join("mssql-max-boundary.xlsx");
     let boundary = bookie_core::QueryResult {
         columns: vec![ordinary.columns[1].clone()],
-        rows: vec![vec![cases[0].1.clone()]],
+        rows: vec![vec![cases[0].1.clone()]].into(),
         truncated: false,
     };
     bookie_core::export::write_result_file(&xlsx_path, &boundary, &export, || false, |_| {}).unwrap();
     let over_limit = bookie_core::QueryResult {
         columns: boundary.columns.clone(),
-        rows: vec![vec![cases[1].1.clone()]],
+        rows: vec![vec![cases[1].1.clone()]].into(),
         truncated: false,
     };
     assert!(

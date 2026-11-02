@@ -178,9 +178,11 @@ pub(crate) async fn dispatch_structured(
                         return Err("CSV export cannot represent multiple result sets; use JSON".into());
                     }
                     let first = result.result_sets.first();
-                    let rows = first.map(|set| set.rows.as_slice()).unwrap_or_default();
+                    let rows = first.map(|set| &set.rows);
                     let columns = first.map(|set| set.columns.as_slice()).unwrap_or_default();
-                    let null_marker = unique_csv_null_marker(rows);
+                    let null_marker = rows
+                        .map(unique_csv_null_marker)
+                        .unwrap_or_else(|| "__BOOKIE_NULL__".into());
                     let options = CsvOptions {
                         null_to_empty: false,
                         null_marker: Some(null_marker.clone()),
@@ -189,7 +191,7 @@ pub(crate) async fn dispatch_structured(
                     };
                     let mut out: Vec<u8> = Vec::new();
                     write_csv_header_with_options(&mut out, columns, &options).map_err(|error| error.to_string())?;
-                    for row in rows {
+                    for row in rows.into_iter().flat_map(|rows| rows.iter()) {
                         bridge.ensure_operation_active(&control)?;
                         write_csv_row_with_columns_and_options(&mut out, columns, row, &options)
                             .map_err(|error| error.to_string())?;
@@ -202,10 +204,10 @@ pub(crate) async fn dispatch_structured(
                 }
                 _ => {
                     let first = result.result_sets.first();
-                    let first_rows = first.map(|set| set.rows.as_slice()).unwrap_or_default();
+                    let first_rows = first.map(|set| &set.rows);
                     let first_columns = first.map(|set| set.columns.as_slice()).unwrap_or_default();
-                    let mut rows = Vec::with_capacity(first_rows.len());
-                    for row in first_rows {
+                    let mut rows = Vec::with_capacity(first_rows.map_or(0, |rows| rows.len()));
+                    for row in first_rows.into_iter().flat_map(|rows| rows.iter()) {
                         bridge.ensure_operation_active(&control)?;
                         rows.push(row.iter().map(value_to_json).collect::<Vec<_>>());
                     }

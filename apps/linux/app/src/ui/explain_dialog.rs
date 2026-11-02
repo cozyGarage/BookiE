@@ -220,7 +220,8 @@ mod tests {
                 Value::Text("PRIMARY".into()),
                 Value::Int(1),
                 Value::Text("Using index".into()),
-            ]],
+            ]]
+            .into(),
             truncated: false,
         };
         let text = format_explain_result(&result);
@@ -239,7 +240,8 @@ mod tests {
             columns: vec![column("QUERY PLAN")],
             rows: vec![vec![Value::Text(
                 "Seq Scan on a  (cost=0.00..60.00 rows=1000 width=4)".into(),
-            )]],
+            )]]
+            .into(),
             truncated: false,
         };
         let text = format_explain_result(&result);

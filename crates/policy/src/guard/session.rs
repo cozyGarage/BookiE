@@ -74,7 +74,7 @@ async fn inner_statement(
     let mut sets = batch.result_sets.into_iter();
     let mut first = sets.next().unwrap_or(QueryResult {
         columns: Vec::new(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated,
     });
     first.truncated |= truncated;

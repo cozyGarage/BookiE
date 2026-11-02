@@ -119,7 +119,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
                 assert_eq!(row[3], Value::Int(1));
                 assert_eq!(row[4], Value::Int(sample_size));
             }
-            assert_eq!(&row[2..], native_shape.rows[0].as_slice());
+            assert_eq!(&row[2..], &native_shape.rows[0][..]);
         }
     }
 
@@ -156,7 +156,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
         assert_eq!(row[2], Value::Text(array_type.clone()));
         assert_eq!(row[3], Value::Int(1));
         assert_eq!(row[4], Value::Int(6));
-        assert_eq!(&row[2..], native_shape.rows[0].as_slice());
+        assert_eq!(&row[2..], &native_shape.rows[0][..]);
     }
 
     let multidimensional = r#"[0:1][4:5]={{ready,"NULL"},{NULL,""}}"#;

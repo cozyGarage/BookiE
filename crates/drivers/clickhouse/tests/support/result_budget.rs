@@ -34,8 +34,8 @@ async fn narrow_queries_stop_at_the_row_limit_and_report_truncation() {
         .await
         .unwrap();
     assert_eq!(result.rows.len(), cap);
-    assert_eq!(result.rows.first(), Some(&vec![Value::Int(0)]));
-    assert_eq!(result.rows.last(), Some(&vec![Value::Int((cap - 1) as i64)]));
+    assert_eq!(result.rows.first(), Some(&[Value::Int(0)][..]));
+    assert_eq!(result.rows.last(), Some(&[Value::Int((cap - 1) as i64)][..]));
     assert!(result.truncated);
 }
 
