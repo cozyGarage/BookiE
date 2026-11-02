@@ -210,6 +210,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::cell_editor::tests::focus_leave_commits_pending_preedit_text"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::cell_editor::tests::committed_preedit_is_not_appended_twice"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::diagram::dialog::lifetime_tests::the_zoom_refresh_tick_does_not_retain_its_dialog_owner"
     ],
     [
