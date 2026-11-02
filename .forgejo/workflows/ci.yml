@@ -92,6 +92,8 @@ jobs:
       CARGO_HOME: /cargo
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
@@ -163,6 +165,8 @@ jobs:
       BOOKIE_TOOL_DIR: /tools
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
@@ -221,6 +225,8 @@ jobs:
       CARGO_BUILD_JOBS: "8"
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
@@ -407,6 +413,8 @@ jobs:
       CARGO_BUILD_JOBS: "8"
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin

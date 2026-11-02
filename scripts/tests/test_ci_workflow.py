@@ -117,6 +117,8 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("RUSTC_WRAPPER: sccache", job)
+                self.assertIn("CMAKE_C_COMPILER_LAUNCHER: /tools/sccache", job)
+                self.assertIn("CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache", job)
                 self.assertIn("SCCACHE_DIR: /cargo/sccache", job)
                 self.assertIn("PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin", job)
                 self.assertIn("SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}", job)
