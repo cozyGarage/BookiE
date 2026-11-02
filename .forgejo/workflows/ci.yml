@@ -90,7 +90,7 @@ jobs:
         shell: bash
     env:
       CARGO_HOME: /cargo
-      RUSTC_WRAPPER: ""
+      RUSTC_WRAPPER: sccache
       PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
@@ -152,7 +152,7 @@ jobs:
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
-      RUSTC_WRAPPER: ""
+      RUSTC_WRAPPER: sccache
       PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
@@ -201,7 +201,7 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: ""
+      RUSTC_WRAPPER: sccache
       PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
@@ -378,7 +378,7 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: ""
+      RUSTC_WRAPPER: sccache
       PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Check out

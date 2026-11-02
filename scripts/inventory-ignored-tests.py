@@ -77,6 +77,12 @@ def docker_activation(path, name, packages):
 
 
 packages = workspace_packages()
+workspace_package_names = set(packages.values())
+for entries in registry.values():
+    for entry in entries:
+        package = entry[0]
+        if package not in workspace_package_names:
+            raise RuntimeError(f"unknown Cargo package in isolated-test registry: {package}")
 mapped = {entry[2].split("::")[-1] for entries in registry.values() for entry in entries}
 output = io.StringIO()
 original_stdout = sys.stdout

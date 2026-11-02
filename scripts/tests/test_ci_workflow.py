@@ -109,6 +109,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("mongodb, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
 
+    def test_native_duckdb_build_jobs_use_the_shared_compiler_cache(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("RUSTC_WRAPPER: sccache", job)
+
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = (
