@@ -43,7 +43,7 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
                 row[key_index] == Value::Json(Box::new(mongodb::bson::Bson::ObjectId(id).into_canonical_extjson()))
             })
             .expect("find row by complete native key")
-            .clone()
+            .to_vec()
     };
     let unchanged = find_row(unchanged_id);
     let row = find_row(row_id);
@@ -83,14 +83,7 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
         )
         .expect("build delete from full grid snapshot")
     };
-    let statements = [
-        unchanged.as_slice(),
-        row.as_slice(),
-        sibling_row.as_slice(),
-        null_row.as_slice(),
-        null_array_row.as_slice(),
-    ]
-    .map(build_delete);
+    let statements = [unchanged, row, sibling_row, null_row, null_array_row].map(|row| build_delete(&row));
     let affected = connection
         .execute_in_transaction(&statements)
         .await

@@ -46,8 +46,8 @@ async fn values(connection: &dyn Connection) -> Vec<Value> {
         .await
         .unwrap()
         .rows
-        .into_iter()
-        .map(|mut row| row.remove(0))
+        .iter()
+        .map(|row| row[0].clone())
         .collect()
 }
 

@@ -9,7 +9,7 @@ impl Transaction for CountingTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
         let mut result = empty_result();
         if sql.to_ascii_lowercase().contains("count(") {
-            result.rows = vec![vec![Value::Int(self.count)]];
+            result.rows = vec![vec![Value::Int(self.count)]].into();
         }
         Ok(result)
     }

@@ -121,7 +121,7 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
             )
             .await
             .unwrap();
-        let sibling_before = before.rows[1].clone();
+        let sibling_before = before.rows[1].to_vec();
 
         let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres")
             .unwrap_or_else(|error| panic!("{data_type}[] parser: {error}"));
@@ -181,8 +181,8 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
         };
         assert!(native_type.ends_with("[]"), "unexpected array type {native_type}");
         if table == "date_array_grid" {
-            date_row_after_edit = Some(after.rows[0].clone());
-            date_sibling_after_edit = Some(after.rows[1].clone());
+            date_row_after_edit = Some(after.rows[0].to_vec());
+            date_sibling_after_edit = Some(after.rows[1].to_vec());
         }
         assert_eq!(id_index, 0, "primary key position in {table}");
     }
@@ -280,7 +280,7 @@ async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values
         )
         .await
         .unwrap();
-    let sibling_before = before.rows[1].clone();
+    let sibling_before = before.rows[1].to_vec();
 
     let parsed = parse_input_for_driver(ARRAY, Some(&columns[value_index]), "postgres")
         .expect("float4[] array text should pass through app grid parsing");
@@ -430,7 +430,7 @@ async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_sib
             )
             .await
             .unwrap();
-        let sibling_before = before.rows[1].clone();
+        let sibling_before = before.rows[1].to_vec();
 
         let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres").unwrap();
         assert_eq!(parsed, Value::Text(literal.into()), "{data_type}[] input text");
@@ -483,8 +483,8 @@ async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_sib
         assert_eq!(after.rows[0][1..], native.rows[0][..], "{data_type}[] native oracle");
         assert_eq!(after.rows[1], sibling_before, "{data_type}[] sibling changed");
         if table == "smallint_array_grid" {
-            smallint_target_after_edit = Some(after.rows[0].clone());
-            smallint_sibling_after_edit = Some(after.rows[1].clone());
+            smallint_target_after_edit = Some(after.rows[0].to_vec());
+            smallint_sibling_after_edit = Some(after.rows[1].to_vec());
         }
     }
 
@@ -577,7 +577,7 @@ async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_a
         )
         .await
         .unwrap();
-    let sibling_before = before.rows[1].clone();
+    let sibling_before = before.rows[1].to_vec();
 
     let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));

@@ -97,7 +97,7 @@ async fn value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offs
     assert!(!sheet.contains("<f>"), "{sheet}");
 
     let mut updates = Vec::new();
-    for row in &before.rows[..3] {
+    for row in before.rows.iter().take(3) {
         let displayed = crate::ui::grid::value_to_display_text(&row[value_index]);
         let Value::Text(original) = &row[value_index] else {
             panic!("datetimeoffset results must retain their exact text carrier");

@@ -154,7 +154,7 @@ fn export_page_fetcher(
                 close_export_cursor(&mut state, true).await?;
                 done.store(true, std::sync::atomic::Ordering::Release);
             }
-            Ok(page.result.rows)
+            Ok(page.result.rows.into_rows())
         });
         let rows = runner(future)?;
         Ok(Some(rows))

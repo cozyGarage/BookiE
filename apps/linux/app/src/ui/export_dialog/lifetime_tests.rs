@@ -21,7 +21,7 @@ fn dismissing_export_setup_releases_its_dialog() {
             paged: None,
             result: std::sync::Arc::new(QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![bookie_core::Value::Bytes(vec![7; 8 * 1024 * 1024])]],
+                rows: vec![vec![bookie_core::Value::Bytes(vec![7; 8 * 1024 * 1024])]].into(),
                 truncated: false,
             }),
             suggested_name: "synthetic".into(),

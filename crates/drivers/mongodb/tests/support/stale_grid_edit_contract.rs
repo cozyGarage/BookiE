@@ -39,7 +39,6 @@ async fn value_contract_mongodb_grid_value_comparison_does_not_detect_aba() {
                 row[key_index] == Value::Json(Box::new(mongodb::bson::Bson::ObjectId(id).into_canonical_extjson()))
             })
             .expect("find row by complete native key")
-            .clone()
     };
     let edit_row = row_for(edit_id);
     let delete_row = row_for(delete_id);
@@ -80,7 +79,7 @@ async fn value_contract_mongodb_grid_value_comparison_does_not_detect_aba() {
         Some("appdb"),
         "aba_grid",
         &before.columns,
-        &delete_row,
+        delete_row,
         &[delete_row[key_index].clone()],
     )
     .expect("build keyed delete from the materialized row");

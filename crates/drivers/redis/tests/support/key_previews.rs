@@ -32,7 +32,7 @@ async fn every_key_type_lists_with_its_type_and_a_preview() {
         rows.iter()
             .find(|row| row[0] == Value::Text(key.into()))
             .unwrap_or_else(|| panic!("{key} is listed"))
-            .clone()
+            .to_vec()
     };
 
     assert_eq!(find("k_string")[1], Value::Text("string".into()));

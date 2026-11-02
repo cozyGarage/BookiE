@@ -1057,7 +1057,10 @@ async fn session_string_settings_follow_sql_mode() {
         ));
     }
     assert_eq!(
-        results,
+        results
+            .iter()
+            .map(|(columns, rows)| (columns.clone(), rows.clone().into_rows()))
+            .collect::<Vec<_>>(),
         [
             (vec![r"a\".to_string()], vec![vec![Value::Text(r"path\".into())]]),
             (vec!["2".to_string()], vec![vec![Value::Int(2)]]),

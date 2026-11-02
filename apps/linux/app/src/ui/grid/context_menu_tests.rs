@@ -80,7 +80,7 @@ fn copying_a_previewed_cell_copies_the_full_value() {
     }];
     let result = std::sync::Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Text(full.clone())]],
+        rows: vec![vec![Value::Text(full.clone())]].into(),
         truncated: false,
     });
     let row = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();
@@ -305,7 +305,7 @@ fn local_result_for_menu() -> LocalResultView {
     LocalResultView::new(
         std::sync::Arc::new(QueryResult {
             columns: Vec::new(),
-            rows: vec![vec![Value::Int(7)]],
+            rows: vec![vec![Value::Int(7)]].into(),
             truncated: false,
         }),
         super::super::local_filter::LocalResultSettingsStore::default(),

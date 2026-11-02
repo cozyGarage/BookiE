@@ -141,7 +141,7 @@ fn grid_and_paste_enum_parsing_use_the_registered_driver_style() {
 fn browse_page(rows: usize, truncated: bool) -> QueryResult {
     QueryResult {
         columns: Vec::new(),
-        rows: vec![vec![Value::Int(1)]; rows],
+        rows: vec![vec![Value::Int(1)]; rows].into(),
         truncated,
     }
 }
@@ -244,7 +244,7 @@ fn only_the_latest_browse_page_request_is_accepted() {
 fn an_empty_page_uses_full_schema_headers_without_a_sparse_row_map() {
     let result = QueryResult {
         columns: Vec::new(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     };
     assert_eq!(projection_for_loaded_page(&result, Some(vec![0, 2])), None);
@@ -371,7 +371,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
             request,
             result: QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![Value::Int(20_001)], vec![Value::Int(21_000)]],
+                rows: vec![vec![Value::Int(20_001)], vec![Value::Int(21_000)]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -452,7 +452,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
             request: page_request,
             result: QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -637,7 +637,8 @@ fn mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing()
             Value::Uuid(Uuid::new_v4()),
             Value::Json(Box::new(serde_json::json!({"$numberDecimal": "1.25"}))),
             Value::Text("late".into()),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     };
 
@@ -1081,7 +1082,7 @@ fn page_metadata_does_not_replace_schema_for_other_drivers() {
     let loaded = vec![column("value", "numeric", false)];
     let page = QueryResult {
         columns: vec![column("value", "text", false)],
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     };
     assert_eq!(columns_for_browse_page("postgres", &loaded, Some(&page)), loaded);
@@ -1117,7 +1118,7 @@ fn a_page_with_unknown_column_types_uses_table_metadata_for_exports() {
     table[3].is_generated = true;
     let mut result = QueryResult {
         columns: vec![plain("id"), plain("qty"), plain("total"), plain("version")],
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     };
     result.columns[1].data_type = "NULL".into();

@@ -700,7 +700,7 @@ pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {
     let Value::Text(decoded_text) = &actual.rows[0][1] else {
         panic!("float8[] result must remain exact text: {:?}", actual.rows[0][1]);
     };
-    assert_eq!(&actual.rows[0][2..], expected.rows[0].as_slice());
+    assert_eq!(&actual.rows[0][2..], &expected.rows[0][..]);
     assert_eq!(
         actual.rows[1][0],
         Value::Int(2),
@@ -938,7 +938,7 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         &options,
     )
     .expect("every allowlisted built-in array should produce a typed CSV INSERT plan");
-    assert_eq!(plan.rows, source.rows, "array CSV parsing preserves exact text cells");
+    assert_eq!(source.rows, plan.rows, "array CSV parsing preserves exact text cells");
     connection
         .execute_params(&plan.statement, &plan.rows[0])
         .await

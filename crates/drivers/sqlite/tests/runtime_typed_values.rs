@@ -405,7 +405,7 @@ async fn jsonb_results_remain_binary_blobs_with_native_json_content() {
         Value::Text(storage_class),
         Value::Text(json_text),
         Value::Text(native_hex),
-    ] = result.rows[0].as_slice()
+    ] = &result.rows[0]
     else {
         panic!("SQLite JSONB result did not remain a byte value")
     };

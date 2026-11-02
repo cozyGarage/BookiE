@@ -363,7 +363,7 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
         &import_options,
     )
     .unwrap();
-    assert_eq!(plan.rows, source.rows);
+    assert_eq!(source.rows, plan.rows);
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }

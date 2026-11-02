@@ -69,7 +69,8 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
         "wide native decimals must fall back to exact text while representable values remain decimal",
     );
     assert_native_text(connection, "numeric_source").await;
-    copy_bound_rows(connection, "numeric_bound", &source.rows).await;
+    let bound_rows = source.rows.clone().into_rows();
+    copy_bound_rows(connection, "numeric_bound", &bound_rows).await;
     create_copy_table(connection, "numeric_csv").await;
     let columns = connection.fetch_columns(None, "numeric_csv").await.unwrap();
     let source_columns = connection.fetch_columns(None, "numeric_source").await.unwrap();
@@ -200,11 +201,12 @@ mod tests {
             rows: vec![vec![
                 Value::Text("99999999999999999999999999999999999999".into()),
                 Value::Text("12345678.123456789012345678901234567890".into()),
-            ]],
+            ]]
+            .into(),
             truncated: false,
         };
         let restored = csv_round_trip(&source, &source.columns);
-        assert_eq!(restored, source.rows);
+        assert_eq!(source.rows, restored);
     }
 
     fn column(name: &str, data_type: &str) -> bookie_core::ColumnInfo {

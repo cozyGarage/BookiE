@@ -53,7 +53,7 @@ fn page(values: &[i64]) -> Arc<QueryResult> {
 
 fn wide_streamed(sql: &str, byte: u8) -> (StatementOutcome, std::sync::Weak<QueryResult>) {
     let mut result = page(&[]).as_ref().clone();
-    result.rows = vec![vec![Value::Bytes(vec![byte; 8 * 1024 * 1024])]];
+    result.rows = vec![vec![Value::Bytes(vec![byte; 8 * 1024 * 1024])]].into();
     let result = Arc::new(result);
     let weak = Arc::downgrade(&result);
     let mut cache = super::super::stream_pages::StreamPageCache::default();

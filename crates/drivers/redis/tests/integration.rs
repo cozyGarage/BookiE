@@ -536,7 +536,7 @@ async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
         hello
             .rows
             .iter()
-            .any(|row| row == &[Value::Text("proto".into()), Value::Int(3)]),
+            .any(|row| row == [Value::Text("proto".into()), Value::Int(3)]),
         "HELLO must return a structured RESP3 map: {:?}",
         hello.rows
     );
@@ -557,13 +557,13 @@ async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
         result
             .rows
             .iter()
-            .any(|row| { row == &[Value::Text("name".into()), Value::Text("Ada".into())] })
+            .any(|row| row == [Value::Text("name".into()), Value::Text("Ada".into())])
     );
     assert!(
         result
             .rows
             .iter()
-            .any(|row| { row == &[Value::Text("opaque".into()), Value::Bytes(vec![0xFF, 0x00, 0x41])] }),
+            .any(|row| row == [Value::Text("opaque".into()), Value::Bytes(vec![0xFF, 0x00, 0x41])]),
         "RESP3 binary hash value changed: {:?}",
         result.rows
     );

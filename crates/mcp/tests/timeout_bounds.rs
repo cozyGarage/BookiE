@@ -316,7 +316,7 @@ async fn query_timeout_bounds_preview_rollback_after_dispatch() {
 fn empty_query_result() -> QueryResult {
     QueryResult {
         columns: Vec::new(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     }
 }
