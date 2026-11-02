@@ -278,6 +278,7 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             self.assertIn(f"-p {package} --test {target} -- --include-ignored --test-threads=1", local)
         registry = json.loads((ROOT / "scripts/isolated-tests.json").read_text())
+        self.assertEqual({entry[0] for entry in registry["gtk"]}, {"bookie-app"})
         self.assertEqual(
             {entry[2].split("::")[-1] for entry in registry["app-server"]},
             {
