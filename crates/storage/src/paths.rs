@@ -66,7 +66,10 @@ mod tests {
     #[test]
     fn connections_file_uses_stem_and_json_extension() {
         let path = append_connections_file(PathBuf::from("/tmp").join(storage_dir_name()));
-        assert_eq!(path, PathBuf::from("/tmp").join(storage_dir_name()).join("connections.json"));
+        assert_eq!(
+            path,
+            PathBuf::from("/tmp").join(storage_dir_name()).join("connections.json")
+        );
         assert_eq!(path.file_stem().and_then(|name| name.to_str()), Some("connections"));
         assert_eq!(path.extension().and_then(|ext| ext.to_str()), Some("json"));
     }
