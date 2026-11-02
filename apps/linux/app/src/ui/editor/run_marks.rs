@@ -67,6 +67,7 @@ fn mark_colors(dark: bool) -> [(u8, u8, u8); 2] {
     }
 }
 
+#[cfg(test)]
 fn relative_luminance(channel: u8) -> f64 {
     let value = f64::from(channel) / 255.0;
     if value <= 0.04045 {
@@ -76,6 +77,7 @@ fn relative_luminance(channel: u8) -> f64 {
     }
 }
 
+#[cfg(test)]
 fn contrast_ratio(foreground: (u8, u8, u8), background: (u8, u8, u8)) -> f64 {
     let left = 0.2126 * relative_luminance(foreground.0)
         + 0.7152 * relative_luminance(foreground.1)
