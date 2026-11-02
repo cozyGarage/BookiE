@@ -104,11 +104,23 @@ while [ "$SECONDS" -lt "$deadline" ]; do
       report="$(api_get "$api/actions/runs/$run_id/jobs" | python3 -c '
 import json, sys
 jobs = json.load(sys.stdin)
-if any(job["status"] in ("running", "waiting") for job in jobs):
+by_name = {}
+for job in jobs:
+    for name in (job["name"], job["name"].split(" (", 1)[0]):
+        by_name.setdefault(name, set()).add(job["status"])
+waiting = [job for job in jobs if job["status"] == "waiting"]
+blocked = {
+    job.get("id") for job in waiting
+    if any(
+        any(status in ("failure", "cancelled", "skipped", "blocked") for status in by_name.get(need, ()))
+        for need in job.get("needs", [])
+    )
+}
+if any(job["status"] == "running" for job in jobs) or any(job.get("id") not in blocked for job in waiting):
     print("RUNNING")
 else:
     for job in jobs:
-        if job["status"] not in ("success", "skipped", "blocked"):
+        if job["status"] not in ("success", "skipped", "blocked") and job.get("id") not in blocked:
             print(job["status"], job["id"], job["name"], sep="\t")
 ')"
       if [ "$report" != "RUNNING" ]; then
