@@ -245,6 +245,8 @@ fn bind_row_cell(
         } else {
             None
         };
+        let ambiguous = row_key_is_ambiguous(context, identity.as_deref().and_then(|identity| identity.key.as_ref()));
+        let editable = editable && !ambiguous;
         let (edited, updated_value, pending_classes) = state_for_bind(
             context,
             row,
@@ -270,7 +272,23 @@ fn bind_row_cell(
                 column,
             },
         );
+        if let Some(child) = item.child() {
+            mark_ambiguous_key(&child, ambiguous);
+        }
     });
+}
+
+fn row_key_is_ambiguous(context: &TabGridContext, key: Option<&crate::services::change_tracker::RowKey>) -> bool {
+    key.is_some_and(|key| context.ambiguous_keys.borrow().contains(key))
+}
+
+fn mark_ambiguous_key(child: &gtk4::Widget, ambiguous: bool) {
+    let reason = crate::tr!("Another loaded row has the same key, so this row cannot be edited on its own.");
+    if ambiguous {
+        child.set_tooltip_text(Some(&reason));
+    } else if child.tooltip_text().is_some_and(|tooltip| tooltip == reason) {
+        child.set_tooltip_text(None);
+    }
 }
 
 fn state_for_bind(

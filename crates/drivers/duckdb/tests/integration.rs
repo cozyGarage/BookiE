@@ -19,8 +19,12 @@ mod fixed_uhugeint_array;
 mod interval_csv_import;
 #[path = "support/nested_collection_refusal.rs"]
 mod nested_collection_refusal;
+#[path = "support/oversized_cell.rs"]
+mod oversized_cell;
 #[path = "support/result_budget.rs"]
 mod result_budget;
+#[path = "support/result_column_types.rs"]
+mod result_column_types;
 #[path = "support/rust_decimal_boundaries.rs"]
 mod rust_decimal_boundaries;
 #[path = "support/submicro_parameter_expression.rs"]
@@ -68,7 +72,7 @@ async fn query_with_zero_rows_preserves_column_metadata_and_completeness() {
             .iter()
             .map(|column| column.data_type.as_str())
             .collect::<Vec<_>>(),
-        vec!["Decimal128(38, 0)", "Utf8"]
+        vec!["HUGEINT", "VARCHAR"]
     );
     let native_types = connection
         .query("SELECT typeof(42::HUGEINT), typeof('payload'::VARCHAR)")

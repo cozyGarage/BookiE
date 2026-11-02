@@ -643,7 +643,7 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
       - name: Pre-pull fixture images
-        if: matrix.driver != 'duckdb'
+        if: ${{ matrix.driver != 'duckdb' }}
         run: bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"
       - name: Driver integration
         run: |

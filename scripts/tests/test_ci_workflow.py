@@ -109,7 +109,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("mongodb, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
-        self.assertIn("if: matrix.driver != 'duckdb'", image_prepull)
+        self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
 
     def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()

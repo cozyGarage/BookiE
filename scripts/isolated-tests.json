@@ -210,6 +210,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::cell_editor::tests::focus_leave_commits_pending_preedit_text"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::cell_editor::tests::committed_preedit_is_not_appended_twice"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::diagram::dialog::lifetime_tests::the_zoom_refresh_tick_does_not_retain_its_dialog_owner"
     ],
     [
@@ -341,6 +351,11 @@
       "bookie-app",
       "--lib",
       "ui::connect_dialog::entry_activation::tests::activating_a_nested_entry_row_invokes_submit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::ssh_section::tests::the_agent_key_row_shows_only_for_agent_authentication_and_round_trips"
     ],
     [
       "bookie-app",
@@ -1281,6 +1296,11 @@
       "bookie-app",
       "--lib",
       "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::row_inspector::tests::long_values_wrap_without_display_only_hyphens"
     ],
     [
       "bookie-app",
