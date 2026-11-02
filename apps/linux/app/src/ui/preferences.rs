@@ -393,12 +393,13 @@ mod tests {
     }
 
     #[test]
-    fn the_standard_null_choice_matches_the_grid_marker() {
+    fn the_standard_null_choice_uses_the_editable_null_marker() {
         set_null_display(NullDisplayPref::Standard);
         assert_eq!(
             null_display_choices()[NullDisplayPref::Standard.index() as usize],
-            value_to_display_text(&Value::Null)
+            crate::tr!("<NULL>")
         );
+        assert_eq!(value_to_display_text(&Value::Null), crate::tr!("NULL"));
     }
 
     /// The stored default must always be one of the choices the per-tab
