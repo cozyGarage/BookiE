@@ -27,6 +27,7 @@ mod imp {
         pub label: gtk4::Label,
         pub entry: RefCell<Option<gtk4::Text>>,
         pub preedit_callback: RefCell<Option<PreeditCallback>>,
+        pub last_preedit: RefCell<String>,
         pub inline_editable: Cell<bool>,
     }
 
@@ -45,6 +46,7 @@ mod imp {
                     .build(),
                 entry: RefCell::new(None),
                 preedit_callback: RefCell::new(None),
+                last_preedit: RefCell::new(String::new()),
                 inline_editable: Cell::default(),
             }
         }
@@ -182,11 +184,17 @@ impl CellEditor {
         let Some(entry) = self.imp().entry.borrow().as_ref().cloned() else {
             return;
         };
+        let pending = std::mem::take(&mut *self.imp().last_preedit.borrow_mut());
         if commit {
-            let new_text = entry.text();
+            let new_text = committed_edit_text(entry.text().as_str(), &pending);
+            if new_text != entry.text().as_str() {
+                entry.set_text(&new_text);
+            }
+            self.clear_preedit_listeners();
             self.label_widget().set_text(&new_text);
         } else {
             entry.set_text(&self.label_widget().text());
+            self.clear_preedit_listeners();
         }
         self.stack_widget().set_visible_child_name("display");
     }
@@ -211,10 +219,21 @@ impl CellEditor {
     }
 
     pub fn connect_preedit_changed<F: Fn(&str) + 'static>(&self, callback: F) {
-        let callback = Rc::new(callback);
-        *self.imp().preedit_callback.borrow_mut() = Some(callback.clone());
-        if let Some(entry) = self.imp().entry.borrow().as_ref() {
-            entry.connect_preedit_changed(move |_, preedit| callback(preedit));
+        *self.imp().preedit_callback.borrow_mut() = Some(Rc::new(callback));
+    }
+
+    fn record_preedit(&self, preedit: &str) {
+        if !preedit.is_empty() {
+            *self.imp().last_preedit.borrow_mut() = preedit.to_string();
+        }
+        if let Some(callback) = self.imp().preedit_callback.borrow().as_ref().cloned() {
+            callback(preedit);
+        }
+    }
+
+    fn clear_preedit_listeners(&self) {
+        if let Some(callback) = self.imp().preedit_callback.borrow().as_ref().cloned() {
+            callback("");
         }
     }
 
@@ -271,9 +290,20 @@ impl CellEditor {
         });
         entry.add_controller(focus_ctrl);
 
-        if let Some(callback) = self.imp().preedit_callback.borrow().as_ref().cloned() {
-            entry.connect_preedit_changed(move |_, preedit| callback(preedit));
-        }
+        let weak_for_preedit = self.downgrade();
+        entry.connect_preedit_changed(move |_, preedit| {
+            if let Some(this) = weak_for_preedit.upgrade() {
+                this.record_preedit(preedit);
+            }
+        });
+    }
+}
+
+fn committed_edit_text(entry_text: &str, pending_preedit: &str) -> String {
+    if pending_preedit.is_empty() || entry_text.ends_with(pending_preedit) {
+        entry_text.to_string()
+    } else {
+        format!("{entry_text}{pending_preedit}")
     }
 }
 
@@ -310,5 +340,38 @@ mod tests {
         cell.stop_editing(true);
         assert_eq!(cell.text().as_str(), "exact value");
         assert_eq!(cell.entry(), entry);
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn focus_leave_commits_pending_preedit_text() {
+        gtk4::init().unwrap();
+        let cell = CellEditor::new();
+        cell.set_inline_editable(true);
+        cell.start_editing_with("Việt ");
+        cell.entry().emit_by_name::<()>("preedit-changed", &[&"nam"]);
+        cell.stop_editing(true);
+        assert_eq!(cell.text().as_str(), "Việt nam");
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn committed_preedit_is_not_appended_twice() {
+        gtk4::init().unwrap();
+        let cell = CellEditor::new();
+        cell.set_inline_editable(true);
+        cell.start_editing_with("Việt nam");
+        let entry = cell.entry();
+        entry.emit_by_name::<()>("preedit-changed", &[&"nam"]);
+        entry.emit_by_name::<()>("preedit-changed", &[&""]);
+        cell.stop_editing(true);
+        assert_eq!(cell.text().as_str(), "Việt nam");
+    }
+
+    #[test]
+    fn pending_preedit_folds_into_committed_text() {
+        assert_eq!(committed_edit_text("Việt ", "nam"), "Việt nam");
+        assert_eq!(committed_edit_text("Việt nam", "nam"), "Việt nam");
+        assert_eq!(committed_edit_text("Việt ", ""), "Việt ");
     }
 }

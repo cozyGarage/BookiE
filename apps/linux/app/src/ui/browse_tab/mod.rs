@@ -103,6 +103,7 @@ pub struct BrowseTab {
     foreign_keys: Vec<ForeignKeyInfo>,
     inbound_foreign_keys: Vec<bookie_core::InboundForeignKeyInfo>,
     choice_labels: crate::ui::grid::ChoiceMap,
+    ambiguous_keys: crate::ui::grid::AmbiguousKeys,
     current_result: Option<std::sync::Arc<QueryResult>>,
     current_projection: Option<Vec<usize>>,
     /// Last row's primary-key values from the most recent page. Used
@@ -650,6 +651,7 @@ impl SimpleComponent for BrowseTab {
             foreign_keys: Vec::new(),
             inbound_foreign_keys: Vec::new(),
             choice_labels: Default::default(),
+            ambiguous_keys: Default::default(),
             current_result: None,
             current_projection: None,
             keyset_cursor: None,

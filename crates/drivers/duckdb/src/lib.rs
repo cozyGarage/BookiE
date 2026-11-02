@@ -17,6 +17,7 @@ use bookie_core::{
 use tempfile::TempDir;
 
 mod temporal;
+mod type_name;
 
 pub struct DuckdbDriver;
 
@@ -342,11 +343,8 @@ impl DuckdbConnection {
         )
         .await
     }
-}
 
-#[async_trait]
-impl Connection for DuckdbConnection {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+    async fn list_information_schema_relations(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
         let conn = Arc::clone(&self.session);
         blocking(move || {
             let guard = conn
@@ -357,12 +355,12 @@ impl Connection for DuckdbConnection {
                 .prepare(
                     "SELECT table_schema, table_name FROM information_schema.tables \
                      WHERE table_schema NOT IN ('information_schema', 'pg_catalog') \
-                     AND table_type = 'BASE TABLE' \
+                     AND table_type = ? \
                      ORDER BY table_schema, table_name",
                 )
                 .map_err(map_duck_error)?;
             let rows = stmt
-                .query_map([], |row| {
+                .query_map(params_from_iter([table_type]), |row| {
                     Ok(TableInfo {
                         schema: row.get::<_, Option<String>>(0)?,
                         name: row.get::<_, String>(1)?,
@@ -376,6 +374,17 @@ impl Connection for DuckdbConnection {
             Ok(out)
         })
         .await
+    }
+}
+
+#[async_trait]
+impl Connection for DuckdbConnection {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        self.list_information_schema_relations("BASE TABLE").await
+    }
+
+    async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+        self.list_information_schema_relations("VIEW").await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
@@ -635,25 +644,33 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
             truncated = true;
             break;
         }
-        let values = zoned_columns
-            .iter()
-            .zip(&uuid_columns)
-            .enumerate()
-            .map(
-                |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
-                    Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
-                    Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
-                        Value::Text(format!("{timestamp}+00"))
-                    }
-                    value => value,
-                },
-            )
-            .collect::<Vec<_>>();
-        if !budget.admit(&values) {
-            truncated = true;
-            break;
+        let payload_bytes = (0..column_count).fold(0usize, |total, i| {
+            total.saturating_add(cell_payload_bytes(&row.get_ref_unwrap(i)))
+        });
+        let admitted = budget.decode_and_admit_row::<std::convert::Infallible>(column_count, payload_bytes, || {
+            Ok(zoned_columns
+                .iter()
+                .zip(&uuid_columns)
+                .enumerate()
+                .map(
+                    |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
+                        Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                        Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
+                            Value::Text(format!("{timestamp}+00"))
+                        }
+                        value => value,
+                    },
+                )
+                .collect::<Vec<_>>())
+        });
+        match admitted {
+            Ok(Some(values)) => raw_rows.push(values),
+            Ok(None) => {
+                truncated = true;
+                break;
+            }
+            Err(never) => match never {},
         }
-        raw_rows.push(values);
     }
     if column_count == 0
         && let Some(stmt_ref) = rows.as_ref()
@@ -667,11 +684,7 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
                     .column_name(i)
                     .map(|s| s.to_string())
                     .unwrap_or_else(|_| format!("col{i}")),
-                data_type: if stmt_ref.column_logical_type(i).id() == LogicalTypeId::Uuid {
-                    "UUID".into()
-                } else {
-                    format!("{:?}", stmt_ref.column_type(i))
-                },
+                data_type: type_name::of(&stmt_ref.column_logical_type(i)),
                 nullable: true,
                 primary_key: false,
                 is_auto_increment: false,
@@ -706,6 +719,13 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
         rows: raw_rows,
         truncated,
     })
+}
+
+fn cell_payload_bytes(value: &ValueRef<'_>) -> usize {
+    match value {
+        ValueRef::Text(bytes) | ValueRef::Blob(bytes) | ValueRef::Geometry(bytes) => bytes.len(),
+        _ => 0,
+    }
 }
 
 fn duck_value_ref_to_value(v: ValueRef<'_>, uuid_column: bool) -> Value {

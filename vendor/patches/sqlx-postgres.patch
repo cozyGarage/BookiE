@@ -34,10 +34,19 @@ index f08e213..8ceccd6 100755
  impl PgConnection {
      /// Check whether EXPLAIN statements are supported by the current connection
 diff --git a/src/connection/establish.rs b/src/connection/establish.rs
-index 3c2f516..8c1f9a0 100755
+index 3c2f516..fea836f 100755
 --- a/src/connection/establish.rs
 +++ b/src/connection/establish.rs
-@@ -138,10 +138,12 @@ impl PgConnection {
+@@ -29,8 +29,6 @@ impl PgConnection {
+             // Sets the client-side encoding (character set).
+             // <https://www.postgresql.org/docs/devel/multibyte.html#MULTIBYTE-CHARSET-SUPPORTED>
+             ("client_encoding", "UTF8"),
+-            // Sets the time zone for displaying and interpreting time stamps.
+-            ("TimeZone", "UTC"),
+         ];
+ 
+         if let Some(ref extra_float_digits) = options.extra_float_digits {
+@@ -138,10 +136,12 @@ impl PgConnection {
          Ok(PgConnection {
              inner: Box::new(PgConnectionInner {
                  stream,

@@ -62,6 +62,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 ## SSH agent (built-in client)
 
 - [ ] Choose "SSH agent" in the SSH section with a key loaded in ssh-agent: the connection authenticates without a password or key file prompt.
+- [ ] With several keys in the agent, fill "Agent key file (optional)" with the public key file of the right one (`~/.ssh/<name>.pub`) and save: the connection offers only that key, and reopening the connection shows the path again. Clear the field to offer every agent key.
 - [ ] With the agent stopped, the error says the agent could not be reached.
 
 ## System OpenSSH tunnel
