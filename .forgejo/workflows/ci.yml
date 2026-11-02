@@ -90,10 +90,11 @@ jobs:
         shell: bash
     env:
       CARGO_HOME: /cargo
+      SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
       BOOKIE_TOOL_DIR: /tools
@@ -160,10 +161,11 @@ jobs:
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
+      SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
       - name: Check out
@@ -217,10 +219,11 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
+      SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
       - name: Check out
@@ -402,10 +405,11 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
+      SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
       SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
       SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Check out
         shell: bash
@@ -631,6 +635,7 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
       - name: Pre-pull fixture images
+        if: matrix.driver != 'duckdb'
         run: bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"
       - name: Driver integration
         run: |

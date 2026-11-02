@@ -108,6 +108,8 @@ class CiWorkflowTests(unittest.TestCase):
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("mongodb, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
+        image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
+        self.assertIn("if: matrix.driver != 'duckdb'", image_prepull)
 
     def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -115,6 +117,8 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("RUSTC_WRAPPER: sccache", job)
+                self.assertIn("SCCACHE_DIR: /cargo/sccache", job)
+                self.assertIn("PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin", job)
                 self.assertIn("SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}", job)
                 self.assertIn("SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock", job)
                 self.assertIn("sccache --start-server", job)
