@@ -17,6 +17,7 @@ defaults:
 env:
   CARGO_TERM_COLOR: never
   CARGO_INCREMENTAL: "0"
+  BOOKIE_BUNDLE_CACHE: /var/cache/ci/bundles
   BOOKIE_GTK_WAIT_SECONDS: "45"
   BOOKIE_GTK_SCENARIO_RETRIES: "1"
   GITHUB_STEP_SUMMARY: /dev/null
@@ -92,13 +93,14 @@ jobs:
       CARGO_HOME: /cargo
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
-      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       BOOKIE_TOOL_DIR: /tools
       CARGO_PROFILE_CI_STRIP: symbols
     steps:
@@ -109,6 +111,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
@@ -124,6 +127,8 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "8"
         run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
           cd src
           cargo build --profile ci --locked -p bookie-app --bin bookie-app
           python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}"
@@ -141,7 +146,10 @@ jobs:
             sccache --show-stats
             sccache --stop-server
           fi
-          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -160,17 +168,18 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
-      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
     steps:
       - name: Check out
         shell: bash
@@ -179,6 +188,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
@@ -190,6 +200,8 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Clippy
         run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
           cd src && cargo clippy --workspace --all-targets -- -D warnings
       - name: Clean builder scratch
         if: always()
@@ -198,7 +210,10 @@ jobs:
             sccache --show-stats
             sccache --stop-server
           fi
-          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -218,17 +233,18 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
-      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
@@ -239,6 +255,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
@@ -249,7 +266,10 @@ jobs:
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Build the default test bundle
-        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default
+        run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default
       - name: Publish the default test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -263,7 +283,10 @@ jobs:
             sccache --show-stats
             sccache --stop-server
           fi
-          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -406,17 +429,18 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
       SCCACHE_DIR: /cargo/sccache
       RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
-      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Check out
@@ -426,6 +450,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
@@ -441,6 +466,8 @@ jobs:
           apt-get install -y --no-install-recommends desktop-file-utils
       - name: Build the shared release package
         run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
           cd src
           DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
           package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
@@ -461,7 +488,10 @@ jobs:
             sccache --show-stats
             sccache --stop-server
           fi
-          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -638,6 +668,7 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
+        if: matrix.driver != 'duckdb'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

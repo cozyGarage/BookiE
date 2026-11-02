@@ -1,7 +1,8 @@
 use std::{collections::HashMap, iter};
 
 use bookie_core::{
-    ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBudget, Value,
+    ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBudget, QueryRows,
+    Value,
 };
 use futures::stream::StreamExt;
 use sqlx::pool::PoolConnection;
@@ -425,7 +426,8 @@ where
     let mut type_infos = Vec::new();
     let mut column_origins = Vec::new();
     let mut type_names = Vec::new();
-    let mut rows = Vec::new();
+    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -448,18 +450,16 @@ where
             type_names = metadata.type_names;
         }
         let payload_bytes = pg_row_payload_bytes(&row).unwrap_or(usize::MAX);
-        let Some(values) = budget.decode_and_admit_row(row.len(), payload_bytes, || {
-            type_names
-                .iter()
-                .enumerate()
-                .map(|(index, type_name)| extract_value(&row, index, type_name))
-                .collect::<Result<Vec<_>, _>>()
-        })?
-        else {
+        if !budget.decode_and_admit_row_into(row.len(), payload_bytes, &mut decoded, |values| {
+            for (index, type_name) in type_names.iter().enumerate() {
+                values.push(extract_value(&row, index, type_name)?);
+            }
+            Ok::<(), DriverError>(())
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(values);
+        }
+        rows.push_row(&mut decoded);
     }
     Ok((
         QueryResult {

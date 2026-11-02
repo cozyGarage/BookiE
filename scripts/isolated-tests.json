@@ -700,7 +700,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::grid::close_edits::tests::finishing_an_inline_edit_keeps_its_field_parented_and_commits_once"
+      "ui::grid::close_edits::tests::finishing_an_inline_edit_restores_its_label_and_commits_once"
     ],
     [
       "bookie-app",

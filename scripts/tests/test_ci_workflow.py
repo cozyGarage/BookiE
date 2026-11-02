@@ -41,18 +41,33 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/target\n", workflow)
-        for name in ("gtk-build", "clippy", "test-build", "floor-build", "supply-chain"):
+        self.assertIn("BOOKIE_BUNDLE_CACHE: /var/cache/ci/bundles", workflow)
+        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-                self.assertIn("CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}", job)
-                self.assertIn("TMPDIR: /target/${{ github.run_id }}/${{ github.job }}", job)
+                self.assertIn("CARGO_TARGET_DIR: /target/bookie-${{ github.job }}", job)
+                self.assertIn("TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}", job)
                 self.assertIn('mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"', job)
-                self.assertIn('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"', job)
+                self.assertIn('touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock', job)
+                self.assertIn('exec 9>>/target/.bookie-build-cache.lock', job)
+                self.assertIn('flock --exclusive 9', job)
+                self.assertNotIn('rm -rf -- "$CARGO_TARGET_DIR"', job)
+                self.assertIn('cleanup --min-free-gib 30', job)
+        supply_chain = re.search(r"(?ms)^  supply-chain:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}", supply_chain)
+        self.assertIn('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"', supply_chain)
         guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/bookie-guards-${{ github.run_id }}", guards)
         self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}", guards)
         self.assertIn('RUSTC_WRAPPER: ""', guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
+
+    def test_build_host_jobs_ignore_sccache_server_io_errors(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("SCCACHE_IGNORE_SERVER_IO_ERROR: \"1\"", job)
 
     def test_postgres_release_temp_directory_stays_short_for_unix_sockets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -121,13 +136,17 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache", job)
                 self.assertIn("SCCACHE_DIR: /cargo/sccache", job)
                 self.assertIn("PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin", job)
-                self.assertIn("SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}", job)
-                self.assertIn("SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock", job)
+                self.assertIn("CARGO_TARGET_DIR: /target/bookie-${{ github.job }}", job)
+                self.assertIn("TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}", job)
+                self.assertIn("SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}", job)
+                self.assertIn("SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock", job)
                 self.assertIn("sccache --start-server", job)
                 self.assertIn("sccache --show-stats", job)
+                self.assertIn("python3 src/scripts/ci-cache.py --root /target", job)
                 stop = job.index("sccache --stop-server")
-                cleanup = job.index('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"')
+                cleanup = job.index('rm -rf -- "$TMPDIR"')
                 self.assertLess(stop, cleanup)
+                self.assertNotIn('rm -rf -- "$CARGO_TARGET_DIR"', job)
 
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -290,6 +309,7 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             self.assertIn(f"-p {package} --test {target} -- --include-ignored --test-threads=1", local)
         registry = json.loads((ROOT / "scripts/isolated-tests.json").read_text())
+        self.assertEqual({entry[0] for entry in registry["gtk"]}, {"bookie-app"})
         self.assertEqual(
             {entry[2].split("::")[-1] for entry in registry["app-server"]},
             {

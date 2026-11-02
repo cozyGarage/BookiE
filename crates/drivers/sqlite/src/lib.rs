@@ -17,8 +17,8 @@ use futures::stream::StreamExt;
 
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo,
-    Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows,
+    TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -642,7 +642,8 @@ async fn stream_into_result(
     let columns = result_columns(connection, statement.columns(), sql).await;
     drop(statement);
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
-    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -652,14 +653,14 @@ async fn stream_into_result(
             break;
         }
         let payload_bytes = sqlite_row_payload_bytes(&row);
-        let Some(values) = budget.decode_and_admit_row(columns.len(), payload_bytes, || {
-            Ok::<_, DriverError>((0..columns.len()).map(|index| extract_value(&row, index)).collect())
-        })?
-        else {
+        if !budget.decode_and_admit_row_into(columns.len(), payload_bytes, &mut decoded, |values| {
+            values.extend((0..columns.len()).map(|index| extract_value(&row, index)));
+            Ok(())
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(values);
+        }
+        rows.push_row(&mut decoded);
     }
     drop(stream);
     Ok(QueryResult {
@@ -1087,7 +1088,8 @@ async fn params_into_result(
     drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
-    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -1097,14 +1099,14 @@ async fn params_into_result(
             break;
         }
         let payload_bytes = sqlite_row_payload_bytes(&row);
-        let Some(values) = budget.decode_and_admit_row(columns.len(), payload_bytes, || {
-            Ok::<_, DriverError>((0..columns.len()).map(|index| extract_value(&row, index)).collect())
-        })?
-        else {
+        if !budget.decode_and_admit_row_into(columns.len(), payload_bytes, &mut decoded, |values| {
+            values.extend((0..columns.len()).map(|index| extract_value(&row, index)));
+            Ok(())
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(values);
+        }
+        rows.push_row(&mut decoded);
     }
     drop(stream);
     Ok(QueryResult {

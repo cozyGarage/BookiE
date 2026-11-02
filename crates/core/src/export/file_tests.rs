@@ -9,7 +9,8 @@ fn result() -> QueryResult {
             Value::Bytes(vec![0, 255]),
             Value::Text("=1+1".into()),
             Value::Int(-42),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     }
 }
@@ -37,7 +38,7 @@ fn value_contract_workbook_empty_text_is_refused_without_losing_destination() {
     std::fs::write(&path, b"existing workbook").unwrap();
     let data = QueryResult {
         columns: vec![column("value")],
-        rows: vec![vec![Value::Null], vec![Value::Text(String::new())]],
+        rows: vec![vec![Value::Null], vec![Value::Text(String::new())]].into(),
         truncated: false,
     };
     let error = write_result_file(
@@ -64,7 +65,8 @@ fn value_contract_html_nul_text_preserves_destination_and_reports_coordinates() 
         rows: vec![
             vec![Value::Int(1), Value::Text("valid".into())],
             vec![Value::Int(2), Value::Text("before\0after".into())],
-        ],
+        ]
+        .into(),
         truncated: false,
     };
     let error = write_result_file(
@@ -93,7 +95,8 @@ fn value_contract_xml_illegal_text_preserves_destination_and_reports_coordinates
             rows: vec![
                 vec![Value::Int(1), Value::Text("valid".into())],
                 vec![Value::Int(2), Value::Text(format!("before{character}after"))],
-            ],
+            ]
+            .into(),
             truncated: false,
         };
         let error = write_result_file(
@@ -120,7 +123,7 @@ fn value_contract_workbook_column_limit_failure_preserves_destination() {
     std::fs::write(&path, b"existing workbook").unwrap();
     let data = QueryResult {
         columns: (0..16_385).map(|index| column(&format!("column_{index}"))).collect(),
-        rows: vec![],
+        rows: vec![].into(),
         truncated: false,
     };
     let error = write_result_file(
@@ -145,7 +148,7 @@ fn value_contract_workbook_mid_export_cancellation_preserves_destination() {
     let path = dir.path().join("keep.xlsx");
     std::fs::write(&path, b"existing workbook").unwrap();
     let mut data = result();
-    data.rows.push(data.rows[0].clone());
+    data.rows.push(data.rows[0].to_vec());
     let written = std::cell::Cell::new(0);
     let error = write_result_file(
         &path,
@@ -166,7 +169,7 @@ fn export_progress_reports_completed_rows_from_one() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("result.csv");
     let mut data = result();
-    data.rows.push(data.rows[0].clone());
+    data.rows.push(data.rows[0].to_vec());
     let progress = std::cell::RefCell::new(Vec::new());
 
     write_result_file(
@@ -240,7 +243,8 @@ fn streamed_sqlite_any_csv_preserves_runtime_value_tags() {
             vec![Value::Text(String::new())],
             vec![Value::Null],
             vec![Value::Bytes(vec![0, 255])],
-        ],
+        ]
+        .into(),
         truncated: false,
     };
     let options = CsvOptions {
@@ -347,7 +351,7 @@ fn an_excel_export_over_the_row_limit_is_refused_before_the_destination_is_touch
     let options = CsvOptions::default();
     let oversized = QueryResult {
         columns: ["id"].map(column).to_vec(),
-        rows: vec![Vec::new(); crate::export::MAX_WORKBOOK_ROWS + 1],
+        rows: vec![Vec::new(); crate::export::MAX_WORKBOOK_ROWS + 1].into(),
         truncated: false,
     };
     let error = write_result_file(

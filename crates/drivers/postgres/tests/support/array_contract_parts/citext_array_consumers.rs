@@ -136,7 +136,7 @@ async fn value_contract_citext_array_decodes_and_rebinds_exact_values() {
         &options,
     )
     .unwrap();
-    assert_eq!(plan.rows, source.rows);
+    assert_eq!(source.rows, plan.rows);
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }

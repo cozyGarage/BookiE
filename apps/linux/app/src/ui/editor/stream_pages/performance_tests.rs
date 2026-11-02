@@ -5,7 +5,7 @@ use bookie_core::Value;
 fn byte_page(bytes: usize) -> Arc<QueryResult> {
     let mut result = page(&["payload"], &[]).as_ref().clone();
     result.columns[0].data_type = "BYTEA".into();
-    result.rows = vec![vec![Value::Bytes(vec![7; bytes])]];
+    result.rows = vec![vec![Value::Bytes(vec![7; bytes])]].into();
     Arc::new(result)
 }
 
@@ -34,7 +34,7 @@ fn snapshots_share_payloads_and_release_evicted_pages_after_the_last_owner() {
         .unwrap();
     let mut cache = StreamPageCache::default();
     let mut wide_page = page(&["payload"], &[]).as_ref().clone();
-    wide_page.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]];
+    wide_page.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]].into();
     let result = Arc::new(wide_page);
     let weak = Arc::downgrade(&result);
     cache.append(0, result).unwrap();
@@ -44,7 +44,7 @@ fn snapshots_share_payloads_and_release_evicted_pages_after_the_last_owner() {
     assert!(Arc::ptr_eq(&first.pages[0].upgrade().unwrap(), &cache.pages()[0].1));
     for index in 1..4 {
         let mut next_page = page(&["payload"], &[]).as_ref().clone();
-        next_page.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]];
+        next_page.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]].into();
         cache.append(index, Arc::new(next_page)).unwrap();
     }
     assert_eq!(cache.first_page(), 2);
@@ -136,7 +136,7 @@ fn rejected_pages_release_payloads_without_advancing_the_retained_window() {
     let mut cache = StreamPageCache::default();
     cache.append(0, page(&["id"], &[1])).unwrap();
     let mut malformed = page(&["id"], &[2]).as_ref().clone();
-    malformed.rows[0].push(Value::Int(3));
+    malformed.rows = vec![vec![Value::Int(1), Value::Int(2), Value::Int(3)]].into();
     for (index, result, expected) in [
         (2, page(&["id"], &[2]), PageAppendError::OutOfOrder),
         (1, page(&["changed"], &[2]), PageAppendError::SchemaChanged),
@@ -176,7 +176,7 @@ fn terminal_snapshots_keep_only_the_retained_window_and_release_on_drop() {
     let mut refs = Vec::new();
     for index in 0..12 {
         let mut result = page(&["payload"], &[]).as_ref().clone();
-        result.rows = vec![vec![Value::Text("x".repeat(15 * 1024 * 1024))]];
+        result.rows = vec![vec![Value::Text("x".repeat(15 * 1024 * 1024))]].into();
         let result = Arc::new(result);
         refs.push(Arc::downgrade(&result));
         cache.append(index as u64, result).unwrap();

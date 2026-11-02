@@ -145,7 +145,7 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
         .expect("verify imported rows");
     assert_eq!(
         result.rows,
-        [
+        vec![
             vec![Value::Int(51), Value::Text("Ada".into())],
             vec![Value::Int(52), Value::Text("Grace".into())]
         ]

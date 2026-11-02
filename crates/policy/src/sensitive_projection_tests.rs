@@ -230,7 +230,7 @@ fn unrecognized_query_shapes_redact_their_result_values() {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![bookie_core::Value::Text("sensitive".into())]],
+            rows: vec![vec![bookie_core::Value::Text("sensitive".into())]].into(),
             truncated: false,
         };
         let masked = crate::mask::apply_masking(result, &patterns, Some(&positions));

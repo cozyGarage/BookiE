@@ -56,7 +56,7 @@ mod tests {
             .await
             .unwrap()
             .rows;
-        assert_eq!(rows, [[Value::Text("a@example.com".into())]]);
+        assert_eq!(rows, vec![vec![Value::Text("a@example.com".into())]]);
     }
 
     #[tokio::test]

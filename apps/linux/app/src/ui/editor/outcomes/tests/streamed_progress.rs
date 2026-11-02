@@ -8,6 +8,7 @@ fn streamed_progress_pluralizes_rows_and_pages_independently() {
         (1, 2, "Received 1 row · 2 pages"),
         (2, 1, "Received 2 rows · 1 page"),
         (2, 2, "Received 2 rows · 2 pages"),
+        (215_804, 43, "Received 215,804 rows · 43 pages"),
     ] {
         let page_row_counts = vec![rows / pages.max(1) as usize; pages as usize];
         let page_row_starts = super::super::super::stream_pages::page_row_starts_from_counts(&page_row_counts);

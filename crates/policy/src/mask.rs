@@ -164,7 +164,7 @@ mod tests {
                     domain_type: None,
                 },
             ],
-            rows: vec![vec![Value::Int(1), Value::Text("4111111111111111".into())]],
+            rows: vec![vec![Value::Int(1), Value::Text("4111111111111111".into())]].into(),
             truncated: false,
         };
         let masked = apply_masking(result, &patterns, None);
@@ -188,7 +188,7 @@ mod tests {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Text("secret".into())]],
+            rows: vec![vec![Value::Text("secret".into())]].into(),
             truncated: false,
         };
         let masked = apply_masking(result, &[], None);
@@ -211,7 +211,7 @@ mod tests {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Text("4111111111111111".into())]],
+            rows: vec![vec![Value::Text("4111111111111111".into())]].into(),
             truncated: false,
         };
         let masked = apply_masking(result, &[], Some(&[true]));
@@ -241,7 +241,8 @@ mod tests {
                     serde_json::json!({"user": "ada", "creds": [{"Password": "p"}]}),
                 )),
                 Value::JsonText(r#"{"name":"ada","ssn":"123-45-6789"}"#.into()),
-            ]],
+            ]]
+            .into(),
             truncated: false,
         };
 

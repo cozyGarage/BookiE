@@ -91,7 +91,7 @@ fn a_loaded_result_still_exports_successfully() {
             enum_type: None,
             domain_type: None,
         }],
-        rows: vec![vec![bookie_core::Value::Text("hello, export".into())]],
+        rows: vec![vec![bookie_core::Value::Text("hello, export".into())]].into(),
         truncated: false,
     }));
     write_export(

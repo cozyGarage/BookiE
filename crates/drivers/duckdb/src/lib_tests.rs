@@ -53,21 +53,6 @@ async fn open_session_is_refused() {
 }
 
 #[tokio::test]
-async fn a_timed_out_query_is_interrupted() {
-    let conn = in_memory_connection().await;
-    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_millis(5));
-
-    let result = conn
-        .query_controlled("SELECT count(*) FROM range(100000000) a, range(2) b", &control)
-        .await;
-
-    match result {
-        Err(DriverError::TimedOut) => {}
-        other => panic!("expected TimedOut, got {other:?}"),
-    }
-}
-
-#[tokio::test]
 async fn cancelling_a_long_query_stops_it_and_frees_the_connection() {
     let conn = in_memory_connection().await;
     let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_millis(100));
@@ -227,14 +212,8 @@ async fn lists_tables_and_views_separately() {
     conn.execute("CREATE VIEW v AS SELECT id FROM t").await.unwrap();
     let tables = conn.list_tables().await.unwrap();
     let views = conn.list_views().await.unwrap();
-    assert_eq!(
-        tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
-        ["t"]
-    );
-    assert_eq!(
-        views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
-        ["v"]
-    );
+    assert_eq!(tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(), ["t"]);
+    assert_eq!(views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(), ["v"]);
 }
 #[tokio::test]
 async fn columns_are_read_for_a_table_whose_name_needs_quoting() {

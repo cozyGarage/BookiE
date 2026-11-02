@@ -602,7 +602,7 @@ mod scope_presentation_tests {
                 paged: None,
                 result: std::sync::Arc::new(QueryResult {
                     columns: Vec::new(),
-                    rows: Vec::new(),
+                    rows: Vec::new().into(),
                     truncated: false,
                 }),
                 suggested_name: "join-result".into(),
@@ -625,7 +625,7 @@ mod scope_presentation_tests {
                 paged: None,
                 result: std::sync::Arc::new(QueryResult {
                     columns: Vec::new(),
-                    rows: Vec::new(),
+                    rows: Vec::new().into(),
                     truncated: false,
                 }),
                 suggested_name: "public.people".into(),
