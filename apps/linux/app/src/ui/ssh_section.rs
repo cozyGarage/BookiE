@@ -373,7 +373,7 @@ mod tests {
         let (auth, saved) = agent_authentication(" /home/me/.ssh/id_ed25519.pub ");
 
         assert!(
-            matches!(auth, SshAuth::AgentIdentity { public_key } if public_key == PathBuf::from("/home/me/.ssh/id_ed25519.pub"))
+            matches!(auth, SshAuth::AgentIdentity { public_key } if public_key.as_path() == std::path::Path::new("/home/me/.ssh/id_ed25519.pub"))
         );
         assert_eq!(saved, Some(PathBuf::from("/home/me/.ssh/id_ed25519.pub")));
     }
