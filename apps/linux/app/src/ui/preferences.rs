@@ -381,7 +381,7 @@ fn null_display_choices() -> [String; 3] {
 mod tests {
     use super::*;
     use crate::ui::grid::{set_null_display, value_to_display_text};
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     #[test]
     fn format_thousands_matches_the_browse_tab_paginator() {
