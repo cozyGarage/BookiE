@@ -17,6 +17,8 @@ mod fixed_uhugeint_array;
 mod interval_csv_import;
 #[path = "support/nested_collection_refusal.rs"]
 mod nested_collection_refusal;
+#[path = "support/oversized_cell.rs"]
+mod oversized_cell;
 #[path = "support/result_budget.rs"]
 mod result_budget;
 #[path = "support/result_column_types.rs"]
