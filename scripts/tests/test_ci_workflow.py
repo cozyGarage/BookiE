@@ -54,6 +54,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('RUSTC_WRAPPER: ""', guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
 
+    def test_build_host_jobs_ignore_sccache_server_io_errors(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("SCCACHE_IGNORE_SERVER_IO_ERROR: \"1\"", job)
+
     def test_postgres_release_temp_directory_stays_short_for_unix_sockets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  pg-release:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
