@@ -345,6 +345,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::ssh_section::tests::the_agent_key_row_shows_only_for_agent_authentication_and_round_trips"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::split_view::tests::split_editor_views_share_buffer_and_retain_text_across_toggles"
     ],
     [
