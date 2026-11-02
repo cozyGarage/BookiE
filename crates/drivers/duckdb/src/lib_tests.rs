@@ -227,14 +227,8 @@ async fn lists_tables_and_views_separately() {
     conn.execute("CREATE VIEW v AS SELECT id FROM t").await.unwrap();
     let tables = conn.list_tables().await.unwrap();
     let views = conn.list_views().await.unwrap();
-    assert_eq!(
-        tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
-        ["t"]
-    );
-    assert_eq!(
-        views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
-        ["v"]
-    );
+    assert_eq!(tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(), ["t"]);
+    assert_eq!(views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(), ["v"]);
 }
 #[tokio::test]
 async fn columns_are_read_for_a_table_whose_name_needs_quoting() {
