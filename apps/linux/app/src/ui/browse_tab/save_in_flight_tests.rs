@@ -444,7 +444,7 @@ fn keyless_tab_refuses_to_stage_deletion_of_a_persisted_row() {
     assert!(
         outputs
             .iter()
-            .any(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
+            .any(|output| matches!(output, BrowseTabOutput::ShowSelectionAlert { .. }))
     );
     assert_eq!(
         pending(tab_id),
