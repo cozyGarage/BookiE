@@ -73,7 +73,8 @@ mod tests {
                 .and_then(|container| container.first_child())
                 .is_some_and(|label| label.is_visible())
         );
-        assert!(!editor.entry().is_visible());
+        assert!(!editor.entry().property::<bool>("visible"));
+        assert!(!editor.entry().should_layout());
         assert!(finish_active_edits(&window));
         assert_eq!(finished.get(), 1);
         window.close();

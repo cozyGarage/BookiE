@@ -337,14 +337,8 @@ mod tests {
         entry.set_text("discarded");
         cell.stop_editing(false);
         assert!(cell.imp().label.is_visible());
-        assert!(
-            !cell
-                .imp()
-                .entry
-                .borrow()
-                .as_ref()
-                .is_some_and(|entry| entry.is_visible())
-        );
+        assert!(!entry.property::<bool>("visible"));
+        assert!(!entry.should_layout());
         assert_eq!(cell.text().as_str(), "stored");
 
         cell.start_editing_with("exact value");
@@ -359,14 +353,8 @@ mod tests {
         assert_eq!(cell.entry().text().as_str(), "exact value");
         cell.stop_editing(true);
         assert!(cell.imp().label.is_visible());
-        assert!(
-            !cell
-                .imp()
-                .entry
-                .borrow()
-                .as_ref()
-                .is_some_and(|entry| entry.is_visible())
-        );
+        assert!(!entry.property::<bool>("visible"));
+        assert!(!entry.should_layout());
         assert_eq!(cell.text().as_str(), "exact value");
         assert_eq!(cell.entry(), entry);
         assert_eq!(edit_transitions.get(), 4);
