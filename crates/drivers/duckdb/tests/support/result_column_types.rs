@@ -1,4 +1,4 @@
-use bookie_core::{ConnectOptions, Connection, DatabaseDriver};
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use drivers_duckdb::DuckdbDriver;
 
 #[tokio::test]
