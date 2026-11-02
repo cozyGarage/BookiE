@@ -345,7 +345,7 @@ impl DuckdbConnection {
         .await
     }
 
-    async fn list_information_schema_relations(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
+    async fn list_catalog_objects(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
         let conn = Arc::clone(&self.session);
         blocking(move || {
             let guard = conn
@@ -381,11 +381,11 @@ impl DuckdbConnection {
 #[async_trait]
 impl Connection for DuckdbConnection {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        self.list_information_schema_relations("BASE TABLE").await
+        self.list_catalog_objects("BASE TABLE").await
     }
 
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
-        self.list_information_schema_relations("VIEW").await
+        self.list_catalog_objects("VIEW").await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
