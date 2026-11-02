@@ -194,6 +194,13 @@ class PrepullTestImagesTests(unittest.TestCase):
         self.assertIn('bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"', ci)
         self.assertIn("bash src/scripts/prepull-test-images.sh driver-tls", ci)
 
+    def test_the_embedded_duckdb_driver_skips_container_image_setup(self):
+        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        driver = ci.split("  driver:\n", 1)[1].split("  e2e:\n", 1)[0]
+        for step in ("Docker Hub login", "Pre-pull fixture images"):
+            block = driver.split(f"- name: {step}\n", 1)[1].split("\n      - name:", 1)[0]
+            self.assertIn("if: matrix.driver != 'duckdb'", block)
+
     def test_distro_floor_package_builds_pre_pull_their_base_image(self):
         self.assertEqual(listed_groups().get("distro-floor"), {"debian:testing"})
         for name, needle in (
