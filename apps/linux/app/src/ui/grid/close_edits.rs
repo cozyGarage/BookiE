@@ -66,8 +66,14 @@ mod tests {
         assert!(finish_active_edits(&window));
         assert!(!editor.is_editing());
         assert_eq!(editor.text().as_str(), "after");
-        assert!(editor.entry().parent().is_none());
-        assert!(editor.first_child().is_some_and(|child| child.is::<gtk4::Label>()));
+        assert!(editor.entry().parent().is_some_and(|parent| parent.is::<gtk4::Box>()));
+        assert!(
+            editor
+                .first_child()
+                .and_then(|container| container.first_child())
+                .is_some_and(|label| label.is_visible())
+        );
+        assert!(!editor.entry().is_visible());
         assert!(finish_active_edits(&window));
         assert_eq!(finished.get(), 1);
         window.close();

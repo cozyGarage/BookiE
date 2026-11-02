@@ -12,6 +12,7 @@ mod imp {
     use super::*;
 
     pub struct CellEditor {
+        pub container: gtk4::Box,
         pub label: gtk4::Label,
         pub entry: RefCell<Option<gtk4::Text>>,
         pub preedit_callback: RefCell<Option<PreeditCallback>>,
@@ -23,6 +24,7 @@ mod imp {
     impl Default for CellEditor {
         fn default() -> Self {
             Self {
+                container: gtk4::Box::builder().spacing(0).build(),
                 label: gtk4::Label::builder()
                     .xalign(0.0)
                     .hexpand(true)
@@ -52,18 +54,12 @@ mod imp {
         fn constructed(&self) {
             self.parent_constructed();
             self.obj().add_css_class("tp-cell-editor");
-            self.label.set_parent(&*self.obj());
+            self.label.set_parent(&self.container);
+            self.container.set_parent(&*self.obj());
         }
 
         fn dispose(&self) {
-            if let Some(entry) = self.entry.borrow().as_ref()
-                && entry.parent().is_some()
-            {
-                entry.unparent();
-            }
-            if self.label.parent().is_some() {
-                self.label.unparent();
-            }
+            self.container.unparent();
         }
 
         fn signals() -> &'static [Signal] {
@@ -155,8 +151,8 @@ impl CellEditor {
         let entry = self.entry_widget();
         entry.set_text(seed);
         if !self.imp().editing.replace(true) {
-            self.label_widget().unparent();
-            entry.set_parent(self);
+            self.label_widget().set_visible(false);
+            entry.set_visible(true);
             self.emit_by_name::<()>("editing-changed", &[]);
         }
         entry.grab_focus();
@@ -184,8 +180,8 @@ impl CellEditor {
             entry.set_text(&self.label_widget().text());
             self.clear_preedit_listeners();
         }
-        entry.unparent();
-        self.label_widget().set_parent(self);
+        entry.set_visible(false);
+        self.label_widget().set_visible(true);
         self.imp().editing.set(false);
         self.emit_by_name::<()>("editing-changed", &[]);
     }
@@ -234,6 +230,8 @@ impl CellEditor {
             return entry.clone();
         }
         let entry = gtk4::Text::builder().hexpand(true).build();
+        entry.set_visible(false);
+        self.imp().container.append(&entry);
         self.install_entry_handlers(&entry);
         *self.imp().entry.borrow_mut() = Some(entry.clone());
         entry
@@ -299,9 +297,20 @@ mod tests {
     fn editable_cell_defers_its_text_widget_until_editing() {
         gtk4::init().unwrap();
         let cell = CellEditor::new();
-        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Label>()));
+        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Box>()));
+        assert!(
+            cell.imp()
+                .container
+                .first_child()
+                .is_some_and(|child| child.is::<gtk4::Label>())
+        );
         cell.set_text("stored");
-        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Label>()));
+        assert!(
+            cell.imp()
+                .container
+                .first_child()
+                .is_some_and(|child| child.is::<gtk4::Label>())
+        );
 
         let preedit_seen = Rc::new(Cell::new(false));
         let preedit_seen_by_callback = preedit_seen.clone();
@@ -313,21 +322,51 @@ mod tests {
         let edit_transitions_callback = edit_transitions.clone();
         cell.connect_editing_notify(move |_| edit_transitions_callback.set(edit_transitions_callback.get() + 1));
         cell.start_editing();
-        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Text>()));
+        assert!(!cell.imp().label.is_visible());
+        assert!(
+            cell.imp()
+                .entry
+                .borrow()
+                .as_ref()
+                .is_some_and(|entry| entry.is_visible())
+        );
         let entry = cell.entry();
         entry.emit_by_name::<()>("preedit-changed", &[&"draft"]);
         assert!(preedit_seen.get());
         assert_eq!(entry.text().as_str(), "stored");
         entry.set_text("discarded");
         cell.stop_editing(false);
-        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Label>()));
+        assert!(cell.imp().label.is_visible());
+        assert!(
+            !cell
+                .imp()
+                .entry
+                .borrow()
+                .as_ref()
+                .is_some_and(|entry| entry.is_visible())
+        );
         assert_eq!(cell.text().as_str(), "stored");
 
         cell.start_editing_with("exact value");
-        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Text>()));
+        assert!(!cell.imp().label.is_visible());
+        assert!(
+            cell.imp()
+                .entry
+                .borrow()
+                .as_ref()
+                .is_some_and(|entry| entry.is_visible())
+        );
         assert_eq!(cell.entry().text().as_str(), "exact value");
         cell.stop_editing(true);
-        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Label>()));
+        assert!(cell.imp().label.is_visible());
+        assert!(
+            !cell
+                .imp()
+                .entry
+                .borrow()
+                .as_ref()
+                .is_some_and(|entry| entry.is_visible())
+        );
         assert_eq!(cell.text().as_str(), "exact value");
         assert_eq!(cell.entry(), entry);
         assert_eq!(edit_transitions.get(), 4);
