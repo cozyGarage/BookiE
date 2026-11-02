@@ -550,6 +550,21 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::local_filter::tests::attaching_a_sorted_result_restores_selection_by_source_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_a_sorted_result_restores_all_source_rows_as_selected"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_a_filtered_result_restores_all_visible_selected_source_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::local_filter::tests::local_filter_and_sort_keep_selection_attached_to_the_source_row"
     ],
     [
