@@ -37,7 +37,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
   <img alt="Browsing a table in BookiE with column types and key marks" src="images/browse-light.png" width="100%">
 </picture>
 
-- Click a table to open it in a preview tab. Edit or keep the tab to make it permanent.
+- Click a table or view in the sidebar to open it in a preview tab. Edit or keep the tab to make it permanent.
 - Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.

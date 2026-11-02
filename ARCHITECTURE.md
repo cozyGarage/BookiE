@@ -335,7 +335,7 @@ MCP may ask policy whether a statement needs write capability for a scope check;
 | MCP token hash, scopes, allowlist | `bookie-mcp` |
 | GTK widgets / Relm4 component state | `bookie-app` (main context only) |
 | Tab UUID, dirty rows, result generation | `bookie-app` tab controllers |
-| Browse pages (`RowStore`) | `bookie-app` UI + bounded fetch plans |
+| Query result rows | `bookie-core::QueryRows` stores cells contiguously with row offsets; the GTK `RowStore` refers to source rows by index and creates row objects on demand |
 | Driver protocol connection | Inner `Connection` behind `PolicyGuard` |
 
 ## Transport and service identity
