@@ -666,3 +666,18 @@ fn editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null() {
     }
     window.close();
 }
+
+#[test]
+fn a_row_whose_key_is_shared_by_another_loaded_row_is_not_editable() {
+    use crate::services::change_tracker::RowKey;
+    let shared = RowKey::from_pk_values(&[Value::Int(1)]).unwrap();
+    let unique = RowKey::from_pk_values(&[Value::Int(2)]).unwrap();
+    let context = TabGridContext::default();
+    assert!(!row_key_is_ambiguous(&context, Some(&shared)));
+
+    context.ambiguous_keys.borrow_mut().insert(shared.clone());
+
+    assert!(row_key_is_ambiguous(&context, Some(&shared)));
+    assert!(!row_key_is_ambiguous(&context, Some(&unique)));
+    assert!(!row_key_is_ambiguous(&context, None));
+}

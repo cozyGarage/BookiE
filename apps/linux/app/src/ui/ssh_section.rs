@@ -25,6 +25,7 @@ pub struct SshSection {
     user: adw::EntryRow,
     password: adw::PasswordEntryRow,
     key_path: adw::EntryRow,
+    agent_key: adw::EntryRow,
     passphrase: adw::PasswordEntryRow,
     system_client: adw::SwitchRow,
 }
@@ -78,7 +79,21 @@ impl SshSection {
             .title(crate::tr!("Private key path"))
             .text(default_ssh_key_path())
             .build();
-        attach_key_browse_button(&key_path);
+        attach_key_browse_button(
+            &key_path,
+            &crate::tr!("Browse for private key"),
+            &crate::tr!("Select SSH private key"),
+            &["id_*", "*.pem", "*.key"],
+        );
+        let agent_key = adw::EntryRow::builder()
+            .title(crate::tr!("Agent key file (optional)"))
+            .build();
+        attach_key_browse_button(
+            &agent_key,
+            &crate::tr!("Browse for public key"),
+            &crate::tr!("Select SSH public key"),
+            &["*.pub"],
+        );
         let passphrase = adw::PasswordEntryRow::builder().title(crate::tr!("Passphrase")).build();
         let system_client = system_client_row();
 
@@ -88,6 +103,7 @@ impl SshSection {
         expander.add_row(&auth_combo);
         expander.add_row(&password);
         expander.add_row(&key_path);
+        expander.add_row(&agent_key);
         expander.add_row(&passphrase);
         expander.add_row(&system_client);
 
@@ -100,6 +116,7 @@ impl SshSection {
             user,
             password,
             key_path,
+            agent_key,
             passphrase,
             system_client,
         };
@@ -114,7 +131,12 @@ impl SshSection {
         self.system_client
             .set_active(saved.client == bookie_storage::SshClient::OpenSsh);
         match &saved.auth {
-            _ if saved.agent => self.auth_combo.set_selected(SSH_AUTH_AGENT),
+            _ if saved.agent => {
+                self.auth_combo.set_selected(SSH_AUTH_AGENT);
+                if let Some(identity) = &saved.agent_identity {
+                    self.agent_key.set_text(&identity.to_string_lossy());
+                }
+            }
             SavedSshAuth::Password => self.auth_combo.set_selected(SSH_AUTH_PASSWORD),
             SavedSshAuth::PrivateKey { path, .. } => {
                 self.auth_combo.set_selected(SSH_AUTH_KEY);
@@ -147,23 +169,13 @@ impl SshSection {
         self.password.set_visible(selected == SSH_AUTH_PASSWORD);
         self.key_path.set_visible(selected == SSH_AUTH_KEY);
         self.passphrase.set_visible(selected == SSH_AUTH_KEY);
+        self.agent_key.set_visible(selected == SSH_AUTH_AGENT);
     }
 
-    pub fn collect(&self) -> Result<SshInputs, String> {
-        let host = self.host.text().to_string();
-        if host.trim().is_empty() {
-            return Err(crate::tr!("SSH host is required"));
-        }
-        let port: u16 = self.port.value() as u16;
-        let username = self.user.text().to_string();
-        if username.trim().is_empty() {
-            return Err(crate::tr!("SSH username is required"));
-        }
-
-        let agent = self.auth_combo.selected() == SSH_AUTH_AGENT;
-        let (auth, saved_auth, secret) = match self.auth_combo.selected() {
+    fn collect_auth(&self, agent_auth: SshAuth) -> Result<(SshAuth, SavedSshAuth, SshSecretToStore), String> {
+        Ok(match self.auth_combo.selected() {
             SSH_AUTH_AGENT => (
-                SshAuth::Agent,
+                agent_auth,
                 SavedSshAuth::PrivateKey {
                     path: PathBuf::from(self.key_path.text().as_str()),
                     has_passphrase: false,
@@ -206,7 +218,23 @@ impl SshSection {
                 let secret = SshSecretToStore::Password(SecretString::new(raw_password.into()));
                 (auth, saved_auth, secret)
             }
-        };
+        })
+    }
+
+    pub fn collect(&self) -> Result<SshInputs, String> {
+        let host = self.host.text().to_string();
+        if host.trim().is_empty() {
+            return Err(crate::tr!("SSH host is required"));
+        }
+        let port: u16 = self.port.value() as u16;
+        let username = self.user.text().to_string();
+        if username.trim().is_empty() {
+            return Err(crate::tr!("SSH username is required"));
+        }
+
+        let agent = self.auth_combo.selected() == SSH_AUTH_AGENT;
+        let (agent_auth, agent_identity) = agent_authentication(self.agent_key.text().as_str());
+        let (auth, saved_auth, secret) = self.collect_auth(agent_auth)?;
 
         Ok(SshInputs {
             cfg: SshConfig {
@@ -229,7 +257,7 @@ impl SshSection {
                 } else {
                     bookie_storage::SshClient::Builtin
                 },
-                agent_identity: None,
+                agent_identity: if agent { agent_identity } else { None },
             },
             secret_to_store: secret,
         })
@@ -270,26 +298,39 @@ fn default_ssh_key_path() -> String {
     String::new()
 }
 
-fn attach_key_browse_button(key_path: &adw::EntryRow) {
+fn agent_authentication(identity_text: &str) -> (SshAuth, Option<PathBuf>) {
+    let identity = identity_text.trim();
+    if identity.is_empty() {
+        return (SshAuth::Agent, None);
+    }
+    let public_key = PathBuf::from(identity);
+    (
+        SshAuth::AgentIdentity {
+            public_key: public_key.clone(),
+        },
+        Some(public_key),
+    )
+}
+
+fn attach_key_browse_button(key_path: &adw::EntryRow, tooltip: &str, title: &str, patterns: &[&str]) {
     let button = gtk::Button::builder()
         .icon_name("document-open-symbolic")
-        .tooltip_text(crate::tr!("Browse for private key"))
+        .tooltip_text(tooltip)
         .valign(gtk::Align::Center)
         .build();
     button.add_css_class("flat");
     let entry = key_path.clone();
+    let title = title.to_owned();
+    let patterns: Vec<String> = patterns.iter().map(|pattern| (*pattern).to_owned()).collect();
     button.connect_clicked(move |btn| {
-        let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Select SSH private key"))
-            .modal(true)
-            .build();
+        let dialog = gtk::FileDialog::builder().title(title.as_str()).modal(true).build();
         // Filter to common SSH key filenames (id_ed25519, id_rsa,
         // id_ecdsa, *.pem, *.key) so the file picker hides irrelevant
         // entries — matches the pattern GNOME Settings uses for
         // certificate pickers.
         let filter = gtk::FileFilter::new();
         filter.set_name(Some(&crate::tr!("SSH keys")));
-        for pattern in ["id_*", "*.pem", "*.key"] {
+        for pattern in &patterns {
             filter.add_pattern(pattern);
         }
         filter.add_mime_type("application/x-pem-file");
@@ -315,4 +356,54 @@ fn attach_key_browse_button(key_path: &adw::EntryRow) {
         });
     });
     key_path.add_suffix(&button);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_empty_agent_key_field_offers_every_agent_key() {
+        assert!(matches!(agent_authentication(""), (SshAuth::Agent, None)));
+        assert!(matches!(agent_authentication("   "), (SshAuth::Agent, None)));
+    }
+
+    #[test]
+    fn a_named_agent_key_is_the_only_one_offered_and_is_saved() {
+        let (auth, saved) = agent_authentication(" /home/me/.ssh/id_ed25519.pub ");
+
+        assert!(
+            matches!(auth, SshAuth::AgentIdentity { public_key } if public_key == PathBuf::from("/home/me/.ssh/id_ed25519.pub"))
+        );
+        assert_eq!(saved, Some(PathBuf::from("/home/me/.ssh/id_ed25519.pub")));
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_agent_key_row_shows_only_for_agent_authentication_and_round_trips() {
+        relm4::adw::init().unwrap();
+        let section = SshSection::build();
+        section.host.set_text("bastion");
+        section.user.set_text("me");
+
+        section.auth_combo.set_selected(SSH_AUTH_PASSWORD);
+        section.refresh_auth_visibility();
+        assert!(!section.agent_key.is_visible());
+        section.auth_combo.set_selected(SSH_AUTH_AGENT);
+        section.refresh_auth_visibility();
+        assert!(section.agent_key.is_visible());
+
+        section.agent_key.set_text("/home/me/.ssh/work.pub");
+        let saved = section.collect().unwrap().saved;
+        assert!(saved.agent);
+        assert_eq!(saved.agent_identity, Some(PathBuf::from("/home/me/.ssh/work.pub")));
+
+        let reopened = SshSection::build();
+        reopened.prefill(&saved, None, None);
+        assert_eq!(reopened.agent_key.text().as_str(), "/home/me/.ssh/work.pub");
+        assert!(reopened.agent_key.is_visible());
+
+        section.agent_key.set_text("");
+        assert_eq!(section.collect().unwrap().saved.agent_identity, None);
+    }
 }

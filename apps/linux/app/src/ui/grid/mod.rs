@@ -127,7 +127,11 @@ pub struct TabGridContext {
     pub has_inbound_foreign_keys: bool,
     pub filters_unavailable: bool,
     pub choices: ChoiceMap,
+    pub ambiguous_keys: AmbiguousKeys,
 }
+
+pub type AmbiguousKeys =
+    std::rc::Rc<std::cell::RefCell<std::collections::HashSet<crate::services::change_tracker::RowKey>>>;
 
 pub type ChoiceMap = std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, (bool, Vec<String>)>>>;
 

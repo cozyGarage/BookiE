@@ -186,6 +186,22 @@ impl BrowseTab {
     /// from `RowsLoaded`). Until both are present the `inner_stack` stays
     /// on the "loading" status page so the user can't interact with cells
     /// whose editability map is wrong.
+    fn refresh_ambiguous_keys(&self, result: &bookie_core::QueryResult) {
+        let ambiguous = if self.driver_id == "clickhouse" {
+            let key_indices: Vec<usize> = self
+                .current_columns
+                .iter()
+                .enumerate()
+                .filter(|(_, column)| column.primary_key)
+                .map(|(index, _)| index)
+                .collect();
+            crate::services::change_tracker::ambiguous_row_keys(&result.rows, &key_indices)
+        } else {
+            Default::default()
+        };
+        *self.ambiguous_keys.borrow_mut() = ambiguous;
+    }
+
     pub(super) fn render_grid_if_ready(&mut self, sender: ComponentSender<Self>) {
         let Some(result) = self.current_result.clone() else {
             return;
@@ -195,6 +211,7 @@ impl BrowseTab {
             // ColumnsLoaded will re-invoke this when it arrives.
             return;
         }
+        self.refresh_ambiguous_keys(&result);
 
         // Fast path: column structure hasn't changed since the last
         // render (typical for sort flips / page changes / save reloads
@@ -250,6 +267,7 @@ impl BrowseTab {
             has_inbound_foreign_keys: !self.inbound_foreign_keys.is_empty(),
             filters_unavailable: !self.browse_filters,
             choices: self.choice_labels.clone(),
+            ambiguous_keys: self.ambiguous_keys.clone(),
         };
         let (column_view, selection) = build_column_view(
             &result,
