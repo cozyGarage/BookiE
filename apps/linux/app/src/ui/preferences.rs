@@ -371,7 +371,7 @@ pub fn present(
 
 fn null_display_choices() -> [String; 3] {
     [
-        crate::tr!("<NULL>"),
+        crate::tr!("NULL"),
         crate::tr!("\u{2205} (empty set)"),
         crate::tr!("(null)"),
     ]
