@@ -111,6 +111,16 @@ class ForgejoGateTests(unittest.TestCase):
         self.assertNotIn('downstream-job', result.stdout)
         self.assertNotIn('passed-job', result.stdout)
 
+    def test_failed_run_does_not_wait_for_jobs_with_failed_needs(self):
+        result = gate([
+            {'id': 101, 'status': 'failure', 'name': 'guards'},
+            {'id': 102, 'status': 'skipped', 'name': 'test-build'},
+            {'id': 103, 'status': 'waiting', 'name': 'gtk (1)', 'needs': ['guards', 'test-build']},
+        ])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('failure guards', result.stdout)
+        self.assertNotIn('gtk (1)', result.stdout)
+
     def test_cancelled_jobs_are_reported_without_fetching_logs(self):
         result = gate([{'id': 101, 'status': 'cancelled', 'name': 'cancelled-job'}], initial_status='cancelled')
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
