@@ -970,7 +970,7 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
                 .replace("{rows}", &format_result_rows(result_rows(sets))),
             StatementOutcomeKind::Streamed(result) => crate::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
-                .replace("{rows}", &format_result_rows(result.total_rows as usize)),
+                .replace("{rows}", &format_result_rows(result.total_rows)),
             StatementOutcomeKind::Error(_) => crate::tr!("Result {n} (error)").replace("{n}", &n),
             StatementOutcomeKind::NotRun => crate::tr!("Result {n} (skipped)").replace("{n}", &n),
         };
@@ -983,7 +983,7 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
         StatementOutcomeKind::Streamed(result) => crate::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
-            .replace("{rows}", &format_result_rows(result.total_rows as usize)),
+            .replace("{rows}", &format_result_rows(result.total_rows)),
         StatementOutcomeKind::Error(_) => crate::tr!("{n} · {statement} (error)")
             .replace("{n}", &n)
             .replace("{statement}", &statement),
@@ -996,7 +996,7 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
 fn pinned_tab_label(o: &StatementOutcome) -> String {
     let rows = match &o.kind {
         StatementOutcomeKind::Rows(sets) => format_result_rows(result_rows(sets)),
-        StatementOutcomeKind::Streamed(result) => format_result_rows(result.total_rows as usize),
+        StatementOutcomeKind::Streamed(result) => format_result_rows(result.total_rows),
         StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => String::new(),
     };
     let subject = statement_subject(&o.sql_preview).unwrap_or_else(|| crate::tr!("Result"));
