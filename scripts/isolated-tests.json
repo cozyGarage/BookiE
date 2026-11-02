@@ -455,6 +455,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::font_zoom::tests::zooming_the_grid_font_rescales_fixed_column_widths_without_saving"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::column::tests::entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value"
     ],
     [
@@ -1373,6 +1378,11 @@
       "bookie-storage",
       "--lib",
       "secrets::tests::round_trip_via_secret_service"
+    ],
+    [
+      "bookie-storage",
+      "--lib",
+      "secrets::tests::a_credential_saved_under_the_legacy_schema_is_found_copied_forward_and_deleted_with_it"
     ],
     [
       "bookie-transport",

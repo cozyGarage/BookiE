@@ -21,7 +21,7 @@ DIALOGS = {
     "column_jump": ("table:win.jump-column", "Jump to Column"),
     "export": ("table:win.export-csv", "Export Results"),
     "value_viewer": ("grid-value:", "payload"),
-    "column_visibility": ("grid-menu:9", "Columns"),
+    "column_visibility": ("grid-menu:10", "Columns"),
     "pending_sql": ("preview:", "Pending SQL"),
     "import_csv": ("import-csv:", "Import CSV"),
     "history_panel": ("win.show-history", "Close history"),
@@ -63,7 +63,7 @@ def scenarios(ui):
         if ui.find_node(name="leak-probe", role=ui.pyatspi.ROLE_LABEL) is None:
             focus_grid_cell()
         ui.press_x11_key("Menu")
-        for _ in range(4):
+        for _ in range(5):
             ui.press_x11_key("Down")
             time.sleep(0.1)
         ui.press_x11_key("Return")

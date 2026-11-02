@@ -62,7 +62,7 @@ build() {
 check() {
   cd "$srcdir/BookiE-${_commit}"
   export CARGO_TARGET_DIR="$srcdir/target"
-  cargo test --workspace --exclude bookie-driver-duckdb --lib --bins --locked --offline
+  cargo test --workspace --lib --bins --locked --offline
   desktop-file-validate apps/linux/flatpak/com.bookie.linux.desktop
   appstreamcli validate --no-net apps/linux/flatpak/com.bookie.linux.metainfo.xml
 }
