@@ -8,7 +8,7 @@ mod update;
 
 use async_trait::async_trait;
 use codec::{
-    bson_to_value, columns_from_docs, columns_from_types, document_to_row, merge_page_types, observe_bson_type,
+    bson_to_value, columns_from_docs, columns_from_types, document_to_row_into, merge_page_types, observe_bson_type,
     serde_json_to_document,
 };
 use error::{map_mongo_connect_error, map_mongo_error};
@@ -25,7 +25,8 @@ use update::{parse_browse_page_select, parse_keyed_delete, parse_keyed_update, p
 
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
-    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, TableInfo, Value,
+    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, QueryRows,
+    TableInfo, Value,
 };
 
 pub struct MongodbDriver;
@@ -172,15 +173,17 @@ struct MongodbConnection {
     database_name: String,
 }
 
-fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (Vec<Vec<Value>>, bool) {
-    let mut rows = Vec::new();
+fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (QueryRows, bool) {
+    let mut rows = QueryRows::with_capacity(docs.len().min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     for doc in docs {
-        let row = document_to_row(doc, columns);
-        if !budget.admit(&row) {
+        decoded.clear();
+        document_to_row_into(doc, columns, &mut decoded);
+        if !budget.admit(&decoded) {
             return (rows, true);
         }
-        rows.push(row);
+        rows.push_row(&mut decoded);
     }
     (rows, false)
 }
@@ -272,7 +275,12 @@ impl Connection for MongodbConnection {
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
         let (columns, docs) = self.columns_and_page(table, Some((offset, limit))).await?;
-        let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
+        let mut rows = QueryRows::with_capacity(docs.len(), 0);
+        let mut decoded = Vec::with_capacity(columns.len());
+        for doc in &docs {
+            document_to_row_into(doc, &columns, &mut decoded);
+            rows.push_row(&mut decoded);
+        }
         Ok(QueryResult {
             columns,
             rows,
@@ -506,7 +514,7 @@ impl MongodbConnection {
             .collect::<Result<Vec<_>, DriverError>>()?;
         Ok(QueryResult {
             columns,
-            rows,
+            rows: rows.into(),
             truncated: docs.len() > 1,
         })
     }

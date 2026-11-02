@@ -369,7 +369,7 @@ impl bookie_core::Session for CursorSession {
         }
         Ok(bookie_core::QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -520,7 +520,7 @@ fn record_streamed_pages(
             match update {
                 StreamUpdate::Started { .. } => true,
                 StreamUpdate::Page { sequence, page, .. } => {
-                    received.lock().unwrap().push((sequence, page.rows.clone()));
+                    received.lock().unwrap().push((sequence, page.rows.clone().into_rows()));
                     true
                 }
             }
@@ -1114,7 +1114,7 @@ async fn a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor(
         panic!("the statement runs without a cursor");
     };
     assert!(
-        matches!(&outcomes[0].kind, StatementOutcomeKind::Rows(sets) if sets[0].rows == [[bookie_core::Value::Int(1)]]),
+        matches!(&outcomes[0].kind, StatementOutcomeKind::Rows(sets) if sets[0].rows == vec![vec![bookie_core::Value::Int(1)]]),
         "{:?}",
         outcomes[0].kind
     );
@@ -1123,7 +1123,7 @@ async fn a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor(
         .query_controlled("SELECT count(*) FROM archived", &control)
         .await
         .unwrap();
-    assert_eq!(stored.rows, [[bookie_core::Value::Int(1)]]);
+    assert_eq!(stored.rows, vec![vec![bookie_core::Value::Int(1)]]);
 }
 
 #[path = "fetch_errors.rs"]

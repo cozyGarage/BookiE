@@ -9,14 +9,14 @@ fn loaded_export_keeps_the_shared_result_and_truncation() {
             bookie_core::Value::Text(String::new()),
             bookie_core::Value::Text("\\N".into()),
             bookie_core::Value::Bytes(vec![0, 255]),
-        ]],
+        ]]
+        .into(),
         truncated: true,
     });
     let file::JobSource::Loaded(loaded) = job_source(&None, &result) else {
         panic!("expected loaded export");
     };
     assert!(std::sync::Arc::ptr_eq(&loaded, &result));
-    assert_eq!(loaded.rows.as_ptr(), result.rows.as_ptr());
     assert_eq!(loaded.rows, result.rows);
     assert!(loaded.truncated);
 }
@@ -47,7 +47,7 @@ fn a_full_export_shows_a_refusal_without_opening_its_source() {
         }),
         result: std::sync::Arc::new(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         }),
         suggested_name: "table.csv".into(),

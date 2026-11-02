@@ -1,4 +1,4 @@
-use bookie_core::{Value, sql_dialect::BuildSqlError};
+use bookie_core::{QueryRowSet, Value, sql_dialect::BuildSqlError};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum RowKey {
@@ -15,10 +15,14 @@ impl RowKey {
     }
 }
 
-pub fn ambiguous_row_keys(rows: &[Vec<Value>], key_indices: &[usize]) -> std::collections::HashSet<RowKey> {
+pub fn ambiguous_row_keys<R: QueryRowSet + ?Sized>(
+    rows: &R,
+    key_indices: &[usize],
+) -> std::collections::HashSet<RowKey> {
     let mut seen = std::collections::HashSet::new();
     let mut ambiguous = std::collections::HashSet::new();
-    for row in rows {
+    for row_index in 0..rows.row_count() {
+        let Some(row) = rows.row(row_index) else { continue };
         let values: Vec<Value> = key_indices
             .iter()
             .filter_map(|&index| row.get(index).cloned())

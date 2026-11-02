@@ -79,7 +79,7 @@ fn local_exclude_keeps_null_and_empty_text_distinct() {
 #[test]
 fn local_value_filter_preserves_duplicate_source_order_and_ignores_missing_cells() {
     let mut result = result(vec![Value::Int(7), Value::Int(2), Value::Int(7)]);
-    result.rows[1].clear();
+    result.rows.truncate_row(1, 0);
 
     assert_eq!(matching_source_indices(&result, 0, &Value::Int(7), false), vec![0, 2]);
     assert!(matching_source_indices(&result, 1, &Value::Int(7), false).is_empty());

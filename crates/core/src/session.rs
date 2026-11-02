@@ -175,7 +175,7 @@ mod tests {
         ) -> Result<QueryResult, DriverError> {
             Ok(QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![Value::Int(1)]],
+                rows: vec![vec![Value::Int(1)]].into(),
                 truncated: true,
             })
         }

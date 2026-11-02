@@ -53,7 +53,7 @@ pub(super) async fn fetch_string_value(
     if key_type == "none" {
         return Ok(QueryResult {
             columns: vec![text_col("Value")],
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         });
     }
@@ -69,7 +69,7 @@ pub(super) async fn fetch_string_value(
     else {
         return Ok(QueryResult {
             columns: vec![text_col("Value")],
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         });
     };
@@ -80,7 +80,7 @@ pub(super) async fn fetch_string_value(
     }
     Ok(QueryResult {
         columns: vec![text_col("Value")],
-        rows: vec![vec![bytes_to_value(bytes)]],
+        rows: vec![vec![bytes_to_value(bytes)]].into(),
         truncated: false,
     })
 }

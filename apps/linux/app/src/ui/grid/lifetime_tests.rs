@@ -212,7 +212,7 @@ fn a_retired_grid_does_not_retain_its_inspector_through_selection_callback() {
     };
     let result = Arc::new(QueryResult {
         columns: vec![column.clone()],
-        rows: vec![vec![Value::Text("value".into())]],
+        rows: vec![vec![Value::Text("value".into())]].into(),
         truncated: false,
     });
     let weak_result = Arc::downgrade(&result);

@@ -56,7 +56,7 @@ async fn value_contract_interval_csv_import_preserves_native_components() {
     )
     .expect("DuckDB interval CSV must form an exact-text INSERT plan");
     assert_eq!(
-        plan.rows, source.rows,
+        source.rows, plan.rows,
         "CSV import keeps interval text and NULL distinct"
     );
     for row in &plan.rows {
@@ -138,7 +138,7 @@ async fn value_contract_extended_calendar_csv_round_trips_exactly() {
         &options,
     )
     .expect("DuckDB extended calendar CSV must form an exact-text INSERT plan");
-    assert_eq!(plan.rows, source.rows);
+    assert_eq!(source.rows, plan.rows);
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }

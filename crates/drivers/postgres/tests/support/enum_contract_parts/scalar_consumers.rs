@@ -284,7 +284,7 @@ async fn value_contract_custom_enum_order_uses_declared_catalog_order() {
         .unwrap();
     assert_eq!(
         catalog.rows,
-        ["zulu", "alpha", "middle"].map(|label| vec![Value::Text(label.into())])
+        vec![vec![Value::Text("zulu".into())], vec![Value::Text("alpha".into())], vec![Value::Text("middle".into())]]
     );
 
     let result = connection

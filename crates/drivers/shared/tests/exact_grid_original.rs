@@ -99,6 +99,7 @@ async fn native_values(connection: &dyn Connection, driver: &str) -> Vec<Vec<Val
         .await
         .unwrap()
         .rows
+        .into_rows()
 }
 
 async fn assert_search_behavior(

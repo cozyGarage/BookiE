@@ -169,12 +169,12 @@ async fn execute_query_preserves_additional_result_sets_in_order() {
     let provider = Arc::new(RecordingProvider::with_result_sets(vec![
         QueryResult {
             columns: vec![column("first_set")],
-            rows: vec![vec![Value::Int(1)]],
+            rows: vec![vec![Value::Int(1)]].into(),
             truncated: false,
         },
         QueryResult {
             columns: vec![column("second_set")],
-            rows: vec![vec![Value::Text("later".into())]],
+            rows: vec![vec![Value::Text("later".into())]].into(),
             truncated: false,
         },
     ]));
@@ -215,7 +215,8 @@ async fn serialized_mcp_numeric_values_survive_javascript_json_parse() {
             Value::Decimal("123456789012345678.12345678".parse().unwrap()),
             Value::Json(serde_json::from_str(r#"{"wide":9007199254740993,"fraction":1.234567890123456789}"#).unwrap()),
             Value::JsonText(raw_json.into()),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     }));
     let bridge = McpBridge::new(provider, store);
@@ -269,12 +270,12 @@ async fn mcp_row_cap_is_shared_across_result_sets() {
     let provider = Arc::new(RecordingProvider::with_result_sets(vec![
         QueryResult {
             columns: vec![column("first_set")],
-            rows: vec![vec![Value::Int(1)]],
+            rows: vec![vec![Value::Int(1)]].into(),
             truncated: false,
         },
         QueryResult {
             columns: vec![column("second_set")],
-            rows: vec![vec![Value::Int(2)], vec![Value::Int(3)]],
+            rows: vec![vec![Value::Int(2)], vec![Value::Int(3)]].into(),
             truncated: false,
         },
     ]));
@@ -315,7 +316,7 @@ async fn a_capped_export_says_it_was_truncated_in_every_format() {
         .unwrap();
     let provider = Arc::new(RecordingProvider::with_result_sets(vec![QueryResult {
         columns: vec![column("n")],
-        rows: vec![vec![Value::Int(1)], vec![Value::Int(2)], vec![Value::Int(3)]],
+        rows: vec![vec![Value::Int(1)], vec![Value::Int(2)], vec![Value::Int(3)]].into(),
         truncated: false,
     }]));
     let bridge = McpBridge::with_limits(
@@ -352,12 +353,12 @@ async fn json_export_keeps_multiple_result_sets_and_csv_refuses_them() {
     let provider = Arc::new(RecordingProvider::with_result_sets(vec![
         QueryResult {
             columns: vec![column("first_set")],
-            rows: vec![vec![Value::Int(1)]],
+            rows: vec![vec![Value::Int(1)]].into(),
             truncated: false,
         },
         QueryResult {
             columns: vec![column("second_set")],
-            rows: vec![vec![Value::Int(2)]],
+            rows: vec![vec![Value::Int(2)]].into(),
             truncated: false,
         },
     ]));
@@ -417,7 +418,7 @@ async fn guarded_tool_path_journals_policy_decision() {
                 page_log: Arc::new(std::sync::Mutex::new(Vec::new())),
                 result: QueryResult {
                     columns: vec![],
-                    rows: vec![vec![Value::Int(1)]],
+                    rows: vec![vec![Value::Int(1)]].into(),
                     truncated: false,
                 },
                 result_sets: None,
@@ -552,7 +553,7 @@ async fn csv_export_escapes_separators_quotes_and_newlines() {
         .unwrap();
     let provider = Arc::new(RecordingProvider::with_result(QueryResult {
         columns: vec![column("note"), column("plain")],
-        rows: vec![vec![Value::Text("a,b\"c\nd".into()), Value::Text("ok".into())]],
+        rows: vec![vec![Value::Text("a,b\"c\nd".into()), Value::Text("ok".into())]].into(),
         truncated: false,
     }));
     let bridge = McpBridge::new(provider, store);
@@ -813,7 +814,7 @@ impl Default for RecordingProvider {
             page_log: Arc::new(std::sync::Mutex::new(Vec::new())),
             result: QueryResult {
                 columns: vec![],
-                rows: vec![vec![Value::Int(1)]],
+                rows: vec![vec![Value::Int(1)]].into(),
                 truncated: false,
             },
             result_sets: None,

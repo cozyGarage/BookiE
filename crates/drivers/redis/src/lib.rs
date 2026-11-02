@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
-    MAX_QUERY_RESULT_BYTES, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text,
-    looks_like_tls_failure,
+    MAX_QUERY_RESULT_BYTES, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
+    error_chain_text, looks_like_tls_failure,
 };
 
 mod value;
@@ -221,7 +221,7 @@ impl Connection for RedisConnection {
         if trimmed.is_empty() {
             return Ok(QueryResult {
                 columns: Vec::new(),
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 truncated: false,
             });
         }
@@ -309,9 +309,11 @@ async fn fetch_page(
     let keys = scan_keys(conn, "*", scan_target(offset, limit)?).await?;
     let skip = offset as usize;
     let page: Vec<Vec<u8>> = keys.into_iter().skip(skip).take(limit as usize).collect();
-    let mut rows = Vec::with_capacity(page.len());
+    let mut rows = QueryRows::with_capacity(page.len(), 0);
+    let mut decoded = Vec::with_capacity(4);
     for key in page {
-        rows.push(key_row(conn, &key).await?);
+        key_row_into(conn, &key, &mut decoded).await?;
+        rows.push_row(&mut decoded);
     }
     Ok(QueryResult {
         columns: redis_columns(),
@@ -386,7 +388,11 @@ async fn string_preview(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]
     Ok(bookie_core::partial_value(length, &prefix))
 }
 
-async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Result<Vec<Value>, DriverError> {
+async fn key_row_into(
+    conn: &mut redis::aio::MultiplexedConnection,
+    key: &[u8],
+    row: &mut Vec<Value>,
+) -> Result<(), DriverError> {
     let key_type: String = conn.key_type(key).await.map_err(map_redis_error)?;
     let ttl: i64 = conn.ttl(key).await.map_err(map_redis_error)?;
     let preview = match key_type.as_str() {
@@ -423,29 +429,30 @@ async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &[u8]) -> Re
         }
         other => Value::Text(format!("<{other}>")),
     };
-    Ok(vec![
+    row.extend([
         bytes_to_value(key.to_vec()),
         Value::Text(key_type),
         Value::Int(ttl),
         preview,
-    ])
+    ]);
+    Ok(())
 }
 
 fn redis_value_to_result(value: RedisValue) -> QueryResult {
     match value {
         RedisValue::Nil => QueryResult {
             columns: vec![text_col("result")],
-            rows: vec![vec![Value::Null]],
+            rows: vec![vec![Value::Null]].into(),
             truncated: false,
         },
         RedisValue::Okay => QueryResult {
             columns: vec![text_col("result")],
-            rows: vec![vec![Value::Text("OK".into())]],
+            rows: vec![vec![Value::Text("OK".into())]].into(),
             truncated: false,
         },
         RedisValue::SimpleString(s) => QueryResult {
             columns: vec![text_col("result")],
-            rows: vec![vec![Value::Text(s)]],
+            rows: vec![vec![Value::Text(s)]].into(),
             truncated: false,
         },
         RedisValue::Int(i) => QueryResult {
@@ -462,7 +469,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Int(i)]],
+            rows: vec![vec![Value::Int(i)]].into(),
             truncated: false,
         },
         RedisValue::Double(f) => QueryResult {
@@ -479,7 +486,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Float(f)]],
+            rows: vec![vec![Value::Float(f)]].into(),
             truncated: false,
         },
         RedisValue::Boolean(b) => QueryResult {
@@ -496,16 +503,17 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Bool(b)]],
+            rows: vec![vec![Value::Bool(b)]].into(),
             truncated: false,
         },
         RedisValue::BulkString(bytes) => QueryResult {
             columns: vec![text_col("result")],
-            rows: vec![vec![bytes_to_value(bytes)]],
+            rows: vec![vec![bytes_to_value(bytes)]].into(),
             truncated: false,
         },
         RedisValue::Array(items) | RedisValue::Set(items) => {
-            let mut rows = Vec::new();
+            let mut rows = QueryRows::with_capacity(items.len().min(MAX_QUERY_ROWS), 0);
+            let mut decoded = Vec::with_capacity(1);
             let mut budget = QueryResultBudget::default();
             let mut truncated = false;
             for item in items {
@@ -513,12 +521,13 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
                     truncated = true;
                     break;
                 }
-                let row = vec![redis_scalar(item)];
-                if !budget.admit(&row) {
+                decoded.clear();
+                decoded.push(redis_scalar(item));
+                if !budget.admit(&decoded) {
                     truncated = true;
                     break;
                 }
-                rows.push(row);
+                rows.push_row(&mut decoded);
             }
             QueryResult {
                 columns: vec![text_col("value")],
@@ -527,16 +536,18 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
             }
         }
         RedisValue::Map(pairs) => {
-            let mut rows = Vec::new();
+            let mut rows = QueryRows::with_capacity(pairs.len().min(MAX_QUERY_ROWS), 0);
+            let mut decoded = Vec::with_capacity(2);
             let mut budget = QueryResultBudget::default();
             let mut truncated = false;
             for (key, value) in pairs {
-                let row = vec![redis_scalar(key), redis_scalar(value)];
-                if !budget.admit(&row) {
+                decoded.clear();
+                decoded.extend([redis_scalar(key), redis_scalar(value)]);
+                if !budget.admit(&decoded) {
                     truncated = true;
                     break;
                 }
-                rows.push(row);
+                rows.push_row(&mut decoded);
             }
             QueryResult {
                 columns: vec![text_col("key"), text_col("value")],
@@ -546,12 +557,12 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
         }
         RedisValue::VerbatimString { text, .. } => QueryResult {
             columns: vec![text_col("result")],
-            rows: vec![vec![Value::Text(text)]],
+            rows: vec![vec![Value::Text(text)]].into(),
             truncated: false,
         },
         other => QueryResult {
             columns: vec![text_col("result")],
-            rows: vec![vec![redis_scalar(other)]],
+            rows: vec![vec![redis_scalar(other)]].into(),
             truncated: false,
         },
     }

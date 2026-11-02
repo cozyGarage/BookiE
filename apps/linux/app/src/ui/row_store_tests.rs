@@ -206,7 +206,7 @@ fn a_handler_may_read_the_model_while_it_is_changing() {
 fn shared(count: i64) -> Arc<QueryResult> {
     Arc::new(QueryResult {
         columns: Vec::new(),
-        rows: rows(count),
+        rows: rows(count).into(),
         truncated: false,
     })
 }
@@ -246,7 +246,7 @@ fn replacing_a_shared_result_releases_the_old_one() {
 fn projected_store_keeps_sql_null_distinct_from_an_unfetched_cell() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("name")],
-        rows: vec![vec![Value::Null, Value::Text("Ada".into())]],
+        rows: vec![vec![Value::Null, Value::Text("Ada".into())]].into(),
         truncated: false,
     });
     let store = RowStore::from_projected(result.clone(), vec![0, 2], 3).unwrap();
@@ -269,7 +269,7 @@ fn projected_store_keeps_sql_null_distinct_from_an_unfetched_cell() {
 fn projected_store_uses_sparse_reordered_column_mappings_for_rows_and_search() {
     let result = Arc::new(QueryResult {
         columns: vec![column("first"), column("second"), column("third")],
-        rows: vec![vec![Value::Int(11), Value::Int(22), Value::Int(33)]],
+        rows: vec![vec![Value::Int(11), Value::Int(22), Value::Int(33)]].into(),
         truncated: false,
     });
     let store = RowStore::from_projected(result, vec![3, 0, 2], 5).unwrap();
@@ -296,7 +296,7 @@ fn projected_store_uses_sparse_reordered_column_mappings_for_rows_and_search() {
 fn search_visits_projected_cells_at_their_visible_columns() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("name")],
-        rows: vec![vec![Value::Int(7), Value::Text("Ada".into())]],
+        rows: vec![vec![Value::Int(7), Value::Text("Ada".into())]].into(),
         truncated: false,
     });
     let store = RowStore::from_projected(result, vec![0, 2], 3).unwrap();
@@ -314,7 +314,7 @@ fn projected_browse_rows_preview_long_values_without_losing_the_key() {
     let text = "x".repeat(9000);
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("payload")],
-        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]],
+        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]].into(),
         truncated: false,
     });
     let store = RowStore::from_projected_with_previews(result, vec![0, 2], 3, vec![0]).unwrap();
@@ -343,7 +343,8 @@ fn arbitrary_query_previews_can_recover_full_values_from_the_shared_result() {
             Value::Text("x".repeat(9000)),
             Value::Bytes(bytes.clone()),
             Value::Json(Box::new(json.clone())),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     });
     let store = RowStore::from_shared_with_result_previews(result);
@@ -386,7 +387,8 @@ fn redis_previews_only_string_values_and_preserves_keys_and_other_types() {
                 Value::Int(-1),
                 Value::Text(long.clone()),
             ],
-        ],
+        ]
+        .into(),
         truncated: false,
     });
     let store = RowStore::from_shared_with_redis_string_previews(result, vec![0]);
@@ -403,7 +405,7 @@ fn loaded_row_search_visits_full_shared_value_without_materializing_it_in_the_gr
     let text = "x".repeat(9000);
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("payload")],
-        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]],
+        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]].into(),
         truncated: false,
     });
     let store = RowStore::from_shared_with_previews(result, vec![0]);
@@ -441,7 +443,7 @@ fn search_visits_an_edited_cached_value() {
 fn projected_store_refuses_rows_that_do_not_match_the_column_map() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id")],
-        rows: vec![vec![Value::Int(1), Value::Int(2)]],
+        rows: vec![vec![Value::Int(1), Value::Int(2)]].into(),
         truncated: false,
     });
     assert!(RowStore::from_projected(result, vec![0], 1).is_err());

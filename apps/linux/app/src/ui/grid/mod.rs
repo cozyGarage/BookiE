@@ -179,7 +179,7 @@ pub fn build_column_view(
                 }
                 RowStore::from_shared(std::sync::Arc::new(QueryResult {
                     columns: schema_columns.to_vec(),
-                    rows: Vec::new(),
+                    rows: Vec::new().into(),
                     truncated: false,
                 }))
             }
@@ -411,7 +411,8 @@ mod local_sort_tests {
                     bookie_core::Value::Text("3".into()),
                     bookie_core::Value::Undecodable("unknown".into()),
                 ],
-            ],
+            ]
+            .into(),
             truncated: false,
         };
 
@@ -425,7 +426,7 @@ mod local_sort_tests {
         }
         let empty = QueryResult {
             columns: result.columns.clone(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         };
         assert_eq!(sortable_result_columns(&empty), (0..result.columns.len()).collect());
@@ -453,7 +454,8 @@ mod local_sort_tests {
                 vec![bookie_core::Value::Int(3)],
                 vec![bookie_core::Value::Int(1)],
                 vec![bookie_core::Value::Int(2)],
-            ],
+            ]
+            .into(),
             truncated: false,
         });
         let store = RowStore::from_shared(result.clone());

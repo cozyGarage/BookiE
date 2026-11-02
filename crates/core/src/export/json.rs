@@ -6,6 +6,7 @@ use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
+use crate::query_rows::QueryRowSet;
 
 pub fn json_field_names(columns: &[ColumnInfo]) -> Vec<String> {
     let mut reserved = columns.iter().map(|column| column.name.clone()).collect::<HashSet<_>>();
@@ -41,10 +42,10 @@ pub fn render_row_json(columns: &[ColumnInfo], row: &[Value]) -> String {
         .unwrap_or_else(|_| "{}".to_string())
 }
 
-pub fn render_json(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
+pub fn render_json<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R) -> String {
     let names = json_field_names(columns);
-    let values = rows
-        .iter()
+    let values = (0..rows.row_count())
+        .filter_map(|index| rows.row(index))
         .map(|row| raw_json_object(&names, row))
         .collect::<Result<Vec<_>, _>>();
     let Ok(values) = values else {
@@ -56,10 +57,13 @@ pub fn render_json(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
     }
 }
 
-pub fn render_json_lines(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> String {
+pub fn render_json_lines<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R) -> String {
     let names = json_field_names(columns);
     let mut out = String::new();
-    for row in rows {
+    for index in 0..rows.row_count() {
+        let Some(row) = rows.row(index) else {
+            continue;
+        };
         if let Ok(object) = raw_json_object(&names, row)
             && let Ok(line) = serde_json::to_string(&object)
         {

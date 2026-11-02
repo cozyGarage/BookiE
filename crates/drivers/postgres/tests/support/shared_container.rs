@@ -150,6 +150,7 @@ async fn reset_server(server: &Server) {
         "CREATE DATABASE test TEMPLATE template0",
         "DROP DATABASE IF EXISTS alpha_db WITH (FORCE)",
         "ALTER ROLE postgres RESET search_path",
+        "ALTER ROLE postgres RESET TimeZone",
     ] {
         connection.execute(statement).await.expect("reset postgres test server");
     }
@@ -159,9 +160,12 @@ async fn reset_server(server: &Server) {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() {
+    let (_container, server) = create_server(false).await;
+    let options = test_options(&server.options);
+    let expected_time_zone;
     {
-        let (_fixture, options) = start_pg().await;
-        let connection = PgDriver.connect(options).await.unwrap();
+        let connection = PgDriver.connect(options.clone()).await.unwrap();
+        expected_time_zone = connection.query("SHOW TimeZone").await.unwrap().rows[0][0].clone();
         connection
             .execute("CREATE TABLE fixture_isolation (value INT)")
             .await
@@ -170,13 +174,21 @@ async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() 
             .execute("ALTER ROLE postgres SET search_path TO pg_catalog")
             .await
             .unwrap();
+        connection
+            .execute("ALTER ROLE postgres SET TimeZone TO 'Europe/Vienna'")
+            .await
+            .unwrap();
     }
-    let (_fixture, options) = start_pg().await;
+    reset_server(&server).await;
     let connection = PgDriver.connect(options).await.unwrap();
     assert!(connection.query("SELECT * FROM fixture_isolation").await.is_err());
     assert_eq!(
         connection.query("SELECT current_schema()::text").await.unwrap().rows,
         vec![vec![Value::Text("public".into())]],
+    );
+    assert_eq!(
+        connection.query("SHOW TimeZone").await.unwrap().rows,
+        vec![vec![expected_time_zone]]
     );
 }
 

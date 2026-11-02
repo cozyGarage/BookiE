@@ -66,7 +66,8 @@ fn verify_fixed_width(saved: bool, persistent: bool) {
         rows: vec![vec![
             Value::Text("first-value".into()),
             Value::Text("second-value".into()),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     });
     let (view, _) = build_column_view(

@@ -1,21 +1,10 @@
-//! `CellEditor` — the cell widget for editable ColumnView cells.
-//!
-//! A thin `Stack[Label | Text]` `gtk::Widget` subclass. The display
-//! page is a plain `GtkLabel` that does not install any pointer-event
-//! controllers, so a single click on the cell bubbles up to the
-//! ColumnView's row-selection gesture without a forwarder. The edit
-//! page is a `GtkText` shown only after `start_editing()`, where
-//! click-to-position-cursor is the desired behaviour. Edit-mode
-//! transitions are observable via `connect_editing_notify`, which
-//! mirrors the stack's `visible-child-name` notify so callers can
-//! snapshot the original text on entry and emit a commit on exit.
-
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
-
+use glib::subclass::Signal;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 use gtk4::{glib, pango};
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+use std::sync::OnceLock;
 
 type PreeditCallback = Rc<dyn Fn(&str)>;
 
@@ -23,22 +12,19 @@ mod imp {
     use super::*;
 
     pub struct CellEditor {
-        pub stack: gtk4::Stack,
+        pub container: gtk4::Box,
         pub label: gtk4::Label,
         pub entry: RefCell<Option<gtk4::Text>>,
         pub preedit_callback: RefCell<Option<PreeditCallback>>,
         pub last_preedit: RefCell<String>,
         pub inline_editable: Cell<bool>,
+        pub editing: Cell<bool>,
     }
 
     impl Default for CellEditor {
         fn default() -> Self {
             Self {
-                stack: gtk4::Stack::builder()
-                    .transition_type(gtk4::StackTransitionType::None)
-                    .hhomogeneous(true)
-                    .vhomogeneous(true)
-                    .build(),
+                container: gtk4::Box::builder().spacing(0).build(),
                 label: gtk4::Label::builder()
                     .xalign(0.0)
                     .hexpand(true)
@@ -48,6 +34,7 @@ mod imp {
                 preedit_callback: RefCell::new(None),
                 last_preedit: RefCell::new(String::new()),
                 inline_editable: Cell::default(),
+                editing: Cell::default(),
             }
         }
     }
@@ -59,9 +46,6 @@ mod imp {
         type ParentType = gtk4::Widget;
 
         fn class_init(klass: &mut Self::Class) {
-            // BinLayout sizes the single child (the stack) to fill
-            // the cell — same effect as having a single-child
-            // container.
             klass.set_layout_manager_type::<gtk4::BinLayout>();
         }
     }
@@ -69,21 +53,18 @@ mod imp {
     impl ObjectImpl for CellEditor {
         fn constructed(&self) {
             self.parent_constructed();
-            // Stable CSS class so app-level selectors can target this
-            // widget without depending on the type-name node default.
             self.obj().add_css_class("tp-cell-editor");
-            let stack = self.stack.clone();
-            let label = self.label.clone();
-            stack.add_named(&label, Some("display"));
-            stack.set_visible_child_name("display");
-            stack.set_parent(&*self.obj());
+            self.label.set_parent(&self.container);
+            self.container.set_parent(&*self.obj());
         }
 
         fn dispose(&self) {
-            // BinLayout-managed child must be unparented before our
-            // destructor runs or GTK warns about a finalised widget
-            // with leftover children.
-            self.stack.unparent();
+            self.container.unparent();
+        }
+
+        fn signals() -> &'static [Signal] {
+            static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
+            SIGNALS.get_or_init(|| vec![Signal::builder("editing-changed").build()])
         }
     }
 
@@ -151,10 +132,7 @@ impl CellEditor {
     }
 
     pub fn is_editing(&self) -> bool {
-        self.stack_widget()
-            .visible_child_name()
-            .map(|n| n == "edit")
-            .unwrap_or(false)
+        self.imp().editing.get()
     }
 
     pub fn start_editing(&self) {
@@ -170,10 +148,13 @@ impl CellEditor {
         if !self.is_inline_editable() {
             return;
         }
-        let stack = self.stack_widget();
         let entry = self.entry_widget();
         entry.set_text(seed);
-        stack.set_visible_child_name("edit");
+        if !self.imp().editing.replace(true) {
+            self.label_widget().set_visible(false);
+            entry.set_visible(true);
+            self.emit_by_name::<()>("editing-changed", &[]);
+        }
         entry.grab_focus();
         // Select all so the first keystroke replaces — matches the
         // GTK Files rename flow and is what spreadsheet users expect.
@@ -184,6 +165,9 @@ impl CellEditor {
         let Some(entry) = self.imp().entry.borrow().as_ref().cloned() else {
             return;
         };
+        if !self.imp().editing.get() {
+            return;
+        }
         let pending = std::mem::take(&mut *self.imp().last_preedit.borrow_mut());
         if commit {
             let new_text = committed_edit_text(entry.text().as_str(), &pending);
@@ -196,18 +180,18 @@ impl CellEditor {
             entry.set_text(&self.label_widget().text());
             self.clear_preedit_listeners();
         }
-        self.stack_widget().set_visible_child_name("display");
+        entry.set_visible(false);
+        self.label_widget().set_visible(true);
+        self.imp().editing.set(false);
+        self.emit_by_name::<()>("editing-changed", &[]);
     }
 
-    /// Subscribe to edit-mode toggles. The callback fires whenever
-    /// the stack's visible child changes (display ↔ edit).
     pub fn connect_editing_notify<F: Fn(&Self) + 'static>(&self, callback: F) -> glib::SignalHandlerId {
-        let stack = self.stack_widget();
-        let weak = self.downgrade();
-        stack.connect_visible_child_name_notify(move |_| {
-            if let Some(this) = weak.upgrade() {
+        self.connect_local("editing-changed", false, move |values| {
+            if let Some(this) = values.first().and_then(|value| value.get::<Self>().ok()) {
                 callback(&this);
             }
+            None
         })
     }
 
@@ -237,10 +221,6 @@ impl CellEditor {
         }
     }
 
-    fn stack_widget(&self) -> gtk4::Stack {
-        self.imp().stack.clone()
-    }
-
     fn label_widget(&self) -> gtk4::Label {
         self.imp().label.clone()
     }
@@ -250,7 +230,8 @@ impl CellEditor {
             return entry.clone();
         }
         let entry = gtk4::Text::builder().hexpand(true).build();
-        self.stack_widget().add_named(&entry, Some("edit"));
+        entry.set_visible(false);
+        self.imp().container.append(&entry);
         self.install_entry_handlers(&entry);
         *self.imp().entry.borrow_mut() = Some(entry.clone());
         entry
@@ -316,9 +297,20 @@ mod tests {
     fn editable_cell_defers_its_text_widget_until_editing() {
         gtk4::init().unwrap();
         let cell = CellEditor::new();
-        assert!(cell.stack_widget().child_by_name("edit").is_none());
+        assert!(cell.first_child().is_some_and(|child| child.is::<gtk4::Box>()));
+        assert!(
+            cell.imp()
+                .container
+                .first_child()
+                .is_some_and(|child| child.is::<gtk4::Label>())
+        );
         cell.set_text("stored");
-        assert!(cell.stack_widget().child_by_name("edit").is_none());
+        assert!(
+            cell.imp()
+                .container
+                .first_child()
+                .is_some_and(|child| child.is::<gtk4::Label>())
+        );
 
         let preedit_seen = Rc::new(Cell::new(false));
         let preedit_seen_by_callback = preedit_seen.clone();
@@ -326,20 +318,46 @@ mod tests {
             preedit_seen_by_callback.set(preedit == "draft");
         });
         cell.set_inline_editable(true);
+        let edit_transitions = Rc::new(Cell::new(0));
+        let edit_transitions_callback = edit_transitions.clone();
+        cell.connect_editing_notify(move |_| edit_transitions_callback.set(edit_transitions_callback.get() + 1));
         cell.start_editing();
+        assert!(!cell.imp().label.is_visible());
+        assert!(
+            cell.imp()
+                .entry
+                .borrow()
+                .as_ref()
+                .is_some_and(|entry| entry.is_visible())
+        );
         let entry = cell.entry();
         entry.emit_by_name::<()>("preedit-changed", &[&"draft"]);
         assert!(preedit_seen.get());
         assert_eq!(entry.text().as_str(), "stored");
         entry.set_text("discarded");
         cell.stop_editing(false);
+        assert!(cell.imp().label.is_visible());
+        assert!(!entry.property::<bool>("visible"));
+        assert!(!entry.should_layout());
         assert_eq!(cell.text().as_str(), "stored");
 
         cell.start_editing_with("exact value");
+        assert!(!cell.imp().label.is_visible());
+        assert!(
+            cell.imp()
+                .entry
+                .borrow()
+                .as_ref()
+                .is_some_and(|entry| entry.is_visible())
+        );
         assert_eq!(cell.entry().text().as_str(), "exact value");
         cell.stop_editing(true);
+        assert!(cell.imp().label.is_visible());
+        assert!(!entry.property::<bool>("visible"));
+        assert!(!entry.should_layout());
         assert_eq!(cell.text().as_str(), "exact value");
         assert_eq!(cell.entry(), entry);
+        assert_eq!(edit_transitions.get(), 4);
     }
 
     #[test]

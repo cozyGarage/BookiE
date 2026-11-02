@@ -12,7 +12,8 @@ use duckdb::{
 
 use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, EnumInputStyle, ExecResult,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, run_server_cancellable,
+    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
+    run_server_cancellable,
 };
 use tempfile::TempDir;
 
@@ -344,7 +345,7 @@ impl DuckdbConnection {
         .await
     }
 
-    async fn list_information_schema_relations(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
+    async fn list_catalog_objects(&self, table_type: &'static str) -> Result<Vec<TableInfo>, DriverError> {
         let conn = Arc::clone(&self.session);
         blocking(move || {
             let guard = conn
@@ -380,11 +381,11 @@ impl DuckdbConnection {
 #[async_trait]
 impl Connection for DuckdbConnection {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        self.list_information_schema_relations("BASE TABLE").await
+        self.list_catalog_objects("BASE TABLE").await
     }
 
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
-        self.list_information_schema_relations("VIEW").await
+        self.list_catalog_objects("VIEW").await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
@@ -619,7 +620,8 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
 
     // DuckDB requires the statement to be stepped before column metadata
     // is available. Collect all values first (capped), then read names.
-    let mut raw_rows: Vec<Vec<Value>> = Vec::new();
+    let mut raw_rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::new();
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     let mut column_count = 0usize;
@@ -647,25 +649,34 @@ fn run_query(conn: &Arc<DuckdbSession>, sql: &str, params: &[Value], limit: usiz
         let payload_bytes = (0..column_count).fold(0usize, |total, i| {
             total.saturating_add(cell_payload_bytes(&row.get_ref_unwrap(i)))
         });
-        let admitted = budget.decode_and_admit_row::<std::convert::Infallible>(column_count, payload_bytes, || {
-            Ok(zoned_columns
-                .iter()
-                .zip(&uuid_columns)
-                .enumerate()
-                .map(
-                    |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
-                        Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
-                        Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
-                            Value::Text(format!("{timestamp}+00"))
-                        }
-                        value => value,
-                    },
-                )
-                .collect::<Vec<_>>())
-        });
+        let admitted = budget.decode_and_admit_row_into::<std::convert::Infallible>(
+            column_count,
+            payload_bytes,
+            &mut decoded,
+            |values| {
+                values.extend(
+                    zoned_columns
+                        .iter()
+                        .zip(&uuid_columns)
+                        .enumerate()
+                        .map(
+                            |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
+                                Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                                Value::Text(timestamp)
+                                    if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") =>
+                                {
+                                    Value::Text(format!("{timestamp}+00"))
+                                }
+                                value => value,
+                            },
+                        ),
+                );
+                Ok(())
+            },
+        );
         match admitted {
-            Ok(Some(values)) => raw_rows.push(values),
-            Ok(None) => {
+            Ok(true) => raw_rows.push_row(&mut decoded),
+            Ok(false) => {
                 truncated = true;
                 break;
             }

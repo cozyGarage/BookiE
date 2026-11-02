@@ -42,7 +42,7 @@ fn page(value: &str, has_next_page: bool) -> QueryCursorPage {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Text(value.into())]],
+            rows: vec![vec![Value::Text(value.into())]].into(),
             truncated: false,
         },
         has_next_page,

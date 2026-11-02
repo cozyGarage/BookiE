@@ -1024,7 +1024,7 @@ fn select_row_for_menu(view: &gtk::ColumnView, position: u32) {
 fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bool) -> Option<QueryResult> {
     Some(QueryResult {
         columns: columns.to_vec(),
-        rows: complete_rows((0..view.model()?.n_items()).map(|position| complete_row_at(view, position)))?,
+        rows: complete_rows((0..view.model()?.n_items()).map(|position| complete_row_at(view, position)))?.into(),
         truncated,
     })
 }

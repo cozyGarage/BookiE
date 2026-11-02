@@ -88,9 +88,9 @@ impl bookie_core::Session for PgSession {
             .await?;
         result
             .rows
-            .into_iter()
-            .map(|row| match row.into_iter().next() {
-                Some(Value::Text(name)) => Ok(name),
+            .iter()
+            .map(|row| match row.first() {
+                Some(Value::Text(name)) => Ok(name.clone()),
                 _ => Err(DriverError::Internal(
                     "PostgreSQL returned an invalid completion column name".into(),
                 )),

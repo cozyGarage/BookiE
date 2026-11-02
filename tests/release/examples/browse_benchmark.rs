@@ -51,8 +51,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("set BOOKIE_FIXTURE_POSTGRES_RELEASE=1 for a disposable database".into());
     }
     let scenario = std::env::args().nth(1).unwrap_or_else(|| "first".into());
-    if !["first", "filtered", "deep", "wide", "capped"].contains(&scenario.as_str()) {
-        return Err("scenario must be first, filtered, deep, wide, or capped".into());
+    if !["first", "filtered", "deep", "wide", "capped", "single", "variable"].contains(&scenario.as_str()) {
+        return Err("scenario must be first, filtered, deep, wide, capped, single, or variable".into());
     }
     let fixture = Fixture::from_env();
     let connection = fixture.connect_verified().await;
@@ -77,6 +77,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .join(", ");
                 format!("SELECT {columns} FROM {name} ORDER BY id LIMIT 100")
             }
+            "single" => format!(
+                "SELECT n AS id FROM generate_series(1,{}) n",
+                MAX_QUERY_ROWS + 100_000
+            ),
+            "variable" => format!(
+                "SELECT n AS id, CASE n % 3 WHEN 0 THEN repeat('x',8) WHEN 1 THEN repeat('x',64) ELSE repeat('x',256) END AS payload FROM generate_series(1,{}) n",
+                MAX_QUERY_ROWS + 100_000
+            ),
             "capped" => format!(
                 "SELECT n AS id, repeat('x',64) AS payload FROM generate_series(1,{}) n",
                 MAX_QUERY_ROWS + 100_000
@@ -99,16 +107,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let observed = task.await.expect("observer task");
             let result = result?;
             let sampled_active_ms = observed?;
-            if scenario == "capped" {
+            let budget_limited = matches!(scenario.as_str(), "capped" | "single" | "variable");
+            if budget_limited {
                 assert!(!result.rows.is_empty());
-                assert!(
-                    result.rows.len() < MAX_QUERY_ROWS,
-                    "decoded memory budget should bind first"
-                );
+                if scenario != "single" {
+                    assert!(result.rows.len() < MAX_QUERY_ROWS, "decoded memory budget should bind first");
+                }
             } else {
                 assert_eq!(result.rows.len(), 100);
             }
-            assert_eq!(result.truncated, scenario == "capped");
+            assert_eq!(result.truncated, budget_limited);
             println!(
                 "{}",
                 serde_json::json!({"scenario": scenario, "attempt": attempt, "warmup": attempt == 0,

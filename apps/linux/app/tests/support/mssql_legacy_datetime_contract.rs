@@ -64,7 +64,7 @@ async fn value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_valu
     );
 
     let mut updates = Vec::new();
-    for row in &before.rows[..3] {
+    for row in before.rows.iter().take(3) {
         let Value::Text(server_text) = &row[2] else {
             panic!("native style-126 result must be text: {:?}", row[2]);
         };

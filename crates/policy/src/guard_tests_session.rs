@@ -46,7 +46,7 @@ impl bookie_core::Session for ScriptedSession {
             .filter(|_| sql.to_ascii_lowercase().contains("count("))
         {
             let mut counted = empty_result();
-            counted.rows = vec![vec![Value::Int(count)]];
+            counted.rows = vec![vec![Value::Int(count)]].into();
             return Ok(counted);
         }
         if self.script.disconnect_on == Some(sql) {
@@ -1109,7 +1109,7 @@ fn secret_set(value: &str) -> QueryResult {
             enum_type: None,
             domain_type: None,
         }],
-        rows: vec![vec![Value::Text(value.into())]],
+        rows: vec![vec![Value::Text(value.into())]].into(),
         truncated: false,
     }
 }
