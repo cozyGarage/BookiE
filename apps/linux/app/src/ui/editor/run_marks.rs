@@ -236,10 +236,7 @@ mod tests {
         ];
         for (label, mark, background) in cases {
             let ratio = contrast_ratio(mark, background);
-            assert!(
-                ratio >= 3.0,
-                "{label}: mark {mark:?} on {background:?} is {ratio:.2}:1"
-            );
+            assert!(ratio >= 3.0, "{label}: mark {mark:?} on {background:?} is {ratio:.2}:1");
         }
     }
 
