@@ -929,7 +929,7 @@ GLib.MainLoop().run()
             ui.wait_for_node(name=marker, role=pyatspi.ROLE_LABEL, timeout=180)
             ui.wait_for_node_containing(f"Received {result_rows:,} rows", timeout=180)
             elapsed_seconds = round(time.monotonic() - started, 2)
-            ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.invoke(ui.wait_for_sensitive_node("Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
             sample = {"stage": f"after_streamed_editor_{index + 1}", **app_memory_profile_kb()}
             samples.append(sample)
