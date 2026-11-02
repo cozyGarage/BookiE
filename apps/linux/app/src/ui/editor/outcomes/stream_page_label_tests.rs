@@ -22,7 +22,7 @@ fn page_label_lookup_uses_a_constant_number_of_page_index_lookups() {
     let label = stream_result_view::stream_page_label(&result, 9_999);
 
     let visited = stream_result_view::PAGE_ROW_INDEX_LOOKUPS.with(std::cell::Cell::get);
-    assert_eq!(label, "Rows 10000-10000");
+    assert_eq!(label, "Rows 10,000-10,000");
     assert!(visited <= 2, "looked up page metadata {visited} times");
 }
 
@@ -54,6 +54,6 @@ fn progress_text_reads_the_cached_retained_row_count_once() {
     let text = stream_result_view::stream_progress_text(&result);
 
     let visited = stream_result_view::RETAINED_ROW_COUNT_LOOKUPS.with(std::cell::Cell::get);
-    assert!(text.starts_with("Received 10000 rows · 10000 pages"));
+    assert!(text.starts_with("Received 10,000 rows · 10,000 pages"));
     assert_eq!(visited, 1, "read the retained row count {visited} times");
 }
