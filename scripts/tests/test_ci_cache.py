@@ -68,7 +68,7 @@ class CiCacheTests(unittest.TestCase):
 
     def test_old_generated_artifacts_removed_but_siblings_preserved(self):
         target = self.target('sandbox', 6)
-        for profile in ('release', 'ci'):
+        for profile in ('release', 'ci', 'dist'):
             (target / profile / 'deps').mkdir(parents=True)
             (target / profile / '.cargo-lock').touch()
             (target / profile / 'deps/artifact').write_text('compiled bytes')
@@ -78,6 +78,7 @@ class CiCacheTests(unittest.TestCase):
         self.assertFalse((target / 'debug').exists())
         self.assertFalse((target / 'release').exists())
         self.assertFalse((target / 'ci').exists())
+        self.assertFalse((target / 'dist').exists())
         self.assertEqual((target / 'evidence.txt').read_text(), 'keep')
 
     def test_recent_nightly_cache_and_unmarked_legacy_cache_survive(self):
@@ -135,7 +136,8 @@ class CiCacheTests(unittest.TestCase):
         self.assertEqual(result, 0)
 
     def test_pressure_cleanup_evicts_old_bundles_but_preserves_current_and_unrelated_data(self):
-        bundle_root = self.directory / 'bundles'
+        target = self.target('current-build', 0.1)
+        bundle_root = self.directory / 'shared-bundles'
         bundle_root.mkdir()
         oldest = bundle_root / ('a' * 40 + '-default')
         newest = bundle_root / ('b' * 40 + '-duckdb')
@@ -156,7 +158,7 @@ class CiCacheTests(unittest.TestCase):
             return SimpleNamespace(free=100 if recovered else 0)
 
         with patch.object(helper.shutil, 'disk_usage', side_effect=disk_usage), patch.dict(
-            os.environ, {'GITHUB_SHA': 'c' * 40}
+            os.environ, {'GITHUB_SHA': 'c' * 40, 'BOOKIE_BUNDLE_CACHE': str(bundle_root)}
         ):
             result = helper.cleanup(self.cache, 50)
 
@@ -165,6 +167,7 @@ class CiCacheTests(unittest.TestCase):
         self.assertTrue(newest.exists())
         self.assertTrue(current.exists())
         self.assertTrue((unrelated / 'payload').is_file())
+        self.assertTrue((target / 'debug/deps/artifact').exists())
 
     def test_checkout_refuses_to_run_when_cleanup_cannot_restore_the_reserve(self):
         self.target('unit', 0)
