@@ -19,7 +19,7 @@ mod row_identity;
 pub use draft::DraftRow;
 
 use row_identity::keyvalue_to_value;
-pub use row_identity::{KeyValue, MaterializeError, RowKey, pk_values_are_unreadable};
+pub use row_identity::{KeyValue, MaterializeError, RowKey, ambiguous_row_keys, pk_values_are_unreadable};
 
 const UNDO_LIMIT: usize = 50;
 

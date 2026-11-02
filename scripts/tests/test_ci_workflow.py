@@ -54,18 +54,12 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('RUSTC_WRAPPER: ""', guards)
         self.assertIn('mkdir -p "$TMPDIR"', guards)
 
-    def test_build_host_jobs_use_the_bounded_rust_and_cmake_cache(self):
+    def test_build_host_jobs_ignore_sccache_server_io_errors(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertIn("SCCACHE_CACHE_SIZE: 40G", workflow)
         for name in ("gtk-build", "clippy", "test-build", "floor-build"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-                self.assertIn("RUSTC_WRAPPER: /tools/sccache", job)
-                self.assertIn("SCCACHE_DIR: /target/sccache", job)
                 self.assertIn("SCCACHE_IGNORE_SERVER_IO_ERROR: \"1\"", job)
-                self.assertIn("CMAKE_C_COMPILER_LAUNCHER: /tools/sccache", job)
-                self.assertIn("CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache", job)
-                self.assertIn("run: /tools/sccache --show-stats || true", job)
 
     def test_postgres_release_temp_directory_stays_short_for_unix_sockets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -121,6 +115,26 @@ class CiWorkflowTests(unittest.TestCase):
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("mongodb, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
+        image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
+        self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
+
+    def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name in ("gtk-build", "clippy", "test-build", "floor-build"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("RUSTC_WRAPPER: sccache", job)
+                self.assertIn("CMAKE_C_COMPILER_LAUNCHER: /tools/sccache", job)
+                self.assertIn("CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache", job)
+                self.assertIn("SCCACHE_DIR: /cargo/sccache", job)
+                self.assertIn("PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin", job)
+                self.assertIn("SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}", job)
+                self.assertIn("SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock", job)
+                self.assertIn("sccache --start-server", job)
+                self.assertIn("sccache --show-stats", job)
+                stop = job.index("sccache --stop-server")
+                cleanup = job.index('rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"')
+                self.assertLess(stop, cleanup)
 
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()

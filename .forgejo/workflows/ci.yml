@@ -90,12 +90,14 @@ jobs:
         shell: bash
     env:
       CARGO_HOME: /cargo
-      RUSTC_WRAPPER: /tools/sccache
-      SCCACHE_DIR: /target/sccache
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
       SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
       BOOKIE_TOOL_DIR: /tools
@@ -108,6 +110,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -132,12 +135,14 @@ jobs:
           path: gtk-artifact/
           if-no-files-found: error
           retention-days: 2
-      - name: Report compiler cache
-        if: always()
-        run: /tools/sccache --show-stats || true
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
       - name: Finalize runner job
@@ -159,12 +164,14 @@ jobs:
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
-      RUSTC_WRAPPER: /tools/sccache
-      SCCACHE_DIR: /target/sccache
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
       SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
       - name: Check out
@@ -174,6 +181,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -185,12 +193,14 @@ jobs:
       - name: Clippy
         run: |
           cd src && cargo clippy --workspace --all-targets -- -D warnings
-      - name: Report compiler cache
-        if: always()
-        run: /tools/sccache --show-stats || true
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
       - name: Finalize runner job
@@ -215,12 +225,14 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: /tools/sccache
-      SCCACHE_DIR: /target/sccache
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
       SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
       - name: Check out
@@ -230,6 +242,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -246,12 +259,14 @@ jobs:
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/default" "${{ github.sha }}" default
-      - name: Report compiler cache
-        if: always()
-        run: /tools/sccache --show-stats || true
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
       - name: Finalize runner job
@@ -399,12 +414,14 @@ jobs:
       CARGO_HOME: /cargo
       BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: /tools/sccache
-      SCCACHE_DIR: /target/sccache
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
       SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
       CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_BASEDIRS: /target/${{ github.run_id }}/${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/${{ github.run_id }}/${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Check out
         shell: bash
@@ -413,6 +430,7 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -440,12 +458,14 @@ jobs:
           path: floor-artifact/
           if-no-files-found: error
           retention-days: 2
-      - name: Report compiler cache
-        if: always()
-        run: /tools/sccache --show-stats || true
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
 
 
       - name: Finalize runner job
@@ -627,6 +647,7 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
       - name: Pre-pull fixture images
+        if: ${{ matrix.driver != 'duckdb' }}
         run: bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"
       - name: Driver integration
         run: |
