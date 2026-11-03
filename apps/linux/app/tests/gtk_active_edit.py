@@ -49,12 +49,13 @@ def scenarios(ui):
         assert notes(database) == [(1, "alpha"), (2, "beta")], "cancel committed the edit"
         save_and_assert_notes(database)
 
-    def save_and_assert_notes(database):
+    def save_and_assert_notes(database, expected=((1, "gamma"), (2, "beta"))):
+        expected = list(expected)
         ui.invoke_accessible_action("win.save-changes")
         deadline = time.monotonic() + ui.WAIT_SECONDS
-        while time.monotonic() < deadline and notes(database) != [(1, "gamma"), (2, "beta")]:
+        while time.monotonic() < deadline and notes(database) != expected:
             time.sleep(ui.POLL_SECONDS)
-        assert notes(database) == [(1, "gamma"), (2, "beta")], "the typed value was lost or its sibling changed"
+        assert notes(database) == expected, "the typed value was lost or its sibling changed"
 
     def assert_single_staged_edit():
         deadline = time.monotonic() + ui.WAIT_SECONDS
@@ -301,11 +302,7 @@ def scenarios(ui):
         ui.press_x11_key("z")
         ui.press_x11_key("Return")
         ui.wait_for_node(name="1 unsaved change")
-        ui.invoke_accessible_action("win.save-changes")
-        deadline = time.monotonic() + ui.WAIT_SECONDS
-        while time.monotonic() < deadline and notes(database)[0][1] == "alpha":
-            time.sleep(ui.POLL_SECONDS)
-        assert notes(database) == [(1, "gammaz"), (2, "beta")], "a click inside the open editor ended or reseeded the edit"
+        save_and_assert_notes(database, ((1, "gammaz"), (2, "beta")))
 
     result = [
         active_cell_edit_enter_control,
