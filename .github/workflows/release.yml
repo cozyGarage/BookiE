@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       artifact_run_id:
-        description: Existing tag run whose four package builds passed; leave empty to build packages
+        description: Existing tag run whose three package builds passed; leave empty to build packages
         type: string
         default: ""
       release_tag:
@@ -95,43 +95,6 @@ jobs:
           path: |
             release-notes.md
             translations/bookie.pot
-
-  deb:
-    name: Debian package
-    if: inputs.artifact_run_id == ''
-    needs: prepare
-    runs-on: ubuntu-24.04
-    container: debian:testing
-    steps:
-      - name: Install build dependencies
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends build-essential ca-certificates curl git nodejs pkg-config \
-            libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libgtksourceview-5-common libssl-dev libsecret-1-dev libkrb5-dev \
-            libsqlite3-dev clang python3 dpkg-dev
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-          ref: ${{ github.sha }}
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        with:
-          toolchain: "1.98"
-      # Only the pull request dry run reuses a cache. A tag or dispatch build that publishes starts clean, so
-      # no earlier cache can reach a released package.
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # zizmor: ignore[cache-poisoning]
-        if: github.event_name == 'pull_request'
-        with:
-          prefix-key: release-deb
-      - name: Build and validate
-        run: |
-          scripts/build-deb.sh
-          package="$(ls apps/linux/packaging/out/*.deb)"
-          scripts/validate-deb-package.sh "$package"
-          (cd "$(dirname "$package")" && sha256sum "$(basename "$package")" > "$(basename "$package").sha256")
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: package-deb
-          path: apps/linux/packaging/out/*.deb*
 
   appimage:
     name: AppImage
@@ -246,9 +209,8 @@ jobs:
     if: >-
       always() && needs.prepare.result == 'success' && needs.prepare.outputs.publish == 'true' &&
       (needs.prepare.outputs.artifact_run != '' ||
-       (needs.deb.result == 'success' && needs.appimage.result == 'success' &&
-        needs.arch.result == 'success' && needs.flatpak.result == 'success'))
-    needs: [prepare, deb, appimage, arch, flatpak]
+       (needs.appimage.result == 'success' && needs.arch.result == 'success' && needs.flatpak.result == 'success'))
+    needs: [prepare, appimage, arch, flatpak]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -266,7 +228,7 @@ jobs:
         run: |
           mkdir release
           cd artifacts
-          cp -- *.deb *.AppImage *.pkg.tar.zst bookie.flatpak translations/bookie.pot ../release/
+          cp -- *.AppImage *.pkg.tar.zst bookie.flatpak translations/bookie.pot ../release/
           cp release-notes.md ../release-notes.md
           cd ../release
           sha256sum -- * > SHA256SUMS

@@ -35,11 +35,11 @@ bookie-agentd --help
 
 Test install, upgrade, downgrade, and removal. Package operations must leave the user's XDG configuration, data, state, and keyring records untouched.
 
-## Debian / Ubuntu package
+## Debian staging build
 
 For native-library and toolchain requirements, see [platforms](../../../docs/platforms.md).
 
-The Debian builder and validator use the workspace release version with Debian revision `-1` by default. `DEB_VERSION` can select another packaging revision. The commands below build and install a local package from the current workspace; they do not replace the manual scenarios in the [verification checklist](../../../docs/manual-verification-0.2-features.md).
+BookiE no longer publishes a Debian package ([ADR 0031](../../../docs/decisions/0031-stop-publishing-the-debian-package.md)). The Debian builder and validator remain because the AppImage build stages its files with them. They use the workspace release version with Debian revision `-1` by default, and `DEB_VERSION` can select another revision. The command below builds a local package for development only; the result needs a system with the toolkit versions listed in [platforms](../../../docs/platforms.md) and does not replace the manual scenarios in the [verification checklist](../../../docs/manual-verification-0.2-features.md).
 
 ```bash
 DEB_VERSION=0.2.4-1 ./scripts/build-deb.sh
