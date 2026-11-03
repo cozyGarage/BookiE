@@ -514,12 +514,11 @@ impl McpBridge {
         sql: &str,
         control: &OperationControl,
     ) -> Result<WriteOutcome, McpToolError> {
-        let driver_id = self.driver_id_for_controlled(connection_id, control).await.ok();
-        if driver_id
-            .as_deref()
-            .is_some_and(|driver| preview_may_implicitly_commit(driver, sql))
-        {
-            return Err(McpToolError::preview_not_transactional());
+        let Ok(driver_id) = self.driver_id_for_controlled(connection_id, control).await else {
+            return Err(McpToolError::preview_refused_before_start());
+        };
+        if preview_may_implicitly_commit(&driver_id, sql) {
+            return Err(McpToolError::preview_refused_before_start());
         }
         let mut transaction = connection.begin_controlled(control).await.map_err(|error| {
             let mut outcome = McpToolError::from_write_error(&error);
@@ -528,10 +527,7 @@ impl McpBridge {
             }
             outcome
         })?;
-        let refused = match &driver_id {
-            Some(driver_id) => touches_nontransactional_table(transaction.as_mut(), driver_id, sql, control).await,
-            None => true,
-        };
+        let refused = touches_nontransactional_table(transaction.as_mut(), &driver_id, sql, control).await;
         let result = if refused {
             Err(DriverError::ReadOnly)
         } else {

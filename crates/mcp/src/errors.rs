@@ -65,6 +65,13 @@ impl McpToolError {
         }
     }
 
+    pub(crate) fn preview_refused_before_start() -> Self {
+        Self {
+            transaction_outcome: TransactionOutcome::NotStarted,
+            ..Self::preview_not_transactional()
+        }
+    }
+
     pub(crate) fn request_failed() -> Self {
         Self {
             code: "request_failed",

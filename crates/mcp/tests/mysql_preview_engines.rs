@@ -159,9 +159,14 @@ async fn a_preview_is_refused_for_statements_that_commit_on_their_own_and_nothin
         "ALTER TABLE modern ADD COLUMN note INT",
         "CREATE TABLE created_by_preview (id INT)",
         "DROP TABLE modern",
+        "UPDATE modern SET v = 2 WHERE id = 1; DROP TABLE modern",
+        "DELETE FROM modern WHERE id = 1; COMMIT",
     ] {
-        let refused = bridge.execute_write(token, connection_id, sql, true).await;
-        assert!(refused.is_err(), "{sql} must not be previewed: {refused:?}");
+        let refused = bridge.execute_write_structured(token, connection_id, sql, true).await;
+        let Err(error) = refused else {
+            panic!("{sql} must not be previewed: {refused:?}");
+        };
+        assert_eq!(error.code, "preview_not_transactional", "{sql}: {error:?}");
     }
     let rows = connection
         .query("SELECT (SELECT COUNT(*) FROM modern), (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'created_by_preview'), (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'modern' AND column_name = 'note')")
