@@ -2,6 +2,8 @@
 mod page_index;
 #[cfg(test)]
 mod page_window;
+#[cfg(test)]
+mod paged_model;
 mod pager;
 pub(super) use pager::build as build_pager;
 

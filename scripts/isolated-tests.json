@@ -605,6 +605,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::paged_model::loading_a_page_preserves_the_selected_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::streaming::tests::a_stream_waits_with_a_loading_status_page"
     ],
     [

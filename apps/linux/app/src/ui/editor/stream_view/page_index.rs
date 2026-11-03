@@ -27,6 +27,13 @@ impl PageIndex {
         self.ends.last().copied().unwrap_or(0)
     }
 
+    pub(super) fn page_range(&self, page: u64) -> Option<(usize, usize)> {
+        let page = usize::try_from(page).ok()?;
+        let end = *self.ends.get(page)?;
+        let start = page.checked_sub(1).map_or(0, |previous| self.ends[previous]);
+        Some((start, end - start))
+    }
+
     pub(super) fn pages_in(&self, start: usize, count: usize) -> Vec<u64> {
         if count == 0 {
             return Vec::new();
