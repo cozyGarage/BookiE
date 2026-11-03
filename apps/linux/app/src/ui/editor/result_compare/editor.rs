@@ -208,7 +208,6 @@ impl SqlEditor {
             },
         );
         let (added, _) = self.pin_and_show(outcome, sender);
-        let message = crate::ui::editor::pinned::with_eviction_note(message, added.evicted);
-        message
+        crate::ui::editor::pinned::with_eviction_note(message, added.evicted)
     }
 }

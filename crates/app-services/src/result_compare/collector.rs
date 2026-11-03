@@ -43,10 +43,6 @@ impl Collector {
         }
     }
 
-    pub(crate) fn mark_capped(&mut self) {
-        self.capped = true;
-    }
-
     pub(crate) fn finish(self) -> (Vec<DiffRow>, bool) {
         (self.rows, self.capped)
     }
