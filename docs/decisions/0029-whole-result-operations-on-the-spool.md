@@ -1,6 +1,6 @@
 # 0029: Operate on a completed streamed result through the spool
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-03)
 - **Date**: 2026-11-03
 
 ## Context

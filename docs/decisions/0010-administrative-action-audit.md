@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-10-07
+- **Extended by**: [ADR 0030](0030-audit-local-result-comparison.md)
 
 ## Context
 

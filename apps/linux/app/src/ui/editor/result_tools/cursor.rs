@@ -1,5 +1,13 @@
 use bookie_app_services::result_find::{FindMatch, FindReport};
 
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum SearchState {
+    #[default]
+    Idle,
+    Searching,
+    Complete,
+}
+
 #[derive(Default)]
 pub(super) struct MatchCursor {
     generation: u64,
@@ -8,8 +16,7 @@ pub(super) struct MatchCursor {
     unsearchable: u64,
     current: Option<usize>,
     needle: String,
-    complete: bool,
-    searching: bool,
+    state: SearchState,
 }
 
 impl MatchCursor {
@@ -19,8 +26,7 @@ impl MatchCursor {
         self.capped = false;
         self.unsearchable = 0;
         self.current = None;
-        self.complete = false;
-        self.searching = true;
+        self.state = SearchState::Searching;
         self.needle = needle.to_owned();
         self.generation
     }
@@ -29,13 +35,12 @@ impl MatchCursor {
         self.generation = self.generation.wrapping_add(1);
         self.matches.clear();
         self.current = None;
-        self.complete = false;
-        self.searching = false;
+        self.state = SearchState::Idle;
     }
 
     pub(super) fn end_search(&mut self, generation: u64) {
-        if self.accepts(generation) {
-            self.searching = false;
+        if self.accepts(generation) && self.state == SearchState::Searching {
+            self.state = SearchState::Idle;
         }
     }
 
@@ -50,17 +55,16 @@ impl MatchCursor {
         self.matches = report.matches;
         self.capped = report.capped;
         self.unsearchable = report.unsearchable_cells;
-        self.complete = true;
-        self.searching = false;
+        self.state = SearchState::Complete;
         true
     }
 
     pub(super) fn has_results_for(&self, needle: &str) -> bool {
-        self.complete && self.needle == needle
+        self.state == SearchState::Complete && self.needle == needle
     }
 
     pub(super) fn keeps_for(&self, needle: &str) -> bool {
-        (self.complete || self.searching) && self.needle == needle
+        self.state != SearchState::Idle && self.needle == needle
     }
 
     pub(super) fn step(&mut self, forward: bool) -> Option<FindMatch> {
@@ -79,7 +83,7 @@ impl MatchCursor {
     }
 
     pub(super) fn status(&self) -> String {
-        if !self.complete {
+        if self.state != SearchState::Complete {
             return String::new();
         }
         let base = self.base_status();
