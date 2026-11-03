@@ -60,17 +60,21 @@ impl BrowseTab {
         // starts inside the 1.8s window: the older timer's clear runs
         // but no-ops because gen no longer matches.
         let tab_id = self.tab_id;
-        let generation =
-            crate::services::change_tracker::with_tab(tab_id, |t| t.set_error_row(key.clone())).unwrap_or(0);
+        let generation = self
+            .change_trackers
+            .with_tab(tab_id, |t| t.set_error_row(key.clone()))
+            .unwrap_or(0);
         self.refresh_row_at(position);
         let selection_for_clear = self.current_selection.clone();
+        let change_trackers = self.change_trackers.clone();
         glib::timeout_add_local_once(std::time::Duration::from_millis(1800), move || {
-            let cleared = crate::services::change_tracker::with_tab(tab_id, |t| {
-                let was_match = t.is_error_row_gen(generation);
-                t.clear_error_row_if_gen(generation);
-                was_match
-            })
-            .unwrap_or(false);
+            let cleared = change_trackers
+                .with_tab(tab_id, |t| {
+                    let was_match = t.is_error_row_gen(generation);
+                    t.clear_error_row_if_gen(generation);
+                    was_match
+                })
+                .unwrap_or(false);
             if !cleared {
                 // A newer flash superseded ours; don't disturb its bind.
                 return;
