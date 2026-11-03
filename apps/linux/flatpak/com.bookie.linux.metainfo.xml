@@ -70,6 +70,9 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.4" type="stable" date="2026-11-03">
+      <description><p>Patch after 0.2.3: find, filter and compare across a whole streamed result; export completed streams without re-running; recent connections on welcome; continuous streamed navigation; plus memory and grid-edit fixes.</p></description>
+    </release>
     <release version="0.2.3" type="stable" date="2026-11-02">
       <description><p>Patch after 0.2.2: DuckDB in every build with views and DuckDB type names in the grid; cell filter/exclude and focused grid font zoom; SSH agent key chooser; streamed counts and NULL label polish; BookiE rename with copy-forward from tablepro; plus memory and correctness fixes across the editor, dump, DuckDB, Redis and ClickHouse.</p></description>
     </release>
