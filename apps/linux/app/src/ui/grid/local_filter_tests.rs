@@ -197,6 +197,101 @@ fn attaching_an_unfiltered_result_restores_saved_selection_by_source_row() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn attaching_a_sorted_result_restores_selection_by_source_row() {
+    gtk4::init().unwrap();
+    let result = Arc::new(result(vec![Value::Int(3), Value::Int(1), Value::Int(2), Value::Int(4)]));
+    let settings = LocalResultSettingsStore::default();
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [8; 32],
+        },
+        result_set_index: 0,
+    };
+    let selected = std::collections::HashSet::from([0, 2]);
+    settings.update(key, |current| {
+        current.sort = Some((0, false));
+        current.selection = Some((Arc::downgrade(&result), Arc::new(selected)));
+    });
+
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let view = LocalResultView::new(result, settings, key);
+    view.attach(store.clone(), selection.clone());
+
+    assert_eq!(
+        (0..store.n_items())
+            .map(|position| store.source_index_at(position))
+            .collect::<Vec<_>>(),
+        vec![Some(3), Some(0), Some(2), Some(1)]
+    );
+    let restored = selection.selection();
+    assert_eq!(restored.size(), 2);
+    assert_eq!(store.source_index_at(restored.nth(0)), Some(0));
+    assert_eq!(store.source_index_at(restored.nth(1)), Some(2));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn attaching_a_sorted_result_restores_all_source_rows_as_selected() {
+    gtk4::init().unwrap();
+    let result = Arc::new(result(vec![Value::Int(3), Value::Int(1), Value::Int(2), Value::Int(4)]));
+    let settings = LocalResultSettingsStore::default();
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [10; 32],
+        },
+        result_set_index: 0,
+    };
+    settings.update(key, |current| {
+        current.sort = Some((0, false));
+        current.selection = Some((Arc::downgrade(&result), Arc::new((0..result.rows.len()).collect())));
+    });
+
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let view = LocalResultView::new(result, settings, key);
+    view.attach(store, selection.clone());
+
+    assert_eq!(selection.selection().size(), 4);
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn attaching_a_filtered_result_restores_all_visible_selected_source_rows() {
+    gtk4::init().unwrap();
+    let result = Arc::new(result(vec![Value::Int(3), Value::Int(1), Value::Int(2), Value::Int(4)]));
+    let settings = LocalResultSettingsStore::default();
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [11; 32],
+        },
+        result_set_index: 0,
+    };
+    settings.update(key, |current| {
+        current.filter = Some(super::LocalCellFilter {
+            column: 0,
+            value: Value::Int(2),
+            exclude: false,
+        });
+        current.selection = Some((Arc::downgrade(&result), Arc::new((0..result.rows.len()).collect())));
+    });
+
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let view = LocalResultView::new(result, settings, key);
+    view.attach(store.clone(), selection.clone());
+
+    assert_eq!(store.n_items(), 1);
+    assert_eq!(store.source_index_at(0), Some(2));
+    assert_eq!(selection.selection().size(), 1);
+    assert_eq!(store.source_index_at(selection.selection().nth(0)), Some(2));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn attaching_an_unfiltered_result_restores_the_entire_selection() {
     gtk4::init().unwrap();
     let result = Arc::new(result(vec![Value::Int(3), Value::Int(1), Value::Int(2), Value::Int(4)]));

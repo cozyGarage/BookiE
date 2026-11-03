@@ -148,7 +148,14 @@ impl LocalResultView {
             self.rebuild_visible_rows();
         }
         if let Some(selected) = settings_store.selection_for(settings_key, &result) {
-            restore_selection(&store, &selection, &selected, has_saved_view_order, &selection_syncing);
+            restore_selection(
+                &store,
+                &selection,
+                &selected,
+                has_saved_view_order,
+                result.rows.len(),
+                &selection_syncing,
+            );
         }
         selection.connect_selection_changed(move |selection, _, _| {
             if selection_syncing.get() {
@@ -278,11 +285,13 @@ fn restore_selection(
     selection: &gtk4::MultiSelection,
     selected: &HashSet<usize>,
     has_saved_view_order: bool,
+    source_row_count: usize,
     selection_syncing: &Cell<bool>,
 ) {
     selection_syncing.set(true);
     let item_count = store.n_items();
-    let positions = if !has_saved_view_order && selected.len() == item_count as usize {
+    let all_source_rows_selected = selected.len() == source_row_count;
+    let positions = if all_source_rows_selected || (!has_saved_view_order && selected.len() == item_count as usize) {
         gtk4::Bitset::new_range(0, item_count)
     } else {
         let positions = gtk4::Bitset::new_empty();
