@@ -315,7 +315,8 @@ def scenarios(ui):
         while time.monotonic() < deadline and saved[0][1] == "alpha":
             time.sleep(ui.POLL_SECONDS)
             saved = notes(database)
-        assert sorted(saved[0][1]) == sorted("gammaz"), f"a click inside the open editor ended the edit: {saved!r}"
+        inserted = {"gamma"[:index] + "z" + "gamma"[index:] for index in range(6)}
+        assert saved[0][1] in inserted, f"a click inside the open editor ended the edit or reseeded it: {saved!r}"
         assert saved[1] == (2, "beta")
 
     result = [

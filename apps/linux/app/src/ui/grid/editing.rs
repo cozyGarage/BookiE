@@ -175,10 +175,11 @@ pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers:
         let Some(cell) = cell_editor_ancestor(&target) else {
             return;
         };
+        super::display::remember_clicked_cell(cell.upcast_ref());
         if cell.is_editing() {
+            refocus_open_editor(&cell, &target);
             return;
         }
-        super::display::remember_clicked_cell(cell.upcast_ref());
         cell.grab_focus();
         if n_press != 2 {
             return;
@@ -205,6 +206,14 @@ pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers:
         handle_cell_key(&cell, keyval, modifiers, &trigger_for_key)
     });
     view.add_controller(controller);
+}
+
+fn refocus_open_editor(cell: &CellEditor, target: &gtk::Widget) {
+    let entry = cell.entry();
+    let inside = target == entry.upcast_ref::<gtk::Widget>() || target.is_ancestor(&entry);
+    if !inside {
+        entry.grab_focus();
+    }
 }
 
 fn cell_edit_trigger<'a>(cell: &CellEditor, triggers: &'a [Option<CellEditTrigger>]) -> Option<&'a CellEditTrigger> {
@@ -732,6 +741,12 @@ mod tests {
         gesture.emit_by_name::<()>("pressed", &[&2_i32, &150.0_f64, &20.0_f64]);
         assert!(!editor.is_editing());
         assert!(second.is_editing());
+        second.entry().set_text("typed");
+        gesture.emit_by_name::<()>("pressed", &[&1_i32, &150.0_f64, &20.0_f64]);
+        gesture.emit_by_name::<()>("pressed", &[&2_i32, &150.0_f64, &20.0_f64]);
+        assert!(second.is_editing());
+        assert_eq!(second.entry().text().as_str(), "typed");
+        second.entry().set_text("before");
         second.stop_editing(false);
         assert!(second.grab_focus());
         let key_controller = (0..controllers.n_items())
