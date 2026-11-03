@@ -133,7 +133,7 @@ fn analyze_statement_inner(
     }
 
     let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    let effects = if driver_id == "duckdb" && crate::duckdb_paths::reads_a_path(&statements) {
+    let effects = if driver_id == "duckdb" && crate::duckdb_paths::touches_foreign_source(&statements) {
         effects.union(Effects::HOST_OR_FILE_ACCESS)
     } else {
         effects
