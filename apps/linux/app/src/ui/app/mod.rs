@@ -82,6 +82,7 @@ pub struct AppInit {
 use bookie_app_services::workspace::{CloseAfterSave, WorkspaceTabs};
 
 pub struct App {
+    change_trackers: crate::services::change_tracker::WorkspaceChangeTrackers,
     structure_trackers: crate::services::structure_tracker::WorkspaceStructureTrackers,
     registry: Arc<DriverRegistry>,
     persistence: crate::services::persistence_stores::PersistenceStores,
@@ -482,7 +483,6 @@ impl SimpleComponent for App {
         widgets
             .sidebar_fold_button
             .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Collapse all"))]);
-
         let schema_filter_list = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(6)
@@ -494,20 +494,19 @@ impl SimpleComponent for App {
         widgets.schema_filter_popover.set_child(Some(&schema_filter_list));
 
         init_css::install_pending_change_css();
+        let change_trackers = crate::services::change_tracker::WorkspaceChangeTrackers::default();
         let structure_trackers = crate::services::structure_tracker::WorkspaceStructureTrackers::default();
         let window_handles = init_window::install_window_lifecycle(
             &widgets.window,
             &widgets.split_view,
             &widgets.sidebar_toggle,
             &structure_trackers,
+            &change_trackers,
             &workspace,
             &sender,
         );
-
         let sidebar = init_sidebar::build_sidebar(&widgets, &sender);
-
         let workspace_chrome = init_workspace::build_workspace_chrome(&widgets, &sender);
-
         let disconnect_action = shortcuts::install_window_actions(&widgets.window, sender.clone());
         shortcuts::install_window_shortcuts(&widgets.window);
         widgets
@@ -538,6 +537,7 @@ impl SimpleComponent for App {
         crate::ui::grid::set_null_display(preferences.load().null_display);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
+            change_trackers,
             structure_trackers,
             registry,
             persistence,

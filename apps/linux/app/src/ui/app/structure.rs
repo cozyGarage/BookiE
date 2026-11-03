@@ -1063,7 +1063,10 @@ impl App {
                 // Combine with the data-side dirty state — either
                 // mode contributing pending changes prefixes the tab
                 // with the "•" GNOME convention.
-                let data = crate::services::change_tracker::with_tab_ref(s.id, |tr| tr.has_pending()).unwrap_or(false);
+                let data = self
+                    .change_trackers
+                    .with_tab_ref(s.id, |tr| tr.has_pending())
+                    .unwrap_or(false);
                 (&s.page, s.schema.as_deref(), s.table.clone(), dirty || data)
             }
             _ => return,

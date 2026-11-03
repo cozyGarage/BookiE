@@ -253,6 +253,7 @@ impl BrowseTab {
             .flat_map(|fk| fk.columns.iter().cloned())
             .collect();
         let tab_ctx = TabGridContext {
+            change_trackers: Some(self.change_trackers.clone()),
             tab_id: Some(self.tab_id),
             pk_col_indices,
             projected_columns: self.current_projection.clone(),
@@ -463,13 +464,15 @@ impl BrowseTab {
         let Some(store) = self.list_store() else {
             return;
         };
-        let drafts = crate::services::change_tracker::with_tab_ref(self.tab_id, |t| {
-            t.drafts()
-                .iter()
-                .map(|d| (d.draft_id, d.values.clone()))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+        let drafts = self
+            .change_trackers
+            .with_tab_ref(self.tab_id, |t| {
+                t.drafts()
+                    .iter()
+                    .map(|d| (d.draft_id, d.values.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         for (draft_id, values) in drafts {
             let draft_row = crate::ui::row_object::RowObject::new_draft(draft_id, values);
             store.insert(0, &draft_row);

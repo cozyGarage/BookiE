@@ -52,6 +52,7 @@ pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<Br
     });
     let controller = BrowseTab::builder()
         .launch(BrowseTabInit {
+            change_trackers: Default::default(),
             tab_id: id,
             schema: Some("public".into()),
             table: "notes".into(),
@@ -82,7 +83,6 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch_with_read_only(tab_id, true);
     load_two_rows(&controller, &observed);
-
     let selection = controller.model().current_selection.clone().unwrap();
     selection.select_item(0, false);
     selection.select_item(1, false);
@@ -182,9 +182,8 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         })
         .unwrap();
     let outputs = pump(&observed);
-
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         0,
         "read-only actions must not create draft or row changes"
     );
@@ -243,14 +242,19 @@ fn read_only_tab_can_discard_a_pending_local_draft() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch_with_read_only(tab_id, true);
-    crate::services::change_tracker::with_tab(tab_id, |tracker| tracker.track_insert(vec![Value::Null]))
+    controller
+        .model()
+        .change_trackers
+        .with_tab(tab_id, |tracker| tracker.track_insert(vec![Value::Null]))
         .expect("tab tracker exists");
-
-    assert_eq!(pending(tab_id), 1);
+    assert_eq!(pending(&controller), 1);
     controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
     let outputs = pump(&observed);
-
-    assert_eq!(pending(tab_id), 0, "discarding a local draft must remain available");
+    assert_eq!(
+        pending(&controller),
+        0,
+        "discarding a local draft must remain available"
+    );
     assert_eq!(
         transactions(&outputs),
         0,
@@ -268,17 +272,18 @@ fn read_only_tab_can_undo_and_redo_pending_local_draft() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch_with_read_only(tab_id, true);
-    crate::services::change_tracker::with_tab(tab_id, |tracker| {
-        tracker.track_insert(vec![Value::Text("draft".into())])
-    })
-    .expect("tab tracker exists");
-    assert_eq!(pending(tab_id), 1);
-
+    controller
+        .model()
+        .change_trackers
+        .with_tab(tab_id, |tracker| {
+            tracker.track_insert(vec![Value::Text("draft".into())])
+        })
+        .expect("tab tracker exists");
+    assert_eq!(pending(&controller), 1);
     controller.sender().send(BrowseTabInput::Undo).unwrap();
     let undo_outputs = pump(&observed);
-
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         0,
         "undo removes a local draft without a database write"
     );
@@ -288,12 +293,10 @@ fn read_only_tab_can_undo_and_redo_pending_local_draft() {
             .iter()
             .any(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
     );
-
     controller.sender().send(BrowseTabInput::Redo).unwrap();
     let redo_outputs = pump(&observed);
-
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         1,
         "redo restores a local draft without a database write"
     );
@@ -320,12 +323,10 @@ fn read_only_tab_can_delete_a_selected_draft_without_deleting_stored_rows() {
     pump(&observed);
     let selection = controller.model().current_selection.clone().unwrap();
     selection.select_item(0, false);
-
     assert!(activate_shortcut(&controller, "Delete"));
     let outputs = pump(&observed);
-
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         0,
         "deleting a selected draft must discard only local state"
     );
@@ -363,12 +364,10 @@ fn read_only_tab_refuses_a_mixed_draft_and_stored_row_delete_atomically() {
     selection.select_item(0, false);
     selection.select_item(1, false);
     assert!(selection.is_selected(0) && selection.is_selected(1));
-
     controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
     let outputs = pump(&observed);
-
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         1,
         "a mixed refusal must leave the local draft available"
     );
@@ -397,7 +396,6 @@ fn keyless_tab_rejects_inline_edits_and_insert_actions() {
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch(tab_id);
     load_keyless_row(&controller, &observed);
-
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -410,8 +408,11 @@ fn keyless_tab_rejects_inline_edits_and_insert_actions() {
         .unwrap();
     controller.sender().send(BrowseTabInput::InsertRow).unwrap();
     let outputs = pump(&observed);
-
-    assert_eq!(pending(tab_id), 0, "keyless mutation routes must not create drafts");
+    assert_eq!(
+        pending(&controller),
+        0,
+        "keyless mutation routes must not create drafts"
+    );
     assert_eq!(
         transactions(&outputs),
         0,
@@ -437,17 +438,15 @@ fn keyless_tab_refuses_to_stage_deletion_of_a_persisted_row() {
     load_keyless_row(&controller, &observed);
     let selection = controller.model().current_selection.clone().unwrap();
     selection.select_item(0, false);
-
     controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
     let outputs = pump(&observed);
-
     assert!(
         outputs
             .iter()
             .any(|output| matches!(output, BrowseTabOutput::ShowSelectionAlert { .. }))
     );
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         0,
         "a persisted keyless row cannot enter the change tracker"
     );
@@ -471,7 +470,6 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
     let (mut controller, observed) = launch(tab_id);
     load_two_rows(&controller, &observed);
     let snapshot = controller.model().capture_paste_snapshot();
-
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -517,8 +515,7 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
         .unwrap()
         .downcast::<crate::ui::row_object::RowObject>()
         .unwrap();
-
-    assert_eq!(pending(tab_id), 0, "stale messages must not stage tracker changes");
+    assert_eq!(pending(&controller), 0, "stale messages must not stage tracker changes");
     assert_eq!(transactions(&outputs), 0, "stale messages must never dispatch a save");
     assert_eq!(
         outputs
@@ -539,7 +536,6 @@ fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch(tab_id);
     load_generated_column_row(&controller, &observed);
-
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -559,8 +555,11 @@ fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
         })
         .unwrap();
     let outputs = pump(&observed);
-
-    assert_eq!(pending(tab_id), 0, "generated cells must not enter the change tracker");
+    assert_eq!(
+        pending(&controller),
+        0,
+        "generated cells must not enter the change tracker"
+    );
     assert_eq!(transactions(&outputs), 0, "generated cells must not dispatch a save");
     assert!(
         outputs
@@ -586,7 +585,6 @@ fn undecodable_cell_edit_and_null_messages_do_not_stage_mutations() {
     let tab_id = Uuid::new_v4();
     let (mut controller, observed) = launch(tab_id);
     load_undecodable_cell_row(&controller, &observed);
-
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -614,9 +612,8 @@ fn undecodable_cell_edit_and_null_messages_do_not_stage_mutations() {
         .unwrap()
         .downcast::<crate::ui::row_object::RowObject>()
         .unwrap();
-
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         0,
         "undecodable cells must not enter the change tracker"
     );
@@ -672,10 +669,13 @@ pub(super) fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed:
 }
 
 fn add_draft_row(controller: &relm4::Controller<BrowseTab>, values: Vec<Value>) {
-    let key = crate::services::change_tracker::with_tab(controller.model().tab_id, |tracker| {
-        tracker.track_insert(values.clone())
-    })
-    .expect("tab tracker exists");
+    let key = controller
+        .model()
+        .change_trackers
+        .with_tab(controller.model().tab_id, |tracker| {
+            tracker.track_insert(values.clone())
+        })
+        .expect("tab tracker exists");
     let crate::services::change_tracker::RowKey::Draft(draft_id) = key else {
         panic!("insert creates a draft key");
     };
@@ -795,8 +795,12 @@ fn edit(controller: &relm4::Controller<BrowseTab>, col_index: usize, new_value: 
         .unwrap();
 }
 
-fn pending(tab_id: Uuid) -> usize {
-    crate::services::change_tracker::with_tab_ref(tab_id, |tracker| tracker.pending_count()).unwrap_or(0)
+fn pending(controller: &relm4::Controller<BrowseTab>) -> usize {
+    controller
+        .model()
+        .change_trackers
+        .with_tab_ref(controller.model().tab_id, |tracker| tracker.pending_count())
+        .unwrap_or(0)
 }
 
 fn transactions(outputs: &[BrowseTabOutput]) -> usize {
@@ -816,14 +820,14 @@ fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
 
     edit(&controller, 1, "first");
     pump(&observed);
-    assert_eq!(pending(tab_id), 1);
+    assert_eq!(pending(&controller), 1);
     controller.sender().send(BrowseTabInput::CommitSave).unwrap();
     assert_eq!(transactions(&pump(&observed)), 1, "the first save starts a transaction");
 
     edit(&controller, 2, "during the save");
     let during = pump(&observed);
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         1,
         "an edit made while saving must not enter the tracker"
     );
@@ -834,7 +838,6 @@ fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
     );
     controller.sender().send(BrowseTabInput::CommitSave).unwrap();
     assert_eq!(transactions(&pump(&observed)), 0, "a second save must not start");
-
     controller
         .sender()
         .send(BrowseTabInput::SaveFailed("lost".into()))
@@ -842,7 +845,11 @@ fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
     pump(&observed);
     edit(&controller, 2, "after the save");
     pump(&observed);
-    assert_eq!(pending(tab_id), 2, "edits are accepted again once the save has ended");
+    assert_eq!(
+        pending(&controller),
+        2,
+        "edits are accepted again once the save has ended"
+    );
     controller.detach_runtime();
 }
 
@@ -894,7 +901,7 @@ fn a_close_flush_waits_until_queued_edits_enter_the_tracker() {
         Err(tokio::sync::oneshot::error::TryRecvError::Empty)
     ));
     assert!(wait_for_flush(reply).is_ok());
-    assert_eq!(pending(tab_id), 1);
+    assert_eq!(pending(&controller), 1);
     controller.detach_runtime();
 }
 
@@ -907,7 +914,7 @@ fn a_close_flush_reports_a_refused_queued_edit_without_staging_it() {
     load_two_rows(&controller, &observed);
     let reply = queue_edit_and_flush(&controller, 0);
     assert!(wait_for_flush(reply).is_err());
-    assert_eq!(pending(tab_id), 0);
+    assert_eq!(pending(&controller), 0);
     controller.detach_runtime();
 }
 
@@ -925,7 +932,6 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
     controller.sender().send(BrowseTabInput::CommitSave).unwrap();
     let started = pump(&observed);
     assert_eq!(transactions(&started), 1);
-
     controller
         .model()
         .current_selection
@@ -977,14 +983,13 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
     for action in actions {
         controller.sender().send(action).unwrap();
         let outputs = pump(&observed);
-        preserved.push(pending(tab_id) == 1);
+        preserved.push(pending(&controller) == 1);
         refusal_count += outputs
             .iter()
             .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
             .count();
         transaction_count += transactions(&outputs);
     }
-
     controller
         .sender()
         .send(BrowseTabInput::SaveFailed("fixture cleanup".into()))
@@ -993,7 +998,6 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
     controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
     pump(&observed);
     controller.detach_runtime();
-
     assert!(
         preserved.iter().all(|unchanged| *unchanged),
         "every action preserves the submitted tracker state"
@@ -1020,7 +1024,6 @@ fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
         vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
     );
     pump(&observed);
-
     controller
         .sender()
         .send(BrowseTabInput::GridSetCellNull {
@@ -1030,8 +1033,11 @@ fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
         })
         .unwrap();
     let outputs = pump(&observed);
-
-    let drafts = crate::services::change_tracker::with_tab_ref(tab_id, |tracker| tracker.drafts().to_vec()).unwrap();
+    let drafts = controller
+        .model()
+        .change_trackers
+        .with_tab_ref(tab_id, |tracker| tracker.drafts().to_vec())
+        .unwrap();
     assert_eq!(drafts.len(), 1);
     assert_eq!(drafts[0].values[1], Value::Null);
     assert!(drafts[0].touched[1], "the user's NULL must override a column default");
@@ -1063,8 +1069,7 @@ fn the_row_menu_deletes_a_draft_row_by_discarding_it() {
         vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
     );
     pump(&observed);
-    assert_eq!(pending(tab_id), 1);
-
+    assert_eq!(pending(&controller), 1);
     controller
         .sender()
         .send(BrowseTabInput::GridDeleteRowAt {
@@ -1073,9 +1078,8 @@ fn the_row_menu_deletes_a_draft_row_by_discarding_it() {
         })
         .unwrap();
     let outputs = pump(&observed);
-
     assert_eq!(
-        pending(tab_id),
+        pending(&controller),
         0,
         "deleting a draft discards it instead of queueing a delete"
     );
@@ -1104,7 +1108,6 @@ fn a_foreign_key_that_arrives_after_the_rows_marks_its_header() {
             .collect::<Vec<_>>()
     };
     assert!(titles(&controller).iter().all(|title| !title.contains('\u{1F517}')));
-
     controller
         .sender()
         .send(BrowseTabInput::ForeignKeysLoaded(vec![bookie_core::ForeignKeyInfo {
@@ -1118,7 +1121,6 @@ fn a_foreign_key_that_arrives_after_the_rows_marks_its_header() {
         }]))
         .unwrap();
     pump(&observed);
-
     let titles = titles(&controller);
     assert!(
         titles.iter().any(|title| title.starts_with("title \u{1F517}")),
@@ -1147,7 +1149,6 @@ fn copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_ed
         Some(vec![Value::Int(1), Value::Text("a".into()), Value::Text("b".into())]),
         "position 1 is the first stored row, not fetch-order row 1"
     );
-
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -1159,7 +1160,6 @@ fn copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_ed
         })
         .unwrap();
     pump(&observed);
-
     assert_eq!(
         controller.model().row_cells_at(1),
         Some(vec![

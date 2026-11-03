@@ -52,7 +52,9 @@ impl BrowseTab {
                 return;
             }
         };
-        let key_opt = crate::services::change_tracker::with_tab(self.tab_id, |t| t.track_insert(values.clone()));
+        let key_opt = self
+            .change_trackers
+            .with_tab(self.tab_id, |t| t.track_insert(values.clone()));
         let Some(key) = key_opt else {
             return;
         };
@@ -82,8 +84,9 @@ impl BrowseTab {
         // with a green tint and editable cells; user fills
         // them inline and clicks Save to commit.
         let default_values: Vec<Value> = self.current_columns.iter().map(|_| Value::Null).collect();
-        let key_opt =
-            crate::services::change_tracker::with_tab(self.tab_id, |t| t.track_insert(default_values.clone()));
+        let key_opt = self
+            .change_trackers
+            .with_tab(self.tab_id, |t| t.track_insert(default_values.clone()));
         let Some(key) = key_opt else {
             return;
         };
@@ -203,9 +206,10 @@ impl BrowseTab {
         let tab_id = self.tab_id;
         let selection_for_commit = selection.clone();
         let store_for_commit = self.list_store();
+        let change_trackers = self.change_trackers.clone();
         let commit_delete = move |snapshot: Vec<(crate::services::change_tracker::RowKey, Vec<Value>)>,
                                   draft_ids: Vec<u64>| {
-            crate::services::change_tracker::with_tab(tab_id, |t| {
+            change_trackers.with_tab(tab_id, |t| {
                 for (key, row) in snapshot {
                     t.track_delete(key, row);
                 }
@@ -329,7 +333,7 @@ impl BrowseTab {
             // directly. The RowObject's own cells are also
             // updated so the grid's display reflects the
             // pending value without waiting for re-fetch.
-            crate::services::change_tracker::with_tab(self.tab_id, |t| {
+            self.change_trackers.with_tab(self.tab_id, |t| {
                 t.track_draft_cell_edit(draft_id, col_index, new.clone());
             });
             row_obj.set_cell(col_index, new);
@@ -340,7 +344,7 @@ impl BrowseTab {
             return false;
         };
         let original = row[col_index].clone();
-        crate::services::change_tracker::with_tab(self.tab_id, |t| {
+        self.change_trackers.with_tab(self.tab_id, |t| {
             t.track_cell_edit(key, col_index, original, new);
         });
         true
@@ -375,7 +379,7 @@ impl BrowseTab {
         if let Some(row) = &row_obj
             && let Some(draft_id) = row.draft_id()
         {
-            crate::services::change_tracker::with_tab(self.tab_id, |tracker| {
+            self.change_trackers.with_tab(self.tab_id, |tracker| {
                 tracker.track_draft_cell_edit(draft_id, col_index, value.clone());
             });
             row.set_cell(col_index, value);
@@ -389,7 +393,7 @@ impl BrowseTab {
             self.refresh_row(row_position);
             return false;
         };
-        crate::services::change_tracker::with_tab(self.tab_id, |tracker| {
+        self.change_trackers.with_tab(self.tab_id, |tracker| {
             tracker.track_cell_edit(key, col_index, original, value);
         });
         true
@@ -466,7 +470,7 @@ impl BrowseTab {
         if let Some(row) = self.row_object_at(row_position)
             && let Some(draft_id) = row.draft_id()
         {
-            crate::services::change_tracker::with_tab(self.tab_id, |tracker| {
+            self.change_trackers.with_tab(self.tab_id, |tracker| {
                 tracker.track_draft_cell_edit(draft_id, col_index, Value::Null);
             });
             row.set_cell(col_index, Value::Null);
@@ -477,7 +481,7 @@ impl BrowseTab {
             return;
         };
         let original = row[col_index].clone();
-        crate::services::change_tracker::with_tab(self.tab_id, |t| {
+        self.change_trackers.with_tab(self.tab_id, |t| {
             t.track_cell_edit(key, col_index, original, Value::Null);
         });
     }
@@ -492,7 +496,7 @@ impl BrowseTab {
             return;
         }
         if let Some(draft_id) = self.row_object_at(row_position).and_then(|row| row.draft_id()) {
-            crate::services::change_tracker::with_tab(self.tab_id, |tracker| {
+            self.change_trackers.with_tab(self.tab_id, |tracker| {
                 tracker.discard_draft(draft_id);
             });
             remove_draft_rows(self.list_store().as_ref(), &[draft_id]);
@@ -502,7 +506,7 @@ impl BrowseTab {
             self.report_unreadable_row_key(row_position, &sender);
             return;
         };
-        crate::services::change_tracker::with_tab(self.tab_id, |t| {
+        self.change_trackers.with_tab(self.tab_id, |t| {
             t.track_delete(key, row);
         });
     }
@@ -654,7 +658,7 @@ impl BrowseTab {
         let driver_id = self.driver_id.clone();
         let schema = self.schema.clone();
         let table = self.table.clone();
-        let result = crate::services::change_tracker::with_tab_ref(self.tab_id, |t| {
+        let result = self.change_trackers.with_tab_ref(self.tab_id, |t| {
             t.materialize(&driver_id, schema.as_deref(), &table, &columns)
         });
         match result {
@@ -689,7 +693,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_preview_sql(&self, sender: &ComponentSender<Self>) {
-        let result = crate::services::change_tracker::with_tab_ref(self.tab_id, |t| {
+        let result = self.change_trackers.with_tab_ref(self.tab_id, |t| {
             t.materialize(
                 &self.driver_id,
                 self.schema.as_deref(),
@@ -713,7 +717,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_discard_all(&mut self, sender: ComponentSender<Self>) {
-        crate::services::change_tracker::with_tab(self.tab_id, |t| t.clear());
+        self.change_trackers.with_tab(self.tab_id, |t| t.clear());
         self.emit_fetch_page(&sender);
     }
 
@@ -749,8 +753,10 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_save_completed(&mut self, sender: ComponentSender<Self>) {
-        self.save_in_flight.set(false);
-        crate::services::change_tracker::with_tab(self.tab_id, |t| t.clear());
+        if !self.save_in_flight.replace(false) {
+            return;
+        }
+        self.change_trackers.with_tab(self.tab_id, |t| t.clear());
         self.refresh_pending_bar(0);
         self.save_button.set_sensitive(true);
         self.discard_button.set_sensitive(true);
@@ -777,7 +783,7 @@ impl BrowseTab {
 
     pub(super) fn handle_undo(&mut self) {
         use crate::services::change_tracker::{RowKey, UndoOp};
-        let op = match crate::services::change_tracker::with_tab(self.tab_id, |t| t.undo()) {
+        let op = match self.change_trackers.with_tab(self.tab_id, |t| t.undo()) {
             Some(Some(op)) => op,
             _ => return,
         };
@@ -831,7 +837,7 @@ impl BrowseTab {
 
     pub(super) fn handle_redo(&mut self) {
         use crate::services::change_tracker::{RowKey, UndoOp};
-        let op = match crate::services::change_tracker::with_tab(self.tab_id, |t| t.redo()) {
+        let op = match self.change_trackers.with_tab(self.tab_id, |t| t.redo()) {
             Some(Some(op)) => op,
             _ => return,
         };
