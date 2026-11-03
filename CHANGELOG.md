@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-03
+
+### Added
+
+- Completed streamed results can be exported without rerunning the query. (#2284)
+- The welcome screen offers recently opened connections. (#2284)
+- Find in all rows, Show matching rows and Compare results work across a whole streamed result. (#2292)
+- Show all rows equal or not equal to a cell value, and changed-cell highlighting in keyed Compare. (#2292)
+
+### Changed
+
+- Editable table browsing uses less memory. (#2279)
+- Large CSV exports use less temporary memory while preserving the existing output. (#2283)
+- Large database sidebars use less memory while loading their tables. (#2285)
+- Streamed query results show progress and support continuous navigation after completion. (#2284)
+- The About credits no longer list TablePro as an upstream project. (#2290)
+- The result header wraps instead of stacking controls on narrow windows. (#2292)
+- Large JSON string cells preview with less processing. (#2289)
+
+### Fixed
+
+- Continuous results keep both visible pages readable when scrolling across wide-page boundaries. (#2286)
+- Result-page errors clear when scrolling away from the failed page. (#2287)
+- Reject malformed workbook inputs without parser panic or unbounded allocation. (#2299)
+- Streamed result views keep their sort and selection when results are pinned or filtered. (#2302)
+- F2 and Enter edit the clicked table cell. (#2288)
+- Find in all rows can be repeated with Enter during a scan, and jumps work on a locally filtered page. (#2306)
+- Clicking inside a cell that is being edited no longer ends the edit. (#2308)
+
 ## [0.2.3] - 2026-11-02
 
 ### Added
