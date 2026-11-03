@@ -27,6 +27,7 @@ pub mod result_scan;
 mod result_test_support;
 pub mod single_flight;
 pub mod state_file;
+pub mod stream_page_validation;
 pub mod stream_result_spool;
 pub mod structure_metadata;
 pub mod structure_tracker;
