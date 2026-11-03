@@ -69,6 +69,14 @@ pub struct CellPreview {
 }
 
 impl RowObject {
+    #[cfg(test)]
+    fn unloaded(width: usize) -> Self {
+        let row: Self = glib::Object::new();
+        *row.imp().cells.borrow_mut() = vec![None; width];
+        *row.imp().previews.borrow_mut() = vec![None; width];
+        row
+    }
+
     pub fn new(cells: Vec<Value>) -> Self {
         let obj: Self = glib::Object::new();
         *obj.imp().cells.borrow_mut() = cells.into_iter().map(Some).collect();

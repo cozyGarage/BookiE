@@ -178,6 +178,16 @@ fn projected_cells_distinguish_unfetched_values_from_sql_null() {
 }
 
 #[test]
+fn unloaded_result_row_cannot_be_copied_as_complete_data() {
+    let row = RowObject::unloaded(3);
+    assert_eq!(row.loaded_cells(), vec![None, None, None]);
+    assert!(!row.cells_are_complete());
+    assert!(row.complete_cells().is_none());
+    let cloned = row.clone_preserving_loading_state();
+    assert!(cloned.complete_cells().is_none());
+}
+
+#[test]
 fn projected_cells_refuse_mismatched_or_duplicate_mappings() {
     assert!(RowObject::new_projected(vec![Value::Int(1)], &[], 1).is_none());
     assert!(RowObject::new_projected(vec![Value::Int(1), Value::Int(2)], &[0, 0], 1).is_none());
