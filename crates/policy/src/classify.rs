@@ -133,6 +133,11 @@ fn analyze_statement_inner(
     }
 
     let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
+    let effects = if driver_id == "duckdb" && crate::duckdb_paths::reads_a_path(&statements) {
+        effects.union(Effects::HOST_OR_FILE_ACCESS)
+    } else {
+        effects
+    };
     let facts = crate::select_writes::with_locking_backstop(
         classify_statements(&statements, effects, contains_administrative_call),
         trimmed,

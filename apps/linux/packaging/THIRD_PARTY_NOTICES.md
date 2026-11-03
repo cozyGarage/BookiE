@@ -1601,6 +1601,7 @@ Packages:
 
 - `ring 0.17.14`
 - `sqlparser 0.63.0`
+- `sqlparser_derive 0.6.0`
 
 ```text
 Apache License

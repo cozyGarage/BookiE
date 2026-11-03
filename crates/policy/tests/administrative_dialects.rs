@@ -195,6 +195,35 @@ fn postgres_host_and_network_functions_are_administrative() {
 }
 
 #[test]
+fn duckdb_file_reads_are_not_allowed_for_an_agent() {
+    for sql in [
+        "SELECT * FROM read_csv('/etc/passwd')",
+        "SELECT * FROM glob('/home/*/.ssh/*')",
+        "SELECT * FROM parquet_scan('/data/x.parquet')",
+        "SELECT * FROM read_json_objects('/etc/passwd')",
+        "SELECT * FROM sniff_csv('/etc/passwd')",
+        "SELECT * FROM '/etc/passwd.csv'",
+        "SELECT * FROM orders, '/data/x.csv'",
+        "SELECT * FROM (SELECT 1 FROM t) s, '/data/x.csv'",
+        "SELECT * FROM query('SELECT * FROM read_csv(''/etc/passwd'')')",
+        "SELECT * FROM sqlite_scan('/x.db', 't')",
+        "SELECT * FROM \"secrets.csv.gz\"",
+        "DESCRIBE '/etc/x.csv'",
+        "SELECT * FROM duckdb_secrets(redact := false)",
+        "SELECT * FROM duckdb_settings()",
+    ] {
+        let decision = agent_decision(sql, "duckdb");
+        assert!(!matches!(decision, Decision::Allow { .. }), "{sql}: {decision:?}");
+    }
+}
+
+#[test]
+fn duckdb_ordinary_reads_are_still_allowed_for_an_agent() {
+    let decision = agent_decision("SELECT * FROM orders WHERE id = 1", "duckdb");
+    assert!(matches!(decision, Decision::Allow { .. }), "{decision:?}");
+}
+
+#[test]
 fn sqlite_fileio_functions_are_administrative() {
     for sql in [
         "SELECT writefile('/home/user/.bashrc', 'evil')",
