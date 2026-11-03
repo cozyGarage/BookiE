@@ -990,7 +990,13 @@ fn rows_for_menu(view: &gtk::ColumnView, clicked: u32) -> Option<Vec<Vec<Value>>
 fn values_for_column_menu(view: &gtk::ColumnView, clicked: u32, column: usize) -> Option<Vec<Vec<Value>>> {
     selected_row_positions(view, clicked)
         .into_iter()
-        .map(|position| row_at(view, position)?.get(column).cloned().map(|value| vec![value]))
+        .map(|position| {
+            let row = row_object_at(view, position)?;
+            if !row.cell_is_loaded(column) {
+                return None;
+            }
+            row.with_cell_value(column, |value| vec![value.clone()])
+        })
         .collect()
 }
 fn selected_row_positions(view: &gtk::ColumnView, clicked: u32) -> Vec<u32> {

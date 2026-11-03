@@ -640,6 +640,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::context_menu::tests::copying_a_column_refuses_unloaded_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::streaming::tests::a_stream_waits_with_a_loading_status_page"
     ],
     [

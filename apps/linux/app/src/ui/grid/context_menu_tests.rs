@@ -16,6 +16,16 @@ fn source_lookup_supports_alternate_models_and_refuses_unloaded_cells() {
 }
 
 #[test]
+#[ignore = "requires an isolated GTK display"]
+fn copying_a_column_refuses_unloaded_rows() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::unloaded(1));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    assert_eq!(values_for_column_menu(&view, 0, 0), None);
+}
+
+#[test]
 fn an_empty_read_only_grid_menu_does_not_offer_insert_row() {
     assert_eq!(empty_grid_menu(false).n_items(), 1);
 }

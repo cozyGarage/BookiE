@@ -141,21 +141,25 @@ mod tests {
             enum_type: None,
             domain_type: None,
         };
-        let page = Arc::new(bookie_core::QueryResult {
-            columns: vec![column.clone()],
-            rows: vec![vec![bookie_core::Value::Int(42)]].into(),
-            truncated: false,
-        });
-        runtime.block_on(spool.append_page(0, page)).unwrap();
+        for page_index in 0..2 {
+            let page = Arc::new(bookie_core::QueryResult {
+                columns: vec![column.clone()],
+                rows: (0..100)
+                    .map(|row| vec![bookie_core::Value::Int(page_index * 100 + row)])
+                    .collect(),
+                truncated: false,
+            });
+            runtime.block_on(spool.append_page(page_index as u64, page)).unwrap();
+        }
         let result = StreamedResult {
             pages: vec![],
             page_indices: vec![],
-            page_row_counts: vec![1],
-            page_row_starts: vec![1],
+            page_row_counts: vec![100, 100],
+            page_row_starts: vec![1, 101],
             retained_rows: 0,
             columns: vec![column],
-            total_pages: 1,
-            total_rows: 1,
+            total_pages: 2,
+            total_rows: 200,
             terminal: StreamTerminal::Complete,
             export: None,
             generation: 0,
@@ -174,23 +178,51 @@ mod tests {
         };
         install(&holder, &pager, &pages, &result, &target);
         let toggle = holder.first_child().unwrap().downcast::<gtk::ToggleButton>().unwrap();
-        let window = gtk::Window::builder().child(&holder).build();
+        let window = gtk::Window::builder()
+            .default_width(600)
+            .default_height(300)
+            .child(&holder)
+            .build();
         window.present();
         toggle.set_active(true);
-        let context = gtk::glib::MainContext::default();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        loop {
-            while context.iteration(false) {}
-            if contains_text(holder.upcast_ref(), "42") {
-                break;
-            }
-            assert!(std::time::Instant::now() < deadline);
-            std::thread::sleep(std::time::Duration::from_millis(1));
-        }
+        wait_for_text(holder.upcast_ref(), "0");
+        let view = find_view(holder.upcast_ref()).unwrap();
+        view.scroll_to(190, None, gtk::ListScrollFlags::FOCUS, None);
+        wait_for_text(holder.upcast_ref(), "190");
+        view.scroll_to(0, None, gtk::ListScrollFlags::FOCUS, None);
+        wait_for_text(holder.upcast_ref(), "0");
         assert!(!pager.is_visible());
         toggle.set_active(false);
         assert!(pager.is_visible());
         window.destroy();
+    }
+
+    fn wait_for_text(root: &gtk::Widget, text: &str) {
+        let context = gtk::glib::MainContext::default();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            while context.iteration(false) {}
+            if contains_text(root, text) {
+                return;
+            }
+            assert!(std::time::Instant::now() < deadline, "row {text} did not appear");
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+    }
+
+    fn find_view(root: &gtk::Widget) -> Option<gtk::ColumnView> {
+        let mut pending = vec![root.clone()];
+        while let Some(widget) = pending.pop() {
+            if let Ok(view) = widget.clone().downcast::<gtk::ColumnView>() {
+                return Some(view);
+            }
+            let mut child = widget.first_child();
+            while let Some(next) = child {
+                child = next.next_sibling();
+                pending.push(next);
+            }
+        }
+        None
     }
 
     fn contains_text(root: &gtk::Widget, expected: &str) -> bool {
