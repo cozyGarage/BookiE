@@ -485,3 +485,50 @@ fn materialize_refuses_a_delete_whose_key_could_not_be_read() {
     let err = t.materialize("postgres", None, "t", &columns).unwrap_err();
     assert!(matches!(err, MaterializeError::UnreadableRowKey));
 }
+
+#[test]
+fn undoing_an_edit_of_an_explicit_null_keeps_the_cell_touched() {
+    let mut t = TabChangeTracker::new();
+    let RowKey::Draft(draft) = t.track_insert(vec![Value::Null, Value::Null]) else {
+        return;
+    };
+    assert!(!t.drafts()[0].touched[0]);
+    t.track_draft_cell_edit(draft, 0, Value::Null);
+    assert!(t.drafts()[0].touched[0]);
+    t.track_draft_cell_edit(draft, 0, Value::Text("x".into()));
+    t.undo();
+    assert_eq!(t.drafts()[0].values[0], Value::Null);
+    assert!(
+        t.drafts()[0].touched[0],
+        "an explicit NULL must not fall back to the column default"
+    );
+    t.redo();
+    assert_eq!(t.drafts()[0].values[0], Value::Text("x".into()));
+    assert!(t.drafts()[0].touched[0]);
+}
+
+#[test]
+fn undoing_the_first_edit_of_an_untouched_draft_cell_leaves_it_untouched() {
+    let mut t = TabChangeTracker::new();
+    let RowKey::Draft(draft) = t.track_insert(vec![Value::Null, Value::Null]) else {
+        return;
+    };
+    t.track_draft_cell_edit(draft, 0, Value::Text("x".into()));
+    assert!(t.drafts()[0].touched[0]);
+    t.undo();
+    assert_eq!(t.drafts()[0].values[0], Value::Null);
+    assert!(!t.drafts()[0].touched[0]);
+}
+
+#[test]
+fn undoing_back_to_a_non_null_value_keeps_the_cell_touched() {
+    let mut t = TabChangeTracker::new();
+    let RowKey::Draft(draft) = t.track_insert(vec![Value::Null]) else {
+        return;
+    };
+    t.track_draft_cell_edit(draft, 0, Value::Text("a".into()));
+    t.track_draft_cell_edit(draft, 0, Value::Text("b".into()));
+    t.undo();
+    assert_eq!(t.drafts()[0].values[0], Value::Text("a".into()));
+    assert!(t.drafts()[0].touched[0]);
+}
