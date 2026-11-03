@@ -7,7 +7,7 @@ use super::collector::Collector;
 use super::columns::CommonColumns;
 use super::digest::{Digest, cells_digest, has_null_or_unreadable, has_unreadable};
 use super::multiset::{ADDED, REMOVED, UNKNOWN_LEFT, UNKNOWN_RIGHT};
-use super::{CompareError, CompareMode, CompareRequest, CompareSummary, MAX_COMPARE_DISTINCT_ROWS, Outcome};
+use super::{CompareError, CompareMode, CompareRequest, CompareSummary, Outcome};
 use crate::result_scan::ScanProgress;
 
 pub(super) const BEFORE: &str = "Before";
@@ -27,6 +27,7 @@ struct Indices {
 struct State {
     entries: HashMap<Digest, LeftEntry>,
     wanted: HashSet<Digest>,
+    added_keys: HashSet<Digest>,
     after: HashMap<Digest, Vec<Value>>,
     collector: Collector,
     summary: CompareSummary,
@@ -64,6 +65,7 @@ impl State {
         Self {
             entries: HashMap::new(),
             wanted: HashSet::new(),
+            added_keys: HashSet::new(),
             after: HashMap::new(),
             collector: Collector::default(),
             summary: CompareSummary {
@@ -98,9 +100,6 @@ impl State {
         {
             return Err(CompareError::DuplicateKey);
         }
-        if self.entries.len() > MAX_COMPARE_DISTINCT_ROWS {
-            return Err(CompareError::TooManyDistinctRows);
-        }
         Ok(())
     }
 
@@ -112,6 +111,9 @@ impl State {
         let right_unknown = has_unreadable(row, common.right_indices());
         let row_digest = cells_digest(row, common.right_indices());
         let Some(entry) = self.entries.get_mut(&key) else {
+            if !self.added_keys.insert(key) {
+                return Err(CompareError::DuplicateKey);
+            }
             self.summary.added += 1;
             self.collector.push(ADDED, common.project_right(row));
             return Ok(());

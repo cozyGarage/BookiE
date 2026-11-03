@@ -19,7 +19,6 @@ pub use input::CompareInput;
 
 pub const MAX_COMPARE_ROWS: u64 = 1_000_000;
 pub const MAX_COMPARE_DIFFERENCES: usize = 100_000;
-pub const MAX_COMPARE_DISTINCT_ROWS: usize = 2_000_000;
 pub const CHANGE_COLUMN: &str = "Change";
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -40,8 +39,6 @@ pub enum CompareError {
     DuplicateKey,
     #[error("a result has more rows than a comparison can read")]
     TooManyRows,
-    #[error("the results have too many distinct rows to compare")]
-    TooManyDistinctRows,
     #[error("the saved result could not be read")]
     Source,
 }

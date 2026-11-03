@@ -51,6 +51,7 @@ pub fn find_matches(
             }
             if report.matches.len() == MAX_FIND_MATCHES {
                 report.capped = true;
+                report.rows_scanned = report.rows_scanned.saturating_add(row_index as u64 + 1);
                 return Ok(ControlFlow::Break(()));
             }
             report.matches.push(FindMatch {

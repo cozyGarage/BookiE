@@ -6,7 +6,7 @@ use tokio_util::sync::CancellationToken;
 use super::collector::Collector;
 use super::columns::CommonColumns;
 use super::digest::{Digest, cells_digest, has_unreadable};
-use super::{CompareError, CompareMode, CompareRequest, CompareSummary, MAX_COMPARE_DISTINCT_ROWS, Outcome};
+use super::{CompareError, CompareMode, CompareRequest, CompareSummary, Outcome};
 use crate::result_scan::ScanProgress;
 
 pub(crate) const REMOVED: &str = "Removed";
@@ -68,9 +68,6 @@ fn count_left(
         return Ok(());
     }
     *counts.entry(cells_digest(row, common.left_indices())).or_insert(0) += 1;
-    if counts.len() > MAX_COMPARE_DISTINCT_ROWS {
-        return Err(CompareError::TooManyDistinctRows);
-    }
     Ok(())
 }
 

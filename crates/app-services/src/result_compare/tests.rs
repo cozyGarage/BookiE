@@ -186,6 +186,12 @@ fn a_duplicate_key_on_either_side_is_refused() {
 }
 
 #[test]
+fn a_duplicate_key_on_the_right_that_the_left_lacks_is_refused() {
+    let right = run(pages(&[(1, "a"), (2, "b")]), pages(&[(1, "a"), (2, "b"), (3, "c"), (3, "d")]), &["id"]);
+    assert_eq!(right.unwrap_err(), CompareError::DuplicateKey);
+}
+
+#[test]
 fn a_null_or_undecodable_key_is_refused() {
     let with_null = CompareInput::Pages(vec![result(
         &["id", "label"],

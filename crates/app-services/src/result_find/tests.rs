@@ -43,6 +43,7 @@ fn the_match_list_is_capped_and_the_scan_stops() {
     assert_eq!(report.matches.len(), MAX_FIND_MATCHES);
     assert!(report.capped);
     assert_eq!(progress.pages_done(), 3);
+    assert_eq!(report.rows_scanned, MAX_FIND_MATCHES as u64 + 1);
 }
 
 #[test]

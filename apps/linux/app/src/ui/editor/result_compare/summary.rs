@@ -51,9 +51,7 @@ pub(super) fn failure_message(error: &CompareError) -> String {
         CompareError::UnknownKeyColumn => crate::tr!("The key column is not in both results"),
         CompareError::UnreadableKey => crate::tr!("A key value is NULL or could not be read"),
         CompareError::DuplicateKey => crate::tr!("A key value appears more than once; choose a unique key"),
-        CompareError::TooManyRows | CompareError::TooManyDistinctRows => {
-            crate::tr!("The results are too large to compare")
-        }
+        CompareError::TooManyRows => crate::tr!("The results are too large to compare"),
         CompareError::Source => crate::tr!("A saved result could not be read"),
     }
 }
