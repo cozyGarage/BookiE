@@ -645,6 +645,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::context_menu::tests::virtual_grid_disables_snapshot_export"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::streaming::tests::a_stream_waits_with_a_loading_status_page"
     ],
     [

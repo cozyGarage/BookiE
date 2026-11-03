@@ -230,6 +230,7 @@ pub fn build_column_view(
                 foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
                 has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
                 local_result_view: tab_ctx.local_result_view.clone(),
+                snapshot_export: tab_ctx.result_model.is_none(),
             },
         );
     }

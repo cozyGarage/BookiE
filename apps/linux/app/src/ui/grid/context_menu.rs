@@ -41,6 +41,7 @@ pub(super) struct GridMenuOptions {
     pub(super) foreign_key_columns: std::collections::HashSet<String>,
     pub(super) has_inbound_foreign_keys: bool,
     pub(super) local_result_view: Option<LocalResultView>,
+    pub(super) snapshot_export: bool,
 }
 
 pub(super) fn install_grid_context_menus(
@@ -496,6 +497,13 @@ pub(super) fn install_grid_context_menus(
     ]);
     group.add_action(&reference_action);
     group.add_action(&show_referencing_action);
+    if !options.snapshot_export
+        && let Some(action) = group
+            .lookup_action("export")
+            .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+    {
+        action.set_enabled(false);
+    }
     column_view.insert_action_group("cell", Some(&group));
     if let Some(action) = group
         .lookup_action("copy-in-clause")
