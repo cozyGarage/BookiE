@@ -9,6 +9,8 @@ use uuid::Uuid;
 
 use super::{App, AppMsg};
 
+mod busy_quit;
+
 /// Owning handles the model needs from the window-close plumbing: the
 /// close-after-save counters, the "close the window once the map
 /// drains" flag, and the in-flight transaction counter the close
@@ -45,6 +47,7 @@ pub(super) fn install_window_lifecycle(
     // a per-tab close so failures abort cleanly.
     let force_close: Rc<Cell<bool>> = Rc::new(Cell::new(false));
     let force_close_for_close = force_close.clone();
+    let busy_quit_confirmed = Rc::new(Cell::new(false));
     let workspace_flushed = Rc::new(Cell::new(false));
     let workspace_flushed_for_close = workspace_flushed.clone();
     let workspace_flush_in_progress = Rc::new(Cell::new(false));
@@ -78,6 +81,10 @@ pub(super) fn install_window_lifecycle(
     let close_state_pending_for_close = window_close_state_pending.clone();
     let structure_trackers = structure_trackers.clone();
     window.connect_close_request(move |w| {
+        if !busy_quit_confirmed.get() && busy_quit::needed(w) {
+            busy_quit::confirm(w, busy_quit_confirmed.clone());
+            return glib::Propagation::Stop;
+        }
         // If a Save is mid-flight (async transaction running), block
         // the close until it resolves. Without this, the completion
         // handler would dispatch SaveCompleted to a tab that's

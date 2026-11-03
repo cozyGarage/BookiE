@@ -1195,6 +1195,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::init_window::busy_quit::tests::the_confirm_defaults_to_keeping_the_work_and_marks_quitting_destructive"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::a_row_count_queued_before_refresh_is_not_shown"
     ],
     [
@@ -1381,6 +1386,11 @@
       "bookie-app",
       "--lib",
       "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::progress_dialog::tests::a_progress_dialog_counts_as_running_work_until_it_is_dropped"
     ],
     [
       "bookie-app",
