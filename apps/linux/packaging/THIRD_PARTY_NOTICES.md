@@ -9390,7 +9390,7 @@ SOFTWARE.
 
 Packages:
 
-- `calamine 0.37.0`
+- `calamine 0.38.0`
 - `quick-xml 0.42.0`
 
 ```text
