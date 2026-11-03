@@ -251,10 +251,11 @@ pub fn build_column_view(
         None
     };
     let mut view_columns: Vec<gtk4::ColumnViewColumn> = Vec::with_capacity(columns.len());
+    let mut edit_triggers = Vec::with_capacity(columns.len());
     for (i, column) in columns.iter().enumerate() {
         let editable = is_cell_editable(schema_columns.get(i).unwrap_or(column));
         let header = header_column(column, schema_columns.get(i));
-        let col = build_column(
+        let (col, edit_trigger) = build_column(
             &header,
             i,
             editable,
@@ -269,7 +270,9 @@ pub fn build_column_view(
         col.set_id(Some(&i.to_string()));
         column_view.append_column(&col);
         view_columns.push(col);
+        edit_triggers.push(edit_trigger);
     }
+    editing::install_grid_edit_triggers(&column_view, edit_triggers);
 
     let grid_actions = gtk4::gio::SimpleActionGroup::new();
     column_visibility::install(

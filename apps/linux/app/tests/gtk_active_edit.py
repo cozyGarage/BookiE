@@ -67,6 +67,49 @@ def scenarios(ui):
         ui.wait_for_node(name="1 unsaved change")
         save_and_assert_notes(database)
 
+    def active_cell_edit_f2_after_click_saves_only_the_selected_cell(database, _base):
+        with sqlite3.connect(database) as connection:
+            connection.executemany(
+                "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
+            )
+        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        cell = ui.wait_for_node(name="beta", role=ui.pyatspi.ROLE_LABEL)
+        bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+        gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+        ui.press_x11_key("F2")
+        for key in "gamma":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        assert notes(database) == [(1, "alpha"), (2, "beta")], "keyboard editing wrote before Save"
+        ui.invoke_accessible_action("win.save-changes")
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and notes(database) != [(1, "alpha"), (2, "gamma")]:
+            time.sleep(ui.POLL_SECONDS)
+        assert notes(database) == [(1, "alpha"), (2, "gamma")], "F2 did not edit only the clicked row"
+
+    def active_cell_edit_enter_after_grid_navigation_saves_only_the_selected_cell(database, _base):
+        with sqlite3.connect(database) as connection:
+            connection.executemany(
+                "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
+            )
+        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
+        bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+        gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+        ui.press_x11_key("Down")
+        ui.press_x11_key("Return")
+        for key in "gamma":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        assert notes(database) == [(1, "alpha"), (2, "beta")], "keyboard editing wrote before Save"
+        ui.invoke_accessible_action("win.save-changes")
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and notes(database) != [(1, "alpha"), (2, "gamma")]:
+            time.sleep(ui.POLL_SECONDS)
+        assert notes(database) == [(1, "alpha"), (2, "gamma")], "Enter did not edit only the focused row"
+
     def active_cell_edit_stages_once_when_focus_moves_to_another_cell(database, base):
         begin_edit(database)
         cell = ui.wait_for_node(name="beta", role=ui.pyatspi.ROLE_LABEL)
@@ -250,6 +293,8 @@ def scenarios(ui):
 
     result = [
         active_cell_edit_enter_control,
+        active_cell_edit_f2_after_click_saves_only_the_selected_cell,
+        active_cell_edit_enter_after_grid_navigation_saves_only_the_selected_cell,
         active_cell_edit_stages_once_when_focus_moves_to_another_cell,
         active_cell_edit_stages_once_when_focus_moves_to_toolbar,
         active_cell_edit_survives_cancelled_tab_close,

@@ -9,7 +9,7 @@ use super::display::{
     COLUMN_SLOT, CellView, FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POPOVER_SLOT, POSITION_SLOT,
     ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_view_with_column_editability, value_to_full_edit_text,
 };
-use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
+use super::editing::{CellEditTrigger, build_edit_trigger, setup_bool_cell, setup_editable_cell, setup_readonly_cell};
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
 use super::types::{classify_editor_kind, is_bool_type};
 use super::{GridMsg, TabGridContext};
@@ -89,15 +89,25 @@ pub(super) fn build_column(
     sort_enabled: bool,
     default_min_width: Option<i32>,
     column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
-) -> gtk4::ColumnViewColumn {
+) -> (gtk4::ColumnViewColumn, Option<CellEditTrigger>) {
     let factory = gtk4::SignalListItemFactory::new();
     let edit_sender = if editable { sender.clone() } else { None };
     let readonly_sender = sender.clone();
     let table_for_persist = table;
 
     let column_data_type = info.data_type.clone();
-    let choices_for_setup = tab_ctx.choices.clone();
     let column_name: Rc<str> = Rc::from(info.name.as_str());
+    let edit_trigger = edit_sender.as_ref().and_then(|sender| {
+        (!is_bool_type(&column_data_type)).then(|| {
+            build_edit_trigger(
+                idx,
+                sender.clone(),
+                classify_editor_kind(&column_data_type),
+                column_name.clone(),
+                tab_ctx.choices.clone(),
+            )
+        })
+    });
     factory.connect_setup(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
             return;
@@ -106,15 +116,7 @@ pub(super) fn build_column(
             if is_bool_type(&column_data_type) {
                 setup_bool_cell(item, idx, edit_sender);
             } else {
-                let editor_kind = classify_editor_kind(&column_data_type);
-                setup_editable_cell(
-                    item,
-                    idx,
-                    edit_sender,
-                    editor_kind,
-                    choices_for_setup.clone(),
-                    column_name.clone(),
-                );
+                setup_editable_cell(item, idx, edit_sender);
             }
         } else {
             setup_readonly_cell(item, idx, readonly_sender.clone());
@@ -243,7 +245,7 @@ pub(super) fn build_column(
         column.set_fixed_width(min);
     }
     column.connect_fixed_width_notify(|column| column.set_expand(column.fixed_width() < 0));
-    column
+    (column, edit_trigger)
 }
 
 fn bind_row_cell(

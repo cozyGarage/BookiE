@@ -25,24 +25,16 @@ pub(super) fn enter_edit_mode(label: &CellEditor) {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn setup_editable_cell(
-    item: &gtk::ListItem,
-    idx: usize,
-    sender: relm4::Sender<GridMsg>,
-    editor_kind: CellEditorKind,
-    choices: super::ChoiceMap,
-    column_name: std::rc::Rc<str>,
-) {
+pub(super) fn setup_editable_cell(item: &gtk::ListItem, idx: usize, sender: relm4::Sender<GridMsg>) {
     let label = CellEditor::new();
     label.set_hexpand(true);
+    label.set_focusable(true);
     label.set_margin_start(8);
     label.set_margin_end(8);
     COLUMN_SLOT.set(&label, idx);
     item.set_child(Some(&label));
 
     install_edit_commit_handler(&label, idx, sender.clone());
-    install_edit_triggers(&label, idx, sender, editor_kind, column_name, choices);
 }
 
 pub(super) fn setup_bool_cell(item: &gtk::ListItem, idx: usize, sender: relm4::Sender<GridMsg>) {
@@ -114,14 +106,15 @@ fn move_focus(widget: &impl IsA<gtk::Widget>, direction: gtk::DirectionType) {
     window.child_focus(direction);
 }
 
-fn install_edit_triggers(
-    label: &CellEditor,
+pub(super) type CellEditTrigger = std::rc::Rc<dyn Fn(&CellEditor)>;
+
+pub(super) fn build_edit_trigger(
     col_index: usize,
     sender: relm4::Sender<GridMsg>,
     editor_kind: CellEditorKind,
     column_name: std::rc::Rc<str>,
     choices: super::ChoiceMap,
-) {
+) -> CellEditTrigger {
     let base: std::rc::Rc<dyn Fn(&CellEditor)> = match editor_kind {
         CellEditorKind::Text => std::rc::Rc::new(|l: &CellEditor| enter_edit_mode(l)),
         CellEditorKind::Date => {
@@ -141,7 +134,7 @@ fn install_edit_triggers(
             std::rc::Rc::new(move |l| show_json_popover(l, col_index, &sender))
         }
     };
-    let trigger: std::rc::Rc<dyn Fn(&CellEditor)> = {
+    let trigger: CellEditTrigger = {
         let sender = sender.clone();
         std::rc::Rc::new(move |l: &CellEditor| {
             let found = choices.borrow().get(column_name.as_ref()).cloned();
@@ -153,85 +146,140 @@ fn install_edit_triggers(
             }
         })
     };
-    let trigger: std::rc::Rc<dyn Fn(&CellEditor)> = {
-        let inner = trigger;
-        std::rc::Rc::new(move |label: &CellEditor| {
-            if label.is_inline_editable() {
-                inner(label);
-            }
-        })
-    };
+    std::rc::Rc::new(move |label: &CellEditor| {
+        if label.is_inline_editable() {
+            trigger(label);
+        }
+    })
+}
+
+pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers: Vec<Option<CellEditTrigger>>) {
+    if triggers.iter().all(Option::is_none) {
+        return;
+    }
+    let view: gtk::Widget = view.clone().upcast();
+    let weak_view = view.downgrade();
+    let triggers = std::rc::Rc::new(triggers);
 
     let gesture = gtk::GestureClick::builder().button(gtk::gdk::BUTTON_PRIMARY).build();
     gesture.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let label_for_press = label.downgrade();
-    let trigger_for_press = trigger.clone();
-    gesture.connect_pressed(move |gesture, n_press, _, _| {
-        if let Some(widget) = gesture.widget() {
-            super::display::remember_clicked_cell(&widget);
-        }
+    let trigger_for_press = triggers.clone();
+    let view_for_press = weak_view.clone();
+    gesture.connect_pressed(move |gesture, n_press, x, y| {
+        let Some(view) = view_for_press.upgrade() else {
+            return;
+        };
+        let Some(target) = view.pick(x, y, gtk::PickFlags::DEFAULT) else {
+            return;
+        };
+        let Some(cell) = cell_editor_ancestor(&target) else {
+            return;
+        };
+        super::display::remember_clicked_cell(cell.upcast_ref());
+        cell.grab_focus();
         if n_press != 2 {
             return;
         }
+        let Some(trigger) = cell_edit_trigger(&cell, &trigger_for_press) else {
+            return;
+        };
         gesture.set_state(gtk::EventSequenceState::Claimed);
-        if let Some(label) = label_for_press.upgrade() {
-            trigger_for_press(&label);
-        }
+        trigger(&cell);
     });
-    label.add_controller(gesture);
+    view.add_controller(gesture);
 
     let controller = gtk::EventControllerKey::new();
-    let label_for_key = label.downgrade();
-    let trigger_for_key = trigger;
+    controller.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let trigger_for_key = triggers;
+    let view_for_key = weak_view;
     controller.connect_key_pressed(move |_, keyval, _, modifiers| {
-        let Some(label_for_key) = label_for_key.upgrade() else {
+        let Some(view) = view_for_key.upgrade() else {
             return glib::Propagation::Proceed;
         };
-        let editing = label_for_key.is_editing();
-        let shift = modifiers.contains(gtk::gdk::ModifierType::SHIFT_MASK);
-
-        if !editing {
-            match keyval {
-                gtk::gdk::Key::F2 | gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter => {
-                    trigger_for_key(&label_for_key);
-                    return glib::Propagation::Stop;
-                }
-                gtk::gdk::Key::Tab if !shift => {
-                    move_focus(&label_for_key, gtk::DirectionType::TabForward);
-                    return glib::Propagation::Stop;
-                }
-                gtk::gdk::Key::Tab | gtk::gdk::Key::ISO_Left_Tab if shift => {
-                    move_focus(&label_for_key, gtk::DirectionType::TabBackward);
-                    return glib::Propagation::Stop;
-                }
-                gtk::gdk::Key::Right => {
-                    move_focus(&label_for_key, gtk::DirectionType::TabForward);
-                    return glib::Propagation::Stop;
-                }
-                gtk::gdk::Key::Left => {
-                    move_focus(&label_for_key, gtk::DirectionType::TabBackward);
-                    return glib::Propagation::Stop;
-                }
-                _ => {}
-            }
+        let Some(cell) = focused_cell_editor(&view) else {
             return glib::Propagation::Proceed;
-        }
-
-        match keyval {
-            gtk::gdk::Key::Tab if !shift => {
-                label_for_key.stop_editing(true);
-                move_focus(&label_for_key, gtk::DirectionType::TabForward);
-                glib::Propagation::Stop
-            }
-            gtk::gdk::Key::Tab | gtk::gdk::Key::ISO_Left_Tab if shift => {
-                label_for_key.stop_editing(true);
-                move_focus(&label_for_key, gtk::DirectionType::TabBackward);
-                glib::Propagation::Stop
-            }
-            _ => glib::Propagation::Proceed,
-        }
+        };
+        handle_cell_key(&cell, keyval, modifiers, &trigger_for_key)
     });
-    label.add_controller(controller);
+    view.add_controller(controller);
+}
+
+fn cell_edit_trigger<'a>(cell: &CellEditor, triggers: &'a [Option<CellEditTrigger>]) -> Option<&'a CellEditTrigger> {
+    triggers.get(COLUMN_SLOT.get(cell)?)?.as_ref()
+}
+
+fn cell_editor_ancestor(widget: &gtk::Widget) -> Option<CellEditor> {
+    if let Ok(cell) = widget.clone().downcast::<CellEditor>() {
+        return Some(cell);
+    }
+    widget.parent().and_then(|parent| cell_editor_ancestor(&parent))
+}
+
+fn focused_cell_editor(view: &gtk::Widget) -> Option<CellEditor> {
+    let root = view.root()?;
+    let window = root.downcast::<gtk::Window>().ok()?;
+    let focused = gtk::prelude::GtkWindowExt::focus(&window)?;
+    cell_editor_ancestor(&focused)
+}
+
+fn handle_cell_key(
+    cell: &CellEditor,
+    keyval: gtk::gdk::Key,
+    modifiers: gtk::gdk::ModifierType,
+    triggers: &[Option<CellEditTrigger>],
+) -> glib::Propagation {
+    let editing = cell.is_editing();
+    let shift = modifiers.contains(gtk::gdk::ModifierType::SHIFT_MASK);
+    if !editing {
+        return handle_readonly_cell_key(cell, keyval, shift, triggers);
+    }
+    match keyval {
+        gtk::gdk::Key::Tab if !shift => {
+            cell.stop_editing(true);
+            move_focus(cell, gtk::DirectionType::TabForward);
+            glib::Propagation::Stop
+        }
+        gtk::gdk::Key::Tab | gtk::gdk::Key::ISO_Left_Tab if shift => {
+            cell.stop_editing(true);
+            move_focus(cell, gtk::DirectionType::TabBackward);
+            glib::Propagation::Stop
+        }
+        _ => glib::Propagation::Proceed,
+    }
+}
+
+fn handle_readonly_cell_key(
+    cell: &CellEditor,
+    keyval: gtk::gdk::Key,
+    shift: bool,
+    triggers: &[Option<CellEditTrigger>],
+) -> glib::Propagation {
+    match keyval {
+        gtk::gdk::Key::F2 | gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter => {
+            if let Some(trigger) = cell_edit_trigger(cell, triggers) {
+                trigger(cell);
+                return glib::Propagation::Stop;
+            }
+        }
+        gtk::gdk::Key::Tab if !shift => {
+            move_focus(cell, gtk::DirectionType::TabForward);
+            return glib::Propagation::Stop;
+        }
+        gtk::gdk::Key::Tab | gtk::gdk::Key::ISO_Left_Tab if shift => {
+            move_focus(cell, gtk::DirectionType::TabBackward);
+            return glib::Propagation::Stop;
+        }
+        gtk::gdk::Key::Right => {
+            move_focus(cell, gtk::DirectionType::TabForward);
+            return glib::Propagation::Stop;
+        }
+        gtk::gdk::Key::Left => {
+            move_focus(cell, gtk::DirectionType::TabBackward);
+            return glib::Propagation::Stop;
+        }
+        _ => {}
+    }
+    glib::Propagation::Proceed
 }
 
 fn show_calendar_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sender<GridMsg>) {
@@ -565,7 +613,7 @@ mod cell_lifetime_tests {
         commit_popover_value(&cell, 2, &sender, "committed".into());
         assert!(matches!(
             receiver.recv().now_or_never().flatten(),
-            Some(GridMsg::CellEdited {
+            Some(super::super::GridMsg::CellEdited {
                 row_position: 5,
                 col_index: 2,
                 new_value,
@@ -634,42 +682,83 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn editable_cells_share_primary_gesture_without_losing_double_click_editing() {
+    fn grid_edit_routing_commits_edits_after_double_click_f2_and_tab() {
+        use futures::FutureExt;
         use gtk4::prelude::*;
         gtk4::init().unwrap();
-        let item = gtk4::glib::Object::new::<gtk4::ListItem>();
-        let (sender, _receiver) = relm4::channel();
-        super::setup_editable_cell(
-            &item,
-            0,
-            sender,
-            super::super::types::CellEditorKind::Text,
-            std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::<
-                String,
-                (bool, Vec<String>),
-            >::new())),
-            std::rc::Rc::from("value"),
-        );
-        let editor = item
-            .child()
-            .unwrap()
-            .downcast::<crate::ui::cell_editor::CellEditor>()
-            .unwrap();
-        let controllers = editor.observe_controllers();
-        let primary_gesture = (0..controllers.n_items())
+        let readonly_view = gtk4::Fixed::new();
+        super::install_grid_edit_triggers(&readonly_view, vec![None]);
+        assert_eq!(readonly_view.observe_controllers().n_items(), 0);
+        let view = gtk4::Fixed::new();
+        view.set_size_request(240, 48);
+        let editor = crate::ui::cell_editor::CellEditor::new();
+        editor.set_size_request(120, 48);
+        editor.set_focusable(true);
+        editor.set_inline_editable(true);
+        super::super::display::COLUMN_SLOT.set(&editor, 0);
+        super::super::display::POSITION_SLOT.set(&editor, 0);
+        let (sender, receiver) = relm4::channel();
+        view.put(&editor, 0.0, 0.0);
+        let second = crate::ui::cell_editor::CellEditor::new();
+        second.set_size_request(120, 48);
+        second.set_focusable(true);
+        second.set_inline_editable(true);
+        second.set_text("before");
+        super::super::display::COLUMN_SLOT.set(&second, 1);
+        super::super::display::POSITION_SLOT.set(&second, 0);
+        super::install_edit_commit_handler(&second, 1, sender);
+        view.put(&second, 120.0, 0.0);
+        let window = gtk4::Window::builder()
+            .child(&view)
+            .default_width(240)
+            .default_height(48)
+            .build();
+        window.present();
+        for _ in 0..20 {
+            while gtk4::glib::MainContext::default().iteration(false) {}
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let trigger: super::CellEditTrigger = std::rc::Rc::new(super::enter_edit_mode);
+        let no_op: super::CellEditTrigger = std::rc::Rc::new(|_| {});
+        super::install_grid_edit_triggers(&view, vec![Some(no_op), Some(trigger)]);
+        let controllers = view.observe_controllers();
+        let gesture = (0..controllers.n_items())
             .filter_map(|index| controllers.item(index)?.downcast::<gtk4::GestureClick>().ok())
             .find(|gesture| gesture.button() == gtk4::gdk::BUTTON_PRIMARY)
             .unwrap();
-        assert_eq!(
-            (0..controllers.n_items())
-                .filter_map(|index| controllers.item(index)?.downcast::<gtk4::GestureClick>().ok())
-                .filter(|gesture| gesture.button() == gtk4::gdk::BUTTON_PRIMARY)
-                .count(),
-            1
+        gesture.emit_by_name::<()>("pressed", &[&2_i32, &150.0_f64, &20.0_f64]);
+        assert!(!editor.is_editing());
+        assert!(second.is_editing());
+        second.stop_editing(false);
+        assert!(second.grab_focus());
+        let key_controller = (0..controllers.n_items())
+            .filter_map(|index| controllers.item(index)?.downcast::<gtk4::EventControllerKey>().ok())
+            .next()
+            .unwrap();
+        let propagation = key_controller.emit_by_name::<bool>(
+            "key-pressed",
+            &[&gtk4::gdk::Key::F2, &0_u32, &gtk4::gdk::ModifierType::empty()],
         );
-        editor.set_inline_editable(true);
-        primary_gesture.emit_by_name::<()>("pressed", &[&2_i32, &0.0_f64, &0.0_f64]);
-        assert!(editor.is_editing());
+        assert!(propagation);
+        assert!(second.is_editing());
+        second.entry().set_text("after");
+        let propagation = key_controller.emit_by_name::<bool>(
+            "key-pressed",
+            &[&gtk4::gdk::Key::Tab, &0_u32, &gtk4::gdk::ModifierType::empty()],
+        );
+        assert!(propagation);
+        assert!(!second.is_editing());
+        assert_eq!(second.text().as_str(), "after");
+        assert!(matches!(
+            receiver.recv().now_or_never().flatten(),
+            Some(super::super::GridMsg::CellEdited {
+                row_position: 0,
+                col_index: 1,
+                new_value,
+                row_key,
+            }) if new_value == "after" && row_key.is_empty()
+        ));
+        window.close();
     }
 
     #[test]

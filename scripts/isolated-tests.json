@@ -1225,7 +1225,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::grid::editing::tests::editable_cells_share_primary_gesture_without_losing_double_click_editing"
+      "ui::grid::editing::tests::grid_edit_routing_commits_edits_after_double_click_f2_and_tab"
     ],
     [
       "bookie-app",
