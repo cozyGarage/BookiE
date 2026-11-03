@@ -167,6 +167,11 @@ jobs:
       - name: Shared sccache
         if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
+      - name: Enable sccache for Rust
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: .
@@ -274,6 +279,11 @@ jobs:
       - name: Shared sccache
         if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
+      - name: Enable sccache for Rust
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: .

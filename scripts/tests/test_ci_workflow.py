@@ -464,6 +464,12 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("needs: preflight", fast)
         self.assertIn("mozilla-actions/sccache-action@", preflight)
         self.assertIn("mozilla-actions/sccache-action@", fast)
+        for job, compile_step in ((preflight, "run-test-layer.py quick"), (fast, "run-test-layer.py change-contracts")):
+            cache_step = job.split("- name: Enable sccache for Rust\n", 1)[1].split("      - ", 1)[0]
+            self.assertIn("RUSTC_WRAPPER=sccache", cache_step)
+            self.assertIn("SCCACHE_GHA_ENABLED=true", cache_step)
+            self.assertIn("if: github.event_name != 'workflow_dispatch' || inputs.ref == ''", cache_step)
+            self.assertLess(job.index("Enable sccache for Rust"), job.index(compile_step))
         self.assertIn("shared-key: linux-build", preflight)
         self.assertIn("shared-key: linux-build", fast)
         self.assertIn(
