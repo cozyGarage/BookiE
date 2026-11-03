@@ -751,7 +751,9 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_save_completed(&mut self, sender: ComponentSender<Self>) {
-        self.save_in_flight.set(false);
+        if !self.save_in_flight.replace(false) {
+            return;
+        }
         self.change_trackers.with_tab(self.tab_id, |t| t.clear());
         self.refresh_pending_bar(0);
         self.save_button.set_sensitive(true);

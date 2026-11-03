@@ -44,6 +44,39 @@ fn independent_browse_owners_keep_edits_and_teardown_separate() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn late_save_completion_does_not_discard_new_edits() {
+    let (controller, outputs) = launch_tab(false);
+    load_two_rows(&controller, &outputs);
+    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&outputs);
+    let id = controller.model().tab_id;
+    assert!(controller.model().change_trackers.any_pending_in([id]));
+    controller.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    pump(&outputs);
+    assert!(controller.model().change_trackers.any_pending_in([id]));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn active_save_completion_clears_submitted_edits() {
+    let (controller, outputs) = launch_tab(false);
+    load_two_rows(&controller, &outputs);
+    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&outputs);
+    let id = controller.model().tab_id;
+    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    assert!(
+        pump(&outputs)
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ExecuteTransaction { .. }))
+    );
+    controller.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    pump(&outputs);
+    assert!(!controller.model().change_trackers.any_pending_in([id]));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn a_row_count_queued_before_refresh_is_not_shown() {
     let (controller, outputs) = launch_tab(false);
     controller
