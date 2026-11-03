@@ -291,8 +291,37 @@ def scenarios(ui):
         ui.wait_for_node_containing("safety_items", role=ui.pyatspi.ROLE_PAGE_TAB, present=False)
         assert notes(database) == [(1, "gamma"), (2, "beta")], "close tabs to the right lost the typed value"
 
+    def active_cell_edit_click_inside_the_open_editor_keeps_editing(database, _base):
+        with sqlite3.connect(database) as connection:
+            connection.executemany(
+                "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
+            )
+        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
+        bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+        x, y = bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2
+        gtk_ux.x11_click(x, y, button=1, clicks=2)
+        time.sleep(0.3)
+        for key in "gamma":
+            ui.press_x11_key(key)
+        gtk_ux.x11_click(x, y, button=1)
+        time.sleep(0.3)
+        ui.press_x11_key("z")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        ui.invoke_accessible_action("win.save-changes")
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        saved = notes(database)
+        while time.monotonic() < deadline and saved[0][1] == "alpha":
+            time.sleep(ui.POLL_SECONDS)
+            saved = notes(database)
+        inserted = {"gamma"[:index] + "z" + "gamma"[index:] for index in range(6)}
+        assert saved[0][1] in inserted, f"a click inside the open editor ended the edit or reseeded it: {saved!r}"
+        assert saved[1] == (2, "beta")
+
     result = [
         active_cell_edit_enter_control,
+        active_cell_edit_click_inside_the_open_editor_keeps_editing,
         active_cell_edit_f2_after_click_saves_only_the_selected_cell,
         active_cell_edit_enter_after_grid_navigation_saves_only_the_selected_cell,
         active_cell_edit_stages_once_when_focus_moves_to_another_cell,

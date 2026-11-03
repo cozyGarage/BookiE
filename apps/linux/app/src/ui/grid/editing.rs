@@ -176,6 +176,13 @@ pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers:
             return;
         };
         super::display::remember_clicked_cell(cell.upcast_ref());
+        if cell.is_editing() {
+            let entry = cell.entry();
+            if !entry.has_focus() {
+                entry.grab_focus();
+            }
+            return;
+        }
         cell.grab_focus();
         if n_press != 2 {
             return;
@@ -729,6 +736,12 @@ mod tests {
         gesture.emit_by_name::<()>("pressed", &[&2_i32, &150.0_f64, &20.0_f64]);
         assert!(!editor.is_editing());
         assert!(second.is_editing());
+        second.entry().set_text("typed");
+        gesture.emit_by_name::<()>("pressed", &[&1_i32, &150.0_f64, &20.0_f64]);
+        gesture.emit_by_name::<()>("pressed", &[&2_i32, &150.0_f64, &20.0_f64]);
+        assert!(second.is_editing());
+        assert_eq!(second.entry().text().as_str(), "typed");
+        second.entry().set_text("before");
         second.stop_editing(false);
         assert!(second.grab_focus());
         let key_controller = (0..controllers.n_items())
