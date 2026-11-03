@@ -605,32 +605,32 @@
     [
       "bookie-app",
       "--lib",
-      "ui::editor::stream_view::paged_model::loading_a_page_preserves_the_selected_row"
+      "ui::editor::stream_view::paged_model::tests::loading_a_page_preserves_the_selected_row"
     ],
     [
       "bookie-app",
       "--lib",
-      "ui::editor::stream_view::paged_model::evicting_a_page_preserves_selection"
+      "ui::editor::stream_view::paged_model::tests::evicting_a_page_preserves_selection"
     ],
     [
       "bookie-app",
       "--lib",
-      "ui::editor::stream_view::paged_model::result_grid_uses_the_paged_model_for_its_rows"
+      "ui::editor::stream_view::paged_model::tests::result_grid_uses_the_paged_model_for_its_rows"
     ],
     [
       "bookie-app",
       "--lib",
-      "ui::editor::stream_view::paged_model::result_grid_reports_rows_when_realized_and_released"
+      "ui::editor::stream_view::paged_model::tests::result_grid_reports_rows_when_realized_and_released"
     ],
     [
       "bookie-app",
       "--lib",
-      "ui::editor::stream_view::paged_model::realized_grid_rows_load_their_spooled_values"
+      "ui::editor::stream_view::paged_model::tests::realized_grid_rows_load_their_spooled_values"
     ],
     [
       "bookie-app",
       "--lib",
-      "ui::editor::stream_view::paged_model::failed_spool_read_shows_status_and_retry_loads_the_page"
+      "ui::editor::stream_view::paged_model::tests::failed_spool_read_shows_status_and_retry_loads_the_page"
     ],
     [
       "bookie-app",
