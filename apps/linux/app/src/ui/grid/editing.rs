@@ -177,7 +177,10 @@ pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers:
         };
         super::display::remember_clicked_cell(cell.upcast_ref());
         if cell.is_editing() {
-            refocus_open_editor(&cell, &target);
+            let entry = cell.entry();
+            if !entry.has_focus() {
+                entry.grab_focus();
+            }
             return;
         }
         cell.grab_focus();
@@ -206,14 +209,6 @@ pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers:
         handle_cell_key(&cell, keyval, modifiers, &trigger_for_key)
     });
     view.add_controller(controller);
-}
-
-fn refocus_open_editor(cell: &CellEditor, target: &gtk::Widget) {
-    let entry = cell.entry();
-    let inside = target == entry.upcast_ref::<gtk::Widget>() || target.is_ancestor(&entry);
-    if !inside {
-        entry.grab_focus();
-    }
 }
 
 fn cell_edit_trigger<'a>(cell: &CellEditor, triggers: &'a [Option<CellEditTrigger>]) -> Option<&'a CellEditTrigger> {
