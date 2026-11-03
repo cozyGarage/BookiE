@@ -271,6 +271,9 @@ fn is_host_or_file_access_function(driver_id: &str, name: &str) -> bool {
                 | "glob"
                 | "write_csv"
                 | "write_parquet"
+                | "getenv"
+                | "current_setting"
+                | "which_secret"
         ),
         _ => false,
     }
