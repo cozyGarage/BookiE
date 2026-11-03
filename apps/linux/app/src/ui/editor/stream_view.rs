@@ -357,6 +357,7 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
                 database,
                 settings_store,
                 super::outcomes::streamed_view_key(identity, generation, index as usize),
+                named::<gtk::Widget>(&root, "tp-result-find-entry").is_some(),
             );
             replace_stream_page_content(&container, &widget);
         }

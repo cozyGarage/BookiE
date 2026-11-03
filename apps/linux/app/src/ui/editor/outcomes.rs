@@ -829,6 +829,7 @@ pub(in crate::ui::editor) fn build_stream_page_widget(
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
     settings_store: LocalResultSettingsStore,
     settings_key: ResultViewKey,
+    whole_result_filter: bool,
 ) -> gtk::Widget {
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     holder.set_vexpand(true);
@@ -842,7 +843,7 @@ pub(in crate::ui::editor) fn build_stream_page_widget(
             database,
             settings_store,
             settings_key,
-            true,
+            whole_result_filter,
         )
     })));
     let scheduled = std::rc::Rc::new(std::cell::Cell::new(false));

@@ -151,6 +151,7 @@ pub(in crate::ui::editor) fn stream_page_container(
             target.database.clone(),
             target.settings_store.clone(),
             streamed_view_key(identity, result.generation, page_index as usize),
+            offers_whole_result_filter(result),
         ));
     } else {
         container.append(&stream_page_placeholder(result, page_index));
@@ -272,4 +273,8 @@ fn stream_terminal_page(result: &StreamedResult, statement_index: usize) -> Opti
                 .upcast(),
         ),
     }
+}
+
+pub(in crate::ui::editor) fn offers_whole_result_filter(result: &StreamedResult) -> bool {
+    matches!(result.terminal, StreamTerminal::Complete) && result.spool.is_some()
 }
