@@ -156,6 +156,7 @@ Every test belongs to one tier with one script and one gate. Use the [validation
 | Tier | Contents | Script |
 |---|---|---|
 | unit | `--lib --bins` on the non-GTK crate list in `preflight.sh` (skips `bookie-app`), run by nextest | `scripts/preflight.sh` |
+| gtk-unit | `bookie-app` `--lib --bins` and Clippy, run after the non-GTK unit tier in GitHub CI | `python3 scripts/run-test-layer.py gtk-app` |
 | sandbox | integration targets needing no Docker, database or display, run by nextest | `scripts/test-sandbox.sh` |
 | driver | `crates/drivers/*/tests/integration.rs`, SSH and socket fixtures | `scripts/ci-local.sh integration` |
 | driver-tls | `tests/driver-tls` | `scripts/test-driver-tls.sh` |
