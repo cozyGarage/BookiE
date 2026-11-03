@@ -25,12 +25,12 @@ pub mod result_predicate;
 pub mod result_scan;
 #[cfg(test)]
 mod result_test_support;
-mod value_exact;
 pub mod single_flight;
 pub mod state_file;
 pub mod stream_result_spool;
 pub mod structure_metadata;
 pub mod structure_tracker;
+mod value_exact;
 pub mod window_state;
 pub mod workspace;
 

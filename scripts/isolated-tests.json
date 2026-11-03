@@ -1515,6 +1515,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::result_tools::widget_tests::pressing_enter_while_a_filter_runs_keeps_stop_and_starts_no_search"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::a_filter_already_running_on_the_result_refuses_a_second_one"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::result_tools::widget_tests::editing_the_text_during_a_filter_keeps_it_busy_and_cancellable"
     ],
     [

@@ -89,6 +89,7 @@ impl Tools {
         if let Some(ticket) = self.filter_ticket.borrow().as_ref() {
             ticket.cancel().cancel();
         }
+        super::ticket::cancel(self.identity);
     }
 
     fn filter_running(&self) -> bool {
@@ -96,6 +97,7 @@ impl Tools {
             .borrow()
             .as_ref()
             .is_some_and(|ticket| !ticket.is_finished())
+            || super::ticket::running(self.identity)
     }
 
     fn entry_changed(&self) {
@@ -113,6 +115,9 @@ impl Tools {
     }
 
     pub(super) fn search(self: &Rc<Self>, forward: bool) {
+        if self.filter_running() {
+            return;
+        }
         let needle = self.needle();
         if needle.is_empty() {
             self.set_status("");
@@ -226,6 +231,7 @@ impl Tools {
         }
         let ticket = Arc::new(FilterTicket::default());
         *self.filter_ticket.borrow_mut() = Some(ticket.clone());
+        super::ticket::register(self.identity, &ticket);
         self.set_busy(true);
         self.poll_filter(ticket.clone());
         let _ = self
@@ -272,7 +278,7 @@ fn searching_text(done: u64, total: u64) -> String {
         .replace("{total}", &format_thousands(u128::from(total)))
 }
 
-fn filtering_text(done: u64, total: u64) -> String {
+pub(super) fn filtering_text(done: u64, total: u64) -> String {
     crate::tr!("Filtering… {done} of {total} rows")
         .replace("{done}", &format_thousands(u128::from(done)))
         .replace("{total}", &format_thousands(u128::from(total)))

@@ -212,6 +212,45 @@ fn cancel_is_hidden_when_idle_and_cancels_a_running_filter() {
     assert!(request.ticket.cancel().is_cancelled());
 }
 
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn pressing_enter_while_a_filter_runs_keeps_stop_and_starts_no_search() {
+    let fixture = fixture();
+    let entry: gtk::SearchEntry = named(&fixture.holder, "tp-result-find-entry");
+    let stop: gtk::Button = named(&fixture.holder, "tp-result-find-stop");
+    entry.set_text("needle");
+    let filter: gtk::Button = named(&fixture.holder, "tp-result-filter-button");
+    filter.emit_clicked();
+    let Some(SqlEditorInput::FilterResults(request)) = fixture.receiver.recv_sync() else {
+        panic!("a filter request was not sent")
+    };
+    entry.emit_activate();
+    for _ in 0..20 {
+        gtk::glib::MainContext::default().iteration(false);
+    }
+    assert!(stop.is_visible());
+    assert!(!filter.is_sensitive());
+    assert!(!request.ticket.cancel().is_cancelled());
+    request.ticket.finish("done".into());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_filter_already_running_on_the_result_refuses_a_second_one() {
+    let fixture = fixture();
+    let running = Arc::new(super::ticket::FilterTicket::default());
+    super::ticket::register(StatementIdentity::default(), &running);
+    let entry: gtk::SearchEntry = named(&fixture.holder, "tp-result-find-entry");
+    entry.set_text("needle");
+    let filter: gtk::Button = named(&fixture.holder, "tp-result-filter-button");
+    filter.emit_clicked();
+    assert!(filter.is_sensitive());
+    let stop: gtk::Button = named(&fixture.holder, "tp-result-find-stop");
+    stop.emit_clicked();
+    assert!(running.cancel().is_cancelled());
+    running.finish(String::new());
+}
+
 fn header_window(width: i32) -> (gtk::Window, relm4::adw::WrapBox, gtk::Box) {
     gtk::init().unwrap();
     let result = spooled_result();

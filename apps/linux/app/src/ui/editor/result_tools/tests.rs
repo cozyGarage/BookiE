@@ -382,3 +382,26 @@ fn an_eviction_is_named_in_the_status_only_when_a_pin_was_closed() {
     assert_eq!(with_eviction_note("Done".into(), 0), "Done");
     assert!(with_eviction_note("Done".into(), 1).contains("oldest pinned result was closed"));
 }
+
+#[test]
+fn a_running_filter_is_found_by_its_statement_and_cancelled_together() {
+    let identity = StatementIdentity {
+        statement_index: 41,
+        digest: [7; 32],
+    };
+    let other = StatementIdentity {
+        statement_index: 42,
+        digest: [8; 32],
+    };
+    let ticket = Arc::new(super::ticket::FilterTicket::default());
+    assert!(!super::ticket::running(identity));
+    super::ticket::register(identity, &ticket);
+    assert!(super::ticket::running(identity));
+    assert!(!super::ticket::running(other));
+    super::ticket::cancel(other);
+    assert!(!ticket.cancel().is_cancelled());
+    super::ticket::cancel(identity);
+    assert!(ticket.cancel().is_cancelled());
+    ticket.finish(String::new());
+    assert!(!super::ticket::running(identity));
+}

@@ -108,7 +108,9 @@ fn contains_in_row(row: &[Value], scope: &ColumnScope, needle: &str, tally: &mut
 fn cell_contains(cell: &Value, needle: &str, tally: &mut CellTally) -> bool {
     match search_text(cell) {
         SearchText::Text(text) => contains_ignore_case(&text, needle),
-        SearchText::TextOrHex(text, bytes) => contains_ignore_case(text, needle) || contains_ignore_case(&hex_text(bytes), needle),
+        SearchText::TextOrHex(text, bytes) => {
+            contains_ignore_case(text, needle) || contains_ignore_case(&hex_text(bytes), needle)
+        }
         SearchText::Never => false,
         SearchText::Unsearchable => {
             tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
