@@ -200,6 +200,9 @@ pub(crate) fn sql_effects_from_tokens(sql: &str, dialect: &dyn Dialect, driver_i
             effects = effects.union(Effects::ADMIN);
         }
     }
+    if driver_id == "duckdb" && crate::duckdb_paths::reads_a_path(&tokens) {
+        effects = effects.union(Effects::HOST_OR_FILE_ACCESS);
+    }
     (effects, legacy_administrative_call)
 }
 
@@ -248,11 +251,27 @@ fn is_host_or_file_access_function(driver_id: &str, name: &str) -> bool {
                 | "read_blob"
                 | "read_csv"
                 | "read_csv_auto"
+                | "sniff_csv"
                 | "read_parquet"
+                | "parquet_scan"
+                | "parquet_metadata"
+                | "parquet_schema"
+                | "parquet_file_metadata"
+                | "parquet_kv_metadata"
                 | "read_json"
                 | "read_json_auto"
+                | "read_json_objects"
+                | "read_json_objects_auto"
                 | "read_ndjson"
                 | "read_ndjson_auto"
+                | "read_ndjson_objects"
+                | "read_xlsx"
+                | "st_read"
+                | "delta_scan"
+                | "iceberg_scan"
+                | "iceberg_metadata"
+                | "iceberg_snapshots"
+                | "glob"
                 | "write_csv"
                 | "write_parquet"
         ),

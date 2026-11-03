@@ -140,6 +140,76 @@ mod tests {
     }
 
     #[test]
+    fn duckdb_file_and_url_readers_are_not_plain_reads() {
+        for sql in [
+            "SELECT * FROM read_csv('/etc/passwd')",
+            "SELECT * FROM read_csv_auto('/etc/passwd')",
+            "SELECT * FROM read_parquet('/data/x.parquet')",
+            "SELECT * FROM parquet_scan('/data/x.parquet')",
+            "SELECT * FROM parquet_metadata('/data/x.parquet')",
+            "SELECT * FROM parquet_schema('/data/x.parquet')",
+            "SELECT * FROM parquet_file_metadata('/data/x.parquet')",
+            "SELECT * FROM parquet_kv_metadata('/data/x.parquet')",
+            "SELECT * FROM glob('/home/*/.ssh/*')",
+            "SELECT * FROM glob('s3://bucket/*')",
+            "SELECT * FROM read_json_objects('/etc/passwd')",
+            "SELECT * FROM read_json_objects_auto('/etc/passwd')",
+            "SELECT * FROM read_ndjson_objects('/etc/passwd')",
+            "SELECT * FROM read_json('/data/x.json')",
+            "SELECT * FROM read_ndjson('/data/x.json')",
+            "SELECT * FROM sniff_csv('/etc/passwd')",
+            "SELECT read_text('/etc/passwd')",
+            "SELECT read_blob('/etc/passwd')",
+            "SELECT * FROM read_xlsx('/data/x.xlsx')",
+            "SELECT * FROM st_read('/data/x.geojson')",
+            "SELECT * FROM delta_scan('/data/delta')",
+            "SELECT * FROM iceberg_scan('/data/iceberg')",
+        ] {
+            let facts = classify(sql, "duckdb");
+            assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
+            assert!(!facts.is_single_read(), "{sql}");
+        }
+    }
+
+    #[test]
+    fn duckdb_reading_a_file_by_path_is_not_a_plain_read() {
+        for sql in [
+            "SELECT * FROM '/etc/passwd.csv'",
+            "SELECT * FROM '/data/x.parquet'",
+            "SELECT * FROM \"/data/x.parquet\"",
+            "SELECT * FROM orders o JOIN '/data/x.csv' c ON c.id = o.id",
+            "SELECT * FROM 'https://example.com/x.csv'",
+            "SELECT * FROM 's3://bucket/x.parquet'",
+            "SELECT * FROM orders, '/data/x.csv'",
+            "SELECT * FROM orders o, (SELECT 1) s, '/data/x.csv' c",
+            "SELECT * FROM orders WHERE id IN (1) UNION SELECT * FROM '/data/x.csv'",
+        ] {
+            let facts = classify(sql, "duckdb");
+            assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
+            assert!(!facts.is_single_read(), "{sql}");
+        }
+    }
+
+    #[test]
+    fn duckdb_ordinary_queries_stay_plain_reads() {
+        for sql in [
+            "SELECT * FROM orders",
+            "SELECT count(*) FROM range(10)",
+            "SELECT * FROM generate_series(1, 5)",
+            "SELECT * FROM duckdb_tables()",
+            "SELECT 'a', 'b' FROM orders WHERE name = 'x'",
+            "SELECT * FROM orders WHERE note IN ('a', 'b')",
+            "SELECT * FROM orders o JOIN items i ON i.kind = 'x' AND i.id = o.id",
+            "SELECT concat(a, '/b.csv') FROM orders",
+            "SELECT * FROM orders WHERE path = '/data/x.csv'",
+        ] {
+            let facts = classify(sql, "duckdb");
+            assert!(!facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
+            assert!(facts.is_single_read(), "{sql}");
+        }
+    }
+
+    #[test]
     fn effects_expose_side_effects_that_legacy_facts_do_not_record() {
         let mysql_lock = classify("SELECT GET_LOCK('bookie', 1)", "mysql");
         assert_eq!(mysql_lock.class, StatementClass::Select);
