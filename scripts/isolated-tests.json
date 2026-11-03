@@ -640,6 +640,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::paged_model::tests::a_failed_offscreen_page_does_not_leave_a_stale_error_message"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::continuous::tests::continuous_view_loads_and_displays_spooled_rows"
     ],
     [

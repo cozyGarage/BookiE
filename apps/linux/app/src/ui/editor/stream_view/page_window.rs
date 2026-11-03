@@ -96,6 +96,10 @@ impl<T> PageWindow<T> {
         !self.deferred.is_empty()
     }
 
+    pub(super) fn has_failed(&self) -> bool {
+        !self.failed.is_empty()
+    }
+
     #[cfg(test)]
     pub(super) fn is_failed(&self, page: u64) -> bool {
         self.failed.contains(&page)
