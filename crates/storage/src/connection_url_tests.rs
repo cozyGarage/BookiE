@@ -73,7 +73,6 @@ fn a_remote_url_without_a_tls_option_defaults_to_verified_tls_and_a_production_e
         "postgres://u@db.example.com/app",
         "mysql://u@10.0.0.5/app",
         "postgres://u@[2001:db8::1]/app",
-        "redis://cache.internal:6379",
         "mongodb://u@0.0.0.0/app",
     ] {
         let parsed = parse_connection_url(url).unwrap();
@@ -87,6 +86,19 @@ fn a_remote_url_without_a_tls_option_defaults_to_verified_tls_and_a_production_e
 }
 
 #[test]
+fn a_remote_url_for_a_driver_with_no_tls_url_option_keeps_cleartext_but_is_production() {
+    for url in [
+        "redis://cache.internal:6379",
+        "clickhouse://u@ch.example.com/db",
+        "mssql://u@sql.corp/db",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::Disabled, "{url}");
+        assert_eq!(parsed.connection.environment, Environment::Prod, "{url}");
+    }
+}
+
+#[test]
 fn a_loopback_url_without_a_tls_option_stays_a_local_cleartext_connection() {
     for url in [
         "postgres://u@localhost/app",
@@ -94,7 +106,8 @@ fn a_loopback_url_without_a_tls_option_stays_a_local_cleartext_connection() {
         "postgres://u@127.0.0.1/app",
         "postgres://u@127.1.2.3/app",
         "postgres://u@[::1]/app",
-        "mysql://u@dev.localhost/app",
+        "postgres://u@localhost./app",
+        "postgres://u@[::ffff:127.0.0.1]/app",
     ] {
         let parsed = parse_connection_url(url).unwrap();
         assert_eq!(parsed.connection.environment, Environment::Local, "{url}");
@@ -120,6 +133,7 @@ fn a_look_alike_host_is_not_treated_as_loopback() {
         "postgres://u@127.0.0.1.example.com/app",
         "postgres://u@mylocalhost/app",
         "postgres://u@128.0.0.1/app",
+        "postgres://u@dev.localhost/app",
     ] {
         let parsed = parse_connection_url(url).unwrap();
         assert_eq!(parsed.connection.environment, Environment::Prod, "{url}");

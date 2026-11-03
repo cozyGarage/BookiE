@@ -105,7 +105,7 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     };
     let database = decode_field(path, "database")?;
     let local = socket.is_some() || is_loopback_host(&host);
-    let tls_mode = explicit_tls.unwrap_or(if local { TlsMode::Disabled } else { TlsMode::default() });
+    let tls_mode = explicit_tls.unwrap_or(default_tls_mode(driver_id, local));
 
     let place = socket
         .as_ref()
@@ -150,13 +150,22 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     Ok(ParsedConnectionUrl { connection, password })
 }
 
+fn default_tls_mode(driver_id: &str, local: bool) -> TlsMode {
+    let url_can_choose = matches!(driver_id, "postgres" | "mysql" | "mongodb");
+    if local || !url_can_choose {
+        TlsMode::Disabled
+    } else {
+        TlsMode::default()
+    }
+}
+
 fn is_loopback_host(host: &str) -> bool {
     let lowered = host.to_ascii_lowercase();
-    lowered == "localhost"
-        || lowered.ends_with(".localhost")
-        || lowered
+    let name = lowered.strip_suffix('.').unwrap_or(&lowered);
+    name == "localhost"
+        || name
             .parse::<std::net::IpAddr>()
-            .is_ok_and(|address| address.is_loopback())
+            .is_ok_and(|address| address.to_canonical().is_loopback())
 }
 
 enum UrlOption {
