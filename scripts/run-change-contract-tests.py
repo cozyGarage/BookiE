@@ -122,6 +122,8 @@ def select_actions(files, data):
             if exact["package"] != package or (exact_target != target and not integration_subset):
                 raise ValueError(f"exact-test package does not match source package for {path}")
             target = exact_target
+        elif target in {"--lib", "--bins"}:
+            continue
         key = (package, target)
         action = actions.setdefault(
             key, {"package": package, "target": target, "full_suite": False, "required_tests": set()}
