@@ -26,6 +26,25 @@ impl PageIndex {
     pub(super) fn len(&self) -> usize {
         self.ends.last().copied().unwrap_or(0)
     }
+
+    pub(super) fn pages_in(&self, start: usize, count: usize) -> Vec<u64> {
+        if count == 0 {
+            return Vec::new();
+        }
+        let Some((first, _)) = self.row(start) else {
+            return Vec::new();
+        };
+        let last_row = start.saturating_add(count - 1).min(self.len() - 1);
+        let Some((last, _)) = self.row(last_row) else {
+            return Vec::new();
+        };
+        (first..=last)
+            .filter(|page| {
+                let index = *page as usize;
+                self.ends[index] > index.checked_sub(1).map_or(0, |previous| self.ends[previous])
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]
@@ -50,5 +69,15 @@ mod tests {
         let index = PageIndex::new(&counts);
         assert_eq!(index.len(), 20_480_000);
         assert_eq!(index.row(20_479_999), Some((4_095, 4_999)));
+    }
+
+    #[test]
+    fn viewport_crosses_short_and_empty_pages_without_requesting_empty_pages() {
+        let index = PageIndex::new(&[2, 0, 1, 3]);
+        assert_eq!(index.pages_in(1, 3), [0, 2, 3]);
+        assert_eq!(index.pages_in(2, 1), [2]);
+        assert_eq!(index.pages_in(5, 100), [3]);
+        assert!(index.pages_in(6, 1).is_empty());
+        assert!(index.pages_in(0, 0).is_empty());
     }
 }
