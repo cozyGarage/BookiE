@@ -203,7 +203,14 @@ impl SqlEditor {
         for note in notes(&report) {
             message = format!("{message} · {note}");
         }
-        self.pinned.add_pin(diff_outcome(request, report.diff));
+        let outcome = diff_outcome(request, report.diff);
+        self.result_view_settings.update(
+            crate::ui::editor::outcomes::result_view_key(outcome.identity, 0),
+            |settings| {
+                settings.changed_cells = Some(report.changed_cells.clone());
+            },
+        );
+        self.pinned.add_pin(outcome);
         clear_results_box(&self.results_holder);
         render_outcomes(
             &self.results_holder,

@@ -188,7 +188,7 @@ fn show_matching_rows_requests_a_filter_and_shows_its_outcome() {
     let Some(SqlEditorInput::FilterResults(request)) = fixture.receiver.recv_sync() else {
         panic!("a filter request was not sent")
     };
-    assert_eq!(request.needle, "needle");
+    assert_eq!(request.label, "needle");
     request.ticket.finish("No rows match".into());
     pump_until(|| filter.is_sensitive(), "the filter button to re-enable");
     assert_eq!(status.text(), "No rows match");

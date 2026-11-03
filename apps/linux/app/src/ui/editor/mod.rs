@@ -729,6 +729,12 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::Grid(GridMsg::ExportStreamedResults(request)) => {
                 let _ = sender.output(SqlEditorOutput::ExportStreamedResults(request));
             }
+            SqlEditorInput::Grid(GridMsg::FilterWholeResult {
+                identity,
+                column,
+                value,
+                exclude,
+            }) => self.on_filter_cell(identity, column, value, exclude, &sender),
             SqlEditorInput::Grid(_) => {}
             SqlEditorInput::SplitToggled(visible) => self.split_view.set_visible(visible),
             SqlEditorInput::SessionToggled(enabled) => self.on_session_toggle(enabled, &sender),

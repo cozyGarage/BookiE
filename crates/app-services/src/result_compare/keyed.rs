@@ -10,8 +10,8 @@ use super::multiset::{ADDED, REMOVED, UNKNOWN_LEFT, UNKNOWN_RIGHT};
 use super::{CompareError, CompareMode, CompareRequest, CompareSummary, MAX_COMPARE_DISTINCT_ROWS, Outcome};
 use crate::result_scan::ScanProgress;
 
-const BEFORE: &str = "Before";
-const AFTER: &str = "After";
+pub(super) const BEFORE: &str = "Before";
+pub(super) const AFTER: &str = "After";
 
 struct LeftEntry {
     row: Digest,

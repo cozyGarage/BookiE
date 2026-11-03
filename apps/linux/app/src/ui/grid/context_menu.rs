@@ -1,5 +1,6 @@
 mod keyboard_menu;
 mod pointer_menu;
+mod whole_result;
 
 use bookie_core::sql_literal::RowStatement;
 use std::rc::Rc;
@@ -41,6 +42,7 @@ pub(super) struct GridMenuOptions {
     pub(super) foreign_key_columns: std::collections::HashSet<String>,
     pub(super) has_inbound_foreign_keys: bool,
     pub(super) local_result_view: Option<LocalResultView>,
+    pub(super) whole_result_filter: bool,
     pub(super) snapshot_export: bool,
 }
 
@@ -63,6 +65,10 @@ pub(super) fn install_grid_context_menus(
         local_result,
     );
     let readonly_menu = build_menu(false, false, true, options.filterable, local_result);
+    if options.whole_result_filter {
+        whole_result::extend_menu(&editable_menu);
+        whole_result::extend_menu(&readonly_menu);
+    }
     let empty_menu = empty_grid_menu(options.row_mutations_allowed);
 
     let group = gio::SimpleActionGroup::new();
@@ -495,6 +501,18 @@ pub(super) fn install_grid_context_menus(
         filter_action,
         exclude_action,
     ]);
+    if let Some(view) = options
+        .local_result_view
+        .as_ref()
+        .filter(|_| options.whole_result_filter)
+    {
+        group.add_action_entries(whole_result::actions(
+            context.clone(),
+            sender.clone(),
+            column_view,
+            view.statement_identity(),
+        ));
+    }
     group.add_action(&reference_action);
     group.add_action(&show_referencing_action);
     if !options.snapshot_export

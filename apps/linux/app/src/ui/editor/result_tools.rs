@@ -1,4 +1,5 @@
 mod actions;
+mod cell_filter;
 mod cursor;
 mod derived;
 mod editor;

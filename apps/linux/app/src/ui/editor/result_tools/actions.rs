@@ -220,7 +220,11 @@ impl Tools {
             .send(super::super::SqlEditorInput::FilterResults(Box::new(FilterRequest {
                 source: self.result.clone(),
                 identity: self.identity,
-                needle,
+                predicate: ResultPredicate::Contains {
+                    scope: ColumnScope::Any,
+                    needle: needle.clone(),
+                },
+                label: needle,
                 ticket,
             })));
     }

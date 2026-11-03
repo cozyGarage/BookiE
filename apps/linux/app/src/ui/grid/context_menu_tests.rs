@@ -44,6 +44,7 @@ fn virtual_grid_disables_snapshot_export() {
             foreign_key_columns: Default::default(),
             has_inbound_foreign_keys: false,
             local_result_view: None,
+            whole_result_filter: false,
             snapshot_export: false,
         },
     );
@@ -106,6 +107,66 @@ fn filterable_and_local_menus_offer_filter_and_exclude_by_cell_value() {
     assert!(display_actions(false, true).contains(&"cell.exclude-value".into()));
     assert!(!display_actions(false, false).contains(&"cell.filter-by-value".into()));
     assert!(!display_actions(false, false).contains(&"cell.exclude-value".into()));
+}
+
+#[test]
+fn whole_result_items_sit_before_the_actions_section_and_name_their_actions() {
+    let menu = build_menu(false, false, true, false, true);
+    let before = menu.n_items();
+    whole_result::extend_menu(&menu);
+    assert_eq!(menu.n_items(), before + 1);
+    let section = menu
+        .item_link(before - 1, gio::MENU_LINK_SECTION)
+        .expect("whole-result section");
+    let actions: Vec<String> = (0..section.n_items())
+        .filter_map(|index| section.item_attribute_value(index, "action", None))
+        .filter_map(|value| value.get::<String>())
+        .collect();
+    assert_eq!(actions, ["cell.whole-result-equals", "cell.whole-result-not-equals"]);
+    let last = menu
+        .item_link(menu.n_items() - 1, gio::MENU_LINK_SECTION)
+        .expect("actions section");
+    assert!((0..last.n_items()).any(|index| {
+        last.item_attribute_value(index, "action", None)
+            .and_then(|value| value.get::<String>())
+            == Some("cell.export".into())
+    }));
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn whole_result_filter_installs_both_cell_actions() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    let (sender, _receiver) = relm4::channel();
+    let result = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: Vec::new(),
+        rows: bookie_core::QueryRows::new(),
+        truncated: false,
+    });
+    let local = LocalResultView::new(
+        result,
+        Default::default(),
+        super::super::local_filter::ResultViewKey {
+            statement_identity: Default::default(),
+            result_set_index: 0,
+        },
+    );
+    let options = |whole_result_filter| GridMenuOptions {
+        filterable: false,
+        row_mutations_allowed: false,
+        foreign_key_columns: Default::default(),
+        has_inbound_foreign_keys: false,
+        local_result_view: Some(local.clone()),
+        whole_result_filter,
+        snapshot_export: false,
+    };
+    install_grid_context_menus(&view, sender.clone(), &[], false, "postgres".into(), options(false));
+    assert!(view.activate_action("cell.whole-result-equals", None).is_err());
+    install_grid_context_menus(&view, sender, &[], false, "postgres".into(), options(true));
+    assert!(view.activate_action("cell.whole-result-equals", None).is_ok());
+    assert!(view.activate_action("cell.whole-result-not-equals", None).is_ok());
 }
 
 #[test]
@@ -308,6 +369,7 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
             foreign_key_columns: ["linked".into()].into(),
             has_inbound_foreign_keys: false,
             local_result_view: Some(local.clone()),
+            whole_result_filter: false,
             snapshot_export: true,
         },
     );
