@@ -164,6 +164,10 @@ mod tests {
             "SELECT * FROM st_read('/data/x.geojson')",
             "SELECT * FROM delta_scan('/data/delta')",
             "SELECT * FROM iceberg_scan('/data/iceberg')",
+            "SELECT * FROM iceberg_metadata('/data/iceberg')",
+            "SELECT * FROM iceberg_snapshots('/data/iceberg')",
+            "SELECT * FROM read_json_auto('/data/x.json')",
+            "SELECT * FROM read_ndjson_auto('/data/x.json')",
         ] {
             let facts = classify(sql, "duckdb");
             assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
@@ -179,15 +183,37 @@ mod tests {
             "SELECT * FROM \"/data/x.parquet\"",
             "SELECT * FROM orders o JOIN '/data/x.csv' c ON c.id = o.id",
             "SELECT * FROM 'https://example.com/x.csv'",
+            "SELECT * FROM query('SELECT * FROM read_csv(''/etc/passwd'')')",
+            "SELECT * FROM query_table('orders')",
+            "SELECT * FROM sqlite_scan('/x.db', 't')",
+            "SELECT * FROM postgres_scan('host=x', 'public', 't')",
+            "SELECT * FROM mysql_scan('host=x', 'db', 't')",
+            "SELECT * FROM read_avro('/data/x.avro')",
+            "SELECT * FROM main.query('SELECT 1')",
+            "SELECT * FROM orders o JOIN LATERAL query('SELECT 1') q ON true",
             "SELECT * FROM 's3://bucket/x.parquet'",
             "SELECT * FROM orders, '/data/x.csv'",
             "SELECT * FROM orders o, (SELECT 1) s, '/data/x.csv' c",
             "SELECT * FROM orders WHERE id IN (1) UNION SELECT * FROM '/data/x.csv'",
+            "SELECT * FROM (SELECT 1 FROM t) s, '/data/x.csv'",
+            "SELECT * FROM orders o, (SELECT 1 FROM t) s, '/etc/passwd.csv' c",
+            "SELECT * FROM \"secrets.csv.gz\"",
+            "SELECT * FROM \"dump.csv.zst\"",
+            "SELECT * FROM \"x.arrow\"",
+            "SELECT * FROM ('/etc/passwd.csv')",
+            "DESCRIBE '/etc/x.csv'",
+            "SELECT * FROM orders WHERE id IN (SELECT id FROM '/data/x.csv')",
         ] {
             let facts = classify(sql, "duckdb");
             assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
             assert!(!facts.is_single_read(), "{sql}");
         }
+    }
+
+    #[test]
+    fn duckdb_statements_the_parser_rejects_are_not_plain_reads() {
+        let facts = classify("SUMMARIZE '/etc/x.csv'", "duckdb");
+        assert!(!facts.is_single_read());
     }
 
     #[test]
@@ -201,6 +227,14 @@ mod tests {
             "SELECT * FROM orders WHERE note IN ('a', 'b')",
             "SELECT * FROM orders o JOIN items i ON i.kind = 'x' AND i.id = o.id",
             "SELECT concat(a, '/b.csv') FROM orders",
+            "SELECT * FROM orders WHERE status IS DISTINCT FROM 'x'",
+            "SELECT extract(year FROM '2020-01-01'::date)",
+            "SELECT trim(BOTH 'x' FROM col) FROM orders",
+            "SELECT substring(name FROM 'a.*') FROM orders",
+            "SELECT * FROM orders WHERE id IN (SELECT id FROM items)",
+            "SELECT * FROM generate_series(1, 5) g, range(3) r",
+            "SELECT * FROM unnest([1, 2, 3])",
+            "SELECT * FROM pragma_table_info('orders')",
             "SELECT * FROM orders WHERE path = '/data/x.csv'",
         ] {
             let facts = classify(sql, "duckdb");
