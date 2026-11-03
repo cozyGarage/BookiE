@@ -72,7 +72,7 @@ impl PagedModel {
         if let Some(window) = self.imp().pages.borrow_mut().as_mut() {
             window.show(&wanted);
         }
-        self.sync_capacity_status();
+        self.sync_status();
     }
 
     fn next_request(&self) -> Option<u64> {
@@ -180,7 +180,7 @@ impl PagedModel {
             }
         }
         self.refresh(start, count);
-        self.sync_capacity_status();
+        self.sync_status();
         true
     }
 
@@ -227,24 +227,23 @@ impl PagedModel {
     }
 
     fn show_failure(&self) {
-        if let Some(status) = self.imp().status.upgrade() {
-            status.set_text(&crate::tr!(
-                "A saved result page could not be loaded. Retry or use the page view."
-            ));
-        }
+        self.sync_status();
     }
 
-    fn sync_capacity_status(&self) {
+    fn sync_status(&self) {
         let Some(status) = self.imp().status.upgrade() else {
             return;
         };
-        let message = crate::tr!("Some visible pages exceed the memory limit. Use the page view to see all rows.");
-        let deferred = self.imp().pages.borrow().as_ref().is_some_and(PageWindow::has_deferred);
-        if deferred && status.text().is_empty() {
-            status.set_text(&message);
-        } else if !deferred && status.text() == message {
-            status.set_text("");
-        }
+        let pages = self.imp().pages.borrow();
+        let Some(pages) = pages.as_ref() else { return };
+        let message = if pages.has_failed() {
+            crate::tr!("A saved result page could not be loaded. Retry or use the page view.")
+        } else if pages.has_deferred() {
+            crate::tr!("Some visible pages exceed the memory limit. Use the page view to see all rows.")
+        } else {
+            String::new()
+        };
+        status.set_text(&message);
     }
 
     pub(super) fn retry_visible(
@@ -256,9 +255,7 @@ impl PagedModel {
         if let Some(window) = self.imp().pages.borrow_mut().as_mut() {
             window.retry_visible();
         }
-        if let Some(status) = self.imp().status.upgrade() {
-            status.set_text("");
-        }
+        self.sync_status();
         self.load_from_spool(runtime, spool, columns);
     }
 }
