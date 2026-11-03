@@ -276,6 +276,14 @@ impl DatabaseService {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn audit_journal_path_for_test(&self) -> std::path::PathBuf {
+        self._audit_temp_dir
+            .as_ref()
+            .map(|dir| dir.path().join("audit.jsonl"))
+            .unwrap_or_default()
+    }
+
     pub fn audit_available(&self) -> bool {
         self.audit_available
     }

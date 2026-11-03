@@ -22,6 +22,7 @@ use bookie_core::sql_format as format_plan;
 use run_lifecycle::{clear_results_box, dim_previous_results};
 mod outcomes;
 mod pinned;
+mod result_compare;
 mod result_tools;
 mod run_generation;
 mod run_marks;
@@ -100,6 +101,7 @@ pub struct SqlEditor {
     longer_timeout_button: gtk::Button,
     timeout_retry: timeout_retry::TimeoutRetry,
     pin_button: gtk::Button,
+    compare_button: gtk::Button,
     pinned: pinned::PinnedResults,
     result_view_settings: crate::ui::grid::local_filter::LocalResultSettingsStore,
     running_spinner: gtk::Spinner,
@@ -196,6 +198,9 @@ pub enum SqlEditorInput {
     Stream(streaming::Input),
     FilterResults(Box<result_tools::FilterRequest>),
     FilterFinished(Box<result_tools::FilterDone>),
+    OpenCompare,
+    CompareResults(Box<result_compare::CompareRequest>),
+    CompareFinished(Box<result_compare::CompareDone>),
     RunWithLongerTimeout,
     ShowCancelled(u64),
     ShowTimedOut {
@@ -366,6 +371,15 @@ impl SimpleComponent for SqlEditor {
                             set_sensitive: false,
                             add_css_class: "flat",
                             connect_clicked => SqlEditorInput::TogglePin,
+                        },
+
+                        #[name = "compare_button"]
+                        append = &gtk::Button {
+                            set_label: &crate::tr!("Compare…"),
+                            set_tooltip_text: Some(crate::tr!("Compare two results row by row").as_str()),
+                            set_sensitive: false,
+                            add_css_class: "flat",
+                            connect_clicked => SqlEditorInput::OpenCompare,
                         },
 
                         #[name = "explain_button"]
@@ -641,6 +655,7 @@ impl SimpleComponent for SqlEditor {
             longer_timeout_button: widgets.longer_timeout_button.clone(),
             timeout_retry: timeout_retry::TimeoutRetry::default(),
             pin_button: widgets.pin_button.clone(),
+            compare_button: widgets.compare_button.clone(),
             pinned: pinned::PinnedResults::default(),
             result_view_settings: Default::default(),
             running_spinner: widgets.running_spinner.clone(),
@@ -876,6 +891,9 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::Stream(input) => self.on_stream_input(input, &sender),
             SqlEditorInput::FilterResults(request) => self.on_filter_results(*request, &sender),
             SqlEditorInput::FilterFinished(done) => self.on_filter_finished(*done, &sender),
+            SqlEditorInput::OpenCompare => self.on_open_compare(&sender),
+            SqlEditorInput::CompareResults(request) => self.on_compare_results(*request, &sender),
+            SqlEditorInput::CompareFinished(done) => self.on_compare_finished(*done, &sender),
 
             SqlEditorInput::ShowCancelled(generation) => {
                 let Some((terminal, context)) = self.finish_run(generation, &sender) else {

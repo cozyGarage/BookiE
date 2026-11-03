@@ -93,6 +93,8 @@ impl SqlEditor {
         self.pin_button.set_label(&label);
         self.pin_button
             .set_sensitive(self.pinned.is_pinned() || self.pinned.has_results());
+        self.compare_button
+            .set_sensitive(super::result_compare::can_compare(&self.pinned.displayed()));
         self.refresh_result_exports();
         self.panel.refresh_errors(self.pinned.latest());
     }

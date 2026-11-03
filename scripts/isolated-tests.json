@@ -1506,6 +1506,16 @@
       "bookie-app",
       "--lib",
       "ui::editor::result_tools::widget_tests::the_result_header_wraps_without_overlap_at_600_px"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_compare::dialog_tests::the_compare_dialog_offers_shared_columns_as_keys_and_sends_the_chosen_request"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_compare::dialog_tests::the_compare_dialog_refuses_the_same_result_on_both_sides"
     ]
   ],
   "keyring": [
