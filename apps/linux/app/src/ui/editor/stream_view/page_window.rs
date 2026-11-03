@@ -28,7 +28,11 @@ impl<T> PageWindow<T> {
     pub(super) fn show(&mut self, wanted: &[u64]) {
         if self.wanted != wanted {
             self.wanted = wanted.to_vec();
-            self.deferred.retain(|page| wanted.contains(page));
+            if wanted.len() <= 2 {
+                self.deferred.clear();
+            } else {
+                self.deferred.retain(|page| wanted.contains(page));
+            }
             self.failed.retain(|page| wanted.contains(page));
         }
     }
@@ -113,6 +117,25 @@ impl<T> PageWindow<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deferred_page_is_retried_when_viewport_shrinks_and_still_contains_it() {
+        let mut window = PageWindow::new(100, 2);
+        window.show(&[0, 1, 2]);
+        assert_eq!(window.next_request(), Some(0));
+        assert_eq!(window.next_request(), Some(1));
+        window.loaded(0, "first", 80);
+        window.loaded(1, "second", 80);
+        assert_eq!(window.next_request(), Some(2));
+        window.loaded(2, "third", 80);
+        assert!(window.has_deferred());
+        window.show(&[0, 1]);
+        assert_eq!(window.next_request(), Some(0));
+        window.loaded(0, "first", 80);
+        assert_eq!(window.get(0), Some(&"first"));
+        assert_eq!(window.get(1), Some(&"second"));
+        assert!(!window.has_deferred());
+    }
 
     #[test]
     fn requests_visible_pages_once_and_bounds_concurrent_loads() {
