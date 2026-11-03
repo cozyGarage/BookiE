@@ -317,6 +317,32 @@ impl DatabaseService {
         }
     }
 
+    pub async fn audit_result_compare(
+        &self,
+        operation_id: Uuid,
+        connection: bookie_policy::AuditConnectionContext,
+        phase: AuditRecordPhase,
+        terminal_status: AuditTerminalStatus,
+        differing_rows: usize,
+        duration_ms: Option<u64>,
+    ) -> Result<(), bookie_policy::AuditError> {
+        let event = AuditEvent::result_compare(
+            operation_id,
+            connection,
+            phase,
+            terminal_status,
+            differing_rows,
+            duration_ms,
+        );
+        match self.audit.record(event).await {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.audit_state.disable_after_audit_failure();
+                Err(error)
+            }
+        }
+    }
+
     /// Whether a prior governed operation has an unresolved outcome.  The UI
     /// uses this to stop a connection transition after cancelling running
     /// work: switching databases must not hide a newly ambiguous write.

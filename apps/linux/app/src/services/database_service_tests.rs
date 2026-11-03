@@ -369,6 +369,79 @@ async fn administrative_bundle_audit_writes_sanitized_intent_and_outcome_pair() 
     assert_eq!(records[1]["event"]["terminal_status"], "succeeded");
 }
 
+fn compare_connection(id: Uuid) -> bookie_policy::AuditConnectionContext {
+    bookie_policy::AuditConnectionContext {
+        id,
+        name: "analytics".into(),
+        environment: Environment::Prod,
+        driver_id: "postgres".into(),
+    }
+}
+
+#[tokio::test]
+async fn result_compare_audit_writes_a_paired_read_record_without_values() {
+    let service = DatabaseService::new_isolated();
+    let operation_id = Uuid::new_v4();
+    let connection_id = Uuid::new_v4();
+
+    for (phase, status, duration) in [
+        (AuditRecordPhase::Intent, AuditTerminalStatus::Pending, None),
+        (AuditRecordPhase::Outcome, AuditTerminalStatus::Succeeded, Some(7)),
+    ] {
+        service
+            .audit_result_compare(
+                operation_id,
+                compare_connection(connection_id),
+                phase,
+                status,
+                42,
+                duration,
+            )
+            .await
+            .expect("durable compare record");
+    }
+
+    let journal = service._audit_temp_dir.as_ref().unwrap().path().join("audit.jsonl");
+    let contents = std::fs::read_to_string(journal).expect("audit journal exists");
+    let records: Vec<serde_json::Value> = contents
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("journal record is valid JSON"))
+        .collect();
+    assert_eq!(records.len(), 2);
+    for (record, phase) in records.iter().zip(["intent", "outcome"]) {
+        let event = &record["event"];
+        assert_eq!(event["operation_id"], operation_id.to_string());
+        assert_eq!(event["phase"], phase);
+        assert_eq!(event["operation_class"], "read");
+        assert_eq!(event["connection_id"], connection_id.to_string());
+        assert_eq!(event["connection_name"], "analytics");
+        assert_eq!(event["administrative_action"]["action"], "result_compare");
+        assert_eq!(event["administrative_action"]["affected_count"], 42);
+        assert_eq!(event["redacted_sql"], "[NOT_APPLICABLE]");
+        assert!(event["targets"].as_array().unwrap().is_empty());
+    }
+    assert_eq!(records[1]["event"]["terminal_status"], "succeeded");
+}
+
+#[tokio::test]
+async fn result_compare_intent_fails_closed_when_audit_is_unavailable() {
+    let audit_dir = tempfile::tempdir().expect("audit temp dir");
+    let service = DatabaseService::with_audit(AuditRuntime::unavailable(), Some(audit_dir));
+
+    let result = service
+        .audit_result_compare(
+            Uuid::new_v4(),
+            compare_connection(Uuid::new_v4()),
+            AuditRecordPhase::Intent,
+            AuditTerminalStatus::Pending,
+            0,
+            None,
+        )
+        .await;
+
+    assert!(result.is_err());
+}
+
 #[tokio::test]
 async fn administrative_bundle_intent_fails_closed_when_audit_is_unavailable() {
     let audit_dir = tempfile::tempdir().expect("audit temp dir");

@@ -156,6 +156,7 @@ pub struct AuditTransportMetadata {
 pub enum AuditAdministrativeAction {
     ConnectionBundleExport,
     ConnectionBundleImport,
+    ResultCompare,
 }
 
 impl AuditAdministrativeAction {
@@ -163,8 +164,17 @@ impl AuditAdministrativeAction {
         match self {
             Self::ConnectionBundleExport => "connection_bundle_export",
             Self::ConnectionBundleImport => "connection_bundle_import",
+            Self::ResultCompare => "result_compare",
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuditConnectionContext {
+    pub id: Uuid,
+    pub name: String,
+    pub environment: Environment,
+    pub driver_id: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -246,6 +256,31 @@ impl AuditEvent {
                 action,
                 affected_count: affected_count.min(u64::MAX as usize) as u64,
             }),
+        }
+    }
+
+    pub fn result_compare(
+        operation_id: Uuid,
+        connection: AuditConnectionContext,
+        phase: AuditRecordPhase,
+        terminal_status: AuditTerminalStatus,
+        differing_rows: usize,
+        duration_ms: Option<u64>,
+    ) -> Self {
+        Self {
+            connection_id: connection.id,
+            connection_name: connection.name,
+            environment: connection.environment,
+            driver_id: connection.driver_id,
+            operation_class: AuditOperationClass::Read,
+            ..Self::administrative_action(
+                operation_id,
+                AuditAdministrativeAction::ResultCompare,
+                phase,
+                terminal_status,
+                differing_rows,
+                duration_ms,
+            )
         }
     }
 

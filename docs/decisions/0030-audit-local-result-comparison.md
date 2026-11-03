@@ -11,8 +11,8 @@ Compare Results diffs two result sets that the editor already holds, in memory o
 
 Record a confirmed comparison as an intent and outcome pair in the existing audit journal, under the same rules as ADR 0010.
 
-1. The pair uses a new stable action code `result_compare` and the operation class `Read`. A comparison never makes governed writes wait on it.
-2. The event carries the source connection identifier, name and environment, because the compared data came from that connection. It carries only aggregate counts: rows compared on each side, rows equal, added, removed and changed, and the number of key columns. It carries no SQL, column names, values, keys or file paths.
+1. The pair uses a new stable action code `result_compare` and the operation class `Read`. A comparison never makes governed writes wait on it, and an intent left without an outcome after a crash is not an unresolved write obligation.
+2. The event carries the source connection identifier, name and environment, because the compared data came from that connection. It carries one aggregate count, the number of differing rows, in the metadata that ADR 0010 defines. It carries no SQL, column names, values, keys, row totals or file paths.
 3. The intent is written after the user confirms the comparison and before any page is read. If the intent cannot be made durable, the comparison does not start. The outcome is written when the comparison ends as succeeded, cancelled or failed.
 4. Both inputs must come from one connection. A comparison across connections is refused.
 5. Inputs that are truncated, still loading, cancelled, timed out or failed are refused. A comparison never reports a difference it cannot prove.

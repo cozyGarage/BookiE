@@ -29,9 +29,10 @@ mod verdict;
 
 pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
 pub use audit::{
-    AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditError, AuditErrorCategory,
-    AuditEvent, AuditOperationClass, AuditPreviewState, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus,
-    AuditTransactionOutcome, AuditTransportClient, AuditTransportMetadata, AuditTransportOutcome, NullAuditSink,
+    AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditConnectionContext, AuditError,
+    AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState, AuditRecordPhase, AuditSink, AuditState,
+    AuditTerminalStatus, AuditTransactionOutcome, AuditTransportClient, AuditTransportMetadata, AuditTransportOutcome,
+    NullAuditSink,
 };
 pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite, count_sql_for_mutation};
 pub use classify::{StatementClass, StatementFacts, classify, statement_requires_write_capability};

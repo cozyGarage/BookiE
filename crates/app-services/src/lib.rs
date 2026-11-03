@@ -18,6 +18,7 @@ pub mod preparation;
 pub mod read_scopes;
 pub mod recent_tabs;
 pub mod request_generation;
+pub mod result_compare;
 pub mod result_filter;
 pub mod result_find;
 pub mod result_predicate;

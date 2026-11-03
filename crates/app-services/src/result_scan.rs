@@ -35,7 +35,7 @@ impl ScanProgress {
         self.rows.load(Ordering::Acquire)
     }
 
-    fn advance(&self, rows: usize) {
+    pub(crate) fn advance(&self, rows: usize) {
         self.pages.fetch_add(1, Ordering::AcqRel);
         self.rows.fetch_add(rows as u64, Ordering::AcqRel);
     }
