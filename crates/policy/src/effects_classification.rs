@@ -200,9 +200,6 @@ pub(crate) fn sql_effects_from_tokens(sql: &str, dialect: &dyn Dialect, driver_i
             effects = effects.union(Effects::ADMIN);
         }
     }
-    if driver_id == "duckdb" && crate::duckdb_paths::reads_a_path(&tokens) {
-        effects = effects.union(Effects::HOST_OR_FILE_ACCESS);
-    }
     (effects, legacy_administrative_call)
 }
 

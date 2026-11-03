@@ -1,22 +1,6 @@
-use sqlparser::tokenizer::Token;
+use std::ops::ControlFlow;
 
-const CLAUSE_ENDS: [&str; 11] = [
-    "where",
-    "group",
-    "order",
-    "having",
-    "limit",
-    "union",
-    "intersect",
-    "except",
-    "select",
-    "window",
-    "qualify",
-];
-
-const NON_SOURCE_OWNERS: [&str; 6] = ["extract", "trim", "substring", "substr", "position", "overlay"];
-
-const NON_SOURCE_BEFORE: [&str; 4] = ["distinct", "both", "leading", "trailing"];
+use sqlparser::ast::{Ident, ObjectName, ObjectNamePart, Statement, TableFactor, Visit, Visitor};
 
 const SAFE_TABLE_FUNCTIONS: [&str; 7] = [
     "range",
@@ -28,113 +12,78 @@ const SAFE_TABLE_FUNCTIONS: [&str; 7] = [
     "repeat_row",
 ];
 
-#[derive(Default)]
-struct Scan {
-    owners: Vec<String>,
-    from_depths: Vec<usize>,
-    source_expected: bool,
-}
+const DATA_FILE_EXTENSIONS: [&str; 17] = [
+    "csv", "tsv", "parquet", "json", "ndjson", "jsonl", "xlsx", "arrow", "avro", "orc", "txt", "geojson", "db",
+    "duckdb", "sqlite", "sqlite3", "xml",
+];
 
-pub(crate) fn reads_a_path(tokens: &[Token]) -> bool {
-    let significant: Vec<&Token> = tokens
+struct SourceFinder;
+
+pub(crate) fn reads_a_path(statements: &[Statement]) -> bool {
+    statements
         .iter()
-        .filter(|token| !matches!(token, Token::Whitespace(_)))
-        .collect();
-    let mut scan = Scan::default();
-    for (index, token) in significant.iter().enumerate() {
-        let previous = index.checked_sub(1).and_then(|before| significant.get(before));
-        if scan.source_expected && is_path_or_foreign_source(token, significant.get(index + 1)) {
-            return true;
-        }
-        scan.advance(token, previous.copied(), significant.get(index + 1).copied());
-    }
-    false
+        .any(|statement| statement.visit(&mut SourceFinder).is_break())
 }
 
-impl Scan {
-    fn depth(&self) -> usize {
-        self.owners.len()
-    }
+impl Visitor for SourceFinder {
+    type Break = ();
 
-    fn advance(&mut self, token: &Token, previous: Option<&Token>, next: Option<&Token>) {
-        match token {
-            Token::LParen => {
-                let owner = word_text(previous).unwrap_or_default();
-                self.owners.push(owner);
-            }
-            Token::RParen => {
-                self.owners.pop();
-                let depth = self.depth();
-                self.from_depths.retain(|active| *active <= depth);
-                self.source_expected = false;
-            }
-            Token::Comma => self.source_expected = self.from_depths.last() == Some(&self.depth()),
-            Token::Period => {}
-            Token::Word(word) if word.quote_style.is_none() => self.keyword(&word.value, previous, next),
-            _ => self.source_expected = false,
+    fn pre_visit_statement(&mut self, statement: &Statement) -> ControlFlow<()> {
+        match statement {
+            Statement::ExplainTable { table_name, .. } if names_a_path(table_name) => ControlFlow::Break(()),
+            _ => ControlFlow::Continue(()),
         }
     }
 
-    fn keyword(&mut self, text: &str, previous: Option<&Token>, next: Option<&Token>) {
-        let lowered = text.to_ascii_lowercase();
-        if lowered == "from" || lowered == "join" {
-            if self.is_source_keyword(previous) {
-                let depth = self.depth();
-                if self.from_depths.last() != Some(&depth) {
-                    self.from_depths.push(depth);
-                }
-                self.source_expected = true;
-            } else {
-                self.source_expected = false;
+    fn pre_visit_table_factor(&mut self, factor: &TableFactor) -> ControlFlow<()> {
+        let foreign = match factor {
+            TableFactor::Table {
+                name, args: Some(_), ..
             }
-            return;
+            | TableFactor::Function { name, .. } => !is_safe_table_function(name),
+            TableFactor::Table { name, args: None, .. } => names_a_path(name),
+            _ => false,
+        };
+        if foreign {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
         }
-        if lowered == "describe" || lowered == "summarize" {
-            self.source_expected = true;
-            return;
-        }
-        if lowered == "lateral" || matches!(next, Some(Token::Period)) {
-            return;
-        }
-        if CLAUSE_ENDS.contains(&lowered.as_str()) {
-            let depth = self.depth();
-            self.from_depths.retain(|active| *active != depth);
-        }
-        self.source_expected = false;
-    }
-
-    fn is_source_keyword(&self, previous: Option<&Token>) -> bool {
-        let after_special = word_text(previous).is_some_and(|word| NON_SOURCE_BEFORE.contains(&word.as_str()));
-        let inside_special = self
-            .owners
-            .last()
-            .is_some_and(|owner| NON_SOURCE_OWNERS.contains(&owner.as_str()));
-        !after_special && !inside_special
     }
 }
 
-fn word_text(token: Option<&Token>) -> Option<String> {
-    match token {
-        Some(Token::Word(word)) if word.quote_style.is_none() => Some(word.value.to_ascii_lowercase()),
+fn identifiers(name: &ObjectName) -> impl Iterator<Item = &Ident> {
+    name.0.iter().filter_map(|part| match part {
+        ObjectNamePart::Identifier(ident) => Some(ident),
         _ => None,
-    }
+    })
 }
 
-fn is_path_or_foreign_source(token: &Token, next: Option<&&Token>) -> bool {
-    match token {
-        Token::SingleQuotedString(_) => true,
-        Token::Word(word) if word.quote_style.is_some() => looks_like_a_path(&word.value),
-        Token::Word(word) => {
-            matches!(next, Some(Token::LParen)) && !is_safe_table_function(&word.value.to_ascii_lowercase())
-        }
-        _ => false,
-    }
+fn is_safe_table_function(name: &ObjectName) -> bool {
+    identifiers(name).last().is_some_and(|ident| {
+        let lowered = ident.value.to_ascii_lowercase();
+        SAFE_TABLE_FUNCTIONS.contains(&lowered.as_str())
+            || lowered.starts_with("duckdb_")
+            || lowered.starts_with("pragma_")
+    })
 }
 
-fn is_safe_table_function(name: &str) -> bool {
-    SAFE_TABLE_FUNCTIONS.contains(&name) || name.starts_with("duckdb_") || name.starts_with("pragma_")
+fn names_a_path(name: &ObjectName) -> bool {
+    identifiers(name).any(|ident| match ident.quote_style {
+        Some('\'') => true,
+        Some(_) => looks_like_a_path(&ident.value),
+        None => false,
+    })
 }
 
 fn looks_like_a_path(name: &str) -> bool {
-    name.contains('/') || name.contains('\\') || name.contains('.')
+    let lowered = name.to_ascii_lowercase();
+    lowered.contains('/')
+        || lowered.contains('\\')
+        || lowered.contains('*')
+        || lowered.contains('?')
+        || lowered
+            .split('.')
+            .skip(1)
+            .any(|segment| DATA_FILE_EXTENSIONS.contains(&segment))
 }

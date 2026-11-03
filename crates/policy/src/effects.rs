@@ -203,11 +203,27 @@ mod tests {
             "SELECT * FROM ('/etc/passwd.csv')",
             "DESCRIBE '/etc/x.csv'",
             "SELECT * FROM orders WHERE id IN (SELECT id FROM '/data/x.csv')",
+            "DELETE FROM t USING '/etc/x.csv' c WHERE t.id = c.id",
+            "DELETE FROM t USING read_avro('/x.avro') c WHERE t.id = c.id",
+            "DELETE FROM t USING sqlite_scan('/x.db', 'u') c WHERE t.id = c.id",
+            "SELECT * FROM orders WHERE EXISTS (SELECT 1 FROM '/etc/x.csv')",
+            "WITH f AS (SELECT * FROM '/etc/x.csv') SELECT * FROM f",
+            "INSERT INTO t SELECT * FROM '/etc/x.csv'",
+            "SELECT * FROM \"data/x\"",
+            "SELECT * FROM \"events-*.parquet\"",
         ] {
             let facts = classify(sql, "duckdb");
             assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
             assert!(!facts.is_single_read(), "{sql}");
         }
+    }
+
+    #[test]
+    fn duckdb_delete_using_a_table_carries_no_file_access() {
+        let facts = classify("DELETE FROM t USING items i WHERE t.id = i.id", "duckdb");
+        assert!(!facts.effects.contains(Effects::HOST_OR_FILE_ACCESS));
+        let facts = classify("DELETE FROM t USING '/etc/x.csv' c WHERE t.id = c.id", "duckdb");
+        assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS));
     }
 
     #[test]
@@ -235,6 +251,13 @@ mod tests {
             "SELECT * FROM generate_series(1, 5) g, range(3) r",
             "SELECT * FROM unnest([1, 2, 3])",
             "SELECT * FROM pragma_table_info('orders')",
+            "SELECT * FROM (VALUES (1, 'a')) AS t(a, b)",
+            "SELECT * FROM orders o JOIN (VALUES (1, 'a')) v(a, b) ON v.a = o.id",
+            "SELECT * FROM orders o JOIN items i ON i.x = ['a', 'b']",
+            "SELECT * FROM orders o JOIN items i ON i.s = {'a': 'x', 'b': 'y'}",
+            "SELECT * FROM \"public.orders\"",
+            "SELECT * FROM \"my.table\"",
+            "SELECT * FROM orders o JOIN items i USING (id)",
             "SELECT * FROM orders WHERE path = '/data/x.csv'",
         ] {
             let facts = classify(sql, "duckdb");
