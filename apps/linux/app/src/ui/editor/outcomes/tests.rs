@@ -1115,4 +1115,11 @@ fn the_cell_menu_offers_a_whole_result_filter_only_for_a_complete_spooled_stream
     }
     let complete = cache.snapshot(StreamTerminal::Complete, None);
     assert!(!super::stream_result_view::offers_whole_result_filter(&complete));
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::with_limit(1 << 20)
+        .create()
+        .unwrap();
+    let spooled = cache.snapshot_with_spool(StreamTerminal::Complete, None, 0, Some(spool.clone()));
+    assert!(super::stream_result_view::offers_whole_result_filter(&spooled));
+    let loading = cache.snapshot_with_spool(StreamTerminal::Loading, None, 0, Some(spool));
+    assert!(!super::stream_result_view::offers_whole_result_filter(&loading));
 }

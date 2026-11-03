@@ -102,10 +102,9 @@ pub(super) enum Attempt {
     GiveUp,
 }
 
-pub(super) fn attempt(view_rows: Option<usize>, expected_rows: Option<usize>, tries: u32) -> Attempt {
+pub(super) fn attempt(view_rows: Option<usize>, tries: u32) -> Attempt {
     match view_rows {
-        Some(rows) if rows > 0 && expected_rows.is_none_or(|expected| rows >= expected) => Attempt::Select,
-        Some(rows) if rows > 0 && tries > MAX_RETRIES => Attempt::Select,
+        Some(rows) if rows > 0 => Attempt::Select,
         _ if tries > MAX_RETRIES => Attempt::GiveUp,
         _ => Attempt::Retry,
     }
@@ -145,13 +144,13 @@ pub(super) fn go_to(
         if current.get() != id {
             return gtk::glib::ControlFlow::Break;
         }
-        let (view, expected, row) = if continuous {
-            (continuous_view(&holder, target.generation), None, target.global_row)
+        let (view, row) = if continuous {
+            (continuous_view(&holder, target.generation), target.global_row)
         } else {
-            (page_view(&holder, &target), Some(target.page_rows), target.row)
+            (page_view(&holder, &target), target.row)
         };
         let rows = view_rows(view.as_ref());
-        match (attempt(rows, expected, tries.get()), view) {
+        match (attempt(rows, tries.get()), view) {
             (Attempt::Select, Some(view)) => {
                 let source_position = (!continuous)
                     .then(|| {

@@ -17,6 +17,7 @@ pub(super) struct MatchCursor {
     current: Option<usize>,
     needle: String,
     state: SearchState,
+    requested_forward: Option<bool>,
 }
 
 impl MatchCursor {
@@ -27,6 +28,7 @@ impl MatchCursor {
         self.unsearchable = 0;
         self.current = None;
         self.state = SearchState::Searching;
+        self.requested_forward = None;
         self.needle = needle.to_owned();
         self.generation
     }
@@ -61,6 +63,14 @@ impl MatchCursor {
 
     pub(super) fn has_results_for(&self, needle: &str) -> bool {
         self.state == SearchState::Complete && self.needle == needle
+    }
+
+    pub(super) fn request_direction(&mut self, forward: bool) {
+        self.requested_forward = Some(forward);
+    }
+
+    pub(super) fn take_direction(&mut self) -> Option<bool> {
+        self.requested_forward.take()
     }
 
     pub(super) fn is_searching_for(&self, needle: &str) -> bool {
