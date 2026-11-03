@@ -266,7 +266,9 @@ impl Tools {
                 label: needle,
                 ticket: ticket.clone(),
             })));
-        super::ticket::finish_if_unsent(sent, &ticket, crate::tr!("The filter could not start"));
+        if sent.is_err() {
+            ticket.finish(crate::tr!("The filter could not start"));
+        }
     }
 
     pub(super) fn adopt_filter(self: &Rc<Self>, ticket: Arc<FilterTicket>) {

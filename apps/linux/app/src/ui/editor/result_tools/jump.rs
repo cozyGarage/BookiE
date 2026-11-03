@@ -57,13 +57,16 @@ fn select_row(view: &gtk::ColumnView, row: usize) {
 }
 
 pub(super) fn position_of_source(model: &gtk::gio::ListModel, source: usize) -> Option<u32> {
-    (0..model.n_items()).find(|position| {
+    let source_at = |position: u32| {
         model
-            .item(*position)
+            .item(position)
             .and_downcast::<crate::ui::row_object::RowObject>()
             .and_then(|row| row.source_index())
-            == Some(source)
-    })
+    };
+    if u32::try_from(source).is_ok_and(|position| source_at(position) == Some(source)) {
+        return u32::try_from(source).ok();
+    }
+    (0..model.n_items()).find(|position| source_at(*position) == Some(source))
 }
 
 fn continuous_view(holder: &gtk::Box, generation: u64) -> Option<gtk::ColumnView> {
