@@ -1,5 +1,46 @@
 pub use bookie_app_services::change_tracker::*;
 
+use std::cell::RefCell;
+use uuid::Uuid;
+
+thread_local! {
+    static REGISTRY: RefCell<ChangeTrackerRegistry> = RefCell::new(ChangeTrackerRegistry::new());
+}
+
+pub fn with_tab<F, R>(tab_id: Uuid, f: F) -> Option<R>
+where
+    F: FnOnce(&mut TabChangeTracker) -> R,
+{
+    REGISTRY.with(|reg| reg.borrow_mut().with_tab(tab_id, f))
+}
+
+pub fn with_tab_ref<F, R>(tab_id: Uuid, f: F) -> Option<R>
+where
+    F: FnOnce(&TabChangeTracker) -> R,
+{
+    REGISTRY.with(|reg| reg.borrow().with_tab_ref(tab_id, f))
+}
+
+pub fn open_tab(tab_id: Uuid) {
+    REGISTRY.with(|reg| reg.borrow_mut().open_tab(tab_id));
+}
+
+pub fn close_tab(tab_id: Uuid) {
+    REGISTRY.with(|reg| reg.borrow_mut().close_tab(tab_id));
+}
+
+pub fn any_pending_in(ids: impl IntoIterator<Item = Uuid>) -> bool {
+    REGISTRY.with(|reg| reg.borrow().any_pending_in(ids))
+}
+
+pub fn pending_among(ids: impl IntoIterator<Item = Uuid>) -> Vec<Uuid> {
+    REGISTRY.with(|reg| reg.borrow().pending_among(ids))
+}
+
+pub fn pending_tabs_for(tab_ids: &std::collections::HashSet<Uuid>) -> Vec<Uuid> {
+    REGISTRY.with(|reg| reg.borrow().pending_tabs_for(tab_ids))
+}
+
 #[derive(Debug)]
 struct RelmTrackerEvents(relm4::Sender<TrackerEvent>);
 
