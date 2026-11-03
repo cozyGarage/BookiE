@@ -35,11 +35,22 @@ fn independent_browse_owners_keep_edits_and_teardown_separate() {
     pump(&first_outputs);
     assert!(first.model().change_trackers.any_pending_in([id]));
     assert!(!second.model().change_trackers.any_pending_in([id]));
-    first.model().change_trackers.close_tab(id);
     second.sender().send(BrowseTabInput::InsertRow).unwrap();
     pump(&second_outputs);
     assert!(second.model().change_trackers.any_pending_in([id]));
+    first.sender().send(BrowseTabInput::CommitSave).unwrap();
+    assert!(
+        pump(&first_outputs)
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ExecuteTransaction { .. }))
+    );
+    first.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    pump(&first_outputs);
+    assert!(!first.model().change_trackers.any_pending_in([id]));
+    assert!(second.model().change_trackers.any_pending_in([id]));
+    first.model().change_trackers.close_tab(id);
     assert!(first.model().change_trackers.with_tab_ref(id, |_| ()).is_none());
+    assert!(second.model().change_trackers.any_pending_in([id]));
 }
 
 #[test]
