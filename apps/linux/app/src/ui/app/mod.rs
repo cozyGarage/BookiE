@@ -494,7 +494,6 @@ impl SimpleComponent for App {
         widgets.schema_filter_popover.set_child(Some(&schema_filter_list));
 
         init_css::install_pending_change_css();
-
         let structure_trackers = crate::services::structure_tracker::WorkspaceStructureTrackers::default();
         let window_handles = init_window::install_window_lifecycle(
             &widgets.window,
