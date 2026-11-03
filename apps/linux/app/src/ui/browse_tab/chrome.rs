@@ -8,11 +8,9 @@ use super::*;
 
 impl BrowseTab {
     pub(super) fn build_paginator(sender: ComponentSender<Self>, page_size: u64, browse_filters: bool) -> Paginator {
-        // First / Last bracket the Prev / Next pair. Tables of
-        // millions of rows make Last especially valuable — without
-        // it the user has to spam Next to reach the bottom. Same
-        // visual + interaction model as TablePlus / DataGrip /
-        // DBeaver. Last stays disabled until the row count loads.
+        // First / Last bracket the Prev / Next pair. Tables of millions
+        // of rows make Last especially valuable; it stays disabled until
+        // the row count loads.
         // Insert row sits at the very start of the paginator's
         // pack_start group — clearly separated from the nav arrows by
         // its position and by the GtkActionBar's start group spacing,

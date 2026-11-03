@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use super::{McpBridge, McpLimits, count_from_value, count_statement, sql_looks_like_write, validated_identifier};
+use super::{
+    McpBridge, McpLimits, count_from_value, count_statement, preview_may_implicitly_commit, sql_looks_like_write,
+    validated_identifier,
+};
 use crate::tokens::TokenStore;
 use bookie_core::Value;
 
@@ -237,5 +240,47 @@ fn only_a_provable_read_skips_the_write_scope_check() {
         "",
     ] {
         assert!(sql_looks_like_write(sql, "postgres"), "{sql}");
+    }
+}
+
+#[test]
+fn a_mysql_preview_is_refused_for_statements_that_implicitly_commit() {
+    for sql in [
+        "DROP TABLE orders",
+        "ALTER TABLE orders ADD COLUMN note text",
+        "TRUNCATE TABLE orders",
+        "CREATE TABLE copy_of_orders (id int)",
+        "RENAME TABLE orders TO old_orders",
+        "CREATE INDEX idx_orders_id ON orders (id)",
+        "DROP DATABASE shop",
+        "COMMIT",
+        "START TRANSACTION",
+        "LOCK TABLES orders WRITE",
+        "GRANT ALL ON *.* TO 'u'@'%'",
+        "this is not sql",
+        "UPDATE orders SET note = 'x' WHERE id = 1; DROP TABLE orders",
+        "DELETE FROM orders WHERE id = 1; COMMIT",
+        "SET autocommit = 1",
+    ] {
+        assert!(preview_may_implicitly_commit("mysql", sql), "{sql}");
+    }
+}
+
+#[test]
+fn a_mysql_preview_still_runs_for_plain_row_changes() {
+    for sql in [
+        "UPDATE orders SET note = 'x' WHERE id = 1",
+        "DELETE FROM orders WHERE id = 1",
+        "INSERT INTO orders (id) VALUES (1)",
+        "SELECT * FROM orders",
+    ] {
+        assert!(!preview_may_implicitly_commit("mysql", sql), "{sql}");
+    }
+}
+
+#[test]
+fn engines_with_transactional_ddl_are_not_refused_for_ddl() {
+    for driver in ["postgres", "sqlite"] {
+        assert!(!preview_may_implicitly_commit(driver, "DROP TABLE orders"), "{driver}");
     }
 }
