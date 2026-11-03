@@ -716,7 +716,7 @@ mod tests {
             while gtk4::glib::MainContext::default().iteration(false) {}
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
-        let trigger: super::CellEditTrigger = std::rc::Rc::new(|cell| super::enter_edit_mode(cell));
+        let trigger: super::CellEditTrigger = std::rc::Rc::new(super::enter_edit_mode);
         let no_op: super::CellEditTrigger = std::rc::Rc::new(|_| {});
         super::install_grid_edit_triggers(&view, vec![Some(no_op), Some(trigger)]);
         let controllers = view.observe_controllers();
