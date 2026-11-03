@@ -112,6 +112,7 @@ fn contains_in_row(row: &[Value], scope: &ColumnScope, needle: &str, tally: &mut
 fn cell_contains(cell: &Value, needle: &str, tally: &mut CellTally) -> bool {
     match search_text(cell) {
         SearchText::Text(text) => contains_ignore_case(&text, needle),
+        SearchText::TextOrHex(text, hex) => contains_ignore_case(text, needle) || contains_ignore_case(&hex, needle),
         SearchText::Never => false,
         SearchText::Unsearchable => {
             tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
@@ -122,6 +123,7 @@ fn cell_contains(cell: &Value, needle: &str, tally: &mut CellTally) -> bool {
 
 enum SearchText<'a> {
     Text(Cow<'a, str>),
+    TextOrHex(&'a str, String),
     Never,
     Unsearchable,
 }
@@ -136,12 +138,15 @@ fn search_text(value: &Value) -> SearchText<'_> {
         Value::Float(value) => SearchText::Text(Cow::Owned(value.to_string())),
         Value::Decimal(value) => SearchText::Text(Cow::Owned(value.to_string())),
         Value::Date(value) => SearchText::Text(Cow::Owned(value.to_string())),
-        Value::Time(value) => SearchText::Text(Cow::Owned(value.to_string())),
-        Value::DateTime(value) => SearchText::Text(Cow::Owned(value.to_string())),
-        Value::TimestampTz(value) => SearchText::Text(Cow::Owned(value.to_rfc3339())),
+        Value::Time(value) => SearchText::Text(Cow::Owned(value.format("%H:%M:%S").to_string())),
+        Value::DateTime(value) => SearchText::Text(Cow::Owned(value.format("%Y-%m-%d %H:%M:%S%.f").to_string())),
+        Value::TimestampTz(value) => SearchText::Text(Cow::Owned(value.format("%Y-%m-%d %H:%M:%S%:z").to_string())),
         Value::Uuid(value) => SearchText::Text(Cow::Owned(value.to_string())),
         Value::Json(value) => SearchText::Text(Cow::Owned(value.to_string())),
-        Value::Bytes(bytes) => SearchText::Text(Cow::Owned(hex_text(bytes))),
+        Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
+            Ok(text) if !text.contains('\0') => SearchText::TextOrHex(text, hex_text(bytes)),
+            _ => SearchText::Text(Cow::Owned(hex_text(bytes))),
+        },
     }
 }
 

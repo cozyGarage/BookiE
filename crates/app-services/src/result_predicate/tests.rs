@@ -141,3 +141,29 @@ fn an_undecodable_comparison_value_is_refused() {
     };
     assert_eq!(predicate.prepare(1).unwrap_err(), PredicateError::UncomparableValue);
 }
+
+#[test]
+fn temporal_values_search_as_the_grid_displays_them() {
+    use chrono::{NaiveTime, TimeZone, Utc};
+    let stamp = Utc.with_ymd_and_hms(2024, 5, 1, 10, 0, 0).unwrap();
+    let row = [
+        Value::TimestampTz(stamp),
+        Value::Time(NaiveTime::from_hms_milli_opt(8, 30, 15, 123).unwrap()),
+    ];
+    assert!(matches(
+        contains("2024-05-01 10:00:00+00:00", ColumnScope::Column(0)),
+        &row
+    ));
+    assert!(matches(contains("2024-05-01 10:00", ColumnScope::Any), &row));
+    assert!(matches(contains("08:30:15", ColumnScope::Column(1)), &row));
+    assert!(!matches(contains("08:30:15.123", ColumnScope::Column(1)), &row));
+}
+
+#[test]
+fn readable_bytes_search_as_text_and_as_hex() {
+    let row = [Value::Bytes(b"hello".to_vec()), Value::Bytes(vec![0xde, 0xad])];
+    assert!(matches(contains("HELLO", ColumnScope::Column(0)), &row));
+    assert!(matches(contains("68656c6c6f", ColumnScope::Column(0)), &row));
+    assert!(matches(contains("dead", ColumnScope::Column(1)), &row));
+    assert!(!matches(contains("hello", ColumnScope::Column(1)), &row));
+}
