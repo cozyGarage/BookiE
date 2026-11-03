@@ -1,7 +1,7 @@
 name: Linux PR readiness rerun
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] This workflow uses trusted branch code and reads CI metadata only; it never downloads artifacts or executes pull request code.
     workflows:
       - Build Linux
       - Flatpak Linux (packaging only)

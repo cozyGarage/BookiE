@@ -455,6 +455,7 @@ class PullRequestReadinessTests(unittest.TestCase):
         checkout = workflow.split("- uses: actions/checkout", 1)[1].split("\n      - name", 1)[0]
 
         self.assertIn("workflow_run:", workflow)
+        self.assertIn("zizmor: ignore[dangerous-triggers]", workflow)
         self.assertIn("- Build Linux", workflow)
         self.assertIn("- Flatpak Linux (packaging only)", workflow)
         self.assertIn("- Linux Security", workflow)
