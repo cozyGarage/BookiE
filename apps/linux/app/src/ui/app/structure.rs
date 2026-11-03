@@ -19,7 +19,6 @@ use crate::services::read_scopes::ReadScope;
 
 use crate::services::catalog::CatalogOrigin;
 use crate::services::error_text;
-use crate::services::structure_tracker;
 use crate::ui::app::ran_statements::finish_if_recorded;
 use crate::ui::app::{App, AppMsg, WorkspaceTab};
 use crate::ui::structure_tab::{StructureMode, StructureTabInput};
@@ -372,7 +371,9 @@ impl App {
             return;
         }
         let driver_id = self.driver_id().to_string();
-        let result = structure_tracker::with_tab_ref(tab_id, |t| t.materialize(&driver_id));
+        let result = self
+            .structure_trackers
+            .with_tab_ref(tab_id, |t| t.materialize(&driver_id));
         match result {
             Some(Ok(statements)) if !statements.is_empty() => {
                 self.on_execute_structure_transaction(tab_id, statements, sender);
@@ -487,16 +488,17 @@ impl App {
         // stub UI doesn't expose a name field yet, so pull it from
         // the first CreateTable op in the tracker.
         let new_table_name = if matches!(mode, StructureMode::New) {
-            structure_tracker::with_tab_ref(tab_id, |t| {
-                t.ops().iter().find_map(|op| {
-                    if let bookie_core::sql_ddl::StructureOp::CreateTable { table, .. } = op {
-                        Some(table.clone())
-                    } else {
-                        None
-                    }
+            self.structure_trackers
+                .with_tab_ref(tab_id, |t| {
+                    t.ops().iter().find_map(|op| {
+                        if let bookie_core::sql_ddl::StructureOp::CreateTable { table, .. } = op {
+                            Some(table.clone())
+                        } else {
+                            None
+                        }
+                    })
                 })
-            })
-            .flatten()
+                .flatten()
         } else {
             None
         };
