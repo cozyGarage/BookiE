@@ -19,3 +19,12 @@ export function displayCell(cell) {
 export function windowTop(scrollTop, height, limit, rowHeight) {
   return Math.max(0, Math.min(scrollTop, height - limit * rowHeight));
 }
+
+export function scrollTopForRow(row, viewportHeight, rowHeight, totalRows) {
+  const { limit, height } = visibleWindow(0, viewportHeight, rowHeight, totalRows);
+  const maxScroll = Math.max(0, height - viewportHeight);
+  const maxOffset = totalRows - limit;
+  if (maxScroll === 0 || maxOffset <= 0) return 0;
+  const target = Math.max(0, Math.min(row - Math.floor(limit / 2), maxOffset));
+  return Math.ceil((target / maxOffset) * maxScroll);
+}
