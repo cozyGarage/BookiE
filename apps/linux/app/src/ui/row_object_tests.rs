@@ -60,7 +60,11 @@ fn parsed_json_uses_its_serialized_size_at_the_preview_boundary() {
 
 #[test]
 fn root_json_string_previews_preserve_escaped_and_multibyte_content() {
-    for text in ["\\\"".repeat(4095), "é".repeat(4096)] {
+    for text in [
+        "\\\"".repeat(4095),
+        "\\\"".repeat(4096),
+        "é".repeat(4096),
+    ] {
         let json = serde_json::Value::String(text);
         let serialized = json.to_string();
         let preview = preview_value(&Value::Json(Box::new(json))).unwrap();
