@@ -175,3 +175,40 @@ async fn a_preview_is_refused_for_statements_that_commit_on_their_own_and_nothin
         .rows;
     assert_eq!(rows, vec![vec![Value::Int(1), Value::Int(0), Value::Int(0)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_preview_is_refused_for_a_myisam_table_in_another_database() {
+    let fixture = fixture().await;
+    let (bridge, token, connection_id, connection) = (
+        &fixture.bridge,
+        &fixture.token,
+        fixture.connection_id,
+        &fixture.connection,
+    );
+    for sql in [
+        "CREATE DATABASE other_db",
+        "CREATE TABLE other_db.legacy_elsewhere (id INT PRIMARY KEY, v INT) ENGINE=MyISAM",
+        "INSERT INTO other_db.legacy_elsewhere VALUES (1, 1)",
+    ] {
+        connection.execute(sql).await.unwrap();
+    }
+    let refused = bridge
+        .execute_write_structured(
+            token,
+            connection_id,
+            "UPDATE other_db.legacy_elsewhere SET v = 2 WHERE id = 1",
+            true,
+        )
+        .await;
+    let Err(error) = refused else {
+        panic!("a MyISAM preview in another database cannot be rolled back: {refused:?}");
+    };
+    assert_eq!(error.code, "preview_not_transactional", "{error:?}");
+    let rows = connection
+        .query("SELECT v FROM other_db.legacy_elsewhere WHERE id = 1")
+        .await
+        .unwrap()
+        .rows;
+    assert_eq!(rows, vec![vec![Value::Int(1)]]);
+}

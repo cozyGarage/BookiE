@@ -580,30 +580,58 @@ pub(crate) fn nontransactional_engine_query(driver_id: &str, sql: &str) -> Optio
     if driver_id != "mysql" {
         return None;
     }
-    let tables: Vec<String> = bookie_policy::classify(sql, driver_id)
+    let clauses: Vec<String> = bookie_policy::classify(sql, driver_id)
         .tables
         .iter()
-        .map(|table| {
-            table
-                .rsplit('.')
-                .next()
-                .unwrap_or(table)
-                .trim_matches('`')
-                .replace('\'', "''")
-        })
+        .filter_map(|table| table_clause(&split_qualified_name(table)))
         .collect();
-    if tables.is_empty() {
+    if clauses.is_empty() {
         return None;
     }
-    let names = tables
-        .iter()
-        .map(|table| format!("'{table}'"))
-        .collect::<Vec<_>>()
-        .join(", ");
     Some(format!(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() \
-         AND table_name IN ({names}) AND UPPER(COALESCE(engine, '')) NOT IN ('INNODB', 'NDB', 'NDBCLUSTER')"
+        "SELECT COUNT(*) FROM information_schema.tables WHERE ({}) \
+         AND UPPER(COALESCE(engine, '')) NOT IN ('INNODB', 'NDB', 'NDBCLUSTER')",
+        clauses.join(" OR ")
     ))
+}
+
+fn table_clause(parts: &[String]) -> Option<String> {
+    match parts {
+        [] => None,
+        [table] => Some(format!(
+            "(table_schema = DATABASE() AND table_name = '{}')",
+            escape_literal(table)
+        )),
+        [.., schema, table] => Some(format!(
+            "(table_schema = '{}' AND table_name = '{}')",
+            escape_literal(schema),
+            escape_literal(table)
+        )),
+    }
+}
+
+fn escape_literal(text: &str) -> String {
+    text.replace('\\', "\\\\").replace('\'', "''")
+}
+
+fn split_qualified_name(name: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    let mut characters = name.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            '`' if quoted && characters.peek() == Some(&'`') => {
+                current.push('`');
+                characters.next();
+            }
+            '`' => quoted = !quoted,
+            '.' if !quoted => parts.push(std::mem::take(&mut current)),
+            other => current.push(other),
+        }
+    }
+    parts.push(current);
+    parts
 }
 
 async fn touches_nontransactional_table(

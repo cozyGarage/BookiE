@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use super::{
-    McpBridge, McpLimits, count_from_value, count_statement, preview_may_implicitly_commit, sql_looks_like_write,
-    validated_identifier,
+    McpBridge, McpLimits, count_from_value, count_statement, nontransactional_engine_query,
+    preview_may_implicitly_commit, sql_looks_like_write, validated_identifier,
 };
 use crate::tokens::TokenStore;
 use bookie_core::Value;
@@ -283,4 +283,66 @@ fn engines_with_transactional_ddl_are_not_refused_for_ddl() {
     for driver in ["postgres", "sqlite"] {
         assert!(!preview_may_implicitly_commit(driver, "DROP TABLE orders"), "{driver}");
     }
+}
+
+#[test]
+fn an_unqualified_table_is_checked_in_the_current_database() {
+    let query = nontransactional_engine_query("mysql", "UPDATE legacy SET v = 2 WHERE id = 1").unwrap();
+    assert!(
+        query.contains("table_schema = DATABASE() AND table_name = 'legacy'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn a_schema_qualified_table_is_checked_in_its_own_database() {
+    let query = nontransactional_engine_query("mysql", "UPDATE other_db.legacy SET v = 2 WHERE id = 1").unwrap();
+    assert!(
+        query.contains("table_schema = 'other_db' AND table_name = 'legacy'"),
+        "{query}"
+    );
+    assert!(
+        !query.contains("table_schema = DATABASE() AND table_name = 'legacy'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn backticked_parts_and_dots_inside_them_are_split_correctly() {
+    let query = nontransactional_engine_query("mysql", "UPDATE `my.db`.`odd.table` SET v = 2 WHERE id = 1").unwrap();
+    assert!(
+        query.contains("table_schema = 'my.db' AND table_name = 'odd.table'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn quotes_and_backslashes_in_names_cannot_break_out_of_the_literal() {
+    let query = nontransactional_engine_query("mysql", "UPDATE `a\\b'c`.`d\\e'f` SET v = 2 WHERE id = 1").unwrap();
+    assert!(
+        query.contains("table_schema = 'a\\\\b''c' AND table_name = 'd\\\\e''f'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn several_tables_are_each_checked_in_their_own_database() {
+    let query = nontransactional_engine_query(
+        "mysql",
+        "UPDATE orders o JOIN other_db.legacy l ON l.id = o.id SET o.v = 2",
+    )
+    .unwrap();
+    assert!(
+        query.contains("table_schema = DATABASE() AND table_name = 'orders'"),
+        "{query}"
+    );
+    assert!(
+        query.contains("table_schema = 'other_db' AND table_name = 'legacy'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn only_mysql_has_an_engine_check() {
+    assert!(nontransactional_engine_query("postgres", "UPDATE t SET v = 1").is_none());
 }
