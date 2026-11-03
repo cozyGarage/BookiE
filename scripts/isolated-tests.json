@@ -635,6 +635,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::paged_model::tests::too_many_wide_visible_pages_show_a_fallback_and_clear_it_after_scrolling"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::continuous::tests::continuous_view_loads_and_displays_spooled_rows"
     ],
     [

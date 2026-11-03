@@ -82,7 +82,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **In-memory cache**: Keeps pages within an estimated 64 MiB row budget.
 - **Encrypted disk spool**: Evicted pages write to a local encrypted spool (up to 4,096 pages, 1 GiB quota), keeping earlier pages navigable via **Previous page** without re-running the query.
 - **Export all rows** is available once the query completes and reads the saved result without running the SQL again. For an incomplete result, export the available page instead.
-- After a streamed query completes, **Continuous scrolling** switches from the page controls to a single scrollable grid. Pages load from temporary storage as rows come into view. If a page cannot be loaded, use **Retry loading pages** or return to the page view. Find in Loaded Rows is available in the page view.
+- After a streamed query completes, **Continuous scrolling** switches from the page controls to a single scrollable grid. Pages load from temporary storage as rows come into view. The grid can retain two visible pages over its 64 MiB estimated row budget; if the visible range needs more memory, it offers the page view. If a page cannot be loaded, use **Retry loading pages** or return to the page view. Find in Loaded Rows is available in the page view.
 - Other statement shapes and database engines load capped results.
 
 ### Sessions, explain plans & history

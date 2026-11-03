@@ -72,6 +72,7 @@ impl PagedModel {
         if let Some(window) = self.imp().pages.borrow_mut().as_mut() {
             window.show(&wanted);
         }
+        self.sync_capacity_status();
     }
 
     fn next_request(&self) -> Option<u64> {
@@ -179,6 +180,7 @@ impl PagedModel {
             }
         }
         self.refresh(start, count);
+        self.sync_capacity_status();
         true
     }
 
@@ -229,6 +231,19 @@ impl PagedModel {
             status.set_text(&crate::tr!(
                 "A saved result page could not be loaded. Retry or use the page view."
             ));
+        }
+    }
+
+    fn sync_capacity_status(&self) {
+        let Some(status) = self.imp().status.upgrade() else {
+            return;
+        };
+        let message = crate::tr!("Some visible pages exceed the memory limit. Use the page view to see all rows.");
+        let deferred = self.imp().pages.borrow().as_ref().is_some_and(PageWindow::has_deferred);
+        if deferred && status.text().is_empty() {
+            status.set_text(&message);
+        } else if !deferred && status.text() == message {
+            status.set_text("");
         }
     }
 
