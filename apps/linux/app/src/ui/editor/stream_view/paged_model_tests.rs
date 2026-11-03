@@ -115,6 +115,52 @@ fn moving_the_window_evicts_old_values_and_allows_reloading() {
 }
 
 #[test]
+fn visible_rows_on_both_sides_of_a_page_boundary_remain_readable() {
+    let model = PagedModel::with_limit(&[1, 1], 1, 4);
+    let page = |value: &str| {
+        std::sync::Arc::new(bookie_core::QueryResult {
+            columns: Vec::new(),
+            rows: vec![vec![bookie_core::Value::Text(value.into())]].into(),
+            truncated: false,
+        })
+    };
+    model.show(0, 2);
+    assert_eq!(model.next_request(), Some(0));
+    assert_eq!(model.next_request(), Some(1));
+    assert!(model.install(0, page("first")));
+    assert!(model.install(1, page("second")));
+    for (position, expected) in [(0, "first"), (1, "second")] {
+        let row = model.item(position).unwrap().downcast::<RowObject>().unwrap();
+        assert_eq!(
+            row.complete_cells(),
+            Some(vec![bookie_core::Value::Text(expected.into())])
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn too_many_wide_visible_pages_show_a_fallback_and_clear_it_after_scrolling() {
+    gtk4::init().unwrap();
+    let model = PagedModel::with_limit(&[1, 1, 1], 1, 4);
+    let status = gtk4::Label::new(None);
+    model.attach_status(&status);
+    model.show(0, 3);
+    for value in ["first", "second", "third"] {
+        let index = model.next_request().unwrap();
+        let page = std::sync::Arc::new(bookie_core::QueryResult {
+            columns: Vec::new(),
+            rows: vec![vec![bookie_core::Value::Text(value.into())]].into(),
+            truncated: false,
+        });
+        assert!(model.install(index, page));
+    }
+    assert!(status.text().contains("page view"));
+    model.show(2, 1);
+    assert!(status.text().is_empty());
+}
+
+#[test]
 fn spool_page_loads_without_blocking_the_gtk_context() {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -409,13 +455,15 @@ fn realized_grid_rows_load_their_spooled_values() {
         enum_type: None,
         domain_type: None,
     };
-    let result = std::sync::Arc::new(bookie_core::QueryResult {
-        columns: vec![column.clone()],
-        rows: vec![vec![bookie_core::Value::Int(42)]].into(),
-        truncated: false,
-    });
-    runtime.block_on(spool.append_page(0, result.clone())).unwrap();
-    let model = PagedModel::new(&[1], 1);
+    for (index, value) in [42, 84].into_iter().enumerate() {
+        let result = std::sync::Arc::new(bookie_core::QueryResult {
+            columns: vec![column.clone()],
+            rows: vec![vec![bookie_core::Value::Int(value)]].into(),
+            truncated: false,
+        });
+        runtime.block_on(spool.append_page(index as u64, result)).unwrap();
+    }
+    let model = PagedModel::with_limit(&[1, 1], 1, 1);
     let visibility = model.visibility_callback(runtime.handle(), &spool, std::slice::from_ref(&column));
     let empty = std::sync::Arc::new(bookie_core::QueryResult {
         columns: vec![column.clone()],
@@ -442,21 +490,25 @@ fn realized_grid_rows_load_their_spooled_values() {
     model.imp().selection.set(Some(&selection));
     let window = gtk4::Window::builder().child(&view).build();
     window.present();
-    wait_for_first_value(&model);
+    wait_for_condition(|| has_label(view.upcast_ref(), "42") && has_label(view.upcast_ref(), "84"));
     window.destroy();
 }
 
 #[cfg(test)]
-fn wait_for_first_value(model: &PagedModel) {
-    let context = glib::MainContext::default();
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    loop {
-        while context.iteration(false) {}
-        let row = model.item(0).unwrap().downcast::<RowObject>().unwrap();
-        if row.complete_cells() == Some(vec![bookie_core::Value::Int(42)]) {
-            break;
+fn has_label(root: &gtk4::Widget, expected: &str) -> bool {
+    let mut pending = vec![root.clone()];
+    while let Some(widget) = pending.pop() {
+        if widget
+            .downcast_ref::<gtk4::Label>()
+            .is_some_and(|label| label.text() == expected)
+        {
+            return true;
         }
-        assert!(std::time::Instant::now() < deadline);
-        std::thread::sleep(std::time::Duration::from_millis(1));
+        let mut child = widget.first_child();
+        while let Some(next) = child {
+            child = next.next_sibling();
+            pending.push(next);
+        }
     }
+    false
 }

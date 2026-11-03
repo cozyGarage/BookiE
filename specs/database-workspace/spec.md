@@ -8,7 +8,7 @@ Draft behavior extracted from the native GTK implementation. [AGENTS](../../AGEN
 
 When the owned editor session reports an open transaction, a separate row offers commit-and-close and rollback-and-close. Actions capture the session UUID and recheck live connection identity, transaction state, execution, lexing, opening and teardown state before dispatch. These are the existing controlled session-end operations, not autocommit switches or shared-connection transaction SQL ([ADR 0008](../../docs/decisions/0008-connection-and-session-ownership.md)). The reported commit outcome is preserved.
 
-File output choices identify a statement and result set from the latest run. Loaded-result export captures that result snapshot and does not rerun SQL. Pinned older runs are excluded. A completed streamed result offers a separate all-row action explicitly labeled as running the query again, retaining the original guarded origin, bindings and session. There is no direct execution-to-file mode for arbitrary scripts.
+File output choices identify a statement and result set from the latest run. Loaded-result export captures that result snapshot and does not rerun SQL. Pinned older runs are excluded. A completed streamed result offers a separate all-row action that reads the saved page spool without re-executing SQL. There is no direct execution-to-file mode for arbitrary scripts.
 
 ## Navigation
 
