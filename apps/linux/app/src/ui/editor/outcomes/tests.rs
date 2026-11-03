@@ -675,17 +675,7 @@ fn streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states
     assert_eq!(streamed_page_title(&loading, 0), "Rows 1-2");
     assert_eq!(streamed_page_title(&loading, 1), "Rows 3-3");
 
-    let complete = streamed_result_pages(
-        vec![
-            std::sync::Arc::new(cursor_page(&[1, 2], true).result),
-            std::sync::Arc::new(cursor_page(&[3], false).result),
-        ],
-        0,
-        2,
-        3,
-        StreamTerminal::Complete,
-    );
-    assert_eq!(complete.visible_child(), complete.first_child());
+    assert_complete_stream_starts_on_first_page();
 
     let empty = streamed_result_pages(
         vec![std::sync::Arc::new(cursor_page(&[], false).result)],
@@ -721,6 +711,20 @@ fn streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states
     assert_eq!(cancelled.pages().n_items(), 1);
     assert_eq!(cancelled.visible_child(), cancelled.last_child());
     assert_eq!(streamed_page_title(&cancelled, 0), "Rows 1-1");
+}
+
+fn assert_complete_stream_starts_on_first_page() {
+    let complete = streamed_result_pages(
+        vec![
+            std::sync::Arc::new(cursor_page(&[1, 2], true).result),
+            std::sync::Arc::new(cursor_page(&[3], false).result),
+        ],
+        0,
+        2,
+        3,
+        StreamTerminal::Complete,
+    );
+    assert_eq!(complete.visible_child(), complete.first_child());
 }
 
 #[tokio::test]

@@ -61,7 +61,11 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
         holder.append(&banner);
     }
     append_stream_export(&holder, result, grid_sender);
-    holder.append(&super::super::stream_view::build_pager(&page_switcher));
+    let pager = super::super::stream_view::build_pager(&page_switcher);
+    holder.append(&pager);
+    if matches!(result.terminal, StreamTerminal::Complete) && sender.is_some() {
+        super::super::stream_view::install_continuous(&holder, &pager, &page_switcher, result, &target);
+    }
     holder.append(&page_switcher);
     holder.upcast()
 }

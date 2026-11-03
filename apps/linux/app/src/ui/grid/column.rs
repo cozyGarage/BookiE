@@ -254,6 +254,12 @@ fn bind_row_cell(
     context: &TabGridContext,
     column_is_editable: bool,
 ) {
+    if !row.cell_is_loaded(index) && !row.cell_is_partial(index) {
+        if let Some(label) = item.child().and_downcast::<gtk4::Label>() {
+            label.set_text(&crate::tr!("Loading…"));
+        }
+        return;
+    }
     row.with_cell_value(index, |source_value| {
         let identity = if context.tab_id.is_some() {
             Some(row.row_identity(&context.pk_col_indices))

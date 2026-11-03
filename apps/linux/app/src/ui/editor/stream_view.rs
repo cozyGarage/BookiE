@@ -1,9 +1,8 @@
-#[cfg(test)]
+mod continuous;
 mod page_index;
-#[cfg(test)]
 mod page_window;
-#[cfg(test)]
 mod paged_model;
+pub(super) use continuous::install as install_continuous;
 mod pager;
 pub(super) use pager::build as build_pager;
 

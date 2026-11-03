@@ -16,6 +16,7 @@ mod imp {
         pub(super) width: Cell<usize>,
         pub(super) pages: RefCell<Option<PageWindow<std::sync::Arc<bookie_core::QueryResult>>>>,
         pub(super) selection: glib::WeakRef<gtk4::MultiSelection>,
+        pub(super) status: glib::WeakRef<gtk4::Label>,
     }
 
     #[glib::object_subclass]
@@ -53,7 +54,7 @@ glib::wrapper! {
 }
 
 impl PagedModel {
-    fn new(counts: &[usize], width: usize) -> Self {
+    pub(super) fn new(counts: &[usize], width: usize) -> Self {
         Self::with_limit(counts, width, bookie_core::MAX_QUERY_RESULT_BYTES)
     }
 
@@ -76,7 +77,7 @@ impl PagedModel {
         self.imp().pages.borrow_mut().as_mut()?.next_request()
     }
 
-    fn visibility_callback(
+    pub(super) fn visibility_callback(
         &self,
         runtime: &tokio::runtime::Handle,
         spool: &bookie_app_services::stream_result_spool::StreamResultSpool,
@@ -144,6 +145,7 @@ impl PagedModel {
                         if let Some(window) = model.imp().pages.borrow_mut().as_mut() {
                             window.failed(index);
                         }
+                        model.show_failure();
                     }
                 }
                 model.load_from_spool(&runtime, &spool, &columns);
@@ -159,6 +161,7 @@ impl PagedModel {
             if let Some(window) = self.imp().pages.borrow_mut().as_mut() {
                 window.failed(index);
             }
+            self.show_failure();
             return false;
         }
         let size = page.estimated_row_bytes();
@@ -185,6 +188,37 @@ impl PagedModel {
         if let (Some(selection), Some(selected)) = (selection, selected) {
             selection.set_selection(&selected, &gtk4::Bitset::new_range(start as u32, count as u32));
         }
+    }
+
+    pub(super) fn attach_selection(&self, selection: &gtk4::MultiSelection) {
+        self.imp().selection.set(Some(selection));
+    }
+
+    pub(super) fn attach_status(&self, status: &gtk4::Label) {
+        self.imp().status.set(Some(status));
+    }
+
+    fn show_failure(&self) {
+        if let Some(status) = self.imp().status.upgrade() {
+            status.set_text(&crate::tr!(
+                "A saved result page could not be loaded. Retry or use the page view."
+            ));
+        }
+    }
+
+    pub(super) fn retry_visible(
+        &self,
+        runtime: &tokio::runtime::Handle,
+        spool: &bookie_app_services::stream_result_spool::StreamResultSpool,
+        columns: &[bookie_core::ColumnInfo],
+    ) {
+        if let Some(window) = self.imp().pages.borrow_mut().as_mut() {
+            window.retry_visible();
+        }
+        if let Some(status) = self.imp().status.upgrade() {
+            status.set_text("");
+        }
+        self.load_from_spool(runtime, spool, columns);
     }
 }
 
@@ -588,6 +622,12 @@ fn realized_grid_rows_load_their_spooled_values() {
     model.imp().selection.set(Some(&selection));
     let window = gtk4::Window::builder().child(&view).build();
     window.present();
+    wait_for_first_value(&model);
+    window.destroy();
+}
+
+#[cfg(test)]
+fn wait_for_first_value(model: &PagedModel) {
     let context = glib::MainContext::default();
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
@@ -599,5 +639,4 @@ fn realized_grid_rows_load_their_spooled_values() {
         assert!(std::time::Instant::now() < deadline);
         std::thread::sleep(std::time::Duration::from_millis(1));
     }
-    window.destroy();
 }

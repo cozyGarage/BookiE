@@ -77,11 +77,18 @@ impl<T> PageWindow<T> {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn retry(&mut self, page: u64) {
         self.failed.remove(&page);
         self.deferred.remove(&page);
     }
 
+    pub(super) fn retry_visible(&mut self) {
+        self.failed.clear();
+        self.deferred.clear();
+    }
+
+    #[cfg(test)]
     pub(super) fn is_failed(&self, page: u64) -> bool {
         self.failed.contains(&page)
     }
