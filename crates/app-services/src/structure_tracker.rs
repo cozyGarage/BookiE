@@ -3,7 +3,7 @@
 //! StructureTab now owns the canonical source of truth for pending
 //! changes — it computes them on every edit by diffing the loaded
 //! snapshot against the live model (`sql_ddl::diff_to_ops`). On each
-//! recompute the tab calls [`with_tab`] to overwrite this cache so
+//! recompute the tab overwrites this cache so
 //! out-of-band callers (close-with-pending dialog, save-by-id, the
 //! window-close prompt) can ask whether a tab is dirty and emit its
 //! current SQL without coupling to the tab's UI internals.
@@ -13,9 +13,7 @@
 //! op history is the wrong granularity for schema editing and was
 //! removed in the Structure-Refactor batch.
 //!
-//! Threading: GTK main thread only. `RefCell` interior mutability.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 
 use uuid::Uuid;
@@ -103,44 +101,6 @@ impl StructureTrackerRegistry {
     }
 }
 
-thread_local! {
-    static REGISTRY: RefCell<StructureTrackerRegistry> = RefCell::new(StructureTrackerRegistry::default());
-}
-
-pub fn open_tab(tab_id: Uuid) {
-    REGISTRY.with(|r| r.borrow_mut().open_tab(tab_id));
-}
-
-pub fn close_tab(tab_id: Uuid) {
-    REGISTRY.with(|r| r.borrow_mut().close_tab(tab_id));
-}
-
-pub fn with_tab<F, R>(tab_id: Uuid, f: F) -> R
-where
-    F: FnOnce(&mut StructureChangeTracker) -> R,
-{
-    REGISTRY.with(|r| r.borrow_mut().with_tab(tab_id, f))
-}
-
-pub fn with_tab_ref<F, R>(tab_id: Uuid, f: F) -> Option<R>
-where
-    F: FnOnce(&StructureChangeTracker) -> R,
-{
-    REGISTRY.with(|r| r.borrow().with_tab_ref(tab_id, f))
-}
-
-pub fn any_pending_in(ids: impl IntoIterator<Item = Uuid>) -> bool {
-    REGISTRY.with(|r| r.borrow().any_pending_in(ids))
-}
-
-pub fn pending_among(ids: impl IntoIterator<Item = Uuid>) -> Vec<Uuid> {
-    REGISTRY.with(|r| r.borrow().pending_among(ids))
-}
-
-pub fn pending_tabs_for(tab_ids: &std::collections::HashSet<Uuid>) -> Vec<Uuid> {
-    REGISTRY.with(|r| r.borrow().pending_tabs_for(tab_ids))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,6 +174,21 @@ mod tests {
     }
 
     #[test]
+    fn separate_registries_keep_tab_changes_independent() {
+        let id = Uuid::new_v4();
+        let mut first = StructureTrackerRegistry::default();
+        let mut second = StructureTrackerRegistry::default();
+        first.open_tab(id);
+        second.open_tab(id);
+        first.with_tab(id, |tracker| tracker.set_ops(vec![pending_op()]));
+        assert!(first.any_pending_in([id]));
+        assert!(!second.any_pending_in([id]));
+        first.close_tab(id);
+        assert!(first.with_tab_ref(id, |_| ()).is_none());
+        assert!(second.with_tab_ref(id, |_| ()).is_some());
+    }
+
+    #[test]
     fn registry_pending_tabs_for_does_not_include_another_window() {
         let mut registry = StructureTrackerRegistry::default();
         let first = Uuid::new_v4();
@@ -265,26 +240,5 @@ mod tests {
         assert!(!r.any_pending_in([clean, unknown]));
         assert_eq!(r.pending_among([clean, dirty, unknown]), vec![dirty]);
         assert!(r.pending_among([clean, unknown]).is_empty());
-    }
-
-    #[test]
-    fn the_module_functions_track_a_tab_from_open_to_close() {
-        let dirty = Uuid::new_v4();
-        let clean = Uuid::new_v4();
-        let window: std::collections::HashSet<Uuid> = [dirty, clean].into();
-        open_tab(clean);
-        with_tab(dirty, |t| t.set_ops(vec![pending_op()]));
-        assert_eq!(with_tab_ref(clean, |t| t.has_pending()), Some(false));
-        assert_eq!(with_tab_ref(dirty, |t| t.has_pending()), Some(true));
-        assert!(any_pending_in([clean, dirty]));
-        assert!(!any_pending_in([clean]));
-        assert_eq!(pending_among([clean, dirty]), vec![dirty]);
-        assert!(pending_among([clean]).is_empty());
-        assert_eq!(pending_tabs_for(&window), vec![dirty]);
-        assert!(pending_tabs_for(&[clean].into()).is_empty());
-        close_tab(dirty);
-        assert_eq!(with_tab_ref(dirty, |t| t.has_pending()), None);
-        assert!(!any_pending_in([clean, dirty]));
-        assert!(pending_tabs_for(&window).is_empty());
     }
 }
