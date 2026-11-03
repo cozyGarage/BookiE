@@ -26,6 +26,7 @@ pub mod result_scan;
 #[cfg(test)]
 mod result_test_support;
 pub mod single_flight;
+pub mod snippets;
 pub mod state_file;
 pub mod stream_page_validation;
 pub mod stream_result_spool;

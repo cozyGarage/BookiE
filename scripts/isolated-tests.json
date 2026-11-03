@@ -320,6 +320,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::snippet_menu::tests::a_snippet_lands_at_the_cursor_and_leaves_the_cursor_at_its_marker"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::snippet_menu::tests::a_snippet_replaces_the_selection_and_counts_characters_not_bytes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::a_page_reload_retires_a_pending_cell_value_request"
     ],
     [
