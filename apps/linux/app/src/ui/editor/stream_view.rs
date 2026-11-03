@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use super::StatementOutcome;
 use super::outcomes::stream_result_view::{
-    build_stream_page_widget, replace_stream_page_content, result_view_key, stream_page_container, stream_page_label,
+    build_stream_page_widget, replace_stream_page_content, stream_page_container, stream_page_label,
     stream_page_placeholder, stream_page_placeholder_with_title, stream_progress_text,
 };
 use super::stream_pages::StreamedResult;
@@ -356,10 +356,7 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
                 connection_id,
                 database,
                 settings_store,
-                result_view_key(
-                    super::result_tools::stream_identity(identity, generation),
-                    index as usize,
-                ),
+                super::outcomes::streamed_view_key(identity, generation, index as usize),
             );
             replace_stream_page_content(&container, &widget);
         }

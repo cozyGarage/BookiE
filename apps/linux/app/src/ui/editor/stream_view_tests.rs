@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::editor::outcomes::result_view_key;
 use crate::ui::editor::stream_pages::{ResidentPageStore, StreamPageCache, StreamTerminal};
 use crate::ui::editor::{StatementIdentity, StatementOutcomeKind};
 use bookie_core::{ColumnInfo, QueryResult, Value};

@@ -1,5 +1,5 @@
 use super::*;
-pub(in crate::ui::editor) use super::{build_stream_page_widget, result_view_key};
+pub(in crate::ui::editor) use super::{build_stream_page_widget, streamed_view_key};
 
 #[cfg(test)]
 thread_local! { pub(super) static PAGE_ROW_INDEX_LOOKUPS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
@@ -150,10 +150,7 @@ pub(in crate::ui::editor) fn stream_page_container(
             target.connection_id,
             target.database.clone(),
             target.settings_store.clone(),
-            result_view_key(
-                super::super::result_tools::stream_identity(identity, result.generation),
-                page_index as usize,
-            ),
+            streamed_view_key(identity, result.generation, page_index as usize),
         ));
     } else {
         container.append(&stream_page_placeholder(result, page_index));

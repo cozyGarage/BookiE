@@ -81,3 +81,9 @@ pub(super) fn active(identity: StatementIdentity) -> Option<Arc<FilterTicket>> {
             .map(|(_, ticket)| ticket.clone())
     })
 }
+
+pub(super) fn finish_if_unsent<E>(sent: Result<(), E>, ticket: &FilterTicket, message: String) {
+    if sent.is_err() {
+        ticket.finish(message);
+    }
+}

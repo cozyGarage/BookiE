@@ -106,7 +106,7 @@ impl Tools {
 
     fn entry_changed(&self) {
         let needle = self.needle();
-        if self.cursor.borrow().has_results_for(&needle) {
+        if self.cursor.borrow().keeps_for(&needle) {
             return;
         }
         self.cancel.borrow().cancel();
@@ -191,8 +191,14 @@ impl Tools {
                 self.cursor.borrow_mut().complete(generation, report);
                 self.step(forward);
             }
-            Err(FindError::Scan(ScanError::Cancelled)) => self.set_status(&crate::tr!("Search cancelled")),
-            Err(_) => self.set_status(&crate::tr!("The search could not finish")),
+            Err(FindError::Scan(ScanError::Cancelled)) => {
+                self.cursor.borrow_mut().end_search(generation);
+                self.set_status(&crate::tr!("Search cancelled"));
+            }
+            Err(_) => {
+                self.cursor.borrow_mut().end_search(generation);
+                self.set_status(&crate::tr!("The search could not finish"));
+            }
         }
     }
 
@@ -244,7 +250,7 @@ impl Tools {
         let ticket = Arc::new(FilterTicket::default());
         super::ticket::register(self.identity, &ticket);
         self.adopt_filter(ticket.clone());
-        let _ = self
+        let sent = self
             .sender
             .send(super::super::SqlEditorInput::FilterResults(Box::new(FilterRequest {
                 source: self.result.clone(),
@@ -254,8 +260,9 @@ impl Tools {
                     needle: needle.clone(),
                 },
                 label: needle,
-                ticket,
+                ticket: ticket.clone(),
             })));
+        super::ticket::finish_if_unsent(sent, &ticket, crate::tr!("Could not start the filter"));
     }
 
     pub(super) fn adopt_filter(self: &Rc<Self>, ticket: Arc<FilterTicket>) {

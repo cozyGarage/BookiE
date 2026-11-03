@@ -108,6 +108,13 @@ pub(super) fn attempt(view_rows: Option<usize>, expected_rows: Option<usize>, tr
     }
 }
 
+pub(super) fn resolve_position(continuous: bool, row: usize, source_position: Option<u32>) -> Option<usize> {
+    if continuous {
+        return Some(row);
+    }
+    source_position.map(|position| position as usize)
+}
+
 fn view_rows(view: Option<&gtk::ColumnView>) -> Option<usize> {
     view.map(|view| view.model().map_or(0, |model| model.n_items() as usize))
 }
@@ -143,11 +150,16 @@ pub(super) fn go_to(
         let rows = view_rows(view.as_ref());
         match (attempt(rows, expected, tries.get()), view) {
             (Attempt::Select, Some(view)) => {
-                let position = match (continuous, view.model()) {
-                    (false, Some(model)) => position_of_source(model.upcast_ref(), row).map_or(row, |p| p as usize),
-                    _ => row,
-                };
-                select_row(&view, position);
+                let source_position = (!continuous)
+                    .then(|| {
+                        view.model()
+                            .and_then(|model| position_of_source(model.upcast_ref(), row))
+                    })
+                    .flatten();
+                match resolve_position(continuous, row, source_position) {
+                    Some(position) => select_row(&view, position),
+                    None => failed(),
+                }
                 gtk::glib::ControlFlow::Break
             }
             (Attempt::Retry, _) => gtk::glib::ControlFlow::Continue,
