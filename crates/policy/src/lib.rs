@@ -10,6 +10,7 @@ mod classify;
 pub use catalog_effect::{CatalogEffect, catalog_effect};
 mod config;
 mod constant_predicate;
+mod duckdb_paths;
 mod effects;
 mod effects_classification;
 mod explain_options;
