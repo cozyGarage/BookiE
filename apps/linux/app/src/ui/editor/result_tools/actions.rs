@@ -199,11 +199,19 @@ impl Tools {
     fn step(&self, forward: bool) {
         let found = self.cursor.borrow_mut().step(forward);
         let mut status = self.cursor.borrow().status();
+        let status_text = status.clone();
         if let Some(found) = found
             && let Some(target) = self.target_for(found.page, found.row)
         {
             if let (Some(holder), Some(pages)) = (self.holder.upgrade(), self.pages.upgrade()) {
-                go_to(&holder, &pages, target, &self.jump);
+                let status = self.controls.status.clone();
+                let base = status_text.clone();
+                let failed: Rc<dyn Fn()> = Rc::new(move || {
+                    with(&status, |label| {
+                        label.set_label(&crate::tr!("{status} · could not show this row").replace("{status}", &base));
+                    });
+                });
+                go_to(&holder, &pages, target, &self.jump, failed);
             }
             status = crate::tr!("{status} · row {row}")
                 .replace("{status}", &status)

@@ -356,7 +356,10 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
                 connection_id,
                 database,
                 settings_store,
-                result_view_key(identity, index as usize),
+                result_view_key(
+                    super::result_tools::stream_identity(identity, generation),
+                    index as usize,
+                ),
             );
             replace_stream_page_content(&container, &widget);
         }

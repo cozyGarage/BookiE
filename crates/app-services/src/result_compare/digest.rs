@@ -21,7 +21,7 @@ pub(crate) fn cells_digest(row: &[Value], indices: &[usize]) -> Digest {
 pub(crate) fn has_unreadable(row: &[Value], indices: &[usize]) -> bool {
     indices
         .iter()
-        .any(|&index| matches!(row.get(index), Some(Value::Undecodable(_))))
+        .any(|&index| matches!(row.get(index), Some(value @ Value::Undecodable(_)) if !value.is_missing_field()))
 }
 
 pub(crate) fn has_null_or_unreadable(row: &[Value], indices: &[usize]) -> bool {

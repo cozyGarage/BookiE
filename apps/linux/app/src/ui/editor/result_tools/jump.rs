@@ -92,13 +92,38 @@ impl JumpTicket {
     }
 }
 
-pub(super) fn go_to(holder: &gtk::Box, pages: &gtk::Stack, target: JumpTarget, ticket: &JumpTicket) {
-    let id = ticket.next();
-    if let Some(view) = continuous_view(holder, target.generation) {
-        select_row(&view, target.global_row);
-        return;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Attempt {
+    Select,
+    Retry,
+    GiveUp,
+}
+
+pub(super) fn attempt(view_rows: Option<usize>, expected_rows: Option<usize>, tries: u32) -> Attempt {
+    match view_rows {
+        Some(rows) if rows > 0 && expected_rows.is_none_or(|expected| expected == rows) => Attempt::Select,
+        Some(rows) if rows > 0 => Attempt::GiveUp,
+        _ if tries > MAX_RETRIES => Attempt::GiveUp,
+        _ => Attempt::Retry,
     }
-    pages.set_visible_child_name(&page_widget_name(target.generation, target.page as u64));
+}
+
+fn view_rows(view: Option<&gtk::ColumnView>) -> Option<usize> {
+    view.map(|view| view.model().map_or(0, |model| model.n_items() as usize))
+}
+
+pub(super) fn go_to(
+    holder: &gtk::Box,
+    pages: &gtk::Stack,
+    target: JumpTarget,
+    ticket: &JumpTicket,
+    failed: Rc<dyn Fn()>,
+) {
+    let id = ticket.next();
+    let continuous = continuous_visible(holder, target.generation);
+    if !continuous {
+        pages.set_visible_child_name(&page_widget_name(target.generation, target.page as u64));
+    }
     let holder = holder.downgrade();
     let current = ticket.0.clone();
     let tries = Cell::new(0_u32);
@@ -107,23 +132,35 @@ pub(super) fn go_to(holder: &gtk::Box, pages: &gtk::Stack, target: JumpTarget, t
             return gtk::glib::ControlFlow::Break;
         };
         tries.set(tries.get() + 1);
-        if current.get() != id || tries.get() > MAX_RETRIES {
+        if current.get() != id {
             return gtk::glib::ControlFlow::Break;
         }
-        let Some(view) = page_view(&holder, &target) else {
-            return gtk::glib::ControlFlow::Continue;
+        let (view, expected, row) = if continuous {
+            (continuous_view(&holder, target.generation), None, target.global_row)
+        } else {
+            (page_view(&holder, &target), Some(target.page_rows), target.row)
         };
-        let rows = view.model().map_or(0, |model| model.n_items() as usize);
-        if rows == 0 {
-            return gtk::glib::ControlFlow::Continue;
+        let rows = view_rows(view.as_ref());
+        match (attempt(rows, expected, tries.get()), view) {
+            (Attempt::Select, Some(view)) => {
+                let position = match (continuous, view.model()) {
+                    (false, Some(model)) => position_of_source(model.upcast_ref(), row).map_or(row, |p| p as usize),
+                    _ => row,
+                };
+                select_row(&view, position);
+                gtk::glib::ControlFlow::Break
+            }
+            (Attempt::Retry, _) => gtk::glib::ControlFlow::Continue,
+            _ => {
+                failed();
+                gtk::glib::ControlFlow::Break
+            }
         }
-        if rows == target.page_rows {
-            let position = view
-                .model()
-                .and_then(|model| position_of_source(model.upcast_ref(), target.row))
-                .map_or(target.row, |position| position as usize);
-            select_row(&view, position);
-        }
-        gtk::glib::ControlFlow::Break
     });
+}
+
+fn continuous_visible(holder: &gtk::Box, generation: u64) -> bool {
+    let root = holder.clone().upcast::<gtk::Widget>();
+    named_descendant::<gtk::Box>(&root, &continuous_container_name(generation))
+        .is_some_and(|container| container.is_visible())
 }

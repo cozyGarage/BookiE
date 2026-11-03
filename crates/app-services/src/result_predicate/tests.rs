@@ -192,3 +192,29 @@ fn not_equals_drops_and_counts_unreadable_cells() {
     assert!(predicate.matches(&[Value::Int(2)], &mut tally));
     assert_eq!(tally.unsearchable_cells, 1);
 }
+
+#[test]
+fn equals_counts_unreadable_cells_and_treats_a_missing_field_as_absent() {
+    let equals = ResultPredicate::Equals {
+        column: 0,
+        value: Value::Int(1),
+    };
+    let prepared = equals.prepare(1).unwrap();
+    let mut tally = CellTally::default();
+    assert!(!prepared.matches(&[Value::Undecodable("numeric".into())], &mut tally));
+    assert_eq!(tally.unsearchable_cells, 1);
+    let missing = Value::Undecodable(Value::MISSING_FIELD.into());
+    assert!(!prepared.matches(std::slice::from_ref(&missing), &mut tally));
+    assert_eq!(tally.unsearchable_cells, 1);
+    let not = ResultPredicate::NotEquals {
+        column: 0,
+        value: Value::Int(1),
+    }
+    .prepare(1)
+    .unwrap();
+    assert!(not.matches(std::slice::from_ref(&missing), &mut tally));
+    assert_eq!(tally.unsearchable_cells, 1);
+    let search = contains("missing", ColumnScope::Any).prepare(1).unwrap();
+    assert!(!search.matches(std::slice::from_ref(&missing), &mut tally));
+    assert_eq!(tally.unsearchable_cells, 1);
+}

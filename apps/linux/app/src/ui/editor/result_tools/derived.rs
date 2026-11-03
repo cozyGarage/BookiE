@@ -37,6 +37,14 @@ fn preview(needle: &str) -> String {
     format!("FILTER {flat}")
 }
 
+fn filtered_name(name: &str) -> String {
+    if name.ends_with("-filtered") {
+        name.to_string()
+    } else {
+        format!("{name}-filtered")
+    }
+}
+
 fn export_request(
     source: &StreamedResult,
     filtered: &FilteredResult,
@@ -46,7 +54,7 @@ fn export_request(
     Some(StreamExportRequest {
         query: StreamExportQuery {
             driver_id: query.driver_id,
-            suggested_name: format!("{}-filtered", query.suggested_name),
+            suggested_name: filtered_name(&query.suggested_name),
         },
         columns: columns.to_vec(),
         spool: Some(filtered.spool.clone()),

@@ -3,9 +3,10 @@ use std::sync::Arc;
 use bookie_app_services::result_predicate::ResultPredicate;
 use bookie_core::{ColumnInfo, Value};
 use relm4::ComponentSender;
+use sha2::{Digest, Sha256};
 
 use super::super::stream_pages::StreamedResult;
-use super::super::{SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcomeKind};
+use super::super::{SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcome, StatementOutcomeKind};
 use super::actions::filtering_text;
 use super::editor::FilterRequest;
 use super::ticket::{FilterTicket, register, running};
@@ -35,15 +36,31 @@ pub(super) fn cell_predicate(
     Some((predicate, label))
 }
 
+pub(in crate::ui::editor) fn stream_identity(identity: StatementIdentity, generation: u64) -> StatementIdentity {
+    let mut digest = Sha256::new();
+    digest.update(identity.digest);
+    digest.update(generation.to_be_bytes());
+    StatementIdentity {
+        statement_index: identity.statement_index,
+        digest: digest.finalize().into(),
+    }
+}
+
+pub(super) fn find_streamed<'a>(
+    mut outcomes: impl Iterator<Item = &'a StatementOutcome>,
+    key: StatementIdentity,
+) -> Option<StreamedResult> {
+    outcomes.find_map(|outcome| match &outcome.kind {
+        StatementOutcomeKind::Streamed(result) if stream_identity(outcome.identity, result.generation) == key => {
+            Some((**result).clone())
+        }
+        _ => None,
+    })
+}
+
 impl SqlEditor {
     fn streamed_result_for(&self, identity: StatementIdentity) -> Option<StreamedResult> {
-        self.pinned
-            .iter()
-            .filter(|outcome| outcome.identity == identity)
-            .find_map(|outcome| match &outcome.kind {
-                StatementOutcomeKind::Streamed(result) => Some((**result).clone()),
-                _ => None,
-            })
+        find_streamed(self.pinned.iter(), identity)
     }
 
     pub(in crate::ui::editor) fn on_result_grid_message(&mut self, message: GridMsg, sender: &ComponentSender<Self>) {

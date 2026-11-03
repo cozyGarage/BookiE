@@ -444,3 +444,28 @@ fn the_diff_is_bounded_by_the_result_byte_budget_and_never_splits_a_pair() {
     assert_eq!(kept, 2);
     assert_eq!(rows.len(), 2);
 }
+
+#[test]
+fn a_missing_field_is_comparable_and_equal_to_another_missing_field() {
+    let rows = || {
+        vec![
+            vec![Value::Int(1), Value::Undecodable(Value::MISSING_FIELD.into())],
+            vec![Value::Int(2), Value::Text("x".into())],
+        ]
+    };
+    let left = CompareInput::Pages(vec![result(&["id", "label"], rows())]);
+    let right = CompareInput::Pages(vec![result(&["id", "label"], rows())]);
+    let whole = run(left, right, &[]).unwrap();
+    assert_eq!(
+        (
+            whole.summary.equal,
+            whole.summary.unknown_left,
+            whole.summary.unknown_right
+        ),
+        (2, 0, 0)
+    );
+    let left = CompareInput::Pages(vec![result(&["id", "label"], rows())]);
+    let right = CompareInput::Pages(vec![result(&["id", "label"], rows())]);
+    let keyed = run(left, right, &["id"]).unwrap();
+    assert_eq!((keyed.summary.equal, keyed.summary.changed), (2, 0));
+}

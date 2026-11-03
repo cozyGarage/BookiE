@@ -263,3 +263,36 @@ fn an_empty_diff_still_names_the_columns_that_were_not_compared() {
     same.columns_only_right.clear();
     assert!(!super::summary::no_difference_message(&same).contains("not compared"));
 }
+
+#[test]
+fn an_empty_capped_diff_is_not_reported_as_no_differences() {
+    use super::summary::{Verdict, too_large_message, verdict};
+    let mut report = bookie_app_services::result_compare::CompareReport {
+        summary: CompareSummary {
+            mode: CompareMode::WholeRow,
+            key_columns: 0,
+            rows_left: 3,
+            rows_right: 3,
+            equal: 2,
+            added: 1,
+            removed: 1,
+            changed: 0,
+            unknown_left: 0,
+            unknown_right: 0,
+            differences_capped: true,
+        },
+        diff: result(&["Change", "id"], 0, false),
+        changed_cells: Default::default(),
+        columns_only_left: Vec::new(),
+        columns_only_right: Vec::new(),
+    };
+    assert_eq!(verdict(&report), Verdict::TooLargeToShow);
+    assert!(too_large_message(&report).contains("Added 1"));
+    report.summary.added = 0;
+    report.summary.removed = 0;
+    report.summary.differences_capped = false;
+    assert_eq!(verdict(&report), Verdict::Identical);
+    report.diff = result(&["Change", "id"], 2, false);
+    report.summary.added = 1;
+    assert_eq!(verdict(&report), Verdict::Show);
+}

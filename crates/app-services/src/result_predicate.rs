@@ -92,9 +92,16 @@ impl PreparedPredicate {
     pub fn matches(&self, row: &[Value], tally: &mut CellTally) -> bool {
         match &self.kind {
             PreparedKind::Contains { scope, needle } => contains_in_row(row, scope, needle, tally),
-            PreparedKind::Equals { column, value } => row.get(*column).is_some_and(|cell| exact_equal(cell, value)),
+            PreparedKind::Equals { column, value } => match row.get(*column) {
+                Some(cell) if is_unreadable(cell) => {
+                    tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
+                    false
+                }
+                Some(cell) => exact_equal(cell, value),
+                None => false,
+            },
             PreparedKind::NotEquals { column, value } => match row.get(*column) {
-                Some(Value::Undecodable(_)) => {
+                Some(cell) if is_unreadable(cell) => {
                     tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
                     false
                 }
@@ -103,6 +110,10 @@ impl PreparedPredicate {
             },
         }
     }
+}
+
+fn is_unreadable(cell: &Value) -> bool {
+    matches!(cell, Value::Undecodable(_)) && !cell.is_missing_field()
 }
 
 fn contains_in_row(row: &[Value], scope: &ColumnScope, needle: &str, tally: &mut CellTally) -> bool {
@@ -136,6 +147,7 @@ enum SearchText<'a> {
 fn search_text(value: &Value) -> SearchText<'_> {
     match value {
         Value::Null => SearchText::Never,
+        Value::Undecodable(_) if value.is_missing_field() => SearchText::Never,
         Value::Undecodable(_) => SearchText::Unsearchable,
         Value::Text(text) | Value::JsonText(text) => SearchText::Text(Cow::Borrowed(text)),
         Value::Bool(value) => SearchText::Text(Cow::Owned(value.to_string())),

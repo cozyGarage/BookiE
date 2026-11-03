@@ -50,6 +50,37 @@ pub(super) fn no_difference_message(report: &CompareReport) -> String {
     message
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Verdict {
+    Identical,
+    TooLargeToShow,
+    Show,
+}
+
+pub(super) fn verdict(report: &CompareReport) -> Verdict {
+    let unknown = report.summary.unknown_left.saturating_add(report.summary.unknown_right);
+    if !report.diff.rows.is_empty() {
+        return Verdict::Show;
+    }
+    if differing_rows(&report.summary) > 0 {
+        return Verdict::TooLargeToShow;
+    }
+    if unknown == 0 {
+        Verdict::Identical
+    } else {
+        Verdict::Show
+    }
+}
+
+pub(super) fn too_large_message(report: &CompareReport) -> String {
+    let mut message = crate::tr!("Differences found, but they are too large to show · {summary}")
+        .replace("{summary}", &summary_text(&report.summary));
+    for note in notes(report) {
+        message = format!("{message} · {note}");
+    }
+    message
+}
+
 pub(super) fn failure_message(error: &CompareError) -> String {
     match error {
         CompareError::Cancelled => crate::tr!("Comparison cancelled"),

@@ -433,3 +433,54 @@ fn a_find_jump_locates_the_row_by_source_index_in_a_reordered_model() {
     assert_eq!(super::jump::position_of_source(store.upcast_ref(), 1), Some(2));
     assert_eq!(super::jump::position_of_source(store.upcast_ref(), 9), None);
 }
+
+#[test]
+fn a_cell_filter_picks_the_result_it_was_started_from_when_the_same_sql_is_pinned_and_rerun() {
+    use super::cell_filter::{find_streamed, stream_identity};
+    use crate::ui::editor::StatementOutcome;
+
+    let directory = StreamResultSpoolManager::default();
+    let make = |generation: u64| {
+        let spool = directory.create().unwrap();
+        let mut result = source_result(spool, vec![3]);
+        result.generation = generation;
+        StatementOutcome {
+            identity: StatementIdentity::default(),
+            sql_preview: "SELECT 1".into(),
+            elapsed_ms: 0,
+            kind: StatementOutcomeKind::Streamed(Box::new(result)),
+            pinned: false,
+        }
+    };
+    let pinned = make(7);
+    let latest = make(8);
+    let outcomes = [pinned, latest];
+    let picked = find_streamed(outcomes.iter(), stream_identity(StatementIdentity::default(), 8)).unwrap();
+    assert_eq!(picked.generation, 8);
+    let older = find_streamed(outcomes.iter(), stream_identity(StatementIdentity::default(), 7)).unwrap();
+    assert_eq!(older.generation, 7);
+    assert!(find_streamed(outcomes.iter(), stream_identity(StatementIdentity::default(), 9)).is_none());
+}
+
+#[test]
+fn filtering_a_filtered_result_does_not_stack_the_export_name() {
+    let (spool, counts) = spooled(&[vec![row(1, "apple"), row(2, "pear")]]);
+    let source = source_result(spool, counts);
+    let once = derived_result(&source, filtered(&source, "a"), 1 << 62);
+    assert_eq!(once.export.as_ref().unwrap().query.suggested_name, "orders-filtered");
+    let twice = derived_result(&once, filtered(&once, "a"), (1 << 62) + 1);
+    assert_eq!(twice.export.as_ref().unwrap().query.suggested_name, "orders-filtered");
+}
+
+#[test]
+fn a_jump_selects_retries_or_gives_up_by_what_the_view_shows() {
+    use super::jump::{Attempt, attempt};
+    assert_eq!(attempt(Some(5), Some(5), 1), Attempt::Select);
+    assert_eq!(attempt(Some(3), Some(5), 1), Attempt::GiveUp);
+    assert_eq!(attempt(None, Some(5), 1), Attempt::Retry);
+    assert_eq!(attempt(Some(0), Some(5), 1), Attempt::Retry);
+    assert_eq!(attempt(None, Some(5), 1_000), Attempt::GiveUp);
+    assert_eq!(attempt(Some(9), None, 1), Attempt::Select);
+    assert_eq!(attempt(None, None, 1), Attempt::Retry);
+    assert_eq!(attempt(None, None, 1_000), Attempt::GiveUp);
+}

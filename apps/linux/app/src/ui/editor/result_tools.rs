@@ -7,6 +7,7 @@ mod jump;
 mod ticket;
 mod widget;
 
+pub(in crate::ui::editor) use cell_filter::stream_identity;
 #[cfg(test)]
 pub(in crate::ui::editor) use derived::derived_outcome;
 pub(in crate::ui) use editor::{FilterDone, FilterRequest};

@@ -96,7 +96,7 @@ fn append_result_tools(
         header,
         pages,
         result,
-        identity: outcome.identity,
+        identity: super::super::result_tools::stream_identity(outcome.identity, result.generation),
         sender: sender.input_sender(),
     });
 }
@@ -150,7 +150,10 @@ pub(in crate::ui::editor) fn stream_page_container(
             target.connection_id,
             target.database.clone(),
             target.settings_store.clone(),
-            result_view_key(identity, page_index as usize),
+            result_view_key(
+                super::super::result_tools::stream_identity(identity, result.generation),
+                page_index as usize,
+            ),
         ));
     } else {
         container.append(&stream_page_placeholder(result, page_index));

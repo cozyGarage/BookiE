@@ -11,7 +11,9 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use super::selection::Candidate;
-use super::summary::{differing_rows, failure_message, no_difference_message, notes, summary_text};
+use super::summary::{
+    Verdict, differing_rows, failure_message, no_difference_message, notes, summary_text, too_large_message, verdict,
+};
 use super::ticket::CompareTicket;
 use crate::services::database_service::DatabaseService;
 use crate::ui::editor::{SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcome, StatementOutcomeKind};
@@ -189,11 +191,8 @@ impl SqlEditor {
         let failed = matches!(&outcome, Err(failure) if !is_cancellation(failure));
         let message = match outcome {
             Err(failure) => failure_text(&failure),
-            Ok(report)
-                if report.diff.rows.is_empty() && report.summary.unknown_left + report.summary.unknown_right == 0 =>
-            {
-                no_difference_message(&report)
-            }
+            Ok(report) if verdict(&report) == Verdict::Identical => no_difference_message(&report),
+            Ok(report) if verdict(&report) == Verdict::TooLargeToShow => too_large_message(&report),
             Ok(report) => self.show_diff(&request, report, sender),
         };
         self.status.set_label(&message);
