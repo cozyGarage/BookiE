@@ -120,6 +120,7 @@ pub struct TabGridContext {
     pub row_mutations_allowed: bool,
     pub local_result_view: Option<local_filter::LocalResultView>,
     pub(crate) result_model: Option<gtk4::gio::ListModel>,
+    pub(crate) row_visibility: Option<std::rc::Rc<dyn Fn(u32, bool)>>,
     pub sortable_result_columns: std::collections::HashSet<usize>,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the

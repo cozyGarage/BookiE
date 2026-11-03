@@ -263,6 +263,7 @@ impl BrowseTab {
             row_mutations_allowed: self.allows_keyed_row_mutations(),
             local_result_view: None,
             result_model: None,
+            row_visibility: None,
             sortable_result_columns: Default::default(),
             foreign_key_columns,
             has_inbound_foreign_keys: !self.inbound_foreign_keys.is_empty(),

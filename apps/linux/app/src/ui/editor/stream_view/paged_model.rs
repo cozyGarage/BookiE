@@ -428,3 +428,65 @@ fn result_grid_uses_the_paged_model_for_its_rows() {
             .is_none()
     );
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn result_grid_reports_rows_when_realized_and_released() {
+    gtk4::init().unwrap();
+    let model = PagedModel::new(&[2], 1);
+    let columns = vec![bookie_core::ColumnInfo {
+        name: "id".into(),
+        data_type: "integer".into(),
+        nullable: false,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }];
+    let result = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: columns.clone(),
+        rows: Vec::new().into(),
+        truncated: false,
+    });
+    let visible = std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashSet::new()));
+    let changes = visible.clone();
+    let (view, _) = crate::ui::grid::build_column_view(
+        &result,
+        &columns,
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        crate::ui::grid::TabGridContext {
+            result_model: Some(model.upcast()),
+            row_visibility: Some(std::rc::Rc::new(move |row, shown| {
+                if shown {
+                    changes.borrow_mut().insert(row);
+                } else {
+                    changes.borrow_mut().remove(&row);
+                }
+            })),
+            ..Default::default()
+        },
+        None,
+        std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+    );
+    let window = gtk4::Window::builder().child(&view).build();
+    window.present();
+    let context = glib::MainContext::default();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    while visible.borrow().is_empty() && std::time::Instant::now() < deadline {
+        context.iteration(false);
+    }
+    assert!(!visible.borrow().is_empty());
+    window.set_child(gtk4::Widget::NONE);
+    while context.iteration(false) {}
+    assert!(visible.borrow().is_empty());
+    window.destroy();
+}
