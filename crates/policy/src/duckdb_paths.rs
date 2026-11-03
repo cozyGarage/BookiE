@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use sqlparser::ast::{Ident, ObjectName, ObjectNamePart, Statement, TableFactor, Visit, Visitor};
 
-const SAFE_TABLE_FUNCTIONS: [&str; 7] = [
+const SAFE_TABLE_FUNCTIONS: [&str; 22] = [
     "range",
     "generate_series",
     "generate_subscripts",
@@ -10,12 +10,24 @@ const SAFE_TABLE_FUNCTIONS: [&str; 7] = [
     "json_each",
     "json_tree",
     "repeat_row",
+    "duckdb_tables",
+    "duckdb_columns",
+    "duckdb_views",
+    "duckdb_schemas",
+    "duckdb_indexes",
+    "duckdb_constraints",
+    "duckdb_sequences",
+    "duckdb_types",
+    "duckdb_functions",
+    "duckdb_keywords",
+    "duckdb_dependencies",
+    "duckdb_comments",
+    "pragma_table_info",
+    "pragma_storage_info",
+    "pragma_version",
 ];
 
-const DATA_FILE_EXTENSIONS: [&str; 17] = [
-    "csv", "tsv", "parquet", "json", "ndjson", "jsonl", "xlsx", "arrow", "avro", "orc", "txt", "geojson", "db",
-    "duckdb", "sqlite", "sqlite3", "xml",
-];
+const BUILTIN_SCHEMAS: [&str; 2] = ["main", "system"];
 
 struct SourceFinder;
 
@@ -60,12 +72,16 @@ fn identifiers(name: &ObjectName) -> impl Iterator<Item = &Ident> {
 }
 
 fn is_safe_table_function(name: &ObjectName) -> bool {
-    identifiers(name).last().is_some_and(|ident| {
-        let lowered = ident.value.to_ascii_lowercase();
-        SAFE_TABLE_FUNCTIONS.contains(&lowered.as_str())
-            || lowered.starts_with("duckdb_")
-            || lowered.starts_with("pragma_")
-    })
+    let parts: Vec<&Ident> = identifiers(name).collect();
+    let qualifier_is_builtin = match parts.as_slice() {
+        [_] => true,
+        [schema, _] => BUILTIN_SCHEMAS.contains(&schema.value.to_ascii_lowercase().as_str()),
+        _ => false,
+    };
+    qualifier_is_builtin
+        && parts
+            .last()
+            .is_some_and(|ident| SAFE_TABLE_FUNCTIONS.contains(&ident.value.to_ascii_lowercase().as_str()))
 }
 
 fn names_a_path(name: &ObjectName) -> bool {
@@ -77,13 +93,5 @@ fn names_a_path(name: &ObjectName) -> bool {
 }
 
 fn looks_like_a_path(name: &str) -> bool {
-    let lowered = name.to_ascii_lowercase();
-    lowered.contains('/')
-        || lowered.contains('\\')
-        || lowered.contains('*')
-        || lowered.contains('?')
-        || lowered
-            .split('.')
-            .skip(1)
-            .any(|segment| DATA_FILE_EXTENSIONS.contains(&segment))
+    name.contains(['/', '\\', '.', '*', '?'])
 }

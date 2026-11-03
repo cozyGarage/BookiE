@@ -209,6 +209,8 @@ fn duckdb_file_reads_are_not_allowed_for_an_agent() {
         "SELECT * FROM sqlite_scan('/x.db', 't')",
         "SELECT * FROM \"secrets.csv.gz\"",
         "DESCRIBE '/etc/x.csv'",
+        "SELECT * FROM duckdb_secrets(redact := false)",
+        "SELECT * FROM duckdb_settings()",
     ] {
         let decision = agent_decision(sql, "duckdb");
         assert!(!matches!(decision, Decision::Allow { .. }), "{sql}: {decision:?}");

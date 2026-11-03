@@ -211,6 +211,16 @@ mod tests {
             "INSERT INTO t SELECT * FROM '/etc/x.csv'",
             "SELECT * FROM \"data/x\"",
             "SELECT * FROM \"events-*.parquet\"",
+            "SELECT * FROM \"x.tbl\"",
+            "SELECT * FROM \"orders.json\"",
+            "SELECT * FROM \"public.orders\"",
+            "SELECT * FROM duckdb_secrets(redact := false)",
+            "SELECT * FROM duckdb_settings()",
+            "SELECT * FROM duckdb_databases()",
+            "SELECT * FROM duckdb_extensions()",
+            "SELECT * FROM duckdb_temporary_files()",
+            "SELECT * FROM x.unnest('x')",
+            "SELECT * FROM other.range(5)",
         ] {
             let facts = classify(sql, "duckdb");
             assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
@@ -251,12 +261,13 @@ mod tests {
             "SELECT * FROM generate_series(1, 5) g, range(3) r",
             "SELECT * FROM unnest([1, 2, 3])",
             "SELECT * FROM pragma_table_info('orders')",
+            "SELECT * FROM main.range(5)",
+            "SELECT * FROM duckdb_columns()",
+            "SELECT * FROM duckdb_functions()",
             "SELECT * FROM (VALUES (1, 'a')) AS t(a, b)",
             "SELECT * FROM orders o JOIN (VALUES (1, 'a')) v(a, b) ON v.a = o.id",
             "SELECT * FROM orders o JOIN items i ON i.x = ['a', 'b']",
             "SELECT * FROM orders o JOIN items i ON i.s = {'a': 'x', 'b': 'y'}",
-            "SELECT * FROM \"public.orders\"",
-            "SELECT * FROM \"my.table\"",
             "SELECT * FROM orders o JOIN items i USING (id)",
             "SELECT * FROM orders WHERE path = '/data/x.csv'",
         ] {
