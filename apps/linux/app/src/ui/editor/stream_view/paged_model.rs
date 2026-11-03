@@ -16,6 +16,7 @@ mod imp {
         pub(super) width: Cell<usize>,
         pub(super) pages: RefCell<Option<PageWindow<std::sync::Arc<bookie_core::QueryResult>>>>,
         pub(super) selection: glib::WeakRef<gtk4::MultiSelection>,
+        pub(super) view: glib::WeakRef<gtk4::ColumnView>,
         pub(super) status: glib::WeakRef<gtk4::Label>,
     }
 
@@ -184,14 +185,39 @@ impl PagedModel {
     fn refresh(&self, start: usize, count: usize) {
         let selection = self.imp().selection.upgrade();
         let selected = selection.as_ref().map(|selection| selection.selection().copy());
+        let focus = self
+            .imp()
+            .view
+            .upgrade()
+            .and_then(|view| crate::ui::grid::focused_row_position(&view));
         self.items_changed(start as u32, count as u32, count as u32);
         if let (Some(selection), Some(selected)) = (selection, selected) {
             selection.set_selection(&selected, &gtk4::Bitset::new_range(start as u32, count as u32));
+            if let Some(position) =
+                focus.filter(|position| (*position as usize) >= start && (*position as usize) < start + count)
+            {
+                let view = self.imp().view.clone();
+                glib::idle_add_local_once(move || {
+                    let Some(view) = view.upgrade() else { return };
+                    let Some(window) = view.root().and_then(|root| root.downcast::<gtk4::Window>().ok()) else {
+                        return;
+                    };
+                    let focused = gtk4::prelude::GtkWindowExt::focus(&window);
+                    if view.is_mapped()
+                        && focused.as_ref().map_or(window.is_active(), |focused| {
+                            focused == &view || focused.is_ancestor(&view) || view.is_ancestor(focused)
+                        })
+                    {
+                        view.scroll_to(position, None, gtk4::ListScrollFlags::FOCUS, None);
+                    }
+                });
+            }
         }
     }
 
-    pub(super) fn attach_selection(&self, selection: &gtk4::MultiSelection) {
+    pub(super) fn attach_selection(&self, selection: &gtk4::MultiSelection, view: &gtk4::ColumnView) {
         self.imp().selection.set(Some(selection));
+        self.imp().view.set(Some(view));
     }
 
     pub(super) fn attach_status(&self, status: &gtk4::Label) {

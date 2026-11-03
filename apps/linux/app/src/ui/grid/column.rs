@@ -257,6 +257,7 @@ fn bind_row_cell(
     if !row.cell_is_loaded(index) && !row.cell_is_partial(index) {
         if let Some(label) = item.child().and_downcast::<gtk4::Label>() {
             label.set_text(&crate::tr!("Loading…"));
+            POSITION_SLOT.set(&label, item.position());
         }
         return;
     }

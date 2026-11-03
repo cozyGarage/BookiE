@@ -98,7 +98,7 @@ fn start_view(
             None,
             database,
         );
-        model.attach_selection(&selection);
+        model.attach_selection(&selection, &view);
         let status = gtk::Label::new(None);
         status.set_wrap(true);
         model.attach_status(&status);

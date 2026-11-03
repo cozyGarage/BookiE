@@ -506,6 +506,26 @@ pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, us
     Some((position, column, row_key))
 }
 
+pub(crate) fn focused_row_position(view: &gtk4::ColumnView) -> Option<u32> {
+    let window = view.root()?.downcast::<gtk4::Window>().ok()?;
+    let focused = gtk4::prelude::GtkWindowExt::focus(&window)?;
+    if !focused.is_ancestor(view) {
+        return None;
+    }
+    let mut pending = vec![focused];
+    while let Some(widget) = pending.pop() {
+        if let Some(position) = POSITION_SLOT.get(&widget) {
+            return Some(position);
+        }
+        let mut child = widget.first_child();
+        while let Some(next) = child {
+            child = next.next_sibling();
+            pending.push(next);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 #[path = "display_tests.rs"]
 mod tests;
