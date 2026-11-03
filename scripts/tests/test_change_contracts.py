@@ -70,14 +70,14 @@ class ChangeContractTests(unittest.TestCase):
             ),
         )
 
-    def test_other_value_path_maps_to_its_package_suite(self):
-        actions = CHECKER.select_actions(["crates/core/src/value.rs"], CHECKER.load_map())
-        self.assertEqual(actions, [{
-            "package": "bookie-core",
-            "target": "--lib",
-            "full_suite": True,
-            "required_tests": [],
-        }])
+    def test_unmapped_library_changes_are_left_to_the_full_workspace_layer(self):
+        for path in [
+            "crates/core/src/value.rs",
+            "apps/linux/app/src/ui/row_object.rs",
+            "crates/drivers/postgres/src/lib.rs",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(CHECKER.select_actions([path], CHECKER.load_map()), [])
 
     def test_driver_integration_test_files_stay_in_the_docker_layer(self):
         actions = CHECKER.select_actions(["crates/drivers/mysql/tests/integration.rs"], CHECKER.load_map())
