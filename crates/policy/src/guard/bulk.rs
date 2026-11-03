@@ -9,6 +9,22 @@ use sqlparser::parser::Parser;
 /// unbounded amount of work.
 pub const MAX_BULK_ROW_BUDGET: u64 = 1_000_000;
 
+pub const MAX_SKIPPED_ROWS: u64 = 1_000;
+
+const MAX_SKIP_REASON_CHARS: usize = 200;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkippedRow {
+    pub index: usize,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct BulkBatchOutcome {
+    pub written: u64,
+    pub skipped: Vec<SkippedRow>,
+}
+
 /// What the user is asked to approve: one INSERT shape, one table, one
 /// connection and a fixed number of rows.
 #[derive(Debug, Clone)]
@@ -62,6 +78,7 @@ pub struct BulkInsertScope {
     row_budget: u64,
     sequence_columns: Vec<String>,
     committed: u64,
+    skipped: u64,
     open: bool,
     started: Instant,
     audit_state: Arc<AuditState>,
@@ -76,6 +93,10 @@ struct GrantedBulkDecision {
 impl BulkInsertScope {
     pub fn committed_rows(&self) -> u64 {
         self.committed
+    }
+
+    pub fn skipped_rows(&self) -> u64 {
+        self.skipped
     }
 
     pub fn row_budget(&self) -> u64 {
@@ -143,6 +164,45 @@ impl Drop for BulkInsertScope {
         }
         tracing::error!("an import ended without a terminal audit record; governed writes are disabled");
         self.audit_state.disable_governed_writes();
+    }
+}
+
+fn rejected_row(error: &DriverError) -> Option<usize> {
+    match error {
+        DriverError::Transaction {
+            statement_index,
+            source,
+        } if matches!(**source, DriverError::Query { .. }) => Some(*statement_index),
+        _ => None,
+    }
+}
+
+fn skip_reason(error: &DriverError) -> String {
+    let DriverError::Transaction { source, .. } = error else {
+        return String::new();
+    };
+    let text = match &**source {
+        DriverError::Query { message, .. } => message.as_str(),
+        _ => "the database rejected the row",
+    };
+    let line = text.lines().next().unwrap_or_default();
+    let cleaned: String = line
+        .chars()
+        .map(|character| if character.is_control() { ' ' } else { character })
+        .take(MAX_SKIP_REASON_CHARS)
+        .collect();
+    if cleaned.trim().is_empty() {
+        "the database rejected the row".to_owned()
+    } else {
+        cleaned
+    }
+}
+
+fn too_many_skipped_rows() -> DriverError {
+    DriverError::Query {
+        message: format!("more than {MAX_SKIPPED_ROWS} rows were rejected by the database; the import stopped"),
+        sqlstate: None,
+        position: None,
     }
 }
 
@@ -247,20 +307,74 @@ impl PolicyGuard {
         }
         let rows = statements.len() as u64;
         scope.committed += rows;
-        if !scope.sequence_columns.is_empty() {
-            let repair_control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
-            self.caught_write(
-                "IMPORT SEQUENCE SYNC",
-                self.inner.synchronize_auto_increment_sequences_controlled(
-                    scope.schema.as_deref(),
-                    &scope.table,
-                    &scope.sequence_columns,
-                    &repair_control,
-                ),
-            )
-            .await?;
-        }
+        self.synchronize_import_sequences(scope).await?;
         Ok(rows)
+    }
+
+    pub async fn execute_bulk_batch_skipping_failed_rows(
+        &self,
+        scope: &mut BulkInsertScope,
+        batch: BulkBatch<'_>,
+        control: &OperationControl,
+    ) -> Result<BulkBatchOutcome, DriverError> {
+        scope.admit(self.ctx.connection_id, &batch)?;
+        if let Err(error) = self.require_governed_write_available().and(check_pre_dispatch(control)) {
+            scope.open = false;
+            return Err(error);
+        }
+        let mut remaining: Vec<(usize, &Vec<Value>)> = batch.rows.iter().enumerate().collect();
+        let mut skipped: Vec<SkippedRow> = Vec::new();
+        while !remaining.is_empty() {
+            let statements: Vec<(String, Vec<Value>)> = remaining
+                .iter()
+                .map(|(_, row)| (scope.statement.clone(), (*row).clone()))
+                .collect();
+            let result = self
+                .caught_write(
+                    "BULK INSERT BATCH",
+                    self.inner.execute_in_transaction_controlled(&statements, control),
+                )
+                .await;
+            let Err(error) = result else { break };
+            let rejected = rejected_row(&error).filter(|at| *at < remaining.len());
+            let Some(at) = rejected else {
+                scope.skipped += skipped.len() as u64;
+                scope.open = false;
+                return Err(error);
+            };
+            if scope.skipped + skipped.len() as u64 >= MAX_SKIPPED_ROWS {
+                scope.skipped += skipped.len() as u64;
+                scope.open = false;
+                return Err(too_many_skipped_rows());
+            }
+            let (index, _) = remaining.remove(at);
+            skipped.push(SkippedRow {
+                index,
+                reason: skip_reason(&error),
+            });
+        }
+        let written = remaining.len() as u64;
+        scope.committed += written;
+        scope.skipped += skipped.len() as u64;
+        self.synchronize_import_sequences(scope).await?;
+        Ok(BulkBatchOutcome { written, skipped })
+    }
+
+    async fn synchronize_import_sequences(&self, scope: &mut BulkInsertScope) -> Result<(), DriverError> {
+        if scope.sequence_columns.is_empty() {
+            return Ok(());
+        }
+        let repair_control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+        self.caught_write(
+            "IMPORT SEQUENCE SYNC",
+            self.inner.synchronize_auto_increment_sequences_controlled(
+                scope.schema.as_deref(),
+                &scope.table,
+                &scope.sequence_columns,
+                &repair_control,
+            ),
+        )
+        .await
     }
 
     /// End the import and write its single terminal audit record, carrying
@@ -276,16 +390,20 @@ impl PolicyGuard {
         if terminal_status == AuditTerminalStatus::Unknown {
             self.ctx.audit_state.disable_governed_writes();
         }
+        let rows_skipped = (scope.skipped > 0).then_some(scope.skipped);
+        if let Some(count) = rows_skipped {
+            tracing::warn!(rows_skipped = count, "an import skipped rows the database rejected");
+        }
         let audit_result = self
-            .record_outcome(
+            .record(
                 &scope.operation(),
-                AuditOutcome {
-                    terminal_status,
-                    transaction_outcome,
-                    rows_affected: Some(committed),
-                    error_category,
-                    duration_ms: scope.started.elapsed().as_millis() as u64,
-                },
+                AuditRecordPhase::Outcome,
+                terminal_status,
+                transaction_outcome,
+                Some(committed),
+                error_category,
+                Some(scope.started.elapsed().as_millis() as u64),
+                rows_skipped,
             )
             .await;
         self.handle_write_outcome_failure(audit_result)?;
@@ -397,6 +515,7 @@ impl PolicyGuard {
             row_budget: request.row_budget,
             sequence_columns: request.sequence_columns,
             committed: 0,
+            skipped: 0,
             open: true,
             started: Instant::now(),
             audit_state: self.ctx.audit_state.clone(),

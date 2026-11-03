@@ -18,6 +18,7 @@ pub struct OperationRow {
     pub sql: String,
     pub error: Option<String>,
     pub rows: Option<u64>,
+    pub rows_skipped: Option<u64>,
     pub duration_ms: Option<u64>,
 }
 
@@ -36,6 +37,7 @@ pub fn operations(events: Vec<AuditEvent>) -> Vec<OperationRow> {
             row.approval = event.approval_outcome;
             row.error = event.error;
             row.rows = event.rows_affected;
+            row.rows_skipped = event.rows_skipped;
             row.duration_ms = event.duration_ms;
         }
     }
@@ -60,6 +62,7 @@ fn row_from(event: &AuditEvent) -> OperationRow {
         sql: event.redacted_sql.clone(),
         error: event.error.clone(),
         rows: event.rows_affected,
+        rows_skipped: event.rows_skipped,
         duration_ms: event.duration_ms,
     }
 }
@@ -100,6 +103,10 @@ pub fn approval_label(approval: AuditApprovalOutcome) -> String {
 
 pub fn needs_attention(status: AuditTerminalStatus) -> bool {
     !matches!(status, AuditTerminalStatus::Succeeded | AuditTerminalStatus::Pending)
+}
+
+pub fn row_needs_attention(row: &OperationRow) -> bool {
+    needs_attention(row.status) || row.rows_skipped.is_some()
 }
 
 pub fn status_label(status: AuditTerminalStatus) -> String {
@@ -163,6 +170,7 @@ mod tests {
             error_category: None,
             error: None,
             rows_affected: (phase == AuditRecordPhase::Outcome).then_some(3),
+            rows_skipped: None,
             duration_ms: (phase == AuditRecordPhase::Outcome).then_some(12),
             transport_attempt: None,
             administrative_action: None,
@@ -206,6 +214,22 @@ mod tests {
         assert_eq!(rows[0].operation_id, long, "the failure that ended last is first");
         assert_eq!(rows[1].principal, "agent:claude:sha256:0123456789abcdef");
         assert!(needs_attention(AuditTerminalStatus::Failed) && !needs_attention(AuditTerminalStatus::Pending));
+    }
+
+    #[test]
+    fn an_import_that_skipped_rows_needs_attention_even_though_it_succeeded() {
+        let id = Uuid::new_v4();
+        let mut outcome = event(id, AuditRecordPhase::Outcome, AuditTerminalStatus::Succeeded);
+        outcome.rows_skipped = Some(2);
+        let skipped = &operations(vec![outcome])[0];
+        assert_eq!(skipped.rows_skipped, Some(2));
+        assert!(row_needs_attention(skipped));
+        let clean = &operations(vec![event(
+            id,
+            AuditRecordPhase::Outcome,
+            AuditTerminalStatus::Succeeded,
+        )])[0];
+        assert!(!row_needs_attention(clean));
     }
 
     #[test]
