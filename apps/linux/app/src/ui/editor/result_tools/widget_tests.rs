@@ -313,3 +313,23 @@ fn the_result_header_wraps_without_overlap_at_920_px() {
 fn the_result_header_wraps_without_overlap_at_600_px() {
     assert_header_layout(600);
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn editing_the_text_during_a_filter_keeps_it_busy_and_cancellable() {
+    let fixture = fixture();
+    let entry: gtk::SearchEntry = named(&fixture.holder, "tp-result-find-entry");
+    let filter: gtk::Button = named(&fixture.holder, "tp-result-filter-button");
+    let stop: gtk::Button = named(&fixture.holder, "tp-result-find-stop");
+    entry.set_text("needle");
+    filter.emit_clicked();
+    let Some(SqlEditorInput::FilterResults(request)) = fixture.receiver.recv_sync() else {
+        panic!("a filter request was not sent")
+    };
+    entry.set_text("needle two");
+    assert!(!filter.is_sensitive());
+    assert!(stop.is_visible());
+    filter.emit_clicked();
+    stop.emit_clicked();
+    assert!(request.ticket.cancel().is_cancelled());
+}

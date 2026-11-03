@@ -13,6 +13,11 @@ fn has_grid_result(outcome: &StatementOutcome) -> bool {
     }
 }
 
+pub(super) struct AddedPin {
+    pub(super) index: usize,
+    pub(super) evicted: usize,
+}
+
 #[derive(Default)]
 pub(super) struct PinnedResults {
     pins: Vec<StatementOutcome>,
@@ -67,14 +72,17 @@ impl PinnedResults {
         self.pins.len()
     }
 
-    pub(super) fn add_pin(&mut self, outcome: StatementOutcome) -> usize {
+    pub(super) fn add_pin(&mut self, outcome: StatementOutcome) -> AddedPin {
         self.pins.push(StatementOutcome {
             pinned: true,
             ..outcome
         });
-        let excess = self.pins.len().saturating_sub(MAX_PINNED);
-        self.pins.drain(..excess);
-        self.pins.len()
+        let evicted = self.pins.len().saturating_sub(MAX_PINNED);
+        self.pins.drain(..evicted);
+        AddedPin {
+            index: self.pins.len() - 1,
+            evicted,
+        }
     }
 
     pub(super) fn unpin_all(&mut self) -> Vec<StatementOutcome> {
@@ -97,6 +105,29 @@ impl SqlEditor {
             .set_sensitive(super::result_compare::can_compare(&self.pinned.displayed()));
         self.refresh_result_exports();
         self.panel.refresh_errors(self.pinned.latest());
+    }
+
+    pub(super) fn pin_and_show(
+        &mut self,
+        outcome: StatementOutcome,
+        sender: &relm4::ComponentSender<Self>,
+    ) -> (AddedPin, bool) {
+        let added = self.pinned.add_pin(outcome);
+        let rendered = self.run_generation.active.is_empty();
+        if rendered {
+            clear_results_box(&self.results_holder);
+            render_outcomes(
+                &self.results_holder,
+                &self.pinned.displayed(),
+                &self.grid_sender,
+                self.connection_id,
+                self.database.clone(),
+                self.result_view_settings.clone(),
+                Some(sender),
+            );
+        }
+        self.refresh_pin_button();
+        (added, rendered)
     }
 
     pub(super) fn show_pins_above(&mut self, page: &impl IsA<gtk::Widget>, sender: &relm4::ComponentSender<Self>) {
@@ -139,6 +170,13 @@ impl SqlEditor {
         self.status
             .set_label(&crate::tr!("{n} pinned; they stay above the next run").replace("{n}", &kept));
     }
+}
+
+pub(super) fn with_eviction_note(message: String, evicted: usize) -> String {
+    if evicted == 0 {
+        return message;
+    }
+    format!("{message} · {}", crate::tr!("The oldest pinned result was closed"))
 }
 
 #[cfg(test)]

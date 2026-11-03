@@ -276,7 +276,9 @@ fn adding_a_pin_keeps_the_newest_and_marks_it_pinned() {
         outcome.pinned = false;
         outcome.sql_preview = format!("n{index}");
         previews.push(outcome.sql_preview.clone());
-        pins.add_pin(outcome);
+        let added = pins.add_pin(outcome);
+        assert_eq!(added.evicted, usize::from(index >= MAX_PINNED));
+        assert_eq!(added.index, pins.count() - 1);
     }
     let shown = pins.displayed();
     assert_eq!(shown.len(), MAX_PINNED);
@@ -340,4 +342,43 @@ fn a_cell_filter_keeps_null_distinct_from_empty_text_and_refuses_unreadable_valu
     assert!(!prepared.matches(&[Value::Text(String::new())], &mut tally));
     assert!(cell_predicate(&columns, 0, Value::Undecodable("x".into()), false).is_none());
     assert!(cell_predicate(&columns, 3, Value::Int(1), false).is_none());
+}
+
+#[test]
+fn only_a_complete_streamed_result_can_be_filtered() {
+    let (spool, counts) = spooled(&[vec![row(1, "a")]]);
+    let mut source = source_result(spool, counts);
+    assert!(super::editor::can_filter(&source));
+    for terminal in [
+        StreamTerminal::Loading,
+        StreamTerminal::Cancelled,
+        StreamTerminal::TimedOut,
+    ] {
+        source.terminal = terminal;
+        assert!(!super::editor::can_filter(&source));
+    }
+}
+
+#[test]
+fn a_panicking_filter_worker_becomes_a_filter_error() {
+    use bookie_app_services::result_filter::FilterError;
+    let outcome: Result<(), FilterError> = super::editor::guarded(|| panic!("worker failed"));
+    assert!(outcome.is_err());
+    assert_eq!(failure_message(&outcome.unwrap_err()), "The filter could not finish");
+}
+
+#[test]
+fn a_find_worker_that_never_answers_is_reported_as_a_failed_search() {
+    use bookie_app_services::result_find::FindError;
+    let dropped = super::actions::received(Err(async_channel::RecvError));
+    assert!(matches!(dropped, Err(FindError::Scan(_))));
+    let answered = super::actions::received(Ok(Ok(report(0, false, 0))));
+    assert!(answered.is_ok());
+}
+
+#[test]
+fn an_eviction_is_named_in_the_status_only_when_a_pin_was_closed() {
+    use crate::ui::editor::pinned::with_eviction_note;
+    assert_eq!(with_eviction_note("Done".into(), 0), "Done");
+    assert!(with_eviction_note("Done".into(), 1).contains("oldest pinned result was closed"));
 }

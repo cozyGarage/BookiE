@@ -1515,6 +1515,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::result_tools::widget_tests::editing_the_text_during_a_filter_keeps_it_busy_and_cancellable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::outcomes::tests::export_partial_view::a_filtered_result_exports_only_its_own_saved_rows"
     ],
     [

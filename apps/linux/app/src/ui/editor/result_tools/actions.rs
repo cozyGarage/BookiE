@@ -91,6 +91,13 @@ impl Tools {
         }
     }
 
+    fn filter_running(&self) -> bool {
+        self.filter_ticket
+            .borrow()
+            .as_ref()
+            .is_some_and(|ticket| !ticket.is_finished())
+    }
+
     fn entry_changed(&self) {
         let needle = self.needle();
         if self.cursor.borrow().has_results_for(&needle) {
@@ -98,6 +105,9 @@ impl Tools {
         }
         self.cancel.borrow().cancel();
         self.cursor.borrow_mut().invalidate();
+        if self.filter_running() {
+            return;
+        }
         self.set_busy(false);
         self.set_status("");
     }
@@ -140,8 +150,8 @@ impl Tools {
         self.poll_search(generation, progress);
         let tools = Rc::downgrade(self);
         gtk::glib::spawn_future_local(async move {
-            let result = receive.recv().await;
-            if let (Some(tools), Ok(result)) = (tools.upgrade(), result) {
+            let result = received(receive.recv().await);
+            if let Some(tools) = tools.upgrade() {
                 tools.finish_search(generation, result, forward);
             }
         });
@@ -206,6 +216,9 @@ impl Tools {
     }
 
     fn filter(self: &Rc<Self>) {
+        if self.filter_running() {
+            return;
+        }
         let needle = self.needle();
         if needle.is_empty() {
             self.set_status(&crate::tr!("Enter text to filter by"));
@@ -245,6 +258,12 @@ impl Tools {
             gtk::glib::ControlFlow::Continue
         });
     }
+}
+
+pub(super) fn received(
+    result: Result<Result<FindReport, FindError>, async_channel::RecvError>,
+) -> Result<FindReport, FindError> {
+    result.unwrap_or(Err(FindError::Scan(ScanError::Incomplete)))
 }
 
 fn searching_text(done: u64, total: u64) -> String {

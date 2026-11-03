@@ -14,10 +14,7 @@ use super::selection::Candidate;
 use super::summary::{differing_rows, failure_message, notes, summary_text};
 use super::ticket::CompareTicket;
 use crate::services::database_service::DatabaseService;
-use crate::ui::editor::{
-    SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcome, StatementOutcomeKind, clear_results_box,
-    render_outcomes,
-};
+use crate::ui::editor::{SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcome, StatementOutcomeKind};
 
 pub(in crate::ui) struct CompareRequest {
     pub(super) left: Candidate,
@@ -157,9 +154,9 @@ impl SqlEditor {
         sender: &ComponentSender<Self>,
     ) {
         let Some(context) = self.audit_context() else {
-            request
-                .ticket
-                .finish(crate::tr!("Open a connection before comparing results"));
+            let message = crate::tr!("Open a connection before comparing results");
+            self.status.set_label(&message);
+            request.ticket.finish(message);
             return;
         };
         let database = self.database.clone();
@@ -210,18 +207,8 @@ impl SqlEditor {
                 settings.changed_cells = Some(report.changed_cells.clone());
             },
         );
-        self.pinned.add_pin(outcome);
-        clear_results_box(&self.results_holder);
-        render_outcomes(
-            &self.results_holder,
-            &self.pinned.displayed(),
-            &self.grid_sender,
-            self.connection_id,
-            self.database.clone(),
-            self.result_view_settings.clone(),
-            Some(sender),
-        );
-        self.refresh_pin_button();
+        let (added, _) = self.pin_and_show(outcome, sender);
+        let message = crate::ui::editor::pinned::with_eviction_note(message, added.evicted);
         message
     }
 }

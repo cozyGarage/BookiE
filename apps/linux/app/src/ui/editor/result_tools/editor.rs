@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 use bookie_app_services::result_filter::{FilterError, FilteredResult, filter_into_spool};
 use bookie_app_services::result_predicate::ResultPredicate;
-use bookie_app_services::result_scan::ScanSource;
+use bookie_app_services::result_scan::{ScanError, ScanSource};
 use bookie_app_services::stream_result_spool::StreamResultSpoolError;
 use relm4::ComponentSender;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 
-use super::super::stream_pages::StreamedResult;
-use super::super::{SqlEditor, SqlEditorInput, StatementIdentity, clear_results_box, render_outcomes};
+use super::super::pinned::with_eviction_note;
+use super::super::stream_pages::{StreamTerminal, StreamedResult};
+use super::super::{SqlEditor, SqlEditorInput, StatementIdentity};
 use super::derived::derived_outcome;
 use super::jump::find_descendant;
 use super::ticket::FilterTicket;
@@ -64,10 +65,28 @@ pub(super) fn success_message(rows: u64, unsearchable: u64) -> String {
     format!("{shown} · {skipped}")
 }
 
+pub(super) fn can_filter(source: &StreamedResult) -> bool {
+    matches!(source.terminal, StreamTerminal::Complete)
+}
+
+pub(super) fn guarded<T>(work: impl FnOnce() -> Result<T, FilterError>) -> Result<T, FilterError> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(work))
+        .unwrap_or(Err(FilterError::Scan(ScanError::Incomplete)))
+}
+
 impl SqlEditor {
+    fn refuse_filter(&self, request: &FilterRequest, message: String) {
+        self.status.set_label(&message);
+        request.ticket.finish(message);
+    }
+
     pub(in crate::ui::editor) fn on_filter_results(&mut self, request: FilterRequest, sender: &ComponentSender<Self>) {
+        if !can_filter(&request.source) {
+            self.refuse_filter(&request, crate::tr!("Only a complete result can be filtered"));
+            return;
+        }
         let Some(spool) = request.source.spool.clone() else {
-            request.ticket.finish(crate::tr!("This result is no longer available"));
+            self.refuse_filter(&request, crate::tr!("This result is no longer available"));
             return;
         };
         let manager = self.database.stream_result_spool_manager();
@@ -76,20 +95,24 @@ impl SqlEditor {
         let ticket = request.ticket.clone();
         let spawned = std::thread::Builder::new().name("result-filter".into()).spawn(move || {
             let predicate = request.predicate.clone();
-            let outcome = filter_into_spool(
-                &source,
-                predicate,
-                &manager,
-                request.ticket.cancel(),
-                request.ticket.progress(),
-            );
+            let outcome = guarded(|| {
+                filter_into_spool(
+                    &source,
+                    predicate,
+                    &manager,
+                    request.ticket.cancel(),
+                    request.ticket.progress(),
+                )
+            });
             let _ = input.send(SqlEditorInput::FilterFinished(Box::new(FilterDone {
                 request,
                 outcome,
             })));
         });
         if spawned.is_err() {
-            ticket.finish(crate::tr!("The filter could not start"));
+            let message = crate::tr!("The filter could not start");
+            self.status.set_label(&message);
+            ticket.finish(message);
         }
     }
 
@@ -112,21 +135,11 @@ impl SqlEditor {
     ) -> String {
         let message = success_message(filtered.total_rows, filtered.unsearchable_cells);
         let outcome = derived_outcome(request.identity, &request.source, filtered, &request.label);
-        let index = self.pinned.add_pin(outcome).saturating_sub(1);
-        clear_results_box(&self.results_holder);
-        let shown = self.pinned.displayed();
-        render_outcomes(
-            &self.results_holder,
-            &shown,
-            &self.grid_sender,
-            self.connection_id,
-            self.database.clone(),
-            self.result_view_settings.clone(),
-            Some(sender),
-        );
-        self.refresh_pin_button();
-        select_result_tab(&self.results_holder, index);
-        message
+        let (added, rendered) = self.pin_and_show(outcome, sender);
+        if rendered {
+            select_result_tab(&self.results_holder, added.index);
+        }
+        with_eviction_note(message, added.evicted)
     }
 }
 
