@@ -151,8 +151,8 @@ impl State {
         }
         self.summary.changed += 1;
         self.wanted.insert(key);
-        if self.collector.reserve_pair() {
-            self.after.insert(key, right_values());
+        if let Some(after) = self.collector.reserve_pair(right_values) {
+            self.after.insert(key, after);
         }
     }
 

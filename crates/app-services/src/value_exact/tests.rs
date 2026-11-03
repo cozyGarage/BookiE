@@ -30,6 +30,8 @@ fn samples() -> Vec<Value> {
         Value::Decimal(Decimal::from_str("1.0").unwrap()),
         Value::Decimal(Decimal::from_str("1.00").unwrap()),
         Value::Decimal(Decimal::from_str("1").unwrap()),
+        Value::Decimal(Decimal::from_str("0.0").unwrap()),
+        Value::Decimal(Decimal::from_str("-0.0").unwrap()),
         Value::Json(Box::new(serde_json::json!({"a": 1, "b": [1, 2]}))),
         Value::Json(Box::new(serde_json::json!({"b": [1, 2], "a": 1}))),
         Value::Undecodable("numeric".into()),

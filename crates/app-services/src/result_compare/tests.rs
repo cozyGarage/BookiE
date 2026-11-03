@@ -400,3 +400,47 @@ fn shared_column_names_follow_the_left_order_and_refuse_ambiguity() {
         CompareError::NoCommonColumns
     );
 }
+
+#[test]
+fn a_negative_zero_decimal_is_judged_the_same_by_the_digest_and_by_exact_equality() {
+    let zero = |text: &str| vec![vec![Value::Int(1), Value::Decimal(Decimal::from_str(text).unwrap())]];
+    let table = |rows| CompareInput::Pages(vec![result(&["id", "v"], rows)]);
+    let whole = run(table(zero("0.0")), table(zero("-0.0")), &[]).unwrap();
+    let keyed = run(table(zero("0.0")), table(zero("-0.0")), &["id"]).unwrap();
+    let exact = crate::value_exact::exact_equal(
+        &Value::Decimal(Decimal::from_str("0.0").unwrap()),
+        &Value::Decimal(Decimal::from_str("-0.0").unwrap()),
+    );
+    assert_eq!(whole.summary.equal == 1, exact);
+    assert_eq!(keyed.summary.equal == 1, exact);
+    assert_eq!(whole.summary.added + whole.summary.removed == 0, exact);
+    assert_eq!(keyed.summary.changed == 0, exact);
+    assert_eq!(keyed.changed_cells.is_empty(), exact);
+}
+
+fn heavy_row() -> Vec<Value> {
+    vec![Value::Text("x".repeat(20 * 1024 * 1024))]
+}
+
+#[test]
+fn the_diff_is_bounded_by_the_result_byte_budget_and_never_splits_a_pair() {
+    let mut singles = super::collector::Collector::default();
+    for _ in 0..5 {
+        singles.push("Added", heavy_row());
+    }
+    let (rows, capped) = singles.finish();
+    assert_eq!(rows.len(), 3);
+    assert!(capped);
+    let mut pairs = super::collector::Collector::default();
+    let mut kept = 0;
+    for _ in 0..3 {
+        if let Some(after) = pairs.reserve_pair(heavy_row) {
+            pairs.push_reserved_pair(heavy_row(), after);
+            kept += 1;
+        }
+    }
+    let (rows, capped) = pairs.finish();
+    assert!(capped);
+    assert_eq!(kept, 2);
+    assert_eq!(rows.len(), 2);
+}
