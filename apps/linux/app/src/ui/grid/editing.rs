@@ -175,6 +175,9 @@ pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers:
         let Some(cell) = cell_editor_ancestor(&target) else {
             return;
         };
+        if cell.is_editing() {
+            return;
+        }
         super::display::remember_clicked_cell(cell.upcast_ref());
         cell.grab_focus();
         if n_press != 2 {
