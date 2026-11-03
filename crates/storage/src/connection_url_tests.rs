@@ -284,3 +284,17 @@ fn a_semicolon_or_quote_in_the_host_cannot_reach_a_saved_record() {
     assert!(parse_connection_url("postgres://u@db'--/app").is_err());
     assert!(parse_connection_url("postgres://u@db\"/app").is_err());
 }
+
+#[test]
+fn explicit_mysql_and_mongodb_tls_options_override_the_remote_default() {
+    let off = [
+        ("mysql://u@db.example.com/app?ssl-mode=DISABLED", TlsMode::Disabled),
+        ("mysql://u@db.example.com/app?ssl-mode=REQUIRED", TlsMode::Require),
+        ("mongodb://u@db.example.com/app?tls=false", TlsMode::Disabled),
+        ("mongodb://u@db.example.com/app", TlsMode::VerifyFull),
+    ];
+    for (url, expected) in off {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.effective_tls_mode(), expected, "{url}");
+    }
+}
