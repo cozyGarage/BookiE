@@ -15,6 +15,8 @@ use tokio_util::sync::CancellationToken;
 
 const PAGE_ROWS: usize = 5_000;
 
+type Failure = Box<dyn std::error::Error + Send + Sync>;
+
 fn column(name: &str) -> ColumnInfo {
     ColumnInfo {
         name: name.into(),
@@ -58,8 +60,8 @@ async fn build_spool(
     rows: i64,
     payload: &str,
     edit: impl Fn(i64) -> Option<&'static str>,
-) -> (StreamResultSpool, u64) {
-    let spool = manager.create().unwrap();
+) -> Result<(StreamResultSpool, u64), Failure> {
+    let spool = manager.create()?;
     let mut index = 0_u64;
     let mut total = 0_u64;
     let mut page: Vec<Vec<Value>> = Vec::new();
@@ -70,17 +72,17 @@ async fn build_spool(
             None => page.push(row(id, payload, "")),
         }
         if page.len() == PAGE_ROWS {
-            total += flush(&spool, &mut page, index).await;
+            total += flush(&spool, &mut page, index).await?;
             index += 1;
         }
     }
     if !page.is_empty() {
-        total += flush(&spool, &mut page, index).await;
+        total += flush(&spool, &mut page, index).await?;
     }
-    (spool, total)
+    Ok((spool, total))
 }
 
-async fn flush(spool: &StreamResultSpool, page: &mut Vec<Vec<Value>>, index: u64) -> u64 {
+async fn flush(spool: &StreamResultSpool, page: &mut Vec<Vec<Value>>, index: u64) -> Result<u64, Failure> {
     let rows = std::mem::take(page);
     let count = rows.len() as u64;
     let result = QueryResult {
@@ -88,8 +90,8 @@ async fn flush(spool: &StreamResultSpool, page: &mut Vec<Vec<Value>>, index: u64
         rows: rows.into(),
         truncated: false,
     };
-    spool.append_page(index, Arc::new(result)).await.unwrap();
-    count
+    spool.append_page(index, Arc::new(result)).await?;
+    Ok(count)
 }
 
 fn status_kib(key: &str) -> u64 {
@@ -131,41 +133,41 @@ fn latency_json(mut millis: Vec<f64>) -> Json {
     })
 }
 
-async fn probe_latency(spool: StreamResultSpool, stop: Arc<AtomicBool>, pages: usize) -> Vec<f64> {
+async fn probe_latency(spool: StreamResultSpool, stop: Arc<AtomicBool>, pages: usize) -> Result<Vec<f64>, Failure> {
     let mut samples = Vec::new();
     let mut index = 0_usize;
     while !stop.load(Ordering::Acquire) {
         index = (index * 31 + 17) % pages.max(1);
         let started = Instant::now();
-        spool.load_page(index as u64, columns()).await.unwrap();
+        spool.load_page(index as u64, columns()).await?;
         samples.push(started.elapsed().as_secs_f64() * 1000.0);
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    samples
+    Ok(samples)
 }
 
-async fn idle_latency(spool: &StreamResultSpool, pages: usize) -> Json {
+async fn idle_latency(spool: &StreamResultSpool, pages: usize) -> Result<Json, Failure> {
     let stop = Arc::new(AtomicBool::new(false));
     let probe = tokio::spawn(probe_latency(spool.clone(), stop.clone(), pages));
     tokio::time::sleep(Duration::from_secs(2)).await;
     stop.store(true, Ordering::Release);
-    latency_json(probe.await.unwrap())
+    Ok(latency_json(probe.await??))
 }
 
 async fn measured<T: Send + 'static>(
     spool: &StreamResultSpool,
     pages: usize,
-    work: impl FnOnce() -> T + Send + 'static,
-) -> (T, Json) {
+    work: impl FnOnce() -> Result<T, Failure> + Send + 'static,
+) -> Result<(T, Json), Failure> {
     reset_peak();
     let rss_before = status_kib("VmRSS:");
     let stop = Arc::new(AtomicBool::new(false));
     let probe = tokio::spawn(probe_latency(spool.clone(), stop.clone(), pages));
     let started = Instant::now();
-    let output = tokio::task::spawn_blocking(work).await.unwrap();
+    let output = tokio::task::spawn_blocking(work).await??;
     let elapsed = started.elapsed().as_secs_f64();
     stop.store(true, Ordering::Release);
-    let latency = latency_json(probe.await.unwrap());
+    let latency = latency_json(probe.await??);
     let stats = json!({
         "seconds": elapsed,
         "rss_before_kib": rss_before,
@@ -174,7 +176,7 @@ async fn measured<T: Send + 'static>(
         "pss_after_kib": pss_kib(),
         "page_load_latency_during": latency,
     });
-    (output, stats)
+    Ok((output, stats))
 }
 
 fn emit(label: &str, body: Json) {
@@ -190,13 +192,13 @@ fn env_number(name: &str, default: i64) -> i64 {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Failure> {
     let rows = env_number("BOOKIE_PROFILE_ROWS", 500_000);
     let payload = "x".repeat(env_number("BOOKIE_PROFILE_PAYLOAD_BYTES", 200) as usize);
     let manager = StreamResultSpoolManager::with_limit(64 << 30)
         .in_directory(bookie_app_services::stream_result_spool::spool_directory_from_environment());
     let base_rss = status_kib("VmRSS:");
-    let (left_spool, left_rows) = build_spool(&manager, rows, &payload, |_| None).await;
+    let (left_spool, left_rows) = build_spool(&manager, rows, &payload, |_| None).await?;
     let pages = left_spool.page_count();
     emit(
         "setup",
@@ -207,12 +209,12 @@ async fn main() {
             "rss_before_kib": base_rss,
             "rss_after_kib": status_kib("VmRSS:"),
             "spool_dir": std::env::var("BOOKIE_SPOOL_DIR").unwrap_or_else(|_| "default temp dir".into()),
-            "idle_latency": idle_latency(&left_spool, pages).await,
+            "idle_latency": idle_latency(&left_spool, pages).await?,
         }),
     );
     let left = ScanSource::new(left_spool.clone(), columns(), left_rows);
-    profile_find_and_filter(&manager, &left, &left_spool, pages).await;
-    profile_compare(&manager, &left, left_rows, rows, &payload, pages).await;
+    profile_find_and_filter(&manager, &left, &left_spool, pages).await?;
+    profile_compare(&manager, &left, left_rows, rows, &payload, pages).await
 }
 
 async fn profile_find_and_filter(
@@ -220,16 +222,21 @@ async fn profile_find_and_filter(
     left: &ScanSource,
     spool: &StreamResultSpool,
     pages: usize,
-) {
+) -> Result<(), Failure> {
     let source = left.clone();
     let (report, stats) = measured(spool, pages, move || {
         let predicate = ResultPredicate::Contains {
             scope: ColumnScope::Any,
             needle: "zzz-not-present".into(),
         };
-        find_matches(&source, predicate, &CancellationToken::new(), &ScanProgress::default()).unwrap()
+        Ok(find_matches(
+            &source,
+            predicate,
+            &CancellationToken::new(),
+            &ScanProgress::default(),
+        )?)
     })
-    .await;
+    .await?;
     emit(
         "find_full_scan",
         json!({ "rows_scanned": report.rows_scanned, "stats": stats }),
@@ -241,16 +248,15 @@ async fn profile_find_and_filter(
             scope: ColumnScope::Column(1),
             needle: "item-7".into(),
         };
-        filter_into_spool(
+        Ok(filter_into_spool(
             &source,
             predicate,
             &manager,
             &CancellationToken::new(),
             &ScanProgress::default(),
-        )
-        .unwrap()
+        )?)
     })
-    .await;
+    .await?;
     emit(
         "filter_to_derived_spool",
         json!({
@@ -260,6 +266,7 @@ async fn profile_find_and_filter(
             "stats": stats,
         }),
     );
+    Ok(())
 }
 
 async fn profile_compare(
@@ -269,13 +276,13 @@ async fn profile_compare(
     rows: i64,
     payload: &str,
     pages: usize,
-) {
+) -> Result<(), Failure> {
     let edit = |id: i64| match id % 100 {
         1 => Some("-edited"),
         2 => Some("drop"),
         _ => None,
     };
-    let (right_spool, right_rows) = build_spool(manager, rows, payload, edit).await;
+    let (right_spool, right_rows) = build_spool(manager, rows, payload, edit).await?;
     let right = ScanSource::new(right_spool, columns(), right_rows);
     for keys in [Vec::new(), vec!["id".to_string()]] {
         let request = CompareRequest {
@@ -284,9 +291,13 @@ async fn profile_compare(
             key_columns: keys.clone(),
         };
         let (report, stats) = measured(left.spool(), pages, move || {
-            compare_results(&request, &CancellationToken::new(), &ScanProgress::default()).unwrap()
+            Ok(compare_results(
+                &request,
+                &CancellationToken::new(),
+                &ScanProgress::default(),
+            )?)
         })
-        .await;
+        .await?;
         emit(
             if keys.is_empty() {
                 "compare_whole_row"
@@ -305,4 +316,5 @@ async fn profile_compare(
             }),
         );
     }
+    Ok(())
 }
