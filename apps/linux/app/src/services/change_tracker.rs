@@ -65,7 +65,11 @@ mod tests {
         assert!(shared.any_pending_in([id]));
         shared.close_tab(id);
         assert!(shared.with_tab_ref(id, |_| ()).is_none());
-        assert!(shared.with_tab(id, |tracker| tracker.track_insert(vec![Value::Int(5)])).is_none());
+        assert!(
+            shared
+                .with_tab(id, |tracker| tracker.track_insert(vec![Value::Int(5)]))
+                .is_none()
+        );
         assert!(!shared.any_pending_in([id]));
         assert!(second.with_tab_ref(id, |_| ()).is_some());
         drop(shared);

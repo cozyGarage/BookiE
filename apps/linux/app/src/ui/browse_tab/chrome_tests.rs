@@ -24,6 +24,26 @@ fn launch_tab(read_only: bool) -> (Controller<BrowseTab>, std::sync::mpsc::Recei
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn independent_browse_owners_keep_edits_and_teardown_separate() {
+    relm4::gtk::init().unwrap();
+    let id = Uuid::new_v4();
+    let (first, first_outputs) = launch_with_read_only(id, false);
+    let (second, second_outputs) = launch_with_read_only(id, false);
+    load_two_rows(&first, &first_outputs);
+    load_two_rows(&second, &second_outputs);
+    first.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&first_outputs);
+    assert!(first.model().change_trackers.any_pending_in([id]));
+    assert!(!second.model().change_trackers.any_pending_in([id]));
+    first.model().change_trackers.close_tab(id);
+    second.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&second_outputs);
+    assert!(second.model().change_trackers.any_pending_in([id]));
+    assert!(first.model().change_trackers.with_tab_ref(id, |_| ()).is_none());
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn a_row_count_queued_before_refresh_is_not_shown() {
     let (controller, outputs) = launch_tab(false);
     controller
