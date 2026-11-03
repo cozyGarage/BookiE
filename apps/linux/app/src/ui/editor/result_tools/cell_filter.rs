@@ -8,7 +8,7 @@ use super::super::stream_pages::StreamedResult;
 use super::super::{SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcomeKind};
 use super::editor::FilterRequest;
 use super::ticket::FilterTicket;
-use crate::ui::grid::value_to_display_text;
+use crate::ui::grid::{GridMsg, value_to_display_text};
 
 const LABEL_VALUE_CHARS: usize = 24;
 
@@ -45,14 +45,16 @@ impl SqlEditor {
             })
     }
 
-    pub(in crate::ui::editor) fn on_filter_cell(
-        &mut self,
-        identity: StatementIdentity,
-        column: usize,
-        value: Value,
-        exclude: bool,
-        sender: &ComponentSender<Self>,
-    ) {
+    pub(in crate::ui::editor) fn on_result_grid_message(&mut self, message: GridMsg, sender: &ComponentSender<Self>) {
+        let GridMsg::FilterWholeResult {
+            identity,
+            column,
+            value,
+            exclude,
+        } = message
+        else {
+            return;
+        };
         let Some(source) = self.streamed_result_for(identity) else {
             self.status.set_label(&crate::tr!("This result is no longer available"));
             return;
