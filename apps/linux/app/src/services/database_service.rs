@@ -269,7 +269,8 @@ impl DatabaseService {
             unresolved_connection_ids: audit.unresolved_connection_ids,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
             ssh_environment: Mutex::new(SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse)),
-            stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager::default(),
+            stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager::from_environment(
+            ),
             #[cfg(test)]
             _audit_temp_dir: audit_temp_dir,
         }
