@@ -438,6 +438,14 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ref: ${{ needs.pin-revision.outputs.revision }}", workflow)
         self.assertNotIn("needs.preflight.outputs.commit", workflow)
         self.assertNotIn("needs.resolve-ref.outputs.commit", workflow)
+
+    def test_github_gtk_job_runs_only_app_unit_tests_after_non_gtk_preflight(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = re.search(r"(?ms)^  fast:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        preflight = re.search(r"(?ms)^  preflight:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("run-test-layer.py quick", preflight)
+        self.assertIn("run-test-layer.py gtk-app", fast)
+        self.assertNotIn("run-test-layer.py full", fast)
         gate = workflow.split("  regression-gate:\n", 1)[1]
         self.assertNotIn("needs.pin-revision.outputs.revision", gate.split("steps:", 1)[1])
         for line in workflow.splitlines():
@@ -456,6 +464,12 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("needs: preflight", fast)
         self.assertIn("mozilla-actions/sccache-action@", preflight)
         self.assertIn("mozilla-actions/sccache-action@", fast)
+        for job, compile_step in ((preflight, "run-test-layer.py quick"), (fast, "run-test-layer.py change-contracts")):
+            cache_step = job.split("- name: Enable sccache for Rust\n", 1)[1].split("      - ", 1)[0]
+            self.assertIn("RUSTC_WRAPPER=sccache", cache_step)
+            self.assertIn("SCCACHE_GHA_ENABLED=true", cache_step)
+            self.assertIn("if: github.event_name != 'workflow_dispatch' || inputs.ref == ''", cache_step)
+            self.assertLess(job.index("Enable sccache for Rust"), job.index(compile_step))
         self.assertIn("shared-key: linux-build", preflight)
         self.assertIn("shared-key: linux-build", fast)
         self.assertIn(
