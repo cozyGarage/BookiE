@@ -7,6 +7,7 @@ fn closing_a_structure_tab_releases_its_generated_views() {
     adw::init().unwrap();
     let controller = StructureTab::builder()
         .launch(StructureTabInit {
+            structure_trackers: Default::default(),
             tab_id: Uuid::new_v4(),
             schema: None,
             table: "items".into(),

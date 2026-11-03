@@ -275,6 +275,7 @@ impl App {
         let driver_id = self.driver_id().to_string();
         let column_comment_capability = crate::ui::structure_tab::comment_capability_for(&self.registry, &driver_id);
         let init = crate::ui::structure_tab::StructureTabInit {
+            structure_trackers: self.structure_trackers.clone(),
             tab_id,
             schema: schema.clone(),
             table: String::new(),
@@ -476,6 +477,7 @@ impl App {
         let column_comment_capability = crate::ui::structure_tab::comment_capability_for(&self.registry, &driver_id);
         let mode = crate::ui::structure_tab::StructureMode::Edit;
         let init = crate::ui::structure_tab::StructureTabInit {
+            structure_trackers: self.structure_trackers.clone(),
             tab_id,
             schema: schema.clone(),
             table: table.clone(),
@@ -601,14 +603,14 @@ impl App {
             .borrow()
             .get(&id)
             .and_then(|t| match t {
-                WorkspaceTab::Structure(s) => {
-                    crate::services::structure_tracker::with_tab_ref(s.id, |tr| tr.has_pending())
-                }
+                WorkspaceTab::Structure(s) => self.structure_trackers.with_tab_ref(s.id, |tr| tr.has_pending()),
                 WorkspaceTab::Table(s) => {
                     let data_dirty =
                         crate::services::change_tracker::with_tab_ref(s.id, |tr| tr.has_pending()).unwrap_or(false);
-                    let struct_dirty =
-                        crate::services::structure_tracker::with_tab_ref(s.id, |tr| tr.has_pending()).unwrap_or(false);
+                    let struct_dirty = self
+                        .structure_trackers
+                        .with_tab_ref(s.id, |tr| tr.has_pending())
+                        .unwrap_or(false);
                     Some(data_dirty || struct_dirty)
                 }
                 WorkspaceTab::Editor(s) => Some(s.has_unsaved_file_changes()),
@@ -655,12 +657,15 @@ impl App {
             // Structure side doesn't try to save through the Browse
             // path (and vice versa).
             let data_dirty = crate::services::change_tracker::with_tab_ref(id, |tr| tr.has_pending()).unwrap_or(false);
-            let struct_dirty =
-                crate::services::structure_tracker::with_tab_ref(id, |tr| tr.has_pending()).unwrap_or(false);
+            let struct_dirty = self
+                .structure_trackers
+                .with_tab_ref(id, |tr| tr.has_pending())
+                .unwrap_or(false);
             let file_dirty = matches!(
                 self.workspace_tabs.borrow().get(&id),
                 Some(WorkspaceTab::Editor(slot)) if slot.has_unsaved_file_changes()
             );
+            let structure_trackers = self.structure_trackers.clone();
             dialog.connect_response(None, move |dlg, response| {
                 dlg.close();
                 match response {
@@ -669,7 +674,7 @@ impl App {
                             crate::services::change_tracker::with_tab(id, |t| t.clear());
                         }
                         if struct_dirty {
-                            crate::services::structure_tracker::with_tab(id, |t| t.clear());
+                            structure_trackers.with_tab(id, |t| t.clear());
                         }
                         sender_for_resp.input(AppMsg::CloseDiscardedWorkspaceTab(id));
                     }
@@ -779,7 +784,7 @@ impl App {
                 let _ = slot.controller.sender().send(SqlEditorInput::Cancel);
             }
             WorkspaceTab::Structure(slot) => {
-                crate::services::structure_tracker::close_tab(slot.id);
+                self.structure_trackers.close_tab(slot.id);
                 self.structure_saves_in_flight.borrow_mut().remove(&slot.id);
             }
             WorkspaceTab::Table(slot) => {
@@ -790,7 +795,7 @@ impl App {
                 // dropped async future from `drop_on_shutdown`) doesn't
                 // leave the save path permanently locked.
                 crate::services::change_tracker::close_tab(slot.id);
-                crate::services::structure_tracker::close_tab(slot.id);
+                self.structure_trackers.close_tab(slot.id);
                 self.structure_saves_in_flight.borrow_mut().remove(&slot.id);
             }
         }
@@ -859,7 +864,7 @@ impl App {
     pub(super) fn window_has_pending(&self) -> bool {
         let ids = self.this_window_tab_ids();
         crate::services::change_tracker::any_pending_in(ids.iter().copied())
-            || crate::services::structure_tracker::any_pending_in(ids)
+            || self.structure_trackers.any_pending_in(ids)
     }
 
     pub(super) fn window_pending_browse_tabs(&self) -> Vec<Uuid> {
@@ -867,7 +872,7 @@ impl App {
     }
 
     pub(super) fn window_pending_structure_tabs(&self) -> Vec<Uuid> {
-        crate::services::structure_tracker::pending_among(self.this_window_tab_ids())
+        self.structure_trackers.pending_among(self.this_window_tab_ids())
     }
 
     pub(super) fn teardown_workspace_tabs(&mut self) {
@@ -881,10 +886,10 @@ impl App {
         // would no longer be commitable.
         for tab in self.workspace_tabs.borrow().values() {
             match tab {
-                WorkspaceTab::Structure(slot) => crate::services::structure_tracker::close_tab(slot.id),
+                WorkspaceTab::Structure(slot) => self.structure_trackers.close_tab(slot.id),
                 WorkspaceTab::Table(slot) => {
                     crate::services::change_tracker::close_tab(slot.id);
-                    crate::services::structure_tracker::close_tab(slot.id);
+                    self.structure_trackers.close_tab(slot.id);
                 }
                 WorkspaceTab::Editor(_) => {}
             }

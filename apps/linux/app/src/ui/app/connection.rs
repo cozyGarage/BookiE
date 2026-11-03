@@ -607,7 +607,7 @@ impl App {
                     crate::services::change_tracker::with_tab(id, |tracker| tracker.clear());
                 }
                 for id in self.window_pending_structure_tabs() {
-                    crate::services::structure_tracker::with_tab(id, |tracker| tracker.clear());
+                    self.structure_trackers.with_tab(id, |tracker| tracker.clear());
                 }
                 self.activate_prepared_connection(sender);
             }
