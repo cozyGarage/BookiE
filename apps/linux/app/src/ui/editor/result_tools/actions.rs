@@ -182,7 +182,11 @@ impl Tools {
     }
 
     fn finish_search(self: &Rc<Self>, generation: u64, result: Result<FindReport, FindError>, forward: bool) {
-        if !self.cursor.borrow().accepts(generation) || self.filter_running() {
+        if !self.cursor.borrow().accepts(generation) {
+            return;
+        }
+        if self.filter_running() {
+            self.cursor.borrow_mut().end_search(generation);
             return;
         }
         self.set_busy(false);
@@ -262,7 +266,7 @@ impl Tools {
                 label: needle,
                 ticket: ticket.clone(),
             })));
-        super::ticket::finish_if_unsent(sent, &ticket, crate::tr!("Could not start the filter"));
+        super::ticket::finish_if_unsent(sent, &ticket, crate::tr!("The filter could not start"));
     }
 
     pub(super) fn adopt_filter(self: &Rc<Self>, ticket: Arc<FilterTicket>) {

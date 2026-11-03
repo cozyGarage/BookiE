@@ -1015,6 +1015,7 @@ fn skipped_empty_stream_page_does_not_shift_retained_result_identity() {
             generation,
             page
         )));
+        assert!(!keys.contains(&super::result_view_key(StatementIdentity::default(), page)));
     }
 }
 
