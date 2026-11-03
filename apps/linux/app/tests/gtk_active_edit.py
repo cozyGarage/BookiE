@@ -25,11 +25,13 @@ def scenarios(ui):
         ui.invoke_named_action_within("safety_items", "Open safety_items")
         cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
         bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
-        gtk_ux.x11_click(bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2, button=1, clicks=2)
+        point = (bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2)
+        gtk_ux.x11_click(*point, button=1, clicks=2)
         time.sleep(0.3)
         for key in "gamma":
             ui.press_x11_key(key)
         assert notes(database) == [(1, "alpha"), (2, "beta")]
+        return point
 
     def cancel_close_and_save(database, action, heading):
         begin_edit(database)
@@ -47,12 +49,13 @@ def scenarios(ui):
         assert notes(database) == [(1, "alpha"), (2, "beta")], "cancel committed the edit"
         save_and_assert_notes(database)
 
-    def save_and_assert_notes(database):
+    def save_and_assert_notes(database, expected=((1, "gamma"), (2, "beta"))):
+        expected = list(expected)
         ui.invoke_accessible_action("win.save-changes")
         deadline = time.monotonic() + ui.WAIT_SECONDS
-        while time.monotonic() < deadline and notes(database) != [(1, "gamma"), (2, "beta")]:
+        while time.monotonic() < deadline and notes(database) != expected:
             time.sleep(ui.POLL_SECONDS)
-        assert notes(database) == [(1, "gamma"), (2, "beta")], "the typed value was lost or its sibling changed"
+        assert notes(database) == expected, "the typed value was lost or its sibling changed"
 
     def assert_single_staged_edit():
         deadline = time.monotonic() + ui.WAIT_SECONDS
@@ -292,32 +295,14 @@ def scenarios(ui):
         assert notes(database) == [(1, "gamma"), (2, "beta")], "close tabs to the right lost the typed value"
 
     def active_cell_edit_click_inside_the_open_editor_keeps_editing(database, _base):
-        with sqlite3.connect(database) as connection:
-            connection.executemany(
-                "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
-            )
-        ui.invoke_named_action_within("safety_items", "Open safety_items")
-        cell = ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
-        bounds = cell.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
-        x, y = bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2
-        gtk_ux.x11_click(x, y, button=1, clicks=2)
-        time.sleep(0.3)
-        for key in "gamma":
-            ui.press_x11_key(key)
+        x, y = begin_edit(database)
         gtk_ux.x11_click(x, y, button=1)
         time.sleep(0.3)
+        ui.press_x11_key("End")
         ui.press_x11_key("z")
         ui.press_x11_key("Return")
         ui.wait_for_node(name="1 unsaved change")
-        ui.invoke_accessible_action("win.save-changes")
-        deadline = time.monotonic() + ui.WAIT_SECONDS
-        saved = notes(database)
-        while time.monotonic() < deadline and saved[0][1] == "alpha":
-            time.sleep(ui.POLL_SECONDS)
-            saved = notes(database)
-        inserted = {"gamma"[:index] + "z" + "gamma"[index:] for index in range(6)}
-        assert saved[0][1] in inserted, f"a click inside the open editor ended the edit or reseeded it: {saved!r}"
-        assert saved[1] == (2, "beta")
+        save_and_assert_notes(database, ((1, "gammaz"), (2, "beta")))
 
     result = [
         active_cell_edit_enter_control,

@@ -741,7 +741,6 @@ mod tests {
         gesture.emit_by_name::<()>("pressed", &[&2_i32, &150.0_f64, &20.0_f64]);
         assert!(second.is_editing());
         assert_eq!(second.entry().text().as_str(), "typed");
-        second.entry().set_text("before");
         second.stop_editing(false);
         assert!(second.grab_focus());
         let key_controller = (0..controllers.n_items())
