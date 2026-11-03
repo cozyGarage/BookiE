@@ -47,9 +47,10 @@ impl<T> PageWindow<T> {
         Some(page)
     }
 
-    pub(super) fn loaded(&mut self, page: u64, data: T, bytes: usize) {
+    pub(super) fn loaded(&mut self, page: u64, data: T, bytes: usize) -> Option<Vec<u64>> {
+        let mut evictions = Vec::new();
         if !self.pending.remove(&page) || !self.wanted.contains(&page) {
-            return;
+            return None;
         }
         self.bytes = self.bytes.saturating_add(bytes);
         self.pages.push_back((page, data, bytes));
@@ -61,9 +62,13 @@ impl<T> PageWindow<T> {
                 .unwrap_or(0);
             if let Some((evicted, _, size)) = self.pages.remove(position) {
                 self.bytes = self.bytes.saturating_sub(size);
-                self.deferred.insert(evicted);
+                if self.wanted.contains(&evicted) {
+                    self.deferred.insert(evicted);
+                }
+                evictions.push(evicted);
             }
         }
+        Some(evictions)
     }
 
     pub(super) fn failed(&mut self, page: u64) {

@@ -610,6 +610,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::paged_model::evicting_a_page_preserves_selection"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::streaming::tests::a_stream_waits_with_a_loading_status_page"
     ],
     [
