@@ -79,7 +79,7 @@ Editor failures carry only audit receipts returned by the exact guarded statemen
 
 ## State that does not belong in a component
 
-Streamed-page order, row width and schema validation live in `app-services`. The editor owns the page cache and only updates it after validation succeeds.
+Streamed-page order, row width, schema validation and row offsets live in `app-services`. The editor owns the page cache and only updates it after validation succeeds.
 
 Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons before explicit ownership was introduced, and the `Arc` handles replaced them.
 
