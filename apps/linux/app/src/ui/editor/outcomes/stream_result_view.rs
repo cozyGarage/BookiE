@@ -14,23 +14,54 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     sender: Option<&relm4::ComponentSender<super::super::SqlEditor>>,
 ) -> gtk::Widget {
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let page_switcher = gtk::Stack::builder().vexpand(true).hexpand(true).build();
     let target = super::super::stream_view::LiveStreamTarget {
         grid_sender,
         connection_id,
         database: database.clone(),
         settings_store: settings_store.clone(),
     };
+    let page_switcher = build_page_stack(outcome, result, &target, sender);
+    let progress = gtk::Label::new(Some(&stream_progress_text(result)));
+    if matches!(result.terminal, StreamTerminal::Loading) {
+        page_switcher.set_widget_name(super::super::stream_view::LIVE_PAGES);
+        progress.set_widget_name(super::super::stream_view::LIVE_PROGRESS);
+    } else {
+        page_switcher.set_widget_name(&super::super::stream_view::completed_page_stack_name(result.generation));
+    }
+    let header = super::super::stream_view::build_header(&progress);
+    holder.append(&header);
+    if let Some(notice) = stream_terminal_notice(result) {
+        let banner = adw::Banner::new(&notice);
+        banner.set_revealed(true);
+        holder.append(&banner);
+    }
+    let pager = super::super::stream_view::build_pager(&page_switcher);
+    header.append(&pager);
+    append_result_tools(&holder, &header, &page_switcher, outcome, result, sender);
+    append_stream_export(&header, result, grid_sender);
+    if matches!(result.terminal, StreamTerminal::Complete) && sender.is_some() {
+        super::super::stream_view::install_continuous(&holder, &header, &pager, &page_switcher, result, &target);
+    }
+    holder.append(&page_switcher);
+    holder.upcast()
+}
+
+fn build_page_stack(
+    outcome: &StatementOutcome,
+    result: &StreamedResult,
+    target: &super::super::stream_view::LiveStreamTarget<'_>,
+    sender: Option<&relm4::ComponentSender<super::super::SqlEditor>>,
+) -> gtk::Stack {
+    let page_switcher = gtk::Stack::builder().vexpand(true).hexpand(true).build();
     for page_index in 0..result.total_pages {
-        let container = stream_page_container(result, outcome.identity, page_index, &target);
+        let container = stream_page_container(result, outcome.identity, page_index, target);
         page_switcher.add_titled(
             &container,
             Some(container.widget_name().as_str()),
             &stream_page_label(result, page_index as usize),
         );
     }
-    let notice = stream_terminal_notice(result);
-    if notice.is_none()
+    if stream_terminal_notice(result).is_none()
         && let Some(page) = stream_terminal_page(result, outcome.identity.statement_index)
     {
         page_switcher.add_titled(&page, Some("status"), &crate::tr!("Status"));
@@ -46,35 +77,38 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     if let Some(sender) = sender {
         super::super::stream_view::install_page_loader(&page_switcher, result, outcome.identity, sender);
     }
-    let progress = gtk::Label::new(Some(&stream_progress_text(result)));
-    progress.set_wrap(true);
-    if matches!(result.terminal, StreamTerminal::Loading) {
-        page_switcher.set_widget_name(super::super::stream_view::LIVE_PAGES);
-        progress.set_widget_name(super::super::stream_view::LIVE_PROGRESS);
-    } else {
-        page_switcher.set_widget_name(&super::super::stream_view::completed_page_stack_name(result.generation));
-    }
-    holder.append(&progress);
-    if let Some(notice) = notice {
-        let banner = adw::Banner::new(&notice);
-        banner.set_revealed(true);
-        holder.append(&banner);
-    }
-    append_stream_export(&holder, result, grid_sender);
-    let pager = super::super::stream_view::build_pager(&page_switcher);
-    holder.append(&pager);
-    if matches!(result.terminal, StreamTerminal::Complete) && sender.is_some() {
-        super::super::stream_view::install_continuous(&holder, &pager, &page_switcher, result, &target);
-    }
-    holder.append(&page_switcher);
-    holder.upcast()
+    page_switcher
 }
 
-fn append_stream_export(holder: &gtk::Box, result: &StreamedResult, grid_sender: &relm4::Sender<GridMsg>) {
+fn append_result_tools(
+    holder: &gtk::Box,
+    header: &adw::WrapBox,
+    pages: &gtk::Stack,
+    outcome: &StatementOutcome,
+    result: &StreamedResult,
+    sender: Option<&relm4::ComponentSender<super::super::SqlEditor>>,
+) {
+    let (StreamTerminal::Complete, Some(sender)) = (&result.terminal, sender) else {
+        return;
+    };
+    super::super::result_tools::append(super::super::result_tools::ToolsTarget {
+        holder,
+        header,
+        pages,
+        result,
+        identity: outcome.identity,
+        sender: sender.input_sender(),
+    });
+}
+
+fn append_stream_export(holder: &adw::WrapBox, result: &StreamedResult, grid_sender: &relm4::Sender<GridMsg>) {
     if matches!(result.terminal, StreamTerminal::Loading) {
-        holder.append(&gtk::Label::new(Some(&crate::tr!(
+        let notice = gtk::Label::new(Some(&crate::tr!(
             "Export all rows is available when the query completes."
-        ))));
+        )));
+        notice.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        notice.set_max_width_chars(40);
+        holder.append(&notice);
     }
     if matches!(result.terminal, StreamTerminal::Complete)
         && let Some(request) = result.export.clone().filter(|request| request.spool.is_some())

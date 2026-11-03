@@ -2,8 +2,8 @@ use relm4::gtk;
 use relm4::gtk::prelude::*;
 
 pub(in crate::ui::editor) fn build(pages: &gtk::Stack) -> gtk::Box {
-    let controls = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-    controls.set_halign(gtk::Align::Center);
+    let controls = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    controls.set_halign(gtk::Align::Start);
     let previous = gtk::Button::with_label(&crate::tr!("Previous page"));
     let range = gtk::Label::new(None);
     let next = gtk::Button::with_label(&crate::tr!("Next page"));

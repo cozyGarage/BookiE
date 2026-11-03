@@ -1461,6 +1461,46 @@
       "bookie-app",
       "--lib",
       "ui::history_dialog::export_tests::a_failed_history_export_shows_a_dismissible_error"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::find_searches_every_page_and_jumps_to_the_page_with_the_match"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::find_reports_no_match_and_a_new_query_clears_the_old_status"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::find_buttons_step_through_matches_and_wrap"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::show_matching_rows_requests_a_filter_and_shows_its_outcome"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::cancel_is_hidden_when_idle_and_cancels_a_running_filter"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::outcomes::tests::export_partial_view::a_filtered_result_exports_only_its_own_saved_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::the_result_header_wraps_without_overlap_at_920_px"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::the_result_header_wraps_without_overlap_at_600_px"
     ]
   ],
   "keyring": [

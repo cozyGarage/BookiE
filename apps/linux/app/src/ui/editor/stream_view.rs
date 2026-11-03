@@ -3,6 +3,8 @@ mod page_index;
 mod page_window;
 mod paged_model;
 pub(super) use continuous::install as install_continuous;
+mod header;
+pub(super) use header::build as build_header;
 mod pager;
 pub(super) use pager::build as build_pager;
 

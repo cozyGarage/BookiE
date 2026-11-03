@@ -67,6 +67,16 @@ impl PinnedResults {
         self.pins.len()
     }
 
+    pub(super) fn add_pin(&mut self, outcome: StatementOutcome) -> usize {
+        self.pins.push(StatementOutcome {
+            pinned: true,
+            ..outcome
+        });
+        let excess = self.pins.len().saturating_sub(MAX_PINNED);
+        self.pins.drain(..excess);
+        self.pins.len()
+    }
+
     pub(super) fn unpin_all(&mut self) -> Vec<StatementOutcome> {
         self.pins.clear();
         self.last.clone()

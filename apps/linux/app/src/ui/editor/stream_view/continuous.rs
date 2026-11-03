@@ -9,6 +9,7 @@ use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
 pub(in crate::ui::editor) fn install(
     holder: &gtk::Box,
+    header: &relm4::adw::WrapBox,
     pager: &gtk::Box,
     pages: &gtk::Stack,
     result: &StreamedResult,
@@ -21,7 +22,10 @@ pub(in crate::ui::editor) fn install(
     let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
     container.set_vexpand(true);
     container.set_visible(false);
-    holder.append(&button);
+    container.set_widget_name(&super::super::result_tools::continuous_container_name(
+        result.generation,
+    ));
+    header.append(&button);
     holder.append(&container);
     let pager = pager.downgrade();
     let pages = pages.downgrade();
@@ -182,8 +186,10 @@ mod tests {
             database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
             settings_store: Default::default(),
         };
-        install(&holder, &pager, &pages, &result, &target);
-        let toggle = holder.first_child().unwrap().downcast::<gtk::ToggleButton>().unwrap();
+        let header = relm4::adw::WrapBox::new();
+        holder.append(&header);
+        install(&holder, &header, &pager, &pages, &result, &target);
+        let toggle = header.first_child().unwrap().downcast::<gtk::ToggleButton>().unwrap();
         let window = gtk::Window::builder()
             .default_width(600)
             .default_height(300)

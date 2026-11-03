@@ -22,6 +22,7 @@ use bookie_core::sql_format as format_plan;
 use run_lifecycle::{clear_results_box, dim_previous_results};
 mod outcomes;
 mod pinned;
+mod result_tools;
 mod run_generation;
 mod run_marks;
 mod schema;
@@ -193,6 +194,8 @@ pub enum SqlEditorInput {
         outcomes: Vec<StatementOutcome>,
     },
     Stream(streaming::Input),
+    FilterResults(Box<result_tools::FilterRequest>),
+    FilterFinished(Box<result_tools::FilterDone>),
     RunWithLongerTimeout,
     ShowCancelled(u64),
     ShowTimedOut {
@@ -871,6 +874,8 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::ShowOutcomes { generation, outcomes } => self.on_outcomes(generation, outcomes, &sender),
 
             SqlEditorInput::Stream(input) => self.on_stream_input(input, &sender),
+            SqlEditorInput::FilterResults(request) => self.on_filter_results(*request, &sender),
+            SqlEditorInput::FilterFinished(done) => self.on_filter_finished(*done, &sender),
 
             SqlEditorInput::ShowCancelled(generation) => {
                 let Some((terminal, context)) = self.finish_run(generation, &sender) else {
