@@ -32,7 +32,7 @@ struct ScriptedSession {
 }
 
 #[async_trait]
-impl tablepro_core::Session for ScriptedSession {
+impl bookie_core::Session for ScriptedSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,
@@ -46,7 +46,7 @@ impl tablepro_core::Session for ScriptedSession {
             .filter(|_| sql.to_ascii_lowercase().contains("count("))
         {
             let mut counted = empty_result();
-            counted.rows = vec![vec![Value::Int(count)]];
+            counted.rows = vec![vec![Value::Int(count)]].into();
             return Ok(counted);
         }
         if self.script.disconnect_on == Some(sql) {
@@ -75,15 +75,15 @@ impl tablepro_core::Session for ScriptedSession {
         sql: &str,
         params: &[Value],
         control: &OperationControl,
-    ) -> Result<tablepro_core::QueryResultBatch, DriverError> {
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
         if self.script.result_sets_on != Some(sql) {
             return self
                 .query_params_controlled(sql, params, control)
                 .await
-                .map(tablepro_core::QueryResultBatch::single);
+                .map(bookie_core::QueryResultBatch::single);
         }
         self.script.sent.lock().expect("sent lock").push(sql.to_string());
-        Ok(tablepro_core::QueryResultBatch {
+        Ok(bookie_core::QueryResultBatch {
             result_sets: vec![secret_set("first-secret"), secret_set("second-secret")],
             truncated: false,
         })
@@ -180,7 +180,7 @@ impl Connection for SessionConn {
         Ok(vec![])
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         Ok(Box::new(ScriptedSession {
             script: self.script.clone(),
             usable: true,
@@ -377,7 +377,7 @@ async fn a_read_only_begin_is_refused_before_dispatch_on_unsupported_engines() {
     assert!(h.script.sent.lock().expect("sent lock").is_empty());
 }
 
-async fn run(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Result<QueryResult, DriverError> {
+async fn run(session: &mut Box<dyn bookie_core::Session>, sql: &str) -> Result<QueryResult, DriverError> {
     session
         .query_params_controlled(sql, &[], &OperationControl::with_timeout(Duration::from_secs(5)))
         .await
@@ -1109,7 +1109,7 @@ fn secret_set(value: &str) -> QueryResult {
             enum_type: None,
             domain_type: None,
         }],
-        rows: vec![vec![Value::Text(value.into())]],
+        rows: vec![vec![Value::Text(value.into())]].into(),
         truncated: false,
     }
 }
@@ -1117,9 +1117,9 @@ fn secret_set(value: &str) -> QueryResult {
 const TWO_SETS: &str = "SELECT password FROM accounts";
 
 async fn run_sets(
-    session: &mut Box<dyn tablepro_core::Session>,
+    session: &mut Box<dyn bookie_core::Session>,
     sql: &str,
-) -> Result<tablepro_core::QueryResultBatch, DriverError> {
+) -> Result<bookie_core::QueryResultBatch, DriverError> {
     session
         .query_result_sets_params_controlled(sql, &[], &OperationControl::with_timeout(Duration::from_secs(5)))
         .await

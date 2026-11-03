@@ -29,6 +29,7 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] For SQLite `id INTEGER PRIMARY KEY`, a matching CSV `id` header is preselected when explicit auto-increment values are supported. The preview says those CSV values will be inserted when mapped, and source IDs 51 and 52 are preserved.
 - [ ] Creating a table shows a name and an inferred type per column, both editable before anything runs.
 - [ ] Approval is requested **once** for the whole import, not per batch.
+- [ ] Import a 900,000-row CSV: a preparation dialog stays visible and the window continues responding while the file is read and its insert plan is built. Cancel during preparation: no approval is requested and no rows are written.
 - [ ] Progress advances and Cancel stops it.
 - [ ] A file with a bad row partway through stops the import and the message says how many rows were written.
 - [ ] Import refuses to start on a read-only connection.
@@ -74,13 +75,24 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] With the referenced table already open, the same action switches to that tab and replaces its filter.
 - [ ] A composite key filters every referenced column from the same row; with one of its columns hidden, a toast says so.
 
-## Filter by This Value
+## Result grid font zoom
+
+Focus a browse or SQL result grid. Editor font size in Preferences must stay unchanged.
+
+- [ ] With the result grid focused, Ctrl+= / Ctrl++ increases the grid value font; Ctrl+- decreases it; Ctrl+0 resets to the default. The same chords leave the SQL editor font unchanged when the editor is focused.
+- [ ] Fixed column widths grow and shrink with the zoom so headers stay aligned with values; user-saved widths are not written during a zoom step.
+- [ ] Zoom persists for the rest of the session across result grids and does not change the SQL editor font. Restart restores the default grid size.
+- [ ] Repeat under Wayland and X11 at 100% and a fractional scale.
+
+## Filter by This Value / Exclude This Value
 
 - [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows and the filter strip shows the new rule.
-- [ ] On a NULL cell it filters with IS NULL.
-- [ ] Doing it again on another value of the same column replaces that rule.
+- [ ] Exclude This Value adds a not-equal (or is-not-null) rule through the same filter strip path.
+- [ ] On a NULL cell, Filter uses IS NULL and Exclude uses IS NOT NULL.
+- [ ] Empty-string cells stay distinct from NULL for both actions.
+- [ ] Doing either action again on another value of the same column replaces that column's rule.
 - [ ] A JSON or binary cell shows "Values of this type can't be used as a filter".
-- [ ] The item is absent from SQL editor result grids.
+- [ ] On a SQL editor result grid, both actions filter the loaded rows only; Clear filter restores the prior loaded page.
 
 ## Named browse filters
 

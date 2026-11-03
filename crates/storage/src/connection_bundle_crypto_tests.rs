@@ -17,6 +17,7 @@ use super::*;
 
 fn envelope() -> EnvelopeHeader {
     EnvelopeHeader {
+        format: crate::connection_bundle::BUNDLE_FORMAT,
         version: 1,
         producer: "bookie 0.2.0".into(),
         exported_at: "2026-09-19T10:00:00Z".into(),
@@ -86,6 +87,7 @@ fn downgrading_the_kdf_header_cannot_produce_a_cheap_bundle() {
 fn rewriting_the_envelope_invalidates_the_tag() {
     let bundle = sealed(b"{\"connections\":[]}");
     let other = EnvelopeHeader {
+        format: crate::connection_bundle::BUNDLE_FORMAT,
         version: 1,
         producer: "attacker 9.9".into(),
         exported_at: "2026-09-19T10:00:00Z".into(),
@@ -163,6 +165,7 @@ fn the_associated_data_layout_is_length_prefixed_and_unambiguous() {
     };
     let first = associated_data(
         &EnvelopeHeader {
+            format: crate::connection_bundle::BUNDLE_FORMAT,
             version: 1,
             producer: "ab".into(),
             exported_at: "c".into(),
@@ -173,6 +176,7 @@ fn the_associated_data_layout_is_length_prefixed_and_unambiguous() {
     );
     let second = associated_data(
         &EnvelopeHeader {
+            format: crate::connection_bundle::BUNDLE_FORMAT,
             version: 1,
             producer: "a".into(),
             exported_at: "bc".into(),
@@ -182,5 +186,17 @@ fn the_associated_data_layout_is_length_prefixed_and_unambiguous() {
         &[9u8; NONCE_LEN],
     );
     assert_ne!(first, second);
-    assert!(first.starts_with(b"tablepro.connection-bundle\0"));
+    assert!(first.starts_with(b"bookie.connection-bundle\0"));
+}
+
+#[test]
+fn a_bundle_sealed_under_the_legacy_format_still_opens() {
+    let legacy = EnvelopeHeader {
+        format: crate::connection_bundle::LEGACY_BUNDLE_FORMAT,
+        ..envelope()
+    };
+    let sealed = seal(b"payload", "correct horse", &legacy).expect("seal");
+
+    assert_eq!(&open(&sealed, "correct horse", &legacy).expect("open")[..], b"payload");
+    assert!(open(&sealed, "correct horse", &envelope()).is_err());
 }

@@ -3,7 +3,7 @@ use super::parse_input_for_driver;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -56,13 +56,13 @@ async fn value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_s
         )
         .await
         .unwrap();
-    let sibling_before = before.rows[1].clone();
+    let sibling_before = before.rows[1].to_vec();
 
     let fixed = parse_input_for_driver(FIXED, Some(&columns[fixed_index]), "postgres").unwrap();
     let variable = parse_input_for_driver(VARIABLE, Some(&columns[variable_index]), "postgres").unwrap();
     assert_eq!(fixed, Value::Text(FIXED.into()));
     assert_eq!(variable, Value::Text(VARIABLE.into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "bit_array_grid",
@@ -106,7 +106,7 @@ async fn value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_s
     assert_eq!(after.rows[1], sibling_before);
 
     let invalid = parse_input_for_driver("{1,not-a-bit}", Some(&columns[variable_index]), "postgres").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "bit_array_grid",
@@ -122,8 +122,8 @@ async fn value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_s
     assert!(
         matches!(
             &error,
-            tablepro_core::DriverError::Transaction { source, .. }
-                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
+            bookie_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
         ),
         "invalid varbit[] should retain PostgreSQL's invalid-text SQLSTATE: {error:?}"
     );

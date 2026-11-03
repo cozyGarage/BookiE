@@ -46,14 +46,13 @@ run_full() {
   cargo fmt --all -- --check
 
   echo "==> cargo clippy"
-  cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
+  cargo clippy --workspace --all-targets -- -D warnings
 
   echo "==> nextest --workspace --lib --bins"
   # Compiling tests already builds the crates; a separate `cargo build`
   # beforehand doubles wall time for little signal.
-  # DuckDB is optional (--features duckdb) and expensive to compile.
   NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-  "$NEXTEST" nextest run --workspace --exclude tablepro-driver-duckdb --lib --bins --profile "${TABLEPRO_NEXTEST_PROFILE:-default}" --no-tests=fail
+  "$NEXTEST" nextest run --workspace --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
 
   echo "==> sandbox integration tier"
   "$ROOT/scripts/test-sandbox.sh"
@@ -63,22 +62,22 @@ run_full() {
 }
 
 run_integration() {
-  export TABLEPRO_TEST_RUN_ID="ci-${$}-${RANDOM}"
+  export BOOKIE_TEST_RUN_ID="ci-${$}-${RANDOM}"
   cleanup_testcontainers() {
-    python3 "$ROOT/scripts/cleanup-testcontainers.py" "$TABLEPRO_TEST_RUN_ID"
+    python3 "$ROOT/scripts/cleanup-testcontainers.py" "$BOOKIE_TEST_RUN_ID"
   }
   trap cleanup_testcontainers EXIT
   trap 'cleanup_testcontainers; exit 143' TERM
   trap 'cleanup_testcontainers; exit 130' INT
   echo "==> SQL and document/key-value driver integration"
   cargo test --locked --test integration \
-    -p tablepro-driver-postgres -p tablepro-driver-mysql -p tablepro-driver-mssql \
-    -p tablepro-driver-clickhouse -p tablepro-driver-redis -p tablepro-driver-mongodb \
+    -p bookie-driver-postgres -p bookie-driver-mysql -p bookie-driver-mssql \
+    -p bookie-driver-clickhouse -p bookie-driver-redis -p bookie-driver-mongodb \
     -- --include-ignored --test-threads=1
-  cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
-  cargo test --locked -p tablepro-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
-  cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
-  cargo test --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
+  cargo test --locked -p bookie-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+  cargo test --locked -p bookie-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
+  cargo test --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1
+  cargo test --locked -p bookie-policy --test session_mssql -- --include-ignored --test-threads=1
   echo "==> PostgreSQL Unix-socket integration"
   ./scripts/test-postgres-socket.sh
   bash ./scripts/test-ssh.sh
@@ -102,8 +101,8 @@ run_release() {
   python3 scripts/run-test-layer.py gtk-mysql-approval
   echo "==> MongoDB-backed GTK cursor and edit contract"
   python3 scripts/run-test-layer.py gtk-mongodb
-  cargo test --locked -p tablepro-driver-duckdb
-  cargo build --locked -p tablepro-app --features duckdb
+  cargo test --locked -p bookie-driver-duckdb
+  cargo build --locked -p bookie-app
   cargo deny check
   cargo audit
   echo "Automated release gates passed. Package install/upgrade/rollback, Wayland and candidate soak remain separate."

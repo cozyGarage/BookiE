@@ -39,7 +39,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 | | |
 |---|---|
 | Platform | Linux, with a native GTK4 and libadwaita interface. |
-| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB is experimental and available in optional builds, not the release packages; MongoDB and Redis are experimental. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
+| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB, MongoDB and Redis are experimental and built in. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Every shipped feature is free, with no account, license key, subscription, paid tier or remote entitlement check. |
 | Credentials | Kept in the desktop keyring (Secret Service). |
 | Safety | Database operations pass local policy checks. Audit-intent failures block writes by default; explicit Local/Dev policy can allow a human write without an audit record. |
@@ -48,9 +48,9 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 
 ## Install
 
-The [release page](https://github.com/cozyGarage/BookiE/releases) lists each version's available artifacts and checksums. The published 0.2.0 release provides a Debian package, an Arch package, a Flatpak bundle and an AppImage; the Debian and Arch packages are the main install paths. Library requirements and install acceptance are in [platforms](docs/platforms.md).
+The [0.2.3 release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.3) provides Debian and Arch packages, a Flatpak bundle, and an AppImage. The Debian and Arch packages are the main install paths. Library requirements and install acceptance are in [platforms](docs/platforms.md).
 
-The AppImage is for trying BookiE without installing it. Editor highlighting on a clean system remains unverified ([#1325](https://github.com/cozyGarage/BookiE/issues/1325)).
+The AppImage is for trying BookiE without installing it.
 
 To build from source, see [Build and run](#build-and-run).
 
@@ -84,7 +84,7 @@ BookiE targets Linux. The [platform guide](docs/platforms.md) lists the current 
 
 ![BookiE architecture overview: the desktop app and the headless MCP host reach every database through one PolicyGuard, then routing and static drivers](docs/images/architecture-overview.svg)
 
-Every database handle that the desktop app, the MCP tools and `bookie-agentd` receive is a `PolicyGuard`. Token scopes and connection allowlists do not replace it. Drivers are linked at build time and the interface is native GTK, with no embedded browser. The desktop app uses `tablepro-app-services` for GTK-free application state and service logic.
+Every database handle that the desktop app, the MCP tools and `bookie-agentd` receive is a `PolicyGuard`. Token scopes and connection allowlists do not replace it. Drivers are linked at build time and the interface is native GTK, with no embedded browser. The desktop app uses `bookie-app-services` for GTK-free application state and service logic.
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) has the crate map, the request pipeline, trait boundaries and deliberate limits.
 
@@ -98,7 +98,7 @@ Start with the [documentation map](docs/README.md) and [Project #3](https://gith
 
 BookiE is an independent, standalone Linux database client with its own autonomous architecture, development lifecycle, and product roadmap.
 
-Installed commands are `bookie` and `bookie-agentd`, with `tablepro*` aliases provided for launcher compatibility. To guarantee seamless user upgrades and prevent data loss, existing installations preserve their established local storage schemas and credentials: app ID (`com.tablepro.linux`), configuration and data paths (`~/.config/tablepro/`), keyring schema, UUIDs, audit format, and protocol contracts retain their existing identifiers. Cargo packages and binaries remain `tablepro-app` / `tablepro-agentd`, and workspace crate names remain `tablepro-*`.
+Installed commands are `bookie`, `bookie-agentd` and `bookie-askpass`. The app ID is `com.bookie.linux` and state lives under `~/.config/bookie/` and `~/.local/share/bookie/`. On first start the app copies state from the legacy `tablepro` locations and keyring entries and leaves the originals in place for rollback ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)). Cargo packages are `bookie-*`.
 
 
 ## Build requirements
@@ -131,19 +131,15 @@ rustc --version
 From the repository root:
 
 ```bash
-cargo run -p tablepro-app
+cargo run -p bookie-app
 ```
 
-Optional DuckDB driver:
+The first build compiles the bundled DuckDB engine, which takes several minutes.
+
+A plain `cargo run` shares settings, saved connections, the keyring entries and the single-instance lock with an installed BookiE. To keep test data apart, build with the development profile, which uses `~/.config/bookie-devel` and its own keyring schema:
 
 ```bash
-cargo run -p tablepro-app --features duckdb
-```
-
-A plain `cargo run` shares settings, saved connections, the keyring entries and the single-instance lock with an installed BookiE. To keep test data apart, build with the development profile, which uses `~/.config/tablepro-devel` and its own keyring schema:
-
-```bash
-TABLEPRO_PROFILE=development cargo run -p tablepro-app
+BOOKIE_PROFILE=development cargo run -p bookie-app
 ```
 
 Starting a second copy of the same profile asks the running one to show its window and then exits.
@@ -162,7 +158,7 @@ Local cheap checks from the repository root:
 bash scripts/preflight.sh
 ```
 
-`preflight.sh` covers size and panic guards, formatting, Clippy, unit tests on non-GTK crates (it skips `tablepro-app`) and the sandbox tier. It does not run the installed GTK suite. Deeper layers (Docker drivers, GTK widgets, installed GTK, release fixture) are documented in [`docs/validation-playbook.md`](docs/validation-playbook.md) and [`docs/testing.md`](docs/testing.md).
+`preflight.sh` covers size and panic guards, formatting, Clippy, unit tests on non-GTK crates (it skips `bookie-app`) and the sandbox tier. It does not run the installed GTK suite. Deeper layers (Docker drivers, GTK widgets, installed GTK, release fixture) are documented in [`docs/validation-playbook.md`](docs/validation-playbook.md) and [`docs/testing.md`](docs/testing.md).
 
 From the repository root:
 

@@ -3,8 +3,8 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
+use bookie_core::{AuthMode, ConnectOptions, TlsMode};
 use secrecy::ExposeSecret;
-use tablepro_core::{AuthMode, ConnectOptions, TlsMode};
 use tokio::process::Command;
 use tokio_util::sync::CancellationToken;
 
@@ -46,12 +46,15 @@ pub async fn pg_dump(
         return Err(DumpError::PathNotAbsolute);
     }
     let partial = partial_path(request.output);
-    let _cleanup = RemoveOnDrop(partial.clone());
-    create_private_file(&partial).await?;
+    create_private_file(&partial)?;
+    let mut cleanup = RemoveOnDrop::owned(partial.clone());
     let args = dump_args(request.format, &partial);
-    run_pg_tool(tool, request.options, args, runtime_dir, cancel, None).await?;
-    tokio::fs::rename(&partial, request.output).await?;
-    Ok(())
+    let outcome = run_pg_tool(tool, request.options, args, runtime_dir, cancel, None).await;
+    if outcome.is_ok() {
+        tokio::fs::rename(&partial, request.output).await?;
+        cleanup.disarm();
+    }
+    outcome
 }
 
 pub async fn pg_restore(
@@ -127,13 +130,13 @@ fn restore_args(input: &Path) -> Vec<OsString> {
     .collect()
 }
 
-async fn create_private_file(path: &Path) -> Result<(), DumpError> {
-    tokio::fs::OpenOptions::new()
+fn create_private_file(path: &Path) -> Result<(), DumpError> {
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
-        .open(path)
-        .await?;
+        .open(path)?;
     Ok(())
 }
 
@@ -143,11 +146,23 @@ fn partial_path(output: &Path) -> PathBuf {
     output.with_file_name(name)
 }
 
-struct RemoveOnDrop(PathBuf);
+struct RemoveOnDrop(Option<PathBuf>);
+
+impl RemoveOnDrop {
+    fn owned(path: PathBuf) -> Self {
+        Self(Some(path))
+    }
+
+    fn disarm(&mut self) {
+        self.0 = None;
+    }
+}
 
 impl Drop for RemoveOnDrop {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
+        if let Some(path) = self.0.take() {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 

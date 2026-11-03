@@ -1,4 +1,4 @@
-//! Shared composition pieces for the headless TablePro agent daemon.
+//! Shared composition pieces for the headless BookiE agent daemon.
 //!
 //! Agents reach a database through exactly the transport a saved connection
 //! describes, and every handle handed out is wrapped by `PolicyGuard`.
@@ -9,18 +9,18 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     AuthMode, ColumnInfo, Connection, DriverError, DriverRegistry, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo,
     IndexInfo, OperationControl, QueryResult, TableInfo, TlsMode, Transaction, Value,
 };
-use tablepro_mcp::ConnectionProvider;
-use tablepro_policy::{AuditState, GuardContext, PolicyConfig, PolicyGuard, Principal};
-use tablepro_storage::{SavedConnection, SavedSshConfig, load_connections};
+use bookie_mcp::ConnectionProvider;
+use bookie_policy::{AuditState, GuardContext, PolicyConfig, PolicyGuard, Principal};
+use bookie_storage::{SavedConnection, SavedSshConfig, load_connections};
 use uuid::Uuid;
 
 const SESSION_PING_TIMEOUT: Duration = Duration::from_secs(5);
 
-pub(crate) const AGENT_UNKNOWN_HOST_KEY: tablepro_ssh::UnknownHostKey = tablepro_ssh::UnknownHostKey::Refuse;
+pub(crate) const AGENT_UNKNOWN_HOST_KEY: bookie_ssh::UnknownHostKey = bookie_ssh::UnknownHostKey::Refuse;
 
 struct OpenSession {
     key: SessionKey,
@@ -33,7 +33,7 @@ struct SessionFaultSink {
     retired: Arc<std::sync::atomic::AtomicBool>,
 }
 
-impl tablepro_policy::ConnectionFaultSink for SessionFaultSink {
+impl bookie_policy::ConnectionFaultSink for SessionFaultSink {
     fn connection_became_unusable(&self, operation: &str) {
         tracing::warn!(operation, "a cached session became unusable and will be replaced");
         self.retired.store(true, std::sync::atomic::Ordering::Release);
@@ -42,7 +42,7 @@ impl tablepro_policy::ConnectionFaultSink for SessionFaultSink {
 
 struct SessionConnection {
     inner: Arc<dyn Connection>,
-    _tunnel: Option<tablepro_transport::Tunnel>,
+    _tunnel: Option<bookie_transport::Tunnel>,
 }
 
 #[async_trait]
@@ -69,18 +69,18 @@ impl Connection for SessionConnection {
 
     async fn list_objects(
         &self,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<&str>,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         self.inner.list_objects(kind, schema).await
     }
 
     async fn list_objects_controlled(
         &self,
-        kind: tablepro_core::CatalogObjectKind,
+        kind: bookie_core::CatalogObjectKind,
         schema: Option<&str>,
         control: &OperationControl,
-    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         self.inner.list_objects_controlled(kind, schema, control).await
     }
 
@@ -263,7 +263,7 @@ impl Connection for SessionConnection {
         self.inner.list_databases_controlled(control).await
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         self.inner.open_session().await
     }
 
@@ -272,7 +272,7 @@ impl Connection for SessionConnection {
         sql: &str,
         params: &[Value],
         control: &OperationControl,
-    ) -> Result<tablepro_core::QueryResultBatch, DriverError> {
+    ) -> Result<bookie_core::QueryResultBatch, DriverError> {
         self.inner.query_result_sets_controlled(sql, params, control).await
     }
 
@@ -314,7 +314,7 @@ impl Connection for SessionConnection {
     async fn lexical_settings_controlled(
         &self,
         control: &OperationControl,
-    ) -> Result<Option<tablepro_core::sql_syntax::script::LexicalSettings>, DriverError> {
+    ) -> Result<Option<bookie_core::sql_syntax::script::LexicalSettings>, DriverError> {
         self.inner.lexical_settings_controlled(control).await
     }
 
@@ -361,12 +361,12 @@ impl SessionKey {
 pub struct DaemonProvider {
     registry: Arc<DriverRegistry>,
     policy: Arc<PolicyConfig>,
-    audit: Arc<dyn tablepro_policy::AuditSink>,
+    audit: Arc<dyn bookie_policy::AuditSink>,
     audit_state: Arc<AuditState>,
-    approval: Arc<dyn tablepro_policy::ApprovalSink>,
+    approval: Arc<dyn bookie_policy::ApprovalSink>,
     sessions: Mutex<HashMap<Uuid, OpenSession>>,
     session_locks: Mutex<HashMap<Uuid, Arc<tokio::sync::Mutex<()>>>>,
-    ssh: tablepro_transport::SshEnvironment,
+    ssh: bookie_transport::SshEnvironment,
 }
 
 #[async_trait]
@@ -392,9 +392,9 @@ impl DaemonProvider {
     pub fn new(
         registry: Arc<DriverRegistry>,
         policy: Arc<PolicyConfig>,
-        audit: Arc<dyn tablepro_policy::AuditSink>,
+        audit: Arc<dyn bookie_policy::AuditSink>,
         audit_state: Arc<AuditState>,
-        approval: Arc<dyn tablepro_policy::ApprovalSink>,
+        approval: Arc<dyn bookie_policy::ApprovalSink>,
     ) -> Self {
         Self {
             registry,
@@ -404,7 +404,7 @@ impl DaemonProvider {
             approval,
             sessions: Mutex::new(HashMap::new()),
             session_locks: Mutex::new(HashMap::new()),
-            ssh: tablepro_transport::SshEnvironment::builtin(AGENT_UNKNOWN_HOST_KEY),
+            ssh: bookie_transport::SshEnvironment::builtin(AGENT_UNKNOWN_HOST_KEY),
         }
     }
 
@@ -462,7 +462,7 @@ impl DaemonProvider {
         Arc::new(PolicyGuard::new(raw, ctx).with_fault_sink(fault))
     }
 
-    pub fn with_system_openssh(mut self, openssh: tablepro_transport::OpenSshEnvironment) -> Self {
+    pub fn with_system_openssh(mut self, openssh: bookie_transport::OpenSshEnvironment) -> Self {
         self.ssh.openssh = Some(openssh);
         self
     }
@@ -479,7 +479,7 @@ impl DaemonProvider {
     ) -> Result<Arc<dyn Connection>, String> {
         let session_lock = self.session_lock(saved.id)?;
         let _open = session_lock.lock_owned().await;
-        let material = match tablepro_transport::session_material_digest(saved).await {
+        let material = match bookie_transport::session_material_digest(saved).await {
             Ok(material) => material,
             Err(error) => return Err(error.to_string()),
         };
@@ -497,7 +497,7 @@ impl DaemonProvider {
         }
 
         let connection = self.connect_session(saved, principal).await?;
-        let material = match tablepro_transport::session_material_digest(saved).await {
+        let material = match bookie_transport::session_material_digest(saved).await {
             Ok(material) => material,
             Err(error) => {
                 drop(connection);
@@ -521,17 +521,17 @@ impl DaemonProvider {
             .registry
             .get(&saved.driver_id)
             .ok_or_else(|| format!("driver {} not registered", saved.driver_id))?;
-        let ssh = tablepro_transport::saved_ssh_route(saved)
+        let ssh = bookie_transport::saved_ssh_route(saved)
             .await
             .map_err(|e| e.to_string())?;
-        let mut opts = tablepro_transport::connect_options_for(saved)
+        let mut opts = bookie_transport::connect_options_for(saved)
             .await
             .map_err(|e| e.to_string())?;
         opts.application_name = Some("BookiE agent".into());
         let ssh_environment = self
             .ssh
             .clone()
-            .with_audit(tablepro_transport::TransportAuditContext::new(
+            .with_audit(bookie_transport::TransportAuditContext::new(
                 self.audit.clone(),
                 self.audit_state.clone(),
                 principal,
@@ -540,7 +540,7 @@ impl DaemonProvider {
                 saved.environment,
                 saved.driver_id.clone(),
             ));
-        let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh, &ssh_environment)
+        let (raw, tunnel) = bookie_transport::establish(driver.as_ref(), opts, ssh, &ssh_environment)
             .await
             .map_err(|e| e.to_string())?;
         Ok(Arc::new(SessionConnection {
@@ -601,7 +601,7 @@ impl DaemonProvider {
 }
 
 async fn ping_is_healthy(
-    ping: impl std::future::Future<Output = Result<(), tablepro_core::DriverError>>,
+    ping: impl std::future::Future<Output = Result<(), bookie_core::DriverError>>,
     timeout: Duration,
 ) -> bool {
     tokio::time::timeout(timeout, ping)

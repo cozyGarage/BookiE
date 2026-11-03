@@ -1,4 +1,4 @@
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn value_contract_interval_csv_import_preserves_native_components() {
@@ -33,19 +33,19 @@ async fn value_contract_interval_csv_import_preserves_native_components() {
         .execute("CREATE TABLE interval_csv_import (id INTEGER PRIMARY KEY, span INTERVAL)")
         .await
         .unwrap();
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection.fetch_columns(None, "interval_csv_import").await.unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "duckdb",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "interval_csv_import",
             columns: &columns,
@@ -56,7 +56,7 @@ async fn value_contract_interval_csv_import_preserves_native_components() {
     )
     .expect("DuckDB interval CSV must form an exact-text INSERT plan");
     assert_eq!(
-        plan.rows, source.rows,
+        source.rows, plan.rows,
         "CSV import keeps interval text and NULL distinct"
     );
     for row in &plan.rows {
@@ -113,22 +113,22 @@ async fn value_contract_extended_calendar_csv_round_trips_exactly() {
         .execute("CREATE TABLE extended_calendar_import (id INTEGER, day DATE, moment TIMESTAMP)")
         .await
         .unwrap();
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let csv = tablepro_core::export::render_csv(
+    let options = bookie_core::import::CsvImportOptions::default();
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection
         .fetch_columns(None, "extended_calendar_import")
         .await
         .unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "duckdb",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "extended_calendar_import",
             columns: &columns,
@@ -138,7 +138,7 @@ async fn value_contract_extended_calendar_csv_round_trips_exactly() {
         &options,
     )
     .expect("DuckDB extended calendar CSV must form an exact-text INSERT plan");
-    assert_eq!(plan.rows, source.rows);
+    assert_eq!(source.rows, plan.rows);
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }

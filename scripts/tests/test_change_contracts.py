@@ -23,7 +23,7 @@ class ChangeContractTests(unittest.TestCase):
     def test_row_edit_source_maps_to_its_required_regressions(self):
         actions = CHECKER.select_actions(["apps/linux/app/src/ui/browse_tab/row_ops.rs"], CHECKER.load_map())
         self.assertEqual(len(actions), 1)
-        self.assertEqual(actions[0]["package"], "tablepro-app")
+        self.assertEqual(actions[0]["package"], "bookie-app")
         self.assertEqual(actions[0]["target"], "--lib")
         self.assertFalse(actions[0]["full_suite"])
         self.assertEqual(len(actions[0]["required_tests"]), 4)
@@ -32,7 +32,7 @@ class ChangeContractTests(unittest.TestCase):
         data = CHECKER.load_map()
         actions = CHECKER.select_actions(["crates/drivers/clickhouse/src/lib.rs"], data)
         self.assertEqual(len(actions), 1)
-        self.assertEqual(actions[0]["package"], "tablepro-driver-clickhouse")
+        self.assertEqual(actions[0]["package"], "bookie-driver-clickhouse")
         self.assertEqual(actions[0]["target"], "--lib")
         self.assertEqual(
             actions[0]["required_tests"],
@@ -73,7 +73,7 @@ class ChangeContractTests(unittest.TestCase):
     def test_other_value_path_maps_to_its_package_suite(self):
         actions = CHECKER.select_actions(["crates/core/src/value.rs"], CHECKER.load_map())
         self.assertEqual(actions, [{
-            "package": "tablepro-core",
+            "package": "bookie-core",
             "target": "--lib",
             "full_suite": True,
             "required_tests": [],

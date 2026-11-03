@@ -17,8 +17,9 @@ defaults:
 env:
   CARGO_TERM_COLOR: never
   CARGO_INCREMENTAL: "0"
-  TABLEPRO_GTK_WAIT_SECONDS: "45"
-  TABLEPRO_GTK_SCENARIO_RETRIES: "1"
+  BOOKIE_BUNDLE_CACHE: /var/cache/ci/bundles
+  BOOKIE_GTK_WAIT_SECONDS: "45"
+  BOOKIE_GTK_SCENARIO_RETRIES: "1"
   GITHUB_STEP_SUMMARY: /dev/null
   PATH: /home/runner/.cargo/bin:/home/ubuntu/.cargo/bin:/usr/local/bin:/usr/bin:/bin
   RUSTC_WRAPPER: sccache
@@ -35,7 +36,7 @@ jobs:
       run:
         shell: bash
     env:
-      TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+      BOOKIE_TOOL_DIR: /var/cache/ci/tools
       CARGO_TARGET_DIR: /var/cache/ci/target/bookie-guards-${{ github.run_id }}
       TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}
       RUSTC_WRAPPER: ""
@@ -90,11 +91,17 @@ jobs:
         shell: bash
     env:
       CARGO_HOME: /cargo
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
-      TABLEPRO_TOOL_DIR: /tools
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
+      BOOKIE_TOOL_DIR: /tools
       CARGO_PROFILE_CI_STRIP: symbols
     steps:
       - name: Check out
@@ -104,6 +111,8 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -118,9 +127,11 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "8"
         run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
           cd src
-          cargo build --profile ci --locked -p tablepro-app --bin tablepro-app
-          python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/tablepro-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}"
+          cargo build --profile ci --locked -p bookie-app --bin bookie-app
+          python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}"
       - name: Upload the source-pinned GTK binary
         uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
         with:
@@ -130,7 +141,15 @@ jobs:
           retention-days: 2
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -149,12 +168,18 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       CARGO_HOME: /cargo
-      TABLEPRO_TOOL_DIR: /tools
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      BOOKIE_TOOL_DIR: /tools
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
     steps:
       - name: Check out
         shell: bash
@@ -163,6 +188,8 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -173,10 +200,20 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Clippy
         run: |
-          cd src && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
+          cd src && cargo clippy --workspace --all-targets -- -D warnings
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -196,13 +233,19 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       CARGO_HOME: /cargo
-      TABLEPRO_TOOL_DIR: /tools
+      BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
       - name: Check out
@@ -212,6 +255,8 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -221,7 +266,10 @@ jobs:
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Build the default test bundle
-        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default
+        run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default
       - name: Publish the default test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -230,66 +278,15 @@ jobs:
         run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/default" "${{ github.sha }}" default
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
-
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
         run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
           fi
-  duckdb-build:
-    runs-on: build-host
-    needs: [test-build]
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    env:
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
-      CARGO_HOME: /cargo
-      TABLEPRO_TOOL_DIR: /tools
-      CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
-      BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
-    steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Build the DuckDB test bundle
-        run: cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" duckdb
-      - name: DuckDB analysis and documentation tests
-        run: |
-          cd src
-          cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings
-          cargo test --locked -p tablepro-driver-duckdb --doc
-      - name: Publish the DuckDB test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/duckdb" "${{ github.sha }}" duckdb
-      - name: Clean builder scratch
-        if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -328,7 +325,7 @@ jobs:
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Unit tests
         env:
-          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
         run: |
           cd src
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
@@ -372,8 +369,8 @@ jobs:
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Sandbox tier
         env:
-          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
-          TABLEPRO_NEXTEST_PROFILE: ci
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_NEXTEST_PROFILE: ci
         run: |
           cd src && bash scripts/test-sandbox.sh
 
@@ -432,13 +429,19 @@ jobs:
       run:
         shell: bash
     env:
-      CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
-      TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
+      CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
+      TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
       CARGO_HOME: /cargo
-      TABLEPRO_TOOL_DIR: /tools
+      BOOKIE_TOOL_DIR: /tools
       CARGO_BUILD_JOBS: "8"
-      RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      SCCACHE_DIR: /cargo/sccache
+      RUSTC_WRAPPER: sccache
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      CMAKE_C_COMPILER_LAUNCHER: /tools/sccache
+      CMAKE_CXX_COMPILER_LAUNCHER: /tools/sccache
+      SCCACHE_BASEDIRS: /target/bookie-${{ github.job }}
+      SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
+      PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
       - name: Check out
         shell: bash
@@ -447,6 +450,8 @@ jobs:
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
+          touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
+          sccache --start-server
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
@@ -461,6 +466,8 @@ jobs:
           apt-get install -y --no-install-recommends desktop-file-utils
       - name: Build the shared release package
         run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
           cd src
           DEB_OUT="$GITHUB_WORKSPACE/floor-package" bash scripts/build-deb.sh
           package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
@@ -476,7 +483,15 @@ jobs:
           retention-days: 2
       - name: Clean builder scratch
         if: always()
-        run: rm -rf -- "$CARGO_TARGET_DIR" "$TMPDIR"
+        run: |
+          if [[ -S "$SCCACHE_SERVER_UDS" ]]; then
+            sccache --show-stats
+            sccache --stop-server
+          fi
+          rm -rf -- "$TMPDIR"
+          if [[ -f src/scripts/ci-cache.py ]]; then
+            python3 src/scripts/ci-cache.py --root /target --lock /target/.bookie-build-cache.lock cleanup --min-free-gib 30
+          fi
 
 
       - name: Finalize runner job
@@ -525,7 +540,7 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Prepare artifact runtime
         env:
-          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Download the shared release package
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
@@ -581,7 +596,7 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Prepare artifact runtime
         env:
-          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Download the shared release package
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
@@ -604,7 +619,7 @@ jobs:
           cd src
           for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do
             python3 scripts/ci-mcp-port.py "$((10 + shard))"
-            TABLEPRO_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing
+            BOOKIE_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing
           done
 
       - name: Finalize runner job
@@ -623,11 +638,14 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
-      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
     strategy:
       fail-fast: false
       matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb]
+        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, duckdb]
+        include:
+          - driver: duckdb
+            tests: --test integration --test read_only --test missing_file
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -650,22 +668,24 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Docker Hub login
+        if: matrix.driver != 'duckdb'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
       - name: Pre-pull fixture images
+        if: ${{ matrix.driver != 'duckdb' }}
         run: bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"
       - name: Driver integration
         run: |
           cd src
           cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
+            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
           }
           trap cleanup_testcontainers EXIT
           trap 'cleanup_testcontainers; exit 143' TERM
           trap 'cleanup_testcontainers; exit 130' INT
-          bash scripts/run-rust-tests.sh --locked -p tablepro-driver-${{ matrix.driver }} --test integration -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p bookie-driver-${{ matrix.driver }} ${{ matrix.tests || '--test integration' }} -- --include-ignored --test-threads=1
 
       - name: Finalize runner job
         if: always()
@@ -683,8 +703,8 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
-      TABLEPRO_GTK_SCENARIO_RETRIES: "0"
-      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-e2e-${{ matrix.server }}
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-e2e-${{ matrix.server }}
     strategy:
       fail-fast: false
       matrix:
@@ -716,7 +736,7 @@ jobs:
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Prepare artifact runtime
         env:
-          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Download the shared GTK binary
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
@@ -726,7 +746,7 @@ jobs:
       - name: Verify the shared GTK binary
         run: |
           binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'TABLEPRO_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -783,10 +803,10 @@ jobs:
       - name: MCP, policy sessions
         run: |
           cd src
-          bash scripts/run-rust-tests.sh --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
-          bash scripts/run-rust-tests.sh --locked -p tablepro-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
-          bash scripts/run-rust-tests.sh --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
-          bash scripts/run-rust-tests.sh --locked -p tablepro-policy --test session_mssql -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1
+          bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_mssql -- --include-ignored --test-threads=1
       - name: App server tests
         run: |
           cd src && python3 scripts/run-isolated-tests.py app-server
@@ -834,7 +854,7 @@ jobs:
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Prepare artifact runtime
         env:
-          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Download the shared GTK binary
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
@@ -844,7 +864,7 @@ jobs:
       - name: Verify the shared GTK binary
         run: |
           binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'TABLEPRO_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -854,54 +874,8 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
       - name: Installed GTK end-to-end suite, one third
         run: |
-          cd src && TABLEPRO_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
+          cd src && BOOKIE_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
 
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
-  duckdb:
-    runs-on: any-host
-    needs: [duckdb-build]
-    if: github.event_name != 'pull_request'
-    timeout-minutes: 90
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/duckdb
-    steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" duckdb
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: DuckDB driver and the app with DuckDB
-        run: |
-          cd src
-          bash scripts/run-rust-tests.sh --locked -p tablepro-driver-duckdb -- --include-ignored
       - name: Finalize runner job
         if: always()
         shell: bash
@@ -1017,7 +991,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
-      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -1050,7 +1024,7 @@ jobs:
         run: |
           cd src
           cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$TABLEPRO_TEST_RUN_ID"
+            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
           }
           trap cleanup_testcontainers EXIT
           trap 'cleanup_testcontainers; exit 143' TERM
@@ -1074,8 +1048,8 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
-      TABLEPRO_GTK_SCENARIO_RETRIES: "0"
-      TABLEPRO_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
     strategy:
       fail-fast: false
       matrix:
@@ -1109,7 +1083,7 @@ jobs:
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Prepare artifact runtime
         env:
-          TABLEPRO_TOOL_DIR: /var/cache/ci/tools
+          BOOKIE_TOOL_DIR: /var/cache/ci/tools
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Download the shared GTK binary
         uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
@@ -1119,7 +1093,7 @@ jobs:
       - name: Verify the shared GTK binary
         run: |
           binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'TABLEPRO_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

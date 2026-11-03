@@ -2,16 +2,16 @@
 
 use std::sync::Arc;
 
-use drivers_postgres::PgDriver;
-use tablepro_agentd::DaemonProvider;
-use tablepro_core::{AuthMode, DriverRegistry, Environment, TlsMode};
-use tablepro_mcp::ConnectionProvider;
-use tablepro_policy::{AuditState, DenyApprovalSink, PolicyConfig, Principal};
-use tablepro_release_tests::Fixture;
-use tablepro_storage::{
+use bookie_agentd::DaemonProvider;
+use bookie_core::{AuthMode, DriverRegistry, Environment, TlsMode};
+use bookie_mcp::ConnectionProvider;
+use bookie_policy::{AuditState, DenyApprovalSink, PolicyConfig, Principal};
+use bookie_release_tests::Fixture;
+use bookie_storage::{
     AuditJournal, SavedConnection, SavedSshAuth, SavedSshConfig, delete_connection, delete_password, save_connections,
     store_password,
 };
+use drivers_postgres::PgDriver;
 use uuid::Uuid;
 
 fn saved_connection(fixture: &Fixture, id: Uuid, cert: Option<&str>, key: Option<&str>) -> SavedConnection {
@@ -26,7 +26,7 @@ fn saved_connection(fixture: &Fixture, id: Uuid, cert: Option<&str>, key: Option
         socket_dir: None,
         socket_path: None,
         database: fixture.database.clone(),
-        username: "tablepro_mtls".into(),
+        username: "bookie_mtls".into(),
         use_tls: true,
         tls_mode: Some(TlsMode::VerifyFull),
         tls_root_cert: Some(fixture.ca_cert.clone()),

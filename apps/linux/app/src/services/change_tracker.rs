@@ -1,4 +1,4 @@
-pub use tablepro_app_services::change_tracker::*;
+pub use bookie_app_services::change_tracker::*;
 
 #[derive(Debug)]
 struct RelmTrackerEvents(relm4::Sender<TrackerEvent>);
@@ -16,11 +16,11 @@ pub fn subscribe(tab_id: uuid::Uuid, sender: relm4::Sender<TrackerEvent>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     #[tokio::test]
     async fn a_deleted_rows_unique_value_can_be_added_again_in_the_same_save() {
-        use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+        use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl};
         let connection = drivers_sqlite::SqliteDriver
             .connect(ConnectOptions {
                 database: ":memory:".into(),
@@ -56,7 +56,7 @@ mod tests {
             .await
             .unwrap()
             .rows;
-        assert_eq!(rows, [[Value::Text("a@example.com".into())]]);
+        assert_eq!(rows, vec![vec![Value::Text("a@example.com".into())]]);
     }
 
     #[tokio::test]

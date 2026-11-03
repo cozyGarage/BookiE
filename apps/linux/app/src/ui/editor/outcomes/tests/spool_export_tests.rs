@@ -1,0 +1,49 @@
+use super::*;
+use std::sync::{Arc, Mutex, atomic::Ordering};
+
+#[test]
+fn exporting_a_completed_stream_reuses_pages_without_executing_sql_again() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let counters = Arc::new(CursorCounters::default());
+    let saved = Arc::new(Mutex::new(None));
+    let columns = cursor_page(&[1], true).result.columns;
+    let result = runtime.block_on(run_statements_with_stream(
+        StatementRun {
+            target: cursor_target(
+                vec![Ok(cursor_page(&[1, 2], true)), Ok(cursor_page(&[3], false))],
+                counters.clone(),
+            ),
+            statements: vec!["SELECT id FROM items".into()],
+            driver_id: "postgres",
+            parameter_values: &Default::default(),
+            control: &crate::services::operation_control::bounded(30),
+            error_policy: BatchErrorPolicy::StopScript,
+            settings_check: None,
+            succeeded: |_: &str| {},
+        },
+        {
+            let saved = saved.clone();
+            move |update| {
+                if let StreamUpdate::Started { spool, .. } = update {
+                    *saved.lock().unwrap() = Some(spool);
+                }
+                std::future::ready(true)
+            }
+        },
+    ));
+    assert!(matches!(result, ScriptRunResult::Streamed(StreamTerminal::Complete)));
+    let spool = saved.lock().unwrap().take().unwrap();
+    let factory = crate::ui::export_dialog::spool_export_factory(spool, columns, 3);
+    let mut pages = factory(tokio_util::sync::CancellationToken::new());
+    let mut rows = Vec::new();
+    while let Some(page) = pages.next_page().unwrap() {
+        rows.extend(page.into_iter().map(|row| row[0].clone()));
+    }
+    pages.finish().unwrap();
+    assert_eq!(rows, [1, 2, 3].map(bookie_core::Value::Int));
+    assert_eq!(counters.opened.load(Ordering::SeqCst), 1);
+    assert_eq!(counters.fetched.load(Ordering::SeqCst), 2);
+}

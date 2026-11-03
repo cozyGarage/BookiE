@@ -36,8 +36,8 @@ python3 scripts/run-test-layer.py sandbox
 That layer runs `scripts/test-sandbox.sh`, which invokes the Redis cancellation target explicitly after the sandbox crate tests. MongoDB's cancellation and same-client recovery cases can be run individually:
 
 ```sh
-cargo test --locked -p tablepro-driver-mongodb --test integration a_lost_mongodb_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
-cargo test --locked -p tablepro-driver-mongodb --test integration a_cancelled_mongodb_read_leaves_the_client_usable -- --ignored --exact --test-threads=1
+cargo test --locked -p bookie-driver-mongodb --test integration a_lost_mongodb_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
+cargo test --locked -p bookie-driver-mongodb --test integration a_cancelled_mongodb_read_leaves_the_client_usable -- --ignored --exact --test-threads=1
 ```
 
 These suites are separate from the strict shared value-contract filter. A green value layer alone does not prove disconnect, cancellation, or reconnect behavior.

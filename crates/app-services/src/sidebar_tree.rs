@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use tablepro_core::{CatalogObjectKind, TableInfo};
+use bookie_core::{CatalogObjectKind, TableInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupKind {
@@ -33,15 +33,50 @@ impl TreeNode {
         matches!(self.kind, NodeKind::Schema | NodeKind::Group(_))
     }
 
-    fn qualified_name(&self) -> Option<String> {
+    fn matches_search(&self, query: &str) -> bool {
         match &self.kind {
-            NodeKind::Table { schema, name } | NodeKind::View { schema, name } => Some(match schema {
-                Some(schema) => format!("{schema}.{name}"),
-                None => name.clone(),
-            }),
-            _ => None,
+            NodeKind::Table { schema, name } | NodeKind::View { schema, name } => {
+                qualified_name_matches(schema.as_deref(), name, query)
+            }
+            _ => false,
         }
     }
+}
+
+fn qualified_name_matches(schema: Option<&str>, name: &str, query: &str) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+    if !name.is_ascii() || !query.is_ascii() || schema.is_some_and(|value| !value.is_ascii()) {
+        let qualified_name = schema.map_or_else(|| name.to_string(), |schema| format!("{schema}.{name}"));
+        return qualified_name.to_lowercase().contains(query);
+    }
+    let Some(schema) = schema else {
+        return name_matches(name, query);
+    };
+    if name_matches(schema, query) || name_matches(name, query) {
+        return true;
+    }
+    query
+        .as_bytes()
+        .iter()
+        .enumerate()
+        .filter(|(_, byte)| **byte == b'.')
+        .any(|(separator, _)| {
+            schema
+                .get(schema.len().saturating_sub(separator)..)
+                .is_some_and(|suffix| suffix.eq_ignore_ascii_case(&query[..separator]))
+                && name
+                    .get(..query.len().saturating_sub(separator + 1))
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(&query[separator + 1..]))
+        })
+}
+
+fn name_matches(value: &str, query: &str) -> bool {
+    value
+        .as_bytes()
+        .windows(query.len())
+        .any(|candidate| candidate.eq_ignore_ascii_case(query.as_bytes()))
 }
 
 #[derive(Debug, Clone, Default)]
@@ -236,11 +271,7 @@ pub fn visible_nodes_with_hidden_schemas(
     }
     let mut shown = vec![false; nodes.len()];
     for (index, node) in nodes.iter().enumerate() {
-        if !schema_is_visible(node, hidden_schemas)
-            || !node
-                .qualified_name()
-                .is_some_and(|name| name.to_lowercase().contains(&query))
-        {
+        if !schema_is_visible(node, hidden_schemas) || !node.matches_search(&query) {
             continue;
         }
         shown[index] = true;
@@ -296,10 +327,7 @@ pub fn reveal_target(
         return Reveal::HiddenBySchemaFilter;
     }
     let query = query.trim().to_lowercase();
-    let matches_search = node
-        .qualified_name()
-        .is_some_and(|name| name.to_lowercase().contains(&query));
-    if !query.is_empty() && matches_search {
+    if !query.is_empty() && node.matches_search(&query) {
         return Reveal::Show {
             index,
             uncollapse: Vec::new(),

@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -57,8 +58,8 @@ POSTGRES_SSH_AUDIT_CONNECTION_ID = "1c971938-9732-433e-a9bf-ae64e94794da"
 POSTGRES_SSH_SETUP_FAILURE_CONNECTION_NAME = "PostgreSQL SSH setup failure"
 POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID = "ee8f8451-05cf-4c21-8c7f-f37c8c96e251"
 MCP_DISCONNECT_TEST_TOKEN = "bookie-gtk-mcp-disconnect-test-token"
-MCP_HTTP_PORT = int(os.environ.get("TABLEPRO_TEST_MCP_HTTP_PORT", "17432"))
-WAIT_SECONDS = float(os.environ.get("TABLEPRO_GTK_WAIT_SECONDS", "15"))
+MCP_HTTP_PORT = int(os.environ.get("BOOKIE_TEST_MCP_HTTP_PORT", "17432"))
+WAIT_SECONDS = float(os.environ.get("BOOKIE_GTK_WAIT_SECONDS", "15"))
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
 SWITCH_ROLES = tuple(
@@ -71,7 +72,7 @@ SETTLE_SECONDS = 3.0
 
 
 def storage_dir_name():
-    return os.environ.get("TABLEPRO_GTK_STORAGE_DIR", "tablepro")
+    return os.environ.get("BOOKIE_GTK_STORAGE_DIR", "bookie")
 
 
 def descendants(node):
@@ -509,6 +510,31 @@ def database_row_count(path):
         return connection.execute("SELECT COUNT(*) FROM safety_items").fetchone()[0]
 
 
+def application_memory_kib():
+    pid = _owned_application.process.pid
+    fields = {"Rss:": "rss", "Pss:": "pss", "Private_Clean:": "private_clean", "Private_Dirty:": "private_dirty"}
+    values = {}
+    for line in Path(f"/proc/{pid}/smaps_rollup").read_text().splitlines():
+        name, *parts = line.split()
+        if name in fields and parts:
+            values[fields[name]] = int(parts[0])
+    return values
+
+
+def application_sidebar_row_construction():
+    process = owned_application().process
+    stderr = process.stderr
+    position = stderr.tell()
+    stderr.seek(0)
+    output = stderr.read()
+    stderr.seek(position)
+    matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
+    if not matches:
+        raise AssertionError("the app did not report sidebar row construction timing")
+    count, elapsed = matches[-1]
+    return int(count), float(elapsed)
+
+
 def wait_for_database_count(path, expected, timeout=WAIT_SECONDS):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -641,10 +667,10 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
     with sqlite3.connect(database_b) as connection:
         connection.execute("CREATE TABLE safety_items (id INTEGER PRIMARY KEY, note TEXT)")
 
-    tablepro_config = config / storage_dir_name()
-    tablepro_config.mkdir(parents=True)
+    bookie_config = config / storage_dir_name()
+    bookie_config.mkdir(parents=True)
     if mcp_token:
-        token_config = config / "tablepro"
+        token_config = config / "bookie"
         token_config.mkdir(parents=True, exist_ok=True)
         token_path = token_config / "mcp-tokens.json"
         token_path.write_text(
@@ -712,14 +738,14 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
             }
         ],
     }
-    mysql_port = os.environ.get("TABLEPRO_GTK_MYSQL_PORT")
+    mysql_port = os.environ.get("BOOKIE_GTK_MYSQL_PORT")
     if mysql_port:
         connections["connections"].append(
             {
                 "id": MYSQL_CONNECTION_ID,
                 "name": MYSQL_CONNECTION_NAME,
                 "driver_id": "mysql",
-                "host": os.environ.get("TABLEPRO_GTK_MYSQL_HOST", "127.0.0.1"),
+                "host": os.environ.get("BOOKIE_GTK_MYSQL_HOST", "127.0.0.1"),
                 "port": int(mysql_port),
                 "database": "bookie_test",
                 "username": "root",
@@ -730,14 +756,14 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 "environment": environment,
             }
         )
-    mongodb_port = os.environ.get("TABLEPRO_GTK_MONGODB_PORT")
+    mongodb_port = os.environ.get("BOOKIE_GTK_MONGODB_PORT")
     if mongodb_port:
         connections["connections"].append(
             {
                 "id": MONGODB_CONNECTION_ID,
                 "name": MONGODB_CONNECTION_NAME,
                 "driver_id": "mongodb",
-                "host": os.environ.get("TABLEPRO_GTK_MONGODB_HOST", "127.0.0.1"),
+                "host": os.environ.get("BOOKIE_GTK_MONGODB_HOST", "127.0.0.1"),
                 "port": int(mongodb_port),
                 "database": "bookie_test",
                 "username": "",
@@ -748,14 +774,14 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 "environment": environment,
             }
         )
-    clickhouse_port = os.environ.get("TABLEPRO_GTK_CLICKHOUSE_PORT")
+    clickhouse_port = os.environ.get("BOOKIE_GTK_CLICKHOUSE_PORT")
     if clickhouse_port:
         connections["connections"].append(
             {
                 "id": CLICKHOUSE_CONNECTION_ID,
                 "name": CLICKHOUSE_CONNECTION_NAME,
                 "driver_id": "clickhouse",
-                "host": os.environ.get("TABLEPRO_GTK_CLICKHOUSE_HOST", "127.0.0.1"),
+                "host": os.environ.get("BOOKIE_GTK_CLICKHOUSE_HOST", "127.0.0.1"),
                 "port": int(clickhouse_port),
                 "database": "default",
                 "username": "default",
@@ -766,14 +792,14 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 "environment": environment,
             }
         )
-    postgres_port = os.environ.get("TABLEPRO_GTK_POSTGRES_PORT")
+    postgres_port = os.environ.get("BOOKIE_GTK_POSTGRES_PORT")
     if postgres_port:
         connections["connections"].append(
             {
                 "id": POSTGRES_CONNECTION_ID,
                 "name": POSTGRES_CONNECTION_NAME,
                 "driver_id": "postgres",
-                "host": os.environ.get("TABLEPRO_GTK_POSTGRES_HOST", "127.0.0.1"),
+                "host": os.environ.get("BOOKIE_GTK_POSTGRES_HOST", "127.0.0.1"),
                 "port": int(postgres_port),
                 "database": "bookie_test",
                 "username": "postgres",
@@ -784,28 +810,28 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 "environment": environment,
             }
         )
-    postgres_mtls_port = os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT")
+    postgres_mtls_port = os.environ.get("BOOKIE_GTK_POSTGRES_MTLS_PORT")
     if postgres_mtls_port:
         connections["connections"].append(
             {
                 "id": POSTGRES_MTLS_CONNECTION_ID,
                 "name": POSTGRES_MTLS_CONNECTION_NAME,
                 "driver_id": "postgres",
-                "host": os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_HOST", "localhost"),
+                "host": os.environ.get("BOOKIE_GTK_POSTGRES_MTLS_HOST", "localhost"),
                 "port": int(postgres_mtls_port),
-                "database": os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_DB", "tablepro"),
-                "username": os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_USER", "tablepro_mtls"),
+                "database": os.environ.get("BOOKIE_GTK_POSTGRES_MTLS_DB", "bookie"),
+                "username": os.environ.get("BOOKIE_GTK_POSTGRES_MTLS_USER", "bookie_mtls"),
                 "use_tls": True,
                 "tls_mode": "verify_full",
-                "tls_root_cert": os.environ["TABLEPRO_GTK_POSTGRES_MTLS_CA"],
-                "tls_client_cert": os.environ["TABLEPRO_GTK_POSTGRES_MTLS_CERT"],
-                "tls_client_key": os.environ["TABLEPRO_GTK_POSTGRES_MTLS_KEY"],
+                "tls_root_cert": os.environ["BOOKIE_GTK_POSTGRES_MTLS_CA"],
+                "tls_client_cert": os.environ["BOOKIE_GTK_POSTGRES_MTLS_CERT"],
+                "tls_client_key": os.environ["BOOKIE_GTK_POSTGRES_MTLS_KEY"],
                 "read_only": True,
                 "auth_mode": "password",
                 "environment": environment,
             }
         )
-        password = os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PASSWORD")
+        password = os.environ.get("BOOKIE_GTK_POSTGRES_MTLS_PASSWORD")
         if password:
             subprocess.run(
                 [
@@ -813,7 +839,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                     "store",
                     "--label=BookiE GTK PostgreSQL mTLS fixture",
                     "xdg:schema",
-                    "com.tablepro.linux.Password",
+                    "com.bookie.linux.Password",
                     "connection-id",
                     POSTGRES_MTLS_CONNECTION_ID,
                     "kind",
@@ -824,27 +850,27 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 check=True,
                 capture_output=True,
             )
-    postgres_ssh_audit_port = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PORT")
+    postgres_ssh_audit_port = os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT")
     if postgres_ssh_audit_port:
         ssh_audit = {
-            "host": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_HOST", "127.0.0.1"),
+            "host": os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST", "127.0.0.1"),
             "port": int(postgres_ssh_audit_port),
-            "username": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_USER", "tunnel"),
+            "username": os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_USER", "tunnel"),
             "auth": {
                 "kind": "private_key",
-                "path": os.environ["TABLEPRO_GTK_POSTGRES_SSH_AUDIT_KEY"],
+                "path": os.environ["BOOKIE_GTK_POSTGRES_SSH_AUDIT_KEY"],
                 "has_passphrase": False,
             },
         }
-        second_hop = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
+        second_hop = os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
         if second_hop:
             ssh_audit["jump"] = {
                 "host": second_hop,
-                "port": int(os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT", "22")),
-                "username": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_USER", "tunnel"),
+                "port": int(os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT", "22")),
+                "username": os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_USER", "tunnel"),
                 "auth": {
                     "kind": "private_key",
-                    "path": os.environ["TABLEPRO_GTK_POSTGRES_SSH_AUDIT_KEY"],
+                    "path": os.environ["BOOKIE_GTK_POSTGRES_SSH_AUDIT_KEY"],
                     "has_passphrase": False,
                 },
             }
@@ -853,22 +879,22 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 "id": POSTGRES_SSH_AUDIT_CONNECTION_ID,
                 "name": POSTGRES_SSH_AUDIT_CONNECTION_NAME,
                 "driver_id": "postgres",
-                "host": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_DB_HOST", "db.tablepro.test"),
-                "port": int(os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_DB_PORT", "5432")),
-                "database": "tablepro",
-                "username": "tablepro",
+                "host": os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_DB_HOST", "db.bookie.test"),
+                "port": int(os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_DB_PORT", "5432")),
+                "database": "bookie",
+                "username": "bookie",
                 "use_tls": True,
                 "tls_mode": "verify_full",
-                "tls_root_cert": os.environ["TABLEPRO_GTK_POSTGRES_SSH_AUDIT_CA"],
+                "tls_root_cert": os.environ["BOOKIE_GTK_POSTGRES_SSH_AUDIT_CA"],
                 "tls_client_cert": None,
                 "tls_client_key": None,
-                "read_only": os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_READ_ONLY", "true").lower() != "false",
+                "read_only": os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_READ_ONLY", "true").lower() != "false",
                 "auth_mode": "password",
                 "environment": environment,
                 "ssh": ssh_audit,
             }
         )
-        password = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PASSWORD")
+        password = os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_PASSWORD")
         if password:
             subprocess.run(
                 [
@@ -876,7 +902,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                     "store",
                     "--label=BookiE GTK PostgreSQL SSH audit fixture",
                     "xdg:schema",
-                    "com.tablepro.linux.Password",
+                    "com.bookie.linux.Password",
                     "connection-id",
                     POSTGRES_SSH_AUDIT_CONNECTION_ID,
                     "kind",
@@ -899,7 +925,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                     "store",
                     "--label=BookiE GTK PostgreSQL SSH setup failure fixture",
                     "xdg:schema",
-                    "com.tablepro.linux.Password",
+                    "com.bookie.linux.Password",
                     "connection-id",
                     POSTGRES_SSH_SETUP_FAILURE_CONNECTION_ID,
                     "kind",
@@ -910,8 +936,8 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 check=True,
                 capture_output=True,
             )
-    (tablepro_config / "connections.json").write_text(json.dumps(connections), encoding="utf-8")
-    (tablepro_config / "preferences.json").write_text(
+    (bookie_config / "connections.json").write_text(json.dumps(connections), encoding="utf-8")
+    (bookie_config / "preferences.json").write_text(
         json.dumps(
             {
                 "default_page_size": 100,
@@ -932,10 +958,10 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
             "XDG_DATA_HOME": str(data),
             "XDG_CACHE_HOME": str(cache),
             "XDG_STATE_HOME": str(state),
-            "TABLEPRO_GTK_LEAK_REPORT": str(base / "leak-report.txt"),
+            "BOOKIE_GTK_LEAK_REPORT": str(base / "leak-report.txt"),
             "XDG_RUNTIME_DIR": str(runtime),
             "GSETTINGS_BACKEND": "keyfile",
-            "RUST_LOG": "tablepro_app=debug",
+            "RUST_LOG": "bookie_app=debug",
             **gtk_input.display_environment(),
         }
     )
@@ -950,6 +976,13 @@ def owned_application():
 def start_application(binary, environment, restored=False):
     global _owned_application
     environment.setdefault("G_DEBUG", "fatal-criticals")
+    heaptrack_preload = os.environ.get("BOOKIE_GTK_APP_LD_PRELOAD")
+    heaptrack_output = os.environ.get("BOOKIE_GTK_APP_HEAPTRACK_OUTPUT")
+    if (heaptrack_preload is None) != (heaptrack_output is None):
+        raise AssertionError("Heaptrack requires both an app preload library and output pipe")
+    if heaptrack_preload is not None and heaptrack_output is not None:
+        environment["LD_PRELOAD"] = heaptrack_preload
+        environment["DUMP_HEAPTRACK_OUTPUT"] = heaptrack_output
     stderr_capture = tempfile.TemporaryFile(mode="w+", encoding="utf-8")
     try:
         process = subprocess.Popen(
@@ -1023,7 +1056,7 @@ def run_sql(sql):
 
 
 def run_scenario(binary, scenario):
-    base = Path(tempfile.mkdtemp(prefix=f"tablepro-{scenario.__name__}-"))
+    base = Path(tempfile.mkdtemp(prefix=f"bookie-{scenario.__name__}-"))
     process = None
     failure = None
     stderr = ""
@@ -1058,8 +1091,8 @@ def run_scenario(binary, scenario):
         failure = error
     finally:
         artifact_dir = None
-        if os.environ.get("TABLEPRO_GTK_ARTIFACT_DIR"):
-            artifact_dir = Path(os.environ["TABLEPRO_GTK_ARTIFACT_DIR"])
+        if os.environ.get("BOOKIE_GTK_ARTIFACT_DIR"):
+            artifact_dir = Path(os.environ["BOOKIE_GTK_ARTIFACT_DIR"])
             artifact_dir.mkdir(parents=True, exist_ok=True)
         if failure is not None and artifact_dir is not None:
             (artifact_dir / f"{scenario.__name__}-accessibility.txt").write_text(
@@ -1201,7 +1234,7 @@ def unparseable_routine_requests_human_approval(database, _base):
 
 
 def mysql_unparseable_routine_dialog_denial_preserves_database(database, _base):
-    container = os.environ["TABLEPRO_GTK_MYSQL_CONTAINER"]
+    container = os.environ["BOOKIE_GTK_MYSQL_CONTAINER"]
     open_saved_connection(MYSQL_CONNECTION_NAME)
     wait_for_frame_containing(f"{MYSQL_CONNECTION_NAME} — BookiE")
     invoke(wait_for_node(name="Open SQL editor"))
@@ -1235,7 +1268,7 @@ def mysql_routine_count(container, routine_name):
             container,
             "mysql",
             "--user=root",
-            "--password=tablepro_test",
+            "--password=bookie_test",
             "--batch",
             "--skip-column-names",
             "bookie_test",
@@ -1346,7 +1379,7 @@ def bundle_import_records_sanitized_audit_outcome(_database, base):
     import_path = base / "home" / "review-only.bookie-connections"
     incoming_id = "c6f8f3a4-c7d5-4a39-80e1-2cb50308a8bb"
     bundle = {
-        "format": "tablepro.connection-bundle",
+        "format": "bookie.connection-bundle",
         "version": 1,
         "producer": "BookiE GTK fixture",
         "exported_at": "2026-10-07T00:00:00Z",
@@ -1435,7 +1468,7 @@ def encrypted_bundle_round_trip_restores_credentials(_database, base):
     exported_secret = "fixture exported database secret"
     changed_secret = "fixture replacement database secret"
     attributes = [
-        "xdg:schema", "com.tablepro.linux.Password",
+        "xdg:schema", "com.bookie.linux.Password",
         "connection-id", "d4f5e246-c40a-4a30-90f2-39e93e94d920",
         "kind", "db_password",
     ]
@@ -1655,6 +1688,46 @@ def expanding_a_sidebar_table_loads_its_columns(database, _base):
 
 
 expanding_a_sidebar_table_loads_its_columns.environment = "local"
+
+
+def postgres_sidebar_catalog_profile(_database, base):
+    target = os.environ["BOOKIE_GTK_CATALOG_TARGET"]
+    before = application_memory_kib()
+    connect_started = time.monotonic()
+    open_saved_connection(POSTGRES_CONNECTION_NAME)
+    wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
+    frame_ready = time.monotonic()
+    wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
+    catalog_ready = time.monotonic()
+    search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
+    if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
+        invoke(search_toggle)
+    search = wait_for_node(name="Search tables", role=pyatspi.ROLE_ENTRY)
+    filter_started = time.monotonic()
+    search.queryEditableText().setTextContents(target)
+    wait_for_node_showing(target, True, timeout=120)
+    filter_ready = time.monotonic()
+    after = application_memory_kib()
+    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
+    profile = {
+        "scenario": "postgres_sidebar_catalog_profile",
+        "source_commit": os.environ.get("BOOKIE_GTK_SOURCE_COMMIT"),
+        "created_tables": int(os.environ["BOOKIE_GTK_CATALOG_TABLES"]),
+        "target": target,
+        "connect_and_catalog_frame_ms": (frame_ready - connect_started) * 1000,
+        "catalog_accessible_ms": (catalog_ready - connect_started) * 1000,
+        "search_filter_ms": (filter_ready - filter_started) * 1000,
+        "sidebar_nodes": sidebar_nodes,
+        "row_construction_ms": row_construction_ms,
+        "memory_before_kib": before,
+        "memory_after_kib": after,
+    }
+    output = Path(os.environ.get("BOOKIE_GTK_PROFILE_OUTPUT", base / "sidebar-profile.json"))
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(profile) + "\n", encoding="utf-8")
+
+
+postgres_sidebar_catalog_profile.environment = "local"
 
 
 def press_x11_text(text):
@@ -2493,7 +2566,7 @@ def overlong_sql_files_are_refused_without_replacing_the_editor(_database, base)
     editor = set_editor_text("SELECT 731;")
     app = owned_application()
     tab_count = sum(node_role(node) == pyatspi.ROLE_PAGE_TAB for node in descendants(application_node()))
-    output = os.environ.get("TABLEPRO_PROFILE_OUT")
+    output = os.environ.get("BOOKIE_PROFILE_OUT")
     for cycle in range(3 if output else 1):
         wait_for_node_containing("Split long lines before opening", present=False)
         before_rss, _ = app.memory_kb()
@@ -2574,11 +2647,11 @@ committed_editor_ddl_refreshes_sidebar.environment = "local"
 
 
 def imported_socket_urls_connect_to_mysql(_database, base):
-    socket_path = os.environ["TABLEPRO_GTK_MYSQL_SOCKET"]
+    socket_path = os.environ["BOOKIE_GTK_MYSQL_SOCKET"]
     config_path = base / "config" / storage_dir_name() / "connections.json"
     for scheme, database in (("mysql", "bookie_test"), ("mariadb", "mysql")):
         invoke(wait_for_node(name="Import from URL", role=pyatspi.ROLE_PUSH_BUTTON))
-        set_text_by_name("Connection URL", f"{scheme}://root:tablepro_test@/{database}?socket={socket_path}")
+        set_text_by_name("Connection URL", f"{scheme}://root:bookie_test@/{database}?socket={socket_path}")
         invoke(wait_for_node(name="Import", role=pyatspi.ROLE_PUSH_BUTTON))
         deadline = time.monotonic() + WAIT_SECONDS
         record = None
@@ -2611,7 +2684,7 @@ def wait_for_socket_password(record):
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline:
         secret = subprocess.run(
-            ["secret-tool", "lookup", "xdg:schema", "com.tablepro.linux.Password",
+            ["secret-tool", "lookup", "xdg:schema", "com.bookie.linux.Password",
              "connection-id", record["id"], "kind", "db_password"],
             capture_output=True, text=True, timeout=5,
         )
@@ -2635,7 +2708,7 @@ def round_trip_imported_socket_bundle(base, restart, expected):
     assert bundle_path.exists(), "socket connection bundle was not exported"
     for record in expected:
         subprocess.run(
-            ["secret-tool", "clear", "xdg:schema", "com.tablepro.linux.Password",
+            ["secret-tool", "clear", "xdg:schema", "com.bookie.linux.Password",
              "connection-id", record["id"], "kind", "db_password"],
             capture_output=True, text=True, check=True, timeout=5,
         )
@@ -2828,7 +2901,7 @@ new_connection_form_keeps_title_and_help_text_visible.environment = "local"
 
 def main():
     if len(sys.argv) != 2:
-        raise SystemExit("usage: gtk_safety.py /path/to/tablepro-app")
+        raise SystemExit("usage: gtk_safety.py /path/to/bookie-app")
     binary = Path(sys.argv[1]).resolve()
     if not binary.is_file():
         raise SystemExit(f"application binary not found: {binary}")
@@ -2880,10 +2953,12 @@ def main():
         restart_with_a_deleted_connection_opens_the_welcome_list,
         a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile,
     ]
-    if os.environ.get("TABLEPRO_GTK_MYSQL_SOCKET"):
+    if os.environ.get("BOOKIE_GTK_MYSQL_SOCKET"):
         scenarios.append(imported_socket_urls_connect_to_mysql)
-    if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
+    if os.environ.get("BOOKIE_GTK_MYSQL_CONTAINER"):
         scenarios.append(mysql_unparseable_routine_dialog_denial_preserves_database)
+    if os.environ.get("BOOKIE_GTK_POSTGRES_PORT") and os.environ.get("BOOKIE_GTK_CATALOG_TARGET"):
+        scenarios.append(postgres_sidebar_catalog_profile)
     scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_parameters.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_xml.scenarios(sys.modules[__name__]))
@@ -2900,16 +2975,16 @@ def main():
     scenarios.extend(gtk_unreadable_drafts.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_structure.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_sequences.scenarios(sys.modules[__name__]))
-    selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
+    selected = os.environ.get("BOOKIE_GTK_SCENARIO")
     if selected:
         names = set(selected.split(","))
         scenarios = [scenario for scenario in scenarios if scenario.__name__ in names]
         if {scenario.__name__ for scenario in scenarios} != names:
             raise SystemExit(f"unknown GTK scenario in: {selected}")
-    scenarios = gtk_shard.select(scenarios, os.environ.get("TABLEPRO_GTK_SHARD", ""))
-    # The merge gate sets TABLEPRO_GTK_SCENARIO_RETRIES=1 so one start-up flake (TEST-31) does not
+    scenarios = gtk_shard.select(scenarios, os.environ.get("BOOKIE_GTK_SHARD", ""))
+    # The merge gate sets BOOKIE_GTK_SCENARIO_RETRIES=1 so one start-up flake (TEST-31) does not
     # fail a run; the nightly soak leaves it unset and stays retry-free. A retry is always printed.
-    retries = int(os.environ.get("TABLEPRO_GTK_SCENARIO_RETRIES", "0"))
+    retries = int(os.environ.get("BOOKIE_GTK_SCENARIO_RETRIES", "0"))
     failures = gtk_runner.run_scenarios(scenarios, lambda scenario: run_scenario(binary, scenario), retries)
     if failures:
         raise SystemExit(gtk_runner.summary(failures))

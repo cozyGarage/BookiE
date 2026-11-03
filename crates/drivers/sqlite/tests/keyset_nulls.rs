@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use bookie_core::{keyset_before_where_clause, keyset_order_by, keyset_order_by_before, keyset_where_clause};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
-use tablepro_core::{keyset_before_where_clause, keyset_order_by, keyset_order_by_before, keyset_where_clause};
 use tempfile::TempDir;
 
 async fn seeded(directory: &TempDir) -> Box<dyn Connection> {
@@ -43,7 +43,7 @@ async fn walk(connection: &dyn Connection, backwards: bool) -> Vec<Vec<Value>> {
             .query_params(&format!("SELECT a, b FROM t WHERE {predicate}{order} LIMIT 1"), &params)
             .await
             .unwrap();
-        let Some(row) = page.rows.into_iter().next() else {
+        let Some(row) = page.rows.first().map(<[Value]>::to_vec) else {
             return seen;
         };
         seen.push(row);
@@ -60,6 +60,6 @@ async fn keyset_paging_reaches_every_row_when_key_components_are_null() {
     let mut backwards = walk(connection.as_ref(), true).await;
     backwards.reverse();
 
-    assert_eq!(forwards, all);
-    assert_eq!(backwards, all);
+    assert_eq!(all, forwards);
+    assert_eq!(all, backwards);
 }

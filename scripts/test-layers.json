@@ -119,7 +119,7 @@
             "test",
             "--locked",
             "-p",
-            "tablepro-driver-mysql",
+            "bookie-driver-mysql",
             "--test",
             "integration",
             "mysql_atomic",
@@ -136,7 +136,7 @@
             "test",
             "--locked",
             "-p",
-            "tablepro-driver-postgres",
+            "bookie-driver-postgres",
             "--test",
             "integration",
             "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
@@ -263,7 +263,7 @@
     },
     "ui": {
       "purpose": "Installed application safety flows through AT-SPI under X11",
-      "prerequisites": "GTK 4.24; Rust 1.98 or TABLEPRO_GTK_BINARY; Xvfb; PyAT-SPI; private D-Bus",
+      "prerequisites": "GTK 4.24; Rust 1.98 or BOOKIE_GTK_BINARY; Xvfb; PyAT-SPI; private D-Bus",
       "hosted_gate": "Build Linux / gtk-safety; GTK Safety Soak",
       "steps": [
         {
@@ -322,16 +322,15 @@
       ]
     },
     "values": {
-      "purpose": "Exact shared values across eight drivers, GTK and DuckDB",
-      "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker; disk space for DuckDB",
-      "hosted_gate": "Build Linux unit/driver/DuckDB jobs; strict combined runner locally",
+      "purpose": "Exact shared values across eight drivers and GTK",
+      "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker; disk space for the bundled DuckDB build",
+      "hosted_gate": "Build Linux unit and driver jobs; strict combined runner locally",
       "steps": [
         {
           "argv": [
             "bash",
             "scripts/test-value-contracts.sh",
-            "--gtk",
-            "--duckdb"
+            "--gtk"
           ],
           "timeout_seconds": 5400,
           "evidence": "exit"
@@ -349,9 +348,9 @@
             "test",
             "--locked",
             "-p",
-            "tablepro-policy",
+            "bookie-policy",
             "-p",
-            "tablepro-mcp",
+            "bookie-mcp",
             "--lib",
             "--tests"
           ],

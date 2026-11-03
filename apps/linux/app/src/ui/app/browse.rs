@@ -1,7 +1,7 @@
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender, adw};
 
-use tablepro_core::{ColumnInfo, QueryResult};
+use bookie_core::{ColumnInfo, QueryResult};
 use uuid::Uuid;
 
 use crate::services::browse_query::{BrowseTarget, PageQuery};
@@ -29,7 +29,7 @@ impl App {
         request: crate::ui::browse_tab::BrowseCellValueRequest,
         col_index: usize,
         column_name: String,
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
         sender: ComponentSender<Self>,
     ) {
         let Some((schema, table, columns, driver_id)) = self.browse_cell_value_context(tab_id) else {
@@ -415,7 +415,7 @@ impl App {
     pub(super) fn fetch_browse_enum_labels(
         &self,
         tab_id: Uuid,
-        targets: Vec<(String, tablepro_core::QualifiedTypeName)>,
+        targets: Vec<(String, bookie_core::QualifiedTypeName)>,
         sender: ComponentSender<Self>,
     ) {
         let Some(conn) = self.window_connection() else {
@@ -446,14 +446,14 @@ impl App {
         });
     }
 
-    pub(super) fn on_browse_foreign_keys_loaded(&self, tab_id: Uuid, foreign_keys: Vec<tablepro_core::ForeignKeyInfo>) {
+    pub(super) fn on_browse_foreign_keys_loaded(&self, tab_id: Uuid, foreign_keys: Vec<bookie_core::ForeignKeyInfo>) {
         self.dispatch_to_tab(tab_id, BrowseTabInput::ForeignKeysLoaded(foreign_keys));
     }
 
     pub(super) fn on_browse_inbound_foreign_keys_loaded(
         &self,
         tab_id: Uuid,
-        inbound: Vec<tablepro_core::InboundForeignKeyInfo>,
+        inbound: Vec<bookie_core::InboundForeignKeyInfo>,
     ) {
         self.dispatch_to_tab(tab_id, BrowseTabInput::InboundForeignKeysLoaded(inbound));
     }
@@ -562,24 +562,25 @@ impl App {
     }
 
     pub(super) fn on_export_streamed_results(&self, request: crate::ui::export_dialog::StreamExportRequest) {
-        let Some(connection) = request.query.origin.connection(&self.database) else {
-            self.show_toast(&crate::tr!("The connection for this result is no longer available."));
+        let Some(spool) = request.spool else {
+            self.show_toast(&crate::tr!("The complete query result is no longer available."));
             return;
         };
+        let fetcher =
+            crate::ui::export_dialog::spool_export_factory(spool, request.columns.clone(), request.total_rows);
         let result = QueryResult {
             columns: request.columns,
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         };
-        let fetcher = crate::ui::editor::query_cursor_export_factory(connection, request.query.clone());
         crate::ui::export_dialog::present_with_format(
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
-                scope: crate::ui::export_dialog::ExportScope::QueryRerun,
+                scope: crate::ui::export_dialog::ExportScope::QueryStored,
                 paged: Some(crate::ui::export_dialog::PagedExport {
-                    mode: crate::ui::export_dialog::PagedExportMode::GuardedQuery,
-                    total_rows: None,
+                    mode: crate::ui::export_dialog::PagedExportMode::StoredQuery,
+                    total_rows: Some(request.total_rows),
                     open: fetcher,
                 }),
                 result: std::sync::Arc::new(result),
@@ -635,7 +636,7 @@ impl App {
         };
         let columns_only = QueryResult {
             columns: plan.columns.clone(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         };
         crate::ui::export_dialog::present_with_format(
@@ -750,7 +751,7 @@ fn browse_cell_value_query(
     driver_id: &str,
     col_index: usize,
     column_name: &str,
-    row_key: &[tablepro_core::Value],
+    row_key: &[bookie_core::Value],
 ) -> Result<crate::services::browse_query::BoundQuery, String> {
     if columns.get(col_index).is_none_or(|column| column.name != column_name) {
         return Err(crate::tr!("The table columns changed before the value could be fetched.").to_string());
@@ -760,21 +761,24 @@ fn browse_cell_value_query(
         schema,
         table,
         columns,
-        filter: &tablepro_core::FilterSet::default(),
+        filter: &bookie_core::FilterSet::default(),
         hidden_columns: None,
         long_text_preview: false,
     }
     .value_query(col_index, row_key)
 }
 
-fn single_cell_value(result: QueryResult) -> Result<tablepro_core::Value, String> {
+fn single_cell_value(result: QueryResult) -> Result<bookie_core::Value, String> {
     if result.columns.len() != 1 || result.truncated {
         return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
     }
-    let [row] = result.rows.as_slice() else {
+    let Some(row) = result.rows.first() else {
         return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
     };
-    let [value] = row.as_slice() else {
+    if result.rows.len() != 1 {
+        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+    }
+    let [value] = row else {
         return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
     };
     Ok(value.clone())
@@ -783,18 +787,18 @@ fn single_cell_value(result: QueryResult) -> Result<tablepro_core::Value, String
 fn row_count_from_result(result: &QueryResult) -> Option<u64> {
     let value = result.rows.first()?.first()?;
     match value {
-        tablepro_core::Value::Int(i) if *i >= 0 => Some(*i as u64),
-        tablepro_core::Value::Float(f) if *f >= 0.0 && f.is_finite() => Some(*f as u64),
-        tablepro_core::Value::Decimal(d) => d.to_string().parse::<u64>().ok(),
+        bookie_core::Value::Int(i) if *i >= 0 => Some(*i as u64),
+        bookie_core::Value::Float(f) if *f >= 0.0 && f.is_finite() => Some(*f as u64),
+        bookie_core::Value::Decimal(d) => d.to_string().parse::<u64>().ok(),
         _ => None,
     }
 }
 
 async fn run_browse_count(
-    connection: std::sync::Arc<dyn tablepro_core::Connection>,
+    connection: std::sync::Arc<dyn bookie_core::Connection>,
     query: crate::services::browse_query::BoundQuery,
-    control: &tablepro_core::OperationControl,
-) -> Result<QueryResult, tablepro_core::DriverError> {
+    control: &bookie_core::OperationControl,
+) -> Result<QueryResult, bookie_core::DriverError> {
     if query.params.is_empty() {
         connection.query_controlled(&query.sql, control).await
     } else {
@@ -805,7 +809,7 @@ async fn run_browse_count(
 }
 
 fn page_fetcher_factory(
-    conn: std::sync::Arc<dyn tablepro_core::Connection>,
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
     plan: crate::services::export_pages::PagePlan,
 ) -> crate::ui::export_dialog::PageFetcherFactory {
     let run: crate::services::export_pages::PageRunner = std::sync::Arc::new(|future| {
@@ -814,7 +818,7 @@ fn page_fetcher_factory(
             let _ = reply.send(future.await).await;
         });
         answer.recv_blocking().unwrap_or_else(|_| {
-            Err(tablepro_core::export::ExportError::Source(
+            Err(bookie_core::export::ExportError::Source(
                 "the export was interrupted".into(),
             ))
         })
@@ -832,7 +836,7 @@ mod tests {
         single_cell_value,
     };
     use crate::services::read_scopes::{ReadScope, ReadScopes};
-    use tablepro_core::{ColumnInfo, QueryResult, Value};
+    use bookie_core::{ColumnInfo, QueryResult, Value};
     use uuid::Uuid;
 
     #[test]
@@ -865,7 +869,7 @@ mod tests {
     fn scalar_result(row: Option<Value>) -> QueryResult {
         QueryResult {
             columns: Vec::new(),
-            rows: row.map(|v| vec![vec![v]]).unwrap_or_default(),
+            rows: row.map(|v| vec![vec![v]]).unwrap_or_default().into(),
             truncated: false,
         }
     }
@@ -902,7 +906,7 @@ mod tests {
     fn value_refetch_accepts_only_one_complete_cell() {
         let complete = QueryResult {
             columns: vec![column()],
-            rows: vec![vec![Value::Bytes(vec![0, 255])]],
+            rows: vec![vec![Value::Bytes(vec![0, 255])]].into(),
             truncated: false,
         };
         assert_eq!(single_cell_value(complete), Ok(Value::Bytes(vec![0, 255])));
@@ -910,22 +914,22 @@ mod tests {
         for result in [
             QueryResult {
                 columns: vec![column()],
-                rows: Vec::new(),
+                rows: Vec::new().into(),
                 truncated: false,
             },
             QueryResult {
                 columns: vec![column()],
-                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]].into(),
                 truncated: false,
             },
             QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![Value::Int(1)]],
+                rows: vec![vec![Value::Int(1)]].into(),
                 truncated: false,
             },
             QueryResult {
                 columns: vec![column()],
-                rows: vec![vec![Value::Int(1)]],
+                rows: vec![vec![Value::Int(1)]].into(),
                 truncated: true,
             },
         ] {

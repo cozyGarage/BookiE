@@ -1,7 +1,7 @@
 use std::sync::{LazyLock, Mutex as StdMutex};
 
+use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use drivers_postgres::PgDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
 use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
 use testcontainers::core::{ExecCommand, Mount};
@@ -44,7 +44,7 @@ pub(crate) async fn start_pg_durable() -> (TestDatabase, ConnectOptions) {
 async fn start_pg_with_durability(durable: bool) -> (TestDatabase, ConnectOptions) {
     if can_reuse_server(
         &std::env::args().skip(1).collect::<Vec<_>>(),
-        std::env::var_os("TABLEPRO_TEST_RUN_ID").is_some(),
+        std::env::var_os("BOOKIE_TEST_RUN_ID").is_some(),
     ) && !durable
     {
         let test_lock = TEST_LOCK.lock().await;
@@ -113,8 +113,8 @@ async fn create_server(durable: bool) -> (ContainerAsync<Postgres>, Server) {
             ])
             .with_mount(Mount::tmpfs_mount("/var/lib/postgresql/data"))
     };
-    let image = match std::env::var("TABLEPRO_TEST_RUN_ID") {
-        Ok(run_id) => image.with_label("com.tablepro.test-run", run_id),
+    let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
         Err(_) => image,
     };
     let container = image
@@ -150,6 +150,7 @@ async fn reset_server(server: &Server) {
         "CREATE DATABASE test TEMPLATE template0",
         "DROP DATABASE IF EXISTS alpha_db WITH (FORCE)",
         "ALTER ROLE postgres RESET search_path",
+        "ALTER ROLE postgres RESET TimeZone",
     ] {
         connection.execute(statement).await.expect("reset postgres test server");
     }
@@ -159,9 +160,12 @@ async fn reset_server(server: &Server) {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() {
+    let (_container, server) = create_server(false).await;
+    let options = test_options(&server.options);
+    let expected_time_zone;
     {
-        let (_fixture, options) = start_pg().await;
-        let connection = PgDriver.connect(options).await.unwrap();
+        let connection = PgDriver.connect(options.clone()).await.unwrap();
+        expected_time_zone = connection.query("SHOW TimeZone").await.unwrap().rows[0][0].clone();
         connection
             .execute("CREATE TABLE fixture_isolation (value INT)")
             .await
@@ -170,13 +174,21 @@ async fn value_contract_postgres_fixtures_reset_database_and_role_search_path() 
             .execute("ALTER ROLE postgres SET search_path TO pg_catalog")
             .await
             .unwrap();
+        connection
+            .execute("ALTER ROLE postgres SET TimeZone TO 'Europe/Vienna'")
+            .await
+            .unwrap();
     }
-    let (_fixture, options) = start_pg().await;
+    reset_server(&server).await;
     let connection = PgDriver.connect(options).await.unwrap();
     assert!(connection.query("SELECT * FROM fixture_isolation").await.is_err());
     assert_eq!(
         connection.query("SELECT current_schema()::text").await.unwrap().rows,
         vec![vec![Value::Text("public".into())]],
+    );
+    assert_eq!(
+        connection.query("SHOW TimeZone").await.unwrap().rows,
+        vec![vec![expected_time_zone]]
     );
 }
 

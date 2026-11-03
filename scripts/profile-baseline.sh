@@ -9,7 +9,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 target="${CARGO_TARGET_DIR:-$PWD/target}"
 
 echo "== driver level: rows returned, time, peak memory"
-cargo build --release -q -p tablepro-driver-sqlite --example materialize_profile
+cargo build --release -q -p bookie-driver-sqlite --example materialize_profile
 for rows in 10000 100000 500000 1000000; do
   /usr/bin/time -f 'wall_s=%e maxrss_kb=%M' "$target/release/examples/materialize_profile" "$rows" 2>&1 | tr '\n' ' '
   echo
@@ -21,13 +21,13 @@ heaptrack_print /tmp/heaptrack.profile.zst 2>/dev/null |
   grep -E '^(calls to allocation functions|temporary memory allocations|peak heap memory consumption)'
 
 echo "== binary size by crate"
-ls -l "$target/release/tablepro-app" | awk '{print "binary_bytes=" $5}'
-cargo bloat --release -p tablepro-app --crates -n 12 2>&1 | sed -n '3,16p'
+ls -l "$target/release/bookie-app" | awk '{print "binary_bytes=" $5}'
+cargo bloat --release -p bookie-app --crates -n 12 2>&1 | sed -n '3,16p'
 
 echo "== app memory with a large result in the grid"
 out="$(mktemp)"
 for rows in 10000 100000 300000 1000000; do
-  TABLEPRO_PROFILE_ROWS="$rows" TABLEPRO_PROFILE_OUT="$out" TABLEPRO_GTK_SCENARIO=profile_large_result_in_the_grid \
-    TABLEPRO_GTK_BUILD_PROFILE=release bash scripts/test-gtk-safety.sh >/dev/null 2>&1
+  BOOKIE_PROFILE_ROWS="$rows" BOOKIE_PROFILE_OUT="$out" BOOKIE_GTK_SCENARIO=profile_large_result_in_the_grid \
+    BOOKIE_GTK_BUILD_PROFILE=release bash scripts/test-gtk-safety.sh >/dev/null 2>&1
 done
 cat "$out"

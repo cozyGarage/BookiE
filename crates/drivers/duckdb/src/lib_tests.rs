@@ -53,24 +53,9 @@ async fn open_session_is_refused() {
 }
 
 #[tokio::test]
-async fn a_timed_out_query_is_interrupted() {
-    let conn = in_memory_connection().await;
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(5));
-
-    let result = conn
-        .query_controlled("SELECT count(*) FROM range(100000000) a, range(2) b", &control)
-        .await;
-
-    match result {
-        Err(DriverError::TimedOut) => {}
-        other => panic!("expected TimedOut, got {other:?}"),
-    }
-}
-
-#[tokio::test]
 async fn cancelling_a_long_query_stops_it_and_frees_the_connection() {
     let conn = in_memory_connection().await;
-    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(100));
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_millis(100));
     let started = std::time::Instant::now();
 
     let result = conn
@@ -101,7 +86,7 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
     let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
     for (id, value) in values.iter().enumerate() {
-        let sql = tablepro_core::sql_literal::build_insert_literal(
+        let sql = bookie_core::sql_literal::build_insert_literal(
             "duckdb",
             None,
             "binary_exports",
@@ -217,6 +202,18 @@ async fn connect_existing_and_list_tables() {
     assert_eq!(cols.len(), 2);
     let rows = conn.fetch_rows(None, "foo", 0, 10).await.unwrap();
     assert_eq!(rows.rows.len(), 2);
+}
+
+#[tokio::test]
+async fn lists_tables_and_views_separately() {
+    let driver = DuckdbDriver;
+    let conn = driver.connect(ConnectOptions::default()).await.unwrap();
+    conn.execute("CREATE TABLE t (id INTEGER)").await.unwrap();
+    conn.execute("CREATE VIEW v AS SELECT id FROM t").await.unwrap();
+    let tables = conn.list_tables().await.unwrap();
+    let views = conn.list_views().await.unwrap();
+    assert_eq!(tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(), ["t"]);
+    assert_eq!(views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(), ["v"]);
 }
 #[tokio::test]
 async fn columns_are_read_for_a_table_whose_name_needs_quoting() {

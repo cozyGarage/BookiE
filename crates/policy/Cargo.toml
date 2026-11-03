@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-policy"
+name = "bookie-policy"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,11 +7,11 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_policy"
+name = "bookie_policy"
 path = "src/lib.rs"
 
 [dependencies]
-tablepro-core = { path = "../core" }
+bookie-core = { path = "../core" }
 async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
@@ -35,8 +35,8 @@ tokio-util.workspace = true
 tempfile.workspace = true
 proptest = "1"
 secrecy.workspace = true
-tablepro-driver-postgres = { path = "../drivers/postgres" }
-tablepro-driver-mssql = { path = "../drivers/mssql" }
+bookie-driver-postgres = { path = "../drivers/postgres" }
+bookie-driver-mssql = { path = "../drivers/mssql" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mssql_server", "postgres"] }
 

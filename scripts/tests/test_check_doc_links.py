@@ -115,7 +115,7 @@ class DocLinkTests(unittest.TestCase):
                 subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
             new_doc = root / "docs/new.md"
             new_doc.write_text("[missing](missing.md)\n")
-            vendor_doc = root / "apps/linux/packaging/arch/src/TablePro/cargo-vendor/crate/README.md"
+            vendor_doc = root / "apps/linux/packaging/arch/src/BookiE/cargo-vendor/crate/README.md"
             vendor_doc.parent.mkdir(parents=True)
             vendor_doc.write_text("[third party link](missing-vendor.md)\n")
 

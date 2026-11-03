@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::{TabGridContext, build_column_view};
 use crate::services::database_service::DatabaseService;
@@ -212,7 +212,7 @@ fn a_retired_grid_does_not_retain_its_inspector_through_selection_callback() {
     };
     let result = Arc::new(QueryResult {
         columns: vec![column.clone()],
-        rows: vec![vec![Value::Text("value".into())]],
+        rows: vec![vec![Value::Text("value".into())]].into(),
         truncated: false,
     });
     let weak_result = Arc::downgrade(&result);

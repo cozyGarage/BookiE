@@ -29,7 +29,10 @@ async fn reverse_composite_keyset_pages_keep_native_identity_and_skip_gaps() {
         .unwrap();
     let mut ascending = previous.rows;
     ascending.reverse();
-    assert_eq!(integer_pairs(&ascending), vec![(2, 996), (2, 997), (2, 999)]);
+    assert_eq!(
+        integer_pairs(&ascending.into_rows()),
+        vec![(2, 996), (2, 997), (2, 999)]
+    );
     let next = connection
         .query_params(
             "SELECT tenant, id FROM reverse_pages WHERE (tenant, id) > ($1, $2) ORDER BY tenant ASC, id ASC LIMIT 3",
@@ -37,7 +40,7 @@ async fn reverse_composite_keyset_pages_keep_native_identity_and_skip_gaps() {
         )
         .await
         .unwrap();
-    assert_eq!(integer_pairs(&next.rows), vec![(2, 999), (2, 1000), (3, 1)]);
+    assert_eq!(integer_pairs(&next.rows.into_rows()), vec![(2, 999), (2, 1000), (3, 1)]);
 }
 
 #[tokio::test]

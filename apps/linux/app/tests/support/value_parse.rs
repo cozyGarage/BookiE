@@ -2,7 +2,7 @@ use super::{
     TypeKind, classify_type, parse_decimal_value, parse_input_for_column, parse_input_for_driver,
     parse_input_for_grid_cell,
 };
-use tablepro_core::{ColumnInfo, Value, import::column_kind};
+use bookie_core::{ColumnInfo, Value, import::column_kind};
 
 #[path = "postgres_numeric_csv.rs"]
 mod postgres_numeric_csv;
@@ -12,7 +12,7 @@ mod postgres_temporal;
 
 #[tokio::test]
 async fn sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -41,7 +41,7 @@ async fn sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior() {
     let amount_index = columns.iter().position(|column| column.name == "amount").unwrap();
     let edit = parse_input_for_column("42.50", Some(&columns[amount_index])).unwrap();
     assert_eq!(edit, Value::Decimal("42.50".parse().unwrap()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "sqlite",
         None,
         "flexible",
@@ -65,8 +65,8 @@ async fn sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_date_grid_edit_preserves_millisecond_instant() {
+    use bookie_core::{ConnectOptions, DatabaseDriver};
     use mongodb::bson::{DateTime, doc, oid::ObjectId};
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
     use testcontainers::ImageExt;
     use testcontainers_modules::mongo::Mongo;
     use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -136,7 +136,7 @@ async fn value_contract_mongodb_date_grid_edit_preserves_millisecond_instant() {
     let input = "2026-09-29T18:04:56.789+05:30";
     let edited = parse_input_for_driver(input, Some(&before.columns[date_index]), "mongodb").unwrap();
     let expected_millis = chrono::DateTime::parse_from_rfc3339(input).unwrap().timestamp_millis();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "date_edits",
@@ -178,8 +178,8 @@ async fn value_contract_mongodb_date_grid_edit_preserves_millisecond_instant() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision() {
+    use bookie_core::{ConnectOptions, DatabaseDriver};
     use mongodb::bson::{Decimal128, doc, oid::ObjectId};
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
     use testcontainers::ImageExt;
     use testcontainers_modules::mongo::Mongo;
     use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -226,7 +226,7 @@ async fn value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision() 
         edited,
         Value::Json(Box::new(serde_json::json!({"$numberDecimal": wide})))
     );
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "decimal128_grid_edits",
@@ -252,7 +252,7 @@ async fn value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision() 
 
     let cleared = parse_input_for_driver("", Some(&after.columns[amount_index]), "mongodb").unwrap();
     assert_eq!(cleared, Value::Null);
-    let clear = tablepro_core::sql_dialect::build_keyed_update(
+    let clear = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "decimal128_grid_edits",
@@ -266,10 +266,9 @@ async fn value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision() 
     assert_eq!(persisted.get("amount"), Some(&mongodb::bson::Bson::Null));
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_interval_grid_edit_preserves_native_components() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -297,7 +296,7 @@ async fn value_contract_duckdb_interval_grid_edit_preserves_native_components() 
     let edit = parse_input_for_column("-2 months 4 days -5 microseconds", Some(&columns[span_index])).unwrap();
     assert_eq!(edit, Value::Text("-2 months 4 days -5 microseconds".into()));
 
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "interval_grid",
@@ -327,10 +326,9 @@ async fn value_contract_duckdb_interval_grid_edit_preserves_native_components() 
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -400,7 +398,7 @@ async fn value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding()
         "duckdb",
     )
     .unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "tz_grid",
@@ -483,7 +481,7 @@ fn postgres_wide_numeric_edits_stay_exact_text_when_decimal_cannot_represent_the
     assert_eq!(parsed, Value::Text(wide.into()));
     let mut columns = vec![col("id", false), column.clone()];
     columns[0].primary_key = true;
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "wide_numeric",
@@ -565,13 +563,13 @@ fn value_contract_mysql_bit_parser_enforces_declared_width_and_safe_range() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_bit_parser_edits_preserve_native_values() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
+    use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
 
     let container = Mysql::default()
-        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
         .with_cmd(["--default-authentication-plugin=mysql_native_password"])
         .with_startup_timeout(std::time::Duration::from_secs(180))
         .start()
@@ -582,7 +580,7 @@ async fn value_contract_mysql_bit_parser_edits_preserve_native_values() {
         port: container.get_host_port_ipv4(3306).await.unwrap(),
         database: "test".into(),
         username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        password: secrecy::SecretString::new("bookie_test".to_string().into()),
         tls: TlsConfig::disabled(),
         ..Default::default()
     };
@@ -629,7 +627,7 @@ async fn value_contract_mysql_bit_parser_edits_preserve_native_values() {
     assert_eq!(bit_sixty_three, Value::Int(i64::MAX));
     assert!(parse_input_for_driver("9223372036854775808", Some(&columns[sixty_four_bit]), "mysql").is_err());
 
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "mysql",
         None,
         "bit_edit_contract",
@@ -674,7 +672,7 @@ fn postgres_text_array_grid_literal_stays_text_for_the_shared_cast() {
     columns[0].primary_key = true;
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "text_array_grid",
@@ -695,7 +693,7 @@ fn postgres_numeric_array_grid_literal_stays_text_for_the_shared_cast() {
     columns[0].primary_key = true;
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "numeric_array_grid",
@@ -722,7 +720,7 @@ fn grid_input_preserves_other_whitespace_and_array_literals() {
     assert_eq!(parsed, Value::Text(literal.into()));
     let mut columns = vec![col("integer", false), column];
     columns[0].primary_key = true;
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "whitespace_contract",
@@ -790,11 +788,11 @@ fn mongodb_binary_subtype_edits_parse_as_extended_json() {
     let input = r#"{"$binary":{"base64":"AP9B","subType":"04"}}"#;
     let expected = serde_json::json!({"$binary": {"base64": "AP9B", "subType": "04"}});
     assert_eq!(classify_type(&data_type.to_ascii_lowercase()), TypeKind::Json);
-    assert_eq!(column_kind(data_type), tablepro_core::import::ColumnKind::Json);
+    assert_eq!(column_kind(data_type), bookie_core::import::ColumnKind::Json);
     let generic_kind = column_kind("binData-subtype-00");
-    assert_eq!(generic_kind, tablepro_core::import::ColumnKind::Bytes);
+    assert_eq!(generic_kind, bookie_core::import::ColumnKind::Bytes);
     assert_eq!(
-        tablepro_core::import::parse_cell("\\x00ff", generic_kind),
+        bookie_core::import::parse_cell("\\x00ff", generic_kind),
         Ok(Value::Bytes(vec![0, 255]))
     );
     assert_eq!(
@@ -1092,7 +1090,7 @@ fn unknown_type_falls_through_to_text() {
     assert!(matches!(r, Value::Text(_)));
 
     let mut enum_column = col("value_contract_enum_schema.value_contract_grid_enum", false);
-    enum_column.enum_type = Some(tablepro_core::QualifiedTypeName {
+    enum_column.enum_type = Some(bookie_core::QualifiedTypeName {
         schema: "value_contract_enum_schema".into(),
         name: "value_contract_grid_enum".into(),
     });

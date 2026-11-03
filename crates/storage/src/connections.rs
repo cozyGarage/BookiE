@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::error::StorageError;
 use crate::file_access::{lock_path, read_bounded, write_atomically};
-use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
+use bookie_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 const CURRENT_VERSION: u32 = 2;
 const MAX_CONNECTIONS_FILE_BYTES: usize = 16 * 1024 * 1024;
@@ -461,7 +461,7 @@ fn carry_unknown_fields(document: &mut serde_json::Value, stored: &serde_json::M
 }
 
 fn connections_path() -> Result<PathBuf, StorageError> {
-    crate::config_path("connections.json")
+    crate::paths::connections_config_path()
 }
 
 #[cfg(test)]

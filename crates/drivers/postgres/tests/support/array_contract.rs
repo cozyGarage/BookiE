@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, OperationControl, QueryResult, Value};
+use bookie_core::{Connection, OperationControl, QueryResult, Value};
 use tokio_util::sync::CancellationToken;
 
 pub async fn assert_array_contract(connection: &dyn Connection) {
@@ -152,7 +152,7 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
         .unwrap();
     let mut row = connection.query("SELECT * FROM array_grid_edit").await.unwrap();
     row.columns[0].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "array_grid_edit",
@@ -181,7 +181,7 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     let id_index = row.columns.iter().position(|column| column.name == "id").unwrap();
     let value_index = row.columns.iter().position(|column| column.name == "value").unwrap();
     row.columns[id_index].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "text_array_grid_edit",
@@ -239,7 +239,7 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
         .unwrap()
         .rows[0][0]
         .clone();
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "name_array_grid_edit",
@@ -310,7 +310,7 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
         .unwrap()
         .rows[0][0]
         .clone();
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "xml_array_grid_edit",
@@ -359,7 +359,7 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
         .await
         .unwrap_err();
     assert!(
-        matches!(&invalid_xml, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "2200N"),
+        matches!(&invalid_xml, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "2200N"),
         "expected native XML parse refusal, got {invalid_xml:?}"
     );
     let after_refusal = connection
@@ -407,7 +407,7 @@ async fn assert_oid_array_grid_edit(connection: &dyn Connection) {
         .unwrap()
         .rows[0][0]
         .clone();
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, update_params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "oid_array_grid_edit",
@@ -470,7 +470,7 @@ async fn assert_bool_array_grid_edit(connection: &dyn Connection) {
     let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
     let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
     rows.columns[id_index].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "bool_array_grid_edit",
@@ -523,7 +523,7 @@ async fn assert_bytea_array_grid_edit(connection: &dyn Connection) {
     let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
     let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
     rows.columns[id_index].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "bytea_array_grid_edit",
@@ -574,7 +574,7 @@ async fn assert_uuid_array_grid_edit(connection: &dyn Connection) {
     let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
     let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
     rows.columns[id_index].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "uuid_array_grid_edit",
@@ -624,7 +624,7 @@ async fn assert_timestamptz_array_grid_edit(connection: &dyn Connection) {
     let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
     let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
     rows.columns[id_index].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "timestamptz_array_grid_edit",
@@ -669,7 +669,7 @@ pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {
     let id_index = row.columns.iter().position(|column| column.name == "id").unwrap();
     let value_index = row.columns.iter().position(|column| column.name == "value").unwrap();
     row.columns[id_index].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "float8_array_grid_edit",
@@ -700,7 +700,7 @@ pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {
     let Value::Text(decoded_text) = &actual.rows[0][1] else {
         panic!("float8[] result must remain exact text: {:?}", actual.rows[0][1]);
     };
-    assert_eq!(&actual.rows[0][2..], expected.rows[0].as_slice());
+    assert_eq!(&actual.rows[0][2..], &expected.rows[0][..]);
     assert_eq!(
         actual.rows[1][0],
         Value::Int(2),
@@ -719,10 +719,10 @@ async fn assert_float8_array_csv_round_trip(
 ) {
     let columns = vec![result.columns[0].clone(), result.columns[1].clone()];
     let row = vec![result.rows[0][0].clone(), result.rows[0][1].clone()];
-    let csv_text = tablepro_core::export::render_csv(
+    let csv_text = bookie_core::export::render_csv(
         &columns,
         std::slice::from_ref(&row),
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
     let mut reader = csv::Reader::from_reader(csv_text.as_bytes());
     assert_eq!(reader.headers().unwrap().iter().collect::<Vec<_>>(), ["id", "value"]);
@@ -733,10 +733,10 @@ async fn assert_float8_array_csv_round_trip(
     );
     assert!(reader.records().next().is_none());
 
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv_text.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv_text.as_bytes(), &options, None).unwrap();
     let imported =
-        tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &columns, &options, 2).unwrap();
+        bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &columns, &options, 2).unwrap();
     assert_eq!(imported, row, "CSV import must retain the array as exact text");
 
     connection
@@ -747,17 +747,17 @@ async fn assert_float8_array_csv_round_trip(
     let import_mapping = [Some(0), Some(1)];
     let mut import_row = row.clone();
     import_row[0] = Value::Int(4);
-    let import_csv = tablepro_core::export::render_csv(
+    let import_csv = bookie_core::export::render_csv(
         &columns,
         std::slice::from_ref(&import_row),
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let import_sheet = tablepro_core::import::read_csv(import_csv.as_bytes(), &options, None).unwrap();
-    let insert_plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let import_sheet = bookie_core::import::read_csv(import_csv.as_bytes(), &options, None).unwrap();
+    let insert_plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "float8_array_csv_import",
             columns: &import_columns,
@@ -787,7 +787,7 @@ async fn assert_float8_array_csv_round_trip(
 
     let mut update_columns = columns;
     update_columns[0].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "float8_array_grid_edit",
@@ -915,20 +915,20 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         .query(&format!("SELECT {wire_columns} FROM array_csv_source"))
         .await
         .unwrap();
-    let csv_text = tablepro_core::export::render_csv(
+    let csv_text = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv_text.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv_text.as_bytes(), &options, None).unwrap();
     let columns = connection.fetch_columns(None, "array_csv_target").await.unwrap();
     let mapping = (0..columns.len()).map(Some).collect::<Vec<_>>();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "array_csv_target",
             columns: &columns,
@@ -938,7 +938,7 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         &options,
     )
     .expect("every allowlisted built-in array should produce a typed CSV INSERT plan");
-    assert_eq!(plan.rows, source.rows, "array CSV parsing preserves exact text cells");
+    assert_eq!(source.rows, plan.rows, "array CSV parsing preserves exact text cells");
     connection
         .execute_params(&plan.statement, &plan.rows[0])
         .await
@@ -999,7 +999,7 @@ async fn value_contract_numeric_array_grid_edit_preserves_elements() {
     let id_index = row.columns.iter().position(|column| column.name == "id").unwrap();
     let value_index = row.columns.iter().position(|column| column.name == "value").unwrap();
     row.columns[id_index].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "numeric_array_grid_edit",
@@ -1041,7 +1041,7 @@ fn assert_array_value(kind: &str, result: &QueryResult) {
         _ => kind.to_ascii_uppercase(),
     };
     assert_eq!(result.columns[0].data_type, expected_type);
-    let json = tablepro_core::export::row_to_json(&result.columns, &result.rows[0]);
+    let json = bookie_core::export::row_to_json(&result.columns, &result.rows[0]);
     match value {
         Value::Null => assert!(json["value"].is_null()),
         Value::Text(text) => assert_eq!(json["value"].as_str(), Some(text.as_str())),

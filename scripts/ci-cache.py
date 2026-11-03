@@ -60,7 +60,7 @@ def prune_job(job, cutoff):
     marker = metadata('.bookie-last-used', job)
     if marker is None or not stat.S_ISREG(marker.st_mode) or marker.st_mtime >= cutoff:
         return
-    for profile in ('debug', 'release', 'ci'):
+    for profile in ('debug', 'release', 'ci', 'dist'):
         entry = metadata(profile, job)
         if entry is None or not stat.S_ISDIR(entry.st_mode):
             continue
@@ -119,9 +119,9 @@ def cleanup(root, reserve):
     if shutil.disk_usage(root).free < reserve:
         prune(root, now - 86400, reserve)
     if shutil.disk_usage(root).free < reserve:
-        prune(root, float('inf'), reserve, least_recent_first=True)
-    if shutil.disk_usage(root).free < reserve:
         prune_bundles(root, reserve, os.environ.get('GITHUB_SHA', ''))
+    if shutil.disk_usage(root).free < reserve:
+        prune(root, float('inf'), reserve, least_recent_first=True)
     after = shutil.disk_usage(root).free
     print(f'free after cleanup: {after} bytes; required reserve: {reserve} bytes', flush=True)
     if after < reserve:
@@ -131,7 +131,7 @@ def cleanup(root, reserve):
 
 
 def prune_bundles(root, reserve, revision):
-    bundle_root = root.parent / 'bundles'
+    bundle_root = Path(os.environ.get('BOOKIE_BUNDLE_CACHE', root.parent / 'bundles'))
     try:
         directory = open_directory(bundle_root)
     except FileNotFoundError:

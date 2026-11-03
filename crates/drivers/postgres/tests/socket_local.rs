@@ -4,22 +4,22 @@
 //! Run through `scripts/test-postgres-socket.sh`; the harness exposes a
 //! real PostgreSQL socket directory from a disposable container.
 
+use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
 use drivers_postgres::PgDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 fn options() -> ConnectOptions {
-    let directory = std::env::var("TABLEPRO_PG_SOCKET_DIR").expect("TABLEPRO_PG_SOCKET_DIR is set by the harness");
+    let directory = std::env::var("BOOKIE_PG_SOCKET_DIR").expect("BOOKIE_PG_SOCKET_DIR is set by the harness");
     ConnectOptions {
         host: "localhost".into(),
-        port: std::env::var("TABLEPRO_PG_SOCKET_PORT")
+        port: std::env::var("BOOKIE_PG_SOCKET_PORT")
             .ok()
             .and_then(|value| value.parse().ok())
             .unwrap_or(5432),
         database: "postgres".into(),
         username: "postgres".into(),
         password: secrecy::SecretString::new(String::new().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
+        tls: bookie_core::TlsConfig::disabled(),
         local_socket_dir: Some(directory.into()),
         ..Default::default()
     }
@@ -37,12 +37,12 @@ async fn socket_query_write_cancel_and_reconnect() {
     assert_eq!(result.rows, vec![vec![Value::Int(42)]]);
 
     connection
-        .execute("CREATE TABLE tablepro_socket_smoke (id int primary key)")
+        .execute("CREATE TABLE bookie_socket_smoke (id int primary key)")
         .await
         .expect("governed-write driver primitive");
     assert_eq!(
         connection
-            .execute("INSERT INTO tablepro_socket_smoke VALUES (1)")
+            .execute("INSERT INTO bookie_socket_smoke VALUES (1)")
             .await
             .expect("insert")
             .rows_affected,
@@ -55,7 +55,7 @@ async fn socket_query_write_cancel_and_reconnect() {
         .query_controlled("SELECT pg_sleep(30)", &OperationControl::new(token, None))
         .await
         .expect_err("pre-cancelled query must not run");
-    assert!(matches!(error, tablepro_core::DriverError::Cancelled));
+    assert!(matches!(error, bookie_core::DriverError::Cancelled));
     connection.close().await.expect("close");
 
     let reconnected = PgDriver.connect(options).await.expect("reconnect over Unix socket");

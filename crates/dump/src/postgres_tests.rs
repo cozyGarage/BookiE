@@ -1,8 +1,8 @@
 use std::os::unix::fs::PermissionsExt;
 use std::time::Duration;
 
+use bookie_core::TlsConfig;
 use secrecy::SecretString;
-use tablepro_core::TlsConfig;
 
 use super::*;
 
@@ -172,6 +172,23 @@ async fn a_failed_dump_keeps_the_previous_file_and_redacts_connection_details() 
     );
     assert_eq!(std::fs::read_to_string(&output).unwrap(), "previous backup");
     assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 2);
+}
+
+#[tokio::test]
+async fn a_failed_partial_claim_leaves_an_existing_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let partial = dir.path().join("appdb.dump.partial-collision");
+    std::fs::write(&partial, "preexisting partial").unwrap();
+
+    match create_private_file(&partial) {
+        Ok(()) => {
+            let _cleanup = RemoveOnDrop::owned(partial.clone());
+            panic!("claim must fail when the path exists");
+        }
+        Err(DumpError::Io(_)) => {}
+        Err(error) => panic!("unexpected error: {error:?}"),
+    }
+    assert_eq!(std::fs::read_to_string(&partial).unwrap(), "preexisting partial");
 }
 
 #[tokio::test]

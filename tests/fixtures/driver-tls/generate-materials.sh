@@ -3,7 +3,7 @@ set -euo pipefail
 
 FIXTURE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MATERIALS="$FIXTURE/materials"
-SERVER_HOSTNAME="${TABLEPRO_DRIVER_TLS_HOSTNAME:-localhost}"
+SERVER_HOSTNAME="${BOOKIE_DRIVER_TLS_HOSTNAME:-localhost}"
 
 if [[ "${1:-}" == "--force" ]]; then
   rm -rf "$MATERIALS"
@@ -16,7 +16,7 @@ fi
 
 mkdir -p "$MATERIALS"
 if [[ ! -f "$MATERIALS/ssh_client" ]]; then
-  ssh-keygen -q -t ed25519 -N '' -C 'tablepro-driver-tls-fixture' -f "$MATERIALS/ssh_client"
+  ssh-keygen -q -t ed25519 -N '' -C 'bookie-driver-tls-fixture' -f "$MATERIALS/ssh_client"
 fi
 chmod 600 "$MATERIALS/ssh_client"
 chmod 644 "$MATERIALS/ssh_client.pub"
@@ -30,7 +30,7 @@ fi
 
 rm -rf "$MATERIALS"
 mkdir -p "$MATERIALS"
-ssh-keygen -q -t ed25519 -N '' -C 'tablepro-driver-tls-fixture' -f "$MATERIALS/ssh_client"
+ssh-keygen -q -t ed25519 -N '' -C 'bookie-driver-tls-fixture' -f "$MATERIALS/ssh_client"
 chmod 600 "$MATERIALS/ssh_client"
 chmod 644 "$MATERIALS/ssh_client.pub"
 
@@ -44,18 +44,18 @@ cd "$MATERIALS"
 
 openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
   -keyout ca.key -out ca.crt \
-  -subj "/CN=TablePro driver TLS fixture CA" \
+  -subj "/CN=BookiE driver TLS fixture CA" \
   -addext "basicConstraints=critical,CA:TRUE" >/dev/null 2>&1
 
 openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
   -keyout other-ca.key -out other-ca.crt \
-  -subj "/CN=TablePro unrelated CA" \
+  -subj "/CN=BookiE unrelated CA" \
   -addext "basicConstraints=critical,CA:TRUE" >/dev/null 2>&1
 
 cat > server.ext <<EXT
 basicConstraints=CA:FALSE
 extendedKeyUsage=serverAuth
-subjectAltName=DNS:${SERVER_HOSTNAME},DNS:mongo.tablepro.test,DNS:redis.tablepro.test,DNS:mysql.tablepro.test,DNS:mysql-ssh.tablepro.test,DNS:mysql-mtls.tablepro.test,DNS:mysql-mtls-ssh.tablepro.test,DNS:clickhouse.tablepro.test,DNS:mssql.tablepro.test,DNS:mssql-ssh.tablepro.test
+subjectAltName=DNS:${SERVER_HOSTNAME},DNS:mongo.bookie.test,DNS:redis.bookie.test,DNS:mysql.bookie.test,DNS:mysql-ssh.bookie.test,DNS:mysql-mtls.bookie.test,DNS:mysql-mtls-ssh.bookie.test,DNS:clickhouse.bookie.test,DNS:mssql.bookie.test,DNS:mssql-ssh.bookie.test
 EXT
 
 cat > client.ext <<EXT

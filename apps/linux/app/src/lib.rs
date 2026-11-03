@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use relm4::RelmApp;
 
-use tablepro_core::DriverRegistry;
+use bookie_core::DriverRegistry;
 
 pub mod config;
 mod i18n;
@@ -20,16 +20,21 @@ const MIN_SOURCEVIEW: (u32, u32, u32) = (5, 22, 0);
 pub fn run() {
     initialize_toolkit_or_exit();
     glib::set_prgname(Some(config::APP_ID));
-    tablepro_transport::install_crypto_provider();
+    bookie_transport::install_crypto_provider();
     i18n::init();
 
     if let Err(error) = logging::init(config::profile()) {
         glib::g_critical!("bookie", "{error}");
         return;
     }
-    tablepro_policy::withhold_panic_messages();
+    bookie_policy::withhold_panic_messages();
+    match bookie_storage::migrate_legacy_state() {
+        Ok(0) => {}
+        Ok(copied) => tracing::info!(copied, "copied legacy tablepro state to the bookie directories"),
+        Err(error) => tracing::error!(%error, "legacy tablepro state could not be copied; it was left untouched"),
+    }
     configure_async_runtime();
-    if let Err(error) = gtk4::gio::resources_register_include!("tablepro.gresource") {
+    if let Err(error) = gtk4::gio::resources_register_include!("bookie.gresource") {
         tracing::error!(%error, "could not register application resources");
         return;
     }
@@ -69,7 +74,7 @@ pub fn run() {
     let history_open = runtime.as_ref().map(|runtime| {
         let retention_days = prefs.history_retention_days;
         runtime.spawn(async move {
-            match tablepro_storage::query_history::HistoryStore::open_default().await {
+            match bookie_storage::query_history::HistoryStore::open_default().await {
                 Ok(store) => {
                     let pruning = store.clone();
                     tokio::spawn(async move {
@@ -92,7 +97,7 @@ pub fn run() {
     let workspace = services::workspace_state::create_store();
     workspace.discard_preview_tabs();
     let database = Arc::new(services::database_service::DatabaseService::new());
-    tracing::info!(drivers = registry.len(), "starting tablepro-app");
+    tracing::info!(drivers = registry.len(), "starting bookie-app");
 
     let approval_router = services::approval_router::ApprovalRouter::new(
         Arc::new(services::gtk_approval::GtkApprovalSink),
@@ -209,7 +214,6 @@ fn initialize_ui() -> RelmApp<<ui::App as relm4::Component>::Input> {
 fn build_registry() -> DriverRegistry {
     let mut r = DriverRegistry::new();
     r.register(Arc::new(drivers_clickhouse::ClickhouseDriver));
-    #[cfg(feature = "duckdb")]
     r.register(Arc::new(drivers_duckdb::DuckdbDriver));
     r.register(Arc::new(drivers_mongodb::MongodbDriver));
     r.register(Arc::new(drivers_mssql::MssqlDriver));
@@ -223,7 +227,7 @@ fn build_registry() -> DriverRegistry {
 fn enable_system_openssh(database: Arc<services::database_service::DatabaseService>) {
     database.enable_builtin_ssh_prompter(Arc::new(ui::GtkPrompter));
     relm4::spawn(async move {
-        match tablepro_transport::system_openssh(Arc::new(ui::GtkPrompter)).await {
+        match bookie_transport::system_openssh(Arc::new(ui::GtkPrompter)).await {
             Ok(openssh) => database.enable_system_openssh(openssh),
             Err(error) => tracing::info!(error = %error, "system OpenSSH connections are unavailable"),
         }

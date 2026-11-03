@@ -31,7 +31,7 @@ fn master_argv_is_exact() {
     let args = master_args(
         &config(None, None, OpenSshAuth::Agent),
         Path::new("/tmp/ssh_config"),
-        Path::new("/run/user/1000/tablepro/ssh/0123456789abcdef/89abcdef/control"),
+        Path::new("/run/user/1000/bookie/ssh/0123456789abcdef/89abcdef/control"),
         &OpenSshTimeouts::default(),
     );
     assert_eq!(
@@ -43,7 +43,7 @@ fn master_argv_is_exact() {
             "-F",
             "/tmp/ssh_config",
             "-o",
-            "ControlPath=/run/user/1000/tablepro/ssh/0123456789abcdef/89abcdef/control",
+            "ControlPath=/run/user/1000/bookie/ssh/0123456789abcdef/89abcdef/control",
             "-o",
             "ControlMaster=yes",
             "-o",
@@ -207,7 +207,7 @@ fn control_commands_ignore_the_user_config_and_escape_percent() {
                 "LogLevel=INFO"
             ]
         );
-        assert_eq!(args[args.len() - 2..], ["--", "tablepro"]);
+        assert_eq!(args[args.len() - 2..], ["--", "bookie"]);
     }
     let forward = control_args(
         control,

@@ -510,7 +510,7 @@ impl BrowseTab {
     pub(super) fn handle_grid_copy_row_as_statement(
         &mut self,
         row_position: u32,
-        statement: tablepro_core::sql_literal::RowStatement,
+        statement: bookie_core::sql_literal::RowStatement,
         sender: ComponentSender<Self>,
     ) {
         let _ = sender.output(BrowseTabOutput::CopyRowAsStatement {
@@ -552,7 +552,7 @@ impl BrowseTab {
         if rows.is_empty() {
             return;
         }
-        let tsv = tablepro_core::export::render_tsv(&self.current_columns, &rows, false);
+        let tsv = bookie_core::export::render_tsv(&self.current_columns, &rows, false);
         let _ = sender.output(BrowseTabOutput::CopyToClipboard(tsv));
     }
 
@@ -964,7 +964,7 @@ fn row_key_matches(columns: &[ColumnInfo], row: &crate::ui::row_object::RowObjec
 #[cfg(test)]
 mod row_identity_tests {
     use super::{DuplicateRowError, duplicate_row_values, row_key_matches};
-    use tablepro_core::{ColumnInfo, Value};
+    use bookie_core::{ColumnInfo, Value};
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
         ColumnInfo {
@@ -1000,9 +1000,9 @@ mod row_identity_tests {
     #[test]
     fn shared_row_identity_uses_current_key_values_and_refuses_a_released_source() {
         let columns = [column("id", true), column("payload", false)];
-        let result = std::sync::Arc::new(tablepro_core::QueryResult {
+        let result = std::sync::Arc::new(bookie_core::QueryResult {
             columns: columns.to_vec(),
-            rows: vec![vec![Value::Int(7), Value::Text("payload".into())]],
+            rows: vec![vec![Value::Int(7), Value::Text("payload".into())]].into(),
             truncated: false,
         });
         let row = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();

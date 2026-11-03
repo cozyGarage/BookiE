@@ -8,7 +8,7 @@ mod update;
 
 use async_trait::async_trait;
 use codec::{
-    bson_to_value, columns_from_docs, columns_from_types, document_to_row, merge_page_types, observe_bson_type,
+    bson_to_value, columns_from_docs, columns_from_types, document_to_row_into, merge_page_types, observe_bson_type,
     serde_json_to_document,
 };
 use error::{map_mongo_connect_error, map_mongo_error};
@@ -23,9 +23,10 @@ use shell::{
 };
 use update::{parse_browse_page_select, parse_keyed_delete, parse_keyed_update, parse_keyed_value_select};
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
-    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, TableInfo, Value,
+    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, QueryRows,
+    TableInfo, Value,
 };
 
 pub struct MongodbDriver;
@@ -116,7 +117,7 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
     let mut client_opts = ClientOptions::parse(uri.expose_secret())
         .await
         .map_err(map_mongo_error)?;
-    client_opts.app_name = Some("TablePro".into());
+    client_opts.app_name = Some("BookiE".into());
     client_opts.tls = Some(tls_for(&opts.tls, opts.service_address().0));
     client_opts.connect_timeout = Some(CONNECT_TIMEOUT);
     client_opts.server_selection_timeout = Some(CONNECT_TIMEOUT);
@@ -129,7 +130,7 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
 }
 
 fn uri_host(host: &str) -> Result<String, DriverError> {
-    tablepro_core::uri_host(host).ok_or_else(|| DriverError::Unsupported("invalid MongoDB host".into()))
+    bookie_core::uri_host(host).ok_or_else(|| DriverError::Unsupported("invalid MongoDB host".into()))
 }
 
 fn encode_uri(s: &str) -> String {
@@ -151,8 +152,8 @@ fn encode_uri(s: &str) -> String {
 /// certificate was issued for. The dial address can instead be an SSH
 /// tunnel's `127.0.0.1`, so the verifier is pinned to `service_host` rather
 /// than left to derive a name from the dial address.
-fn tls_for(config: &tablepro_core::TlsConfig, service_host: &str) -> Tls {
-    use tablepro_core::TlsMode;
+fn tls_for(config: &bookie_core::TlsConfig, service_host: &str) -> Tls {
+    use bookie_core::TlsMode;
     if config.mode == TlsMode::Disabled {
         return Tls::Disabled;
     }
@@ -172,15 +173,17 @@ struct MongodbConnection {
     database_name: String,
 }
 
-fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (Vec<Vec<Value>>, bool) {
-    let mut rows = Vec::new();
+fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (QueryRows, bool) {
+    let mut rows = QueryRows::with_capacity(docs.len().min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     for doc in docs {
-        let row = document_to_row(doc, columns);
-        if !budget.admit(&row) {
+        decoded.clear();
+        document_to_row_into(doc, columns, &mut decoded);
+        if !budget.admit(&decoded) {
             return (rows, true);
         }
-        rows.push(row);
+        rows.push_row(&mut decoded);
     }
     (rows, false)
 }
@@ -272,7 +275,12 @@ impl Connection for MongodbConnection {
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
         let (columns, docs) = self.columns_and_page(table, Some((offset, limit))).await?;
-        let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
+        let mut rows = QueryRows::with_capacity(docs.len(), 0);
+        let mut decoded = Vec::with_capacity(columns.len());
+        for doc in &docs {
+            document_to_row_into(doc, &columns, &mut decoded);
+            rows.push_row(&mut decoded);
+        }
         Ok(QueryResult {
             columns,
             rows,
@@ -506,7 +514,7 @@ impl MongodbConnection {
             .collect::<Result<Vec<_>, DriverError>>()?;
         Ok(QueryResult {
             columns,
-            rows,
+            rows: rows.into(),
             truncated: docs.len() > 1,
         })
     }

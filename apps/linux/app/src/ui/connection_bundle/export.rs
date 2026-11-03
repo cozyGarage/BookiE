@@ -3,7 +3,7 @@ use std::rc::Rc;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_storage::SavedConnection;
+use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
 use super::{boxed_list, bundle_file_filter, bundle_file_filters, checkbox_row, suggested_bundle_name};

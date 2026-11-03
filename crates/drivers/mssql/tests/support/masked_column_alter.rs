@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::sql_ddl::{DraftColumn, build_alter_column};
-use tablepro_core::{Connection, Value};
+use bookie_core::sql_ddl::{DraftColumn, build_alter_column};
+use bookie_core::{Connection, Value};
 
 async fn mask_function(connection: &dyn Connection) -> Vec<Vec<Value>> {
     connection
@@ -12,6 +12,7 @@ async fn mask_function(connection: &dyn Connection) -> Vec<Vec<Value>> {
         .await
         .unwrap()
         .rows
+        .into_rows()
 }
 
 #[tokio::test]

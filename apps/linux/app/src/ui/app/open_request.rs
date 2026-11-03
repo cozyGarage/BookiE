@@ -2,7 +2,8 @@ use gtk::prelude::*;
 use relm4::{ComponentSender, gtk};
 
 use super::{App, AppMsg};
-use crate::services::open_request::{LaunchArgument, OpenRejection, classify_file, file_connection};
+use crate::services::open_request::{LaunchArgument, OpenRejection, OpenablePath, classify_openable, file_connection};
+use crate::ui::editor::open_file::read_sql_file;
 
 pub(super) fn forward_open_signal(sender: &relm4::Sender<AppMsg>) {
     let sender = sender.clone();
@@ -26,12 +27,13 @@ impl App {
         let mut arguments = arguments.into_iter();
         let Some(first) = arguments.next() else { return };
         if arguments.next().is_some() {
-            self.show_toast(&crate::tr!("BookiE opens one database at a time. Opening the first."));
+            self.show_toast(&crate::tr!("BookiE opens one file at a time. Opening the first."));
         }
         match first {
             LaunchArgument::Uri(uri) => self.present_connection_url_dialog(sender, Some(&uri)),
-            LaunchArgument::Path(path) => match classify_file(&path) {
-                Ok(file) => self.open_database_file(file, sender),
+            LaunchArgument::Path(path) => match classify_openable(&path) {
+                Ok(OpenablePath::Database(file)) => self.open_database_file(file, sender),
+                Ok(OpenablePath::SqlScript(path)) => Self::open_sql_script_path(path, sender),
                 Err(OpenRejection::Missing(path)) => self
                     .show_toast(&crate::tr!("{path} does not exist.").replace("{path}", &path.display().to_string())),
                 Err(OpenRejection::NotADatabase(path)) => self.show_toast(
@@ -39,10 +41,19 @@ impl App {
                         .replace("{path}", &path.display().to_string()),
                 ),
                 Err(OpenRejection::NonUtf8Path(_)) => self.show_toast(&crate::tr!(
-                    "BookiE cannot open this database because its path contains non-UTF-8 bytes."
+                    "BookiE cannot open this path because it contains non-UTF-8 bytes."
                 )),
             },
         }
+    }
+
+    fn open_sql_script_path(path: std::path::PathBuf, sender: ComponentSender<Self>) {
+        std::thread::spawn(move || {
+            sender.input(match read_sql_file(&path) {
+                Ok(file) => AppMsg::SqlFileOpened(file),
+                Err(message) => AppMsg::SqlFileFailed(message),
+            });
+        });
     }
 
     fn open_database_file(&self, file: crate::services::open_request::DatabaseFile, sender: ComponentSender<Self>) {
@@ -58,7 +69,7 @@ impl App {
                 .register(async move {
                     let database = file.database_path().to_owned();
                     let driver_id = file.driver_id();
-                    let existing = tablepro_storage::load_connections().await.unwrap_or_default();
+                    let existing = bookie_storage::load_connections().await.unwrap_or_default();
                     let saved = match existing
                         .into_iter()
                         .find(|saved| saved.driver_id == driver_id && saved.database == database)
@@ -67,7 +78,7 @@ impl App {
                         None => {
                             let saved = file_connection(&file);
                             if let Err(error) = crate::services::connection_save_turn::run(
-                                tablepro_storage::save_connections(std::slice::from_ref(&saved)),
+                                bookie_storage::save_connections(std::slice::from_ref(&saved)),
                             )
                             .await
                             {

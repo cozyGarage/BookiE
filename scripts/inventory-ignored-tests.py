@@ -45,7 +45,7 @@ def registered_modules(integration):
 def docker_activation(path, name, packages):
     package = package_owning(path, packages)
     relative = path.relative_to(root)
-    if package == "tablepro-app" and relative.parts[-3:-1] == ("tests", "support"):
+    if package == "bookie-app" and relative.parts[-3:-1] == ("tests", "support"):
         # Included through #[path] from a cfg(test) app module, rather than a
         # Cargo integration-test crate. Keep its activation command on --lib.
         selector = f"--lib {name}"
@@ -77,6 +77,12 @@ def docker_activation(path, name, packages):
 
 
 packages = workspace_packages()
+workspace_package_names = set(packages.values())
+for entries in registry.values():
+    for entry in entries:
+        package = entry[0]
+        if package not in workspace_package_names:
+            raise RuntimeError(f"unknown Cargo package in isolated-test registry: {package}")
 mapped = {entry[2].split("::")[-1] for entries in registry.values() for entry in entries}
 output = io.StringIO()
 original_stdout = sys.stdout

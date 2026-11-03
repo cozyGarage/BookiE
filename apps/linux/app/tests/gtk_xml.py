@@ -56,7 +56,7 @@ def scenarios(ui):
         error = "XML 1.0 cannot preserve U+0000 at row 2, column 2. Export as JSON to keep the original text"
         ui.wait_for_node(name=f"Writing {export} failed: {error}")
         assert not export.exists(), "lossy XML was published"
-        assert not list((base / "home").glob(".tablepro-export-*")), "failure left a temporary export"
+        assert not list((base / "home").glob(".bookie-export-*")), "failure left a temporary export"
         assert rows(database) == before, "failed export changed source data"
 
     result = [xml_export_preserves_line_endings_and_null_distinctions,

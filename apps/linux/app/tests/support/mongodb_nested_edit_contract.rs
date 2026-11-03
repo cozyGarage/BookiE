@@ -3,8 +3,8 @@ use super::{Value, parse_input_for_driver};
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity() {
+    use bookie_core::{ConnectOptions, DatabaseDriver};
     use mongodb::bson::{Binary, Bson, Decimal128, Document, doc, oid::ObjectId, spec::BinarySubtype};
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
     use testcontainers::ImageExt;
     use testcontainers_modules::mongo::Mongo;
     use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -79,7 +79,7 @@ async fn value_contract_mongodb_nested_document_edit_preserves_extended_bson_and
         "mongodb",
     )
     .unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
         "nested_grid_edits",

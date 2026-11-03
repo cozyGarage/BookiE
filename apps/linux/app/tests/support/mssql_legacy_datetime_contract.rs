@@ -1,5 +1,5 @@
 use super::parse_input_for_driver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
 use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::mssql_server::MssqlServer;
@@ -64,7 +64,7 @@ async fn value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_valu
     );
 
     let mut updates = Vec::new();
-    for row in &before.rows[..3] {
+    for row in before.rows.iter().take(3) {
         let Value::Text(server_text) = &row[2] else {
             panic!("native style-126 result must be text: {:?}", row[2]);
         };
@@ -85,7 +85,7 @@ async fn value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_valu
             parsed, expected,
             "grid parsing must retain the displayed fractional tick"
         );
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "mssql",
             None,
             "legacy_datetime_grid",

@@ -130,11 +130,15 @@ impl FilterSet {
 }
 
 pub fn equality_rule(column: &str, value: &Value) -> Option<FilterRule> {
+    cell_filter_rule(column, value, false)
+}
+
+pub fn cell_filter_rule(column: &str, value: &Value, exclude: bool) -> Option<FilterRule> {
     let text = match value {
         Value::Null => {
             return Some(FilterRule {
                 column: column.to_string(),
-                op: FilterOp::IsNull,
+                op: if exclude { FilterOp::IsNotNull } else { FilterOp::IsNull },
                 value: None,
             });
         }
@@ -152,7 +156,7 @@ pub fn equality_rule(column: &str, value: &Value) -> Option<FilterRule> {
     };
     Some(FilterRule {
         column: column.to_string(),
-        op: FilterOp::Eq,
+        op: if exclude { FilterOp::NotEq } else { FilterOp::Eq },
         value: Some(FilterValue::Single(text)),
     })
 }

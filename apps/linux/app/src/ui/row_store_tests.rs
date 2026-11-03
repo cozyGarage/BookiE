@@ -1,7 +1,9 @@
 use super::*;
+use bookie_core::Value;
 use std::cell::Cell;
 use std::rc::Rc;
-use tablepro_core::Value;
+use std::sync::Arc;
+use std::time::Instant;
 
 fn rows(count: i64) -> Vec<Vec<Value>> {
     (0..count).map(|n| vec![Value::Int(n)]).collect()
@@ -204,7 +206,7 @@ fn a_handler_may_read_the_model_while_it_is_changing() {
 fn shared(count: i64) -> Arc<QueryResult> {
     Arc::new(QueryResult {
         columns: Vec::new(),
-        rows: rows(count),
+        rows: rows(count).into(),
         truncated: false,
     })
 }
@@ -244,7 +246,7 @@ fn replacing_a_shared_result_releases_the_old_one() {
 fn projected_store_keeps_sql_null_distinct_from_an_unfetched_cell() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("name")],
-        rows: vec![vec![Value::Null, Value::Text("Ada".into())]],
+        rows: vec![vec![Value::Null, Value::Text("Ada".into())]].into(),
         truncated: false,
     });
     let store = RowStore::from_projected(result.clone(), vec![0, 2], 3).unwrap();
@@ -264,10 +266,37 @@ fn projected_store_keeps_sql_null_distinct_from_an_unfetched_cell() {
 }
 
 #[test]
+fn projected_store_uses_sparse_reordered_column_mappings_for_rows_and_search() {
+    let result = Arc::new(QueryResult {
+        columns: vec![column("first"), column("second"), column("third")],
+        rows: vec![vec![Value::Int(11), Value::Int(22), Value::Int(33)]].into(),
+        truncated: false,
+    });
+    let store = RowStore::from_projected(result, vec![3, 0, 2], 5).unwrap();
+    let row = store.item(0).and_downcast::<RowObject>().unwrap();
+
+    assert_eq!(row.cell_value(0), Value::Int(22));
+    assert_eq!(row.cell_value(1), Value::Undecodable("not fetched".into()));
+    assert_eq!(row.cell_value(2), Value::Int(33));
+    assert_eq!(row.cell_value(3), Value::Int(11));
+    assert_eq!(row.cell_value(4), Value::Undecodable("not fetched".into()));
+
+    let mut searched = Vec::new();
+    store.visit_search_cells(0, |column, value| {
+        searched.push((column, value.clone()));
+        false
+    });
+    assert_eq!(
+        searched,
+        vec![(0, Value::Int(22)), (2, Value::Int(33)), (3, Value::Int(11))]
+    );
+}
+
+#[test]
 fn search_visits_projected_cells_at_their_visible_columns() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("name")],
-        rows: vec![vec![Value::Int(7), Value::Text("Ada".into())]],
+        rows: vec![vec![Value::Int(7), Value::Text("Ada".into())]].into(),
         truncated: false,
     });
     let store = RowStore::from_projected(result, vec![0, 2], 3).unwrap();
@@ -285,7 +314,7 @@ fn projected_browse_rows_preview_long_values_without_losing_the_key() {
     let text = "x".repeat(9000);
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("payload")],
-        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]],
+        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]].into(),
         truncated: false,
     });
     let store = RowStore::from_projected_with_previews(result, vec![0, 2], 3, vec![0]).unwrap();
@@ -314,7 +343,8 @@ fn arbitrary_query_previews_can_recover_full_values_from_the_shared_result() {
             Value::Text("x".repeat(9000)),
             Value::Bytes(bytes.clone()),
             Value::Json(Box::new(json.clone())),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     });
     let store = RowStore::from_shared_with_result_previews(result);
@@ -357,7 +387,8 @@ fn redis_previews_only_string_values_and_preserves_keys_and_other_types() {
                 Value::Int(-1),
                 Value::Text(long.clone()),
             ],
-        ],
+        ]
+        .into(),
         truncated: false,
     });
     let store = RowStore::from_shared_with_redis_string_previews(result, vec![0]);
@@ -374,7 +405,7 @@ fn loaded_row_search_visits_full_shared_value_without_materializing_it_in_the_gr
     let text = "x".repeat(9000);
     let result = Arc::new(QueryResult {
         columns: vec![column("id"), column("payload")],
-        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]],
+        rows: vec![vec![Value::Int(7), Value::Text(text.clone())]].into(),
         truncated: false,
     });
     let store = RowStore::from_shared_with_previews(result, vec![0]);
@@ -412,7 +443,7 @@ fn search_visits_an_edited_cached_value() {
 fn projected_store_refuses_rows_that_do_not_match_the_column_map() {
     let result = Arc::new(QueryResult {
         columns: vec![column("id")],
-        rows: vec![vec![Value::Int(1), Value::Int(2)]],
+        rows: vec![vec![Value::Int(1), Value::Int(2)]].into(),
         truncated: false,
     });
     assert!(RowStore::from_projected(result, vec![0], 1).is_err());
@@ -472,8 +503,8 @@ fn projected_key_lookups_map_columns_and_reject_unfetched_keys() {
     assert_eq!(store.requested(), 0);
 }
 
-fn column(name: &str) -> tablepro_core::ColumnInfo {
-    tablepro_core::ColumnInfo {
+fn column(name: &str) -> bookie_core::ColumnInfo {
+    bookie_core::ColumnInfo {
         name: name.into(),
         data_type: "text".into(),
         nullable: true,
@@ -486,4 +517,62 @@ fn column(name: &str) -> tablepro_core::ColumnInfo {
         enum_type: None,
         domain_type: None,
     }
+}
+
+#[test]
+#[ignore]
+fn profile_projected_row_materialization_and_reads() {
+    let narrow = profile_projected_rows(100_000, 32, 13);
+    let wide = profile_projected_rows(1_000, 256, 73);
+    assert_profile_checksum(&narrow, 100_000, 32);
+    assert_profile_checksum(&wide, 1_000, 256);
+    println!("projected-row-profile narrow={narrow:?} wide={wide:?}");
+}
+
+fn profile_projected_rows(row_count: u32, column_count: usize, mapping_step: usize) -> Vec<(f64, i64)> {
+    let column_count_i64 = i64::try_from(column_count).unwrap();
+    let columns = (0..column_count)
+        .map(|index| column(&format!("column_{index}")))
+        .collect();
+    let rows = (0..row_count)
+        .map(|row| {
+            (0..column_count)
+                .map(|column| Value::Int(i64::from(row) * column_count_i64 + i64::try_from(column).unwrap()))
+                .collect()
+        })
+        .collect();
+    let result = Arc::new(QueryResult {
+        columns,
+        rows,
+        truncated: false,
+    });
+    let indices = (0..column_count)
+        .map(|source| (source * mapping_step) % column_count)
+        .collect::<Vec<_>>();
+    let mut samples = Vec::new();
+
+    for _ in 0..5 {
+        let store = RowStore::from_projected(Arc::clone(&result), indices.clone(), column_count).unwrap();
+        let started = Instant::now();
+        let mut total = 0i64;
+        for _ in 0..8 {
+            for position in 0..row_count {
+                let row = store.item(position).and_downcast::<RowObject>().unwrap();
+                for column in 0..column_count {
+                    if let Value::Int(value) = row.cell_value(column) {
+                        total = total.wrapping_add(value);
+                    }
+                }
+            }
+        }
+        samples.push((started.elapsed().as_secs_f64(), total));
+    }
+
+    samples
+}
+
+fn assert_profile_checksum(samples: &[(f64, i64)], row_count: u32, column_count: usize) {
+    let values = i64::from(row_count) * i64::try_from(column_count).unwrap();
+    let expected = values * (values - 1) / 2 * 8;
+    assert!(samples.iter().all(|(_, total)| *total == expected));
 }

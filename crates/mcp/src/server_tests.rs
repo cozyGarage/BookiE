@@ -1,13 +1,13 @@
 use super::*;
 use axum::http::HeaderValue;
+use bookie_core::{ColumnInfo, Connection, DriverError, Environment, ExecResult, QueryResult, TableInfo, Value};
+use bookie_policy::{
+    ApprovalOutcome, ApprovalRequest, ApprovalSink, AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState,
+    AuditTerminalStatus, GuardContext, PolicyConfig, PolicyGuard, Principal,
+};
 use std::sync::{
     Mutex,
     atomic::{AtomicUsize, Ordering},
-};
-use tablepro_core::{ColumnInfo, Connection, DriverError, Environment, ExecResult, QueryResult, TableInfo, Value};
-use tablepro_policy::{
-    ApprovalOutcome, ApprovalRequest, ApprovalSink, AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState,
-    AuditTerminalStatus, GuardContext, PolicyConfig, PolicyGuard, Principal,
 };
 use tokio::{
     io::AsyncWriteExt,
@@ -34,14 +34,14 @@ struct NoProvider;
 
 #[async_trait::async_trait]
 impl crate::bridge::ConnectionProvider for NoProvider {
-    async fn list_saved_connections(&self) -> Result<Vec<tablepro_storage::SavedConnection>, String> {
+    async fn list_saved_connections(&self) -> Result<Vec<bookie_storage::SavedConnection>, String> {
         Ok(Vec::new())
     }
     async fn connection(
         &self,
         _connection_id: uuid::Uuid,
-        _principal: tablepro_policy::Principal,
-    ) -> Result<Arc<dyn tablepro_core::Connection>, String> {
+        _principal: bookie_policy::Principal,
+    ) -> Result<Arc<dyn bookie_core::Connection>, String> {
         Err("no connections in this test".into())
     }
 }
@@ -193,14 +193,14 @@ impl Connection for WriteProbeConnection {
     ) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
     async fn query(&self, _sql: &str) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -223,13 +223,13 @@ impl Connection for WriteProbeConnection {
 }
 
 struct ApprovalProvider {
-    saved: tablepro_storage::SavedConnection,
+    saved: bookie_storage::SavedConnection,
     connection: Arc<dyn Connection>,
 }
 
 #[async_trait::async_trait]
 impl crate::bridge::ConnectionProvider for ApprovalProvider {
-    async fn list_saved_connections(&self) -> Result<Vec<tablepro_storage::SavedConnection>, String> {
+    async fn list_saved_connections(&self) -> Result<Vec<bookie_storage::SavedConnection>, String> {
         Ok(vec![self.saved.clone()])
     }
     async fn connection(

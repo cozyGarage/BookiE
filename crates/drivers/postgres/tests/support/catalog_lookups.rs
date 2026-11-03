@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use tablepro_core::{ColumnInfo, DriverError, OperationControl, Session};
+use bookie_core::{ColumnInfo, DriverError, OperationControl, Session};
 use tokio_util::sync::CancellationToken;
 
 use crate::{connect, start_pg};
@@ -165,9 +165,9 @@ async fn a_column_collation_is_read_and_survives_a_type_change() {
     assert_eq!(columns[0].collation.as_deref(), Some("C"));
     assert_eq!(columns[1].collation, None);
 
-    let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(columns[0].clone());
+    let mut draft = bookie_core::sql_ddl::DraftColumn::from_info(columns[0].clone());
     draft.data_type = "character varying(80)".into();
-    for statement in tablepro_core::sql_ddl::build_alter_column("postgres", None, "collated", &draft).unwrap() {
+    for statement in bookie_core::sql_ddl::build_alter_column("postgres", None, "collated", &draft).unwrap() {
         conn.execute(&statement).await.unwrap();
     }
 

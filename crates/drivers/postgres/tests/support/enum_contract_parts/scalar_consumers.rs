@@ -108,7 +108,7 @@ async fn value_contract_scalar_enum_labels_preserve_exact_text() {
 
     for value in ["NULL", "東京", "o'brien"] {
         let input = Value::Text(value.into());
-        let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &input).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("postgres", &input).unwrap();
         let literal_result = connection
             .query(&format!("SELECT {literal}::value_contract_label::text"))
             .await
@@ -153,7 +153,7 @@ async fn value_contract_custom_enum_preserves_maximum_multibyte_label_bytes() {
     let labels = ["x".repeat(63), "界".repeat(21)];
     let literals = labels
         .iter()
-        .map(|label| tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(label.clone())).unwrap())
+        .map(|label| bookie_core::sql_literal::render_sql_literal("postgres", &Value::Text(label.clone())).unwrap())
         .collect::<Vec<_>>();
     connection
         .execute(&format!(
@@ -247,7 +247,7 @@ async fn value_contract_custom_enum_refuses_labels_over_byte_limit() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     let label = "x".repeat(64);
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(label)).unwrap();
+    let literal = bookie_core::sql_literal::render_sql_literal("postgres", &Value::Text(label)).unwrap();
     let error = connection
         .execute(&format!(
             "CREATE TYPE value_contract_enum_overlength AS ENUM ({literal})"
@@ -255,7 +255,7 @@ async fn value_contract_custom_enum_refuses_labels_over_byte_limit() {
         .await
         .expect_err("PostgreSQL must refuse an enum label over the byte limit");
     assert!(
-        matches!(&error, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42602"),
+        matches!(&error, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42602"),
         "{error:?}"
     );
     let type_absent = connection
@@ -284,7 +284,7 @@ async fn value_contract_custom_enum_order_uses_declared_catalog_order() {
         .unwrap();
     assert_eq!(
         catalog.rows,
-        ["zulu", "alpha", "middle"].map(|label| vec![Value::Text(label.into())])
+        vec![vec![Value::Text("zulu".into())], vec![Value::Text("alpha".into())], vec![Value::Text("middle".into())]]
     );
 
     let result = connection
@@ -346,7 +346,7 @@ async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: "value_contract_enum_filter".into(),
             name: "status".into(),
         })
@@ -426,7 +426,7 @@ async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
             }],
             ..Default::default()
         };
-        let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filter)
+        let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &filter)
             .unwrap()
             .unwrap();
         let result = connection
@@ -455,7 +455,7 @@ async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &null_filter)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &null_filter)
         .unwrap()
         .unwrap();
     let result = connection
@@ -485,7 +485,7 @@ async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
         }],
         ..Default::default()
     };
-    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &not_null_filter)
+    let (where_sql, params) = bookie_core::build_filter_where("postgres", &columns, &not_null_filter)
         .unwrap()
         .unwrap();
     let result = connection
@@ -537,7 +537,7 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
     let labels = ["double \" quote", "line one\nline two", "back\\slash", "=1+1"];
     let literals = labels
         .iter()
-        .map(|label| tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text((*label).into())).unwrap())
+        .map(|label| bookie_core::sql_literal::render_sql_literal("postgres", &Value::Text((*label).into())).unwrap())
         .collect::<Vec<_>>();
     connection
         .execute(&format!("CREATE TYPE {enum_type} AS ENUM ({})", literals.join(", ")))
@@ -571,12 +571,12 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
         .query(&format!("SELECT id, status FROM {schema}.source_rows ORDER BY id"))
         .await
         .unwrap();
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
+    let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
     let columns = connection.fetch_columns(Some(schema), "target_rows").await.unwrap();
-    let target = tablepro_core::import::ImportTarget {
+    let target = bookie_core::import::ImportTarget {
         driver_id: "postgres",
 
-        capabilities: tablepro_core::DriverCapabilities::default(),
+        capabilities: bookie_core::DriverCapabilities::default(),
         schema: Some(schema),
         table: "target_rows",
         columns: &columns,
@@ -601,9 +601,9 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
         })
         .collect::<Vec<_>>();
 
-    for delimiter in tablepro_core::export::CsvDelimiter::ALL {
-        for line_break in tablepro_core::export::CsvLineBreak::ALL {
-            let csv_options = tablepro_core::export::CsvOptions {
+    for delimiter in bookie_core::export::CsvDelimiter::ALL {
+        for line_break in bookie_core::export::CsvLineBreak::ALL {
+            let csv_options = bookie_core::export::CsvOptions {
                 null_to_empty: false,
                 null_marker: Some(null_marker.clone()),
                 sanitize_formulas: false,
@@ -611,33 +611,33 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
                 line_break,
                 ..Default::default()
             };
-            let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+            let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
             assert!(csv.contains("\"double \"\" quote\""));
             assert!(csv.contains("\"line one\nline two\""));
             assert!(csv.contains("=1+1"), "raw text must retain formula-shaped enum labels");
 
-            let detected = tablepro_core::import::detect_format(csv.as_bytes());
+            let detected = bookie_core::import::detect_format(csv.as_bytes());
             assert_eq!(
                 detected,
-                tablepro_core::import::CsvFormat {
+                bookie_core::import::CsvFormat {
                     delimiter,
                     has_header: true,
                 },
                 "{delimiter:?}/{line_break:?}"
             );
-            let detected_options: tablepro_core::import::CsvImportOptions = detected.into();
-            let import_options = tablepro_core::import::CsvImportOptions {
+            let detected_options: bookie_core::import::CsvImportOptions = detected.into();
+            let import_options = bookie_core::import::CsvImportOptions {
                 null_marker: null_marker.clone(),
                 ..detected_options
             };
-            let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+            let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
             assert_eq!(sheet.rows.len(), expected.len(), "{delimiter:?}/{line_break:?}");
 
             connection
                 .execute(&format!("TRUNCATE TABLE {schema}.target_rows"))
                 .await
                 .unwrap();
-            let plan = tablepro_core::import::build_insert_plan(&target, &sheet, &import_options).unwrap();
+            let plan = bookie_core::import::build_insert_plan(&target, &sheet, &import_options).unwrap();
             assert!(
                 plan.statement
                     .contains("$2::text::\"value_contract_enum_csv_edges\".\"status\"")
@@ -687,7 +687,7 @@ async fn value_contract_enum_null_label_and_sql_null_write_as_distinct_values() 
         .fetch_columns(None, "value_contract_null_enum_edits")
         .await
         .unwrap();
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "value_contract_null_enum_edits",
@@ -697,7 +697,7 @@ async fn value_contract_enum_null_label_and_sql_null_write_as_distinct_values() 
     )
     .unwrap();
     connection.execute_params(&sql, &params).await.unwrap();
-    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (sql, params) = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "value_contract_null_enum_edits",
@@ -824,7 +824,7 @@ async fn value_contract_custom_enum_json_and_file_exports_preserve_empty_literal
         ]
     );
 
-    let exported = tablepro_core::export::render_json(&result.columns, &result.rows);
+    let exported = bookie_core::export::render_json(&result.columns, &result.rows);
     let json: serde_json::Value = serde_json::from_str(&exported).unwrap();
     assert_eq!(
         json,
@@ -839,15 +839,15 @@ async fn value_contract_custom_enum_json_and_file_exports_preserve_empty_literal
     let directory = tempfile::tempdir().unwrap();
     let json_path = directory.path().join("enum.json");
     let csv_path = directory.path().join("enum.csv");
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     for (path, format) in [
-        (&json_path, tablepro_core::export::ResultFormat::Json),
-        (&csv_path, tablepro_core::export::ResultFormat::Csv),
+        (&json_path, bookie_core::export::ResultFormat::Json),
+        (&csv_path, bookie_core::export::ResultFormat::Csv),
     ] {
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             path,
             &result,
-            &tablepro_core::export::ResultExport {
+            &bookie_core::export::ResultExport {
                 format,
                 csv: &csv_options,
                 sql: None,
@@ -867,11 +867,11 @@ async fn value_contract_custom_enum_json_and_file_exports_preserve_empty_literal
 
     let previous = std::fs::read(&json_path).unwrap();
     let cancelled = std::cell::Cell::new(false);
-    let error = tablepro_core::export::write_result_file(
+    let error = bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -938,34 +938,34 @@ async fn value_contract_custom_enum_unicode_csv_import_preserves_native_type_and
         ))
         .await
         .unwrap();
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let csv_options = tablepro_core::export::CsvOptions {
+    let null_marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = bookie_core::export::CsvOptions {
         null_to_empty: false,
         null_marker: Some(null_marker.clone()),
         ..Default::default()
     };
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(Some(schema), "target_rows")
         .await
         .unwrap();
     assert_eq!(
         columns[1].enum_type,
-        Some(tablepro_core::QualifiedTypeName {
+        Some(bookie_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
         })
     );
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some(schema),
             table: "target_rows",
             columns: &columns,

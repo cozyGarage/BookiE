@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Combinator, Connection, FilterOp, FilterRule, FilterSet, FilterValue, Value, build_filter_where,
     keyset_order_by, keyset_where_clause,
 };
-use tablepro_release_tests::Fixture;
+use bookie_release_tests::Fixture;
 
 const TABLE: &str = "browse_filter_items";
 
@@ -374,8 +374,8 @@ async fn postgres_patterns_search_non_text_columns_without_changing_comparisons(
 #[tokio::test]
 #[ignore = "requires the postgres release fixture"]
 async fn capped_stream_preserves_columns_values_and_connection_reuse() {
+    use bookie_core::{MAX_QUERY_ROWS, OperationControl};
     use std::time::Duration;
-    use tablepro_core::{MAX_QUERY_ROWS, OperationControl};
     let connection = Fixture::from_env().connect_verified().await;
     let result = connection
         .query_controlled(

@@ -1,5 +1,5 @@
 use super::parse_input_for_driver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
 use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mssql_server::MssqlServer;
 
@@ -68,12 +68,12 @@ async fn value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offs
         .unwrap();
     let directory = tempfile::tempdir().unwrap();
     let workbook_path = directory.path().join("datetimeoffset.xlsx");
-    let csv_options = tablepro_core::export::CsvOptions::default();
-    tablepro_core::export::write_result_file(
+    let csv_options = bookie_core::export::CsvOptions::default();
+    bookie_core::export::write_result_file(
         &workbook_path,
         &workbook_result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -97,7 +97,7 @@ async fn value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offs
     assert!(!sheet.contains("<f>"), "{sheet}");
 
     let mut updates = Vec::new();
-    for row in &before.rows[..3] {
+    for row in before.rows.iter().take(3) {
         let displayed = crate::ui::grid::value_to_display_text(&row[value_index]);
         let Value::Text(original) = &row[value_index] else {
             panic!("datetimeoffset results must retain their exact text carrier");
@@ -109,7 +109,7 @@ async fn value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offs
             "the local value, scale and offset must stay text-exact"
         );
         updates.push(
-            tablepro_core::sql_dialect::build_keyed_update(
+            bookie_core::sql_dialect::build_keyed_update(
                 "mssql",
                 None,
                 "datetimeoffset_grid",

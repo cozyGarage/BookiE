@@ -4,7 +4,7 @@ use std::sync::Arc;
 #[test]
 fn column_requests_require_a_complete_catalog_name() {
     let mut index = super::SchemaIndex {
-        grammar: Some(tablepro_core::sql_syntax::SqlGrammar::PostgreSql),
+        grammar: Some(bookie_core::sql_syntax::SqlGrammar::PostgreSql),
         ..Default::default()
     };
     index.set_tables(vec![
@@ -138,7 +138,7 @@ fn schema_requests_are_accepted_only_by_their_generation() {
 
 #[test]
 fn editor_completion_snapshots_keep_columns_and_requests_private() {
-    let connection: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection::ready());
+    let connection: Arc<dyn bookie_core::Connection> = Arc::new(IdentityConnection::ready());
     let identity = crate::connection_identity::ConnectionIdentity::from_connection(&connection);
     let mut catalog = completion_index();
     catalog.sync_connection(&identity);
@@ -188,7 +188,7 @@ fn refreshing_one_editor_retires_only_its_stale_completion_request() {
 async fn completion_column_reads_obey_the_configured_timeout() {
     let (started, started_rx) = tokio::sync::oneshot::channel();
     let (release, release_rx) = tokio::sync::oneshot::channel();
-    let connection: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection::held(started, release_rx));
+    let connection: Arc<dyn bookie_core::Connection> = Arc::new(IdentityConnection::held(started, release_rx));
     let task = tokio::spawn(fetch_column_names(
         connection,
         SchemaRequest {
@@ -361,8 +361,8 @@ fn clearing_connection_metadata_cancels_pending_reads_and_retires_the_generation
 
 #[test]
 fn connection_replacement_cancels_old_fetches_and_rejects_late_results() {
-    let first: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection::ready());
-    let replacement: Arc<dyn tablepro_core::Connection> = Arc::new(IdentityConnection::ready());
+    let first: Arc<dyn bookie_core::Connection> = Arc::new(IdentityConnection::ready());
+    let replacement: Arc<dyn bookie_core::Connection> = Arc::new(IdentityConnection::ready());
     let mut index = completion_index();
     let first_identity = crate::connection_identity::ConnectionIdentity::from_connection(&first);
     let replacement_identity = crate::connection_identity::ConnectionIdentity::from_connection(&replacement);
@@ -418,22 +418,22 @@ struct CompletionSession {
 }
 
 #[async_trait::async_trait]
-impl tablepro_core::Session for CompletionSession {
+impl bookie_core::Session for CompletionSession {
     async fn query_params_controlled(
         &mut self,
         _sql: &str,
-        _params: &[tablepro_core::Value],
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
-        Err(tablepro_core::DriverError::Unsupported("query is unused".into()))
+        _params: &[bookie_core::Value],
+        _control: &bookie_core::OperationControl,
+    ) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Unsupported("query is unused".into()))
     }
 
     async fn fetch_completion_columns_controlled(
         &mut self,
         schema: Option<&str>,
         table: &str,
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<Vec<String>, tablepro_core::DriverError> {
+        _control: &bookie_core::OperationControl,
+    ) -> Result<Vec<String>, bookie_core::DriverError> {
         self.calls
             .lock()
             .expect("completion calls")
@@ -445,7 +445,7 @@ impl tablepro_core::Session for CompletionSession {
         true
     }
 
-    async fn close(self: Box<Self>) -> Result<(), tablepro_core::DriverError> {
+    async fn close(self: Box<Self>) -> Result<(), bookie_core::DriverError> {
         Ok(())
     }
 }
@@ -467,8 +467,8 @@ impl IdentityConnection {
 }
 
 #[async_trait::async_trait]
-impl tablepro_core::Connection for IdentityConnection {
-    async fn list_tables(&self) -> Result<Vec<tablepro_core::TableInfo>, tablepro_core::DriverError> {
+impl bookie_core::Connection for IdentityConnection {
+    async fn list_tables(&self) -> Result<Vec<bookie_core::TableInfo>, bookie_core::DriverError> {
         Ok(Vec::new())
     }
 
@@ -476,7 +476,7 @@ impl tablepro_core::Connection for IdentityConnection {
         &self,
         _schema: Option<&str>,
         _table: &str,
-    ) -> Result<Vec<tablepro_core::ColumnInfo>, tablepro_core::DriverError> {
+    ) -> Result<Vec<bookie_core::ColumnInfo>, bookie_core::DriverError> {
         if let Some(started) = self.started.lock().await.take() {
             let _ = started.send(());
         }
@@ -492,38 +492,38 @@ impl tablepro_core::Connection for IdentityConnection {
         _table: &str,
         _offset: u64,
         _limit: u64,
-    ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
-        Err(tablepro_core::DriverError::Unsupported("unused".into()))
+    ) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Unsupported("unused".into()))
     }
 
-    async fn query(&self, _sql: &str) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
-        Err(tablepro_core::DriverError::Unsupported("unused".into()))
+    async fn query(&self, _sql: &str) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Unsupported("unused".into()))
     }
 
-    async fn execute(&self, _sql: &str) -> Result<tablepro_core::ExecResult, tablepro_core::DriverError> {
-        Err(tablepro_core::DriverError::Unsupported("unused".into()))
+    async fn execute(&self, _sql: &str) -> Result<bookie_core::ExecResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Unsupported("unused".into()))
     }
 
     async fn execute_params(
         &self,
         _sql: &str,
-        _params: &[tablepro_core::Value],
-    ) -> Result<tablepro_core::ExecResult, tablepro_core::DriverError> {
-        Err(tablepro_core::DriverError::Unsupported("unused".into()))
+        _params: &[bookie_core::Value],
+    ) -> Result<bookie_core::ExecResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Unsupported("unused".into()))
     }
 
     async fn execute_in_transaction(
         &self,
-        _statements: &[(String, Vec<tablepro_core::Value>)],
-    ) -> Result<Vec<u64>, tablepro_core::DriverError> {
-        Err(tablepro_core::DriverError::Unsupported("unused".into()))
+        _statements: &[(String, Vec<bookie_core::Value>)],
+    ) -> Result<Vec<u64>, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Unsupported("unused".into()))
     }
 
-    async fn ping(&self) -> Result<(), tablepro_core::DriverError> {
+    async fn ping(&self) -> Result<(), bookie_core::DriverError> {
         Ok(())
     }
 
-    async fn close(self: Box<Self>) -> Result<(), tablepro_core::DriverError> {
+    async fn close(self: Box<Self>) -> Result<(), bookie_core::DriverError> {
         Ok(())
     }
 }

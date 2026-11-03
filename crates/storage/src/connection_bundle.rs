@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
-use tablepro_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
+use bookie_core::{AttachedDatabase, AuthMode, Environment, TlsMode};
 
 use crate::connection_bundle_crypto::{
     CipherHeader, EnvelopeHeader, KdfHeader, SealedBundle, check_kdf_parameters, open, seal,
@@ -20,7 +20,8 @@ use crate::connections::{SavedConnection, SavedSshConfig};
 #[path = "connection_bundle_secret_transaction.rs"]
 mod secret_transaction;
 
-pub const BUNDLE_FORMAT: &str = "tablepro.connection-bundle";
+pub const BUNDLE_FORMAT: &str = "bookie.connection-bundle";
+pub const LEGACY_BUNDLE_FORMAT: &str = "tablepro.connection-bundle";
 pub const BUNDLE_VERSION: u32 = 3;
 const LEGACY_BUNDLE_VERSION: u32 = 1;
 const PREVIOUS_BUNDLE_VERSION: u32 = 2;
@@ -416,6 +417,7 @@ impl BundleExport {
 
     fn envelope(&self) -> EnvelopeHeader {
         EnvelopeHeader {
+            format: BUNDLE_FORMAT,
             version: BUNDLE_VERSION,
             producer: self.producer.clone(),
             exported_at: self.exported_at.clone(),
@@ -505,9 +507,10 @@ pub fn parse_bundle(bytes: &[u8]) -> Result<ParsedBundle, BundleError> {
         });
     }
     let document: BundleDocument = serde_json::from_slice(bytes).map_err(|_| BundleError::Malformed)?;
-    if document.format != BUNDLE_FORMAT {
-        return Err(BundleError::NotABundle);
-    }
+    let format = [BUNDLE_FORMAT, LEGACY_BUNDLE_FORMAT]
+        .into_iter()
+        .find(|format| *format == document.format)
+        .ok_or(BundleError::NotABundle)?;
     if !matches!(
         document.version,
         LEGACY_BUNDLE_VERSION | PREVIOUS_BUNDLE_VERSION | BUNDLE_VERSION
@@ -515,6 +518,7 @@ pub fn parse_bundle(bytes: &[u8]) -> Result<ParsedBundle, BundleError> {
         return Err(BundleError::UnsupportedVersion(document.version));
     }
     let envelope = EnvelopeHeader {
+        format,
         version: document.version,
         producer: document.producer,
         exported_at: document.exported_at,
@@ -991,6 +995,10 @@ fn endpoint_key(saved: &SavedConnection) -> EndpointKey {
 #[cfg(test)]
 #[path = "connection_bundle_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "connection_bundle_legacy_tests.rs"]
+mod legacy_tests;
 
 #[cfg(test)]
 pub(crate) fn ssh_chain_for_test(depth: usize) -> SavedSshConfig {

@@ -131,8 +131,8 @@ fn verify_ca_with_a_named_authority_does_not_panic_on_conflicting_trust_settings
     // root_cert into trust_cert_ca() only, never trust_cert(), for
     // VerifyCa/VerifyFull.
     let options = ConnectOptions {
-        tls: tablepro_core::TlsConfig {
-            mode: tablepro_core::TlsMode::VerifyCa,
+        tls: bookie_core::TlsConfig {
+            mode: bookie_core::TlsMode::VerifyCa,
             root_cert: Some(std::path::PathBuf::from("/etc/ssl/private-ca.pem")),
             ..Default::default()
         },
@@ -144,8 +144,8 @@ fn verify_ca_with_a_named_authority_does_not_panic_on_conflicting_trust_settings
 #[test]
 fn verify_full_without_a_named_authority_does_not_panic() {
     let options = ConnectOptions {
-        tls: tablepro_core::TlsConfig {
-            mode: tablepro_core::TlsMode::VerifyFull,
+        tls: bookie_core::TlsConfig {
+            mode: bookie_core::TlsMode::VerifyFull,
             ..Default::default()
         },
         ..direct_options()
@@ -282,22 +282,22 @@ async fn retire_wakes_the_fault_sink_and_leaves_the_outcome_unknown() {
 #[test]
 fn only_prefer_may_continue_without_encryption() {
     let with_mode = |mode| ConnectOptions {
-        tls: tablepro_core::TlsConfig {
+        tls: bookie_core::TlsConfig {
             mode,
-            ..tablepro_core::TlsConfig::default()
+            ..bookie_core::TlsConfig::default()
         },
         ..direct_options()
     };
     assert!(
-        build_target(&with_mode(tablepro_core::TlsMode::Prefer))
+        build_target(&with_mode(bookie_core::TlsMode::Prefer))
             .unwrap()
             .plaintext_fallback
     );
     for strict in [
-        tablepro_core::TlsMode::Disabled,
-        tablepro_core::TlsMode::Require,
-        tablepro_core::TlsMode::VerifyCa,
-        tablepro_core::TlsMode::VerifyFull,
+        bookie_core::TlsMode::Disabled,
+        bookie_core::TlsMode::Require,
+        bookie_core::TlsMode::VerifyCa,
+        bookie_core::TlsMode::VerifyFull,
     ] {
         assert!(
             !build_target(&with_mode(strict)).unwrap().plaintext_fallback,
@@ -320,7 +320,7 @@ fn a_server_that_declines_encryption_is_reported_as_a_tls_failure() {
 fn empty_result_set() -> QueryResult {
     QueryResult {
         columns: Vec::new(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     }
 }
@@ -331,10 +331,13 @@ fn a_row_refused_by_the_byte_budget_ends_the_retained_prefix() {
     let mut result_set = empty_result_set();
     let big = |megabytes: usize| vec![Value::Text("x".repeat(megabytes * 1024 * 1024))];
 
-    assert!(admission.admit(big(63), &mut result_set));
-    assert!(!admission.admit(big(2), &mut result_set));
+    let mut accepted = big(63);
+    let mut rejected = big(2);
+    assert!(admission.admit(&mut accepted, &mut result_set));
+    assert!(!admission.admit(&mut rejected, &mut result_set));
+    let mut trailing = vec![Value::Int(3)];
     assert!(
-        !admission.admit(vec![Value::Int(3)], &mut result_set),
+        !admission.admit(&mut trailing, &mut result_set),
         "a small row after a refusal must not leave a gap in the result"
     );
     assert_eq!(result_set.rows.len(), 1);
@@ -346,10 +349,13 @@ fn the_row_limit_closes_admission() {
     let mut admission = RowAdmission::new(2);
     let mut result_set = empty_result_set();
 
-    assert!(admission.admit(vec![Value::Int(1)], &mut result_set));
-    assert!(admission.admit(vec![Value::Int(2)], &mut result_set));
+    let mut first = vec![Value::Int(1)];
+    let mut second = vec![Value::Int(2)];
+    let mut third = vec![Value::Int(3)];
+    assert!(admission.admit(&mut first, &mut result_set));
+    assert!(admission.admit(&mut second, &mut result_set));
     assert!(admission.is_closed());
-    assert!(!admission.admit(vec![Value::Int(3)], &mut result_set));
+    assert!(!admission.admit(&mut third, &mut result_set));
     assert_eq!(result_set.rows.len(), 2);
 }
 

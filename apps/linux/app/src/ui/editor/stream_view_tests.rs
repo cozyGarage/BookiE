@@ -1,8 +1,8 @@
 use super::*;
 use crate::ui::editor::stream_pages::{ResidentPageStore, StreamPageCache, StreamTerminal};
 use crate::ui::editor::{StatementIdentity, StatementOutcomeKind};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use std::sync::Arc;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 fn wait_for_grid(root: &gtk::Widget) -> gtk::ColumnView {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
@@ -69,7 +69,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
     let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let resident_pages = ResidentPageStore::from_pages(indices.iter().copied().zip(pages.iter().cloned()));
     let result = StreamedResult {
-        pages,
+        pages: pages.iter().map(Arc::downgrade).collect(),
         page_indices: indices.to_vec(),
         page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
@@ -165,7 +165,7 @@ fn short_retained_pages_use_received_row_positions_after_eviction() {
     assert_eq!(stream_page_label(&result, 6), "Rows 7-7");
     assert_eq!(
         stream_progress_text(&result),
-        "Received 7 rows · 7 pages\nEarlier pages can be loaded from temporary storage."
+        "Receiving… · Received 7 rows · 7 pages\nEarlier pages can be loaded from temporary storage."
     );
 }
 
@@ -305,7 +305,7 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
     cache.append(1, page(&[3, 4])).unwrap();
     let result = cache.snapshot(StreamTerminal::Loading, None);
     let resident_pages = result.resident_pages.clone();
-    let original = result.pages[0].clone();
+    let original = result.pages[0].upgrade().unwrap();
     let original_weak = Arc::downgrade(&original);
     let outcome = StatementOutcome {
         identity: StatementIdentity::default(),
@@ -386,7 +386,7 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
     assert!(new_grid.is_mapped());
 
     let mut oversized = page(&[0]).as_ref().clone();
-    oversized.rows = vec![vec![Value::Bytes(vec![0; 65 * 1024 * 1024])]];
+    oversized.rows = vec![vec![Value::Bytes(vec![0; 65 * 1024 * 1024])]].into();
     cache.append(2, Arc::new(oversized)).unwrap();
     assert!(resident_pages.get(0).is_none());
     assert!(resident_pages.get(1).is_none());
@@ -412,7 +412,7 @@ fn a_terminal_status_keeps_retained_grids_unbuilt_until_selected() {
         None,
     );
     let root = holder.clone().upcast::<gtk::Widget>();
-    let pages = named::<gtk::Stack>(&root, "GtkStack").unwrap();
+    let pages = named::<gtk::Stack>(&root, &completed_page_stack_name(0)).unwrap();
     let data = pages.first_child().unwrap();
     let window = gtk::Window::builder()
         .default_width(900)
@@ -465,7 +465,7 @@ fn the_page_being_read_is_not_evicted_while_the_stream_keeps_loading() {
     let retired = Arc::downgrade(&original);
     let columns = original.columns.clone();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let spool = tablepro_app_services::stream_result_spool::StreamResultSpoolManager::default()
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
         .create()
         .unwrap();
     runtime.block_on(spool.append_page(0, original.clone())).unwrap();
@@ -528,7 +528,7 @@ fn a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice() {
         None,
     );
     let root = holder.clone().upcast::<gtk::Widget>();
-    let pages = named::<gtk::Stack>(&root, "GtkStack").unwrap();
+    let pages = named::<gtk::Stack>(&root, &completed_page_stack_name(0)).unwrap();
     assert_eq!(pages.pages().n_items(), 2, "the timeout is not a third page");
     assert_eq!(pages.visible_child(), pages.last_child());
     let title = pages.page(&pages.visible_child().unwrap()).title();

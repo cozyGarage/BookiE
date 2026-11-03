@@ -1,12 +1,13 @@
 use std::{collections::HashMap, iter};
 
+use bookie_core::{
+    ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBudget, QueryRows,
+    Value,
+};
 use futures::stream::StreamExt;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgCancelToken, PgRow, PgTypeInfo, PgTypeKind};
 use sqlx::{Column, Connection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
-use tablepro_core::{
-    ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QualifiedTypeName, QueryResult, QueryResultBudget, Value,
-};
 
 use super::params::{bind_pg_params, describe_query_parameters, needs_text_type_inference, pg_parameter_type_infos};
 use super::{array, decode, map_sqlx_error, numeric, temporal};
@@ -425,7 +426,8 @@ where
     let mut type_infos = Vec::new();
     let mut column_origins = Vec::new();
     let mut type_names = Vec::new();
-    let mut rows = Vec::new();
+    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -448,18 +450,16 @@ where
             type_names = metadata.type_names;
         }
         let payload_bytes = pg_row_payload_bytes(&row).unwrap_or(usize::MAX);
-        let Some(values) = budget.decode_and_admit_row(row.len(), payload_bytes, || {
-            type_names
-                .iter()
-                .enumerate()
-                .map(|(index, type_name)| extract_value(&row, index, type_name))
-                .collect::<Result<Vec<_>, _>>()
-        })?
-        else {
+        if !budget.decode_and_admit_row_into(row.len(), payload_bytes, &mut decoded, |values| {
+            for (index, type_name) in type_names.iter().enumerate() {
+                values.push(extract_value(&row, index, type_name)?);
+            }
+            Ok::<(), DriverError>(())
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(values);
+        }
+        rows.push_row(&mut decoded);
     }
     Ok((
         QueryResult {
@@ -578,7 +578,7 @@ fn extract_non_null_value(row: &PgRow, idx: usize, type_name: &str, raw: &sqlx::
         "INT8" => row.try_get::<i64, _>(idx).map(Value::Int),
         "FLOAT4" => row
             .try_get::<f32, _>(idx)
-            .map(|v| Value::Float(tablepro_core::single_precision_as_f64(v))),
+            .map(|v| Value::Float(bookie_core::single_precision_as_f64(v))),
         "FLOAT8" => row.try_get::<f64, _>(idx).map(Value::Float),
         "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date),
         "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time),

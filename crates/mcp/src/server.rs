@@ -50,7 +50,7 @@ fn initialize_result(params: &JsonValue) -> Result<JsonValue, String> {
     Ok(json!({
         "protocolVersion": version,
         "capabilities": {"tools": {}},
-        "serverInfo": {"name": "tablepro", "version": env!("CARGO_PKG_VERSION")}
+        "serverInfo": {"name": "bookie", "version": env!("CARGO_PKG_VERSION")}
     }))
 }
 
@@ -252,8 +252,8 @@ mod structured_error_tests {
 
     #[test]
     fn legacy_transport_returns_the_shared_structured_error_shape() {
-        let error = McpToolError::from_write_error(&tablepro_core::DriverError::OperationOutcomeUnknown {
-            source: Box::new(tablepro_core::DriverError::Disconnected),
+        let error = McpToolError::from_write_error(&bookie_core::DriverError::OperationOutcomeUnknown {
+            source: Box::new(bookie_core::DriverError::Disconnected),
         });
 
         assert_eq!(
@@ -368,7 +368,7 @@ pub(crate) fn tool_schema(name: &str) -> JsonValue {
                 "connection_id": {"type": "string"},
                 "kind": {
                     "type": "string",
-                    "enum": tablepro_core::CatalogObjectKind::ALL.iter().map(|kind| kind.as_str()).collect::<Vec<_>>()
+                    "enum": bookie_core::CatalogObjectKind::ALL.iter().map(|kind| kind.as_str()).collect::<Vec<_>>()
                 },
                 "schema": {"type": "string"},
                 "token": {"type": "string"}
@@ -434,7 +434,7 @@ pub async fn serve_streamable_http(bridge: Arc<McpBridge>, config: McpServerConf
 /// gets to finish its own bounded cancellation and reach a terminal audit
 /// outcome before the runtime hosting it is torn down. A caller that drops
 /// this future's loser branch does not stop an already-spawned request task,
-/// but a caller that also drops the runtime (`tablepro-app`'s dedicated MCP
+/// but a caller that also drops the runtime (`bookie-app`'s dedicated MCP
 /// thread) does, so this deadline must never be shorter than the operation
 /// bound `McpBridge` itself already enforces.
 const SHUTDOWN_TEARDOWN_MARGIN: std::time::Duration = std::time::Duration::from_secs(5);

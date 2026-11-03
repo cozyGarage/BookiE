@@ -98,7 +98,7 @@ fn kind_constants_are_distinct_and_non_empty() {
 #[test]
 fn schema_constant_uses_reverse_dns() {
     assert!(crate::secret_schema().starts_with("com."));
-    assert!(crate::secret_schema().contains("tablepro"));
+    assert!(crate::secret_schema().contains("bookie"));
 }
 
 #[test]
@@ -116,7 +116,7 @@ fn map_err_keeps_the_underlying_message_for_an_unclassified_failure() {
 fn invalid_utf8_secret_produces_schema_error_with_descriptive_prefix() {
     // load_secret's UTF-8 conversion path: if a secret round-trips through
     // a non-UTF-8 byte sequence (e.g. a binary blob smuggled in via a
-    // non-tablepro caller), we surface a clear "secret utf8" prefix
+    // non-bookie caller), we surface a clear "secret utf8" prefix
     // instead of a raw FromUtf8Error.
     let bad: Vec<u8> = vec![0xFF, 0xFE, 0xFD];
     let err = String::from_utf8(bad)
@@ -164,7 +164,7 @@ async fn reading_a_missing_password_does_not_create_a_keyring() {
 async fn round_trip_via_secret_service() {
     use secrecy::ExposeSecret;
     let id = Uuid::new_v4();
-    store_password(id, "test-secret", "tablepro-spike").await.unwrap();
+    store_password(id, "test-secret", "bookie-spike").await.unwrap();
     let loaded = load_password(id).await.unwrap();
     assert_eq!(
         loaded.map(|s| s.expose_secret().to_string()),
@@ -173,4 +173,36 @@ async fn round_trip_via_secret_service() {
     delete_password(id).await.unwrap();
     let after = load_password(id).await.unwrap();
     assert!(after.is_none());
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn a_credential_saved_under_the_legacy_schema_is_found_copied_forward_and_deleted_with_it() {
+    use secrecy::ExposeSecret;
+    let id = Uuid::new_v4();
+    let current = attrs_for(id, KIND_DB_PASSWORD);
+    let legacy = legacy_attrs(&current);
+    assert_eq!(
+        legacy.get("xdg:schema").map(String::as_str),
+        Some("com.tablepro.linux.Password")
+    );
+    let keyring = open().await.unwrap();
+    keyring
+        .create_item("legacy credential", &legacy, b"legacy-secret", true)
+        .await
+        .unwrap();
+
+    let loaded = load_password(id).await.unwrap();
+
+    assert_eq!(
+        loaded.map(|secret| secret.expose_secret().to_string()),
+        Some("legacy-secret".into())
+    );
+    assert_eq!(keyring.search_items(&current).await.unwrap().len(), 1);
+    assert_eq!(keyring.search_items(&legacy).await.unwrap().len(), 1);
+
+    delete_password(id).await.unwrap();
+
+    assert!(keyring.search_items(&current).await.unwrap().is_empty());
+    assert!(keyring.search_items(&legacy).await.unwrap().is_empty());
 }

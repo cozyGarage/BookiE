@@ -5,12 +5,12 @@ use super::{
     run_statements, run_statements_with_stream, sql_preview, statement_identity, summary_label,
 };
 use super::{statement_subject, uses_drop_down};
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use relm4::gtk;
 use relm4::gtk::prelude::*;
-use tablepro_core::{ConnectOptions, DatabaseDriver};
 
-type ReceivedRows = std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<tablepro_core::Value>)>>>;
-type ReceivedPages = std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<Vec<tablepro_core::Value>>)>>>;
+type ReceivedRows = std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<bookie_core::Value>)>>>;
+type ReceivedPages = std::sync::Arc<std::sync::Mutex<Vec<(u64, Vec<Vec<bookie_core::Value>>)>>>;
 
 #[test]
 fn a_statement_is_named_by_its_verb_and_the_table_it_touches() {
@@ -40,7 +40,7 @@ fn a_few_results_keep_their_buttons_and_many_collapse_into_a_drop_down() {
     assert!(uses_drop_down(40));
 }
 
-async fn sqlite_connection() -> std::sync::Arc<dyn tablepro_core::Connection> {
+async fn sqlite_connection() -> std::sync::Arc<dyn bookie_core::Connection> {
     let driver = drivers_sqlite::SqliteDriver;
     let connection = driver
         .connect(ConnectOptions {
@@ -55,7 +55,7 @@ async fn sqlite_connection() -> std::sync::Arc<dyn tablepro_core::Connection> {
 async fn guarded_sqlite_file(
     service: &crate::services::database_service::DatabaseService,
     path: &std::path::Path,
-) -> std::sync::Arc<dyn tablepro_core::Connection> {
+) -> std::sync::Arc<dyn bookie_core::Connection> {
     use crate::services::database_service::{ConnectionMetadata, ReconnectParams};
     let driver: std::sync::Arc<dyn DatabaseDriver> = std::sync::Arc::new(drivers_sqlite::SqliteDriver);
     std::fs::File::create(path).expect("sqlite file fixture");
@@ -69,7 +69,7 @@ async fn guarded_sqlite_file(
         id,
         name: "script".into(),
         driver_id: "sqlite".into(),
-        environment: tablepro_core::Environment::Local,
+        environment: bookie_core::Environment::Local,
         read_only: false,
         server_version: None,
         query_timeout_secs: None,
@@ -78,7 +78,7 @@ async fn guarded_sqlite_file(
         driver,
         opts: options,
         ssh: None,
-        environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
     };
     assert!(service.activate(id, metadata, connection, None, false, reconnect));
     service.get(id).expect("guarded handle")
@@ -114,7 +114,7 @@ async fn a_script_rollback_cannot_silently_commit_the_statements_before_it() {
     assert!(message.contains("transaction"), "{message}");
     assert!(matches!(outcomes[1].kind, StatementOutcomeKind::NotRun));
     let rows = conn.query_controlled("SELECT count(*) FROM t", &control).await.unwrap();
-    assert_eq!(rows.rows, vec![vec![tablepro_core::Value::Int(0)]]);
+    assert_eq!(rows.rows, vec![vec![bookie_core::Value::Int(0)]]);
 }
 
 struct SlowApproval {
@@ -122,19 +122,19 @@ struct SlowApproval {
 }
 
 #[async_trait::async_trait]
-impl tablepro_policy::ApprovalSink for SlowApproval {
-    async fn request(&self, _request: tablepro_policy::ApprovalRequest) -> tablepro_policy::ApprovalOutcome {
+impl bookie_policy::ApprovalSink for SlowApproval {
+    async fn request(&self, _request: bookie_policy::ApprovalRequest) -> bookie_policy::ApprovalOutcome {
         self.asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-        tablepro_policy::ApprovalOutcome::AllowOnce
+        bookie_policy::ApprovalOutcome::AllowOnce
     }
 }
 
 struct QuietAudit;
 
 #[async_trait::async_trait]
-impl tablepro_policy::AuditSink for QuietAudit {
-    async fn record(&self, _event: tablepro_policy::AuditEvent) -> Result<(), tablepro_policy::AuditError> {
+impl bookie_policy::AuditSink for QuietAudit {
+    async fn record(&self, _event: bookie_policy::AuditEvent) -> Result<(), bookie_policy::AuditError> {
         Ok(())
     }
 }
@@ -148,19 +148,19 @@ async fn the_elapsed_time_of_a_statement_excludes_the_wait_for_approval() {
         slow.clone(),
         slow.clone(),
     ));
-    let guard = tablepro_policy::PolicyGuard::new(
+    let guard = bookie_policy::PolicyGuard::new(
         sqlite_connection().await,
-        tablepro_policy::GuardContext {
+        bookie_policy::GuardContext {
             connection_id: uuid::Uuid::new_v4(),
             connection_name: "production".into(),
             driver_id: "sqlite".into(),
-            environment: tablepro_core::Environment::Prod,
+            environment: bookie_core::Environment::Prod,
             read_only: false,
-            principal: tablepro_policy::Principal::human_gui(),
-            policy: std::sync::Arc::new(tablepro_policy::PolicyConfig::default()),
+            principal: bookie_policy::Principal::human_gui(),
+            policy: std::sync::Arc::new(bookie_policy::PolicyConfig::default()),
             approval,
             audit: std::sync::Arc::new(QuietAudit),
-            audit_state: std::sync::Arc::new(tablepro_policy::AuditState::new()),
+            audit_state: std::sync::Arc::new(bookie_policy::AuditState::new()),
         },
     );
     let control = crate::services::operation_control::bounded(0);
@@ -332,20 +332,20 @@ struct CursorCounters {
 }
 
 struct CursorSession {
-    pages: std::collections::VecDeque<Result<tablepro_core::QueryCursorPage, tablepro_core::DriverError>>,
+    pages: std::collections::VecDeque<Result<bookie_core::QueryCursorPage, bookie_core::DriverError>>,
     counters: std::sync::Arc<CursorCounters>,
     transaction_open: bool,
     cursor_open: bool,
 }
 
 #[async_trait::async_trait]
-impl tablepro_core::Session for CursorSession {
+impl bookie_core::Session for CursorSession {
     async fn query_params_controlled(
         &mut self,
         sql: &str,
-        _params: &[tablepro_core::Value],
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<tablepro_core::QueryResult, tablepro_core::DriverError> {
+        _params: &[bookie_core::Value],
+        _control: &bookie_core::OperationControl,
+    ) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
         if sql.starts_with("BEGIN READ ONLY") {
             self.counters.lifecycle.lock().unwrap().push("begin");
             self.transaction_open = true;
@@ -367,9 +367,9 @@ impl tablepro_core::Session for CursorSession {
                 .rolled_back
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
-        Ok(tablepro_core::QueryResult {
+        Ok(bookie_core::QueryResult {
             columns: Vec::new(),
-            rows: Vec::new(),
+            rows: Vec::new().into(),
             truncated: false,
         })
     }
@@ -377,36 +377,36 @@ impl tablepro_core::Session for CursorSession {
     async fn open_query_cursor_controlled(
         &mut self,
         _sql: &str,
-        _params: &[tablepro_core::Value],
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<tablepro_core::QueryCursorId, tablepro_core::DriverError> {
+        _params: &[bookie_core::Value],
+        _control: &bookie_core::OperationControl,
+    ) -> Result<bookie_core::QueryCursorId, bookie_core::DriverError> {
         self.counters.lifecycle.lock().unwrap().push("open_cursor");
         self.cursor_open = true;
         self.counters
             .cursor_open
             .store(true, std::sync::atomic::Ordering::SeqCst);
         self.counters.opened.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        Ok(tablepro_core::QueryCursorId::new())
+        Ok(bookie_core::QueryCursorId::new())
     }
 
     async fn fetch_query_cursor_page_controlled(
         &mut self,
-        _cursor_id: tablepro_core::QueryCursorId,
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<tablepro_core::QueryCursorPage, tablepro_core::DriverError> {
+        _cursor_id: bookie_core::QueryCursorId,
+        _control: &bookie_core::OperationControl,
+    ) -> Result<bookie_core::QueryCursorPage, bookie_core::DriverError> {
         self.counters.fetched.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         match self.pages.pop_front() {
             Some(Ok(page)) => Ok(page),
             Some(Err(error)) => Err(error),
-            None => Err(tablepro_core::DriverError::Internal("no scripted cursor page".into())),
+            None => Err(bookie_core::DriverError::Internal("no scripted cursor page".into())),
         }
     }
 
     async fn close_query_cursor_controlled(
         &mut self,
-        _cursor_id: tablepro_core::QueryCursorId,
-        _control: &tablepro_core::OperationControl,
-    ) -> Result<(), tablepro_core::DriverError> {
+        _cursor_id: bookie_core::QueryCursorId,
+        _control: &bookie_core::OperationControl,
+    ) -> Result<(), bookie_core::DriverError> {
         self.counters.lifecycle.lock().unwrap().push("close_cursor");
         self.cursor_open = false;
         self.counters
@@ -424,14 +424,14 @@ impl tablepro_core::Session for CursorSession {
         self.transaction_open
     }
 
-    async fn close(self: Box<Self>) -> Result<(), tablepro_core::DriverError> {
+    async fn close(self: Box<Self>) -> Result<(), bookie_core::DriverError> {
         Ok(())
     }
 }
 
-fn cursor_page(values: &[i64], has_next_page: bool) -> tablepro_core::QueryCursorPage {
-    use tablepro_core::{ColumnInfo, QueryResult, Value};
-    tablepro_core::QueryCursorPage {
+fn cursor_page(values: &[i64], has_next_page: bool) -> bookie_core::QueryCursorPage {
+    use bookie_core::{ColumnInfo, QueryResult, Value};
+    bookie_core::QueryCursorPage {
         result: QueryResult {
             columns: vec![ColumnInfo {
                 name: "id".into(),
@@ -453,13 +453,13 @@ fn cursor_page(values: &[i64], has_next_page: bool) -> tablepro_core::QueryCurso
     }
 }
 
-fn cursor_page_with_values(values: Vec<tablepro_core::Value>, has_next_page: bool) -> tablepro_core::QueryCursorPage {
+fn cursor_page_with_values(values: Vec<bookie_core::Value>, has_next_page: bool) -> bookie_core::QueryCursorPage {
     let mut page = cursor_page(&[], has_next_page);
     let template = page.result.columns[0].clone();
     page.result.columns = values
         .iter()
         .enumerate()
-        .map(|(index, _)| tablepro_core::ColumnInfo {
+        .map(|(index, _)| bookie_core::ColumnInfo {
             name: format!("value_{index}"),
             data_type: "test value".into(),
             ..template.clone()
@@ -470,7 +470,7 @@ fn cursor_page_with_values(values: Vec<tablepro_core::Value>, has_next_page: boo
 }
 
 fn cursor_target(
-    pages: Vec<Result<tablepro_core::QueryCursorPage, tablepro_core::DriverError>>,
+    pages: Vec<Result<bookie_core::QueryCursorPage, bookie_core::DriverError>>,
     counters: std::sync::Arc<CursorCounters>,
 ) -> StatementTarget {
     let session = CursorSession {
@@ -520,7 +520,7 @@ fn record_streamed_pages(
             match update {
                 StreamUpdate::Started { .. } => true,
                 StreamUpdate::Page { sequence, page, .. } => {
-                    received.lock().unwrap().push((sequence, page.rows.clone()));
+                    received.lock().unwrap().push((sequence, page.rows.clone().into_rows()));
                     true
                 }
             }
@@ -531,23 +531,6 @@ fn record_streamed_pages(
 fn reject_stream_page() -> impl FnMut(StreamUpdate) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
 {
     move |update| Box::pin(async move { matches!(update, StreamUpdate::Started { .. }) })
-}
-
-fn query_export_runner(runtime: std::sync::Arc<tokio::runtime::Runtime>) -> crate::services::export_pages::PageRunner {
-    std::sync::Arc::new(move |future| runtime.block_on(future))
-}
-
-fn query_export_factory(
-    target: StatementTarget,
-    runtime: std::sync::Arc<tokio::runtime::Runtime>,
-) -> crate::ui::export_dialog::PageFetcherFactory {
-    super::super::session_mode::query_cursor_export_factory_for_target(
-        target,
-        "SELECT id FROM items WHERE id > $1".into(),
-        vec![tablepro_core::Value::Int(0)],
-        30,
-        query_export_runner(runtime),
-    )
 }
 
 fn stream_export_origin() -> (
@@ -562,9 +545,9 @@ fn stream_export_origin() -> (
             .unwrap(),
     );
     let database = std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated());
-    let driver: std::sync::Arc<dyn tablepro_core::DatabaseDriver> = std::sync::Arc::new(drivers_sqlite::SqliteDriver);
+    let driver: std::sync::Arc<dyn bookie_core::DatabaseDriver> = std::sync::Arc::new(drivers_sqlite::SqliteDriver);
     let id = uuid::Uuid::new_v4();
-    let options = tablepro_core::ConnectOptions {
+    let options = bookie_core::ConnectOptions {
         database: ":memory:".into(),
         ..Default::default()
     };
@@ -576,7 +559,7 @@ fn stream_export_origin() -> (
                 id,
                 name: "stream export test".into(),
                 driver_id: "sqlite".into(),
-                environment: tablepro_core::Environment::Local,
+                environment: bookie_core::Environment::Local,
                 read_only: false,
                 server_version: None,
                 query_timeout_secs: None,
@@ -588,7 +571,7 @@ fn stream_export_origin() -> (
                 driver,
                 opts: options,
                 ssh: None,
-                environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+                environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
             },
         )
     });
@@ -615,7 +598,7 @@ fn stream_export_button(widget: &gtk::Widget) -> Option<gtk::Button> {
 }
 
 fn streamed_result_pages(
-    pages: Vec<std::sync::Arc<tablepro_core::QueryResult>>,
+    pages: Vec<std::sync::Arc<bookie_core::QueryResult>>,
     first_page: u64,
     total_pages: u64,
     total_rows: usize,
@@ -634,7 +617,7 @@ fn streamed_result_pages(
         .collect();
     let retained_rows = pages.iter().map(|page| page.rows.len()).sum();
     let streamed = StreamedResult {
-        pages,
+        pages: pages.iter().map(std::sync::Arc::downgrade).collect(),
         page_indices,
         page_row_starts: super::super::stream_pages::page_row_starts_from_counts(&page_row_counts),
         page_row_counts,
@@ -688,9 +671,11 @@ fn streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states
         StreamTerminal::Loading,
     );
     assert_eq!(loading.pages().n_items(), 2);
-    assert_eq!(loading.visible_child(), loading.last_child());
+    assert_eq!(loading.visible_child(), loading.first_child());
     assert_eq!(streamed_page_title(&loading, 0), "Rows 1-2");
     assert_eq!(streamed_page_title(&loading, 1), "Rows 3-3");
+
+    assert_complete_stream_starts_on_first_page();
 
     let empty = streamed_result_pages(
         vec![std::sync::Arc::new(cursor_page(&[], false).result)],
@@ -728,6 +713,20 @@ fn streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states
     assert_eq!(streamed_page_title(&cancelled, 0), "Rows 1-1");
 }
 
+fn assert_complete_stream_starts_on_first_page() {
+    let complete = streamed_result_pages(
+        vec![
+            std::sync::Arc::new(cursor_page(&[1, 2], true).result),
+            std::sync::Arc::new(cursor_page(&[3], false).result),
+        ],
+        0,
+        2,
+        3,
+        StreamTerminal::Complete,
+    );
+    assert_eq!(complete.visible_child(), complete.first_child());
+}
+
 #[tokio::test]
 async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
     let counters = std::sync::Arc::new(CursorCounters::default());
@@ -754,8 +753,8 @@ async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
     assert_eq!(
         *received.lock().unwrap(),
         [
-            (0, vec![tablepro_core::Value::Int(1), tablepro_core::Value::Int(2)]),
-            (1, vec![tablepro_core::Value::Int(3)]),
+            (0, vec![bookie_core::Value::Int(1), bookie_core::Value::Int(2)]),
+            (1, vec![bookie_core::Value::Int(3)]),
         ]
     );
     assert_eq!(counters.opened.load(std::sync::atomic::Ordering::SeqCst), 1);
@@ -766,7 +765,7 @@ async fn postgres_editor_streams_pages_in_order_with_one_fetch_in_flight() {
 
 #[tokio::test]
 async fn streamed_cursor_pages_preserve_native_values_across_page_boundaries() {
-    use tablepro_core::Value;
+    use bookie_core::Value;
 
     let first = vec![
         Value::Null,
@@ -819,7 +818,7 @@ async fn a_late_cursor_error_keeps_prior_pages_and_rolls_back_the_snapshot() {
             target: cursor_target(
                 vec![
                     Ok(cursor_page(&[1], true)),
-                    Err(tablepro_core::DriverError::Query {
+                    Err(bookie_core::DriverError::Query {
                         message: "later page failed".into(),
                         sqlstate: Some("XX000".into()),
                         position: None,
@@ -876,7 +875,7 @@ async fn cancelling_page_delivery_closes_the_cursor_and_rolls_back() {
 #[tokio::test]
 async fn cancelling_during_fetch_rolls_back_and_keeps_the_session_usable() {
     let counters = std::sync::Arc::new(CursorCounters::default());
-    let target = cursor_target(vec![Err(tablepro_core::DriverError::Cancelled)], counters.clone());
+    let target = cursor_target(vec![Err(bookie_core::DriverError::Cancelled)], counters.clone());
     let result = run_statements_with_stream(
         StatementRun {
             target: target.clone(),
@@ -897,63 +896,6 @@ async fn cancelling_during_fetch_rolls_back_and_keeps_the_session_usable() {
     assert!(!counters.transaction_open.load(std::sync::atomic::Ordering::SeqCst));
     assert!(!counters.cursor_open.load(std::sync::atomic::Ordering::SeqCst));
     assert!(matches!(target.session_state().await, Some((_, false, true))));
-}
-
-#[test]
-fn guarded_query_export_reads_every_page_and_releases_its_cursor() {
-    let runtime = std::sync::Arc::new(
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap(),
-    );
-    let counters = std::sync::Arc::new(CursorCounters::default());
-    let target = cursor_target(
-        vec![Ok(cursor_page(&[1, 2], true)), Ok(cursor_page(&[3], false))],
-        counters.clone(),
-    );
-    let mut pages = query_export_factory(target, runtime)(tokio_util::sync::CancellationToken::new());
-    let mut rows = Vec::new();
-    while let Some(page) = pages.next_page().unwrap() {
-        rows.extend(page.into_iter().map(|row| row[0].clone()));
-    }
-    pages.finish().unwrap();
-
-    assert_eq!(rows, [1, 2, 3].map(tablepro_core::Value::Int));
-    assert_eq!(counters.opened.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(counters.fetched.load(std::sync::atomic::Ordering::SeqCst), 2);
-    assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
-}
-
-#[test]
-fn guarded_query_export_failure_rolls_back_and_keeps_the_database_error() {
-    let runtime = std::sync::Arc::new(
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap(),
-    );
-    let counters = std::sync::Arc::new(CursorCounters::default());
-    let target = cursor_target(
-        vec![
-            Ok(cursor_page(&[1], true)),
-            Err(tablepro_core::DriverError::Query {
-                message: "later page failed".into(),
-                sqlstate: Some("XX000".into()),
-                position: None,
-            }),
-        ],
-        counters.clone(),
-    );
-    let mut pages = query_export_factory(target, runtime)(tokio_util::sync::CancellationToken::new());
-    assert_eq!(pages.next_page().unwrap().unwrap().len(), 1);
-    let error = pages.next_page().unwrap_err();
-    pages.finish().unwrap();
-
-    assert!(matches!(error, tablepro_core::export::ExportError::Source(_)));
-    assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 0);
 }
 
 #[test]
@@ -1070,7 +1012,7 @@ async fn a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor(
     use testcontainers_modules::postgres::Postgres;
 
     let container = Postgres::default().with_tag("16-alpine").start().await.unwrap();
-    let connection: std::sync::Arc<dyn tablepro_core::Connection> = std::sync::Arc::from(
+    let connection: std::sync::Arc<dyn bookie_core::Connection> = std::sync::Arc::from(
         drivers_postgres::PgDriver
             .connect(ConnectOptions {
                 host: container.get_host().await.unwrap().to_string(),
@@ -1114,7 +1056,7 @@ async fn a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor(
         panic!("the statement runs without a cursor");
     };
     assert!(
-        matches!(&outcomes[0].kind, StatementOutcomeKind::Rows(sets) if sets[0].rows == [[tablepro_core::Value::Int(1)]]),
+        matches!(&outcomes[0].kind, StatementOutcomeKind::Rows(sets) if sets[0].rows == vec![vec![bookie_core::Value::Int(1)]]),
         "{:?}",
         outcomes[0].kind
     );
@@ -1123,7 +1065,7 @@ async fn a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor(
         .query_controlled("SELECT count(*) FROM archived", &control)
         .await
         .unwrap();
-    assert_eq!(stored.rows, [[tablepro_core::Value::Int(1)]]);
+    assert_eq!(stored.rows, vec![vec![bookie_core::Value::Int(1)]]);
 }
 
 #[path = "fetch_errors.rs"]
@@ -1136,8 +1078,11 @@ use error_view_tests::contains_label;
 #[path = "tests/streamed_progress.rs"]
 mod streamed_progress;
 
-#[path = "tests/export_partial_view.rs"]
+#[path = "tests/export_partial_view_tests.rs"]
 mod export_partial_view;
+
+#[path = "tests/spool_export_tests.rs"]
+mod spool_export;
 
 #[path = "tests/audit_receipts.rs"]
 mod audit_receipts;

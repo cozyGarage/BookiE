@@ -9,8 +9,8 @@ use tokio::net::TcpStream;
 use tokio::sync::{MappedMutexGuard, Mutex, Notify};
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
-use tablepro_core::sql_dialect::build_order_and_pagination;
-use tablepro_core::{
+use bookie_core::sql_dialect::build_order_and_pagination;
+use bookie_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
     ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
     QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
@@ -86,7 +86,7 @@ impl DatabaseDriver for MssqlDriver {
         true
     }
 
-    fn catalog_object_kinds(&self) -> &'static [tablepro_core::CatalogObjectKind] {
+    fn catalog_object_kinds(&self) -> &'static [bookie_core::CatalogObjectKind] {
         catalog::SUPPORTED_KINDS
     }
 
@@ -116,7 +116,7 @@ fn build_target(opts: &ConnectOptions) -> Result<MssqlTarget, DriverError> {
     config.port(service_port);
     config.database(&opts.database);
     config.authentication(auth_method(opts)?);
-    use tablepro_core::TlsMode;
+    use bookie_core::TlsMode;
     match opts.tls.mode {
         TlsMode::Disabled => {
             config.encryption(EncryptionLevel::Off);
@@ -362,7 +362,7 @@ impl Connection for MssqlConnection {
         *self.fault.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(notify);
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         session::open(&self.session_options).await
     }
 
@@ -396,7 +396,7 @@ impl Connection for MssqlConnection {
         schema: Option<&str>,
         control: &OperationControl,
     ) -> Result<Vec<CatalogObject>, DriverError> {
-        let mut client = tablepro_core::run_controlled_setup(self.client(), control).await??;
+        let mut client = bookie_core::run_controlled_setup(self.client(), control).await??;
         self.run_abandonable(catalog::list_objects(&mut client, kind, schema), control)
             .await
     }
@@ -450,7 +450,7 @@ impl Connection for MssqlConnection {
                 MAX_QUERY_ROWS,
             )
             .await?;
-        Ok(result.rows.iter().map(|r| row_to_column_info(r.as_slice())).collect())
+        Ok(result.rows.iter().map(row_to_column_info).collect())
     }
 
     async fn fetch_rows(
@@ -822,15 +822,15 @@ impl RowAdmission {
         self.refused || self.retained_rows >= self.limit
     }
 
-    fn admit(&mut self, values: Vec<Value>, result_set: &mut QueryResult) -> bool {
+    fn admit(&mut self, values: &mut Vec<Value>, result_set: &mut QueryResult) -> bool {
         if self.is_closed() {
             return false;
         }
-        if !self.budget.admit(&values) {
+        if !self.budget.admit(values) {
             self.refused = true;
             return false;
         }
-        result_set.rows.push(values);
+        result_set.rows.push_row(values);
         self.retained_rows += 1;
         true
     }
@@ -844,6 +844,7 @@ async fn collect_result_sets(
     let mut result_sets: Vec<QueryResult> = Vec::new();
     let mut current: Option<QueryResult> = None;
     let mut admission = RowAdmission::new(limit);
+    let mut values = Vec::new();
     let mut truncated = false;
     // The stream is read to its end rather than dropped early: tiberius only
     // drains unread tokens at the start of the next call, so an early exit
@@ -858,7 +859,7 @@ async fn collect_result_sets(
                 if result_sets.is_empty() || retain_additional_sets {
                     current = Some(QueryResult {
                         columns: meta.columns().iter().map(codec::col_to_info).collect(),
-                        rows: Vec::new(),
+                        rows: Vec::new().into(),
                         truncated: false,
                     });
                 }
@@ -872,14 +873,15 @@ async fn collect_result_sets(
             }
             QueryItem::Row(row) => {
                 let types: Vec<ColumnType> = row.columns().iter().map(Column::column_type).collect();
-                let values = row
-                    .into_iter()
-                    .zip(types)
-                    .map(|(data, column_type)| codec::column_data_to_value_for_type(&data, column_type))
-                    .collect::<Vec<_>>();
+                values.clear();
+                values.extend(
+                    row.into_iter()
+                        .zip(types)
+                        .map(|(data, column_type)| codec::column_data_to_value_for_type(&data, column_type)),
+                );
                 let kept = current
                     .as_mut()
-                    .is_some_and(|result_set| admission.admit(values, result_set));
+                    .is_some_and(|result_set| admission.admit(&mut values, result_set));
                 if !kept {
                     truncated = true;
                     if let Some(result_set) = current.as_mut() {

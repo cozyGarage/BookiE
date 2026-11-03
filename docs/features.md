@@ -1,6 +1,6 @@
 # BookiE features on `linux`
 
-This page describes current behavior on the `linux` branch, including changes made after 0.2.0 was published. It does not certify that every listed feature is present in the [0.2.0 release assets](platforms.md#published-020-artifacts). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
+This page describes current behavior on the `linux` branch. Published artifact versions and package requirements are listed in [platforms](platforms.md). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
 
 ## Databases
 
@@ -13,7 +13,7 @@ This page describes current behavior on the `linux` branch, including changes ma
 | ClickHouse | Stable | Mutations are awaited, so saved edits show up in the grid. |
 | MongoDB | Experimental | Collections, find and aggregate. An optional authentication database can be set. |
 | Redis | Experimental | One host and port. Sentinel and Cluster are not supported. |
-| DuckDB | Experimental | Only in builds made with `--features duckdb`. Not in the released packages. |
+| DuckDB | Experimental | Built in. |
 
 Drivers are linked at build time. There is no plugin system ([ADR 0001](decisions/0001-no-plugin-system.md)).
 
@@ -21,6 +21,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 ## Connect
 
+- The welcome screen offers up to three recently opened connections, with their driver and environment shown on each card.
 - Saved connections keep passwords in the desktop keyring (Secret Service), not in BookiE's own files.
 - SSH tunnels use the built-in client or the system OpenSSH. BookiE asks before trusting an unknown host key.
 - TLS has several strictness levels, up to checking both the certificate authority and the host name.
@@ -37,7 +38,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
   <img alt="Browsing a table in BookiE with column types and key marks" src="images/browse-light.png" width="100%">
 </picture>
 
-- Click a table to open it in a preview tab. Edit or keep the tab to make it permanent.
+- Click a table or view in the sidebar to open it in a preview tab. Edit or keep the tab to make it permanent.
 - Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
@@ -67,7 +68,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Syntax highlighting, code folding and a side-by-side split of the same query.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
 - Bound parameters: Write `:name` in queries; BookiE prompts for typed values before execution without string concatenation.
-- Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL. The newest page and the page currently being viewed remain in memory while later pages arrive; if a stream times out or is cancelled, received pages stay selected.
+- Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL. The first page stays selected while rows arrive, and the result shows whether it is receiving, complete or incomplete. The newest page and the page currently being viewed remain in memory while later pages arrive; if a stream times out or is cancelled, received pages stay selected. After successful completion, Export all rows reads the stored result without executing the query again.
 - Local sort and filter: Sorting and filtering loaded query results are local and do not re-execute SQL.
 - Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
 - Visual explain plans: PostgreSQL displays execution trees with relative cost bars; SQLite displays indented trees.

@@ -35,11 +35,12 @@ impl SqlEditor {
         if !self.can_start_run() {
             return;
         }
+        self.dismiss_completion_popups();
         if single_statement {
             let planned = PlannedStatements {
                 statements: vec![sql.clone()],
                 source_ranges: std::iter::once(0..sql.len()).collect(),
-                error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy::StopScript,
+                error_policy: bookie_core::sql_syntax::script::BatchErrorPolicy::StopScript,
                 settings_check: None,
             };
             self.run_planned(sql, anchor, planned, sender);
@@ -52,11 +53,17 @@ impl SqlEditor {
         if !self.can_start_run() {
             return;
         }
+        self.dismiss_completion_popups();
         let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
         match script_statements(&sql, self.lexing(&driver_id)) {
             Ok(planned) => self.run_planned(sql, anchor, planned, sender),
             Err(message) => self.status.set_label(&message),
         }
+    }
+
+    fn dismiss_completion_popups(&self) {
+        completion_provider::dismiss(&self.source_view);
+        completion_provider::dismiss(self.split_view.secondary_view());
     }
 
     fn run_planned(
@@ -197,7 +204,7 @@ impl SqlEditor {
             duration_ms: Some(duration_ms),
             rows_affected,
             outcome,
-            source: tablepro_storage::query_history::Source::Editor,
+            source: bookie_storage::query_history::Source::Editor,
         };
         relm4::spawn(async move {
             if let Err(e) = history.record(entry).await {

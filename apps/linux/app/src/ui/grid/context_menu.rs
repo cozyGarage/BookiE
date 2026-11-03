@@ -1,12 +1,12 @@
 mod keyboard_menu;
 mod pointer_menu;
 
+use bookie_core::sql_literal::RowStatement;
 use std::rc::Rc;
-use tablepro_core::sql_literal::RowStatement;
 
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio};
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use super::GridMsg;
 use super::display::{FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
@@ -22,6 +22,7 @@ use super::cell_context::{CellContext, CellContextStore};
 #[derive(Clone)]
 pub(super) struct GridMenus {
     context: CellContextStore,
+    columns: Rc<Vec<ColumnInfo>>,
     cell_menu_trigger: gtk::ShortcutTrigger,
     editable_popover: gtk::PopoverMenu,
     readonly_popover: gtk::PopoverMenu,
@@ -40,6 +41,7 @@ pub(super) struct GridMenuOptions {
     pub(super) foreign_key_columns: std::collections::HashSet<String>,
     pub(super) has_inbound_foreign_keys: bool,
     pub(super) local_result_view: Option<LocalResultView>,
+    pub(super) snapshot_export: bool,
 }
 
 pub(super) fn install_grid_context_menus(
@@ -246,7 +248,7 @@ pub(super) fn install_grid_context_menus(
             move |columns, rows| export::render_value_list(&driver_id, columns, rows),
         )
     };
-    let supports_sql = tablepro_core::export::supports_sql_literals(&driver_id);
+    let supports_sql = bookie_core::export::supports_sql_literals(&driver_id);
     let copy_in_clause_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -298,13 +300,7 @@ pub(super) fn install_grid_context_menus(
                 {
                     let (_, row_key) = cell_row_identity(&slot.widget);
                     if row_key.is_empty() {
-                        let Some(value) = view
-                            .model()
-                            .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
-                            .and_then(|selection| selection.model())
-                            .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok())
-                            .and_then(|store| store.source_value_at(position(slot), slot.col_index))
-                        else {
+                        let Some(value) = source_value_at(&view, position(slot), slot.col_index) else {
                             return;
                         };
                         value_viewer::present(&view, &slot.column_name, value, None);
@@ -433,7 +429,16 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
-        options.local_result_view,
+        options.local_result_view.clone(),
+        false,
+    );
+    let exclude_action = filter_by_value_action(
+        context.clone(),
+        sender.clone(),
+        column_view,
+        columns.clone(),
+        options.local_result_view.clone(),
+        true,
     );
     let reference_action = go_to_reference_action(context.clone(), sender.clone(), column_view, columns.clone());
     let show_referencing_action =
@@ -488,9 +493,17 @@ pub(super) fn install_grid_context_menus(
         delete_row_action,
         duplicate_row_action,
         filter_action,
+        exclude_action,
     ]);
     group.add_action(&reference_action);
     group.add_action(&show_referencing_action);
+    if !options.snapshot_export
+        && let Some(action) = group
+            .lookup_action("export")
+            .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+    {
+        action.set_enabled(false);
+    }
     column_view.insert_action_group("cell", Some(&group));
     if let Some(action) = group
         .lookup_action("copy-in-clause")
@@ -524,6 +537,7 @@ pub(super) fn install_grid_context_menus(
     });
     let menus = GridMenus {
         context,
+        columns,
         cell_menu_trigger: crate::ui::shortcut::parse(CELL_MENU_TRIGGER),
         editable_popover,
         readonly_popover,
@@ -601,6 +615,7 @@ fn build_menu(
     let display = gio::Menu::new();
     if filterable || local_result {
         display.append(Some(&crate::tr!("Filter by This Value")), Some("cell.filter-by-value"));
+        display.append(Some(&crate::tr!("Exclude This Value")), Some("cell.exclude-value"));
     }
     if filterable {
         display.append(Some(&crate::tr!("Go to Referenced Row")), Some("cell.go-to-reference"));
@@ -698,9 +713,11 @@ fn filter_by_value_action(
     column_view: &gtk::ColumnView,
     columns: Rc<Vec<ColumnInfo>>,
     local_result_view: Option<LocalResultView>,
+    exclude: bool,
 ) -> gio::ActionEntry<gio::SimpleActionGroup> {
     let view = column_view.downgrade();
-    gio::ActionEntry::builder("filter-by-value")
+    let name = if exclude { "exclude-value" } else { "filter-by-value" };
+    gio::ActionEntry::builder(name)
         .activate(move |_, _, _| {
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
@@ -711,7 +728,13 @@ fn filter_by_value_action(
             };
             let Some(value) = value else { return };
             if let Some(local_result_view) = &local_result_view {
-                local_result_view.filter_by_value(slot.col_index, value);
+                if !local_result_view.filter_by_value(slot.col_index, value, exclude) {
+                    sender
+                        .send(GridMsg::ShowToast(crate::tr!(
+                            "Values of this type can't be used as a filter"
+                        )))
+                        .ok();
+                }
                 return;
             }
             let Some(column) = columns.get(slot.col_index) else {
@@ -721,6 +744,7 @@ fn filter_by_value_action(
                 .send(GridMsg::FilterByValue {
                     column: column.name.clone(),
                     value,
+                    exclude,
                 })
                 .ok();
         })
@@ -728,13 +752,15 @@ fn filter_by_value_action(
 }
 
 fn source_value_at(view: &gtk::ColumnView, position: u32, column: usize) -> Option<Value> {
-    view.model()?
-        .downcast::<gtk::MultiSelection>()
+    let model = view.model()?.downcast::<gtk::MultiSelection>().ok()?.model()?;
+    if let Some(store) = model.downcast_ref::<crate::ui::row_store::RowStore>() {
+        return store.source_value_at(position, column);
+    }
+    model
+        .item(position)?
+        .downcast::<crate::ui::row_object::RowObject>()
         .ok()?
-        .model()?
-        .downcast::<crate::ui::row_store::RowStore>()
-        .ok()?
-        .source_value_at(position, column)
+        .with_cell_value(column, Clone::clone)
 }
 
 fn copy_rows_action<F>(
@@ -764,11 +790,31 @@ where
 }
 
 pub(super) struct CellGestureOptions {
-    pub(super) idx: usize,
-    pub(super) column_name: String,
-    pub(super) is_editable: bool,
-    pub(super) is_text_editable: bool,
-    pub(super) supports_full_value: bool,
+    idx: usize,
+    column_name: String,
+    is_editable: bool,
+    is_text_editable: bool,
+    supports_full_value: bool,
+}
+
+pub(super) fn cell_menu_options(menus: &GridMenus, widget: &gtk::Widget) -> Option<CellGestureOptions> {
+    let idx = super::display::COLUMN_SLOT.get(widget)?;
+    let column = menus.columns.get(idx)?;
+    let is_text_editable = widget.is::<crate::ui::cell_editor::CellEditor>();
+    let is_editable = is_text_editable || widget.is::<gtk::CheckButton>();
+    Some(CellGestureOptions {
+        idx,
+        column_name: column.name.clone(),
+        is_editable,
+        is_text_editable,
+        supports_full_value: is_editable && super::full_value_editor::is_full_value_column(&column.data_type),
+    })
+}
+
+pub(super) fn is_cell_menu_widget(menus: &GridMenus, widget: &gtk::Widget) -> bool {
+    super::display::COLUMN_SLOT
+        .get(widget)
+        .is_some_and(|idx| menus.columns.get(idx).is_some())
 }
 
 fn prepare_cell_menu(
@@ -804,10 +850,6 @@ fn prepare_cell_menu(
     } else {
         menus.readonly_popover.clone()
     }
-}
-
-pub(super) fn set_cell_menu_options(widget: &gtk::Widget, options: CellGestureOptions) {
-    super::display::CELL_MENU_OPTIONS_SLOT.set(widget, options);
 }
 
 fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {
@@ -895,7 +937,7 @@ fn has_persisted_row_key(row_key: &[Value]) -> bool {
 fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
     (
         POSITION_SLOT.get(widget).unwrap_or(0),
-        ROW_KEY_SLOT.cloned(widget).unwrap_or_default(),
+        ROW_KEY_SLOT.cloned(widget).map_or_else(Vec::new, |key| key.to_vec()),
     )
 }
 fn pending_cell_value(widget: &gtk::Widget) -> Option<Value> {
@@ -956,7 +998,13 @@ fn rows_for_menu(view: &gtk::ColumnView, clicked: u32) -> Option<Vec<Vec<Value>>
 fn values_for_column_menu(view: &gtk::ColumnView, clicked: u32, column: usize) -> Option<Vec<Vec<Value>>> {
     selected_row_positions(view, clicked)
         .into_iter()
-        .map(|position| row_at(view, position)?.get(column).cloned().map(|value| vec![value]))
+        .map(|position| {
+            let row = row_object_at(view, position)?;
+            if !row.cell_is_loaded(column) {
+                return None;
+            }
+            row.with_cell_value(column, |value| vec![value.clone()])
+        })
         .collect()
 }
 fn selected_row_positions(view: &gtk::ColumnView, clicked: u32) -> Vec<u32> {
@@ -986,7 +1034,7 @@ fn select_row_for_menu(view: &gtk::ColumnView, position: u32) {
 fn export_snapshot(view: &gtk::ColumnView, columns: &[ColumnInfo], truncated: bool) -> Option<QueryResult> {
     Some(QueryResult {
         columns: columns.to_vec(),
-        rows: complete_rows((0..view.model()?.n_items()).map(|position| complete_row_at(view, position)))?,
+        rows: complete_rows((0..view.model()?.n_items()).map(|position| complete_row_at(view, position)))?.into(),
         truncated,
     })
 }
@@ -1000,7 +1048,7 @@ pub(crate) struct LoadedCellEdit<'a> {
     pub(crate) col_index: usize,
     pub(crate) row_position: u32,
     pub(crate) row_key: Vec<Value>,
-    pub(crate) column: &'a tablepro_core::ColumnInfo,
+    pub(crate) column: &'a bookie_core::ColumnInfo,
     pub(crate) value: Value,
     pub(crate) sender: relm4::Sender<GridMsg>,
 }

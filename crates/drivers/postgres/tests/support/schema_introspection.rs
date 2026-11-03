@@ -72,13 +72,13 @@ async fn completion_metadata_preserves_exact_postgresql_catalog_names() {
     .into_iter()
     .enumerate()
     {
-        let schema_sql = tablepro_core::sql_dialect::quote_ident("postgres", schema);
-        let table_sql = tablepro_core::sql_dialect::quote_ident("postgres", table);
+        let schema_sql = bookie_core::sql_dialect::quote_ident("postgres", schema);
+        let table_sql = bookie_core::sql_dialect::quote_ident("postgres", table);
         let column = format!("column_{index}");
         conn.execute(&format!("CREATE TABLE {schema_sql}.{table_sql} ({column} int)"))
             .await
             .unwrap();
-        let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+        let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
         let columns = conn
             .fetch_columns_controlled(Some(schema), table, &control)
             .await

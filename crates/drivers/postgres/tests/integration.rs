@@ -9,14 +9,16 @@ use rust_decimal::Decimal;
 use serde_json::json;
 use uuid::Uuid;
 
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use drivers_postgres::PgDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use testcontainers::ImageExt;
 use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use tokio_util::sync::CancellationToken;
 
+#[path = "support/session_time_zone.rs"]
+mod session_time_zone;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 #[path = "support/wire_round_trip.rs"]
@@ -160,7 +162,7 @@ fn no_timeout() -> OperationControl {
     OperationControl::new(CancellationToken::new(), None)
 }
 
-async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
+async fn session_value(session: &mut Box<dyn bookie_core::Session>, sql: &str) -> Value {
     let result = session.query_params_controlled(sql, &[], &no_timeout()).await.unwrap();
     result.rows[0][0].clone()
 }
@@ -292,7 +294,7 @@ async fn the_session_reports_the_application_name_it_was_given() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn catalog_objects_are_listed_per_kind_and_filtered_by_schema() {
-    use tablepro_core::CatalogObjectKind as Kind;
+    use bookie_core::CatalogObjectKind as Kind;
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;
     for statement in [
@@ -416,7 +418,7 @@ async fn indexes_report_expression_keys_predicates_and_leave_out_included_column
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn formatting_preserves_server_results_for_significant_whitespace() {
-    use tablepro_core::sql_syntax::{SqlGrammar, script::LexicalSettings};
+    use bookie_core::sql_syntax::{SqlGrammar, script::LexicalSettings};
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     for source in [
@@ -425,7 +427,7 @@ async fn formatting_preserves_server_results_for_significant_whitespace() {
         "SELECT 1 + 2 AS total",
         "SELECT E'a\\nb'",
     ] {
-        let formatted = tablepro_core::sql_format::format_script(
+        let formatted = bookie_core::sql_format::format_script(
             source,
             SqlGrammar::PostgreSql,
             LexicalSettings::default_for(SqlGrammar::PostgreSql),
@@ -646,7 +648,7 @@ async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: Que
         elapsed,
     } = result;
     assert!(truncated, "{rows} rows in {elapsed:?}");
-    assert!(rows <= tablepro_core::MAX_QUERY_ROWS);
+    assert!(rows <= bookie_core::MAX_QUERY_ROWS);
     assert!(
         elapsed < std::time::Duration::from_secs(30),
         "{rows} rows in {elapsed:?}"
@@ -835,7 +837,7 @@ async fn value_contract_numeric_digits_scale_and_special_values_survive_decoding
         "Infinity",
         "-Infinity",
     ] {
-        let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(input.into())).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("postgres", &Value::Text(input.into())).unwrap();
         let sql = format!("SELECT {literal}::numeric AS value, ({literal}::numeric)::text AS expected");
         let direct = conn.query(&sql).await.unwrap();
         let bound = conn
@@ -1012,19 +1014,18 @@ async fn fetched_defaults_keep_no_default_null_empty_and_literal_apart_and_reapp
 
     let columns = conn.fetch_columns(None, "defaults_kept").await.unwrap();
     for info in columns.into_iter().filter(|c| c.name != "id") {
-        let mut copy = tablepro_core::sql_ddl::DraftColumn::from_info(info.clone());
+        let mut copy = bookie_core::sql_ddl::DraftColumn::from_info(info.clone());
         copy.original = None;
         copy.name = format!("{}_copy", info.name);
-        for statement in tablepro_core::sql_ddl::build_add_column("postgres", None, "defaults_kept", &copy).unwrap() {
+        for statement in bookie_core::sql_ddl::build_add_column("postgres", None, "defaults_kept", &copy).unwrap() {
             conn.execute(&statement).await.unwrap();
         }
-        let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(info);
+        let mut draft = bookie_core::sql_ddl::DraftColumn::from_info(info);
         draft.nullable = false;
         if draft.default_value.is_none() {
             continue;
         }
-        for statement in tablepro_core::sql_ddl::build_alter_column("postgres", None, "defaults_kept", &draft).unwrap()
-        {
+        for statement in bookie_core::sql_ddl::build_alter_column("postgres", None, "defaults_kept", &draft).unwrap() {
             conn.execute(&statement).await.unwrap();
         }
     }
@@ -1083,7 +1084,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
     let before = notes_in(conn, table).await;
     let others: Vec<String> = before.iter().filter(|n| *n != "target").cloned().collect();
 
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         driver_id,
         None,
         table,
@@ -1105,7 +1106,7 @@ async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver
         "{table} update touched only the keyed row"
     );
 
-    let delete = tablepro_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
+    let delete = bookie_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
     assert_eq!(
         conn.execute_in_transaction(&[delete]).await.unwrap(),
         vec![1],
@@ -1150,7 +1151,7 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
     let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
     for (id, value) in values.iter().enumerate() {
-        let statement = tablepro_core::sql_literal::build_insert_literal(
+        let statement = bookie_core::sql_literal::build_insert_literal(
             "postgres",
             None,
             "binary_exports",

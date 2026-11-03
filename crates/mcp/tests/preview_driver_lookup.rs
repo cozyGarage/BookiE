@@ -4,13 +4,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverError, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, Transaction,
     Value,
 };
-use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
-use tablepro_policy::Principal;
-use tablepro_storage::SavedConnection;
+use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use bookie_policy::Principal;
+use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
 struct CountingTransaction {
@@ -22,7 +22,7 @@ impl Transaction for CountingTransaction {
     async fn query(&mut self, _: &str) -> Result<QueryResult, DriverError> {
         Ok(QueryResult {
             columns: Vec::new(),
-            rows: vec![vec![Value::Int(0)]],
+            rows: vec![vec![Value::Int(0)]].into(),
             truncated: false,
         })
     }

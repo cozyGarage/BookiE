@@ -1,12 +1,9 @@
-#[cfg(feature = "duckdb")]
 use super::parse_input_for_grid_cell;
-#[cfg(feature = "duckdb")]
-use tablepro_core::Value;
+use bookie_core::Value;
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_siblings() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -33,7 +30,7 @@ async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_sibling
     assert!(columns[status_index].data_type.starts_with("ENUM"));
     let edit = parse_input_for_grid_cell("ready", Some(&columns[status_index]), "duckdb", None).unwrap();
     assert_eq!(edit, Value::Text("ready".into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "moods",
@@ -50,7 +47,7 @@ async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_sibling
     );
     let empty_label = parse_input_for_grid_cell("''", Some(&columns[status_index]), "duckdb", None).unwrap();
     assert_eq!(empty_label, Value::Text(String::new()));
-    let empty_update = tablepro_core::sql_dialect::build_keyed_update(
+    let empty_update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "moods",
@@ -63,7 +60,7 @@ async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_sibling
 
     let escaped = parse_input_for_grid_cell("'O''Brien'", Some(&columns[status_index]), "duckdb", None).unwrap();
     assert_eq!(escaped, Value::Text("O'Brien".into()));
-    let escaped_update = tablepro_core::sql_dialect::build_keyed_update(
+    let escaped_update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "moods",
@@ -75,7 +72,7 @@ async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_sibling
     connection.execute_in_transaction(&[escaped_update]).await.unwrap();
 
     let invalid = parse_input_for_grid_cell("not a label", Some(&columns[status_index]), "duckdb", None).unwrap();
-    let invalid_update = tablepro_core::sql_dialect::build_keyed_update(
+    let invalid_update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "moods",
@@ -114,10 +111,9 @@ async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_sibling
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_null() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -143,7 +139,7 @@ async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_nu
     let status_index = columns.iter().position(|column| column.name == "status").unwrap();
     let literal_null = parse_input_for_grid_cell("NULL", Some(&columns[status_index]), "duckdb", None).unwrap();
     assert_eq!(literal_null, Value::Text("NULL".into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "duckdb",
         None,
         "mood_null_labels",
@@ -185,10 +181,9 @@ async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_nu
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_list_result_matches_native_json() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -218,7 +213,7 @@ async fn value_contract_duckdb_enum_list_result_matches_native_json() {
         "nested enum lists must be explicitly un-decodable: {:?}",
         result.rows[0][0]
     );
-    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", &result.rows[0][0]).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("duckdb", &result.rows[0][0]).is_err());
     assert!(
         connection
             .query_params("SELECT ?", std::slice::from_ref(&result.rows[0][0]))
@@ -241,10 +236,9 @@ async fn value_contract_duckdb_enum_list_result_matches_native_json() {
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -263,7 +257,7 @@ async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
         .await
         .unwrap();
     assert_eq!(values.rows, vec![vec![Value::Undecodable("LIST".into()), Value::Null]]);
-    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", &values.rows[0][0]).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("duckdb", &values.rows[0][0]).is_err());
     assert!(
         connection
             .query_params("SELECT ?", std::slice::from_ref(&values.rows[0][0]))
@@ -296,10 +290,9 @@ async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
     );
 }
 
-#[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use bookie_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_duckdb::DuckdbDriver
         .connect(ConnectOptions {
@@ -337,30 +330,30 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
         .query("SELECT id, status FROM mood_csv_source ORDER BY id")
         .await
         .unwrap();
-    let marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let export_options = tablepro_core::export::CsvOptions {
+    let marker = bookie_core::export::unique_csv_null_marker(&source.rows);
+    let export_options = bookie_core::export::CsvOptions {
         null_to_empty: false,
         sanitize_formulas: false,
         null_marker: Some(marker.clone()),
         ..Default::default()
     };
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &export_options);
+    let csv = bookie_core::export::render_csv(&source.columns, &source.rows, &export_options);
     assert_eq!(
         csv,
         format!("id,status\n1,\"\"\n2,NULL\n3,東京\n4,O'Brien\n5,=1+1\n6,'=1+1\n7,{marker}\n")
     );
 
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker: marker,
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection.fetch_columns(None, "mood_csv_target").await.unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "duckdb",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "mood_csv_target",
             columns: &columns,
@@ -370,18 +363,18 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
         &import_options,
     )
     .unwrap();
-    assert_eq!(plan.rows, source.rows);
+    assert_eq!(source.rows, plan.rows);
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }
 
-    let safe_options = tablepro_core::export::CsvOptions {
+    let safe_options = bookie_core::export::CsvOptions {
         null_to_empty: false,
         sanitize_formulas: true,
         null_marker: Some(import_options.null_marker.clone()),
         ..Default::default()
     };
-    let safe_csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &safe_options);
+    let safe_csv = bookie_core::export::render_csv(&source.columns, &source.rows, &safe_options);
     assert_eq!(
         safe_csv,
         format!(
@@ -389,12 +382,12 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
             marker = import_options.null_marker
         )
     );
-    let safe_sheet = tablepro_core::import::read_csv(safe_csv.as_bytes(), &import_options, None).unwrap();
-    let safe_plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let safe_sheet = bookie_core::import::read_csv(safe_csv.as_bytes(), &import_options, None).unwrap();
+    let safe_plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "duckdb",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "mood_csv_target",
             columns: &columns,

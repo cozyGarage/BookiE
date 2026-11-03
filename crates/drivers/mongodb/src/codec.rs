@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use mongodb::bson::{Bson, Document};
 
-use tablepro_core::{ColumnInfo, DriverError, Value};
+use bookie_core::{ColumnInfo, DriverError, Value};
 
 pub(super) fn value_to_bson(value: &Value) -> Result<Bson, DriverError> {
     use mongodb::bson::{Binary, DateTime, spec::BinarySubtype};
@@ -112,15 +112,19 @@ pub(super) fn observe_bson_type(union: &mut BTreeMap<String, String>, key: &str,
         .or_insert(bson_type);
 }
 
+#[cfg(test)]
 pub(super) fn document_to_row(doc: &Document, columns: &[ColumnInfo]) -> Vec<Value> {
-    columns
-        .iter()
-        .map(|c| match doc.get(&c.name) {
-            Some(b) if c.data_type == "mixed" => Value::Json(Box::new(b.clone().into_canonical_extjson())),
-            Some(b) => bson_to_value(b),
-            None => Value::Undecodable(Value::MISSING_FIELD.into()),
-        })
-        .collect()
+    let mut row = Vec::with_capacity(columns.len());
+    document_to_row_into(doc, columns, &mut row);
+    row
+}
+
+pub(super) fn document_to_row_into(doc: &Document, columns: &[ColumnInfo], row: &mut Vec<Value>) {
+    row.extend(columns.iter().map(|c| match doc.get(&c.name) {
+        Some(b) if c.data_type == "mixed" => Value::Json(Box::new(b.clone().into_canonical_extjson())),
+        Some(b) => bson_to_value(b),
+        None => Value::Undecodable(Value::MISSING_FIELD.into()),
+    }));
 }
 
 pub(super) fn bson_to_value(b: &Bson) -> Value {

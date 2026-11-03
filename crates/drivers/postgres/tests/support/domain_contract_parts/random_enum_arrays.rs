@@ -46,7 +46,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
         .await
         .expect_err("array_sample needs an explicitly typed enum array");
     assert!(
-        matches!(&untyped_sample, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
+        matches!(&untyped_sample, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
         "expected unresolved-polymorphic-type SQLSTATE 42804, got {untyped_sample:?}"
     );
     transaction
@@ -63,7 +63,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
         .await
         .expect_err("array_shuffle needs an explicitly typed enum array");
     assert!(
-        matches!(&untyped_shuffle, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
+        matches!(&untyped_shuffle, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
         "expected unresolved-polymorphic-type SQLSTATE 42804, got {untyped_shuffle:?}"
     );
     transaction
@@ -119,7 +119,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
                 assert_eq!(row[3], Value::Int(1));
                 assert_eq!(row[4], Value::Int(sample_size));
             }
-            assert_eq!(&row[2..], native_shape.rows[0].as_slice());
+            assert_eq!(&row[2..], &native_shape.rows[0][..]);
         }
     }
 
@@ -156,7 +156,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
         assert_eq!(row[2], Value::Text(array_type.clone()));
         assert_eq!(row[3], Value::Int(1));
         assert_eq!(row[4], Value::Int(6));
-        assert_eq!(&row[2..], native_shape.rows[0].as_slice());
+        assert_eq!(&row[2..], &native_shape.rows[0][..]);
     }
 
     let multidimensional = r#"[0:1][4:5]={{ready,"NULL"},{NULL,""}}"#;
@@ -249,7 +249,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
         .await
         .expect_err("array_sample cannot request more items than the first dimension");
     assert!(
-        matches!(&oversized, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22023"),
+        matches!(&oversized, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22023"),
         "expected invalid-parameter SQLSTATE 22023, got {oversized:?}"
     );
     transaction
@@ -269,7 +269,7 @@ async fn value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_s
         .await
         .expect_err("a shadow-only enum label must not resolve for the target array");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
     );
     transaction

@@ -1,17 +1,17 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use bookie_core::import::{
+    CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportError, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError,
+    build_insert_plan, detect_format, read_csv, read_import_file,
+};
+use bookie_core::sql_ddl::build_create_table;
+use bookie_core::{ColumnInfo, Connection, DriverCapabilities, DriverError, OperationControl};
+use bookie_policy::{BulkBatch, BulkInsertEnd, BulkInsertRequest, PolicyGuard};
 use relm4::adw::prelude::*;
 use relm4::gtk;
 use relm4::gtk::gio;
 use relm4::{ComponentController, ComponentSender};
-use tablepro_core::import::{
-    CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportError, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError,
-    build_insert_plan, detect_format, read_csv, read_import_file,
-};
-use tablepro_core::sql_ddl::build_create_table;
-use tablepro_core::{ColumnInfo, Connection, DriverCapabilities, DriverError, OperationControl};
-use tablepro_policy::{BulkBatch, BulkInsertEnd, BulkInsertRequest, PolicyGuard};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -49,7 +49,48 @@ pub struct CsvImportReport {
     pub error: Option<String>,
 }
 
+#[derive(Debug)]
+pub struct CsvImportPreparationFailure {
+    pub connection_id: Uuid,
+    pub driver_id: String,
+    pub message: String,
+}
+
+pub struct CsvImportPlanPreparation {
+    connection_id: Uuid,
+    driver_id: String,
+    choice: Option<ImportChoice>,
+    result: Result<(InsertPlan, Option<String>), String>,
+}
+
+impl std::fmt::Debug for CsvImportPlanPreparation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CsvImportPlanPreparation")
+            .field("connection_id", &self.connection_id)
+            .field("driver_id", &self.driver_id)
+            .field("result_ready", &self.result.is_ok())
+            .finish()
+    }
+}
+
 impl App {
+    fn begin_csv_import_preparation(&mut self, label: &str) -> Option<CancellationToken> {
+        if self.csv_import_progress.is_some() {
+            return None;
+        }
+        self.csv_import_progress = Some(crate::ui::import_dialog::present_preparing(&self.window, label));
+        self.csv_import_progress
+            .as_ref()
+            .map(crate::ui::import_dialog::ImportProgress::cancel_token)
+    }
+
+    fn close_csv_import_progress(&mut self) {
+        if let Some(progress) = self.csv_import_progress.take() {
+            progress.close();
+        }
+    }
+
     pub(super) fn on_import_csv_into_table(
         &self,
         schema: Option<String>,
@@ -60,7 +101,7 @@ impl App {
     }
 
     pub(super) fn on_create_table_from_csv(&self, schema: Option<String>, sender: ComponentSender<Self>) {
-        if !tablepro_core::import::supports_table_creation(self.driver_id()) {
+        if !bookie_core::import::supports_table_creation(self.driver_id()) {
             self.show_error_alert(
                 &crate::tr!("Can't create a table"),
                 &crate::tr!(
@@ -129,7 +170,7 @@ impl App {
     }
 
     pub(super) fn on_csv_file_chosen(
-        &self,
+        &mut self,
         schema: Option<String>,
         table: Option<String>,
         path: PathBuf,
@@ -148,6 +189,9 @@ impl App {
         let Some(conn) = self.database.get(connection_id) else {
             return;
         };
+        let Some(cancellation) = self.begin_csv_import_preparation("CSV file") else {
+            return;
+        };
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let database = self
@@ -156,10 +200,11 @@ impl App {
             .find(|saved| saved.id == connection_id)
             .map(|saved| saved.database.clone())
             .unwrap_or_default();
+        let failure_driver_id = driver_id.clone();
         sender.clone().command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, cancellation);
                     match prepare_import(
                         conn,
                         &control,
@@ -176,17 +221,20 @@ impl App {
                     .await
                     {
                         Ok(preparation) => sender.input(AppMsg::CsvImportPrepared(Box::new(preparation))),
-                        Err(message) => sender.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Can't import"),
-                            body: message,
-                        }),
+                        Err(message) => sender.input(AppMsg::CsvImportPreparationFailed(Box::new(
+                            CsvImportPreparationFailure {
+                                connection_id,
+                                driver_id: failure_driver_id,
+                                message,
+                            },
+                        ))),
                     }
                 })
                 .drop_on_shutdown()
         });
     }
 
-    pub(super) fn on_csv_import_prepared(&self, preparation: CsvImportPreparation, sender: ComponentSender<Self>) {
+    pub(super) fn on_csv_import_prepared(&mut self, preparation: CsvImportPreparation, sender: ComponentSender<Self>) {
         if self.connection_id != Some(preparation.connection_id)
             || self.current_driver_id.as_deref() != Some(preparation.driver_id.as_str())
             || self
@@ -195,6 +243,17 @@ impl App {
                 .find(|saved| saved.id == preparation.connection_id)
                 .is_none_or(|saved| saved.database != preparation.database)
         {
+            if let Some(progress) = self.csv_import_progress.take() {
+                progress.close();
+            }
+            return;
+        }
+        let Some(progress) = self.csv_import_progress.take() else {
+            return;
+        };
+        let cancelled = progress.is_cancelled();
+        progress.close();
+        if cancelled {
             return;
         }
         let mapping_scope = preparation.table.as_ref().map(|table| CsvMappingScope {
@@ -231,6 +290,24 @@ impl App {
         });
     }
 
+    pub(super) fn on_csv_import_preparation_failed(&mut self, failure: CsvImportPreparationFailure) {
+        if self.connection_id != Some(failure.connection_id)
+            || self.current_driver_id.as_deref() != Some(failure.driver_id.as_str())
+        {
+            self.close_csv_import_progress();
+            return;
+        }
+        let cancelled = self
+            .csv_import_progress
+            .as_ref()
+            .is_some_and(crate::ui::import_dialog::ImportProgress::is_cancelled);
+        self.close_csv_import_progress();
+        if cancelled {
+            return;
+        }
+        self.show_error_alert(&crate::tr!("Can't import"), &failure.message);
+    }
+
     pub(super) fn on_start_csv_import(&mut self, choice: ImportChoice, sender: ComponentSender<Self>) {
         if let Some(message) = self.import_refusal() {
             self.show_error_alert(&crate::tr!("Can't import"), &message);
@@ -239,30 +316,73 @@ impl App {
         let (Some(connection_id), Some(driver_id)) = (self.connection_id, self.current_driver_id.clone()) else {
             return;
         };
-        let plan = match plan_for(&driver_id, &choice) {
-            Ok(plan) => plan,
+        if self.begin_csv_import_preparation(&choice.table).is_none() {
+            return;
+        }
+        let worker_driver_id = driver_id.clone();
+        sender.clone().command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let prepared = prepare_csv_plan(connection_id, worker_driver_id, choice).await;
+                    sender.input(AppMsg::CsvImportPlanPrepared(Box::new(prepared)));
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn on_csv_import_plan_prepared(
+        &mut self,
+        preparation: CsvImportPlanPreparation,
+        sender: ComponentSender<Self>,
+    ) {
+        if self.connection_id != Some(preparation.connection_id)
+            || self.current_driver_id.as_deref() != Some(preparation.driver_id.as_str())
+        {
+            self.close_csv_import_progress();
+            return;
+        }
+        if let Some(message) = self.import_refusal() {
+            self.close_csv_import_progress();
+            self.show_error_alert(&crate::tr!("Can't import"), &message);
+            return;
+        }
+        let (plan, create_sql) = match preparation.result {
+            Ok(prepared) => prepared,
             Err(message) => {
+                self.close_csv_import_progress();
                 self.show_error_alert(&crate::tr!("Can't import"), &message);
                 return;
             }
         };
-        let create_sql = match create_statement(&driver_id, &choice) {
-            Ok(sql) => sql,
-            Err(message) => {
-                self.show_error_alert(&crate::tr!("Can't import"), &message);
-                return;
-            }
-        };
+        if self
+            .csv_import_progress
+            .as_ref()
+            .is_none_or(crate::ui::import_dialog::ImportProgress::is_cancelled)
+        {
+            self.close_csv_import_progress();
+            return;
+        }
         let Some(guard) = self
             .database
-            .guard(connection_id, tablepro_policy::Principal::human_gui())
+            .guard(preparation.connection_id, bookie_policy::Principal::human_gui())
         else {
+            self.close_csv_import_progress();
             self.show_error_alert(&crate::tr!("Can't import"), &crate::tr!("No active connection."));
             return;
         };
-        let progress = crate::ui::import_dialog::present_progress(&self.window, &choice.table, plan.row_count());
+        let Some(choice) = preparation.choice else {
+            self.close_csv_import_progress();
+            self.show_error_alert(
+                &crate::tr!("Can't import"),
+                &crate::tr!("The import plan could not be prepared."),
+            );
+            return;
+        };
+        let Some(progress) = self.csv_import_progress.as_mut() else {
+            return;
+        };
+        progress.set_total(plan.row_count());
         let token = progress.cancel_token();
-        self.csv_import_progress = Some(progress);
         self.run_import(guard, plan, create_sql, choice, token, sender);
     }
 
@@ -478,7 +598,7 @@ impl ImportRun {
 
     async fn run_batches(
         &self,
-        scope: &mut tablepro_policy::BulkInsertScope,
+        scope: &mut bookie_policy::BulkInsertScope,
         sender: &ComponentSender<App>,
     ) -> Result<(), BatchStop> {
         let mut committed = 0;
@@ -536,7 +656,13 @@ async fn prepare_import(
     control: &OperationControl,
     prepare: Prepare,
 ) -> Result<CsvImportPreparation, String> {
-    let bytes = read_file(&prepare.path)?;
+    let path = prepare.path.clone();
+    let bytes = tokio::task::spawn_blocking(move || read_file(&path))
+        .await
+        .map_err(|_| crate::tr!("The import file could not be prepared."))??;
+    if control.cancellation_token().is_cancelled() {
+        return Err(crate::tr!("Import preparation was cancelled."));
+    }
     let format = detect_format(&bytes);
     let columns = match &prepare.table {
         None => Vec::new(),
@@ -607,8 +733,8 @@ fn read_file(path: &std::path::Path) -> Result<Vec<u8>, String> {
             .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()),
         _ => crate::tr!("The file could not be read."),
     })?;
-    if tablepro_core::import::is_xlsx(&bytes) {
-        return tablepro_core::import::xlsx_to_csv(&bytes).map_err(|error| error.to_string());
+    if bookie_core::import::is_xlsx(&bytes) {
+        return bookie_core::import::xlsx_to_csv(&bytes).map_err(|error| error.to_string());
     }
     Ok(bytes)
 }
@@ -624,6 +750,30 @@ fn plan_for(driver_id: &str, choice: &ImportChoice) -> Result<InsertPlan, String
         mapping: &choice.mapping,
     };
     build_insert_plan(&target, &sheet, &choice.options).map_err(plan_error_text)
+}
+
+async fn prepare_csv_plan(connection_id: Uuid, driver_id: String, choice: ImportChoice) -> CsvImportPlanPreparation {
+    let worker_driver_id = driver_id.clone();
+    let prepared = tokio::task::spawn_blocking(move || {
+        let result = (|| {
+            let plan = plan_for(&worker_driver_id, &choice)?;
+            let create_sql = create_statement(&worker_driver_id, &choice)?;
+            Ok((plan, create_sql))
+        })();
+        CsvImportPlanPreparation {
+            connection_id,
+            driver_id: worker_driver_id,
+            choice: Some(choice),
+            result,
+        }
+    })
+    .await;
+    prepared.unwrap_or(CsvImportPlanPreparation {
+        connection_id,
+        driver_id,
+        choice: None,
+        result: Err(crate::tr!("The import plan could not be prepared.")),
+    })
 }
 
 /// A plan failure names the rows it could not read, never their contents.

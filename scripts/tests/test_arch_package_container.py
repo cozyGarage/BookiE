@@ -30,7 +30,7 @@ class ArchPackageContainerTests(unittest.TestCase):
         date = commands / "date"
         date.write_text(f'#!/bin/bash\nif [[ "$*" == "-u +%F" ]]; then echo "${{FAKE_UTC_DATE:-2026-10-22}}"; else exec "{real_date}" "$@"; fi\n')
         date.chmod(0o700)
-        self.environment = {key: value for key, value in os.environ.items() if key not in {"TABLEPRO_RC_DATE", "ARCH_CANDIDATE_DATE", "ARCH_CANDIDATE_VERSION", "ARCH_RELEASED_URL"}}
+        self.environment = {key: value for key, value in os.environ.items() if key not in {"BOOKIE_RC_DATE", "ARCH_CANDIDATE_DATE", "ARCH_CANDIDATE_VERSION", "ARCH_RELEASED_URL"}}
         self.environment.update(PATH=str(commands) + os.pathsep + os.environ["PATH"], DOCKER_RECORD=str(self.record), FAKE_UTC_DATE="2026-10-22")
 
     def run_wrapper(self, **overrides):
@@ -46,7 +46,7 @@ class ArchPackageContainerTests(unittest.TestCase):
             with self.subTest(date=date):
                 result = self.run_wrapper(FAKE_UTC_DATE=date)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(self.docker_environment().get("TABLEPRO_RC_DATE"), date)
+                self.assertEqual(self.docker_environment().get("BOOKIE_RC_DATE"), date)
 
     def test_default_version_tracks_the_workspace(self):
         (self.root / "Cargo.toml").write_text('[workspace.package]\nversion = "0.3.0"\n')
@@ -55,14 +55,14 @@ class ArchPackageContainerTests(unittest.TestCase):
         self.assertEqual(self.docker_environment()["VERSION"], "0.3.0")
 
     def test_explicit_date_takes_precedence_over_inherited_date(self):
-        result = self.run_wrapper(ARCH_CANDIDATE_DATE="2026-10-19", TABLEPRO_RC_DATE="2026-10-18")
+        result = self.run_wrapper(ARCH_CANDIDATE_DATE="2026-10-19", BOOKIE_RC_DATE="2026-10-18")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.docker_environment().get("TABLEPRO_RC_DATE"), "2026-10-19")
+        self.assertEqual(self.docker_environment().get("BOOKIE_RC_DATE"), "2026-10-19")
 
     def test_inherited_candidate_date_is_forwarded(self):
-        result = self.run_wrapper(TABLEPRO_RC_DATE="2026-10-18")
+        result = self.run_wrapper(BOOKIE_RC_DATE="2026-10-18")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.docker_environment().get("TABLEPRO_RC_DATE"), "2026-10-18")
+        self.assertEqual(self.docker_environment().get("BOOKIE_RC_DATE"), "2026-10-18")
 
     def test_invalid_calendar_date_is_refused_before_container_work(self):
         result = self.run_wrapper(ARCH_CANDIDATE_DATE="2026-02-30")
@@ -82,7 +82,7 @@ class ArchPackageContainerTests(unittest.TestCase):
     def test_a_valid_leap_day_is_accepted(self):
         result = self.run_wrapper(ARCH_CANDIDATE_DATE="2024-02-29")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.docker_environment()["TABLEPRO_RC_DATE"], "2024-02-29")
+        self.assertEqual(self.docker_environment()["BOOKIE_RC_DATE"], "2024-02-29")
 
     def test_noncanonical_dates_are_refused_before_container_work(self):
         for date in ("2026-02-29", "2026-2-03", "2026-10-19\nextra", "$(exit 0)"):
@@ -104,7 +104,7 @@ class ArchPackageContainerTests(unittest.TestCase):
         scripts = self.root / "scripts"
         (scripts / "build-arch-rc.sh").write_text(
             'python3 - <<\'PY\'\nimport json,os\nfrom pathlib import Path\n'
-            'Path(os.environ["BUILD_RECORD"]).write_text(json.dumps({key: os.environ.get(key) for key in ["TABLEPRO_RC_DATE", "TABLEPRO_RC_VERSION", "TABLEPRO_RC_COMMIT", "CARGO_BUILD_JOBS"]}))\nPY\n'
+            'Path(os.environ["BUILD_RECORD"]).write_text(json.dumps({key: os.environ.get(key) for key in ["BOOKIE_RC_DATE", "BOOKIE_RC_VERSION", "BOOKIE_RC_COMMIT", "CARGO_BUILD_JOBS"]}))\nPY\n'
         )
         (scripts / "test-arch-package.sh").write_text('printf \'%s\\n\' "$@" > "$LIFECYCLE_RECORD"\n')
         commands = self.root / "commands"
@@ -131,7 +131,7 @@ class ArchPackageContainerTests(unittest.TestCase):
         self.assertEqual(builder.returncode, 0, builder.stderr)
         self.assertFalse(marker.exists())
         build = json.loads((self.root / "build.json").read_text())
-        self.assertEqual(build, {"TABLEPRO_RC_DATE": "2026-10-19", "TABLEPRO_RC_VERSION": "0.2.0", "TABLEPRO_RC_COMMIT": "0" * 39 + "1", "CARGO_BUILD_JOBS": "2"})
+        self.assertEqual(build, {"BOOKIE_RC_DATE": "2026-10-19", "BOOKIE_RC_VERSION": "0.2.0", "BOOKIE_RC_COMMIT": "0" * 39 + "1", "CARGO_BUILD_JOBS": "2"})
         self.assertEqual(json.loads((self.root / "curl.json").read_text())[-2:], ["--", url])
         self.assertIn("bookie-0.2.0-1-x86_64.pkg.tar.zst", (self.root / "lifecycle").read_text())
         self.assertFalse(marker.exists())

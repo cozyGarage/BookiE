@@ -35,8 +35,13 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     {
         page_switcher.add_titled(&page, Some("status"), &crate::tr!("Status"));
     }
-    if let Some(last) = page_switcher.last_child() {
-        page_switcher.set_visible_child(&last);
+    let initial = if matches!(result.terminal, StreamTerminal::Loading | StreamTerminal::Complete) {
+        page_switcher.first_child()
+    } else {
+        page_switcher.last_child()
+    };
+    if let Some(initial) = initial {
+        page_switcher.set_visible_child(&initial);
     }
     if let Some(sender) = sender {
         super::super::stream_view::install_page_loader(&page_switcher, result, outcome.identity, sender);
@@ -46,6 +51,8 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     if matches!(result.terminal, StreamTerminal::Loading) {
         page_switcher.set_widget_name(super::super::stream_view::LIVE_PAGES);
         progress.set_widget_name(super::super::stream_view::LIVE_PROGRESS);
+    } else {
+        page_switcher.set_widget_name(&super::super::stream_view::completed_page_stack_name(result.generation));
     }
     holder.append(&progress);
     if let Some(notice) = notice {
@@ -53,7 +60,25 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
         banner.set_revealed(true);
         holder.append(&banner);
     }
-    if let Some(request) = result.export.clone() {
+    append_stream_export(&holder, result, grid_sender);
+    let pager = super::super::stream_view::build_pager(&page_switcher);
+    holder.append(&pager);
+    if matches!(result.terminal, StreamTerminal::Complete) && sender.is_some() {
+        super::super::stream_view::install_continuous(&holder, &pager, &page_switcher, result, &target);
+    }
+    holder.append(&page_switcher);
+    holder.upcast()
+}
+
+fn append_stream_export(holder: &gtk::Box, result: &StreamedResult, grid_sender: &relm4::Sender<GridMsg>) {
+    if matches!(result.terminal, StreamTerminal::Loading) {
+        holder.append(&gtk::Label::new(Some(&crate::tr!(
+            "Export all rows is available when the query completes."
+        ))));
+    }
+    if matches!(result.terminal, StreamTerminal::Complete)
+        && let Some(request) = result.export.clone().filter(|request| request.spool.is_some())
+    {
         let export = gtk::Button::with_label(&crate::tr!("Export all rows…"));
         export.add_css_class("flat");
         export.connect_clicked({
@@ -63,13 +88,7 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
             }
         });
         holder.append(&export);
-        holder.append(&gtk::Label::new(Some(&crate::tr!(
-            "The query will run again through a guarded cursor."
-        ))));
     }
-    holder.append(&super::super::stream_view::build_pager(&page_switcher));
-    holder.append(&page_switcher);
-    holder.upcast()
 }
 
 pub(in crate::ui::editor) fn stream_page_container(
@@ -87,11 +106,12 @@ pub(in crate::ui::editor) fn stream_page_container(
         .page_indices
         .binary_search(&page_index)
         .ok()
-        .and_then(|position| result.pages.get(position));
+        .and_then(|position| result.pages.get(position))
+        .and_then(std::sync::Weak::upgrade);
     if let Some(page) = resident {
         container.add_css_class("tp-stream-page-ram-resident");
         container.append(&build_stream_page_widget(
-            page,
+            &page,
             target.grid_sender,
             target.connection_id,
             target.database.clone(),
@@ -125,11 +145,22 @@ pub(in crate::ui::editor) fn stream_page_placeholder_with_title(title: String) -
 }
 
 pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> String {
-    let rows = crate::trn!("Received {rows} row", "Received {rows} rows", result.total_rows)
-        .replace("{rows}", &result.total_rows.to_string());
-    let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages)
-        .replace("{pages}", &result.total_pages.to_string());
-    let received = format!("{rows} · {pages}");
+    let rows = crate::trn!("Received {rows} row", "Received {rows} rows", result.total_rows).replace(
+        "{rows}",
+        &crate::ui::count_format::format_thousands(result.total_rows as u128),
+    );
+    let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages).replace(
+        "{pages}",
+        &crate::ui::count_format::format_thousands(u128::from(result.total_pages)),
+    );
+    let status = match result.terminal {
+        StreamTerminal::Loading => crate::tr!("Receiving…"),
+        StreamTerminal::Complete => crate::tr!("Complete"),
+        StreamTerminal::Cancelled => crate::tr!("Cancelled"),
+        StreamTerminal::TimedOut => crate::tr!("Timed out"),
+        StreamTerminal::Failed(_) => crate::tr!("Incomplete"),
+    };
+    let received = format!("{status} · {rows} · {pages}");
     if stream_retained_rows(result) == result.total_rows {
         return received;
     }
@@ -157,8 +188,8 @@ pub(in crate::ui::editor) fn stream_page_label(result: &StreamedResult, page_ind
     };
     let end = start.saturating_add(count.saturating_sub(1));
     crate::tr!("Rows {start}-{end}")
-        .replace("{start}", &start.to_string())
-        .replace("{end}", &end.to_string())
+        .replace("{start}", &crate::ui::count_format::format_thousands(start as u128))
+        .replace("{end}", &crate::ui::count_format::format_thousands(end as u128))
 }
 
 fn stream_page_row_count(result: &StreamedResult, page_index: usize) -> Option<usize> {

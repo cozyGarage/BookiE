@@ -1,5 +1,5 @@
 #[cfg(test)]
-extern crate self as tablepro_core;
+extern crate self as bookie_core;
 #[cfg(test)]
 #[path = "../tests/support/parser_contract.rs"]
 mod parser_contract;
@@ -17,6 +17,7 @@ mod operation;
 mod pagination;
 mod params;
 mod query;
+mod query_rows;
 mod registry;
 mod session;
 pub mod sql_credentials;
@@ -42,7 +43,7 @@ pub use driver::{
 pub use error::DriverError;
 pub use filter::{
     BuildFilterError, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, FilterValueKind, build_filter_where,
-    equality_rule, filter_value_kind,
+    cell_filter_rule, equality_rule, filter_value_kind,
 };
 pub use numeric_input::{
     FloatInputError, is_numeric_input, parse_float_input, single_precision_as_f64, sqlite_affinity_decimal,
@@ -62,6 +63,7 @@ pub use query::{
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,
     QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, parse_partial, partial_value,
 };
+pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};

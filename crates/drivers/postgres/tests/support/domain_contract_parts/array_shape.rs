@@ -59,7 +59,7 @@ async fn value_contract_enum_array_shape_functions_preserve_bounds_under_shadowe
             .await
             .expect_err("array shape functions have no typed argument for an unknown array");
         assert!(
-            matches!(&untyped, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
+            matches!(&untyped, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
             "expected unresolved-polymorphic-type SQLSTATE 42804, got {untyped:?}"
         );
         transaction
@@ -110,7 +110,7 @@ async fn value_contract_enum_array_shape_functions_preserve_bounds_under_shadowe
         .await
         .expect_err("a label defined only by the shadow enum must be rejected");
     assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        matches!(&invalid, bookie_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
         "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
     );
     transaction

@@ -1,4 +1,4 @@
-use tablepro_core::{DriverError, Value};
+use bookie_core::{DriverError, Value};
 
 pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
     let rendered = match value {
@@ -20,12 +20,10 @@ pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
         Value::Bytes(b) => format!("unhex('{}')", hex_encode(b)),
         Value::Date(d) => format!("toDate('{}')", d.format("%Y-%m-%d")),
         Value::Time(t) => format!("'{}'", t.format("%H:%M:%S%.f")),
-        Value::DateTime(dt) => tablepro_core::sql_literal::clickhouse_datetime64_literal(*dt, None)
+        Value::DateTime(dt) => bookie_core::sql_literal::clickhouse_datetime64_literal(*dt, None)
             .ok_or_else(unsupported_datetime64_range)?,
-        Value::TimestampTz(ts) => {
-            tablepro_core::sql_literal::clickhouse_datetime64_literal(ts.naive_utc(), Some("UTC"))
-                .ok_or_else(unsupported_datetime64_range)?
-        }
+        Value::TimestampTz(ts) => bookie_core::sql_literal::clickhouse_datetime64_literal(ts.naive_utc(), Some("UTC"))
+            .ok_or_else(unsupported_datetime64_range)?,
         Value::Decimal(d) => format!("toDecimal128('{d}', {})", d.scale()),
         Value::Uuid(u) => format!("toUUID('{u}')"),
         Value::Json(_) | Value::JsonText(_) => {
@@ -65,7 +63,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::literal;
-    use tablepro_core::{DriverError, Value};
+    use bookie_core::{DriverError, Value};
 
     #[test]
     fn nested_json_cell_edits_refuse_values_without_native_type_metadata() {

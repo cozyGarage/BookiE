@@ -1,5 +1,5 @@
 use super::native_connection;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 #[tokio::test]
 async fn value_contract_rust_decimal_capacity_edges_round_trip_through_duckdb() {
@@ -15,16 +15,15 @@ async fn value_contract_rust_decimal_capacity_edges_round_trip_through_duckdb() 
             .await
             .unwrap();
         assert!(
-            bound.rows.len() == 1
-                && matches!(bound.rows[0].as_slice(), [Value::Decimal(actual)] if actual.to_string() == text),
+            bound.rows.len() == 1 && matches!(&bound.rows[0], [Value::Decimal(actual)] if actual.to_string() == text),
             "bound value changed: {text}"
         );
 
-        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
+        let literal = bookie_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
         let restored = connection.query(&format!("SELECT {literal}")).await.unwrap();
         assert!(
             restored.rows.len() == 1
-                && matches!(restored.rows[0].as_slice(), [Value::Decimal(actual)] if actual.to_string() == text),
+                && matches!(&restored.rows[0], [Value::Decimal(actual)] if actual.to_string() == text),
             "SQL literal value changed: {text}: {:?}",
             restored.rows
         );

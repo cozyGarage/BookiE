@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, Weak};
 
-use tablepro_app_services::stream_result_spool::StreamResultSpool;
-use tablepro_core::{ColumnInfo, MAX_QUERY_RESULT_BYTES, QueryResult};
+use bookie_app_services::stream_result_spool::StreamResultSpool;
+use bookie_core::{ColumnInfo, MAX_QUERY_RESULT_BYTES, QueryResult};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum PageAppendError {
@@ -22,7 +22,7 @@ pub enum StreamTerminal {
 
 #[derive(Debug, Clone)]
 pub struct StreamedResult {
-    pub(super) pages: Vec<Arc<QueryResult>>,
+    pub(super) pages: Vec<Weak<QueryResult>>,
     pub(super) page_indices: Vec<u64>,
     pub(super) page_row_counts: Vec<usize>,
     pub(super) page_row_starts: Vec<usize>,
@@ -78,10 +78,21 @@ pub(super) struct StreamPageCache {
     retained_rows: usize,
     total_rows: usize,
     resident_pages: ResidentPageStore,
+    unspooled_page: Option<u64>,
 }
 
 impl StreamPageCache {
+    #[cfg(test)]
     pub(super) fn append(&mut self, index: u64, result: Arc<QueryResult>) -> Result<(), PageAppendError> {
+        self.append_with_storage_status(index, result, true)
+    }
+
+    pub(super) fn append_with_storage_status(
+        &mut self,
+        index: u64,
+        result: Arc<QueryResult>,
+        spooled: bool,
+    ) -> Result<(), PageAppendError> {
         if index != self.next_page {
             return Err(PageAppendError::OutOfOrder);
         }
@@ -115,6 +126,9 @@ impl StreamPageCache {
                 self.retained_rows = self.retained_rows.saturating_sub(retired.rows.len());
             }
         }
+        if !spooled {
+            self.unspooled_page = Some(index);
+        }
         Ok(())
     }
 
@@ -139,7 +153,7 @@ impl StreamPageCache {
 
     #[cfg(test)]
     pub(super) fn snapshot(
-        &self,
+        &mut self,
         terminal: StreamTerminal,
         query: Option<crate::ui::export_dialog::StreamExportQuery>,
     ) -> StreamedResult {
@@ -147,17 +161,29 @@ impl StreamPageCache {
     }
 
     pub(super) fn snapshot_with_spool(
-        &self,
+        &mut self,
         terminal: StreamTerminal,
         query: Option<crate::ui::export_dialog::StreamExportQuery>,
         generation: u64,
         spool: Option<StreamResultSpool>,
     ) -> StreamedResult {
-        let export = query
-            .zip(self.columns.clone())
-            .map(|(query, columns)| crate::ui::export_dialog::StreamExportRequest { query, columns });
+        if !matches!(&terminal, StreamTerminal::Loading) && spool.is_some() {
+            self.release_spooled_pages();
+        }
+        let export = if matches!(terminal, StreamTerminal::Complete) && spool.is_some() {
+            query
+                .zip(self.columns.clone())
+                .map(|(query, columns)| crate::ui::export_dialog::StreamExportRequest {
+                    query,
+                    columns,
+                    spool: spool.clone(),
+                    total_rows: self.total_rows,
+                })
+        } else {
+            None
+        };
         StreamedResult {
-            pages: self.pages.iter().map(|(_, page, _)| page.clone()).collect(),
+            pages: self.pages.iter().map(|(_, page, _)| Arc::downgrade(page)).collect(),
             page_indices: self.pages.iter().map(|(index, _, _)| *index).collect(),
             page_row_counts: self.page_row_counts.clone(),
             page_row_starts: self.page_row_starts.clone(),
@@ -171,6 +197,25 @@ impl StreamPageCache {
             spool,
             resident_pages: self.resident_pages.clone(),
         }
+    }
+
+    fn release_spooled_pages(&mut self) {
+        let keep_index = self.unspooled_page;
+        let mut retained = VecDeque::new();
+        let mut retained_bytes = 0;
+        let mut retained_rows = 0;
+        while let Some((index, page, bytes)) = self.pages.pop_front() {
+            if Some(index) == keep_index {
+                retained_bytes = bytes;
+                retained_rows = page.rows.len();
+                retained.push_back((index, page, bytes));
+            } else {
+                self.resident_pages.remove(index);
+            }
+        }
+        self.pages = retained;
+        self.retained_bytes = retained_bytes;
+        self.retained_rows = retained_rows;
     }
 }
 

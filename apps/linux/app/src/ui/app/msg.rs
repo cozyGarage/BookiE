@@ -1,5 +1,5 @@
-use tablepro_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
-use tablepro_storage::{ConnectionOrganization, ConnectionOrganizationIndex, SavedConnection};
+use bookie_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
+use bookie_storage::{ConnectionOrganization, ConnectionOrganizationIndex, SavedConnection};
 use uuid::Uuid;
 
 use super::{OpenMode, SessionTeardownAction};
@@ -21,15 +21,15 @@ pub enum AppMsg {
     OpenReferencedRow {
         schema: Option<String>,
         table: String,
-        filter: tablepro_core::FilterSet,
+        filter: bookie_core::FilterSet,
     },
     ChooseReferencedRow(Vec<crate::ui::browse_tab::reference::ReferencedRowTarget>),
     ColumnsLoaded(Uuid, Vec<ColumnInfo>, tokio_util::sync::CancellationToken),
     FetchBrowseForeignKeys(Uuid),
-    FetchBrowseEnumLabels(Uuid, Vec<(String, tablepro_core::QualifiedTypeName)>),
+    FetchBrowseEnumLabels(Uuid, Vec<(String, bookie_core::QualifiedTypeName)>),
     EnumLabelsLoaded(Uuid, Vec<(String, Vec<String>)>),
     ForeignKeysLoaded(Uuid, Vec<ForeignKeyInfo>),
-    InboundForeignKeysLoaded(Uuid, Vec<tablepro_core::InboundForeignKeyInfo>),
+    InboundForeignKeysLoaded(Uuid, Vec<bookie_core::InboundForeignKeyInfo>),
     RowsLoaded(
         Uuid,
         crate::ui::browse_tab::BrowsePageRequest,
@@ -56,7 +56,7 @@ pub enum AppMsg {
     ExportConnectionsSucceeded(usize),
     ImportBundle,
     ImportBundleFile(std::path::PathBuf),
-    ImportBundleEncrypted(tablepro_storage::EncryptedBundle),
+    ImportBundleEncrypted(bookie_storage::EncryptedBundle),
     ImportBundleUnlock(String),
     ImportBundlePlanned(super::bundle::PendingImport),
     ImportBundleConfirmed(crate::ui::connection_bundle::ImportChoice),
@@ -79,7 +79,7 @@ pub enum AppMsg {
     ImportConnectionUrlFailed,
     NewEditorTab,
     OpenSqlFile,
-    SqlFileOpened(tablepro_core::text_file::TextFile),
+    SqlFileOpened(bookie_core::text_file::TextFile),
     SqlFileFailed(String),
     SaveActiveEditorFileAs,
     SaveEditorFileAs(Uuid),
@@ -88,20 +88,20 @@ pub enum AppMsg {
         tab: Uuid,
         overwrite: bool,
     },
-    EditorFileSaved(Uuid, tablepro_core::text_file::TextFile),
+    EditorFileSaved(Uuid, bookie_core::text_file::TextFile),
     EditorFileSaveFailed(Uuid, String),
     EditorFileChangedOnDisk(Uuid),
-    EditorFileRestored(Uuid, Result<tablepro_core::text_file::TextFile, String>),
+    EditorFileRestored(Uuid, Result<bookie_core::text_file::TextFile, String>),
     CloseActiveWorkspaceTab,
     EditorTabRunStateChanged(Uuid, bool),
     EditorTabQueryChanged(Uuid, String),
-    FavoritesLoaded(u64, Vec<tablepro_storage::SavedQuery>),
-    PersistFavorite(tablepro_storage::SavedQuery),
+    FavoritesLoaded(u64, Vec<bookie_storage::SavedQuery>),
+    PersistFavorite(bookie_storage::SavedQuery),
     FavoriteSaved,
     FavoriteSaveFailed(String),
     SaveQueryAsFavorite,
     ShowSavedQueries,
-    SavedQueriesChanged(Vec<tablepro_storage::SavedQuery>),
+    SavedQueriesChanged(Vec<bookie_storage::SavedQuery>),
     SavedQueriesDialogClosed,
     ShowQuickSwitcher,
     QuickSwitcherChose(crate::services::quick_switcher::QuickTarget),
@@ -143,7 +143,7 @@ pub enum AppMsg {
     ShowErDiagram {
         schema: Option<String>,
     },
-    ShowCatalogKind(tablepro_core::CatalogObjectKind),
+    ShowCatalogKind(bookie_core::CatalogObjectKind),
     ToggleAllSidebarGroups,
     ExplainActiveQuery,
     ShowPreferences,
@@ -169,7 +169,7 @@ pub enum AppMsg {
     CopyRowAsStatement {
         tab_id: Uuid,
         row_position: u32,
-        statement: tablepro_core::sql_literal::RowStatement,
+        statement: bookie_core::sql_literal::RowStatement,
     },
     FetchBrowsePage(Uuid),
     FetchBrowseCellValue(
@@ -286,7 +286,7 @@ pub enum AppMsg {
     StructureDataLoaded {
         tab_id: Uuid,
         columns: Vec<ColumnInfo>,
-        metadata: tablepro_app_services::structure_metadata::StructureMetadata,
+        metadata: bookie_app_services::structure_metadata::StructureMetadata,
     },
     StructureLoadFailed {
         tab_id: Uuid,
@@ -318,11 +318,13 @@ pub enum AppMsg {
         path: std::path::PathBuf,
     },
     CsvImportPrepared(Box<super::import::CsvImportPreparation>),
+    CsvImportPreparationFailed(Box<super::import::CsvImportPreparationFailure>),
     StartCsvImport(Box<crate::ui::import_dialog::ImportChoice>),
+    CsvImportPlanPrepared(Box<super::import::CsvImportPlanPreparation>),
     CsvImportProgress(u64),
     CsvImportFinished(Box<super::import::CsvImportReport>),
     BackUpDatabase,
     RestoreDatabase,
-    StartBackupJob(tablepro_app_services::database_backup::BackupJob),
+    StartBackupJob(bookie_app_services::database_backup::BackupJob),
     BackupJobFinished(Box<super::backup::BackupReport>),
 }

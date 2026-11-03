@@ -6,8 +6,8 @@ use relm4::{adw, gtk};
 use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
 
-use tablepro_core::{AuthMode, ConnectOptions, Connection, DriverMaturity, DriverRegistry, Environment, TlsMode};
-use tablepro_storage::{
+use bookie_core::{AuthMode, ConnectOptions, Connection, DriverMaturity, DriverRegistry, Environment, TlsMode};
+use bookie_storage::{
     SavedConnection, delete_password, save_connections, store_password, store_ssh_passphrase, store_ssh_password,
 };
 
@@ -56,8 +56,8 @@ pub struct ConnectDialog {
     form: ConnectFormState,
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
-    ssh_environment: tablepro_transport::SshEnvironment,
-    audit_factory: tablepro_transport::TransportAuditFactory,
+    ssh_environment: bookie_transport::SshEnvironment,
+    audit_factory: bookie_transport::TransportAuditFactory,
     guard_factory: crate::services::database_service::CandidateGuardFactory,
     applied_driver: Option<u32>,
     connect_cancel: Option<tokio_util::sync::CancellationToken>,
@@ -109,8 +109,8 @@ pub struct ConnectDialogInit {
     /// separate instead of folding into whichever matched first.
     pub bound_connection_id: Option<Uuid>,
     pub prefill: Option<ConnectionPrefill>,
-    pub ssh_environment: tablepro_transport::SshEnvironment,
-    pub audit_factory: tablepro_transport::TransportAuditFactory,
+    pub ssh_environment: bookie_transport::SshEnvironment,
+    pub audit_factory: bookie_transport::TransportAuditFactory,
     pub guard_factory: crate::services::database_service::CandidateGuardFactory,
 }
 
@@ -600,7 +600,7 @@ impl Component for ConnectDialog {
                                         .as_ref()
                                         .map_or_else(|| bound_id.unwrap_or_else(Uuid::new_v4), |saved| saved.id);
                                     let audit = audit_factory.context(
-                                        tablepro_policy::Principal::human_gui(),
+                                        bookie_policy::Principal::human_gui(),
                                         id,
                                         name.clone(),
                                         environment,
@@ -616,7 +616,7 @@ impl Component for ConnectDialog {
                                         server_version: None,
                                         query_timeout_secs,
                                     };
-                                    match tablepro_transport::establish_with_cancellation(
+                                    match bookie_transport::establish_with_cancellation(
                                         driver.as_ref(),
                                         opts,
                                         ssh,
@@ -626,15 +626,15 @@ impl Component for ConnectDialog {
                                     .await
                                     {
                                         Ok((conn, _tunnel)) => {
-                                            let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
+                                            let conn: Arc<dyn bookie_core::Connection> = Arc::from(conn);
                                             let guarded = guard_factory.guard(
                                                 conn,
                                                 &metadata,
-                                                tablepro_policy::Principal::human_gui(),
+                                                bookie_policy::Principal::human_gui(),
                                             );
                                             let listed = match guarded {
                                                 Ok(guarded) => guarded.list_tables_controlled(&control).await,
-                                                Err(error) => Err(tablepro_core::DriverError::PolicyDenied(error)),
+                                                Err(error) => Err(bookie_core::DriverError::PolicyDenied(error)),
                                             };
                                             match listed {
                                                 Ok(tables) => Ok(tables.len()),
@@ -765,13 +765,13 @@ impl ConnectDialog {
         TlsMode::from_index(self.tls_mode.selected())
     }
 
-    fn tls_config_for(&self, driver: &dyn tablepro_core::DatabaseDriver) -> tablepro_core::TlsConfig {
+    fn tls_config_for(&self, driver: &dyn bookie_core::DatabaseDriver) -> bookie_core::TlsConfig {
         let mode = if driver.capabilities().is_file_based || self.uses_local_socket() {
             TlsMode::Disabled
         } else {
             self.selected_tls_mode()
         };
-        tablepro_core::TlsConfig {
+        bookie_core::TlsConfig {
             mode,
             root_cert: self.selected_root_cert(mode),
             client_cert: selected_path(&self.tls_client_cert),
@@ -896,14 +896,14 @@ fn toggle_error(row: &adw::EntryRow, invalid: bool) {
 }
 
 struct ConnectRequest {
-    driver: Arc<dyn tablepro_core::DatabaseDriver>,
+    driver: Arc<dyn bookie_core::DatabaseDriver>,
     driver_id: String,
     bound_id: Option<Uuid>,
     label: String,
     opts: ConnectOptions,
     ssh: Option<SshInputs>,
-    ssh_environment: tablepro_transport::SshEnvironment,
-    audit_factory: tablepro_transport::TransportAuditFactory,
+    ssh_environment: bookie_transport::SshEnvironment,
+    audit_factory: bookie_transport::TransportAuditFactory,
     guard_factory: crate::services::database_service::CandidateGuardFactory,
     read_only: bool,
     environment: Environment,
@@ -913,11 +913,11 @@ struct ConnectRequest {
 }
 
 struct OpenedCandidate {
-    conn: Arc<dyn tablepro_core::Connection>,
-    tunnel: Option<tablepro_transport::Tunnel>,
+    conn: Arc<dyn bookie_core::Connection>,
+    tunnel: Option<bookie_transport::Tunnel>,
     server_version: Option<String>,
-    tables: Vec<tablepro_core::TableInfo>,
-    views: Vec<tablepro_core::TableInfo>,
+    tables: Vec<bookie_core::TableInfo>,
+    views: Vec<bookie_core::TableInfo>,
 }
 
 struct CandidateBootstrap<'a> {
@@ -926,27 +926,26 @@ struct CandidateBootstrap<'a> {
 }
 
 async fn open_candidate(
-    driver: &dyn tablepro_core::DatabaseDriver,
+    driver: &dyn bookie_core::DatabaseDriver,
     opts: ConnectOptions,
-    ssh: Option<tablepro_transport::SshRoute>,
-    ssh_environment: &tablepro_transport::SshEnvironment,
+    ssh: Option<bookie_transport::SshRoute>,
+    ssh_environment: &bookie_transport::SshEnvironment,
     timeout_secs: u32,
     cancellation: tokio_util::sync::CancellationToken,
     bootstrap: CandidateBootstrap<'_>,
 ) -> Result<OpenedCandidate, String> {
     let (conn, tunnel) =
-        tablepro_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
+        bookie_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
             .await
             .map_err(connection_service::message)?;
-    let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
-    let guarded = bootstrap.guard_factory.guard(
-        conn.clone(),
-        bootstrap.metadata,
-        tablepro_policy::Principal::human_gui(),
-    )?;
+    let conn: Arc<dyn bookie_core::Connection> = Arc::from(conn);
+    let guarded =
+        bootstrap
+            .guard_factory
+            .guard(conn.clone(), bootstrap.metadata, bookie_policy::Principal::human_gui())?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
-        Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),
         Err(_) => None,
     };
     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -1004,7 +1003,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         .or(bound_id)
         .unwrap_or_else(Uuid::new_v4);
     let ssh_environment = ssh_environment.with_audit(audit_factory.context(
-        tablepro_policy::Principal::human_gui(),
+        bookie_policy::Principal::human_gui(),
         id,
         label.clone(),
         environment,
@@ -1154,16 +1153,16 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
     )))
 }
 
-async fn save_one(connection: &SavedConnection) -> Result<(), tablepro_storage::StorageError> {
+async fn save_one(connection: &SavedConnection) -> Result<(), bookie_storage::StorageError> {
     save_connections(std::slice::from_ref(connection)).await
 }
 
 async fn rollback_saved_connection(
     previous: Option<&SavedConnection>,
     id: Uuid,
-) -> Result<(), tablepro_storage::StorageError> {
+) -> Result<(), bookie_storage::StorageError> {
     match previous {
         Some(connection) => save_one(connection).await,
-        None => tablepro_storage::delete_connection(id).await,
+        None => bookie_storage::delete_connection(id).await,
     }
 }

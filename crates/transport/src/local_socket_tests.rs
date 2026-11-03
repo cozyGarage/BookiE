@@ -1,6 +1,6 @@
 use std::os::unix::net::UnixListener;
 
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
 
 use super::validate_local_socket;
 use crate::TransportError;

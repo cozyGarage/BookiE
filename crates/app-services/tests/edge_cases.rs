@@ -3,11 +3,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use tablepro_app_services::enum_input::{EnumInputError, declared_member_labels, parse_enum_input};
-use tablepro_app_services::reconnect::next_delay;
-use tablepro_app_services::sql_text::SqlTextLimits;
-use tablepro_app_services::stream_result_spool::StreamResultSpoolManager;
-use tablepro_core::{ColumnInfo, EnumInputStyle, QueryResult, Value};
+use bookie_app_services::enum_input::{EnumInputError, declared_member_labels, parse_enum_input};
+use bookie_app_services::reconnect::next_delay;
+use bookie_app_services::sql_text::SqlTextLimits;
+use bookie_app_services::stream_result_spool::StreamResultSpoolManager;
+use bookie_core::{ColumnInfo, EnumInputStyle, QueryResult, Value};
 
 fn column(name: &str, data_type: &str) -> ColumnInfo {
     ColumnInfo {
@@ -33,7 +33,7 @@ async fn a_spooled_page_larger_than_one_encryption_chunk_round_trips() {
     let big = "x".repeat(200_000);
     let page = Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Text(big.clone())], vec![Value::Text("é".repeat(70_000))]],
+        rows: vec![vec![Value::Text(big.clone())], vec![Value::Text("é".repeat(70_000))]].into(),
         truncated: false,
     });
 
@@ -45,13 +45,34 @@ async fn a_spooled_page_larger_than_one_encryption_chunk_round_trips() {
 }
 
 #[tokio::test]
+async fn spooled_json_preserves_arbitrary_precision_numbers() {
+    let manager = StreamResultSpoolManager::with_limit(1024 * 1024);
+    let spool = manager.create().unwrap();
+    let columns = vec![column("payload", "json")];
+    let json = serde_json::from_str::<serde_json::Value>(
+        r#"{"positive":18446744073709551617,"negative":-9223372036854775809,"decimal":0.1234567890123456789012345678901234}"#,
+    )
+    .unwrap();
+    let page = Arc::new(QueryResult {
+        columns: columns.clone(),
+        rows: vec![vec![Value::Json(Box::new(json.clone()))]].into(),
+        truncated: false,
+    });
+
+    spool.append_page(0, page).await.unwrap();
+    let loaded = spool.load_page(0, columns).await.unwrap();
+
+    assert_eq!(loaded.rows[0][0], Value::Json(Box::new(json)));
+}
+
+#[tokio::test]
 async fn an_empty_spooled_page_round_trips() {
     let manager = StreamResultSpoolManager::with_limit(1024 * 1024);
     let spool = manager.create().unwrap();
     let columns = vec![column("a", "int")];
     let page = Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: true,
     });
 
@@ -69,7 +90,7 @@ async fn a_page_appended_out_of_order_is_refused_and_the_spool_stays_usable() {
     let columns = vec![column("a", "int")];
     let page = Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Int(1)]],
+        rows: vec![vec![Value::Int(1)]].into(),
         truncated: false,
     });
 

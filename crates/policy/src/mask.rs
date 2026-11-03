@@ -1,4 +1,4 @@
-use tablepro_core::{QueryResult, Value};
+use bookie_core::{QueryResult, Value};
 
 pub const DEFAULT_SENSITIVE_PATTERNS: &[&str] = &[
     "*pan*",
@@ -122,7 +122,7 @@ pub fn apply_masking(result: QueryResult, patterns: &[String], sensitive_positio
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::ColumnInfo;
+    use bookie_core::ColumnInfo;
 
     #[test]
     fn matches_pan_column() {
@@ -164,7 +164,7 @@ mod tests {
                     domain_type: None,
                 },
             ],
-            rows: vec![vec![Value::Int(1), Value::Text("4111111111111111".into())]],
+            rows: vec![vec![Value::Int(1), Value::Text("4111111111111111".into())]].into(),
             truncated: false,
         };
         let masked = apply_masking(result, &patterns, None);
@@ -188,7 +188,7 @@ mod tests {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Text("secret".into())]],
+            rows: vec![vec![Value::Text("secret".into())]].into(),
             truncated: false,
         };
         let masked = apply_masking(result, &[], None);
@@ -211,7 +211,7 @@ mod tests {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![Value::Text("4111111111111111".into())]],
+            rows: vec![vec![Value::Text("4111111111111111".into())]].into(),
             truncated: false,
         };
         let masked = apply_masking(result, &[], Some(&[true]));
@@ -241,7 +241,8 @@ mod tests {
                     serde_json::json!({"user": "ada", "creds": [{"Password": "p"}]}),
                 )),
                 Value::JsonText(r#"{"name":"ada","ssn":"123-45-6789"}"#.into()),
-            ]],
+            ]]
+            .into(),
             truncated: false,
         };
 

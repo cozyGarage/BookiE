@@ -2,6 +2,61 @@ use super::*;
 use gtk::glib;
 
 #[test]
+#[ignore = "requires an isolated GTK display"]
+fn source_lookup_supports_alternate_models_and_refuses_unloaded_cells() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![Value::Text(
+        "whole".repeat(3000),
+    )]));
+    rows.append(&crate::ui::row_object::RowObject::unloaded(1));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    assert_eq!(source_value_at(&view, 0, 0), Some(Value::Text("whole".repeat(3000))));
+    assert_eq!(source_value_at(&view, 1, 0), None);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn copying_a_column_refuses_unloaded_rows() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::unloaded(1));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    assert_eq!(values_for_column_menu(&view, 0, 0), None);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn virtual_grid_disables_snapshot_export() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    let (sender, receiver) = relm4::channel();
+    install_grid_context_menus(
+        &view,
+        sender,
+        &[],
+        false,
+        "postgres".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: false,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            snapshot_export: false,
+        },
+    );
+    view.activate_action("cell.export", None).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    assert!(runtime.block_on(async {
+        tokio::time::timeout(std::time::Duration::from_millis(20), receiver.recv())
+            .await
+            .is_err()
+    }));
+}
+
+#[test]
 fn an_empty_read_only_grid_menu_does_not_offer_insert_row() {
     assert_eq!(empty_grid_menu(false).n_items(), 1);
 }
@@ -36,6 +91,24 @@ fn a_local_result_menu_offers_visible_and_all_loaded_row_exports() {
 }
 
 #[test]
+fn filterable_and_local_menus_offer_filter_and_exclude_by_cell_value() {
+    let display_actions = |filterable, local_result| {
+        let menu = build_menu(false, false, true, filterable, local_result);
+        let display = menu.item_link(1, gio::MENU_LINK_SECTION).expect("display section");
+        (0..display.n_items())
+            .filter_map(|index| display.item_attribute_value(index, "action", None))
+            .filter_map(|value| value.get::<String>())
+            .collect::<Vec<_>>()
+    };
+    assert!(display_actions(true, false).contains(&"cell.filter-by-value".into()));
+    assert!(display_actions(true, false).contains(&"cell.exclude-value".into()));
+    assert!(display_actions(false, true).contains(&"cell.filter-by-value".into()));
+    assert!(display_actions(false, true).contains(&"cell.exclude-value".into()));
+    assert!(!display_actions(false, false).contains(&"cell.filter-by-value".into()));
+    assert!(!display_actions(false, false).contains(&"cell.exclude-value".into()));
+}
+
+#[test]
 fn editable_grid_menu_offers_row_mutations_when_the_table_has_a_key() {
     let menu = build_menu(true, true, true, true, false);
     let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
@@ -62,7 +135,7 @@ fn copying_a_previewed_cell_copies_the_full_value() {
     }];
     let result = std::sync::Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Text(full.clone())]],
+        rows: vec![vec![Value::Text(full.clone())]].into(),
         truncated: false,
     });
     let row = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();
@@ -193,7 +266,7 @@ fn keyboard_reference_state_follows_current_cell() {
     let export = &menus.export_loaded.as_ref().unwrap().0;
     assert!(!export.is_enabled());
     menus.readonly_popover.popdown();
-    local.filter_by_value(0, Value::Int(7));
+    assert!(local.filter_by_value(0, Value::Int(7), false));
     assert!(cell.grab_focus());
     assert!(action.activate(gtk::ShortcutActionFlags::empty(), &view, None));
     assert!(export.is_enabled());
@@ -218,10 +291,15 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
     let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
     let (sender, _receiver) = relm4::channel();
     let local = local_result_for_menu();
+    let columns = [
+        menu_test_column("linked", "INTEGER"),
+        menu_test_column("payload", "TEXT"),
+        menu_test_column("active", "BOOLEAN"),
+    ];
     let menus = install_grid_context_menus(
         &view,
         sender,
-        &[],
+        &columns,
         false,
         "sqlite".into(),
         GridMenuOptions {
@@ -230,10 +308,11 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
             foreign_key_columns: ["linked".into()].into(),
             has_inbound_foreign_keys: false,
             local_result_view: Some(local.clone()),
+            snapshot_export: true,
         },
     );
     let cells = Rc::new(std::cell::RefCell::new(Vec::new()));
-    let factory = keyboard_menu_factory(&menus, cells.clone());
+    let factory = keyboard_menu_factory(cells.clone());
     view.append_column(&gtk::ColumnViewColumn::new(None, Some(factory)));
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     content.append(&view);
@@ -260,15 +339,11 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
     (window, label, menus, local)
 }
 
-fn keyboard_menu_factory(
-    menus: &GridMenus,
-    cells: Rc<std::cell::RefCell<Vec<gtk::Label>>>,
-) -> gtk::SignalListItemFactory {
+fn keyboard_menu_factory(cells: Rc<std::cell::RefCell<Vec<gtk::Label>>>) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
-    let menus = menus.clone();
     factory.connect_setup(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
-        super::super::editing::setup_readonly_cell(item, 0, "linked".into(), None, Some(&menus));
+        super::super::editing::setup_readonly_cell(item, 0, None);
         cells
             .borrow_mut()
             .push(item.child().and_downcast::<gtk::Label>().unwrap());
@@ -286,7 +361,7 @@ fn local_result_for_menu() -> LocalResultView {
     LocalResultView::new(
         std::sync::Arc::new(QueryResult {
             columns: Vec::new(),
-            rows: vec![vec![Value::Int(7)]],
+            rows: vec![vec![Value::Int(7)]].into(),
             truncated: false,
         }),
         super::super::local_filter::LocalResultSettingsStore::default(),
@@ -409,21 +484,27 @@ fn append_menu_widget(view: &gtk::ColumnView, widget: gtk::Widget) {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(move |_, item| {
         let item = item.downcast_ref::<gtk::ListItem>().unwrap();
-        let idx = super::super::display::COLUMN_SLOT.get(&widget).unwrap();
+        super::super::display::COLUMN_SLOT.get(&widget).unwrap();
         POSITION_SLOT.set(&widget, 0);
-        set_cell_menu_options(
-            &widget,
-            CellGestureOptions {
-                idx,
-                column_name: format!("c{idx}"),
-                is_editable: true,
-                is_text_editable: widget.is::<crate::ui::cell_editor::CellEditor>(),
-                supports_full_value: false,
-            },
-        );
         item.set_child(Some(&widget));
     });
     view.append_column(&gtk::ColumnViewColumn::new(Some("Fixture"), Some(factory)));
+}
+
+fn menu_test_column(name: &str, data_type: &str) -> ColumnInfo {
+    ColumnInfo {
+        name: name.into(),
+        data_type: data_type.into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        is_generated: false,
+        default_value: None,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }
 }
 
 fn pointer_menu_uses_target_and_current_row() {

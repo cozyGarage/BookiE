@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::Value;
+use bookie_core::Value;
 
 pub(super) fn page(columns: &[&str], values: &[i64]) -> Arc<QueryResult> {
     Arc::new(QueryResult {
@@ -78,7 +78,7 @@ fn wide_pages_evict_by_bytes_before_the_page_count_limit() {
     let mut retired = None;
     for index in 0..3 {
         let mut result = page(&["payload"], &[]).as_ref().clone();
-        result.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]];
+        result.rows = vec![vec![Value::Text("x".repeat(24 * 1024 * 1024))]].into();
         let result = Arc::new(result);
         if index == 0 {
             retired = Some(Arc::downgrade(&result));
@@ -93,14 +93,17 @@ fn wide_pages_evict_by_bytes_before_the_page_count_limit() {
     assert_eq!(snapshot.total_pages, 3);
     assert_eq!(snapshot.page_row_counts, vec![1, 1, 1]);
     assert_eq!(snapshot.retained_rows, 2);
-    assert_eq!(snapshot.pages[0].rows[0][0], Value::Text("x".repeat(24 * 1024 * 1024)));
+    assert_eq!(
+        snapshot.pages[0].upgrade().unwrap().rows[0][0],
+        Value::Text("x".repeat(24 * 1024 * 1024))
+    );
 }
 
 #[test]
 fn the_newest_page_is_kept_even_when_it_alone_exceeds_the_byte_budget() {
     let mut cache = StreamPageCache::default();
     let mut result = page(&["payload"], &[]).as_ref().clone();
-    result.rows = vec![vec![Value::Bytes(vec![7; 65 * 1024 * 1024])]];
+    result.rows = vec![vec![Value::Bytes(vec![7; 65 * 1024 * 1024])]].into();
     let result = Arc::new(result);
     let retired = Arc::downgrade(&result);
     cache.append(0, result).unwrap();
@@ -138,7 +141,7 @@ fn rejects_a_late_schema_change_and_keeps_decoded_rows_from_a_truncated_page() {
     cache.append(1, Arc::new(truncated)).expect("partial page");
     let result = cache.snapshot(StreamTerminal::Failed("page budget exceeded".into()), None);
     assert_eq!(result.total_rows, 2);
-    assert!(result.pages[1].truncated);
+    assert!(result.pages[1].upgrade().unwrap().truncated);
     assert!(matches!(result.terminal, StreamTerminal::Failed(_)));
 }
 
@@ -147,7 +150,7 @@ fn an_empty_final_page_keeps_result_metadata() {
     let mut cache = StreamPageCache::default();
     let empty = Arc::new(QueryResult {
         columns: page(&["id"], &[]).columns.clone(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     });
     cache.append(0, empty).expect("empty result page");
@@ -169,7 +172,13 @@ fn an_empty_page_after_the_first_ends_the_stream_without_evicting_rows() {
     assert_eq!(cache.first_page(), 0);
     let snapshot = cache.snapshot(StreamTerminal::Complete, None);
     assert_eq!(snapshot.total_pages, 20);
-    assert!(snapshot.pages.iter().all(|page| !page.rows.is_empty()));
+    assert!(
+        snapshot
+            .pages
+            .iter()
+            .filter_map(Weak::upgrade)
+            .all(|page| !page.rows.is_empty())
+    );
 }
 
 #[test]

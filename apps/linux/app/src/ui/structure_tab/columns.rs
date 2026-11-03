@@ -8,7 +8,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{ComponentSender, adw, gtk};
 
-use tablepro_core::sql_ddl::{ColumnCommentCapability, DraftColumn};
+use bookie_core::sql_ddl::{ColumnCommentCapability, DraftColumn};
 
 use super::{ColumnField, StructureTab, StructureTabInput};
 
@@ -489,9 +489,9 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
 mod tests {
     use super::{CommentEditability, comment_editability, configure_comment_row};
     use super::{bind_expander_arrow, expander_arrow};
+    use bookie_core::sql_ddl::ColumnCommentCapability;
     use relm4::adw::prelude::*;
     use relm4::{adw, gtk};
-    use tablepro_core::sql_ddl::ColumnCommentCapability;
 
     fn pump() {
         let context = gtk::glib::MainContext::default();

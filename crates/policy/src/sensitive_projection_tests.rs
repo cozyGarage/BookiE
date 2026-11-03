@@ -216,8 +216,8 @@ fn unrecognized_query_shapes_redact_their_result_values() {
         "INSERT INTO cards (pan) VALUES ('4111111111111111') RETURNING pan AS p",
     ] {
         let positions = sensitive_projection(sql, "postgres", &patterns, 1);
-        let result = tablepro_core::QueryResult {
-            columns: vec![tablepro_core::ColumnInfo {
+        let result = bookie_core::QueryResult {
+            columns: vec![bookie_core::ColumnInfo {
                 name: "p".into(),
                 data_type: "text".into(),
                 nullable: true,
@@ -230,13 +230,13 @@ fn unrecognized_query_shapes_redact_their_result_values() {
                 enum_type: None,
                 domain_type: None,
             }],
-            rows: vec![vec![tablepro_core::Value::Text("sensitive".into())]],
+            rows: vec![vec![bookie_core::Value::Text("sensitive".into())]].into(),
             truncated: false,
         };
         let masked = crate::mask::apply_masking(result, &patterns, Some(&positions));
         assert_eq!(
             masked.rows[0][0],
-            tablepro_core::Value::Text("***REDACTED***".into()),
+            bookie_core::Value::Text("***REDACTED***".into()),
             "{sql}"
         );
     }

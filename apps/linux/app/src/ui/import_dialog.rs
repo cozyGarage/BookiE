@@ -2,16 +2,16 @@ use std::path::PathBuf;
 
 use crate::services::csv_import_mappings::{CsvMappingScope, CsvMappingStore};
 use crate::ui::progress_dialog::CancellableDialog;
-use relm4::adw::prelude::*;
-use relm4::{adw, gtk};
-use tablepro_core::export::CsvDelimiter;
-use tablepro_core::import::{
+use bookie_core::export::CsvDelimiter;
+use bookie_core::import::{
     CsvFormat, CsvImportOptions, CsvSheet, INFER_SAMPLE_ROWS, MAX_PREVIEW_ROWS, infer_columns, read_csv,
     suggest_mapping,
 };
-use tablepro_core::import::{CsvImportEncoding, CsvImportQuote};
-use tablepro_core::sql_ddl::DraftColumn;
-use tablepro_core::{ColumnInfo, DriverCapabilities, sql_dialect};
+use bookie_core::import::{CsvImportEncoding, CsvImportQuote};
+use bookie_core::sql_ddl::DraftColumn;
+use bookie_core::{ColumnInfo, DriverCapabilities, sql_dialect};
+use relm4::adw::prelude::*;
+use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
 /// Whether the rows go into a table that is already there, or into one
@@ -712,8 +712,8 @@ fn mark(row: &adw::EntryRow, ok: bool) {
 
 fn type_names_for(driver_id: &str) -> Vec<&'static str> {
     let mut names = Vec::new();
-    for kind in tablepro_core::import::ColumnKind::ALL {
-        let name = tablepro_core::import::type_name(driver_id, kind);
+    for kind in bookie_core::import::ColumnKind::ALL {
+        let name = bookie_core::import::type_name(driver_id, kind);
         if !names.contains(&name) {
             names.push(name);
         }
@@ -806,7 +806,8 @@ pub(crate) struct ImportProgress {
     window: CancellableDialog,
     bar: gtk::ProgressBar,
     label: gtk::Label,
-    total: u64,
+    spinner: gtk::Spinner,
+    total: Option<u64>,
 }
 
 impl ImportProgress {
@@ -815,13 +816,26 @@ impl ImportProgress {
     }
 
     pub(crate) fn set_committed(&self, committed: u64) {
-        let fraction = if self.total == 0 {
+        let total = self.total.unwrap_or_default();
+        let fraction = if total == 0 {
             0.0
         } else {
-            committed as f64 / self.total as f64
+            committed as f64 / total as f64
         };
         self.bar.set_fraction(fraction);
-        self.label.set_label(&rows_label(committed, self.total));
+        self.label.set_label(&rows_label(committed, total));
+    }
+
+    pub(crate) fn set_total(&mut self, total: u64) {
+        self.total = Some(total);
+        self.spinner.stop();
+        self.spinner.set_visible(false);
+        self.bar.set_visible(true);
+        self.label.set_label(&rows_label(0, total));
+    }
+
+    pub(crate) fn is_cancelled(&self) -> bool {
+        self.window.cancel_token().is_cancelled()
     }
 
     pub(crate) fn close(&self) {
@@ -835,16 +849,24 @@ fn rows_label(committed: u64, total: u64) -> String {
         .replace("{total}", &total.to_string())
 }
 
-pub(crate) fn present_progress(parent: &adw::ApplicationWindow, table: &str, total: u64) -> ImportProgress {
-    let label = gtk::Label::new(Some(&rows_label(0, total)));
+pub(crate) fn present_preparing(parent: &adw::ApplicationWindow, table: &str) -> ImportProgress {
+    let label = gtk::Label::new(Some(&crate::tr!("Reading and planning the import…")));
+    let spinner = gtk::Spinner::new();
+    spinner.start();
     let bar = gtk::ProgressBar::new();
-    let title = crate::tr!("Importing into {table}").replace("{table}", table);
-    let window = CancellableDialog::present(parent, &title, &[label.upcast_ref(), bar.upcast_ref()]);
+    bar.set_visible(false);
+    let title = crate::tr!("Preparing import into {table}").replace("{table}", table);
+    let window = CancellableDialog::present(
+        parent,
+        &title,
+        &[label.upcast_ref(), spinner.upcast_ref(), bar.upcast_ref()],
+    );
     ImportProgress {
         window,
         bar,
         label,
-        total,
+        spinner,
+        total: None,
     }
 }
 
@@ -871,9 +893,10 @@ mod tests {
         application.register(None::<&gtk::gio::Cancellable>).unwrap();
         let window = adw::ApplicationWindow::new(&application);
         window.present();
-        let progress = present_progress(&window, "items", 2);
+        let mut progress = present_preparing(&window, "items");
 
         assert!(wait_until(|| progress.window.dialog().is_mapped()));
+        progress.set_total(2);
         let closed = std::rc::Rc::new(std::cell::Cell::new(false));
         let closed_for_signal = closed.clone();
         progress
@@ -882,6 +905,31 @@ mod tests {
             .connect_closed(move |_| closed_for_signal.set(true));
         progress.close();
         assert!(wait_until(|| closed.get()));
+        window.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn csv_preparation_progress_changes_from_spinner_to_row_count() {
+        gtk::init().unwrap();
+        adw::init().unwrap();
+        let application = gtk::Application::new(None::<&str>, gtk::gio::ApplicationFlags::NON_UNIQUE);
+        application.register(None::<&gtk::gio::Cancellable>).unwrap();
+        let window = adw::ApplicationWindow::new(&application);
+        window.present();
+        let mut progress = present_preparing(&window, "people");
+
+        assert!(wait_until(|| progress.window.dialog().is_mapped()));
+        assert!(progress.spinner.is_spinning());
+        assert!(progress.spinner.is_visible());
+        assert!(!progress.bar.is_visible());
+        assert!(progress.label.label().contains("planning"));
+        progress.set_total(42);
+        assert!(!progress.spinner.is_spinning());
+        assert!(!progress.spinner.is_visible());
+        assert!(progress.bar.is_visible());
+        assert!(progress.label.label().contains("42"));
+        progress.close();
         window.close();
     }
 

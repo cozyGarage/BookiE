@@ -40,7 +40,7 @@ class EnsureNodeTests(unittest.TestCase):
         curl.chmod(0o755)
         self.environment = {
             **os.environ, "PATH": f"{self.stubs}:{os.environ['PATH']}",
-            "TABLEPRO_TOOL_DIR": str(self.root / "tools"), "ARCHIVE": str(self.archive),
+            "BOOKIE_TOOL_DIR": str(self.root / "tools"), "ARCHIVE": str(self.archive),
             "CALLS": str(self.root / "calls"),
         }
 

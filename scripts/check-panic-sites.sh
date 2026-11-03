@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A panic in production code takes the whole process with it: the GUI
-# window disappears, or `tablepro-agentd` drops every MCP session mid
+# window disappears, or `bookie-agentd` drops every MCP session mid
 # request. `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!` and
 # `unreachable!` are all that shape, so production Rust may not add new
 # ones. Tests may panic freely: that is how a test reports failure.

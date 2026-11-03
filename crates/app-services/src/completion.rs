@@ -4,8 +4,8 @@ use std::{
     time::Duration,
 };
 
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
-use tablepro_core::{Connection, OperationControl, Session, sql_syntax::SqlGrammar};
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
+use bookie_core::{Connection, OperationControl, Session, sql_syntax::SqlGrammar};
 use tokio_util::sync::CancellationToken;
 
 use super::completion_identifiers::{bare_reference, normalized, split_table_reference, table_key, words};
@@ -384,7 +384,7 @@ pub(super) fn candidate_sql(
     };
     let narrowing = Narrowing { table_prefix, plan };
     candidates(sql, cursor_byte, index, settings, false, narrowing, |column| {
-        tablepro_core::sql_dialect::quote_ident(driver, column)
+        bookie_core::sql_dialect::quote_ident(driver, column)
     })
 }
 
@@ -522,7 +522,7 @@ fn statement_range(
         .tokens(current.range.end..current.extent.end)
         .filter(|token| !token.kind.is_trivia())
         .map(|token| token.range.end)
-        .last();
+        .next_back();
     if let Some(terminator_end) = terminator_end.filter(|end| cursor >= *end) {
         return terminator_end..next_end;
     }
@@ -626,8 +626,7 @@ fn trailing_qualifier(prefix: &str, grammar: Option<SqlGrammar>, settings: Optio
     let plan = super::completion_identifiers::plan(word, Some(grammar.unwrap_or(SqlGrammar::Sqlite)));
     let dot = plan
         .tokens(0..word.len())
-        .filter(|token| &word[token.range.clone()] == ".")
-        .last()?;
+        .rfind(|token| &word[token.range.clone()] == ".")?;
     let qualifier = &word[..dot.range.start];
     table_key(qualifier, grammar)?;
     Some(qualifier.to_string())

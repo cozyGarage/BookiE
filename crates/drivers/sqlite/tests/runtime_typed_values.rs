@@ -1,9 +1,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::sql_dialect::build_optimistic_keyed_update;
+use bookie_core::{ColumnInfo, ConnectOptions, DatabaseDriver, Value};
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use drivers_sqlite::SqliteDriver;
-use tablepro_core::sql_dialect::build_optimistic_keyed_update;
-use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, Value};
 
 fn memory_options() -> ConnectOptions {
     ConnectOptions {
@@ -405,7 +405,7 @@ async fn jsonb_results_remain_binary_blobs_with_native_json_content() {
         Value::Text(storage_class),
         Value::Text(json_text),
         Value::Text(native_hex),
-    ] = result.rows[0].as_slice()
+    ] = &result.rows[0]
     else {
         panic!("SQLite JSONB result did not remain a byte value")
     };

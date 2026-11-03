@@ -1,5 +1,5 @@
-pub use tablepro_core::parse_partial;
-use tablepro_core::{QueryResult, Value, partial_value};
+pub use bookie_core::parse_partial;
+use bookie_core::{QueryResult, Value, partial_value};
 
 use super::BrowseTarget;
 
@@ -12,7 +12,7 @@ pub(super) fn projection(target: &BrowseTarget<'_>) -> Option<String> {
         return None;
     }
     let driver_id = target.driver_id;
-    let quote = |name: &str| tablepro_core::sql_dialect::quote_ident(driver_id, name);
+    let quote = |name: &str| bookie_core::sql_dialect::quote_ident(driver_id, name);
     let mut any = false;
     let list: Vec<String> = target
         .columns
@@ -96,7 +96,10 @@ pub fn mark_partial_cells(result: &mut QueryResult, preview_columns: &[usize]) {
         return;
     }
     let visible = result.columns.len().saturating_sub(preview_columns.len());
-    for row in &mut result.rows {
+    for row_index in 0..result.rows.len() {
+        let Some(row) = result.rows.get_mut(row_index) else {
+            continue;
+        };
         for (flag, &index) in preview_columns.iter().enumerate() {
             if row.get(visible + flag) != Some(&Value::Int(1)) {
                 continue;
@@ -114,7 +117,7 @@ pub fn mark_partial_cells(result: &mut QueryResult, preview_columns: &[usize]) {
                 *cell = partial;
             }
         }
-        row.truncate(visible);
+        result.rows.truncate_row(row_index, visible);
     }
     result.columns.truncate(visible);
 }

@@ -6,8 +6,8 @@ use super::{
     RowCountRequestTracker, columns_for_browse_page, next_page_offset, previous_page_offset,
     projection_for_loaded_page,
 };
+use bookie_core::EnumInputStyle;
 use relm4::{Component, ComponentController};
-use tablepro_core::EnumInputStyle;
 
 #[test]
 fn registered_drivers_declare_enum_input_style_for_grid_parsing() {
@@ -30,7 +30,6 @@ fn registered_drivers_declare_enum_input_style_for_grid_parsing() {
             .map(|driver| driver.capabilities().enum_input_style),
         Some(EnumInputStyle::RawValue)
     );
-    #[cfg(feature = "duckdb")]
     assert_eq!(
         registry
             .get("duckdb")
@@ -66,7 +65,7 @@ fn every_registered_driver_profile_matches_its_declared_static_behavior() {
         );
         assert_matches_declaration!(
             capabilities.column_comment,
-            tablepro_core::sql_ddl::column_comment_capability(driver.id())
+            bookie_core::sql_ddl::column_comment_capability(driver.id())
         );
         assert_matches_declaration!(
             capabilities.column_comment.is_supported(),
@@ -78,7 +77,7 @@ fn every_registered_driver_profile_matches_its_declared_static_behavior() {
         assert_matches_declaration!(capabilities.supports_local_socket, driver.supports_local_socket());
         assert_eq!(
             capabilities.supports_local_socket,
-            tablepro_app_services::connection_form::local_socket_path_kind(capabilities).is_some(),
+            bookie_app_services::connection_form::local_socket_path_kind(capabilities).is_some(),
             "driver {} must declare one local socket path shape when socket mode is enabled",
             driver.id()
         );
@@ -142,7 +141,7 @@ fn grid_and_paste_enum_parsing_use_the_registered_driver_style() {
 fn browse_page(rows: usize, truncated: bool) -> QueryResult {
     QueryResult {
         columns: Vec::new(),
-        rows: vec![vec![Value::Int(1)]; rows],
+        rows: vec![vec![Value::Int(1)]; rows].into(),
         truncated,
     }
 }
@@ -190,7 +189,7 @@ fn previous_page_after_a_truncated_advance_stops_at_the_first_row() {
     assert_eq!(previous_page_offset(200, 100), Some(100));
     assert_eq!(previous_page_offset(0, 100), None);
 }
-use tablepro_core::{ColumnInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use uuid::Uuid;
 
 fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
@@ -245,7 +244,7 @@ fn only_the_latest_browse_page_request_is_accepted() {
 fn an_empty_page_uses_full_schema_headers_without_a_sparse_row_map() {
     let result = QueryResult {
         columns: Vec::new(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     };
     assert_eq!(projection_for_loaded_page(&result, Some(vec![0, 2])), None);
@@ -372,7 +371,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
             request,
             result: QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![Value::Int(20_001)], vec![Value::Int(21_000)]],
+                rows: vec![vec![Value::Int(20_001)], vec![Value::Int(21_000)]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -453,7 +452,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
             request: page_request,
             result: QueryResult {
                 columns: Vec::new(),
-                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+                rows: vec![vec![Value::Int(1)], vec![Value::Int(2)]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -539,7 +538,7 @@ fn grid_text_input_preserves_lf_and_crlf() {
 
 #[tokio::test]
 async fn grid_text_paste_stores_line_breaks_and_leaves_sibling_rows_unchanged() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -577,7 +576,7 @@ async fn grid_text_paste_stores_line_breaks_and_leaves_sibling_rows_unchanged() 
             None,
         )
         .unwrap();
-        let update = tablepro_core::sql_dialect::build_keyed_update(
+        let update = bookie_core::sql_dialect::build_keyed_update(
             "sqlite",
             None,
             "grid_text_paste",
@@ -638,7 +637,8 @@ fn mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing()
             Value::Uuid(Uuid::new_v4()),
             Value::Json(Box::new(serde_json::json!({"$numberDecimal": "1.25"}))),
             Value::Text("late".into()),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     };
 
@@ -661,7 +661,7 @@ fn mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing()
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit() {
-    use tablepro_core::OperationControl;
+    use bookie_core::OperationControl;
 
     let (_container, connection, collection, decimal) = mongodb_late_mixed_page_fixture().await;
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
@@ -722,8 +722,8 @@ async fn value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_off_page_type_change_during_census_refuses_edit() {
+    use bookie_core::OperationControl;
     use mongodb::bson::{Decimal128, doc};
-    use tablepro_core::OperationControl;
 
     let (_container, native, collection, connection) = mongodb_census_race_fixture().await;
 
@@ -780,8 +780,8 @@ async fn value_contract_mongodb_off_page_type_change_during_census_refuses_edit(
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents() {
+    use bookie_core::OperationControl;
     use mongodb::bson::{Decimal128, doc};
-    use tablepro_core::OperationControl;
 
     let (_container, native, collection, connection) = mongodb_census_race_fixture().await;
 
@@ -837,7 +837,7 @@ async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_docume
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find() {
-    use tablepro_core::OperationControl;
+    use bookie_core::OperationControl;
 
     let (_container, native, _collection, connection) = mongodb_census_race_fixture().await;
     let before = mongodb_find_command_count(&native).await;
@@ -872,8 +872,8 @@ async fn mongodb_find_command_count(native: &mongodb::Client) -> i64 {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values() {
+    use bookie_core::OperationControl;
     use mongodb::bson::{Decimal128, doc};
-    use tablepro_core::OperationControl;
 
     let (_container, native, collection, connection) = mongodb_census_race_fixture().await;
     native
@@ -927,17 +927,17 @@ async fn value_contract_mongodb_run_find_merges_page_types_and_exports_materiali
 fn assert_decimal_export_formats(result: &QueryResult, decimal: &str) {
     let temp = tempfile::tempdir().unwrap();
     for (format, extension) in [
-        (tablepro_core::export::ResultFormat::Csv, "csv"),
-        (tablepro_core::export::ResultFormat::Json, "json"),
+        (bookie_core::export::ResultFormat::Csv, "csv"),
+        (bookie_core::export::ResultFormat::Json, "json"),
     ] {
         let path = temp.path().join(format!("result.{extension}"));
-        let csv = tablepro_core::export::CsvOptions::default();
-        let export = tablepro_core::export::ResultExport {
+        let csv = bookie_core::export::CsvOptions::default();
+        let export = bookie_core::export::ResultExport {
             format,
             csv: &csv,
             sql: None,
         };
-        tablepro_core::export::write_result_file(&path, result, &export, || false, |_| {}).unwrap();
+        bookie_core::export::write_result_file(&path, result, &export, || false, |_| {}).unwrap();
         let contents = std::fs::read_to_string(path).unwrap();
         assert!(contents.contains("$numberDecimal"), "{extension}: {contents}");
         assert!(contents.contains(decimal), "{extension}: {contents}");
@@ -948,10 +948,10 @@ async fn mongodb_census_race_fixture() -> (
     testcontainers::ContainerAsync<testcontainers_modules::mongo::Mongo>,
     mongodb::Client,
     mongodb::Collection<mongodb::bson::Document>,
-    std::sync::Arc<dyn tablepro_core::Connection>,
+    std::sync::Arc<dyn bookie_core::Connection>,
 ) {
+    use bookie_core::DatabaseDriver;
     use mongodb::bson::{Document, doc};
-    use tablepro_core::DatabaseDriver;
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mongo::Mongo;
@@ -973,11 +973,11 @@ async fn mongodb_census_race_fixture() -> (
         .collect::<Vec<_>>();
     collection.insert_many(documents).await.unwrap();
     let connection = drivers_mongodb::MongodbDriver
-        .connect(tablepro_core::ConnectOptions {
+        .connect(bookie_core::ConnectOptions {
             host,
             port,
             database: "appdb".into(),
-            tls: tablepro_core::TlsConfig::disabled(),
+            tls: bookie_core::TlsConfig::disabled(),
             ..Default::default()
         })
         .await
@@ -1037,12 +1037,12 @@ fn assert_mongodb_census_race_page(page: &QueryResult) {
 
 async fn mongodb_late_mixed_page_fixture() -> (
     testcontainers::ContainerAsync<testcontainers_modules::mongo::Mongo>,
-    Box<dyn tablepro_core::Connection>,
+    Box<dyn bookie_core::Connection>,
     mongodb::Collection<mongodb::bson::Document>,
     mongodb::bson::Decimal128,
 ) {
+    use bookie_core::DatabaseDriver;
     use mongodb::bson::{Decimal128, doc};
-    use tablepro_core::DatabaseDriver;
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mongo::Mongo;
@@ -1065,11 +1065,11 @@ async fn mongodb_late_mixed_page_fixture() -> (
     collection.insert_many(docs).await.unwrap();
 
     let connection = drivers_mongodb::MongodbDriver
-        .connect(tablepro_core::ConnectOptions {
+        .connect(bookie_core::ConnectOptions {
             host,
             port,
             database: "appdb".into(),
-            tls: tablepro_core::TlsConfig::disabled(),
+            tls: bookie_core::TlsConfig::disabled(),
             ..Default::default()
         })
         .await
@@ -1082,7 +1082,7 @@ fn page_metadata_does_not_replace_schema_for_other_drivers() {
     let loaded = vec![column("value", "numeric", false)];
     let page = QueryResult {
         columns: vec![column("value", "text", false)],
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     };
     assert_eq!(columns_for_browse_page("postgres", &loaded, Some(&page)), loaded);
@@ -1118,7 +1118,7 @@ fn a_page_with_unknown_column_types_uses_table_metadata_for_exports() {
     table[3].is_generated = true;
     let mut result = QueryResult {
         columns: vec![plain("id"), plain("qty"), plain("total"), plain("version")],
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     };
     result.columns[1].data_type = "NULL".into();
@@ -1127,8 +1127,7 @@ fn a_page_with_unknown_column_types_uses_table_metadata_for_exports() {
 
     let row = [Value::Int(1), Value::Int(2), Value::Int(4), Value::Int(9)];
     assert_eq!(
-        tablepro_core::sql_literal::build_insert_literal("mssql", Some("dbo"), "orders", &result.columns, &row)
-            .unwrap(),
+        bookie_core::sql_literal::build_insert_literal("mssql", Some("dbo"), "orders", &result.columns, &row).unwrap(),
         "INSERT INTO [dbo].[orders] ([qty]) VALUES (2);"
     );
     assert!(result.columns[0].primary_key);

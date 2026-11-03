@@ -1,10 +1,15 @@
+mod continuous;
+mod page_index;
+mod page_window;
+mod paged_model;
+pub(super) use continuous::install as install_continuous;
 mod pager;
 pub(super) use pager::build as build_pager;
 
+use bookie_core::QueryResult;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 use std::sync::Arc;
-use tablepro_core::QueryResult;
 
 use super::StatementOutcome;
 use super::outcomes::stream_result_view::{
@@ -18,6 +23,7 @@ use crate::ui::grid::local_filter::LocalResultSettingsStore;
 pub(super) const LIVE_PAGES: &str = "tp-live-stream-pages";
 pub(super) const LIVE_PROGRESS: &str = "tp-live-stream-progress";
 const PAGE_PREFIX: &str = "tp-stream-page-";
+const COMPLETED_PAGES_PREFIX: &str = "tp-completed-stream-pages-";
 
 #[derive(Default)]
 pub(super) struct EvictionCursor {
@@ -43,6 +49,28 @@ impl EvictionCursor {
 
 pub(super) fn page_widget_name(generation: u64, page_index: u64) -> String {
     format!("{PAGE_PREFIX}{generation}-{page_index}")
+}
+
+pub(super) fn completed_page_stack_name(generation: u64) -> String {
+    format!("{COMPLETED_PAGES_PREFIX}{generation}")
+}
+
+pub(super) fn visible_page_index(holder: &gtk::Box, generation: u64) -> Option<u64> {
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, LIVE_PAGES)?;
+    let visible = pages.visible_child()?;
+    page_index_from_name(&visible, generation)
+}
+
+pub(super) fn restore_page_selection(holder: &gtk::Box, generation: u64, page_index: u64) {
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let Some(pages) = named::<gtk::Stack>(&root, &completed_page_stack_name(generation)) else {
+        return;
+    };
+    let Some(page) = pages.child_by_name(&page_widget_name(generation, page_index)) else {
+        return;
+    };
+    pages.set_visible_child(&page);
 }
 
 #[cfg(test)]
@@ -163,6 +191,15 @@ pub(super) fn install_page_loader(
             .visible_child()
             .and_then(|child| page_index_from_name(&child, generation)),
     ));
+    let initial_context = VisiblePageLoadContext {
+        generation,
+        identity,
+        resident_pages: &resident_pages,
+        spool: spool.as_ref(),
+        columns: &columns,
+        sender: &sender,
+    };
+    handle_visible_child_change(pages, &initial_context, &previous_index);
     pages.connect_visible_child_notify(move |pages| {
         let context = VisiblePageLoadContext {
             generation,
@@ -180,8 +217,8 @@ struct VisiblePageLoadContext<'a> {
     generation: u64,
     identity: super::StatementIdentity,
     resident_pages: &'a super::stream_pages::ResidentPageStore,
-    spool: Option<&'a tablepro_app_services::stream_result_spool::StreamResultSpool>,
-    columns: &'a [tablepro_core::ColumnInfo],
+    spool: Option<&'a bookie_app_services::stream_result_spool::StreamResultSpool>,
+    columns: &'a [bookie_core::ColumnInfo],
     sender: &'a relm4::ComponentSender<super::SqlEditor>,
 }
 

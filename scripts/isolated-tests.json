@@ -1,1403 +1,1548 @@
 {
   "app-server": [
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::clickhouse_enum_contract::value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::tests::postgres_numeric_csv::postgres_numeric_parser_outputs_round_trip_through_server"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::tests::postgres_temporal::postgres_extended_temporal_grid_edits_preserve_native_values"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_float4_array_grid_edit_preserves_extreme_values_and_sibling"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_integer_array_grid_edits_preserve_width_and_siblings"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_text_array_grid_edit_preserves_escaped_values_and_siblings"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::postgres_bit_array_grid::value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::postgres_citext_array_grid::value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
-      "ui::editor::pinned::tests::an_evicted_stream_page_stays_alive_while_pinned_and_releases_after_unpin"
+      "ui::editor::pinned::tests::a_pinned_spooled_page_reloads_without_retaining_its_payload"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::pinned::tests::evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::pinned::tests::closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::tests::value_contract_mongodb_date_grid_edit_preserves_millisecond_instant"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::tests::value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mongodb_nested_edit_contract::value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mysql_integer_contract::value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mssql_legacy_datetime_contract::value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mssql_datetimeoffset_contract::value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mssql_max_value_contract::value_contract_mssql_max_values_survive_connection_session_and_consumers"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mssql_server_owned_columns::value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::postgres_identity_csv_import::value_contract_postgres_csv_import_preserves_explicit_identity_values"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::mysql_spatial_contract::value_contract_mysql_spatial_grid_refusal_preserves_native_bytes"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::value_parse::tests::value_contract_mysql_bit_parser_edits_preserve_native_values"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::value_contract_mongodb_off_page_type_change_during_census_refuses_edit"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::value_contract_mongodb_browse_uses_a_bounded_sample_and_page_find"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "services::browse_query::tests::postgres_value_query_refetches_by_enum_and_domain_composite_key"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "services::browse_query::tests::mysql_value_query_refetches_the_exact_blob_for_a_composite_key"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "services::browse_query::tests::mssql_value_query_refetches_the_exact_blob_for_a_composite_key"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "services::browse_query::tests::clickhouse_value_query_refetches_the_exact_text_for_a_composite_key"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "services::browse_query::tests::mongodb_value::mongodb_guarded_refetch_preserves_long_text_and_binary_values"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "services::browse_query::tests::redis_value::redis_guarded_refetch_preserves_binary_key_and_value"
     ]
   ],
   "gtk": [
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::cell_editor::tests::editable_cell_defers_its_text_widget_until_editing"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::cell_editor::tests::focus_leave_commits_pending_preedit_text"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::cell_editor::tests::committed_preedit_is_not_appended_twice"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::diagram::dialog::lifetime_tests::the_zoom_refresh_tick_does_not_retain_its_dialog_owner"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::diagram::dialog::lifetime_tests::the_diagram_canvas_releases_its_controllers"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::diagram::dialog::lifetime_tests::diagram_selection_callbacks_do_not_retain_the_list_or_canvas"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::theme::tests::given_gruvbox_when_warning_text_is_styled_then_it_is_distinct_and_readable"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::workspace_overview::tests::the_tab_overview_hides_duplicate_window_close_controls"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::draft_mutation_routes_are_ignored_during_a_save"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::keyless_tab_rejects_inline_edits_and_insert_actions"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::keyless_tab_refuses_to_stage_deletion_of_a_persisted_row"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::generated_column_edit_and_null_messages_do_not_stage_mutations"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::undecodable_cell_edit_and_null_messages_do_not_stage_mutations"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selection"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_can_delete_a_selected_draft_without_deleting_stored_rows"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::the_cell_menu_sets_a_draft_cell_to_null_in_the_draft"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::the_row_menu_deletes_a_draft_row_by_discarding_it"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_refuses_a_mixed_draft_and_stored_row_delete_atomically"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_can_undo_and_redo_pending_local_draft"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::read_only_tab_can_discard_a_pending_local_draft"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::browse_page_fetch_waits_until_the_new_columns_are_applied"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::browse_next_page_is_disabled_when_known_total_matches_page_end"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::icons::tests::schema_filter_icon_exists_in_the_active_theme"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::explain_dialog::tests::explain_pages_have_available_icons_for_the_view_switcher"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::explain_dialog::tests::closing_the_explain_window_cancels_its_query"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::folding::tests::folding_hides_lines_without_changing_query_text_and_can_be_cleared"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::connect_dialog::entry_activation::tests::activating_a_nested_entry_row_invokes_submit"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::ssh_section::tests::the_agent_key_row_shows_only_for_agent_authentication_and_round_trips"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::editor::split_view::tests::split_editor_views_share_buffer_and_retain_text_across_toggles"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::filter_presets::tests::applying_two_saved_filters_switches_the_rules_in_the_browse_editor"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::row_inspector::tests::the_inspector_lists_a_row_and_returns_to_its_placeholder"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::statement_band::tests::moving_the_cursor_moves_the_band_between_statements"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::shortcuts::dialog_tests::the_shortcuts_window_lists_keys_and_describes_mouse_gestures"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::grid_close::tests::a_pending_grid_flush_matches_only_its_original_tab_page"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::workspace_tabs::bulk_close::tests::bulk_close_actions_dispatch_the_selected_page_id"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::context_menu::tests::view_value_resolves_pending_text_null_and_draft_values_from_the_cell"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column_visibility::tests::hiding_a_column_hides_it_persists_it_and_keeps_the_last_one"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::display::tests::typed_widget_slots_round_trip_and_keep_same_value_types_apart"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::value_viewer::tests::the_viewer_dialog_builds_and_shows_the_full_value"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::full_value_editor::tests::applying_empty_text_stages_empty_text_without_converting_it_to_null"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::full_value_editor::tests::invalid_json_stages_nothing_and_valid_apply_keeps_json_typed"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::full_value_editor::tests::set_null_stages_null_and_cancel_stages_nothing"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::find_bar::tests::find_selects_matches_and_replace_all_rewrites_every_occurrence"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column::tests::bind_does_not_open_binary_bytes_in_a_text_column_for_editing"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column::tests::boolean_affinity_mismatch_cannot_emit_an_edit"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column::tests::mysql_bit_one_grid_shows_numeric_values_and_emits_boolean_edits"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column::tests::recycled_cell_clears_pending_visual_state_and_resets_accessible_description"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column::tests::mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::choice_editor::tests::enum_picker_selects_the_current_row_for_keyboard_navigation"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column_jump::tests::stale_picker_cannot_target_a_replacement_grid"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::grid::font_zoom::tests::zooming_the_grid_font_rescales_fixed_column_widths_without_saving"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::grid::column::tests::entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column::tests::editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::context_menu::tests::copying_a_previewed_cell_copies_the_full_value"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::context_menu::tests::copy_value_keeps_keyless_previews_pending_edits_and_drafts_whole"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::export::tests::clipboard_csv_is_published_and_read_back_exactly"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::export::tests::clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::session_mode::tests::session_end_dialog_keeps_the_toggle_active_until_the_selected_action_finishes"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column_order::tests::a_saved_order_is_shown_and_a_new_drag_is_saved"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::local_sort_tests::local_sort_keeps_selection_attached_to_its_source_row"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::local_sort::tests::local_text_sort_follows_the_locale_collation_not_byte_order"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::local_filter::tests::sorting_a_truncated_result_without_a_filter_warns_that_only_loaded_rows_were_sorted"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::local_sort_tests::sorting_a_fully_selected_result_restores_the_selection_in_one_signal"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_an_unfiltered_result_keeps_the_existing_row_model"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_an_unfiltered_result_restores_the_entire_selection"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_an_unfiltered_result_restores_saved_selection_by_source_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_a_sorted_result_restores_selection_by_source_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_a_sorted_result_restores_all_source_rows_as_selected"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::attaching_a_filtered_result_restores_all_visible_selected_source_rows"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::grid::local_filter::tests::local_filter_and_sort_keep_selection_attached_to_the_source_row"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::clearing_a_filter_does_not_select_rows_that_were_hidden"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::local_filter::tests::sorting_a_fully_selected_result_keeps_all_source_rows_selected"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::grid::local_filter::tests::filtering_a_fully_selected_result_restores_the_selection_in_one_signal"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::schema::vim_tests::vim_keys_are_attached_only_when_enabled"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
-      "ui::editor::outcomes::tests::export_partial_view::exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values"
+      "ui::editor::outcomes::tests::export_partial_view::an_incomplete_stream_does_not_offer_full_result_export"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::editor::outcomes::tests::export_partial_view::a_completed_stream_offers_its_saved_result_for_export"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::loading_a_page_preserves_the_selected_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::evicting_a_page_preserves_selection"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::result_grid_uses_the_paged_model_for_its_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::result_grid_reports_rows_when_realized_and_released"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::realized_grid_rows_load_their_spooled_values"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::failed_spool_read_shows_status_and_retry_loads_the_page"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::continuous::tests::continuous_view_loads_and_displays_spooled_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::source_lookup_supports_alternate_models_and_refuses_unloaded_cells"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::copying_a_column_refuses_unloaded_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::virtual_grid_disables_snapshot_export"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::editor::streaming::tests::a_stream_waits_with_a_loading_status_page"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::live_progress_lookup_does_not_walk_result_pages"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::live_eviction_visits_only_pages_evicted_since_the_previous_update"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::run_marks::tests::each_statement_gets_a_gutter_mark_for_its_outcome"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::sidebar_row::tests::a_group_row_shows_a_chevron_that_follows_its_collapse_state"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::sidebar_row::lazy_context_menu_tests::a_table_context_menu_is_created_on_demand_and_resolves_row_actions"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::structure_tab::columns::tests::a_structure_expander_arrow_matches_its_expansion_state"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab::columns::tests::column_comment_editor_enabled_state_follows_typed_capability"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab::tests::sql_preview_is_read_only_without_a_visible_cursor"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab::metadata::tests::metadata_notice_explains_that_reads_are_unavailable"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::export_dialog::tests::a_full_export_shows_a_refusal_without_opening_its_source"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::import_dialog::tests::finishing_an_import_force_closes_the_non_user_closable_progress_dialog"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::tests::csv_preparation_progress_changes_from_spinner_to_row_count"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::app::organization::tests::changing_a_connection_colour_updates_the_retained_tab_bar"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::filter_strip::tests::an_externally_applied_rule_expands_the_rule_editor"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::proposals_activate_complete_quoted_references"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::proposals_preserve_aliases_and_replace_only_the_identifier"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::dropping_one_editor_completion_view_keeps_shared_columns_for_another"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::retired_proposals_do_not_edit_the_buffer"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::a_close_flush_waits_until_queued_edits_enter_the_tracker"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::a_close_flush_reports_a_refused_queued_edit_without_staging_it"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
-      "ui::grid::close_edits::tests::finishing_an_inline_edit_keeps_its_field_parented_and_commits_once"
+      "ui::grid::close_edits::tests::finishing_an_inline_edit_restores_its_label_and_commits_once"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::close_edits::tests::an_active_preedit_is_refused_without_hiding_or_replacing_the_edit"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::close_edits::tests::a_visible_editor_popover_is_refused_without_hiding_or_replacing_the_edit"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::run_lifecycle::tests::previous_results_are_dimmed_while_a_run_is_in_flight_and_cleared_with_their_replacement"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::environment_marker::tests::the_badge_and_header_tint_follow_the_connection_environment"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_inputs_cannot_dispatch_or_cancel_an_active_query"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_dispatch_resumes_after_success_cancel_and_timeout"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column_width_tests::saved_grid_width_stays_fixed_when_the_window_grows"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column_width_tests::resized_grid_width_stays_fixed_when_the_window_grows"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column_width_tests::unsaved_result_grid_width_stays_fixed_when_the_window_grows"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::split_view::tests::opening_an_editor_moves_focus_out_of_sidebar_search"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::a_dropped_result_grid_releases_its_page"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::a_rendered_result_grid_with_menus_releases_its_page"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::a_rendered_editable_grid_releases_its_page"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::repeated_result_grid_replacement_releases_every_retired_page"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::a_menu_context_does_not_keep_a_removed_cell_alive"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::outcomes::lifetime_tests::streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::pager::tests::pager_navigates_retained_pages_and_status_without_retaining_its_pages"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::sql_text::tests::advisory_text_is_bounded_by_utf8_bytes_without_truncating_the_buffer"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::session_teardown::tests::a_window_close_whose_sessions_cannot_close_offers_to_close_anyway"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::hidden_stream_pages_build_their_grid_only_when_selected"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::a_terminal_status_keeps_retained_grids_unbuilt_until_selected"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::large_catalog_materializes_only_requested_completion_proposals"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::proposals_first_requested_after_catalog_retirement_do_not_edit_the_buffer"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::a_foreign_key_that_arrives_after_the_rows_marks_its_header"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_edit"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::undoing_a_second_edit_keeps_the_persisted_original_for_later_edits_and_the_saved_update"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_actions_fit_narrow_rows_with_running_and_retry_controls"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::toolbar_operability_tests::narrow_editor_run_and_cancel_buttons_dispatch_inside_their_layout"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::dropping_an_editor_releases_its_source_view_and_buffer"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::closing_an_editor_releases_its_large_buffer_even_when_its_views_are_retained"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::closing_a_vim_editor_releases_both_views_and_its_buffer"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::a_stream_page_retired_before_a_frame_does_not_build_a_grid"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::a_loaded_page_replaces_only_its_matching_generation_placeholder"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::a_retired_grid_does_not_retain_its_inspector_through_selection_callback"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::editor_waits_for_its_session_before_accepting_any_run_input"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::commenting_selected_lines_publishes_one_complete_query_change"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::query_publication_waits_for_nested_actions_and_keeps_ordinary_edits_immediate"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::error_view_tests::a_failure_without_a_receipt_does_not_offer_audit_navigation"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::error_view_tests::a_failure_action_targets_its_exact_audit_operation"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::error_view_tests::a_refused_statement_keeps_its_recorded_audit_action"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::run_scope_menu_executes_the_current_statement_and_blocks_overlap"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::transaction_buttons_close_only_the_idle_owned_session"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::closing_an_idle_session_clears_its_status"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::a_transaction_action_refuses_a_changed_connection_identity"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::export_dialog::scope_presentation_tests::export_describes_the_row_scope_before_the_format"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::export_dialog::scope::tests::table_scope_cannot_enable_unqualified_snapshot_export"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::sidebar_row::columns_affordance_tests::a_table_has_a_separate_keyboard_reachable_columns_expander"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::sidebar_columns::tests::a_stale_column_reply_cannot_replace_newer_fields_or_retain_its_budget"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::sidebar_layout::tests::the_sidebar_resizes_when_docked_and_keeps_the_narrow_overlay"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::sidebar_state::explicit_reveal_tests::an_explicit_reveal_opens_the_sidebar_in_a_narrow_window"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::sidebar_layout::allocated_tests::an_allocated_divider_preserves_workspace_space_and_moves_through_the_breakpoint"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::sidebar_columns::structure_action_tests::the_structure_shortcut_activates_the_owning_row_action"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::the_results_panel_can_be_hidden_without_releasing_or_rerunning_its_result"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::maximizing_and_hiding_restore_the_split_editor_and_divider"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_error_view_retains_results_and_clears_failures_after_success"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::hiding_results_falls_back_when_the_remembered_sql_split_was_closed"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::a_server_error_navigates_to_its_original_unicode_statement"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::run_current_locates_the_second_identical_statement_and_restores_the_editor"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::editing_the_query_disables_an_existing_error_navigation_action"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::a_new_run_disables_the_previous_error_navigation_action"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::closing_the_connection_disables_its_error_navigation_action"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::error_navigation_does_not_mistake_a_comment_for_the_executed_statement"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::sidebar_state::tests::the_sidebar_stays_closed_in_a_narrow_window_and_never_opens_empty"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::column_visibility::tests::resetting_widths_forgets_the_saved_widths_and_frees_the_columns"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::catalog_dialog::tests::choosing_a_longer_kind_does_not_change_the_dropdown_width"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::populated_completion_is_presented_after_the_editor_is_rooted"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::sql_text::tests::run_uses_the_selection_when_there_is_one_and_the_whole_buffer_otherwise"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::connection_row::tests::connection_actions_leave_room_for_text_in_a_narrow_row"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::connection_row::tests::connection_menu_dispatches_actions_for_its_own_record"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::mcp_preferences::copy_tests::the_copy_button_puts_the_token_on_the_clipboard_and_keeps_the_dialog_open"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::grid_render::selection_stats_tests::wide_selection_statistics_preserve_rows_and_selection"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::a_selected_query_error_keeps_its_original_unicode_offset"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::tests::a_closed_browse_tab_releases_its_root_widget"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::filter_support_tests::a_filter_is_ignored_when_the_driver_cannot_filter_a_browse"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::filter_support_tests::a_saved_filter_is_not_restored_when_the_driver_cannot_filter_a_browse"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "tests::startup_reaches_the_application_loop_with_supported_toolkits"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::dialog_focus::tests::closing_a_search_restores_navigation_only_to_a_mapped_grid"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::dialog_focus::tests::a_search_dialog_does_not_keep_the_grid_alive"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::dialog_focus::tests::virtualized_rows_keep_the_focused_cells_identity_when_revealed"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::chrome_tests::a_row_count_queued_before_refresh_is_not_shown"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::chrome_tests::page_size_changes_apply_after_a_failed_first_load"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::chrome_tests::read_only_selection_does_not_offer_delete"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::chrome_tests::load_error_page_retries_the_fetch"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::chrome_tests::paginator_controls_have_accessible_names"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::chrome_tests::an_edit_for_a_saved_row_does_not_land_on_a_draft_inserted_at_its_position"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::grid::editing::tests::editable_cells_share_primary_gesture_without_losing_double_click_editing"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::grid::editing::tests::readonly_multiline_cells_keep_compact_height_and_exact_text"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::column_refresh_coalesces_a_burst_of_editor_changes"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::connect_dialog::controls::tests::choice_rows_expose_an_activation_target"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::connect_dialog::controls::tests::choice_rows_show_only_the_current_selection"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::connect_dialog::controls::tests::dropping_a_choice_row_releases_its_popup"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::connect_dialog::controls::tests::port_input_reserves_room_for_a_five_digit_port"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::confirmed_session_rollbacks_retire_gutter_marks_and_stale_callbacks_do_not"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::large_completion_models_release_cached_proposals_when_discarded"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::completion_provider::tests::discarding_metadata_refresh_cancels_work_and_releases_its_callback"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::alternating_editable_and_readonly_grids_release_every_retired_page"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::editing::cell_lifetime_tests::every_grid_edit_popover_releases_its_cell_and_widget"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::split_view::tests::dropped_sql_rejection_preserves_text_cursor_and_accepted_drop_undo"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::import_dialog::lifetime_tests::import_format_controls_release_their_source_bytes"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab::lifetime_tests::closing_a_structure_tab_releases_its_generated_views"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab_dialogs::lifetime_tests::dismissing_index_setup_releases_its_dialog"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::import_dialog::lifetime_tests::dismissing_import_setup_releases_its_callback"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab_dialogs::lifetime_tests::dismissing_foreign_key_setup_releases_its_dialog"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab_dialogs::lifetime_tests::submitting_index_setup_updates_preview_and_releases_its_dialog"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab_dialogs::lifetime_tests::submitting_foreign_key_setup_updates_preview_and_releases_its_dialog"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::export_dialog::lifetime_tests::dismissing_export_setup_releases_its_dialog"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::editing::lifetime_tests::closed_edit_popovers_release_their_widgets"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::history_dialog::lifetime_tests::refreshing_history_releases_removed_rows"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::history_dialog::lifetime_tests::closing_history_releases_its_rows_and_popovers"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::history_dialog::lifetime_tests::history_filter_popover_stays_inside_narrow_windows"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--test=cli_info",
       "information_flags_exit_without_display_or_profile_access"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::browse_tab::preview::tests::the_preview_is_read_only_and_shows_no_blinking_caret"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::row_inspector::tests::markup_like_values_and_names_are_shown_as_typed"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::app::init_workspace::tests::saved_connections_popover_stays_inside_narrow_windows"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::structure_tab::columns::tests::a_comment_row_is_shown_only_for_engines_that_can_store_one"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::progress_dialog::tests::progress_dialog_displays_and_names_its_operation"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
+      "--lib",
+      "ui::row_inspector::tests::long_values_wrap_without_display_only_hyphens"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "ui::diagram::canvas::tests::a_diagram_is_laid_out_with_one_card_per_table_and_fits_the_view"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::diagram::canvas::tests::clicking_a_card_selects_it_and_clicking_empty_space_clears_the_selection"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::diagram::canvas::tests::zoom_steps_stay_within_the_limits_and_fit_restores_the_whole_diagram"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::diagram::canvas::tests::every_way_of_zooming_reports_the_new_level"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::diagram::card_text::tests::a_card_is_as_tall_as_its_rows_and_as_wide_as_its_longest_line"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::diagram::card_text::tests::a_very_long_name_is_cut_short"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_result_switcher_groups_results_and_errors_in_one_linked_strip"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_results_button_shows_results_after_hiding_errors"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_switcher_shows_the_error_count_only_when_there_are_errors_and_marks_the_active_view"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_editor_toolbar_is_one_wrapping_bar_with_folding_in_a_menu"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::filter_strip::tests::the_where_field_apply_and_clear_share_one_row"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::filter_strip::tests::saved_filter_controls_live_in_one_menu_on_the_where_row"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::the_page_being_read_is_not_evicted_while_the_stream_keeps_loading"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::a_timed_out_stream_keeps_its_last_data_page_and_shows_a_notice"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::sidebar_row::catalog_entry_tests::a_catalog_entry_is_a_leaf_row_without_a_chevron_and_with_an_icon"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::grid::choice_editor::tests::the_choice_popover_is_as_wide_as_its_widest_content"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::running_a_query_dismisses_the_visible_completion_popup"
     ],
     [
-      "tablepro-app",
+      "bookie-app",
       "--lib",
       "ui::history_dialog::export_tests::a_failed_history_export_shows_a_dismissible_error"
     ]
   ],
   "keyring": [
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "secrets::tests::round_trip_via_secret_service"
     ],
     [
-      "tablepro-transport",
+      "bookie-storage",
+      "--lib",
+      "secrets::tests::a_credential_saved_under_the_legacy_schema_is_found_copied_forward_and_deleted_with_it"
+    ],
+    [
+      "bookie-transport",
       "--lib",
       "tests::hop_zero_password_auth_still_works"
     ],
     [
-      "tablepro-transport",
+      "bookie-transport",
       "--lib",
       "tests::password_auth_uses_the_secret_bound_to_each_hop"
     ],
     [
-      "tablepro-transport",
+      "bookie-transport",
       "--lib",
       "tests::legacy_jump_key_passphrase_is_refused_before_keyring_access"
     ],
     [
-      "tablepro-transport",
+      "bookie-transport",
       "--lib",
       "tests::ssh_passphrase_tests::private_key_passphrases_use_the_secret_bound_to_each_hop"
     ],
     [
-      "tablepro-transport",
+      "bookie-transport",
       "--lib",
       "tests::ssh_passphrase_tests::a_missing_jump_key_passphrase_does_not_receive_the_root_secret"
     ],
     [
-      "tablepro-agentd",
+      "bookie-agentd",
       "saved_transport",
       "a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly"
     ],
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "connection_bundle::tests::an_export_collects_every_credential_kind_for_a_connection"
     ],
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "connection_bundle::tests::a_connection_with_no_stored_credentials_contributes_nothing_to_a_bundle"
     ],
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "connection_bundle::tests::an_import_keeps_the_local_password_until_replacement_is_asked_for"
     ],
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "connection_bundle::tests::rolling_back_an_import_removes_only_the_credentials_it_wrote"
     ],
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "connection_bundle::tests::an_export_collects_each_versioned_ssh_hop_secret"
     ],
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "connection_bundle::tests::rolling_back_a_bundle_import_removes_its_per_hop_credentials"
     ],
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "connection_bundle::tests::importing_a_bundle_keeps_existing_hop_credentials_until_replacement_is_asked_for"
     ]
   ],
   "keyring-fresh": [
     [
-      "tablepro-storage",
+      "bookie-storage",
       "--lib",
       "secrets::tests::reading_a_missing_password_does_not_create_a_keyring"
     ]

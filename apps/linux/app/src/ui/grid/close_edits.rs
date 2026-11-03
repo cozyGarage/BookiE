@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires isolated GTK display"]
-    fn finishing_an_inline_edit_keeps_its_field_parented_and_commits_once() {
+    fn finishing_an_inline_edit_restores_its_label_and_commits_once() {
         let (window, editor) = editor_window();
         let finished = Rc::new(Cell::new(0));
         let seen = finished.clone();
@@ -66,7 +66,19 @@ mod tests {
         assert!(finish_active_edits(&window));
         assert!(!editor.is_editing());
         assert_eq!(editor.text().as_str(), "after");
-        assert!(editor.entry().parent().is_some());
+        assert!(
+            editor
+                .entry()
+                .parent()
+                .is_some_and(|parent| parent == editor.clone().upcast::<gtk4::Widget>())
+        );
+        assert!(
+            editor
+                .first_child()
+                .is_some_and(|label| label.is::<gtk4::Label>() && label.is_visible())
+        );
+        assert!(!editor.entry().property::<bool>("visible"));
+        assert!(!editor.entry().should_layout());
         assert!(finish_active_edits(&window));
         assert_eq!(finished.get(), 1);
         window.close();

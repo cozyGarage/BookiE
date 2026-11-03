@@ -1,7 +1,8 @@
 use relm4::adw;
+use relm4::adw::prelude::{ActionRowExt, PreferencesRowExt};
 use relm4::gtk::{self, prelude::*};
 
-use tablepro_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, Value};
 
 use super::grid::value_to_display_text;
 
@@ -169,18 +170,38 @@ fn show_row(list: &gtk::ListBox, stack: &gtk::Stack, fields: Option<Vec<Inspecto
 }
 
 fn field_row(field: &InspectorField) -> adw::ActionRow {
-    let row = adw::ActionRow::builder()
-        .title(format!("{} \u{b7} {}", field.name, field.data_type))
-        .subtitle(&field.text)
-        .subtitle_lines(0)
-        .subtitle_selectable(true)
-        .use_markup(false)
-        .build();
+    let row = adw::ActionRow::new();
+    row.set_use_markup(false);
+    row.set_title(&format!("{} \u{b7} {}", field.name, field.data_type));
+    row.set_subtitle(&field.text);
+    row.set_subtitle_lines(0);
+    row.set_subtitle_selectable(true);
     row.add_css_class("property");
     if field.is_null {
         row.add_css_class("dim-label");
     }
+    if let Some(label) = value_label(row.upcast_ref::<gtk::Widget>(), &field.text) {
+        let attributes = relm4::gtk::pango::AttrList::new();
+        attributes.insert(relm4::gtk::pango::AttrInt::new_insert_hyphens(false));
+        label.set_attributes(Some(&attributes));
+    }
     row
+}
+
+fn value_label(widget: &gtk::Widget, text: &str) -> Option<gtk::Label> {
+    let mut child = widget.first_child();
+    while let Some(current) = child {
+        if let Some(label) = current.downcast_ref::<gtk::Label>()
+            && label.label() == text
+        {
+            return Some(label.clone());
+        }
+        if let Some(found) = value_label(&current, text) {
+            return Some(found);
+        }
+        child = current.next_sibling();
+    }
+    None
 }
 
 #[cfg(test)]
@@ -311,5 +332,29 @@ mod tests {
         assert!(!row.uses_markup());
         assert_eq!(row.subtitle().as_deref(), Some("<undecodable DATE>"));
         assert!(row.title().contains("a<b&c"));
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn long_values_wrap_without_display_only_hyphens() {
+        use relm4::adw::prelude::*;
+        relm4::adw::init().unwrap();
+        let columns = [column("body", "text")];
+        let fields = inspector_fields(&columns, &[Value::Text("y".repeat(9000))]);
+
+        let row = field_row(&fields[0]);
+
+        let label = value_label(row.upcast_ref::<gtk::Widget>(), &fields[0].text).expect("subtitle label");
+        let hyphens = label
+            .attributes()
+            .and_then(|attributes| {
+                attributes
+                    .attributes()
+                    .into_iter()
+                    .find(|attribute| attribute.type_() == relm4::gtk::pango::AttrType::InsertHyphens)
+            })
+            .and_then(|attribute| attribute.downcast::<relm4::gtk::pango::AttrInt>().ok())
+            .map(|attribute| attribute.value());
+        assert_eq!(hyphens, Some(0));
     }
 }

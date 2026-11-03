@@ -168,7 +168,7 @@ fn closing_the_connection_disables_its_error_navigation_action() {
             driver: Arc::new(drivers_sqlite::SqliteDriver),
             opts: ConnectOptions::default(),
             ssh: None,
-            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse),
+            environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse),
         },
     ));
     drop(entered);

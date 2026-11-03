@@ -105,10 +105,10 @@ async fn mysql_transaction_queries_are_bounded_and_mark_truncation() {
     transaction.rollback().await.unwrap();
 
     assert!(!result.rows.is_empty());
-    assert_eq!(result.rows.len(), tablepro_core::MAX_QUERY_ROWS);
+    assert_eq!(result.rows.len(), bookie_core::MAX_QUERY_ROWS);
     assert!(result.truncated);
     assert_eq!(result.columns[0].name, "value");
-    assert!(result.rows.iter().all(|row| row == &[Value::Int(7)]));
+    assert!(result.rows.iter().all(|row| row == [Value::Int(7)]));
 }
 
 #[tokio::test]
@@ -130,7 +130,7 @@ async fn mysql_transaction_queries_obey_result_byte_budget_and_remain_usable() {
     assert!(result.truncated, "omitted rows must be reported");
     assert!(!result.rows.is_empty());
     assert!(result.rows.len() < 20);
-    assert!(result.rows.len() * payload_len <= tablepro_core::MAX_QUERY_RESULT_BYTES);
+    assert!(result.rows.len() * payload_len <= bookie_core::MAX_QUERY_RESULT_BYTES);
     assert!(result.rows.iter().all(|row| {
         matches!(row.first(), Some(Value::Text(value)) if value.len() == payload_len && value == &payload)
     }));
@@ -1153,7 +1153,7 @@ async fn a_lost_connection_during_a_batch_reports_rollback_failure() {
         .execute("INSERT INTO rollback_loss VALUES (1)")
         .await
         .unwrap();
-    let tag = "tablepro_mysql_batch_rollback_loss";
+    let tag = "bookie_mysql_batch_rollback_loss";
     let running = connection.clone();
     let task = tokio::spawn(async move {
         running

@@ -1,12 +1,12 @@
 use super::*;
-use std::time::Duration;
-use tablepro_core::import::CsvImportOptions;
-use tablepro_core::sql_ddl::DraftColumn;
-use tablepro_core::{ConnectOptions, DatabaseDriver, Environment, Value};
-use tablepro_policy::{
+use bookie_core::import::CsvImportOptions;
+use bookie_core::sql_ddl::DraftColumn;
+use bookie_core::{ConnectOptions, DatabaseDriver, Environment, Value};
+use bookie_policy::{
     AuditError, AuditEvent, AuditSink, AuditState, AutoApproveSink, BulkBatch, BulkInsertEnd, BulkInsertRequest,
     GuardContext, PolicyConfig, Principal,
 };
+use std::time::Duration;
 use uuid::Uuid;
 
 struct TestAudit;
@@ -40,7 +40,7 @@ fn choice(create: Option<Vec<DraftColumn>>) -> ImportChoice {
         options: CsvImportOptions::default(),
         mapping: Vec::new(),
         columns: Vec::new(),
-        capabilities: tablepro_core::DriverCapabilities::default(),
+        capabilities: bookie_core::DriverCapabilities::default(),
         create,
     }
 }
@@ -82,9 +82,9 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
     let bytes = b"id,name\n51,Ada\n52,Grace\n".to_vec();
     let options = CsvImportOptions::default();
     let sheet = read_csv(&bytes, &options, None).expect("read CSV");
-    let capabilities = tablepro_core::DriverCapabilities {
+    let capabilities = bookie_core::DriverCapabilities {
         supports_explicit_auto_increment_values: true,
-        ..tablepro_core::DriverCapabilities::default()
+        ..bookie_core::DriverCapabilities::default()
     };
     let mapping = crate::ui::import_dialog::suggested_existing_mapping(capabilities, &sheet.headers, &columns);
     assert_eq!(mapping, [Some(0), Some(1)]);
@@ -98,7 +98,8 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
         capabilities,
         create: None,
     };
-    let plan = plan_for("sqlite", &choice).expect("build import plan");
+    let prepared = prepare_csv_plan(Uuid::new_v4(), "sqlite".into(), choice.clone()).await;
+    let (plan, _) = prepared.result.expect("build import plan");
     assert_eq!(
         plan.columns
             .iter()
@@ -144,7 +145,7 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
         .expect("verify imported rows");
     assert_eq!(
         result.rows,
-        [
+        vec![
             vec![Value::Int(51), Value::Text("Ada".into())],
             vec![Value::Int(52), Value::Text("Grace".into())]
         ]

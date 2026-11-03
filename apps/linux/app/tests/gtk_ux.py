@@ -31,7 +31,7 @@ ATSPI_WINDOW_Y_OFFSET = gtk_input.window_y_offset()
 
 
 def capture_grid_navigation_artifact(name):
-    folder = os.environ.get("TABLEPRO_GTK_ARTIFACT_DIR")
+    folder = os.environ.get("BOOKIE_GTK_ARTIFACT_DIR")
     scrot, imagemagick = shutil.which("scrot"), shutil.which("import")
     if folder is None or os.environ.get("GDK_BACKEND") != "x11" or not (scrot or imagemagick):
         return
@@ -231,7 +231,7 @@ def scenarios(ui):
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
-        choose_menu_item(11)
+        choose_menu_item(12)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switch = next(
@@ -246,6 +246,7 @@ def scenarios(ui):
 
     def choose_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
+        items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
 
         def focused_item():
             items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
@@ -256,7 +257,6 @@ def scenarios(ui):
 
         start = focused_item()
         if position == "last":
-            items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
             assert items, "the menu has no items"
             target = len(items) - 1
         else:
@@ -289,7 +289,8 @@ def scenarios(ui):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
         assert len(items) >= 12, f"grid menu exposed only {len(items)} actionable items"
-        actions = items[11].queryAction()
+        columns = items[12]
+        actions = columns.queryAction()
         click_action = next(
             index for index in range(actions.nActions) if actions.getName(index) == "click"
         )
@@ -312,7 +313,7 @@ def scenarios(ui):
         ):
             wait_for_focused_grid_row(ui, pyatspi, expected)
             ui.press_x11_key(key, modifiers)
-            choose_menu_item(4)
+            choose_menu_item(5)
             wait_for_adw_dialog("payload")
             deadline = time.monotonic() + ui.WAIT_SECONDS
             while time.monotonic() < deadline:
@@ -339,7 +340,7 @@ def scenarios(ui):
         ui.wait_for_node(name="Search columns", present=False)
         wait_for_focused_grid_row(ui, pyatspi, "pointer-first")
         open_cell_menu("pointer-second")
-        choose_menu_item(4)
+        choose_menu_item(5)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -900,9 +901,9 @@ GLib.MainLoop().run()
         assert count == expected_rows
 
     def profile_streamed_pin_retention(database, base):
-        rows = int(os.environ.get("TABLEPRO_PROFILE_STREAM_ROWS", "34000"))
-        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_STREAM_CELL_BYTES", "2048"))
-        repetitions = int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1"))
+        rows = int(os.environ.get("BOOKIE_PROFILE_STREAM_ROWS", "34000"))
+        payload_bytes = int(os.environ.get("BOOKIE_PROFILE_STREAM_CELL_BYTES", "2048"))
+        repetitions = int(os.environ.get("BOOKIE_PROFILE_REPETITION", "1"))
         if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
             raise ValueError("stream profile rows or payload size are outside their bounded workload")
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
@@ -926,9 +927,9 @@ GLib.MainLoop().run()
             ui.set_editor_text(query)
             ui.invoke(ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node(name=marker, role=pyatspi.ROLE_LABEL, timeout=180)
-            ui.wait_for_node_containing(f"Received {result_rows} rows", timeout=180)
+            ui.wait_for_node_containing(f"Received {result_rows:,} rows", timeout=180)
             elapsed_seconds = round(time.monotonic() - started, 2)
-            ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.invoke(ui.wait_for_sensitive_node("Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
             sample = {"stage": f"after_streamed_editor_{index + 1}", **app_memory_profile_kb()}
             samples.append(sample)
@@ -953,7 +954,7 @@ GLib.MainLoop().run()
         time.sleep(3)
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
         teardown_samples.append({"stage": "after_all_editors_closed_idle_3s", **app_memory_profile_kb()})
-        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a", encoding="utf-8") as out:
+        with open(os.environ["BOOKIE_PROFILE_OUT"], "a", encoding="utf-8") as out:
             out.write(json.dumps({
                 **ui.owned_application().identity(),
                 "profile_mode": "postgres-stream-pin-retention-across-editors",
@@ -969,9 +970,9 @@ GLib.MainLoop().run()
             }) + "\n")
 
     def profile_streamed_result_export(database, base):
-        rows = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_ROWS", "39999"))
-        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_CELL_BYTES", "2048"))
-        repetition = int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1"))
+        rows = int(os.environ.get("BOOKIE_PROFILE_EXPORT_ROWS", "39999"))
+        payload_bytes = int(os.environ.get("BOOKIE_PROFILE_EXPORT_CELL_BYTES", "2048"))
+        repetition = int(os.environ.get("BOOKIE_PROFILE_REPETITION", "1"))
         if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
             raise ValueError("stream export profile rows or payload size are outside their bounded workload")
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
@@ -986,7 +987,7 @@ GLib.MainLoop().run()
             f"SELECT value AS id, {columns}, repeat('x', {payload_bytes}) AS payload "
             f"FROM generate_series(1, {rows}) AS value"
         )
-        ui.wait_for_node_containing(f"Received {rows} rows", timeout=180)
+        ui.wait_for_node_containing(f"Received {rows:,} rows", timeout=180)
         query_seconds = round(time.monotonic() - query_started, 2)
         ui.invoke(ui.wait_for_node(name="Export all rows…", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Export Results", role=pyatspi.ROLE_DIALOG)
@@ -1006,7 +1007,7 @@ GLib.MainLoop().run()
         after = app_memory_profile_kb()
         cpu_seconds = round(app_cpu_seconds() - cpu_before, 3)
         verify_profile_csv(path, rows, payload_bytes)
-        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a", encoding="utf-8") as out:
+        with open(os.environ["BOOKIE_PROFILE_OUT"], "a", encoding="utf-8") as out:
             out.write(json.dumps({
                 **ui.owned_application().identity(),
                 "profile_mode": "postgres-streamed-result-csv-export",
@@ -1056,7 +1057,7 @@ GLib.MainLoop().run()
             f"large table page did not retain the expected payload: delta={actual_delta_mb:.1f} MB, "
             f"minimum={minimum_delta_mb:.1f} MB"
         )
-        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+        with open(os.environ["BOOKIE_PROFILE_OUT"], "a") as out:
             out.write(json.dumps({
                 **ui.owned_application().identity(),
                 "profile_mode": "table-browse",
@@ -1071,9 +1072,9 @@ GLib.MainLoop().run()
             }) + "\n")
 
     def profile_large_result_export_dialog(database, base):
-        rows = int(os.environ["TABLEPRO_PROFILE_EXPORT_ROWS"])
-        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_EXPORT_CELL_BYTES", "2048"))
-        text_mode = os.environ.get("TABLEPRO_PROFILE_EXPORT_TEXT_MODE", "unique")
+        rows = int(os.environ["BOOKIE_PROFILE_EXPORT_ROWS"])
+        payload_bytes = int(os.environ.get("BOOKIE_PROFILE_EXPORT_CELL_BYTES", "2048"))
+        text_mode = os.environ.get("BOOKIE_PROFILE_EXPORT_TEXT_MODE", "unique")
         if rows < 1 or not 1 <= payload_bytes <= 8192:
             raise ValueError("export profile rows or cell payload size are outside their supported bounds")
         if rows * payload_bytes > 256 * 1024 * 1024:
@@ -1130,11 +1131,11 @@ GLib.MainLoop().run()
         export_cpu_seconds = ui.owned_application().cpu_seconds() - export_cpu_started
         marker_text = marker_field.queryText().getText(0, marker_field.queryText().characterCount)
         after_resident, peak = app_memory_kb()
-        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+        with open(os.environ["BOOKIE_PROFILE_OUT"], "a") as out:
             out.write(json.dumps({
                 **ui.owned_application().identity(),
-                "source_revision": os.environ.get("TABLEPRO_PROFILE_SOURCE_REVISION", "unknown"),
-                "binary_sha256": os.environ.get("TABLEPRO_PROFILE_BINARY_SHA256", "unknown"),
+                "source_revision": os.environ.get("BOOKIE_PROFILE_SOURCE_REVISION", "unknown"),
+                "binary_sha256": os.environ.get("BOOKIE_PROFILE_BINARY_SHA256", "unknown"),
                 "profile_mode": "loaded-result-export-dialog",
                 "rows_requested": rows,
                 "cell_payload_bytes": payload_bytes,
@@ -1154,12 +1155,81 @@ GLib.MainLoop().run()
                 "peak_mb": round(peak / 1024, 1),
             }) + "\n")
 
+    def profile_wide_table_browse(database, _base):
+        import sqlite3
+        rows = int(os.environ["BOOKIE_PROFILE_ROWS"])
+        columns = int(os.environ["BOOKIE_PROFILE_COLUMNS"])
+        key_bytes = int(os.environ.get("BOOKIE_PROFILE_KEY_BYTES", "0"))
+        if not 1 <= rows <= 100_000 or not 3 <= columns <= 512:
+            raise ValueError("profile row or column count is outside its supported bounds")
+        if not 0 <= key_bytes <= 8192:
+            raise ValueError("profile primary-key size is outside its supported bounds")
+        column_names = ["id", "marker"] + [f"value_{index:03d}" for index in range(columns - 2)]
+        key_type = "TEXT" if key_bytes else "INTEGER"
+        definitions = [f"id {key_type} PRIMARY KEY", "marker TEXT NOT NULL"]
+        definitions.extend(f'"{name}" INTEGER NOT NULL' for name in column_names[2:])
+        placeholders = ",".join("?" for _ in column_names)
+        with sqlite3.connect(database) as connection:
+            connection.execute(f'CREATE TABLE profile_wide ({", ".join(definitions)})')
+            connection.executemany(
+                f'INSERT INTO profile_wide ({", ".join(column_names)}) VALUES ({placeholders})',
+                (
+                    (
+                        f"row-{row:06d}".ljust(key_bytes, "x") if key_bytes else row,
+                        f"row-{row:06d}",
+                        *(row * columns + index for index in range(columns - 2)),
+                    )
+                    for row in range(1, rows + 1)
+                ),
+            )
+        ui.invoke(ui.wait_for_node(name="Refresh tables", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="profile_wide", timeout=120)
+        before_rss, _ = app_memory_kb()
+        started = time.monotonic()
+        ui.invoke_named_action_within("profile_wide", "Open profile_wide")
+        open_action_seconds = time.monotonic() - started
+        observation_seconds = int(os.environ.get("BOOKIE_PROFILE_OBSERVATION_SECONDS", "15"))
+        time.sleep(observation_seconds)
+        screenshot = os.environ.get("BOOKIE_PROFILE_SCREENSHOT")
+        if screenshot:
+            import subprocess
+            subprocess.run(["import", "-window", "root", screenshot], check=True)
+        after_rss, peak = app_memory_kb()
+        with open(os.environ["BOOKIE_PROFILE_OUT"], "a") as out:
+            out.write(json.dumps({
+                **ui.owned_application().identity(),
+                "profile_mode": "wide-table-browse",
+                "rows_requested": rows,
+                "columns_requested": columns,
+                "primary_key_bytes": key_bytes,
+                "open_action_seconds": round(open_action_seconds, 3),
+                "observation_seconds_without_accessibility_scan": observation_seconds,
+                "rss_before_mb": round(before_rss / 1024, 1),
+                "rss_after_mb": round(after_rss / 1024, 1),
+                "rss_delta_mb": round((after_rss - before_rss) / 1024, 1),
+                "peak_mb": round(peak / 1024, 1),
+            }) + "\n")
+        if os.environ.get("BOOKIE_PROFILE_SCAN_ROW_A11Y") == "1":
+            scan_started = time.monotonic()
+            ui.wait_for_node(name="row-000001", role=pyatspi.ROLE_LABEL, timeout=120)
+            scanned_rss, scanned_peak = app_memory_kb()
+            with open(os.environ["BOOKIE_PROFILE_OUT"], "a") as out:
+                out.write(json.dumps({
+                    **ui.owned_application().identity(),
+                    "profile_mode": "wide-table-accessibility-scan",
+                    "scan_seconds": round(time.monotonic() - scan_started, 3),
+                    "rss_before_mb": round(after_rss / 1024, 1),
+                    "rss_after_mb": round(scanned_rss / 1024, 1),
+                    "rss_delta_mb": round((scanned_rss - after_rss) / 1024, 1),
+                    "peak_mb": round(scanned_peak / 1024, 1),
+                }) + "\n")
+
     def profile_large_result_in_the_grid(database, base):
-        rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
-        payload_bytes = int(os.environ.get("TABLEPRO_PROFILE_CELL_BYTES", "0"))
-        text_mode = os.environ.get("TABLEPRO_PROFILE_TEXT_MODE", "unique")
-        layout = os.environ.get("TABLEPRO_PROFILE_LAYOUT", "narrow")
-        input_mode = os.environ.get("TABLEPRO_PROFILE_INPUT", "scrub")
+        rows = int(os.environ["BOOKIE_PROFILE_ROWS"])
+        payload_bytes = int(os.environ.get("BOOKIE_PROFILE_CELL_BYTES", "0"))
+        text_mode = os.environ.get("BOOKIE_PROFILE_TEXT_MODE", "unique")
+        layout = os.environ.get("BOOKIE_PROFILE_LAYOUT", "narrow")
+        input_mode = os.environ.get("BOOKIE_PROFILE_INPUT", "scrub")
         if text_mode not in ("unique", "repeated") or layout not in ("narrow", "wide"):
             raise ValueError("profile text mode or layout is unsupported")
         if input_mode not in ("scrub", "wheel"):
@@ -1264,7 +1334,7 @@ GLib.MainLoop().run()
             return round(time.monotonic() - started_scroll, 3), sample
 
         if input_mode == "scrub":
-            scroll_steps = int(os.environ.get("TABLEPRO_PROFILE_SCROLL_STEPS", str(min(20000, max(1000, rows // 10)))))
+            scroll_steps = int(os.environ.get("BOOKIE_PROFILE_SCROLL_STEPS", str(min(20000, max(1000, rows // 10)))))
             if not 2 <= scroll_steps <= 20000:
                 raise ValueError("profile scrollbar scrub steps are outside their supported bounds")
             middle_steps = max(1, scroll_steps // 2)
@@ -1286,8 +1356,8 @@ GLib.MainLoop().run()
             assert not gtk_input.uses_atspi_input(), "wheel profile requires the X11/Xvfb input path"
             pointer_x = int(bounds.x + max(1, bounds.width // 2))
             pointer_y = int(bounds.y + max(1, bounds.height // 2))
-            wheel_events = int(os.environ.get("TABLEPRO_PROFILE_WHEEL_EVENTS", "40"))
-            wheel_delay = float(os.environ.get("TABLEPRO_PROFILE_WHEEL_DELAY_SECONDS", "0.08"))
+            wheel_events = int(os.environ.get("BOOKIE_PROFILE_WHEEL_EVENTS", "40"))
+            wheel_delay = float(os.environ.get("BOOKIE_PROFILE_WHEEL_DELAY_SECONDS", "0.08"))
             if not 1 <= wheel_events <= 2000 or not 0 <= wheel_delay <= 0.5:
                 raise ValueError("profile wheel event count or delay is outside its supported bounds")
             wheel_cpu_start = ui.owned_application().cpu_seconds()
@@ -1335,8 +1405,8 @@ GLib.MainLoop().run()
         responsive_probe_seconds = round(time.monotonic() - responsive_probe_started, 3)
         line = json.dumps({
             **ui.owned_application().identity(),
-            "source_revision": os.environ.get("TABLEPRO_PROFILE_SOURCE_REVISION", "unknown"),
-            "binary_sha256": os.environ.get("TABLEPRO_PROFILE_BINARY_SHA256", "unknown"),
+            "source_revision": os.environ.get("BOOKIE_PROFILE_SOURCE_REVISION", "unknown"),
+            "binary_sha256": os.environ.get("BOOKIE_PROFILE_BINARY_SHA256", "unknown"),
             "rows_requested": rows,
             "columns_requested": column_count,
             "text_mode": text_mode,
@@ -1344,7 +1414,7 @@ GLib.MainLoop().run()
             "input_mode": input_mode,
             "input_events": input_events,
             "cell_payload_bytes": payload_bytes,
-            "repetition": int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1")),
+            "repetition": int(os.environ.get("BOOKIE_PROFILE_REPETITION", "1")),
             "rows_loaded_inferred": end["visible_rows"][1] if end["visible_rows"] else None,
             "truncated_inferred": bool(end["visible_rows"] and end["visible_rows"][1] < rows),
             "full_range_verified": bool(end["visible_rows"] and end["visible_rows"][1] >= rows),
@@ -1361,7 +1431,7 @@ GLib.MainLoop().run()
             "peak_mb": round(peak / 1024, 1),
             "responsive_run_probe_seconds": responsive_probe_seconds,
         })
-        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+        with open(os.environ["BOOKIE_PROFILE_OUT"], "a") as out:
             out.write(line + "\n")
 
     def find_bar_replaces_every_match_in_the_editor(database, base):
@@ -1390,7 +1460,7 @@ GLib.MainLoop().run()
         wait_for_focused_grid_row(ui, pyatspi, value)
         ui.press_x11_key("Menu")
         ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        choose_menu_item(4)
+        choose_menu_item(5)
         wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -1433,7 +1503,7 @@ GLib.MainLoop().run()
         started = time.monotonic()
         ui.press_x11_key("Menu")
         ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        choose_menu_item(4)
+        choose_menu_item(5)
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON, timeout=10)
         assert time.monotonic() - started < 10, "the large value viewer took too long to open"
 
@@ -1449,7 +1519,7 @@ GLib.MainLoop().run()
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         wait_for_result_column("beta")
         open_cell_menu("1")
-        choose_menu_item(7)
+        choose_menu_item(8)
         wait_for_adw_dialog("Columns")
         switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switches = [
@@ -1922,7 +1992,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         open_cell_menu("Ada Lovelace")
-        choose_menu_item(4)
+        choose_menu_item(5)
         wait_for_adw_dialog("name")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.press_x11_key("Escape")
@@ -1930,7 +2000,7 @@ GLib.MainLoop().run()
 
     def postgres_large_stream_pages_round_trip_from_spool(database, base):
         page_size = 5000
-        stream_rows = int(os.environ.get("TABLEPRO_GTK_STREAM_ROWS", "150000"))
+        stream_rows = int(os.environ.get("BOOKIE_GTK_STREAM_ROWS", "150000"))
         assert stream_rows >= 2 * page_size and stream_rows % page_size == 0
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
@@ -1957,23 +2027,67 @@ GLib.MainLoop().run()
             if first_run_marker is None:
                 time.sleep(ui.POLL_SECONDS)
         assert first_run_marker is not None, "the first streamed page never exposed its run marker"
-        last_page_start = stream_rows - page_size + 1
-        ui.wait_for_node_containing(f"Rows {last_page_start}-{stream_rows}", timeout=120)
-        ui.wait_for_node(name=str(last_page_start))
+        ui.wait_for_node_containing(f"Rows 1-{page_size:,}", timeout=120)
+        wait_for_visible_cell_value("1")
+        wait_for_visible_marker(first_run_marker)
+        ui.wait_for_node_containing(f"Complete · Received {stream_rows:,} rows", timeout=180)
         scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
-        capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-last-page")
-        for first_id in range(stream_rows - 2 * page_size + 1, 0, -page_size):
-            ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
-            ui.wait_for_node_containing(f"Rows {first_id}-{first_id + page_size - 1}", timeout=30)
-            ui.wait_for_node(name=str(first_id), timeout=30)
-        ui.wait_for_node(name="1")
-        ui.wait_for_node(name=first_run_marker, role=pyatspi.ROLE_LABEL, timeout=120)
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
         ui.invoke(ui.wait_for_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 5001-10000", timeout=30)
+        wait_for_node_showing(f"Rows {page_size + 1:,}-{2 * page_size:,}")
+        wait_for_visible_cell_value("5001")
+        wait_for_visible_marker(first_run_marker)
         ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 1-5000", timeout=30)
-        ui.wait_for_node(name=first_run_marker, role=pyatspi.ROLE_LABEL, timeout=120)
+        wait_for_node_showing(f"Rows 1-{page_size:,}")
+        wait_for_visible_cell_value("1")
+        wait_for_visible_marker(first_run_marker)
+        ui.invoke(ui.wait_for_node(name="Continuous scrolling"))
+        wait_for_visible_cell_value("1")
+        deadline = time.monotonic() + 30
+        visible = None
+        while visible is None and time.monotonic() < deadline:
+            visible = next((
+                node for node in ui.descendants(ui.application_node())
+                if ui.node_name(node) == "1" and ui.node_role(node) == pyatspi.ROLE_LABEL
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+            ), None)
+            if visible is None:
+                time.sleep(ui.POLL_SECONDS)
+        assert visible is not None, "continuous grid did not display its first row"
+        extents = visible.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2, button=1)
+        ui.press_x11_key("End", ("Control_L",))
+        wait_for_visible_cell_value(str(stream_rows))
+        wait_for_visible_marker(first_run_marker)
+        ui.press_x11_key("Home", ("Control_L",))
+        wait_for_visible_cell_value("1")
+        wait_for_visible_marker(first_run_marker)
+
+    def wait_for_node_showing(name):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            if app is not None and any(
+                ui.node_name(node) == name and node.getState().contains(pyatspi.STATE_SHOWING)
+                for node in ui.descendants(app)
+            ):
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"{name!r} was not visible")
+
+    def wait_for_visible_cell_value(value):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            app = ui.application_node()
+            if app is not None and any(
+                ui.node_name(node) == value
+                and ui.node_role(node) == pyatspi.ROLE_LABEL
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+                for node in ui.descendants(app)
+            ):
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"cell value {value!r} was not visible")
 
     def wait_for_visible_marker(name):
         deadline = time.monotonic() + 30
@@ -1992,10 +2106,13 @@ GLib.MainLoop().run()
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
         ui.invoke(ui.wait_for_node(name="Open SQL editor"))
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        payload_expression = "value::text"
+        for _ in range(32):
+            payload_expression = f"md5({payload_expression})"
+        payload_expression = f"repeat({payload_expression}, 64)"
         ui.run_sql(
             "SELECT value AS id, 'page-marker-' || value::text AS marker, "
-            "repeat('x', 2048) AS payload "
-            "FROM generate_series(1, 400000) AS value"
+            f"{payload_expression} AS payload FROM generate_series(1, 400000) AS value"
         )
         ui.wait_for_node(name="page-marker-1", role=pyatspi.ROLE_LABEL, timeout=120)
         deadline = time.monotonic() + 120
@@ -2003,17 +2120,19 @@ GLib.MainLoop().run()
             app = ui.application_node()
             labels = list(ui.descendants(app)) if app is not None else []
             current = any(ui.node_name(node) == "page-marker-1" and node.getState().contains(pyatspi.STATE_SHOWING) for node in labels)
-            counts = [re.search(r"Received (\d+) rows", ui.node_name(node)) for node in labels]
-            if current and any(match and 40000 <= int(match.group(1)) < 400000 for match in counts):
+            counts = [re.search(r"Received ([0-9,]+) rows", ui.node_name(node)) for node in labels]
+            if current and any(match and 40000 <= int(match.group(1).replace(",", "")) < 400000 for match in counts):
                 break
             time.sleep(ui.POLL_SECONDS)
         else:
             raise AssertionError("first page was not visible after enough streamed rows to exceed the cache")
         ui.invoke(ui.wait_for_sensitive_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 5001-10000", timeout=30)
+        ui.wait_for_node_containing("Rows 5,001-10,000", timeout=30)
         wait_for_visible_marker("page-marker-5001")
         ui.invoke(ui.wait_for_sensitive_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node_containing("Rows 1-5000", timeout=30)
+        ui.wait_for_node_containing("Rows 1-5,000", timeout=30)
+        wait_for_visible_marker("page-marker-1")
+        ui.wait_for_node_containing("done in", timeout=120)
         wait_for_visible_marker("page-marker-1")
 
     def postgres_hidden_projection_refresh_and_edit_preserve_hidden_value(database, base):
@@ -2093,9 +2212,9 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing("127.0.0.1:2223")
         ui.invoke(ui.wait_within(prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
-        jump_host = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
+        jump_host = os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
         if jump_host:
-            jump_port = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT", "22")
+            jump_port = os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT", "22")
             second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
             ui.wait_for_node_containing(f"{jump_host}:{jump_port}")
             ui.invoke(ui.wait_within(second_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
@@ -2114,7 +2233,7 @@ GLib.MainLoop().run()
         assert known_hosts.exists() and known_hosts.read_text().strip(), (
             "accepting the host key must persist it in the isolated known_hosts file"
         )
-        if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
+        if os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
             assert len([line for line in known_hosts.read_text().splitlines() if line.strip()]) == 2, (
                 "the full jump chain must persist both accepted host keys"
             )
@@ -2139,7 +2258,7 @@ GLib.MainLoop().run()
         assert attempts[0]["transport_attempt"] == {"client": "builtin_ssh", "outcome": "connected"}
 
     def postgres_ssh_multihop_trusts_both_hops_and_queries(database, base):
-        assert os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST") == "relay", (
+        assert os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST") == "relay", (
             "the two-hop release fixture must configure its relay jump host"
         )
         postgres_ssh_unknown_host_key_accepts_and_queries(database, base)
@@ -2183,7 +2302,7 @@ GLib.MainLoop().run()
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
         known_hosts.parent.mkdir(parents=True, exist_ok=True)
-        wrong_host_key = Path(os.environ["TABLEPRO_FIXTURE_MATERIALS"]) / "ssh_host_ed25519_key.pub"
+        wrong_host_key = Path(os.environ["BOOKIE_FIXTURE_MATERIALS"]) / "ssh_host_ed25519_key.pub"
         key_parts = wrong_host_key.read_text(encoding="utf-8").split()
         assert len(key_parts) >= 2, "the release fixture must provide the bastion host public key"
         relay_record = f"relay {key_parts[0]} {key_parts[1]} fixture-wrong-relay-key\n"
@@ -2366,9 +2485,9 @@ GLib.MainLoop().run()
     def psql(sql):
         import subprocess
         out = subprocess.run(
-            ["docker", "exec", os.environ["TABLEPRO_GTK_POSTGRES_CONTAINER"], "psql",
-             f"--username={os.environ.get('TABLEPRO_GTK_POSTGRES_USER', 'postgres')}",
-             f"--dbname={os.environ.get('TABLEPRO_GTK_POSTGRES_DB', 'bookie_test')}",
+            ["docker", "exec", os.environ["BOOKIE_GTK_POSTGRES_CONTAINER"], "psql",
+             f"--username={os.environ.get('BOOKIE_GTK_POSTGRES_USER', 'postgres')}",
+             f"--dbname={os.environ.get('BOOKIE_GTK_POSTGRES_DB', 'bookie_test')}",
              "--tuples-only", "--no-align", f"--command={sql}"],
             check=True, capture_output=True, text=True,
         )
@@ -2431,8 +2550,8 @@ GLib.MainLoop().run()
     def mysql(sql):
         import subprocess
         out = subprocess.run(
-            ["docker", "exec", os.environ["TABLEPRO_GTK_MYSQL_CONTAINER"], "mysql", "--user=root",
-             "--password=tablepro_test", "--batch", "--skip-column-names", "bookie_test", f"--execute={sql}"],
+            ["docker", "exec", os.environ["BOOKIE_GTK_MYSQL_CONTAINER"], "mysql", "--user=root",
+             "--password=bookie_test", "--batch", "--skip-column-names", "bookie_test", f"--execute={sql}"],
             check=True, capture_output=True, text=True,
         )
         return out.stdout.strip()
@@ -2440,7 +2559,7 @@ GLib.MainLoop().run()
     def mongodb(sql):
         import subprocess
         out = subprocess.run(
-            ["docker", "exec", os.environ["TABLEPRO_GTK_MONGODB_CONTAINER"], "mongosh", "--quiet",
+            ["docker", "exec", os.environ["BOOKIE_GTK_MONGODB_CONTAINER"], "mongosh", "--quiet",
              "bookie_test", f"--eval={sql}"],
             check=True, capture_output=True, text=True,
         )
@@ -2449,8 +2568,8 @@ GLib.MainLoop().run()
     def clickhouse(sql):
         import subprocess
         out = subprocess.run(
-            ["docker", "exec", os.environ["TABLEPRO_GTK_CLICKHOUSE_CONTAINER"], "clickhouse-client",
-             "--user=default", "--password=tablepro", "--format=TabSeparatedRaw", f"--query={sql}"],
+            ["docker", "exec", os.environ["BOOKIE_GTK_CLICKHOUSE_CONTAINER"], "clickhouse-client",
+             "--user=default", "--password=bookie", "--format=TabSeparatedRaw", f"--query={sql}"],
             check=True, capture_output=True, text=True,
         )
         return out.stdout.strip()
@@ -2671,8 +2790,8 @@ GLib.MainLoop().run()
 
     def invoke_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
-        items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
-        actions = items[position].queryAction()
+        item = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM][position]
+        actions = item.queryAction()
         click = next(index for index in range(actions.nActions) if actions.getName(index) == "click")
         assert actions.doAction(click)
 
@@ -2697,13 +2816,11 @@ GLib.MainLoop().run()
         )
         wait_until(lambda: len(page_tab_names()) >= 2, "two result sets did not appear")
         ui.invoke(ui.wait_for_node(name="Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
-        filter_by_this_value = 3
         open_cell_menu("pear")
-        invoke_menu_item(filter_by_this_value)
+        invoke_menu_item(3)
         ui.wait_for_node_containing("Showing 1 of 3 loaded rows", role=pyatspi.ROLE_LABEL)
         ui.wait_for_node(name="apple", role=pyatspi.ROLE_LABEL, present=False)
-        export_visible, export_all_loaded = 6, 7
-        for item, rows in ((export_visible, "1 loaded rows"), (export_all_loaded, "3 loaded rows")):
+        for item, rows in ((7, "1 loaded rows"), (8, "3 loaded rows")):
             reopen_cell_menu("pear")
             invoke_menu_item(item)
             ui.wait_for_node(name=rows, role=pyatspi.ROLE_LABEL)
@@ -2715,7 +2832,7 @@ GLib.MainLoop().run()
         )
         ui.invoke(second)
         reopen_cell_menu("blue")
-        invoke_menu_item(filter_by_this_value)
+        invoke_menu_item(3)
         ui.wait_for_node_containing("Showing 1 of 2 loaded rows", role=pyatspi.ROLE_LABEL)
 
     def filter_by_this_value_narrows_the_browse_rows(database, _base):
@@ -2903,18 +3020,20 @@ GLib.MainLoop().run()
         restart_with_an_untouched_editor_restores_without_layout_criticals,
         disconnected_editor_remains_usable_without_cached_table_names,
     ]
-    if os.environ.get("TABLEPRO_PROFILE_ROWS"):
+    if os.environ.get("BOOKIE_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
-    if os.environ.get("TABLEPRO_PROFILE_EXPORT_ROWS"):
+    if os.environ.get("BOOKIE_PROFILE_COLUMNS"):
+        result.append(profile_wide_table_browse)
+    if os.environ.get("BOOKIE_PROFILE_EXPORT_ROWS"):
         result.append(profile_large_result_export_dialog)
-    if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
+    if os.environ.get("BOOKIE_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
         result.append(mysql_enum_set_grid_edit_preserves_native_values_and_siblings)
-    if os.environ.get("TABLEPRO_GTK_MONGODB_CONTAINER"):
+    if os.environ.get("BOOKIE_GTK_MONGODB_CONTAINER"):
         result.append(mongodb_grid_observes_cursor_values_until_refresh_and_edits_native_row)
-    if os.environ.get("TABLEPRO_GTK_CLICKHOUSE_CONTAINER"):
+    if os.environ.get("BOOKIE_GTK_CLICKHOUSE_CONTAINER"):
         result.append(clickhouse_enum_grid_edit_preserves_native_label_and_siblings)
-    if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
+    if os.environ.get("BOOKIE_GTK_POSTGRES_PORT"):
         result.append(postgres_completion_uses_each_editor_session_search_path)
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit)
@@ -2926,19 +3045,19 @@ GLib.MainLoop().run()
         result.append(postgres_visible_evicted_page_can_be_revisited)
         result.append(postgres_enum_grid_edit_preserves_native_label_and_siblings)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
-        if os.environ.get("TABLEPRO_PROFILE_STREAM_PINS"):
+        if os.environ.get("BOOKIE_PROFILE_STREAM_PINS"):
             result.append(profile_streamed_pin_retention)
-        if os.environ.get("TABLEPRO_PROFILE_STREAM_EXPORT"):
+        if os.environ.get("BOOKIE_PROFILE_STREAM_EXPORT"):
             result.append(profile_streamed_result_export)
-    if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
+    if os.environ.get("BOOKIE_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)
         result.append(postgres_structure_tabs_keep_backend_count_bounded)
-    if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PORT"):
+    if os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT"):
         result.append(postgres_ssh_unknown_host_key_decline_is_durably_audited)
         result.append(postgres_ssh_unknown_host_key_accepts_and_queries)
         result.append(postgres_ssh_setup_failure_is_durably_audited)
         result.append(postgres_ssh_tunnel_loss_retires_session_and_reconnects)
-        if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
+        if os.environ.get("BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
             result.append(postgres_ssh_multihop_trusts_both_hops_and_queries)
             result.append(postgres_ssh_second_hop_decline_does_not_learn_key)
             result.append(postgres_ssh_changed_second_hop_key_is_refused)

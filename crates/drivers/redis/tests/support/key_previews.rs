@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use bookie_core::{DatabaseDriver, Value};
 use drivers_redis::RedisDriver;
-use tablepro_core::{DatabaseDriver, Value};
 
 use crate::{opts, start_redis};
 
@@ -32,7 +32,7 @@ async fn every_key_type_lists_with_its_type_and_a_preview() {
         rows.iter()
             .find(|row| row[0] == Value::Text(key.into()))
             .unwrap_or_else(|| panic!("{key} is listed"))
-            .clone()
+            .to_vec()
     };
 
     assert_eq!(find("k_string")[1], Value::Text("string".into()));
@@ -78,7 +78,7 @@ async fn a_browse_preview_of_a_large_value_stays_small() {
     let rows = connection.fetch_rows(None, "db0", 0, 50).await.unwrap().rows;
     let preview = |key: &str| match &rows.iter().find(|row| row[0] == Value::Text(key.into())).unwrap()[3] {
         Value::Text(text) => text.clone(),
-        Value::Undecodable(kind) => tablepro_core::parse_partial(kind).unwrap().1.to_owned(),
+        Value::Undecodable(kind) => bookie_core::parse_partial(kind).unwrap().1.to_owned(),
         other => panic!("{key} has no bounded preview: {other:?}"),
     };
 
@@ -121,7 +121,7 @@ async fn bounded_string_previews_distinguish_complete_values_from_partial_cells(
         panic!("long values must be partial")
     };
     assert_eq!(
-        tablepro_core::parse_partial(kind),
+        bookie_core::parse_partial(kind),
         Some((4097, "x".repeat(4096).as_str()))
     );
     assert!(

@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-ssh"
+name = "bookie-ssh"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,12 +7,12 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_ssh"
+name = "bookie_ssh"
 path = "src/lib.rs"
 
 [[bin]]
-name = "tablepro-askpass"
-path = "src/bin/tablepro-askpass.rs"
+name = "bookie-askpass"
+path = "src/bin/bookie-askpass.rs"
 
 [dependencies]
 async-trait.workspace = true

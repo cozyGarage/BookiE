@@ -64,7 +64,7 @@ body:
       required: false
 
   - type: input
-    id: tablepro_version
+    id: bookie_version
     attributes:
       label: BookiE version or commit
       placeholder: "0.2.0 or commit SHA"
@@ -107,6 +107,6 @@ body:
     id: policy_context
     attributes:
       label: Policy, audit, or MCP context
-      description: If relevant, state whether the request came from the GUI, MCP, or tablepro-agentd and describe the policy result. Do not include tokens.
+      description: If relevant, state whether the request came from the GUI, MCP, or bookie-agentd and describe the policy result. Do not include tokens.
     validations:
       required: false

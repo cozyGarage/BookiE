@@ -22,7 +22,7 @@ class GtkPostgresToolchainHomeTests(unittest.TestCase):
             env = {
                 key: value
                 for key, value in os.environ.items()
-                if key not in {"CARGO_HOME", "RUSTUP_HOME", "TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE"}
+                if key not in {"CARGO_HOME", "RUSTUP_HOME", "BOOKIE_GTK_POSTGRES_DBUS_ACTIVE"}
             }
             env.update({"PATH": f"{bin_dir}:{env['PATH']}", "HOME": str(home), "TMPDIR": str(root), **extra_env})
             result = subprocess.run(

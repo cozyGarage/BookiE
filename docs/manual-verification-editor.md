@@ -22,7 +22,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] A `.sql` file containing an excessively long line exceeding the per-line length ceiling is refused with an explanation before loading.
 - [ ] Ctrl+Shift+D lists saved queries; open, rename and delete all work.
 - [ ] Saving a structure change or edited rows appears in history, and the history dialog can filter those out.
-- [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as JSON; unset keeps the human format.
+- [ ] `BOOKIE_LOG_FORMAT=json ./target/debug/bookie` writes lines that parse as JSON; unset keeps the human format.
 
 ## Editor sessions (PostgreSQL, MySQL, SQL Server and SQLite files)
 
@@ -66,6 +66,8 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 ## Pinned results and gutter marks
 
 - [ ] Run `SELECT 1 AS first;`, then run `SELECT pg_sleep(3), 2 AS second;`: while it runs, the first result stays on screen, dimmed, with Running… and the spinner in the toolbar; when it finishes the dimming is gone and the second result is shown. Repeat with a query that fails, with Cancel, and with a statement that times out: each replaces the dimmed result. A streamed PostgreSQL SELECT keeps the previous result until its first page arrives.
+- [ ] Run a PostgreSQL SELECT that produces several pages slowly. The first page stays selected while more arrive, and the status changes from receiving to complete. Cancel a second run and confirm it reports cancellation and does not offer full-result export.
+- [ ] Complete a multi-page PostgreSQL result, change the source rows from another connection, then export all rows from the result. The export contains the originally received values and does not run the query again. Close the tab and confirm the saved result is released.
 
 - [ ] On SQL Server, run `EXEC sys.sp_executesql N'SELECT 1 AS first_result; SELECT 2 AS second_result;'` as one query. Confirm the result-set selector shows both sets in source order and each displays its own column and value.
 - [ ] Run `SELECT 1 AS one; SELECT 2 AS two;`, pin both results, then run `SELECT 3 AS three;` and `SELECT 4 AS four; SELECT * FROM missing_table;`: pinned results stay first and the failed second statement is labelled **Statement 2**, not Statement 4. Unpin removes the pinned results.

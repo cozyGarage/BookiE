@@ -53,13 +53,13 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     assert_eq!(rebound.rows[0][1], native.rows[0][4]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let csv_path = directory.path().join("timestamp-array-dmy.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -72,15 +72,15 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
 
     let csv = std::fs::read_to_string(directory.path().join("timestamp-array-dmy.csv")).unwrap();
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
 
     let json_path = directory.path().join("timestamp-array-dmy.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -109,11 +109,11 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
         .fetch_columns(None, "timestamp_array_dmy_csv_target")
         .await
         .unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "timestamp_array_dmy_csv_target",
             columns: &columns,
@@ -134,7 +134,7 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     assert_eq!(csv_restored.rows.len(), 2);
     assert!(csv_restored.rows.contains(&csv_sibling.rows[0]));
     assert!(
-        csv_restored.rows.contains(&vec![
+        csv_restored.rows.contains(&[
             native.rows[0][1].clone(),
             native.rows[0][3].clone(),
             native.rows[0][4].clone(),
@@ -162,13 +162,13 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
         .await
         .unwrap();
     let sql_path = directory.path().join("timestamp-array-dmy.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "timestamp_array_dmy_target",
@@ -192,7 +192,7 @@ async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dm
     assert_eq!(restored.rows.len(), 2);
     assert!(restored.rows.contains(&sibling.rows[0]));
     assert!(
-        restored.rows.contains(&vec![
+        restored.rows.contains(&[
             native.rows[0][1].clone(),
             native.rows[0][3].clone(),
             native.rows[0][4].clone(),

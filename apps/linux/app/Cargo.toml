@@ -1,5 +1,5 @@
 [package]
-name = "tablepro-app"
+name = "bookie-app"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,40 +7,38 @@ rust-version.workspace = true
 publish = false
 
 [lib]
-name = "tablepro_app"
+name = "bookie_app"
 path = "src/lib.rs"
 
 [[bin]]
-name = "tablepro-app"
+name = "bookie-app"
 path = "src/main.rs"
 
 [features]
 default = ["kerberos"]
-kerberos = ["tablepro-driver-mssql/kerberos"]
-# Bundled DuckDB compiles a large C++ tree; enable explicitly when needed.
-duckdb = ["dep:tablepro-driver-duckdb"]
+kerberos = ["bookie-driver-mssql/kerberos"]
 
 [dependencies]
-tablepro-app-services = { path = "../../../crates/app-services" }
-tablepro-core = { path = "../../../crates/core" }
-tablepro-policy = { path = "../../../crates/policy" }
-tablepro-mcp = { path = "../../../crates/mcp" }
-tablepro-driver-clickhouse = { path = "../../../crates/drivers/clickhouse" }
-tablepro-driver-duckdb = { path = "../../../crates/drivers/duckdb", optional = true }
-tablepro-driver-mongodb = { path = "../../../crates/drivers/mongodb" }
-tablepro-driver-mssql = { path = "../../../crates/drivers/mssql" }
-tablepro-driver-mysql = { path = "../../../crates/drivers/mysql" }
-tablepro-driver-postgres = { path = "../../../crates/drivers/postgres" }
-tablepro-driver-redis = { path = "../../../crates/drivers/redis" }
-tablepro-driver-sqlite = { path = "../../../crates/drivers/sqlite" }
+bookie-app-services = { path = "../../../crates/app-services" }
+bookie-core = { path = "../../../crates/core" }
+bookie-policy = { path = "../../../crates/policy" }
+bookie-mcp = { path = "../../../crates/mcp" }
+bookie-driver-clickhouse = { path = "../../../crates/drivers/clickhouse" }
+bookie-driver-duckdb = { path = "../../../crates/drivers/duckdb" }
+bookie-driver-mongodb = { path = "../../../crates/drivers/mongodb" }
+bookie-driver-mssql = { path = "../../../crates/drivers/mssql" }
+bookie-driver-mysql = { path = "../../../crates/drivers/mysql" }
+bookie-driver-postgres = { path = "../../../crates/drivers/postgres" }
+bookie-driver-redis = { path = "../../../crates/drivers/redis" }
+bookie-driver-sqlite = { path = "../../../crates/drivers/sqlite" }
 chrono.workspace = true
 rust_decimal.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
-tablepro-ssh = { path = "../../../crates/ssh" }
-tablepro-storage = { path = "../../../crates/storage" }
-tablepro-transport = { path = "../../../crates/transport" }
+bookie-ssh = { path = "../../../crates/ssh" }
+bookie-storage = { path = "../../../crates/storage" }
+bookie-transport = { path = "../../../crates/transport" }
 gtk4.workspace = true
 libadwaita.workspace = true
 sourceview5.workspace = true

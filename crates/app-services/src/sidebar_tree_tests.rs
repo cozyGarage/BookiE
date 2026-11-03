@@ -1,5 +1,5 @@
 use super::*;
-use tablepro_core::CatalogObjectKind;
+use bookie_core::CatalogObjectKind;
 
 fn info(schema: Option<&str>, name: &str) -> TableInfo {
     TableInfo {
@@ -102,6 +102,39 @@ fn a_search_cannot_reveal_a_hidden_schema() {
     let hidden = HashSet::from(["private".to_string()]);
 
     assert!(visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), "secrets", &hidden).is_empty());
+}
+
+#[test]
+fn search_matches_ascii_names_without_case_or_qualified_boundary_differences() {
+    let nodes = build_nodes(&[info(Some("schema"), "table")], &[]);
+
+    assert_eq!(visible_nodes(&nodes, &CollapseState::default(), "SCHEMA.TA"), [0, 1]);
+    assert_eq!(visible_nodes(&nodes, &CollapseState::default(), "MA.TA"), [0, 1]);
+}
+
+#[test]
+fn ascii_search_matches_the_previous_qualified_name_rule() {
+    let names = ["", "a", "A", "b", "a.b", "_", "."];
+    let queries = ["", "a", "A.", ".a", "a.b", "B.A", "_", "."];
+    for schema in [None, Some(""), Some("a"), Some("A.B"), Some("_")] {
+        for name in names {
+            for query in queries {
+                let qualified_name = schema.map_or_else(|| name.to_string(), |schema| format!("{schema}.{name}"));
+                assert_eq!(
+                    qualified_name_matches(schema, name, &query.to_lowercase()),
+                    qualified_name.to_lowercase().contains(&query.to_lowercase()),
+                    "schema={schema:?} name={name:?} query={query:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn search_keeps_unicode_lowercase_expansion_semantics() {
+    let nodes = build_nodes(&[info(Some("schema"), "İtems")], &[]);
+
+    assert_eq!(visible_nodes(&nodes, &CollapseState::default(), "i\u{307}tem"), [0, 1]);
 }
 
 #[test]

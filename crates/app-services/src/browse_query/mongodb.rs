@@ -1,5 +1,5 @@
 use super::{BoundQuery, BrowseTarget};
-use tablepro_core::Value;
+use bookie_core::Value;
 
 pub(super) fn value_query(
     target: &BrowseTarget<'_>,
@@ -13,7 +13,7 @@ pub(super) fn value_query(
     if keys.len() != 1 || keys[0].name != "_id" || pk_values.len() != 1 {
         return Err("MongoDB value fetch requires its single _id key".into());
     }
-    let quote = |name| tablepro_core::sql_dialect::quote_ident("mongodb", name);
+    let quote = |name| bookie_core::sql_dialect::quote_ident("mongodb", name);
     let collection = target
         .schema
         .map(|schema| format!("{}.{}", quote(schema), quote(target.table)))
@@ -34,7 +34,7 @@ pub(super) fn value_query(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tablepro_core::{ColumnInfo, FilterSet};
+    use bookie_core::{ColumnInfo, FilterSet};
 
     #[test]
     fn mongo_value_query_binds_the_single_id_key() {

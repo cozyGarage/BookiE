@@ -6,17 +6,17 @@ use std::sync::{
 };
 
 use async_trait::async_trait;
-use drivers_postgres::PgDriver;
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, ExecResult, OperationControl,
     QueryResult, TableInfo, TlsConfig, Value,
 };
-use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
-use tablepro_policy::{
+use bookie_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use bookie_policy::{
     AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AutoApproveSink,
     GuardContext, PolicyConfig, PolicyGuard, Principal, WritePolicy,
 };
-use tablepro_storage::SavedConnection;
+use bookie_storage::SavedConnection;
+use drivers_postgres::PgDriver;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::{postgres::Postgres, testcontainers::runners::AsyncRunner};
 use uuid::Uuid;
@@ -57,7 +57,7 @@ fn mcp_context(
     connection: Arc<dyn Connection>,
     host: String,
     port: u16,
-) -> (Uuid, McpBridge, tablepro_mcp::McpToken, tempfile::TempDir) {
+) -> (Uuid, McpBridge, bookie_mcp::McpToken, tempfile::TempDir) {
     let connection_id = Uuid::new_v4();
     let saved = SavedConnection {
         auth_source: None,
@@ -138,7 +138,7 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
     let (connection_id, bridge, token, _directory) = mcp_context(connection.clone(), host, port);
 
     let sql = "SELECT id, status::text AS label, pg_typeof(status)::text AS native_type FROM mcp_enum.rows ORDER BY id";
-    let response = tablepro_mcp::dispatch(
+    let response = bookie_mcp::dispatch(
         &bridge,
         &token,
         "execute_query",
@@ -165,7 +165,7 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
     );
     assert_eq!(response["truncated"], false);
 
-    let numeric_response = tablepro_mcp::dispatch(
+    let numeric_response = bookie_mcp::dispatch(
         &bridge,
         &token,
         "execute_query",
@@ -207,7 +207,7 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
         ])
     );
 
-    let json_export = tablepro_mcp::dispatch(
+    let json_export = bookie_mcp::dispatch(
         &bridge,
         &token,
         "export_data",
@@ -224,7 +224,7 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
     assert_eq!(json_export["rows"], response["rows"]);
 
     let csv_sql = "SELECT id, status::text AS status FROM mcp_enum.rows ORDER BY id";
-    let csv_export = tablepro_mcp::dispatch(
+    let csv_export = bookie_mcp::dispatch(
         &bridge,
         &token,
         "export_data",
@@ -245,18 +245,18 @@ async fn postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool() {
 
     let null_marker = csv_export["null_marker"].as_str().expect("CSV null marker");
     let content = csv_export["content"].as_str().expect("CSV content");
-    let import_options = tablepro_core::import::CsvImportOptions {
+    let import_options = bookie_core::import::CsvImportOptions {
         null_marker: null_marker.to_owned(),
         ..Default::default()
     };
-    let sheet = tablepro_core::import::read_csv(content.as_bytes(), &import_options, None)
+    let sheet = bookie_core::import::read_csv(content.as_bytes(), &import_options, None)
         .expect("read MCP CSV with its declared null marker");
     let mapping = [Some(0), Some(1)];
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("mcp_enum"),
             table: "target_rows",
             columns: &target_columns,
@@ -345,7 +345,7 @@ async fn postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_impor
 
     let sql = "SELECT id, status, pg_typeof(status)::text AS native_type \
                FROM mcp_domain_enum.rows ORDER BY id";
-    let response = tablepro_mcp::dispatch(
+    let response = bookie_mcp::dispatch(
         &bridge,
         &token,
         "execute_query",
@@ -367,7 +367,7 @@ async fn postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_impor
     );
     assert_eq!(response["truncated"], false);
 
-    let json_export = tablepro_mcp::dispatch(
+    let json_export = bookie_mcp::dispatch(
         &bridge,
         &token,
         "export_data",
@@ -383,7 +383,7 @@ async fn postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_impor
     assert_eq!(json_export["format"], "json");
 
     let csv_sql = "SELECT id, status FROM mcp_domain_enum.rows ORDER BY id";
-    let csv_export = tablepro_mcp::dispatch(
+    let csv_export = bookie_mcp::dispatch(
         &bridge,
         &token,
         "export_data",
@@ -398,17 +398,17 @@ async fn postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_impor
     assert_eq!(csv_export["null_marker"], "\\N");
     assert_eq!(csv_export["content"], "id,status\n1,NULL\n2,\"\"\n3,東京\n4,\\N\n");
 
-    let options = tablepro_core::import::CsvImportOptions {
+    let options = bookie_core::import::CsvImportOptions {
         null_marker: csv_export["null_marker"].as_str().unwrap().into(),
         ..Default::default()
     };
     let content = csv_export["content"].as_str().unwrap();
-    let sheet = tablepro_core::import::read_csv(content.as_bytes(), &options, None).unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let sheet = bookie_core::import::read_csv(content.as_bytes(), &options, None).unwrap();
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("mcp_domain_enum"),
             table: "target_rows",
             columns: &target_columns,
@@ -650,11 +650,8 @@ async fn postgres_lost_write_ack_is_structured_and_never_retried() {
         .await
         .expect_err("the committed write acknowledgement must be lost");
     assert_eq!(error.code, "operation_outcome_unknown");
-    assert_eq!(error.operation_outcome, tablepro_mcp::OperationOutcome::Unknown);
-    assert_eq!(
-        error.transaction_outcome,
-        tablepro_mcp::TransactionOutcome::NotApplicable
-    );
+    assert_eq!(error.operation_outcome, bookie_mcp::OperationOutcome::Unknown);
+    assert_eq!(error.transaction_outcome, bookie_mcp::TransactionOutcome::NotApplicable);
 
     let stored = driver
         .query("SELECT COUNT(*) FROM mcp_lost_ack")

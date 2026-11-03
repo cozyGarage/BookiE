@@ -18,7 +18,7 @@ cd BookiE
 git checkout linux
 rustc --version
 pkg-config --modversion gtk4 libadwaita-1 gtksourceview-5
-cargo run -p tablepro-app
+cargo run -p bookie-app
 ```
 
 ## Validation

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use bookie_core::Value;
 
 use crate::{connect, start_pg};
 
@@ -65,32 +65,32 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
             _ => "",
         }
     );
-    let json_export = tablepro_core::export::render_json(&source.columns, &source.rows);
+    let json_export = bookie_core::export::render_json(&source.columns, &source.rows);
     assert!(
         json_export.contains(&marker),
         "JSON export must expose the undecodable type marker: {json_export}"
     );
     assert!(
-        tablepro_core::export::render_csv(
+        bookie_core::export::render_csv(
             &source.columns,
             &source.rows,
-            &tablepro_core::export::CsvOptions::default(),
+            &bookie_core::export::CsvOptions::default(),
         )
         .contains(&marker),
         "CSV export must expose the undecodable type marker"
     );
-    let export_result = tablepro_core::QueryResult {
+    let export_result = bookie_core::QueryResult {
         columns: vec![source.columns[0].clone()],
-        rows: vec![vec![refusal.clone()]],
+        rows: vec![vec![refusal.clone()]].into(),
         truncated: false,
     };
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     for (format, expected_marker) in [
-        (tablepro_core::export::ResultFormat::Json, marker.clone()),
-        (tablepro_core::export::ResultFormat::Csv, marker.clone()),
+        (bookie_core::export::ResultFormat::Json, marker.clone()),
+        (bookie_core::export::ResultFormat::Csv, marker.clone()),
         (
-            tablepro_core::export::ResultFormat::Markdown,
+            bookie_core::export::ResultFormat::Markdown,
             marker
                 .replace('<', "&lt;")
                 .replace('>', "&gt;")
@@ -99,19 +99,19 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
                 .replace(']', "&#93;"),
         ),
         (
-            tablepro_core::export::ResultFormat::Html,
+            bookie_core::export::ResultFormat::Html,
             marker.replace('<', "&lt;").replace('>', "&gt;"),
         ),
         (
-            tablepro_core::export::ResultFormat::Xml,
+            bookie_core::export::ResultFormat::Xml,
             marker.replace('<', "&lt;").replace('>', "&gt;"),
         ),
     ] {
         let path = directory.path().join(format!("{format:?}"));
-        tablepro_core::export::write_result_file(
+        bookie_core::export::write_result_file(
             &path,
             &export_result,
-            &tablepro_core::export::ResultExport {
+            &bookie_core::export::ResultExport {
                 format,
                 csv: &csv_options,
                 sql: None,
@@ -128,11 +128,11 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
     }
 
     let xlsx_path = directory.path().join("range-array.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &export_result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -154,13 +154,13 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
 
     let sql_path = directory.path().join("range-array.sql");
     std::fs::write(&sql_path, b"keep existing export").unwrap();
-    let error = tablepro_core::export::write_result_file(
+    let error = bookie_core::export::write_result_file(
         &sql_path,
         &export_result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: Some("custom_range_array_contract"),
                 table: "rows",
@@ -203,7 +203,7 @@ async fn value_contract_custom_range_array_refusal_preserves_target_and_sibling_
     assert_eq!(null_array.rows[0][0], Value::Null);
     assert_eq!(null_array.rows[0][1], Value::Bool(true));
     assert_eq!(null_array.rows[0][2], Value::Null);
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&refusal))
@@ -317,7 +317,7 @@ async fn value_contract_custom_range_scalar_refusal_preserves_target_and_sibling
     assert_eq!(before.rows[0][2], source.rows[0][3]);
     assert_eq!(before.rows[0][3], source.rows[0][4]);
     assert_eq!(before.rows[1][4], Value::Text("sibling".into()));
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+    assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
     assert!(
         connection
             .query_params("SELECT $1", std::slice::from_ref(&refusal))
@@ -432,7 +432,7 @@ async fn value_contract_range_array_refusal_preserves_target_and_sibling_rows() 
         assert_eq!(before.rows[0][4], Value::Text("target".into()));
         assert_eq!(before.rows[1][4], Value::Text("sibling".into()));
 
-        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+        assert!(bookie_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
         assert!(
             connection
                 .query_params("SELECT $1", std::slice::from_ref(&refusal))

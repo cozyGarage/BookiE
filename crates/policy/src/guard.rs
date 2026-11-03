@@ -3,12 +3,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use chrono::Utc;
-use sha2::{Digest, Sha256};
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo,
     OperationControl, QueryResult, QueryResultBatch, TableInfo, Transaction, Value, check_pre_dispatch,
 };
+use chrono::Utc;
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink};
@@ -60,7 +60,7 @@ pub struct PolicyGuard {
 }
 
 enum Counter<'a> {
-    Session(&'a mut dyn tablepro_core::Session),
+    Session(&'a mut dyn bookie_core::Session),
     Transaction(&'a mut dyn Transaction),
 }
 
@@ -956,7 +956,7 @@ impl PolicyGuard {
     }
 }
 
-fn catalog_target(kind: tablepro_core::CatalogObjectKind, schema: Option<&str>) -> Vec<String> {
+fn catalog_target(kind: bookie_core::CatalogObjectKind, schema: Option<&str>) -> Vec<String> {
     match schema.filter(|_| kind.is_schema_scoped()) {
         Some(schema) => vec![format!("{}:{schema}", kind.as_str())],
         None => vec![kind.as_str().to_string()],

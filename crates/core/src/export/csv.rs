@@ -6,6 +6,7 @@ use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
+use crate::query_rows::QueryRowSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CsvDelimiter {
@@ -104,26 +105,29 @@ impl Default for CsvOptions {
     }
 }
 
-pub fn render_csv(columns: &[ColumnInfo], rows: &[Vec<Value>], options: &CsvOptions) -> String {
+pub fn render_csv<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R, options: &CsvOptions) -> String {
     let mut output = String::new();
     if options.header_row {
         output.push_str(&csv_header_line(columns, options));
         output.push_str(options.line_break.as_str());
     }
-    for row in rows {
-        output.push_str(&csv_row_line_for_columns(row, columns, options));
+    for index in 0..rows.row_count() {
+        if let Some(row) = rows.row(index) {
+            output.push_str(&csv_row_line_for_columns(row, columns, options));
+        }
         output.push_str(options.line_break.as_str());
     }
     output
 }
 
-pub fn unique_csv_null_marker(rows: &[Vec<Value>]) -> String {
+pub fn unique_csv_null_marker<R: QueryRowSet + ?Sized>(rows: &R) -> String {
     let mut marker = "\\N".to_string();
-    while rows
-        .iter()
-        .flatten()
-        .any(|value| value_to_text(value).as_deref() == Some(marker.as_str()))
-    {
+    while (0..rows.row_count()).any(|index| {
+        rows.row(index)
+            .into_iter()
+            .flatten()
+            .any(|value| value_to_text(value).as_deref() == Some(marker.as_str()))
+    }) {
         marker.push('N');
     }
     marker
@@ -135,10 +139,6 @@ pub(crate) fn csv_header_line(columns: &[ColumnInfo], options: &CsvOptions) -> S
         .map(|column| escape_csv_field(&column.name, options, false))
         .collect::<Vec<_>>()
         .join(options.delimiter.as_str())
-}
-
-pub(crate) fn csv_row_line(row: &[Value], options: &CsvOptions) -> String {
-    csv_row_line_with_any_columns(row, &[], options)
 }
 
 fn csv_row_line_for_columns(row: &[Value], columns: &[ColumnInfo], options: &CsvOptions) -> String {
@@ -167,7 +167,7 @@ fn csv_row_line_with_any_columns(row: &[Value], any_columns: &[bool], options: &
         .join(options.delimiter.as_str())
 }
 
-pub fn render_tsv(columns: &[ColumnInfo], rows: &[Vec<Value>], with_headers: bool) -> String {
+pub fn render_tsv<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R, with_headers: bool) -> String {
     let options = CsvOptions {
         header_row: with_headers,
         null_to_empty: false,
@@ -175,11 +175,14 @@ pub fn render_tsv(columns: &[ColumnInfo], rows: &[Vec<Value>], with_headers: boo
         delimiter: CsvDelimiter::Tab,
         ..CsvOptions::default()
     };
-    let mut lines = Vec::with_capacity(rows.len() + usize::from(with_headers));
+    let mut lines = Vec::with_capacity(rows.row_count() + usize::from(with_headers));
     if with_headers {
         lines.push(csv_header_line(columns, &options));
     }
-    for row in rows {
+    for index in 0..rows.row_count() {
+        let Some(row) = rows.row(index) else {
+            continue;
+        };
         let cells: Vec<String> = row
             .iter()
             .map(|value| match value_to_text(value) {
@@ -222,11 +225,13 @@ pub fn write_csv_header_with_options(
 /// Escape and write one CSV data row.
 pub fn write_csv_row(writer: &mut impl Write, row: &[Value]) -> io::Result<()> {
     let options = rfc4180_options(false);
-    writeln!(writer, "{}", csv_row_line(row, &options))
+    write_csv_row_inner(writer, row, &options, |_, _| None)?;
+    writer.write_all(b"\n")
 }
 
 pub fn write_csv_row_with_options(writer: &mut impl Write, row: &[Value], options: &CsvOptions) -> io::Result<()> {
-    writeln!(writer, "{}", csv_row_line(row, options))
+    write_csv_row_inner(writer, row, options, |_, _| None)?;
+    writer.write_all(b"\n")
 }
 
 pub fn write_csv_row_with_columns_and_options(
@@ -235,7 +240,160 @@ pub fn write_csv_row_with_columns_and_options(
     row: &[Value],
     options: &CsvOptions,
 ) -> io::Result<()> {
-    writeln!(writer, "{}", csv_row_line_for_columns(row, columns, options))
+    write_csv_row_inner(writer, row, options, |index, value| {
+        let column = columns.get(index)?;
+        let any_type = crate::sqlite_any_csv::is_any_type(&column.data_type)
+            || (options.preserve_sqlite_result_types && crate::sqlite_any_csv::is_unknown_type(&column.data_type));
+        any_type.then(|| crate::sqlite_any_csv::encode(value)).flatten()
+    })?;
+    writer.write_all(b"\n")
+}
+
+fn write_csv_row_inner<W: Write + ?Sized>(
+    writer: &mut W,
+    row: &[Value],
+    options: &CsvOptions,
+    mut encode_any: impl FnMut(usize, &Value) -> Option<String>,
+) -> io::Result<()> {
+    for (index, value) in row.iter().enumerate() {
+        if index > 0 {
+            writer.write_all(options.delimiter.as_str().as_bytes())?;
+        }
+        if let Some(encoded) = encode_any(index, value) {
+            write_csv_text_field(writer, &encoded, options, true, true)?;
+        } else {
+            write_csv_cell(writer, value, options)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_csv_cell<W: Write + ?Sized>(writer: &mut W, value: &Value, options: &CsvOptions) -> io::Result<()> {
+    match value {
+        Value::Null => match (&options.null_marker, options.null_to_empty) {
+            (Some(marker), _) => write_csv_text_field(writer, marker, options, false, false),
+            (None, true) => Ok(()),
+            (None, false) => write_csv_text_field(writer, "NULL", options, false, false),
+        },
+        Value::Text(text) => write_csv_text_field(writer, text, options, options.sanitize_formulas, true),
+        Value::JsonText(text) => write_csv_text_field(writer, text, options, false, true),
+        Value::Bytes(bytes) => write_csv_bytes(writer, bytes, options.quote),
+        value => match value_to_text(value) {
+            Some(text) => write_csv_text_field(writer, &text, options, false, true),
+            None => Ok(()),
+        },
+    }
+}
+
+fn write_csv_text_field<W: Write + ?Sized>(
+    writer: &mut W,
+    text: &str,
+    options: &CsvOptions,
+    sanitize_formulas: bool,
+    transform_value: bool,
+) -> io::Result<()> {
+    if transform_value && text.is_empty() && options.quote != CsvQuote::Never {
+        return writer.write_all(b"\"\"");
+    }
+    let replace_decimal = transform_value && options.decimal == CsvDecimal::Comma && is_plain_decimal(text);
+    let neutralized = sanitize_formulas
+        && text.starts_with(['=', '+', '-', '@', '\t', '\r'])
+        && !(transform_value && options.line_break_to_space && text.starts_with('\r'))
+        && !(options.spare_plain_numbers && !replace_decimal && is_plain_number(text));
+    let had_line_breaks = transform_value && text.contains(['\n', '\r']);
+    let decimal_delimiter_conflict = replace_decimal && options.delimiter == CsvDelimiter::Comma;
+    let quote = match options.quote {
+        CsvQuote::Always => true,
+        CsvQuote::Never => false,
+        CsvQuote::IfNeeded => {
+            text.contains(options.delimiter.as_str())
+                || text.contains(['"', '\n', '\r', '\t'])
+                || had_line_breaks
+                || decimal_delimiter_conflict
+                || neutralized
+        }
+    };
+    if quote {
+        writer.write_all(b"\"")?;
+    }
+    if neutralized {
+        writer.write_all(b"'")?;
+    }
+    write_csv_text_body(
+        writer,
+        text,
+        options,
+        had_line_breaks,
+        replace_decimal,
+        quote,
+        transform_value,
+    )?;
+    if quote {
+        writer.write_all(b"\"")?;
+    }
+    Ok(())
+}
+
+fn write_csv_text_body<W: Write + ?Sized>(
+    writer: &mut W,
+    text: &str,
+    options: &CsvOptions,
+    had_line_breaks: bool,
+    replace_decimal: bool,
+    escape_quotes: bool,
+    transform_value: bool,
+) -> io::Result<()> {
+    let replace_breaks = transform_value && options.line_break_to_space && had_line_breaks;
+    if !replace_breaks && !replace_decimal && !(escape_quotes && text.contains('"')) {
+        return writer.write_all(text.as_bytes());
+    }
+    let mut start = 0;
+    let mut characters = text.char_indices().peekable();
+    while let Some((index, character)) = characters.next() {
+        let end = index + character.len_utf8();
+        let replacement = match character {
+            '"' if escape_quotes => Some((b"\"\"".as_slice(), end)),
+            '\r' if replace_breaks => {
+                let after_pair = characters
+                    .peek()
+                    .filter(|(_, next)| *next == '\n')
+                    .map(|(offset, _)| offset + 1);
+                if after_pair.is_some() {
+                    characters.next();
+                }
+                Some((b" ".as_slice(), after_pair.unwrap_or(end)))
+            }
+            '\n' if replace_breaks => Some((b" ".as_slice(), end)),
+            '.' if replace_decimal => Some((b",".as_slice(), end)),
+            _ => None,
+        };
+        if let Some((replacement, next)) = replacement {
+            writer.write_all(&text.as_bytes()[start..index])?;
+            writer.write_all(replacement)?;
+            start = next;
+        }
+    }
+    writer.write_all(&text.as_bytes()[start..])
+}
+
+fn write_csv_bytes<W: Write + ?Sized>(writer: &mut W, bytes: &[u8], quote: CsvQuote) -> io::Result<()> {
+    if quote == CsvQuote::Always {
+        writer.write_all(b"\"")?;
+    }
+    writer.write_all(b"\\x")?;
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = [0_u8; 512];
+    for chunk in bytes.chunks(encoded.len() / 2) {
+        for (index, byte) in chunk.iter().enumerate() {
+            encoded[index * 2] = HEX[usize::from(byte >> 4)];
+            encoded[index * 2 + 1] = HEX[usize::from(byte & 0x0f)];
+        }
+        writer.write_all(&encoded[..chunk.len() * 2])?;
+    }
+    if quote == CsvQuote::Always {
+        writer.write_all(b"\"")?;
+    }
+    Ok(())
 }
 
 fn is_plain_number(value: &str) -> bool {
@@ -350,7 +508,13 @@ impl ResultWriter for CsvWriter {
     }
 
     fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
-        output.write_all(csv_row_line_with_any_columns(row, &self.any_columns, &self.rows).as_bytes())?;
+        write_csv_row_inner(output, row, &self.rows, |index, value| {
+            if self.any_columns.get(index) == Some(&true) {
+                crate::sqlite_any_csv::encode(value)
+            } else {
+                None
+            }
+        })?;
         output.write_all(self.rows.line_break.as_str().as_bytes())?;
         Ok(())
     }

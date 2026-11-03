@@ -13,6 +13,7 @@ mod dialog_focus;
 mod display;
 mod editing;
 mod export;
+mod font_zoom;
 pub(crate) mod full_value_editor;
 #[cfg(test)]
 mod lifetime_tests;
@@ -27,7 +28,7 @@ pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_null};
 
 use gtk4::prelude::*;
 
-use tablepro_core::{ColumnInfo, QueryResult};
+use bookie_core::{ColumnInfo, QueryResult};
 
 use crate::services::database_service::DatabaseService;
 use crate::ui::row_store::RowStore;
@@ -36,6 +37,7 @@ use column::{build_column, header_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
+pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_null_display, value_to_display_text};
 pub(crate) use value_viewer::present as present_value_viewer;
@@ -58,35 +60,35 @@ pub enum GridMsg {
         /// Primary-key values read when the editor opened. The receiver
         /// rejects the edit if the row now at `row_position` is a
         /// different one.
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
     },
     CellEditedValue {
         row_position: u32,
         col_index: usize,
-        value: tablepro_core::Value,
-        row_key: Vec<tablepro_core::Value>,
+        value: bookie_core::Value,
+        row_key: Vec<bookie_core::Value>,
     },
     CopyToClipboard(String),
     FetchCellValue {
         col_index: usize,
         column_name: String,
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
         edit_row_position: Option<u32>,
     },
     IncompleteRowData,
     ProjectionFailure,
-    CopyRowAsStatement(u32, tablepro_core::sql_literal::RowStatement),
+    CopyRowAsStatement(u32, bookie_core::sql_literal::RowStatement),
     ShowRowAsJson(String),
     ExportResults(std::sync::Arc<QueryResult>),
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
     SetCellNull {
         row_position: u32,
         col_index: usize,
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
     },
     DeleteRowAt {
         row_position: u32,
-        row_key: Vec<tablepro_core::Value>,
+        row_key: Vec<bookie_core::Value>,
     },
     InsertRow,
     DuplicateRow {
@@ -94,14 +96,16 @@ pub enum GridMsg {
     },
     FilterByValue {
         column: String,
-        value: tablepro_core::Value,
+        value: bookie_core::Value,
+        exclude: bool,
     },
+    ShowToast(String),
     GoToReference {
         column: String,
-        row: Vec<(String, tablepro_core::Value)>,
+        row: Vec<(String, bookie_core::Value)>,
     },
     ShowReferencingRows {
-        row: Vec<(String, tablepro_core::Value)>,
+        row: Vec<(String, bookie_core::Value)>,
     },
 }
 
@@ -116,6 +120,8 @@ pub struct TabGridContext {
     pub local_result_sort: bool,
     pub row_mutations_allowed: bool,
     pub local_result_view: Option<local_filter::LocalResultView>,
+    pub(crate) result_model: Option<gtk4::gio::ListModel>,
+    pub(crate) row_visibility: Option<std::rc::Rc<dyn Fn(u32, bool)>>,
     pub sortable_result_columns: std::collections::HashSet<usize>,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the
@@ -124,7 +130,11 @@ pub struct TabGridContext {
     pub has_inbound_foreign_keys: bool,
     pub filters_unavailable: bool,
     pub choices: ChoiceMap,
+    pub ambiguous_keys: AmbiguousKeys,
 }
+
+pub type AmbiguousKeys =
+    std::rc::Rc<std::cell::RefCell<std::collections::HashSet<crate::services::change_tracker::RowKey>>>;
 
 pub type ChoiceMap = std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, (bool, Vec<String>)>>>;
 
@@ -172,7 +182,7 @@ pub fn build_column_view(
                 }
                 RowStore::from_shared(std::sync::Arc::new(QueryResult {
                     columns: schema_columns.to_vec(),
-                    rows: Vec::new(),
+                    rows: Vec::new().into(),
                     truncated: false,
                 }))
             }
@@ -191,8 +201,11 @@ pub fn build_column_view(
     } else {
         &result.columns
     };
-    let selection = gtk4::MultiSelection::new(Some(store.clone()));
-    if let Some(local_result_view) = &tab_ctx.local_result_view {
+    let model = tab_ctx.result_model.clone().unwrap_or_else(|| store.clone().upcast());
+    let selection = gtk4::MultiSelection::new(Some(model));
+    if tab_ctx.result_model.is_none()
+        && let Some(local_result_view) = &tab_ctx.local_result_view
+    {
         local_result_view.attach(store.clone(), selection.clone());
     }
     let column_view = gtk4::ColumnView::builder()
@@ -201,7 +214,7 @@ pub fn build_column_view(
         .show_column_separators(true)
         .build();
 
-    let grid_menus = menu_sender.as_ref().map(|sender| {
+    if let Some(sender) = menu_sender.as_ref() {
         let driver_id = connection_id
             .and_then(|id| database.metadata(id))
             .map(|metadata| metadata.driver_id)
@@ -218,9 +231,10 @@ pub fn build_column_view(
                 foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
                 has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
                 local_result_view: tab_ctx.local_result_view.clone(),
+                snapshot_export: tab_ctx.result_model.is_none(),
             },
-        )
-    });
+        );
+    }
 
     let default_min_width = if columns.len() > WIDE_TABLE_THRESHOLD {
         Some(MIN_COLUMN_WIDTH_PX)
@@ -241,7 +255,6 @@ pub fn build_column_view(
             tab_ctx.clone(),
             sort_sender.is_some() || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
             default_min_width,
-            grid_menus.clone(),
             column_widths.clone(),
         );
         col.set_id(Some(&i.to_string()));
@@ -275,11 +288,14 @@ pub fn build_column_view(
         connection_id,
         database,
     );
-    row_find::install(
-        &column_view,
-        &grid_actions,
-        columns.iter().map(|column| column.name.clone()).collect(),
-    );
+    if tab_ctx.result_model.is_none() {
+        row_find::install(
+            &column_view,
+            &grid_actions,
+            columns.iter().map(|column| column.name.clone()).collect(),
+        );
+    }
+    font_zoom::install(&column_view, &grid_actions);
     column_view.insert_action_group("grid", Some(&grid_actions));
 
     if let Some((col_idx, ascending)) = sort
@@ -360,9 +376,7 @@ fn sort_local_result(
 }
 
 pub(crate) fn sortable_result_columns(result: &QueryResult) -> std::collections::HashSet<usize> {
-    (0..result.columns.len())
-        .filter(|column| local_sort::is_sortable_column(result, *column))
-        .collect()
+    local_sort::sortable_columns(result)
 }
 
 pub(crate) fn jump_to_column(widget: &gtk4::Widget) -> bool {
@@ -374,11 +388,65 @@ mod local_sort_tests {
     use super::*;
 
     #[test]
+    fn sortable_columns_preserve_null_mixed_type_and_missing_cell_rules() {
+        let columns = (0..5)
+            .map(|index| ColumnInfo {
+                name: format!("column_{index}"),
+                data_type: "INTEGER".into(),
+                nullable: true,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            })
+            .collect();
+        let result = QueryResult {
+            columns,
+            rows: vec![
+                vec![
+                    bookie_core::Value::Int(1),
+                    bookie_core::Value::Null,
+                    bookie_core::Value::Int(3),
+                    bookie_core::Value::Int(4),
+                    bookie_core::Value::Int(5),
+                ],
+                vec![
+                    bookie_core::Value::Null,
+                    bookie_core::Value::Null,
+                    bookie_core::Value::Text("3".into()),
+                    bookie_core::Value::Undecodable("unknown".into()),
+                ],
+            ]
+            .into(),
+            truncated: false,
+        };
+
+        let expected = std::collections::HashSet::from([0, 1]);
+        assert_eq!(sortable_result_columns(&result), expected);
+        for column in 0..result.columns.len() {
+            assert_eq!(
+                local_sort::is_sortable_column(&result, column),
+                expected.contains(&column)
+            );
+        }
+        let empty = QueryResult {
+            columns: result.columns.clone(),
+            rows: Vec::new().into(),
+            truncated: false,
+        };
+        assert_eq!(sortable_result_columns(&empty), (0..result.columns.len()).collect());
+    }
+
+    #[test]
     #[ignore = "requires isolated GTK display"]
     fn local_sort_keeps_selection_attached_to_its_source_row() {
         gtk4::init().unwrap();
         let result = std::sync::Arc::new(QueryResult {
-            columns: vec![tablepro_core::ColumnInfo {
+            columns: vec![bookie_core::ColumnInfo {
                 name: "value".into(),
                 data_type: "INTEGER".into(),
                 nullable: false,
@@ -392,10 +460,11 @@ mod local_sort_tests {
                 domain_type: None,
             }],
             rows: vec![
-                vec![tablepro_core::Value::Int(3)],
-                vec![tablepro_core::Value::Int(1)],
-                vec![tablepro_core::Value::Int(2)],
-            ],
+                vec![bookie_core::Value::Int(3)],
+                vec![bookie_core::Value::Int(1)],
+                vec![bookie_core::Value::Int(2)],
+            ]
+            .into(),
             truncated: false,
         });
         let store = RowStore::from_shared(result.clone());
@@ -411,7 +480,7 @@ mod local_sort_tests {
         assert_eq!(store.source_index_at(positions.nth(1)), Some(0));
         assert_eq!(
             store.source_value_at(positions.nth(1), 0),
-            Some(tablepro_core::Value::Int(3))
+            Some(bookie_core::Value::Int(3))
         );
     }
 
@@ -421,10 +490,10 @@ mod local_sort_tests {
         gtk4::init().unwrap();
         let rows = (0..2000_i64)
             .rev()
-            .map(|value| vec![tablepro_core::Value::Int(value)])
+            .map(|value| vec![bookie_core::Value::Int(value)])
             .collect();
         let result = std::sync::Arc::new(QueryResult {
-            columns: vec![tablepro_core::ColumnInfo {
+            columns: vec![bookie_core::ColumnInfo {
                 name: "value".into(),
                 data_type: "INTEGER".into(),
                 nullable: false,

@@ -1,6 +1,6 @@
-use tablepro_core::sql_dialect::quote_ident;
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
+use bookie_core::sql_dialect::quote_ident;
+use bookie_core::sql_syntax::SqlGrammar;
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
 
 pub(super) fn plan(text: &str, grammar: Option<SqlGrammar>) -> ScriptPlan {
     plan_with(text, grammar, None)
@@ -124,10 +124,7 @@ pub fn table_key(text: &str, grammar: Option<SqlGrammar>) -> Option<String> {
 pub(super) fn bare_reference(text: &str, grammar: Option<SqlGrammar>) -> Option<String> {
     split_table_reference(text, grammar)?;
     let plan = plan(text, grammar);
-    let token = plan
-        .tokens(0..text.len())
-        .filter(|token| !token.kind.is_trivia())
-        .last()?;
+    let token = plan.tokens(0..text.len()).rfind(|token| !token.kind.is_trivia())?;
     Some(text[token.range].to_string())
 }
 

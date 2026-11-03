@@ -49,13 +49,13 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
     assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let json_path = directory.path().join("timestamptz-array.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -67,11 +67,11 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
     assert_eq!(json_file[0]["value"], *driver_text);
 
     let csv_path = directory.path().join("timestamptz-array.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -84,11 +84,11 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
 
     let xlsx_path = directory.path().join("timestamptz-array.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -117,13 +117,13 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
         .await
         .unwrap();
     let sql_path = directory.path().join("timestamptz-array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "timestamptz_array_filewriter_target",
@@ -202,13 +202,13 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
     assert_eq!(rebound.rows[0][0], oracle.rows[0][3]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let json_path = directory.path().join("timestamptz-array-non-utc.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -220,11 +220,11 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
     assert_eq!(json_file[0]["value"], *driver_text);
 
     let csv_path = directory.path().join("timestamptz-array-non-utc.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -260,17 +260,17 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
         .await
         .unwrap();
     let csv_text = std::fs::read(&csv_path).unwrap();
-    let import_options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(&csv_text, &import_options, None).unwrap();
+    let import_options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(&csv_text, &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(None, "timestamptz_array_csv_import_target")
         .await
         .unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: Some("public"),
             table: "timestamptz_array_csv_import_target",
             columns: &columns,
@@ -298,15 +298,15 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
         csv_restored.rows.contains(&expected_utc.rows[0]),
         "CSV import produced {:?}, expected {:?}",
         csv_restored.rows,
-        expected_utc.rows[0]
+        &expected_utc.rows[0]
     );
 
     let xlsx_path = directory.path().join("timestamptz-array-non-utc.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -335,13 +335,13 @@ async fn value_contract_timestamptz_array_file_exports_preserve_instants_under_n
         .await
         .unwrap();
     let sql_path = directory.path().join("timestamptz-array-non-utc.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "timestamptz_array_non_utc_target",
@@ -425,13 +425,13 @@ async fn value_contract_interval_array_file_exports_preserve_values_under_interv
     assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let json_path = directory.path().join("interval-array.json");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &json_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Json,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Json,
             csv: &csv_options,
             sql: None,
         },
@@ -443,11 +443,11 @@ async fn value_contract_interval_array_file_exports_preserve_values_under_interv
     assert_eq!(json_file[0]["value"], *driver_text);
 
     let csv_path = directory.path().join("interval-array.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -460,11 +460,11 @@ async fn value_contract_interval_array_file_exports_preserve_values_under_interv
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
 
     let xlsx_path = directory.path().join("interval-array.xlsx");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &xlsx_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Xlsx,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Xlsx,
             csv: &csv_options,
             sql: None,
         },
@@ -489,13 +489,13 @@ async fn value_contract_interval_array_file_exports_preserve_values_under_interv
     assert!(!sheet.contains("<f>"), "{sheet}");
 
     let sql_path = directory.path().join("interval-array.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "interval_array_filewriter_target",
@@ -558,15 +558,15 @@ async fn value_contract_interval_array_csv_and_sql_replay_survive_intervalstyle_
     };
 
     let directory = tempfile::tempdir().unwrap();
-    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_options = bookie_core::export::CsvOptions::default();
     let sql_path = directory.path().join("interval-array-style-transition.sql");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &sql_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Sql,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Sql,
             csv: &csv_options,
-            sql: Some(tablepro_core::export::SqlTarget {
+            sql: Some(bookie_core::export::SqlTarget {
                 driver_id: "postgres",
                 schema: None,
                 table: "interval_style_transition_target",
@@ -582,11 +582,11 @@ async fn value_contract_interval_array_csv_and_sql_replay_survive_intervalstyle_
         .unwrap();
 
     let csv_path = directory.path().join("interval-array-style-transition.csv");
-    tablepro_core::export::write_result_file(
+    bookie_core::export::write_result_file(
         &csv_path,
         &result,
-        &tablepro_core::export::ResultExport {
-            format: tablepro_core::export::ResultFormat::Csv,
+        &bookie_core::export::ResultExport {
+            format: bookie_core::export::ResultFormat::Csv,
             csv: &csv_options,
             sql: None,
         },
@@ -658,7 +658,7 @@ async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
         assert_eq!(result.rows[0][2], Value::Text(expected_text.into()), "{expected_type}");
         assert_eq!(result.rows[0][3], Value::Text(expected_json.into()), "{expected_type}");
         assert!(
-            tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err(),
+            bookie_core::sql_literal::render_sql_literal("postgres", value).is_err(),
             "{expected_type}"
         );
         assert!(
@@ -721,7 +721,7 @@ async fn value_contract_pg_lsn_array_result_bind_keyed_edit_and_csv_are_exact() 
         .unwrap();
     let mut columns = connection.fetch_columns(None, "pg_lsn_array_grid").await.unwrap();
     columns[0].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "pg_lsn_array_grid",
@@ -759,19 +759,19 @@ async fn value_contract_pg_lsn_array_result_bind_keyed_edit_and_csv_are_exact() 
     assert_eq!(after_invalid.rows[0][0], source.rows[0][4]);
 
     connection.execute("CREATE TABLE pg_lsn_csv_target (value pg_lsn[])").await.unwrap();
-    let csv = tablepro_core::export::render_csv(
+    let csv = bookie_core::export::render_csv(
         &source.columns[..1],
         &[source.rows[0][..1].to_vec()],
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection.fetch_columns(None, "pg_lsn_csv_target").await.unwrap();
-    let plan = tablepro_core::import::build_insert_plan(
-        &tablepro_core::import::ImportTarget {
+    let plan = bookie_core::import::build_insert_plan(
+        &bookie_core::import::ImportTarget {
             driver_id: "postgres",
 
-            capabilities: tablepro_core::DriverCapabilities::default(),
+            capabilities: bookie_core::DriverCapabilities::default(),
             schema: None,
             table: "pg_lsn_csv_target",
             columns: &columns,
@@ -837,7 +837,7 @@ async fn value_contract_macaddr_array_binding_and_keyed_edit_preserve_native_byt
         .expect("assignment context infers macaddr[] for a binary array parameter");
     let mut columns = connection.fetch_columns(None, "macaddr_array_grid").await.unwrap();
     columns[0].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "macaddr_array_grid",
@@ -916,7 +916,7 @@ async fn value_contract_macaddr8_array_binding_and_keyed_edit_preserve_native_by
         .expect("assignment context infers macaddr8[] for a binary array parameter");
     let mut columns = connection.fetch_columns(None, "macaddr8_array_grid").await.unwrap();
     columns[0].primary_key = true;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "macaddr8_array_grid",
@@ -974,7 +974,7 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
     let mut refused_names = Vec::new();
     let mut blocked = Vec::new();
 
-    for row in catalog.rows {
+    for row in catalog.rows.into_rows() {
         let Value::Int(oid) = row[0] else {
             panic!("unexpected catalog OID: {:?}", row[0])
         };
@@ -1013,7 +1013,7 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
         if supported_oids.contains(&(oid as u32)) {
             seen_supported.push(oid as u32);
             assert_eq!(value, &Value::Text("{NULL}".into()), "supported {array_type}");
-            assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_ok());
+            assert!(bookie_core::sql_literal::render_sql_literal("postgres", value).is_ok());
         } else {
             refused += 1;
             refused_names.push(array_type.clone());
@@ -1024,7 +1024,7 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
                     "{array_type} must retain its native type name: {value:?}"
                 );
             }
-            assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
+            assert!(bookie_core::sql_literal::render_sql_literal("postgres", value).is_err());
             assert!(
                 connection
                     .query_params("SELECT $1", std::slice::from_ref(value))

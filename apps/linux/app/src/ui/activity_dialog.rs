@@ -9,7 +9,9 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
-use tablepro_core::{ActivityQuery, ActivityUnsupported, Value, activity_kinds, activity_sql, parse_session_id};
+use bookie_core::{
+    ActivityQuery, ActivityUnsupported, QueryRowSet, Value, activity_kinds, activity_sql, parse_session_id,
+};
 
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
@@ -240,11 +242,12 @@ fn unsupported_text(driver_id: &str) -> String {
     }
 }
 
-fn render_result(columns: &[String], rows: &[Vec<Value>]) -> String {
+fn render_result<R: QueryRowSet + ?Sized>(columns: &[String], rows: &R) -> String {
     let mut out = String::new();
     out.push_str(&columns.join("\t"));
     out.push('\n');
-    for row in rows {
+    for row_index in 0..rows.row_count() {
+        let Some(row) = rows.row(row_index) else { continue };
         let cells: Vec<String> = row.iter().map(value_to_string).collect();
         out.push_str(&cells.join("\t"));
         out.push('\n');

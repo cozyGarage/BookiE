@@ -1,9 +1,9 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
 use relm4::gtk::{gio::prelude::ListModelExt, glib::prelude::Cast};
 use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 use uuid::Uuid;
 
 pub(super) fn column(name: &str, primary_key: bool) -> ColumnInfo {
@@ -56,7 +56,7 @@ pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<Br
             schema: Some("public".into()),
             table: "notes".into(),
             driver_id: "postgres".into(),
-            enum_input_style: tablepro_core::EnumInputStyle::RawValue,
+            enum_input_style: bookie_core::EnumInputStyle::RawValue,
             browse_filters: true,
             connection_id: None,
             read_only,
@@ -662,7 +662,7 @@ pub(super) fn load_two_rows(controller: &relm4::Controller<BrowseTab>, observed:
             request,
             result: QueryResult {
                 columns,
-                rows,
+                rows: rows.into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -707,7 +707,7 @@ fn load_keyless_row(controller: &relm4::Controller<BrowseTab>, observed: &Receiv
             request,
             result: QueryResult {
                 columns,
-                rows: vec![vec![Value::Text("original".into())]],
+                rows: vec![vec![Value::Text("original".into())]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -737,7 +737,7 @@ fn load_generated_column_row(controller: &relm4::Controller<BrowseTab>, observed
             request,
             result: QueryResult {
                 columns,
-                rows: vec![vec![Value::Int(1), Value::Text("database value".into())]],
+                rows: vec![vec![Value::Int(1), Value::Text("database value".into())]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -767,7 +767,7 @@ fn load_undecodable_cell_row(controller: &relm4::Controller<BrowseTab>, observed
             request,
             result: QueryResult {
                 columns,
-                rows: vec![vec![Value::Int(1), Value::Undecodable("NUMERIC".into())]],
+                rows: vec![vec![Value::Int(1), Value::Undecodable("NUMERIC".into())]].into(),
                 truncated: false,
             },
             projected_columns: None,
@@ -1107,7 +1107,7 @@ fn a_foreign_key_that_arrives_after_the_rows_marks_its_header() {
 
     controller
         .sender()
-        .send(BrowseTabInput::ForeignKeysLoaded(vec![tablepro_core::ForeignKeyInfo {
+        .send(BrowseTabInput::ForeignKeysLoaded(vec![bookie_core::ForeignKeyInfo {
             name: "notes_title_fk".into(),
             columns: vec!["title".into()],
             ref_schema: Some("public".into()),

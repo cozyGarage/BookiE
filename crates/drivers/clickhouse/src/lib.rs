@@ -18,10 +18,10 @@ use serde::Deserialize;
 use tls::https_connector;
 use value_literal::literal;
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text,
-    looks_like_tls_failure, run_server_cancellable, sql_dialect::quote_ident,
+    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
+    error_chain_text, looks_like_tls_failure, run_server_cancellable, sql_dialect::quote_ident,
 };
 
 const DRIVER_ID: &str = "clickhouse";
@@ -86,7 +86,7 @@ impl DatabaseDriver for ClickhouseDriver {
             HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls, opts.service_address().0)?);
         let mut client = clickhouse::Client::with_http_client(http)
             .with_url(url)
-            .with_product_info("tablepro-linux", env!("CARGO_PKG_VERSION"));
+            .with_product_info("bookie-linux", env!("CARGO_PKG_VERSION"));
         if !opts.username.is_empty() {
             client = client.with_user(opts.username);
         }
@@ -446,7 +446,8 @@ async fn fetch_result(
 
     let columns = response_columns(names, types)?;
 
-    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut rows = QueryRows::with_capacity(max_rows.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(line) = reader.next_line().await? {
@@ -459,7 +460,7 @@ async fn fetch_result(
             truncated = true;
             break;
         }
-        let Some(row) = budget.decode_and_admit_row(columns.len(), line.len(), || {
+        if !budget.decode_and_admit_row_into(columns.len(), line.len(), &mut decoded, |values| {
             let raw = parse_row(&line)?;
             if let Some(message) = exception_row_message(&raw) {
                 return Err(DriverError::Query {
@@ -468,13 +469,12 @@ async fn fetch_result(
                     position: None,
                 });
             }
-            response_row(raw, &columns)
-        })?
-        else {
+            response_row_into(raw, &columns, values)
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(row);
+        }
+        rows.push_row(&mut decoded);
     }
 
     Ok(QueryResult {
@@ -511,7 +511,14 @@ fn response_columns(names: Vec<String>, types: Vec<String>) -> Result<Vec<Column
         .collect())
 }
 
+#[cfg(test)]
 fn response_row(raw: Vec<RowCell>, columns: &[ColumnInfo]) -> Result<Vec<Value>, DriverError> {
+    let mut values = Vec::with_capacity(columns.len());
+    response_row_into(raw, columns, &mut values)?;
+    Ok(values)
+}
+
+fn response_row_into(raw: Vec<RowCell>, columns: &[ColumnInfo], values: &mut Vec<Value>) -> Result<(), DriverError> {
     if raw.len() != columns.len() {
         return Err(DriverError::Internal(format!(
             "clickhouse response row width mismatch: {} values, {} columns",
@@ -519,10 +526,10 @@ fn response_row(raw: Vec<RowCell>, columns: &[ColumnInfo]) -> Result<Vec<Value>,
             columns.len()
         )));
     }
-    raw.into_iter()
-        .zip(columns)
-        .map(|(cell, column)| response_cell(cell, &column.data_type))
-        .collect()
+    for (cell, column) in raw.into_iter().zip(columns) {
+        values.push(response_cell(cell, &column.data_type)?);
+    }
+    Ok(())
 }
 
 fn response_cell(cell: RowCell, data_type: &str) -> Result<Value, DriverError> {
@@ -546,7 +553,7 @@ fn response_cell(cell: RowCell, data_type: &str) -> Result<Value, DriverError> {
 fn empty_result() -> QueryResult {
     QueryResult {
         columns: Vec::new(),
-        rows: Vec::new(),
+        rows: Vec::new().into(),
         truncated: false,
     }
 }

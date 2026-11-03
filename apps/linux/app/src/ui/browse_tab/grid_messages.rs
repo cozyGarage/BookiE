@@ -54,7 +54,8 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::DeleteRowAt { row_position, row_key } => BrowseTabInput::GridDeleteRowAt { row_position, row_key },
         GridMsg::InsertRow => BrowseTabInput::InsertRow,
         GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
-        GridMsg::FilterByValue { column, value } => BrowseTabInput::FilterByValue { column, value },
+        GridMsg::FilterByValue { column, value, exclude } => BrowseTabInput::FilterByValue { column, value, exclude },
+        GridMsg::ShowToast(message) => BrowseTabInput::ShowToast(message),
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
     }
@@ -63,7 +64,7 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
 fn fetch_cell_input(
     col_index: usize,
     column_name: String,
-    row_key: Vec<tablepro_core::Value>,
+    row_key: Vec<bookie_core::Value>,
     edit_row_position: Option<u32>,
 ) -> BrowseTabInput {
     BrowseTabInput::GridFetchCellValue {

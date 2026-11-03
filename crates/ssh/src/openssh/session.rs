@@ -274,7 +274,7 @@ fn spawn_master(
         .env("SSH_ASKPASS", &context.askpass_program)
         .env("SSH_ASKPASS_REQUIRE", "force")
         .env_remove("SSH_ASKPASS_PROMPT")
-        .env("TABLEPRO_ASKPASS_SOCKET", master_dir.path().join(ASKPASS_SOCKET))
+        .env("BOOKIE_ASKPASS_SOCKET", master_dir.path().join(ASKPASS_SOCKET))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -455,7 +455,7 @@ async fn collect_stderr(stderr: ChildStderr, tail: Arc<Mutex<String>>) {
     let mut segments = BufReader::new(stderr).split(b'\n');
     while let Ok(Some(bytes)) = segments.next_segment().await {
         let line = String::from_utf8_lossy(&bytes);
-        tracing::debug!(target: "tablepro_ssh::openssh::master", "{line}");
+        tracing::debug!(target: "bookie_ssh::openssh::master", "{line}");
         append_bounded(&mut lock(&tail), &line);
     }
 }

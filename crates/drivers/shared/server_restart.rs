@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::time::{Duration, Instant};
 
-use tablepro_core::DriverError;
+use bookie_core::DriverError;
 
 /// Retry the driver's real connection and operation while a restarted service
 /// finishes booting. Only connection failures, timeouts and Redis's startup

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
-use tablepro_core::{ColumnInfo, QueryResult, Value};
 
 use crate::services::column_widths::ColumnWidthStore;
 use crate::services::database_service::DatabaseService;
@@ -66,7 +66,8 @@ fn verify_fixed_width(saved: bool, persistent: bool) {
         rows: vec![vec![
             Value::Text("first-value".into()),
             Value::Text("second-value".into()),
-        ]],
+        ]]
+        .into(),
         truncated: false,
     });
     let (view, _) = build_column_view(

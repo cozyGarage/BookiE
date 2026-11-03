@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
+use bookie_core::{Connection, Value};
 use rust_decimal::Decimal;
-use tablepro_core::{Connection, Value};
 
 pub(super) async fn assert_contract(connection: &dyn Connection) {
     let positive_scale_38 = format!("0.{}1", "0".repeat(37));
@@ -69,7 +69,8 @@ pub(super) async fn assert_contract(connection: &dyn Connection) {
         "wide native decimals must fall back to exact text while representable values remain decimal",
     );
     assert_native_text(connection, "numeric_source").await;
-    copy_bound_rows(connection, "numeric_bound", &source.rows).await;
+    let bound_rows = source.rows.clone().into_rows();
+    copy_bound_rows(connection, "numeric_bound", &bound_rows).await;
     create_copy_table(connection, "numeric_csv").await;
     let columns = connection.fetch_columns(None, "numeric_csv").await.unwrap();
     let source_columns = connection.fetch_columns(None, "numeric_source").await.unwrap();
@@ -170,21 +171,21 @@ async fn assert_native_text(connection: &dyn Connection, table: &str) {
     );
 }
 
-fn csv_round_trip(source: &tablepro_core::QueryResult, columns: &[tablepro_core::ColumnInfo]) -> Vec<Vec<Value>> {
-    let csv = tablepro_core::export::render_csv(
+fn csv_round_trip(source: &bookie_core::QueryResult, columns: &[bookie_core::ColumnInfo]) -> Vec<Vec<Value>> {
+    let csv = bookie_core::export::render_csv(
         &source.columns,
         &source.rows,
-        &tablepro_core::export::CsvOptions::default(),
+        &bookie_core::export::CsvOptions::default(),
     );
-    let options = tablepro_core::import::CsvImportOptions::default();
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let options = bookie_core::import::CsvImportOptions::default();
+    let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let mapping = (0..source.columns.len()).map(Some).collect::<Vec<_>>();
     sheet
         .rows
         .iter()
         .enumerate()
         .map(|(index, fields)| {
-            tablepro_core::import::row_to_values(fields, &mapping, columns, &options, index + 2).unwrap()
+            bookie_core::import::row_to_values(fields, &mapping, columns, &options, index + 2).unwrap()
         })
         .collect()
 }
@@ -195,20 +196,21 @@ mod tests {
 
     #[test]
     fn csv_keeps_wide_decimals_as_exact_text_and_null_distinct() {
-        let source = tablepro_core::QueryResult {
+        let source = bookie_core::QueryResult {
             columns: vec![column("wide", "decimal(38,0)"), column("high_scale", "decimal(38,30)")],
             rows: vec![vec![
                 Value::Text("99999999999999999999999999999999999999".into()),
                 Value::Text("12345678.123456789012345678901234567890".into()),
-            ]],
+            ]]
+            .into(),
             truncated: false,
         };
         let restored = csv_round_trip(&source, &source.columns);
-        assert_eq!(restored, source.rows);
+        assert_eq!(source.rows, restored);
     }
 
-    fn column(name: &str, data_type: &str) -> tablepro_core::ColumnInfo {
-        tablepro_core::ColumnInfo {
+    fn column(name: &str, data_type: &str) -> bookie_core::ColumnInfo {
+        bookie_core::ColumnInfo {
             name: name.into(),
             data_type: data_type.into(),
             nullable: true,

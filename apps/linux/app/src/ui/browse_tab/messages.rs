@@ -1,5 +1,5 @@
 use super::{BrowseCellValueRequest, BrowsePageRequest, BrowseRowCountRequest, paste, reference};
-use tablepro_core::{ColumnInfo, ForeignKeyInfo, InboundForeignKeyInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, ForeignKeyInfo, InboundForeignKeyInfo, QueryResult, Value};
 
 #[derive(Debug)]
 pub enum BrowseTabInput {
@@ -25,7 +25,7 @@ pub enum BrowseTabInput {
     Refresh,
     ClearSelection,
     ToggleFilterStrip,
-    FilterApplied(tablepro_core::FilterSet),
+    FilterApplied(bookie_core::FilterSet),
     FirstPage,
     PrevPage,
     NextPage,
@@ -47,8 +47,10 @@ pub enum BrowseTabInput {
     },
     FilterByValue {
         column: String,
-        value: tablepro_core::Value,
+        value: bookie_core::Value,
+        exclude: bool,
     },
+    ShowToast(String),
     GoToReference {
         column: String,
         row: Vec<(String, Value)>,
@@ -65,7 +67,7 @@ pub enum BrowseTabInput {
         row_position: u32,
         row_key: Vec<Value>,
     },
-    GridCopyRowAsStatement(u32, tablepro_core::sql_literal::RowStatement),
+    GridCopyRowAsStatement(u32, bookie_core::sql_literal::RowStatement),
     DuplicateRow {
         row_position: u32,
     },
@@ -113,7 +115,7 @@ pub enum BrowseTabOutput {
     OpenReferencedRow {
         schema: Option<String>,
         table: String,
-        filter: tablepro_core::FilterSet,
+        filter: bookie_core::FilterSet,
     },
     ChooseReferencedRow(Vec<reference::ReferencedRowTarget>),
     FetchPage,
@@ -128,7 +130,7 @@ pub enum BrowseTabOutput {
     StateChanged,
     CopyRowAsStatement {
         row_position: u32,
-        statement: tablepro_core::sql_literal::RowStatement,
+        statement: bookie_core::sql_literal::RowStatement,
     },
     CopyToClipboard(String),
     ShowRowAsJson(String),

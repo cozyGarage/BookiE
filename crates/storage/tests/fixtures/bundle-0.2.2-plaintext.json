@@ -1,0 +1,27 @@
+{
+  "format": "tablepro.connection-bundle",
+  "version": 3,
+  "producer": "bookie 0.2.0",
+  "exported_at": "2026-09-19T10:00:00Z",
+  "payload": {
+    "kind": "plaintext",
+    "body": {
+      "connections": [
+        {
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "legacy fixture",
+          "driver_id": "postgres",
+          "host": "db.example",
+          "port": 5432,
+          "database": "sales",
+          "username": "reader",
+          "tls_mode": "require",
+          "read_only": false,
+          "auth_mode": "password",
+          "environment": "dev"
+        }
+      ],
+      "organization": {}
+    }
+  }
+}

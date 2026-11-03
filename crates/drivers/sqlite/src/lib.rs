@@ -15,10 +15,10 @@ use sqlx::{
 
 use futures::stream::StreamExt;
 
-use tablepro_core::{
+use bookie_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo,
-    Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows,
+    TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -113,7 +113,7 @@ impl DatabaseDriver for SqliteDriver {
 
 pub(crate) async fn attach_databases_to_connection(
     conn: &mut SqlxSqliteConnection,
-    attached: &[tablepro_core::AttachedDatabase],
+    attached: &[bookie_core::AttachedDatabase],
 ) {
     for db in attached {
         let expanded = expand_tilde(&db.path);
@@ -143,7 +143,7 @@ fn expand_tilde(path: &str) -> String {
 struct SqliteConnection {
     pool: Pool<Sqlite>,
     session_options: Option<SqliteConnectOptions>,
-    attached_databases: Vec<tablepro_core::AttachedDatabase>,
+    attached_databases: Vec<bookie_core::AttachedDatabase>,
 }
 
 // `foreign_key_list.to` is NULL when a key references the parent's primary key implicitly.
@@ -352,7 +352,7 @@ impl Connection for SqliteConnection {
         self.query_params_controlled(sql, &[], control).await
     }
 
-    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+    async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         match &self.session_options {
             Some(options) => session::open(options, &self.attached_databases).await,
             None => Err(DriverError::Unsupported(
@@ -570,7 +570,7 @@ impl Connection for SqliteConnection {
         Ok(())
     }
 
-    async fn begin(&self) -> Result<Box<dyn tablepro_core::Transaction>, DriverError> {
+    async fn begin(&self) -> Result<Box<dyn bookie_core::Transaction>, DriverError> {
         let tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         Ok(Box::new(SqliteTransaction { tx: Some(tx) }))
     }
@@ -595,7 +595,7 @@ struct SqliteTransaction {
 }
 
 #[async_trait]
-impl tablepro_core::Transaction for SqliteTransaction {
+impl bookie_core::Transaction for SqliteTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
         let tx = self
             .tx
@@ -642,7 +642,8 @@ async fn stream_into_result(
     let columns = result_columns(connection, statement.columns(), sql).await;
     drop(statement);
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
-    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -652,14 +653,14 @@ async fn stream_into_result(
             break;
         }
         let payload_bytes = sqlite_row_payload_bytes(&row);
-        let Some(values) = budget.decode_and_admit_row(columns.len(), payload_bytes, || {
-            Ok::<_, DriverError>((0..columns.len()).map(|index| extract_value(&row, index)).collect())
-        })?
-        else {
+        if !budget.decode_and_admit_row_into(columns.len(), payload_bytes, &mut decoded, |values| {
+            values.extend((0..columns.len()).map(|index| extract_value(&row, index)));
+            Ok(())
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(values);
+        }
+        rows.push_row(&mut decoded);
     }
     drop(stream);
     Ok(QueryResult {
@@ -1087,7 +1088,8 @@ async fn params_into_result(
     drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
-    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
+    let mut decoded = Vec::with_capacity(columns.len());
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -1097,14 +1099,14 @@ async fn params_into_result(
             break;
         }
         let payload_bytes = sqlite_row_payload_bytes(&row);
-        let Some(values) = budget.decode_and_admit_row(columns.len(), payload_bytes, || {
-            Ok::<_, DriverError>((0..columns.len()).map(|index| extract_value(&row, index)).collect())
-        })?
-        else {
+        if !budget.decode_and_admit_row_into(columns.len(), payload_bytes, &mut decoded, |values| {
+            values.extend((0..columns.len()).map(|index| extract_value(&row, index)));
+            Ok(())
+        })? {
             truncated = true;
             break;
-        };
-        rows.push(values);
+        }
+        rows.push_row(&mut decoded);
     }
     drop(stream);
     Ok(QueryResult {

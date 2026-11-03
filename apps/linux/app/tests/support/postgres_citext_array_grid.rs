@@ -3,7 +3,7 @@ use super::parse_input_for_driver;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
+    use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::postgres::Postgres;
@@ -56,11 +56,11 @@ async fn value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and
         )
         .await
         .unwrap();
-    let sibling = before.rows[1].clone();
+    let sibling = before.rows[1].to_vec();
 
     let edited = parse_input_for_driver(EDITED, Some(&columns[labels_index]), "postgres").unwrap();
     assert_eq!(edited, Value::Text(EDITED.into()));
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "citext_array_grid",
@@ -116,7 +116,7 @@ async fn value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and
     );
 
     let invalid = parse_input_for_driver(r#"{"unterminated}"#, Some(&columns[labels_index]), "postgres").unwrap();
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = bookie_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
         "citext_array_grid",

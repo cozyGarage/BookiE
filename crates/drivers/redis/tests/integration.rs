@@ -119,8 +119,8 @@ async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
     server.abort();
 }
 
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use drivers_redis::RedisDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers_modules::redis::Redis;
@@ -536,7 +536,7 @@ async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
         hello
             .rows
             .iter()
-            .any(|row| row == &[Value::Text("proto".into()), Value::Int(3)]),
+            .any(|row| row == [Value::Text("proto".into()), Value::Int(3)]),
         "HELLO must return a structured RESP3 map: {:?}",
         hello.rows
     );
@@ -557,13 +557,13 @@ async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
         result
             .rows
             .iter()
-            .any(|row| { row == &[Value::Text("name".into()), Value::Text("Ada".into())] })
+            .any(|row| row == [Value::Text("name".into()), Value::Text("Ada".into())])
     );
     assert!(
         result
             .rows
             .iter()
-            .any(|row| { row == &[Value::Text("opaque".into()), Value::Bytes(vec![0xFF, 0x00, 0x41])] }),
+            .any(|row| row == [Value::Text("opaque".into()), Value::Bytes(vec![0xFF, 0x00, 0x41])]),
         "RESP3 binary hash value changed: {:?}",
         result.rows
     );
@@ -607,7 +607,7 @@ async fn value_contract_redis_stream_commands_are_refused_without_consuming_the_
             .await
             .expect_err("streaming commands must not return a misleading one-shot result");
         assert!(
-            matches!(error, tablepro_core::DriverError::Unsupported(_)),
+            matches!(error, bookie_core::DriverError::Unsupported(_)),
             "{command} should have a visible unsupported result, got {error:?}"
         );
         assert!(

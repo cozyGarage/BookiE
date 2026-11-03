@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use bookie_core::AttachedDatabase;
 use secrecy::{ExposeSecret, SecretString};
-use tablepro_core::AttachedDatabase;
 
 use super::*;
 use crate::connections::{KNOWN_CONNECTION_FIELDS, SavedSshAuth};
@@ -409,6 +409,7 @@ fn a_version_one_encrypted_bundle_remains_readable() {
     let mut plaintext = Zeroizing::new(Vec::new());
     serde_json::to_writer(&mut *plaintext, &legacy_body).expect("serialize legacy body");
     let envelope = EnvelopeHeader {
+        format: crate::connection_bundle::BUNDLE_FORMAT,
         version: 1,
         producer: export.producer.clone(),
         exported_at: export.exported_at.clone(),
