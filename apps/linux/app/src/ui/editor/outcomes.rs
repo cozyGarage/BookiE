@@ -670,6 +670,7 @@ fn build_outcome_widget(
             database,
             settings_store,
             result_view_key(o.identity, 0),
+            false,
         ),
         StatementOutcomeKind::Rows(_) => {
             let ms = o.elapsed_ms.to_string();
@@ -722,6 +723,7 @@ fn build_multi_result_widget(
             database.clone(),
             settings_store.clone(),
             result_view_key(outcome.identity, index),
+            false,
         );
         stack.add_titled(&widget, Some(&format!("set{index}")), &labels[index]);
     }
@@ -840,6 +842,7 @@ pub(in crate::ui::editor) fn build_stream_page_widget(
             database,
             settings_store,
             settings_key,
+            true,
         )
     })));
     let scheduled = std::rc::Rc::new(std::cell::Cell::new(false));
@@ -871,6 +874,7 @@ pub(super) fn build_result_set_widget(
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
     settings_store: LocalResultSettingsStore,
     settings_key: ResultViewKey,
+    whole_result_filter: bool,
 ) -> gtk::Widget {
     if result.columns.is_empty() {
         return adw::StatusPage::builder()
@@ -880,6 +884,7 @@ pub(super) fn build_result_set_widget(
             .build()
             .upcast();
     }
+    let changed_cells = settings_store.changed_cells(settings_key);
     let local_result_view =
         super::super::grid::local_filter::LocalResultView::new(result.clone(), settings_store, settings_key);
     let (column_view, _selection) = build_column_view(
@@ -895,6 +900,8 @@ pub(super) fn build_result_set_widget(
             preview_result_values: true,
             local_result_sort: true,
             local_result_view: Some(local_result_view.clone()),
+            whole_result_filter,
+            changed_cells,
             sortable_result_columns: crate::ui::grid::sortable_result_columns(result),
             ..Default::default()
         },

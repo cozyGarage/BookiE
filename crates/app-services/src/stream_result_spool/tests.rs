@@ -286,3 +286,40 @@ async fn tampered_ciphertext_is_refused_instead_of_returning_rows() {
 
     assert_eq!(error, StreamResultSpoolError::Encryption);
 }
+
+#[test]
+fn only_an_existing_absolute_directory_is_a_usable_spool_location() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(usable_spool_directory(dir.path()));
+    assert!(!usable_spool_directory(&dir.path().join("missing")));
+    assert!(!usable_spool_directory(Path::new("relative/spool")));
+}
+
+#[test]
+fn a_spool_in_a_chosen_directory_stores_and_reloads_pages() {
+    let dir = tempfile::tempdir().unwrap();
+    let manager = StreamResultSpoolManager::default().in_directory(Some(dir.path().to_path_buf()));
+    let spool = manager.create().unwrap();
+    let page = result(vec![Value::Int(7)]);
+    spool.append_page_sync(0, &page).unwrap();
+    let loaded = spool.load_page_sync(0, page.columns.clone()).unwrap();
+    assert_eq!(loaded.rows[0][0], Value::Int(7));
+    assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn a_missing_spool_directory_fails_to_create_instead_of_falling_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let manager = StreamResultSpoolManager::default().in_directory(Some(dir.path().join("missing")));
+    assert_eq!(manager.create().err(), Some(StreamResultSpoolError::Create));
+}
+
+#[test]
+fn available_bytes_shrink_as_pages_are_stored() {
+    let manager = StreamResultSpoolManager::with_limit(1 << 20);
+    let spool = manager.create().unwrap();
+    assert_eq!(manager.available_bytes(), 1 << 20);
+    spool.append_page_sync(0, &result(vec![Value::Int(1)])).unwrap();
+    assert_eq!(manager.available_bytes(), (1 << 20) - spool.stored_bytes());
+    assert_eq!(manager.limit_bytes(), 1 << 20);
+}

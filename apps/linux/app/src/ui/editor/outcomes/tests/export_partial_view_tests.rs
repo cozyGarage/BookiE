@@ -105,3 +105,63 @@ fn a_completed_stream_offers_its_saved_result_for_export() {
     assert_eq!(request.total_rows, 2);
     assert_eq!(request.spool.unwrap().page_count(), 1);
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_filtered_result_exports_only_its_own_saved_rows() {
+    relm4::adw::init().unwrap();
+    let (runtime, database, origin) = stream_export_origin();
+    let page = std::sync::Arc::new(cursor_page(&[1, 2, 3, 4], false).result);
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    runtime.block_on(spool.append_page(0, page.clone())).unwrap();
+    let mut cache = super::super::super::stream_pages::StreamPageCache::default();
+    cache.append(0, page.clone()).unwrap();
+    let source = cache.snapshot_with_spool(
+        StreamTerminal::Complete,
+        Some(crate::ui::export_dialog::StreamExportQuery {
+            driver_id: "sqlite".into(),
+            suggested_name: "items".into(),
+        }),
+        0,
+        Some(spool.clone()),
+    );
+    let scan = bookie_app_services::result_scan::ScanSource::new(spool, source.columns.clone(), 4);
+    let filtered = bookie_app_services::result_filter::filter_into_spool(
+        &scan,
+        bookie_app_services::result_predicate::ResultPredicate::Equals {
+            column: 0,
+            value: bookie_core::Value::Int(3),
+        },
+        &manager,
+        &tokio_util::sync::CancellationToken::new(),
+        &bookie_app_services::result_scan::ScanProgress::default(),
+    )
+    .unwrap();
+    let outcome =
+        super::super::super::result_tools::derived_outcome(StatementIdentity::default(), &source, filtered, "3");
+    let StatementOutcomeKind::Streamed(derived) = outcome.kind.clone() else {
+        panic!("a derived outcome is streamed");
+    };
+    let (sender, receiver) = relm4::channel::<crate::ui::grid::GridMsg>();
+    let widget = super::super::build_streamed_result_widget(
+        &outcome,
+        &derived,
+        &sender,
+        Some(origin.id),
+        database,
+        Default::default(),
+        None,
+    );
+    stream_export_button(&widget).unwrap().emit_clicked();
+    let Some(crate::ui::grid::GridMsg::ExportStreamedResults(request)) = receiver.recv_sync() else {
+        panic!("expected a saved result export");
+    };
+    assert_eq!(request.total_rows, 1);
+    assert_eq!(request.query.suggested_name, "items-filtered");
+    assert_eq!(request.spool.unwrap().page_count(), 1);
+    assert!(contains_label(
+        &widget,
+        "Complete · Received 1 row · 1 page\nEarlier pages can be loaded from temporary storage."
+    ));
+}

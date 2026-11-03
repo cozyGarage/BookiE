@@ -18,11 +18,19 @@ pub mod preparation;
 pub mod read_scopes;
 pub mod recent_tabs;
 pub mod request_generation;
+pub mod result_compare;
+pub mod result_filter;
+pub mod result_find;
+pub mod result_predicate;
+pub mod result_scan;
+#[cfg(test)]
+mod result_test_support;
 pub mod single_flight;
 pub mod state_file;
 pub mod stream_result_spool;
 pub mod structure_metadata;
 pub mod structure_tracker;
+mod value_exact;
 pub mod window_state;
 pub mod workspace;
 

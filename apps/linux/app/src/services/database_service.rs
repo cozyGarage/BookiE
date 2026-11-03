@@ -269,10 +269,19 @@ impl DatabaseService {
             unresolved_connection_ids: audit.unresolved_connection_ids,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
             ssh_environment: Mutex::new(SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse)),
-            stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager::default(),
+            stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager::from_environment(
+            ),
             #[cfg(test)]
             _audit_temp_dir: audit_temp_dir,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn audit_journal_path_for_test(&self) -> std::path::PathBuf {
+        self._audit_temp_dir
+            .as_ref()
+            .map(|dir| dir.path().join("audit.jsonl"))
+            .unwrap_or_default()
     }
 
     pub fn audit_available(&self) -> bool {
@@ -314,6 +323,26 @@ impl DatabaseService {
                 Err(error)
             }
         }
+    }
+
+    pub async fn audit_result_compare(
+        &self,
+        operation_id: Uuid,
+        connection: bookie_policy::AuditConnectionContext,
+        phase: AuditRecordPhase,
+        terminal_status: AuditTerminalStatus,
+        differing_rows: usize,
+        duration_ms: Option<u64>,
+    ) -> Result<(), bookie_policy::AuditError> {
+        let event = AuditEvent::result_compare(
+            operation_id,
+            connection,
+            phase,
+            terminal_status,
+            differing_rows,
+            duration_ms,
+        );
+        self.audit.record(event).await
     }
 
     /// Whether a prior governed operation has an unresolved outcome.  The UI

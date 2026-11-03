@@ -15,6 +15,12 @@
   background: alpha(@error_color, 0.22);
 }
 
+.tp-cell-changed {
+  background: alpha(@accent_bg_color, 0.22);
+  border-bottom: 2px solid @accent_bg_color;
+  font-weight: bold;
+}
+
 .tp-cell-modified {
   background: alpha(@warning_color, 0.18);
   border-bottom: 2px solid @warning_color;

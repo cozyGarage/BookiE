@@ -665,6 +665,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::context_menu::tests::whole_result_filter_installs_both_cell_actions"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::streaming::tests::a_stream_waits_with_a_loading_status_page"
     ],
     [
@@ -1435,7 +1440,17 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::panel_tests::the_editor_content_fits_the_narrowest_window_with_every_toolbar_button"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::filter_strip::tests::the_where_field_apply_and_clear_share_one_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::filter_strip::tests::the_filter_strip_fits_a_narrow_window"
     ],
     [
       "bookie-app",
@@ -1471,6 +1486,91 @@
       "bookie-app",
       "--lib",
       "ui::history_dialog::export_tests::a_failed_history_export_shows_a_dismissible_error"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::find_searches_every_page_and_jumps_to_the_page_with_the_match"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::find_reports_no_match_and_a_new_query_clears_the_old_status"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::find_buttons_step_through_matches_and_wrap"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::show_matching_rows_requests_a_filter_and_shows_its_outcome"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::cancel_is_hidden_when_idle_and_cancels_a_running_filter"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::pressing_enter_while_a_filter_runs_keeps_stop_and_starts_no_search"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::a_filter_already_running_on_the_result_refuses_a_second_one"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::editing_the_text_during_a_filter_keeps_it_busy_and_cancellable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::destroying_the_toolbar_keeps_a_running_filter_and_the_rebuilt_toolbar_resumes_it"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::a_cell_filter_shows_stop_on_the_toolbar_of_its_own_result"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::a_search_finishing_does_not_clear_a_cell_filter_started_during_it"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::outcomes::tests::export_partial_view::a_filtered_result_exports_only_its_own_saved_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::the_result_header_wraps_without_overlap_at_920_px"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::the_result_header_wraps_without_overlap_at_600_px"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_compare::dialog_tests::the_compare_dialog_offers_shared_columns_as_keys_and_sends_the_chosen_request"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_compare::dialog_tests::the_compare_dialog_refuses_the_same_result_on_both_sides"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_compare::dialog_tests::a_failed_comparison_keeps_the_dialog_and_its_choices_and_a_success_closes_it"
     ]
   ],
   "keyring": [

@@ -3,6 +3,8 @@ mod page_index;
 mod page_window;
 mod paged_model;
 pub(super) use continuous::install as install_continuous;
+mod header;
+pub(super) use header::build as build_header;
 mod pager;
 pub(super) use pager::build as build_pager;
 
@@ -354,7 +356,10 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
                 connection_id,
                 database,
                 settings_store,
-                result_view_key(identity, index as usize),
+                result_view_key(
+                    super::result_tools::stream_identity(identity, generation),
+                    index as usize,
+                ),
             );
             replace_stream_page_content(&container, &widget);
         }

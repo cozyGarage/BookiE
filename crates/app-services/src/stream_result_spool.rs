@@ -1,6 +1,7 @@
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -48,6 +49,7 @@ pub enum StreamResultSpoolError {
 #[derive(Clone)]
 pub struct StreamResultSpoolManager {
     budget: Arc<SpoolBudget>,
+    directory: Option<PathBuf>,
 }
 
 struct SpoolBudget {
@@ -250,11 +252,25 @@ impl StreamResultSpoolManager {
                 limit,
                 reserved: AtomicU64::new(0),
             }),
+            directory: None,
         }
     }
 
+    pub fn in_directory(mut self, directory: Option<PathBuf>) -> Self {
+        self.directory = directory;
+        self
+    }
+
+    pub fn from_environment() -> Self {
+        Self::default().in_directory(spool_directory_from_environment())
+    }
+
     pub fn create(&self) -> Result<StreamResultSpool, StreamResultSpoolError> {
-        let file = tempfile::tempfile().map_err(|_| StreamResultSpoolError::Create)?;
+        let file = match &self.directory {
+            Some(directory) => tempfile::tempfile_in(directory),
+            None => tempfile::tempfile(),
+        }
+        .map_err(|_| StreamResultSpoolError::Create)?;
         let mut key = [0_u8; 32];
         getrandom::fill(&mut key).map_err(|_| StreamResultSpoolError::Randomness)?;
         Ok(StreamResultSpool {
@@ -274,6 +290,32 @@ impl StreamResultSpoolManager {
     pub fn reserved_bytes(&self) -> u64 {
         self.budget.reserved.load(Ordering::Acquire)
     }
+
+    #[cfg(test)]
+    pub(crate) fn limit_bytes(&self) -> u64 {
+        self.budget.limit
+    }
+
+    #[cfg(test)]
+    pub(crate) fn available_bytes(&self) -> u64 {
+        self.budget.limit.saturating_sub(self.reserved_bytes())
+    }
+}
+
+pub const SPOOL_DIRECTORY_VARIABLE: &str = "BOOKIE_SPOOL_DIR";
+
+pub fn spool_directory_from_environment() -> Option<PathBuf> {
+    let value = std::env::var_os(SPOOL_DIRECTORY_VARIABLE)?;
+    let path = PathBuf::from(value);
+    if usable_spool_directory(&path) {
+        return Some(path);
+    }
+    tracing::warn!("ignoring a spool directory that is not an existing absolute directory");
+    None
+}
+
+fn usable_spool_directory(path: &Path) -> bool {
+    path.is_absolute() && path.is_dir()
 }
 
 impl StreamResultSpool {
@@ -298,6 +340,22 @@ impl StreamResultSpool {
     pub fn page_count(&self) -> usize {
         self.inner.file.lock().map(|file| file.pages.len()).unwrap_or_default()
     }
+
+    pub fn stored_bytes(&self) -> u64 {
+        self.inner.reserved.load(Ordering::Acquire)
+    }
+
+    pub(crate) fn append_page_sync(&self, index: u64, page: &QueryResult) -> Result<(), StreamResultSpoolError> {
+        append_page_blocking(&self.inner, index, page)
+    }
+
+    pub(crate) fn load_page_sync(
+        &self,
+        index: u64,
+        columns: Vec<ColumnInfo>,
+    ) -> Result<Arc<QueryResult>, StreamResultSpoolError> {
+        load_page_blocking(&self.inner, index, columns)
+    }
 }
 
 impl Drop for SpoolInner {
@@ -307,7 +365,7 @@ impl Drop for SpoolInner {
     }
 }
 
-fn append_page_blocking(inner: &Arc<SpoolInner>, index: u64, page: &QueryResult) -> Result<(), StreamResultSpoolError> {
+fn append_page_blocking(inner: &SpoolInner, index: u64, page: &QueryResult) -> Result<(), StreamResultSpoolError> {
     let mut spool = inner.file.lock().map_err(|_| StreamResultSpoolError::Io)?;
     let page_index = usize::try_from(index).map_err(|_| StreamResultSpoolError::PageLimit)?;
     if page_index >= MAX_STREAM_RESULT_SPOOL_PAGES {
@@ -534,6 +592,7 @@ fn load_page_blocking(
         .seek(SeekFrom::Start(location.offset))
         .map_err(|_| StreamResultSpoolError::Io)?;
     let page = read_page_payload(inner, &mut spool.file, index, location)?;
+    drop(spool);
     Ok(Arc::new(page.into_query_result(columns)?))
 }
 

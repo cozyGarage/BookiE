@@ -16,6 +16,7 @@ use super::{GridMsg, TabGridContext};
 
 const PENDING_CSS_CLASSES: &[&str] = &[
     "tp-cell-modified",
+    "tp-cell-changed",
     "tp-row-pending-delete",
     "tp-row-pending-insert",
     "tp-row-leftmost-error-flash",
@@ -276,6 +277,7 @@ fn bind_row_cell(
             identity.as_deref().and_then(|identity| identity.key.as_ref()),
             source_value,
         );
+        let pending_classes = mark_changed_cell(context, row, index, pending_classes);
         let preview = preview_for_bind(row, index, edited);
         let value = value_for_bind(source_value, preview.as_ref(), updated_value.as_ref());
         let view = match (preview.as_ref(), value) {
@@ -311,6 +313,23 @@ fn mark_ambiguous_key(child: &gtk4::Widget, ambiguous: bool) {
     } else if child.tooltip_text().is_some_and(|tooltip| tooltip == reason) {
         child.set_tooltip_text(None);
     }
+}
+
+fn mark_changed_cell(
+    context: &TabGridContext,
+    row: &crate::ui::row_object::RowObject,
+    index: usize,
+    mut classes: Vec<&'static str>,
+) -> Vec<&'static str> {
+    let changed = context
+        .changed_cells
+        .as_ref()
+        .zip(row.source_index())
+        .is_some_and(|(cells, source)| cells.contains(source, index));
+    if changed {
+        classes.push("tp-cell-changed");
+    }
+    classes
 }
 
 fn state_for_bind(
@@ -501,6 +520,11 @@ fn pending_description(classes: &[&str]) -> Option<String> {
     classes
         .contains(&"tp-cell-modified")
         .then(|| crate::tr!("Modified").to_string())
+        .or_else(|| {
+            classes
+                .contains(&"tp-cell-changed")
+                .then(|| crate::tr!("Changed").to_string())
+        })
 }
 
 fn apply_pending_description(widget: &gtk4::Widget, classes: &[&str]) {
