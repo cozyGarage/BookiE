@@ -582,7 +582,7 @@ pub(crate) enum EngineCheck {
     Query(String),
 }
 
-const SYSTEM_SCHEMAS: &str = "'information_schema', 'performance_schema', 'sys'";
+const READ_ONLY_SYSTEM_SCHEMA: &str = "information_schema";
 
 pub(crate) fn nontransactional_engine_check(driver_id: &str, sql: &str) -> EngineCheck {
     if driver_id != "mysql" {
@@ -604,7 +604,7 @@ pub(crate) fn nontransactional_engine_check(driver_id: &str, sql: &str) -> Engin
         clauses.push(clause);
     }
     EngineCheck::Query(format!(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE ({}) AND table_schema NOT IN ({SYSTEM_SCHEMAS}) \
+        "SELECT COUNT(*) FROM information_schema.tables WHERE ({}) AND table_schema <> '{READ_ONLY_SYSTEM_SCHEMA}' \
          AND UPPER(COALESCE(engine, '')) NOT IN ('INNODB', 'NDB', 'NDBCLUSTER')",
         clauses.join(" OR ")
     ))

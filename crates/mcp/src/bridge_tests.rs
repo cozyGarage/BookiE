@@ -359,12 +359,25 @@ fn several_tables_are_each_checked_in_their_own_database() {
 }
 
 #[test]
-fn the_system_schemas_never_count_as_non_transactional() {
+fn only_the_read_only_information_schema_is_exempt_from_the_engine_check() {
     let query = engine_query("INSERT INTO audit SELECT table_name FROM information_schema.tables");
-    assert!(
-        query.contains("table_schema NOT IN ('information_schema', 'performance_schema', 'sys')"),
-        "{query}"
-    );
+    assert!(query.contains("table_schema <> 'information_schema'"), "{query}");
+}
+
+#[test]
+fn writable_system_schemas_and_a_database_named_sys_are_still_checked() {
+    for sql in [
+        "UPDATE performance_schema.setup_consumers SET enabled = 'NO'",
+        "UPDATE sys.legacy SET v = 2 WHERE id = 1",
+    ] {
+        let query = engine_query(sql);
+        assert!(!query.contains("NOT IN ('information_schema'"), "{sql}: {query}");
+        assert!(query.contains("table_schema <> 'information_schema'"), "{sql}: {query}");
+        assert!(
+            query.contains("table_schema = 'performance_schema'") || query.contains("table_schema = 'sys'"),
+            "{sql}: {query}"
+        );
+    }
 }
 
 #[test]

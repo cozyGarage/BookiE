@@ -219,6 +219,18 @@ async fn a_preview_is_refused_for_a_myisam_table_in_another_database() {
         .execute("INSERT INTO other_db.modern_elsewhere VALUES (1, 1)")
         .await
         .unwrap();
+    let refused_system = bridge
+        .execute_write_structured(
+            token,
+            connection_id,
+            "UPDATE performance_schema.setup_consumers SET enabled = 'YES' WHERE name = 'events_waits_current'",
+            true,
+        )
+        .await;
+    let Err(error) = refused_system else {
+        panic!("a preview of a performance_schema write cannot be rolled back: {refused_system:?}");
+    };
+    assert_eq!(error.code, "preview_not_transactional", "{error:?}");
     for sql in [
         "UPDATE other_db.modern_elsewhere SET v = 2 WHERE id = 1",
         "UPDATE modern SET v = (SELECT COUNT(*) FROM information_schema.tables) WHERE id = 1",
