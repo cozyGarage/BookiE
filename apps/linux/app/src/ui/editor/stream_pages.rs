@@ -66,12 +66,8 @@ pub(super) struct StreamPageCache {
     pages: VecDeque<(u64, Arc<QueryResult>, usize)>,
     retained_bytes: usize,
     columns: Option<Vec<ColumnInfo>>,
-    next_page: u64,
-    empty_pages: u64,
-    page_row_counts: Vec<usize>,
-    page_row_starts: Vec<usize>,
+    index: bookie_app_services::stream_page_validation::StreamPageIndex,
     retained_rows: usize,
-    total_rows: usize,
     resident_pages: ResidentPageStore,
     unspooled_page: Option<u64>,
 }
@@ -88,29 +84,18 @@ impl StreamPageCache {
         result: Arc<QueryResult>,
         spooled: bool,
     ) -> Result<(), PageAppendError> {
-        bookie_app_services::stream_page_validation::validate_page(
-            index,
-            self.next_page,
-            self.columns.as_deref(),
-            &result,
-        )?;
+        let empty = self.index.accept(index, self.columns.as_deref(), &result)?;
         if self.columns.is_none() {
             self.columns = Some(result.columns.clone());
         }
-        self.page_row_counts.push(result.rows.len());
-        self.page_row_starts.push(self.total_rows.saturating_add(1));
-        if index > 0 && result.rows.is_empty() {
-            self.next_page = self.next_page.saturating_add(1);
-            self.empty_pages = self.empty_pages.saturating_add(1);
+        if empty {
             return Ok(());
         }
-        self.total_rows = self.total_rows.saturating_add(result.rows.len());
         self.retained_rows = self.retained_rows.saturating_add(result.rows.len());
         let bytes = result.estimated_row_bytes();
         self.retained_bytes = self.retained_bytes.saturating_add(bytes);
         self.resident_pages.insert(index, result.clone());
         self.pages.push_back((index, result, bytes));
-        self.next_page = self.next_page.saturating_add(1);
         while self.pages.len() > 1 && self.retained_bytes > MAX_QUERY_RESULT_BYTES {
             if let Some((retired_index, retired, bytes)) = self.pages.pop_front() {
                 self.resident_pages.remove(retired_index);
@@ -131,11 +116,13 @@ impl StreamPageCache {
 
     #[cfg(test)]
     pub(super) fn first_page(&self) -> u64 {
-        self.pages.front().map_or(self.next_page, |(index, _, _)| *index)
+        self.pages
+            .front()
+            .map_or(self.index.next_page(), |(index, _, _)| *index)
     }
 
     pub(super) fn total_rows(&self) -> usize {
-        self.total_rows
+        self.index.total_rows()
     }
 
     #[cfg(test)]
@@ -169,7 +156,7 @@ impl StreamPageCache {
                     query,
                     columns,
                     spool: spool.clone(),
-                    total_rows: self.total_rows,
+                    total_rows: self.index.total_rows(),
                 })
         } else {
             None
@@ -177,12 +164,12 @@ impl StreamPageCache {
         StreamedResult {
             pages: self.pages.iter().map(|(_, page, _)| Arc::downgrade(page)).collect(),
             page_indices: self.pages.iter().map(|(index, _, _)| *index).collect(),
-            page_row_counts: self.page_row_counts.clone(),
-            page_row_starts: self.page_row_starts.clone(),
+            page_row_counts: self.index.row_counts().to_vec(),
+            page_row_starts: self.index.row_starts().to_vec(),
             retained_rows: self.retained_rows,
             columns: self.columns.clone().unwrap_or_default(),
-            total_pages: self.next_page.saturating_sub(self.empty_pages),
-            total_rows: self.total_rows,
+            total_pages: self.index.total_pages(),
+            total_rows: self.index.total_rows(),
             terminal,
             export,
             generation,
