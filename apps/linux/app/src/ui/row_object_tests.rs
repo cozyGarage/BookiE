@@ -71,7 +71,7 @@ fn root_json_string_previews_preserve_escaped_and_multibyte_content() {
 }
 
 #[test]
-fn a_json_value_is_measured_without_serialising_small_documents_twice() {
+fn json_size_probe_respects_the_serialized_byte_limit() {
     assert!(!json_exceeds(&serde_json::json!({"a": 1}), 8));
     assert!(json_exceeds(&serde_json::json!({"payload": "x".repeat(20)}), 8));
     assert!(!json_exceeds(&serde_json::json!("12345"), 7));
