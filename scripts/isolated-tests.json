@@ -1435,13 +1435,21 @@
     [
       "bookie-app",
       "--lib",
-      "ui::editor::dispatch_tests::panel_tests::the_editor_toolbar_is_one_wrapping_bar_with_folding_in_a_menu",
+      "ui::editor::dispatch_tests::panel_tests::the_editor_toolbar_is_one_wrapping_bar_with_folding_in_a_menu"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::panel_tests::the_editor_content_fits_the_narrowest_window_with_every_toolbar_button"
     ],
     [
       "bookie-app",
       "--lib",
-      "ui::filter_strip::tests::the_where_field_apply_and_clear_share_one_row",
+      "ui::filter_strip::tests::the_where_field_apply_and_clear_share_one_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::filter_strip::tests::the_filter_strip_fits_a_narrow_window"
     ],
     [
