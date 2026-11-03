@@ -438,6 +438,14 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ref: ${{ needs.pin-revision.outputs.revision }}", workflow)
         self.assertNotIn("needs.preflight.outputs.commit", workflow)
         self.assertNotIn("needs.resolve-ref.outputs.commit", workflow)
+
+    def test_github_gtk_job_runs_only_app_unit_tests_after_non_gtk_preflight(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = re.search(r"(?ms)^  fast:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        preflight = re.search(r"(?ms)^  preflight:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("run-test-layer.py quick", preflight)
+        self.assertIn("run-test-layer.py gtk-app", fast)
+        self.assertNotIn("run-test-layer.py full", fast)
         gate = workflow.split("  regression-gate:\n", 1)[1]
         self.assertNotIn("needs.pin-revision.outputs.revision", gate.split("steps:", 1)[1])
         for line in workflow.splitlines():

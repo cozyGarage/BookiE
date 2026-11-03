@@ -47,7 +47,7 @@ python3 scripts/run-test-layer.py widgets app-server keyring ui
 python3 scripts/run-test-layer.py values
 ```
 
-The fast Build Linux job runs `change-contracts` before the full GTK/unit layer. It compares the checked-out commit with the pull request base or prior push commit, runs mapped exact regression tests for changed value-path files, and retains a report and per-command logs under `target/quality/`. Locally, check uncommitted work against `HEAD`, or compare a branch with its base explicitly:
+The fast Build Linux job runs `change-contracts` before the GTK app unit layer. The non-GTK unit, sandbox and lint checks run in preflight; the GTK app layer runs only `bookie-app` Clippy and library/binary tests. This avoids rerunning the non-GTK suites in the GTK job. The focused layer compares the checked-out commit with the pull request base or prior push commit, runs mapped exact regression tests for changed value-path files, and retains a report and per-command logs under `target/quality/`. Locally, check uncommitted work against `HEAD`, or compare a branch with its base explicitly:
 
 ```bash
 python3 scripts/run-change-contract-tests.py
@@ -84,6 +84,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `change-contracts` | Focused regressions or package tests selected from changed core, app, MCP and driver source paths | Rust 1.98; changed driver integration tests remain in the Docker `drivers` layer |
 | `quick` | Guards, formatting, non-GTK Clippy, units and sandbox | Rust 1.98 and native libraries |
 | `full` | Default workspace checks including app logic | GTK 4.24 development stack; no display automation or DuckDB |
+| `gtk-app` | GTK app Clippy and library/binary unit tests | GTK 4.24 development stack |
 | `no-default-features` | The workspace and its test targets compile without the default Kerberos feature (`cargo check`, no tests run) | GTK 4.24 development stack; not yet run by any CI job |
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |
 | `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox, DuckDB has its own Build job |

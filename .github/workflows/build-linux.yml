@@ -283,8 +283,8 @@ jobs:
         env:
           BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: python3 scripts/run-test-layer.py change-contracts
-      - name: Unit tests (build via test)
-        run: python3 scripts/run-test-layer.py full
+      - name: GTK app unit tests (build via test)
+        run: python3 scripts/run-test-layer.py gtk-app
       - name: Isolated GTK widget regressions
         run: python3 scripts/run-test-layer.py widgets
       - name: Pre-pull app-server fixture images
