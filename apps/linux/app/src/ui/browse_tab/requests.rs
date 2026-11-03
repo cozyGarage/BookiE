@@ -43,6 +43,10 @@ impl CellValueRequestTracker {
     pub(super) fn accepts(&self, request: BrowseCellValueRequest) -> bool {
         self.latest.get() == Some(request.0)
     }
+
+    pub(super) fn invalidate(&self) {
+        self.latest.set(Some(Uuid::new_v4()));
+    }
 }
 
 impl RowCountRequestTracker {

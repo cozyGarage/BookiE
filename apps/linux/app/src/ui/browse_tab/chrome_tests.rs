@@ -59,6 +59,18 @@ fn page_size_changes_apply_after_a_failed_first_load() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn a_page_reload_retires_a_pending_cell_value_request() {
+    let (controller, outputs) = launch_tab(false);
+    let pending = controller.model().cell_value_requests.begin();
+    assert!(controller.model().cell_value_requests.accepts(pending));
+    controller.sender().send(BrowseTabInput::PageSizeChanged(500)).unwrap();
+    pump(&outputs);
+    assert_eq!(controller.model().page_size, 500);
+    assert!(!controller.model().cell_value_requests.accepts(pending));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn read_only_selection_does_not_offer_delete() {
     let (controller, outputs) = launch_tab(true);
     load_two_rows(&controller, &outputs);
