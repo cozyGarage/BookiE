@@ -350,9 +350,9 @@ pub fn build(
     // (not an AdwHeaderBar) because the strip doesn't own a window
     // chrome — it's a piece of toolbar inside the BrowseTab's
     // ToolbarView.
-    let header = gtk::Box::builder()
-        .orientation(gtk::Orientation::Horizontal)
-        .spacing(6)
+    let header = adw::WrapBox::builder()
+        .child_spacing(6)
+        .line_spacing(6)
         .margin_top(8)
         .margin_bottom(4)
         .margin_start(12)
@@ -446,8 +446,18 @@ pub fn build(
     raw_entry.connect_activate(move |_| {
         apply_btn_for_enter.activate();
     });
-    header.append(&where_label);
-    header.append(&raw_entry);
+    let where_row = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(6)
+        .hexpand(true)
+        .build();
+    where_row.append(&where_label);
+    where_row.append(&raw_entry);
+    let actions = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(6)
+        .halign(gtk::Align::End)
+        .build();
     if let Some(context) = preset_context {
         let presets = crate::ui::filter_presets::build(context, state.clone(), columns.clone(), on_apply.clone());
         let popover = gtk::Popover::new();
@@ -457,11 +467,13 @@ pub fn build(
             .popover(&popover)
             .build();
         saved.add_css_class("flat");
-        header.append(&saved);
+        actions.append(&saved);
     }
-    header.append(&clear_btn);
-    header.append(&apply_btn);
-    header.append(&close_btn);
+    actions.append(&clear_btn);
+    actions.append(&apply_btn);
+    actions.append(&close_btn);
+    header.append(&where_row);
+    header.append(&actions);
 
     // Structured rules — secondary, collapsed by default. Power
     // users who think in raw SQL never need to expand this; users
@@ -982,8 +994,30 @@ mod tests {
         let raw = entries.into_iter().next().expect("the raw WHERE entry");
         let apply = button_labelled(&widget, "Apply");
         let clear = button_labelled(&widget, "Clear all");
-        assert_eq!(raw.parent(), apply.parent());
-        assert_eq!(raw.parent(), clear.parent());
+        assert_eq!(apply.parent(), clear.parent());
+        assert_eq!(
+            raw.parent().and_then(|row| row.parent()),
+            apply.parent().and_then(|actions| actions.parent())
+        );
+    }
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn the_filter_strip_fits_a_narrow_window() {
+        gtk::init().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let context = crate::ui::filter_presets::FilterPresetContext {
+            store: crate::services::named_filter_presets::NamedFilterPresetsStore::load_at(
+                directory.path().join("presets.json"),
+            ),
+            connection: uuid::Uuid::new_v4(),
+            schema: None,
+            table: "jobs".into(),
+            driver_id: "postgres".into(),
+        };
+        let strip = build(Vec::new(), FilterSet::default(), Rc::new(|_| {}), Some(context));
+        let (minimum, _, _, _) = strip.widget.measure(gtk::Orientation::Horizontal, -1);
+        assert!(minimum <= 420, "the filter strip needs {minimum}px at minimum");
     }
 
     #[test]
@@ -1018,7 +1052,10 @@ mod tests {
             .iter()
             .find(|entry| entry.placeholder_text().is_some_and(|text| text.starts_with("e.g.")))
             .unwrap();
-        assert_eq!(saved.parent(), raw.parent());
+        assert_eq!(
+            saved.parent().and_then(|actions| actions.parent()),
+            raw.parent().and_then(|row| row.parent())
+        );
     }
 
     fn find_expander(widget: &gtk::Widget) -> Option<gtk::Expander> {

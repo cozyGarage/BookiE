@@ -222,3 +222,16 @@ fn the_editor_toolbar_is_one_wrapping_bar_with_folding_in_a_menu() {
         .unwrap();
     assert!(fold.ancestor(gtk::Popover::static_type()).is_some());
 }
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn the_editor_content_fits_the_narrowest_window_with_every_toolbar_button() {
+    let fixture = EditorFixture::new();
+    let widest = descendants(fixture.controller.widget().upcast_ref())
+        .into_iter()
+        .filter(|widget| !widget.is::<adw::BreakpointBin>())
+        .map(|widget| widget.measure(gtk::Orientation::Horizontal, -1).0)
+        .max()
+        .unwrap_or(0);
+    assert!(widest <= 480, "an editor widget needs {widest}px at minimum");
+}
