@@ -475,14 +475,12 @@ fn filtering_a_filtered_result_does_not_stack_the_export_name() {
 #[test]
 fn a_jump_selects_retries_or_gives_up_by_what_the_view_shows() {
     use super::jump::{Attempt, attempt};
-    assert_eq!(attempt(Some(5), Some(5), 1), Attempt::Select);
-    assert_eq!(attempt(Some(3), Some(5), 1), Attempt::GiveUp);
-    assert_eq!(attempt(None, Some(5), 1), Attempt::Retry);
-    assert_eq!(attempt(Some(0), Some(5), 1), Attempt::Retry);
-    assert_eq!(attempt(None, Some(5), 1_000), Attempt::GiveUp);
-    assert_eq!(attempt(Some(9), None, 1), Attempt::Select);
-    assert_eq!(attempt(None, None, 1), Attempt::Retry);
-    assert_eq!(attempt(None, None, 1_000), Attempt::GiveUp);
+    assert_eq!(attempt(Some(5), 1), Attempt::Select);
+    assert_eq!(attempt(Some(3), 1_000), Attempt::Select);
+    assert_eq!(attempt(Some(0), 1), Attempt::Retry);
+    assert_eq!(attempt(None, 1), Attempt::Retry);
+    assert_eq!(attempt(None, 1_000), Attempt::GiveUp);
+    assert_eq!(attempt(Some(0), 1_000), Attempt::GiveUp);
 }
 
 #[test]
@@ -537,4 +535,31 @@ fn a_search_ended_without_results_is_idle_and_can_be_edited() {
     assert!(cursor.has_results_for("needle"));
     cursor.end_search(generation);
     assert!(cursor.has_results_for("needle"));
+}
+
+#[test]
+fn a_running_search_for_the_same_text_is_not_restarted() {
+    let mut cursor = MatchCursor::default();
+    assert!(!cursor.is_searching_for("needle"));
+    let generation = cursor.begin("needle");
+    assert!(cursor.is_searching_for("needle"));
+    assert!(!cursor.is_searching_for("other"));
+    assert!(cursor.complete(generation, report(1, false, 0)));
+    assert!(!cursor.is_searching_for("needle"));
+}
+
+#[test]
+fn a_direction_requested_during_a_running_search_is_kept_for_the_result() {
+    let mut cursor = MatchCursor::default();
+    let generation = cursor.begin("needle");
+    assert_eq!(cursor.take_direction(), None);
+    cursor.request_direction(false);
+    cursor.request_direction(true);
+    cursor.request_direction(false);
+    assert_eq!(cursor.take_direction(), Some(false));
+    assert_eq!(cursor.take_direction(), None);
+    cursor.request_direction(false);
+    cursor.begin("other");
+    assert_eq!(cursor.take_direction(), None);
+    assert!(!cursor.accepts(generation));
 }

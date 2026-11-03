@@ -72,7 +72,7 @@ crates/agentd/src/main.rs 16
 crates/agentd/src/main_tests.rs 5
 crates/app-services/src/filter_settings.rs 12
 crates/app-services/src/state_file.rs 2
-crates/app-services/src/structure_tracker.rs 23
+crates/app-services/src/structure_tracker.rs 22
 crates/core/src/activity.rs 9
 crates/core/src/connection.rs 43
 crates/core/src/driver.rs 42

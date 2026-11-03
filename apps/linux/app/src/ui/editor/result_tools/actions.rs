@@ -131,6 +131,10 @@ impl Tools {
             self.step(forward);
             return;
         }
+        if self.cursor.borrow().is_searching_for(&needle) {
+            self.cursor.borrow_mut().request_direction(forward);
+            return;
+        }
         self.start_search(needle, forward);
     }
 
@@ -192,6 +196,7 @@ impl Tools {
         self.set_busy(false);
         match result {
             Ok(report) => {
+                let forward = self.cursor.borrow_mut().take_direction().unwrap_or(forward);
                 self.cursor.borrow_mut().complete(generation, report);
                 self.step(forward);
             }

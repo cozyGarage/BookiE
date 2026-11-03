@@ -231,6 +231,7 @@ fn a_stream_page_retired_before_a_frame_does_not_build_a_grid() {
         Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         LocalResultSettingsStore::default(),
         result_view_key(StatementIdentity::default(), 0),
+        false,
     );
     let holder = widget.clone().downcast::<gtk::Box>().unwrap();
     let window = gtk::Window::builder().default_width(900).default_height(600).build();
