@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use super::selection::Candidate;
-use super::summary::{differing_rows, failure_message, notes, summary_text};
+use super::summary::{differing_rows, failure_message, no_difference_message, notes, summary_text};
 use super::ticket::CompareTicket;
 use crate::services::database_service::DatabaseService;
 use crate::ui::editor::{SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcome, StatementOutcomeKind};
@@ -192,7 +192,7 @@ impl SqlEditor {
             Ok(report)
                 if report.diff.rows.is_empty() && report.summary.unknown_left + report.summary.unknown_right == 0 =>
             {
-                crate::tr!("No differences · {summary}").replace("{summary}", &summary_text(&report.summary))
+                no_difference_message(&report)
             }
             Ok(report) => self.show_diff(&request, report, sender),
         };

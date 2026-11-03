@@ -219,7 +219,6 @@ impl StreamPageCache {
     }
 }
 
-#[cfg(test)]
 pub(super) fn page_row_starts_from_counts(page_row_counts: &[usize]) -> Vec<usize> {
     let mut total_rows = 0usize;
     page_row_counts

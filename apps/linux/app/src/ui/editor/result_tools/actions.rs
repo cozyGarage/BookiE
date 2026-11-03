@@ -182,7 +182,7 @@ impl Tools {
     }
 
     fn finish_search(self: &Rc<Self>, generation: u64, result: Result<FindReport, FindError>, forward: bool) {
-        if !self.cursor.borrow().accepts(generation) {
+        if !self.cursor.borrow().accepts(generation) || self.filter_running() {
             return;
         }
         self.set_busy(false);
@@ -251,6 +251,8 @@ impl Tools {
     }
 
     pub(super) fn adopt_filter(self: &Rc<Self>, ticket: Arc<FilterTicket>) {
+        self.cancel_search();
+        self.cursor.borrow_mut().invalidate();
         *self.filter_ticket.borrow_mut() = Some(ticket.clone());
         self.set_busy(true);
         self.poll_filter(ticket);

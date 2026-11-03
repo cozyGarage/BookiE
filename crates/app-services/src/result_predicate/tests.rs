@@ -177,3 +177,18 @@ fn an_ascii_needle_still_matches_characters_that_lowercase_to_ascii() {
     assert!(matches(contains("zür", ColumnScope::Any), &plain));
     assert!(!matches(contains("kelvin", ColumnScope::Any), &plain));
 }
+
+#[test]
+fn not_equals_drops_and_counts_unreadable_cells() {
+    let predicate = ResultPredicate::NotEquals {
+        column: 0,
+        value: Value::Int(1),
+    }
+    .prepare(1)
+    .unwrap();
+    let mut tally = CellTally::default();
+    assert!(!predicate.matches(&[Value::Undecodable("numeric".into())], &mut tally));
+    assert_eq!(tally.unsearchable_cells, 1);
+    assert!(predicate.matches(&[Value::Int(2)], &mut tally));
+    assert_eq!(tally.unsearchable_cells, 1);
+}

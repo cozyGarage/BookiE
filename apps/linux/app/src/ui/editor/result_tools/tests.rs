@@ -9,9 +9,10 @@ use bookie_core::{ColumnInfo, QueryResult, Value};
 use tokio_util::sync::CancellationToken;
 
 use super::cursor::MatchCursor;
-use super::derived::{derived_outcome, derived_result, next_generation, page_row_starts};
+use super::derived::{derived_outcome, derived_result, next_generation};
 use super::editor::{failure_message, success_message};
 use crate::ui::editor::pinned::{MAX_PINNED, PinnedResults};
+use crate::ui::editor::stream_pages::page_row_starts_from_counts as page_row_starts;
 use crate::ui::editor::stream_pages::{ResidentPageStore, StreamTerminal, StreamedResult};
 use crate::ui::editor::{StatementIdentity, StatementOutcomeKind};
 use crate::ui::export_dialog::{StreamExportQuery, StreamExportRequest};
@@ -411,4 +412,24 @@ fn a_running_filter_is_found_by_its_statement_and_cancelled_together() {
     ticket.finish(String::new());
     assert!(!super::ticket::running(identity));
     assert!(super::ticket::active(identity).is_none());
+}
+
+#[test]
+fn a_find_jump_locates_the_row_by_source_index_in_a_reordered_model() {
+    use relm4::gtk::gio;
+    use relm4::gtk::prelude::*;
+    let result = Arc::new(QueryResult {
+        columns: id_column(),
+        rows: vec![row(1, "a"), row(2, "b"), row(3, "c")].into(),
+        truncated: false,
+    });
+    let store = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    for source in [2_usize, 0, 1] {
+        store.append(&crate::ui::row_object::RowObject::from_shared(&result, source, None).unwrap());
+    }
+    assert_eq!(store.n_items(), 3);
+    assert_eq!(super::jump::position_of_source(store.upcast_ref(), 0), Some(1));
+    assert_eq!(super::jump::position_of_source(store.upcast_ref(), 2), Some(0));
+    assert_eq!(super::jump::position_of_source(store.upcast_ref(), 1), Some(2));
+    assert_eq!(super::jump::position_of_source(store.upcast_ref(), 9), None);
 }

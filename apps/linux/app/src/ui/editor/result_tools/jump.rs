@@ -56,6 +56,16 @@ fn select_row(view: &gtk::ColumnView, row: usize) {
     );
 }
 
+pub(super) fn position_of_source(model: &gtk::gio::ListModel, source: usize) -> Option<u32> {
+    (0..model.n_items()).find(|position| {
+        model
+            .item(*position)
+            .and_downcast::<crate::ui::row_object::RowObject>()
+            .and_then(|row| row.source_index())
+            == Some(source)
+    })
+}
+
 fn continuous_view(holder: &gtk::Box, generation: u64) -> Option<gtk::ColumnView> {
     let root = holder.clone().upcast::<gtk::Widget>();
     let container = named_descendant::<gtk::Box>(&root, &continuous_container_name(generation))?;
@@ -108,7 +118,11 @@ pub(super) fn go_to(holder: &gtk::Box, pages: &gtk::Stack, target: JumpTarget, t
             return gtk::glib::ControlFlow::Continue;
         }
         if rows == target.page_rows {
-            select_row(&view, target.row);
+            let position = view
+                .model()
+                .and_then(|model| position_of_source(model.upcast_ref(), target.row))
+                .map_or(target.row, |position| position as usize);
+            select_row(&view, position);
         }
         gtk::glib::ControlFlow::Break
     });

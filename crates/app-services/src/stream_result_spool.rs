@@ -291,11 +291,13 @@ impl StreamResultSpoolManager {
         self.budget.reserved.load(Ordering::Acquire)
     }
 
-    pub fn limit_bytes(&self) -> u64 {
+    #[cfg(test)]
+    pub(crate) fn limit_bytes(&self) -> u64 {
         self.budget.limit
     }
 
-    pub fn available_bytes(&self) -> u64 {
+    #[cfg(test)]
+    pub(crate) fn available_bytes(&self) -> u64 {
         self.budget.limit.saturating_sub(self.reserved_bytes())
     }
 }

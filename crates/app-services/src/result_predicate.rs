@@ -93,7 +93,14 @@ impl PreparedPredicate {
         match &self.kind {
             PreparedKind::Contains { scope, needle } => contains_in_row(row, scope, needle, tally),
             PreparedKind::Equals { column, value } => row.get(*column).is_some_and(|cell| exact_equal(cell, value)),
-            PreparedKind::NotEquals { column, value } => row.get(*column).is_none_or(|cell| !exact_equal(cell, value)),
+            PreparedKind::NotEquals { column, value } => match row.get(*column) {
+                Some(Value::Undecodable(_)) => {
+                    tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
+                    false
+                }
+                Some(cell) => !exact_equal(cell, value),
+                None => true,
+            },
         }
     }
 }

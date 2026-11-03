@@ -5,8 +5,8 @@ use bookie_core::{ColumnInfo, QueryResult, Value};
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 
-use super::derived::page_row_starts;
 use super::widget::{ToolsTarget, append};
+use crate::ui::editor::stream_pages::page_row_starts_from_counts as page_row_starts;
 use crate::ui::editor::stream_pages::{ResidentPageStore, StreamTerminal, StreamedResult};
 use crate::ui::editor::stream_view::page_widget_name;
 use crate::ui::editor::{SqlEditorInput, StatementIdentity};
@@ -467,5 +467,30 @@ fn a_cell_filter_shows_stop_on_the_toolbar_of_its_own_result() {
     };
     assert!(stop_in(&second).is_visible());
     assert!(!stop_in(&first).is_visible());
+    ticket.finish("done".into());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_search_finishing_does_not_clear_a_cell_filter_started_during_it() {
+    let fixture = fixture();
+    let stop: gtk::Button = named(&fixture.holder, "tp-result-find-stop");
+    let filter: gtk::Button = named(&fixture.holder, "tp-result-filter-button");
+    let status: gtk::Label = named(&fixture.holder, "tp-result-find-status");
+    search(&fixture, "needle");
+    let ticket = Arc::new(super::ticket::FilterTicket::default());
+    super::ticket::register(StatementIdentity::default(), &ticket);
+    super::widget::tools_for(StatementIdentity::default())
+        .unwrap()
+        .adopt_filter(ticket.clone());
+    let context = gtk::glib::MainContext::default();
+    for _ in 0..200 {
+        while context.iteration(false) {}
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(stop.is_visible());
+    assert!(!filter.is_sensitive());
+    assert!(!status.label().contains("Match"), "{}", status.label());
+    assert!(!ticket.cancel().is_cancelled());
     ticket.finish("done".into());
 }

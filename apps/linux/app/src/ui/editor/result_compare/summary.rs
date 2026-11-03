@@ -42,6 +42,14 @@ pub(super) fn notes(report: &CompareReport) -> Vec<String> {
     notes
 }
 
+pub(super) fn no_difference_message(report: &CompareReport) -> String {
+    let mut message = crate::tr!("No differences · {summary}").replace("{summary}", &summary_text(&report.summary));
+    for note in notes(report) {
+        message = format!("{message} · {note}");
+    }
+    message
+}
+
 pub(super) fn failure_message(error: &CompareError) -> String {
     match error {
         CompareError::Cancelled => crate::tr!("Comparison cancelled"),

@@ -232,3 +232,34 @@ fn can_compare_agrees_with_the_candidate_list_and_ignores_ineligible_sets() {
     assert_eq!(candidates(&pair).len(), 2);
     assert!(can_compare(pair.iter()));
 }
+
+#[test]
+fn an_empty_diff_still_names_the_columns_that_were_not_compared() {
+    use bookie_app_services::result_compare::CompareReport;
+    let report = CompareReport {
+        summary: CompareSummary {
+            mode: CompareMode::WholeRow,
+            key_columns: 0,
+            rows_left: 2,
+            rows_right: 2,
+            equal: 2,
+            added: 0,
+            removed: 0,
+            changed: 0,
+            unknown_left: 0,
+            unknown_right: 0,
+            differences_capped: false,
+        },
+        diff: result(&["Change", "id"], 0, false),
+        changed_cells: Default::default(),
+        columns_only_left: vec!["name".into()],
+        columns_only_right: vec!["email".into()],
+    };
+    let message = super::summary::no_difference_message(&report);
+    assert!(message.starts_with("No differences"), "{message}");
+    assert!(message.contains("not in both results were not compared"), "{message}");
+    let mut same = report.clone();
+    same.columns_only_left.clear();
+    same.columns_only_right.clear();
+    assert!(!super::summary::no_difference_message(&same).contains("not compared"));
+}

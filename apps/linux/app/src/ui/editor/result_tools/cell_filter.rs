@@ -38,11 +38,10 @@ pub(super) fn cell_predicate(
 impl SqlEditor {
     fn streamed_result_for(&self, identity: StatementIdentity) -> Option<StreamedResult> {
         self.pinned
-            .displayed()
-            .into_iter()
+            .iter()
             .filter(|outcome| outcome.identity == identity)
-            .find_map(|outcome| match outcome.kind {
-                StatementOutcomeKind::Streamed(result) => Some(*result),
+            .find_map(|outcome| match &outcome.kind {
+                StatementOutcomeKind::Streamed(result) => Some((**result).clone()),
                 _ => None,
             })
     }

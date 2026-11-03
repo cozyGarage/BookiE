@@ -22,7 +22,8 @@ impl ChangedCells {
         self.0.get(&row).is_some_and(|columns| columns.contains(&column))
     }
 
-    pub fn is_empty(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 }

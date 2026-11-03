@@ -16,18 +16,6 @@ pub(super) fn next_generation() -> u64 {
     DERIVED_GENERATION_BASE + NEXT_DERIVED.fetch_add(1, Ordering::Relaxed)
 }
 
-pub(super) fn page_row_starts(counts: &[usize]) -> Vec<usize> {
-    let mut total = 0_usize;
-    counts
-        .iter()
-        .map(|count| {
-            let start = total.saturating_add(1);
-            total = total.saturating_add(*count);
-            start
-        })
-        .collect()
-}
-
 fn identity(source: StatementIdentity, needle: &str, generation: u64) -> StatementIdentity {
     let mut digest = Sha256::new();
     digest.update(source.digest);
@@ -70,7 +58,7 @@ pub(super) fn derived_result(source: &StreamedResult, filtered: FilteredResult, 
     StreamedResult {
         pages: Vec::new(),
         page_indices: Vec::new(),
-        page_row_starts: page_row_starts(&filtered.page_row_counts),
+        page_row_starts: crate::ui::editor::stream_pages::page_row_starts_from_counts(&filtered.page_row_counts),
         retained_rows: 0,
         columns: source.columns.clone(),
         total_pages: filtered.page_row_counts.len() as u64,
