@@ -529,6 +529,34 @@ fn a_copied_where_names_the_row_by_its_whole_primary_key_without_a_terminator() 
 }
 
 #[test]
+fn copying_several_rows_gives_one_statement_per_line_and_refuses_the_whole_copy_on_one_bad_row() {
+    let mut id = column("id");
+    id.primary_key = true;
+    let columns = vec![id, column("note")];
+    let rows = vec![
+        vec![Value::Int(1), Value::Text("a".into())],
+        vec![Value::Int(2), Value::Null],
+    ];
+    assert_eq!(
+        RowStatement::Update
+            .build_all("sqlite", None, "t", &columns, &rows)
+            .unwrap(),
+        "UPDATE \"t\" SET \"note\" = 'a' WHERE \"id\" = 1;\nUPDATE \"t\" SET \"note\" = NULL WHERE \"id\" = 2;"
+    );
+    assert_eq!(
+        RowStatement::Where
+            .build_all("sqlite", None, "t", &columns, &rows)
+            .unwrap(),
+        "(\"id\" = 1)\nOR (\"id\" = 2)"
+    );
+    let bad = vec![rows[0].clone(), vec![Value::Null, Value::Null]];
+    assert!(matches!(
+        RowStatement::Update.build_all("sqlite", None, "t", &columns, &bad),
+        Err(BuildSqlError::UnrepresentableValue { .. })
+    ));
+}
+
+#[test]
 fn copied_update_and_delete_refuse_rows_without_a_usable_key() {
     let columns = vec![column("id"), column("note")];
     let row = vec![Value::Int(7), Value::Text("x".into())];

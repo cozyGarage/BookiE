@@ -1118,9 +1118,9 @@ impl SimpleComponent for App {
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsStatement {
                 tab_id,
-                row_position,
+                row_positions,
                 statement,
-            } => self.on_copy_row_as_statement(tab_id, row_position, statement),
+            } => self.on_copy_row_as_statement(tab_id, &row_positions, statement),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
             AppMsg::CancelConnect => self.on_cancel_connect(),
             AppMsg::ConnectionCancelled => self.on_connection_cancelled(),

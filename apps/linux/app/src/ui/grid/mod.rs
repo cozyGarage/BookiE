@@ -77,7 +77,7 @@ pub enum GridMsg {
     },
     IncompleteRowData,
     ProjectionFailure,
-    CopyRowAsStatement(u32, bookie_core::sql_literal::RowStatement),
+    CopyRowAsStatement(Vec<u32>, bookie_core::sql_literal::RowStatement),
     ShowRowAsJson(String),
     ExportResults(std::sync::Arc<QueryResult>),
     ExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
