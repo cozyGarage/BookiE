@@ -325,6 +325,7 @@ fn preview_value(value: &Value) -> Option<CellPreview> {
             value: Value::Text(text[..text.floor_char_boundary(PREVIEW_BYTES)].to_owned()),
             byte_count: text.len(),
         }),
+        Value::Json(json) if json_must_exceed_preview(json) => json_preview(json),
         Value::Json(json) if json_exceeds(json, PREVIEW_BYTES) => json_preview(json),
         Value::JsonText(json) if json.len() > PREVIEW_BYTES => Some(CellPreview {
             value: Value::JsonText(json[..json.floor_char_boundary(PREVIEW_BYTES)].to_owned()),
@@ -336,6 +337,10 @@ fn preview_value(value: &Value) -> Option<CellPreview> {
         }),
         _ => None,
     }
+}
+
+fn json_must_exceed_preview(json: &serde_json::Value) -> bool {
+    matches!(json, serde_json::Value::String(text) if text.len() > PREVIEW_BYTES.saturating_sub(2))
 }
 
 struct JsonPreviewWriter {
