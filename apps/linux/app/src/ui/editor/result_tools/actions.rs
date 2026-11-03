@@ -59,7 +59,7 @@ pub(super) fn connect(
     });
     row.connect_destroy({
         let tools = tools.clone();
-        move |_| tools.stop()
+        move |_| tools.cancel_search()
     });
 }
 
@@ -84,8 +84,12 @@ impl Tools {
         with(&self.controls.stop, |button| button.set_visible(busy));
     }
 
-    fn stop(&self) {
+    fn cancel_search(&self) {
         self.cancel.borrow().cancel();
+    }
+
+    fn stop(&self) {
+        self.cancel_search();
         if let Some(ticket) = self.filter_ticket.borrow().as_ref() {
             ticket.cancel().cancel();
         }
@@ -230,10 +234,8 @@ impl Tools {
             return;
         }
         let ticket = Arc::new(FilterTicket::default());
-        *self.filter_ticket.borrow_mut() = Some(ticket.clone());
         super::ticket::register(self.identity, &ticket);
-        self.set_busy(true);
-        self.poll_filter(ticket.clone());
+        self.adopt_filter(ticket.clone());
         let _ = self
             .sender
             .send(super::super::SqlEditorInput::FilterResults(Box::new(FilterRequest {
@@ -246,6 +248,12 @@ impl Tools {
                 label: needle,
                 ticket,
             })));
+    }
+
+    pub(super) fn adopt_filter(self: &Rc<Self>, ticket: Arc<FilterTicket>) {
+        *self.filter_ticket.borrow_mut() = Some(ticket.clone());
+        self.set_busy(true);
+        self.poll_filter(ticket);
     }
 
     fn poll_filter(self: &Rc<Self>, ticket: Arc<FilterTicket>) {

@@ -70,3 +70,14 @@ pub(super) fn cancel(identity: StatementIdentity) {
         }
     });
 }
+
+pub(super) fn active(identity: StatementIdentity) -> Option<Arc<FilterTicket>> {
+    ACTIVE.with(|active| {
+        let mut active = active.borrow_mut();
+        active.retain(|(_, ticket)| !ticket.is_finished());
+        active
+            .iter()
+            .find(|(candidate, _)| *candidate == identity)
+            .map(|(_, ticket)| ticket.clone())
+    })
+}

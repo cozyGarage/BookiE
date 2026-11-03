@@ -1530,6 +1530,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::result_tools::widget_tests::destroying_the_toolbar_keeps_a_running_filter_and_the_rebuilt_toolbar_resumes_it"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_tools::widget_tests::a_cell_filter_shows_stop_on_the_toolbar_of_its_own_result"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::outcomes::tests::export_partial_view::a_filtered_result_exports_only_its_own_saved_rows"
     ],
     [

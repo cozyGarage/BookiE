@@ -1,9 +1,4 @@
-use std::cell::Cell;
 use std::sync::Arc;
-use std::time::Duration;
-
-use relm4::gtk;
-use relm4::gtk::prelude::*;
 
 use bookie_app_services::result_predicate::ResultPredicate;
 use bookie_core::{ColumnInfo, Value};
@@ -14,6 +9,7 @@ use super::super::{SqlEditor, SqlEditorInput, StatementIdentity, StatementOutcom
 use super::actions::filtering_text;
 use super::editor::FilterRequest;
 use super::ticket::{FilterTicket, register, running};
+use super::widget::tools_for;
 use crate::ui::grid::{GridMsg, value_to_display_text};
 
 const LABEL_VALUE_CHARS: usize = 24;
@@ -78,7 +74,9 @@ impl SqlEditor {
         let ticket = Arc::new(FilterTicket::default());
         register(identity, &ticket);
         self.status.set_label(&filtering_text(0, source.total_rows as u64));
-        watch_cell_filter(&self.results_holder, &self.status, &ticket, source.total_rows as u64);
+        if let Some(tools) = tools_for(identity) {
+            tools.adopt_filter(ticket.clone());
+        }
         sender.input(SqlEditorInput::FilterResults(Box::new(FilterRequest {
             source,
             identity,
@@ -87,53 +85,4 @@ impl SqlEditor {
             ticket,
         })));
     }
-}
-
-fn find_named(root: &gtk::Widget, name: &str) -> Option<gtk::Widget> {
-    if root.widget_name() == name {
-        return Some(root.clone());
-    }
-    let mut child = root.first_child();
-    while let Some(widget) = child {
-        if let Some(found) = find_named(&widget, name) {
-            return Some(found);
-        }
-        child = widget.next_sibling();
-    }
-    None
-}
-
-fn watch_cell_filter(holder: &gtk::Box, status: &gtk::Label, ticket: &Arc<FilterTicket>, total: u64) {
-    let stop =
-        find_named(holder.upcast_ref(), "tp-result-find-stop").and_then(|widget| widget.downcast::<gtk::Button>().ok());
-    if let Some(stop) = stop {
-        show_stop(&stop, ticket);
-    }
-    let status = status.downgrade();
-    let ticket = ticket.clone();
-    gtk::glib::timeout_add_local(Duration::from_millis(100), move || {
-        let (Some(status), false) = (status.upgrade(), ticket.is_finished()) else {
-            return gtk::glib::ControlFlow::Break;
-        };
-        status.set_label(&filtering_text(ticket.progress().rows_done(), total));
-        gtk::glib::ControlFlow::Continue
-    });
-}
-
-fn show_stop(stop: &gtk::Button, ticket: &Arc<FilterTicket>) {
-    stop.set_visible(true);
-    let cancelling = ticket.clone();
-    let handler = Cell::new(Some(stop.connect_clicked(move |_| cancelling.cancel().cancel())));
-    let stop = stop.downgrade();
-    let ticket = ticket.clone();
-    gtk::glib::timeout_add_local(Duration::from_millis(100), move || {
-        if !ticket.is_finished() {
-            return gtk::glib::ControlFlow::Continue;
-        }
-        if let (Some(stop), Some(handler)) = (stop.upgrade(), handler.take()) {
-            stop.disconnect(handler);
-            stop.set_visible(false);
-        }
-        gtk::glib::ControlFlow::Break
-    });
 }

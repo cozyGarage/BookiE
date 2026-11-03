@@ -397,6 +397,8 @@ fn a_running_filter_is_found_by_its_statement_and_cancelled_together() {
     assert!(!super::ticket::running(identity));
     super::ticket::register(identity, &ticket);
     assert!(super::ticket::running(identity));
+    assert!(super::ticket::active(identity).is_some_and(|active| Arc::ptr_eq(&active, &ticket)));
+    assert!(super::ticket::active(other).is_none());
     assert!(!super::ticket::running(other));
     super::ticket::cancel(other);
     assert!(!ticket.cancel().is_cancelled());
@@ -404,4 +406,5 @@ fn a_running_filter_is_found_by_its_statement_and_cancelled_together() {
     assert!(ticket.cancel().is_cancelled());
     ticket.finish(String::new());
     assert!(!super::ticket::running(identity));
+    assert!(super::ticket::active(identity).is_none());
 }

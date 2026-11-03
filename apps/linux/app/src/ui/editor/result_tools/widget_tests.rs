@@ -76,10 +76,43 @@ struct Fixture {
     holder: gtk::Box,
     pages: gtk::Stack,
     receiver: relm4::Receiver<SqlEditorInput>,
+    sender: relm4::Sender<SqlEditorInput>,
+    result: StreamedResult,
     _window: gtk::Window,
 }
 
+fn identity_number(number: usize) -> StatementIdentity {
+    StatementIdentity {
+        statement_index: number,
+        ..StatementIdentity::default()
+    }
+}
+
+fn mount(
+    holder: &gtk::Box,
+    pages: &gtk::Stack,
+    result: &StreamedResult,
+    identity: StatementIdentity,
+    sender: &relm4::Sender<SqlEditorInput>,
+) -> relm4::adw::WrapBox {
+    let header = relm4::adw::WrapBox::new();
+    holder.prepend(&header);
+    append(ToolsTarget {
+        holder,
+        header: &header,
+        pages,
+        result,
+        identity,
+        sender,
+    });
+    header
+}
+
 fn fixture() -> Fixture {
+    fixture_for(StatementIdentity::default())
+}
+
+fn fixture_for(identity: StatementIdentity) -> Fixture {
     gtk::init().unwrap();
     let result = spooled_result();
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -89,16 +122,7 @@ fn fixture() -> Fixture {
         pages.add_named(&gtk::Box::new(gtk::Orientation::Vertical, 0), Some(&name));
     }
     let (sender, receiver) = relm4::channel();
-    let header = relm4::adw::WrapBox::new();
-    holder.append(&header);
-    append(ToolsTarget {
-        holder: &holder,
-        header: &header,
-        pages: &pages,
-        result: &result,
-        identity: StatementIdentity::default(),
-        sender: &sender,
-    });
+    mount(&holder, &pages, &result, identity, &sender);
     holder.append(&pages);
     let window = gtk::Window::builder().child(&holder).build();
     window.present();
@@ -106,6 +130,8 @@ fn fixture() -> Fixture {
         holder,
         pages,
         receiver,
+        sender,
+        result,
         _window: window,
     }
 }
@@ -371,4 +397,75 @@ fn editing_the_text_during_a_filter_keeps_it_busy_and_cancellable() {
     filter.emit_clicked();
     stop.emit_clicked();
     assert!(request.ticket.cancel().is_cancelled());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn destroying_the_toolbar_keeps_a_running_filter_and_the_rebuilt_toolbar_resumes_it() {
+    let fixture = fixture_for(identity_number(11));
+    let entry: gtk::SearchEntry = named(&fixture.holder, "tp-result-find-entry");
+    entry.set_text("needle");
+    let filter: gtk::Button = named(&fixture.holder, "tp-result-filter-button");
+    filter.emit_clicked();
+    let Some(SqlEditorInput::FilterResults(request)) = fixture.receiver.recv_sync() else {
+        panic!("a filter request was not sent")
+    };
+    let old = fixture
+        .holder
+        .first_child()
+        .and_then(|widget| widget.downcast::<relm4::adw::WrapBox>().ok());
+    fixture.holder.remove(old.as_ref().unwrap());
+    drop(old);
+    drop(filter);
+    drop(entry);
+    for _ in 0..20 {
+        gtk::glib::MainContext::default().iteration(false);
+    }
+    assert!(!request.ticket.cancel().is_cancelled());
+    mount(
+        &fixture.holder,
+        &fixture.pages,
+        &fixture.result,
+        identity_number(11),
+        &fixture.sender,
+    );
+    let stop: gtk::Button = named(&fixture.holder, "tp-result-find-stop");
+    let filter: gtk::Button = named(&fixture.holder, "tp-result-filter-button");
+    assert!(stop.is_visible());
+    assert!(!filter.is_sensitive());
+    stop.emit_clicked();
+    assert!(request.ticket.cancel().is_cancelled());
+    request.ticket.finish("done".into());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_cell_filter_shows_stop_on_the_toolbar_of_its_own_result() {
+    let fixture = fixture_for(identity_number(21));
+    let first = fixture
+        .holder
+        .first_child()
+        .and_then(|widget| widget.downcast::<relm4::adw::WrapBox>().ok())
+        .unwrap();
+    let second = mount(
+        &fixture.holder,
+        &fixture.pages,
+        &fixture.result,
+        identity_number(22),
+        &fixture.sender,
+    );
+    let ticket = Arc::new(super::ticket::FilterTicket::default());
+    super::ticket::register(identity_number(22), &ticket);
+    super::widget::tools_for(identity_number(22))
+        .unwrap()
+        .adopt_filter(ticket.clone());
+    let stop_in = |header: &relm4::adw::WrapBox| -> gtk::Button {
+        super::jump::find_descendant(header.upcast_ref(), |widget| {
+            widget.widget_name() == "tp-result-find-stop"
+        })
+        .unwrap()
+    };
+    assert!(stop_in(&second).is_visible());
+    assert!(!stop_in(&first).is_visible());
+    ticket.finish("done".into());
 }

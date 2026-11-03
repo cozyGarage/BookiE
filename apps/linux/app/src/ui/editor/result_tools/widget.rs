@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
 use bookie_app_services::result_scan::ScanSource;
@@ -45,6 +45,29 @@ pub(super) struct Tools {
     pub(super) filter_ticket: RefCell<Option<Arc<FilterTicket>>>,
     pub(super) jump: JumpTicket,
     pub(super) busy: Cell<bool>,
+}
+
+thread_local! {
+    static TOOLS: RefCell<Vec<(StatementIdentity, Weak<Tools>)>> = const { RefCell::new(Vec::new()) };
+}
+
+fn register_tools(identity: StatementIdentity, tools: &Rc<Tools>) {
+    TOOLS.with(|registry| {
+        let mut registry = registry.borrow_mut();
+        registry.retain(|(_, tools)| tools.strong_count() > 0);
+        registry.push((identity, Rc::downgrade(tools)));
+    });
+}
+
+pub(super) fn tools_for(identity: StatementIdentity) -> Option<Rc<Tools>> {
+    TOOLS.with(|registry| {
+        registry
+            .borrow()
+            .iter()
+            .rev()
+            .filter(|(candidate, _)| *candidate == identity)
+            .find_map(|(_, tools)| tools.upgrade())
+    })
 }
 
 fn labelled_button(icon: &str, name: &str, label: &str) -> gtk::Button {
@@ -160,4 +183,8 @@ pub(in crate::ui::editor) fn append(target: ToolsTarget<'_>) {
     );
     header.append(&widgets.find);
     header.append(&widgets.actions);
+    register_tools(identity, &tools);
+    if let Some(ticket) = super::ticket::active(identity) {
+        tools.adopt_filter(ticket);
+    }
 }
