@@ -489,7 +489,9 @@ fn materialize_refuses_a_delete_whose_key_could_not_be_read() {
 #[test]
 fn undoing_an_edit_of_an_explicit_null_keeps_the_cell_touched() {
     let mut t = TabChangeTracker::new();
-    let RowKey::Draft(draft) = t.track_insert(vec![Value::Null, Value::Null]) else {
+    let key = t.track_insert(vec![Value::Null, Value::Null]);
+    assert!(matches!(key, RowKey::Draft(_)));
+    let RowKey::Draft(draft) = key else {
         return;
     };
     assert!(!t.drafts()[0].touched[0]);
@@ -510,7 +512,9 @@ fn undoing_an_edit_of_an_explicit_null_keeps_the_cell_touched() {
 #[test]
 fn undoing_the_first_edit_of_an_untouched_draft_cell_leaves_it_untouched() {
     let mut t = TabChangeTracker::new();
-    let RowKey::Draft(draft) = t.track_insert(vec![Value::Null, Value::Null]) else {
+    let key = t.track_insert(vec![Value::Null, Value::Null]);
+    assert!(matches!(key, RowKey::Draft(_)));
+    let RowKey::Draft(draft) = key else {
         return;
     };
     t.track_draft_cell_edit(draft, 0, Value::Text("x".into()));
@@ -523,12 +527,38 @@ fn undoing_the_first_edit_of_an_untouched_draft_cell_leaves_it_untouched() {
 #[test]
 fn undoing_back_to_a_non_null_value_keeps_the_cell_touched() {
     let mut t = TabChangeTracker::new();
-    let RowKey::Draft(draft) = t.track_insert(vec![Value::Null]) else {
+    let key = t.track_insert(vec![Value::Null]);
+    assert!(matches!(key, RowKey::Draft(_)));
+    let RowKey::Draft(draft) = key else {
         return;
     };
     t.track_draft_cell_edit(draft, 0, Value::Text("a".into()));
     t.track_draft_cell_edit(draft, 0, Value::Text("b".into()));
     t.undo();
     assert_eq!(t.drafts()[0].values[0], Value::Text("a".into()));
+    assert!(t.drafts()[0].touched[0]);
+}
+
+#[test]
+fn a_chain_of_draft_edits_undoes_and_redoes_through_every_touched_state() {
+    let mut t = TabChangeTracker::new();
+    let key = t.track_insert(vec![Value::Null]);
+    assert!(matches!(key, RowKey::Draft(_)));
+    let RowKey::Draft(draft) = key else {
+        return;
+    };
+    t.track_draft_cell_edit(draft, 0, Value::Null);
+    t.track_draft_cell_edit(draft, 0, Value::Text("x".into()));
+    t.undo();
+    assert_eq!(t.drafts()[0].values[0], Value::Null);
+    assert!(t.drafts()[0].touched[0]);
+    t.undo();
+    assert_eq!(t.drafts()[0].values[0], Value::Null);
+    assert!(!t.drafts()[0].touched[0]);
+    t.redo();
+    assert_eq!(t.drafts()[0].values[0], Value::Null);
+    assert!(t.drafts()[0].touched[0]);
+    t.redo();
+    assert_eq!(t.drafts()[0].values[0], Value::Text("x".into()));
     assert!(t.drafts()[0].touched[0]);
 }
