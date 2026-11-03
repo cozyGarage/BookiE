@@ -919,7 +919,7 @@ impl SimpleComponent for App {
             AppMsg::ShowAllSidebarSchemas => self.show_all_sidebar_schemas(&sender),
             AppMsg::NewTableTab { schema } => self.on_new_table_tab(schema, sender),
             AppMsg::EditStructureTab { schema, table } => self.on_edit_structure_tab(schema, table, sender),
-            AppMsg::ShowCreateTableForExisting { schema, table } => self.on_show_create_table(schema, table, sender),
+            AppMsg::TableText { schema, table, text } => self.on_structure_text(schema, table, text, sender),
             AppMsg::ShowCreateTableLoaded { sql } => self.append_editor_tab(Some(sql), sender),
             AppMsg::RenameTablePrompt { schema, table } => self.on_rename_table_prompt(schema, table, sender),
             AppMsg::RenameTableConfirmed {

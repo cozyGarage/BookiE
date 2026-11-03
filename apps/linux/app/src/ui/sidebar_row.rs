@@ -75,6 +75,10 @@ fn append_table_context_sections(menu: &gtk::gio::Menu) {
         Some(&crate::tr!("Show CREATE TABLE")),
         Some("sidebar-row.show-create-table"),
     );
+    structure_section.append(
+        Some(&crate::tr!("Join Referenced Tables")),
+        Some("sidebar-row.join-referenced"),
+    );
     structure_section.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
     menu.append_section(None, &structure_section);
     let mutate_section = gtk::gio::Menu::new();
@@ -133,6 +137,7 @@ pub enum SidebarRowMsg {
     OpenInNewTab,
     EditStructure,
     ShowCreateTable,
+    JoinReferenced,
     ImportCsv,
     RenameTable,
     TruncateTable,
@@ -179,6 +184,10 @@ pub enum SidebarRowOutput {
     /// it in a fresh editor tab. Useful for schema export, sharing,
     /// or just reading the canonical DDL without going through pg_dump.
     ShowCreateTable {
+        schema: Option<String>,
+        name: String,
+    },
+    JoinReferenced {
         schema: Option<String>,
         name: String,
     },
@@ -413,6 +422,10 @@ impl FactoryComponent for SidebarRow {
         let show_create_action = gtk::gio::ActionEntry::builder("show-create-table")
             .activate(move |_, _, _| sender_show.input(SidebarRowMsg::ShowCreateTable))
             .build();
+        let sender_join = sender.clone();
+        let join_action = gtk::gio::ActionEntry::builder("join-referenced")
+            .activate(move |_, _, _| sender_join.input(SidebarRowMsg::JoinReferenced))
+            .build();
         let sender_diagram = sender.clone();
         let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
             .activate(move |_, _, _| sender_diagram.input(SidebarRowMsg::ShowDiagram))
@@ -437,6 +450,7 @@ impl FactoryComponent for SidebarRow {
             open_action,
             edit_action,
             show_create_action,
+            join_action,
             diagram_action,
             import_action,
             rename_action,
@@ -511,6 +525,7 @@ impl FactoryComponent for SidebarRow {
             SidebarRowMsg::OpenInNewTab => SidebarRowOutput::OpenInNewTab { schema, name },
             SidebarRowMsg::EditStructure => SidebarRowOutput::EditStructure { schema, name },
             SidebarRowMsg::ShowCreateTable => SidebarRowOutput::ShowCreateTable { schema, name },
+            SidebarRowMsg::JoinReferenced => SidebarRowOutput::JoinReferenced { schema, name },
             SidebarRowMsg::ImportCsv => SidebarRowOutput::ImportCsv { schema, name },
             SidebarRowMsg::RenameTable => SidebarRowOutput::RenameTable { schema, name },
             SidebarRowMsg::TruncateTable => SidebarRowOutput::TruncateTable { schema, name },
@@ -816,6 +831,7 @@ mod lazy_context_menu_tests {
         let row = factory.get(0).unwrap();
         let popover = context_popover(&row.popover, &row_widget, row.kind);
         assert!(popover.activate_action("sidebar-row.edit-structure", None).is_ok());
+        assert!(popover.activate_action("sidebar-row.join-referenced", None).is_ok());
         assert!(popover.activate_action("sidebar-row.drop-table", None).is_ok());
         factory.guard().clear();
         while glib::MainContext::default().iteration(false) {}

@@ -229,9 +229,10 @@ pub enum AppMsg {
         schema: Option<String>,
         table: String,
     },
-    ShowCreateTableForExisting {
+    TableText {
         schema: Option<String>,
         table: String,
+        text: super::structure::StructureText,
     },
     ShowCreateTableLoaded {
         sql: String,
