@@ -109,6 +109,10 @@ pub(super) async fn run_audited(
     outcome.map_err(CompareFailure::Compare)
 }
 
+fn is_cancellation(failure: &CompareFailure) -> bool {
+    matches!(failure, CompareFailure::Compare(CompareError::Cancelled))
+}
+
 fn failure_text(failure: &CompareFailure) -> String {
     match failure {
         CompareFailure::Audit => crate::tr!("The comparison needs the audit journal, which is unavailable"),
@@ -156,7 +160,7 @@ impl SqlEditor {
         let Some(context) = self.audit_context() else {
             let message = crate::tr!("Open a connection before comparing results");
             self.status.set_label(&message);
-            request.ticket.finish(message);
+            request.ticket.fail(message);
             return;
         };
         let database = self.database.clone();
@@ -182,6 +186,7 @@ impl SqlEditor {
 
     pub(in crate::ui::editor) fn on_compare_finished(&mut self, done: CompareDone, sender: &ComponentSender<Self>) {
         let CompareDone { request, outcome } = done;
+        let failed = matches!(&outcome, Err(failure) if !is_cancellation(failure));
         let message = match outcome {
             Err(failure) => failure_text(&failure),
             Ok(report)
@@ -192,7 +197,11 @@ impl SqlEditor {
             Ok(report) => self.show_diff(&request, report, sender),
         };
         self.status.set_label(&message);
-        request.ticket.finish(message);
+        if failed {
+            request.ticket.fail(message);
+        } else {
+            request.ticket.finish(message);
+        }
     }
 
     fn show_diff(&mut self, request: &CompareRequest, report: CompareReport, sender: &ComponentSender<Self>) -> String {

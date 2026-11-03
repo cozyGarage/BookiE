@@ -9,6 +9,7 @@ pub(in crate::ui) struct CompareTicket {
     cancel: CancellationToken,
     progress: ScanProgress,
     finished: AtomicBool,
+    failed: AtomicBool,
     message: Mutex<String>,
 }
 
@@ -24,6 +25,20 @@ impl CompareTicket {
     pub(super) fn finish(&self, message: String) {
         *self.message.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = message;
         self.finished.store(true, Ordering::Release);
+    }
+
+    pub(super) fn fail(&self, message: String) {
+        self.failed.store(true, Ordering::Release);
+        self.finish(message);
+    }
+
+    pub(super) fn failure(&self) -> Option<String> {
+        self.failed.load(Ordering::Acquire).then(|| {
+            self.message
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
+        })
     }
 
     pub(super) fn is_finished(&self) -> bool {

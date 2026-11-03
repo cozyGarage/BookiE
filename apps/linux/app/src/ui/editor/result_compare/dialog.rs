@@ -226,12 +226,28 @@ fn start(form: &Rc<Form>) {
     });
 }
 
+fn reopen(form: &Form, reason: &str) {
+    form.ticket.replace(None);
+    for widget in [
+        form.left.upcast_ref::<gtk::Widget>(),
+        form.right.upcast_ref(),
+        form.keys.upcast_ref(),
+        form.compare.upcast_ref(),
+    ] {
+        widget.set_sensitive(true);
+    }
+    form.progress.set_label("");
+    form.note.set_label(reason);
+}
+
 fn poll(form: &Rc<Form>) -> gtk::glib::ControlFlow {
     let Some(ticket) = form.ticket.borrow().clone() else {
         return gtk::glib::ControlFlow::Break;
     };
     if ticket.is_finished() {
-        if let Some(dialog) = form.dialog.upgrade() {
+        if let Some(reason) = ticket.failure() {
+            reopen(form, &reason);
+        } else if let Some(dialog) = form.dialog.upgrade() {
             dialog.force_close();
         }
         return gtk::glib::ControlFlow::Break;

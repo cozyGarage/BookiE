@@ -29,6 +29,15 @@ fn pump() {
     }
 }
 
+fn settle() {
+    let context = gtk::glib::MainContext::default();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(600);
+    while std::time::Instant::now() < deadline {
+        while context.iteration(false) {}
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
 fn button(root: &gtk::Widget, label: &str) -> gtk::Button {
     descendants(root)
         .into_iter()
@@ -110,4 +119,55 @@ fn the_compare_dialog_refuses_the_same_result_on_both_sides() {
         notes.iter().any(|text| text == "Choose two different results"),
         "{notes:?}"
     );
+}
+
+fn compare_buttons(root: &gtk::Widget) -> usize {
+    descendants(root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Button>().ok())
+        .filter(|button| button.label().is_some_and(|text| text == "Compare"))
+        .count()
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_failed_comparison_keeps_the_dialog_and_its_choices_and_a_success_closes_it() {
+    gtk::init().unwrap();
+    adw::init().unwrap();
+    let window = adw::Window::new();
+    window.present();
+    let outcomes = [
+        rows_outcome("SELECT a", vec![result(&["id"], 3, false)]),
+        rows_outcome("SELECT b", vec![result(&["id"], 2, false)]),
+    ];
+    let (sender, receiver) = relm4::channel();
+    present(&window, candidates(&outcomes), sender);
+    settle();
+    let root: gtk::Widget = window.clone().upcast();
+    let keys = checks(&root);
+    keys[0].set_active(true);
+    button(&root, "Compare").emit_clicked();
+    let Some(SqlEditorInput::CompareResults(request)) = receiver.recv_sync() else {
+        panic!("the dialog did not send a comparison request");
+    };
+    request.ticket.fail("A key value appears more than once".into());
+    settle();
+    assert!(button(&root, "Compare").is_sensitive());
+    assert!(checks(&root)[0].is_active());
+    let notes: Vec<String> = descendants(&root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Label>().ok())
+        .map(|label| label.text().to_string())
+        .collect();
+    assert!(
+        notes.iter().any(|text| text == "A key value appears more than once"),
+        "{notes:?}"
+    );
+    button(&root, "Compare").emit_clicked();
+    let Some(SqlEditorInput::CompareResults(request)) = receiver.recv_sync() else {
+        panic!("the dialog did not send a second request");
+    };
+    request.ticket.finish("Equal 1".into());
+    settle();
+    assert_eq!(compare_buttons(&root), 0);
 }

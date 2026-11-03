@@ -1561,6 +1561,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::result_compare::dialog_tests::the_compare_dialog_refuses_the_same_result_on_both_sides"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::result_compare::dialog_tests::a_failed_comparison_keeps_the_dialog_and_its_choices_and_a_success_closes_it"
     ]
   ],
   "keyring": [
