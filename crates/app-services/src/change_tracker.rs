@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
 use uuid::Uuid;
@@ -594,6 +593,20 @@ impl ChangeTrackerRegistry {
         self.trackers.values().any(|t| t.has_pending())
     }
 
+    pub fn with_tab<F, R>(&mut self, tab_id: Uuid, f: F) -> Option<R>
+    where
+        F: FnOnce(&mut TabChangeTracker) -> R,
+    {
+        self.trackers.get_mut(&tab_id).map(f)
+    }
+
+    pub fn with_tab_ref<F, R>(&self, tab_id: Uuid, f: F) -> Option<R>
+    where
+        F: FnOnce(&TabChangeTracker) -> R,
+    {
+        self.trackers.get(&tab_id).map(f)
+    }
+
     pub fn any_pending_in(&self, ids: impl IntoIterator<Item = Uuid>) -> bool {
         ids.into_iter()
             .any(|id| self.trackers.get(&id).is_some_and(|tracker| tracker.has_pending()))
@@ -611,44 +624,6 @@ impl ChangeTrackerRegistry {
             .filter_map(|(id, tracker)| (tab_ids.contains(id) && tracker.has_pending()).then_some(*id))
             .collect()
     }
-}
-
-thread_local! {
-    static REGISTRY: RefCell<ChangeTrackerRegistry> = RefCell::new(ChangeTrackerRegistry::new());
-}
-
-pub fn with_tab<F, R>(tab_id: Uuid, f: F) -> Option<R>
-where
-    F: FnOnce(&mut TabChangeTracker) -> R,
-{
-    REGISTRY.with(|reg| reg.borrow_mut().trackers.get_mut(&tab_id).map(f))
-}
-
-pub fn with_tab_ref<F, R>(tab_id: Uuid, f: F) -> Option<R>
-where
-    F: FnOnce(&TabChangeTracker) -> R,
-{
-    REGISTRY.with(|reg| reg.borrow().trackers.get(&tab_id).map(f))
-}
-
-pub fn open_tab(tab_id: Uuid) {
-    REGISTRY.with(|reg| reg.borrow_mut().open_tab(tab_id));
-}
-
-pub fn close_tab(tab_id: Uuid) {
-    REGISTRY.with(|reg| reg.borrow_mut().close_tab(tab_id));
-}
-
-pub fn any_pending_in(ids: impl IntoIterator<Item = Uuid>) -> bool {
-    REGISTRY.with(|reg| reg.borrow().any_pending_in(ids))
-}
-
-pub fn pending_among(ids: impl IntoIterator<Item = Uuid>) -> Vec<Uuid> {
-    REGISTRY.with(|reg| reg.borrow().pending_among(ids))
-}
-
-pub fn pending_tabs_for(tab_ids: &std::collections::HashSet<Uuid>) -> Vec<Uuid> {
-    REGISTRY.with(|reg| reg.borrow().pending_tabs_for(tab_ids))
 }
 
 #[cfg(test)]

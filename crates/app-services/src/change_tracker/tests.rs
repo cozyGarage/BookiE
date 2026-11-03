@@ -332,6 +332,23 @@ fn registry_any_pending_reports_correctly() {
 }
 
 #[test]
+fn separate_registries_keep_tab_edits_independent() {
+    let id = Uuid::new_v4();
+    let mut first = ChangeTrackerRegistry::new();
+    let mut second = ChangeTrackerRegistry::new();
+    first.open_tab(id);
+    second.open_tab(id);
+    first.with_tab(id, |tracker| {
+        tracker.track_cell_edit(rk(&[Value::Int(1)]), 0, Value::Int(1), Value::Int(2));
+    });
+    assert!(first.any_pending_in([id]));
+    assert!(!second.any_pending_in([id]));
+    first.close_tab(id);
+    assert!(first.with_tab_ref(id, |_| ()).is_none());
+    assert!(second.with_tab_ref(id, |_| ()).is_some());
+}
+
+#[test]
 fn registry_pending_tabs_for_does_not_include_another_window() {
     let mut reg = ChangeTrackerRegistry::new();
     let first = Uuid::new_v4();
