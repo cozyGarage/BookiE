@@ -20,6 +20,7 @@ import gtk_workbook
 import gtk_parameters
 import gtk_xml
 import gtk_ux
+import gtk_whole_result
 import gtk_active_edit
 import gtk_editor_panel
 import gtk_csv_refresh
@@ -2963,6 +2964,7 @@ def main():
     scenarios.extend(gtk_parameters.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_xml.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_ux.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_whole_result.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_active_edit.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_editor_panel.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_csv_refresh.scenarios(sys.modules[__name__]))
