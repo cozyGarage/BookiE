@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { visibleWindow, displayCell, windowTop } from './grid.mjs';
+import { visibleWindow, displayCell, windowTop, scrollTopForRow } from './grid.mjs';
 
 test('virtual rows stay bounded and cover the beginning and end', () => {
   const first = visibleWindow(0, 360, 36, 1_000_000);
@@ -26,4 +26,15 @@ test('large integer text and null remain distinct', () => {
 test('the final visible row stays within the scrollable surface', () => {
   assert.equal(windowTop(7_999_640, 8_000_000, 16, 36), 7_999_424);
   assert.equal(windowTop(40, 8_000_000, 16, 36), 40);
+});
+
+test('jumping to a row scrolls to a position whose window contains that row', () => {
+  for (const total of [150_000, 1_000_000]) {
+    for (const row of [0, 1, 74_999, total - 1]) {
+      const top = scrollTopForRow(row, 360, 36, total);
+      const window = visibleWindow(top, 360, 36, total);
+      assert.ok(window.offset <= row && row < window.offset + window.limit, `${total}:${row}`);
+    }
+  }
+  assert.equal(scrollTopForRow(5, 360, 36, 0), 0);
 });

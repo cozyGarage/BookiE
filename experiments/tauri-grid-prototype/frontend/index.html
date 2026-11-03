@@ -29,14 +29,68 @@
     </section>
     <section id="result" class="result" hidden aria-labelledby="result-title">
       <div class="result-head">
-        <div><p class="eyebrow">QUERY RESULT</p><h2 id="result-title">One million synthetic rows</h2></div>
+        <div><p class="eyebrow">QUERY RESULT</p><h2 id="result-title">Synthetic result</h2></div>
         <span id="status" role="status" aria-live="polite">Loading…</span>
       </div>
+      <div id="strip" class="strip" role="toolbar" aria-label="Result controls">
+        <p id="progress" class="strip-progress"></p>
+        <div class="strip-group pager" role="group" aria-label="Pages">
+          <button id="page-first" type="button" class="flat" aria-label="First page">«</button>
+          <button id="page-previous" type="button" class="flat" aria-label="Previous page">‹</button>
+          <span id="range" class="range"></span>
+          <button id="page-next" type="button" class="flat" aria-label="Next page">›</button>
+          <button id="page-last" type="button" class="flat" aria-label="Last page">»</button>
+        </div>
+        <div class="strip-group find" role="search">
+          <input id="find" type="search" class="entry" aria-label="Find in all rows" placeholder="Find in all rows" maxlength="256">
+          <button id="find-previous" type="button" class="flat" aria-label="Previous match">▲</button>
+          <button id="find-next" type="button" class="flat" aria-label="Next match">▼</button>
+          <span id="find-status" class="muted small" role="status" aria-live="polite"></span>
+        </div>
+        <div id="actions" class="strip-group actions">
+          <button id="show-matching" type="button" class="flat">Show matching rows</button>
+          <button id="compare" type="button" class="flat">Compare…</button>
+          <button id="export" type="button" class="flat">Export all rows…</button>
+          <button id="continuous" type="button" class="flat" aria-pressed="false">Continuous scrolling</button>
+        </div>
+        <details id="more" class="more" hidden>
+          <summary aria-label="More actions">⋯</summary>
+          <div id="more-menu" class="more-menu"></div>
+        </details>
+      </div>
+      <form id="filter-row" class="filter-row" hidden>
+        <label for="where" class="small muted">WHERE</label>
+        <input id="where" type="text" class="entry" placeholder="label contains 7" maxlength="256" autocomplete="off">
+        <details class="saved">
+          <summary>Saved filters</summary>
+          <div class="more-menu">
+            <button type="button" class="flat" data-saved="label contains 7">label contains 7</button>
+            <button type="button" class="flat" data-saved="state = false">state = false</button>
+          </div>
+        </details>
+        <button id="clear-filter" type="button" class="flat">Clear all</button>
+        <button id="apply-filter" type="submit">Apply</button>
+        <button id="close-filter" type="button" class="flat" aria-label="Close filter">×</button>
+      </form>
       <div class="columns" aria-hidden="true"><span>Row</span><span>Value</span><span>Label</span><span>State</span></div>
       <div id="viewport" class="viewport" role="grid" aria-label="Synthetic typed results" aria-rowcount="1000000" aria-colcount="4" tabindex="0">
         <div id="height" class="height"><div id="rows" class="rows"></div></div>
       </div>
-      <p class="muted footnote">Scroll or use Page Up and Page Down. Integer values are transported as text to preserve their exact digits.</p>
+      <section id="compare-panel" class="compare-panel" hidden aria-labelledby="compare-title">
+        <div class="compare-head">
+          <h3 id="compare-title">Compare results</h3>
+          <label class="small muted" for="compare-mode">Mode</label>
+          <select id="compare-mode" class="entry">
+            <option value="whole_row">Whole-row (multiset)</option>
+            <option value="keyed">Keyed (value)</option>
+          </select>
+          <button id="compare-run" type="button">Run</button>
+          <button id="compare-close" type="button" class="flat" aria-label="Close compare">×</button>
+        </div>
+        <p id="compare-summary" class="muted small" role="status" aria-live="polite"></p>
+        <div id="compare-rows" class="compare-rows"></div>
+      </section>
+      <p class="muted footnote">Scroll or use Page Up and Page Down. Ctrl+F opens the filter row. Integer values are transported as text to preserve their exact digits.</p>
     </section>
   </main>
 </body>
