@@ -440,6 +440,48 @@ fn spool_read_failure_can_be_retried_without_reloading_in_a_loop() {
 }
 
 #[test]
+#[ignore = "requires an isolated GTK display"]
+fn failed_spool_read_shows_status_and_retry_loads_the_page() {
+    gtk4::init().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let model = PagedModel::new(&[1], 1);
+    let status = gtk4::Label::new(None);
+    model.attach_status(&status);
+    model.show(0, 1);
+    model.load_from_spool(runtime.handle(), &spool, &[]);
+    wait_for_condition(|| !status.text().is_empty());
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: Vec::new(),
+        rows: vec![vec![bookie_core::Value::Int(42)]].into(),
+        truncated: false,
+    });
+    runtime.block_on(spool.append_page(0, page)).unwrap();
+    model.retry_visible(runtime.handle(), &spool, &[]);
+    wait_for_condition(|| {
+        model
+            .item(0)
+            .and_downcast::<RowObject>()
+            .and_then(|row| row.complete_cells())
+            == Some(vec![bookie_core::Value::Int(42)])
+    });
+    assert!(status.text().is_empty());
+}
+
+#[cfg(test)]
+fn wait_for_condition(condition: impl Fn() -> bool) {
+    let context = glib::MainContext::default();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while !condition() {
+        while context.iteration(false) {}
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+}
+
+#[test]
 fn closing_a_model_does_not_wait_for_an_inflight_spool_read() {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

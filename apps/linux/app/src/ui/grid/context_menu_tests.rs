@@ -50,7 +50,9 @@ fn virtual_grid_disables_snapshot_export() {
     view.activate_action("cell.export", None).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     assert!(runtime.block_on(async {
-        tokio::time::timeout(std::time::Duration::from_millis(20), receiver.recv()).await.is_err()
+        tokio::time::timeout(std::time::Duration::from_millis(20), receiver.recv())
+            .await
+            .is_err()
     }));
 }
 

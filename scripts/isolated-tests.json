@@ -630,6 +630,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::paged_model::failed_spool_read_shows_status_and_retry_loads_the_page"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::continuous::tests::continuous_view_loads_and_displays_spooled_rows"
     ],
     [
