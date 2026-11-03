@@ -114,9 +114,9 @@ pub struct SidebarRow {
     group: Option<GroupInit>,
     row: Option<gtk::ListBoxRow>,
     chevron: gtk::Image,
-    new_table_button: gtk::Button,
-    csv_button: gtk::Button,
-    open_button: gtk::Button,
+    new_table_button: Option<gtk::Button>,
+    csv_button: Option<gtk::Button>,
+    open_button: Option<gtk::Button>,
     /// The eagerly-parented context-menu popover. Held on the model
     /// so `shutdown` can `unparent()` it before the row's root widget
     /// is finalized — without this, GTK warns
@@ -233,6 +233,7 @@ impl FactoryComponent for SidebarRow {
             // this app, so no styling collision risk.
             set_widget_name: &self.info.name,
 
+            #[name = "row_content"]
             #[wrap(Some)]
             set_child = &gtk::Box {
                 set_orientation: gtk::Orientation::Horizontal,
@@ -267,46 +268,50 @@ impl FactoryComponent for SidebarRow {
                     set_css_classes: &["dim-label", "caption"],
                 },
 
-                append: &self.new_table_button,
-                append: &self.csv_button,
-                append: &self.open_button,
             },
         }
     }
 
     fn init_model(init: Self::Init, _index: &DynamicIndex, _sender: FactorySender<Self>) -> Self {
-        let open_label = crate::tr!("Open {name}").replace("{name}", &init.info.name);
-        let open_button = gtk::Button::builder()
-            .icon_name("go-next-symbolic")
-            .tooltip_text(&open_label)
-            .valign(gtk::Align::Center)
-            .css_classes(["flat"])
-            .build();
-        open_button.update_property(&[gtk::accessible::Property::Label(&open_label)]);
-        let actions = init.group.as_ref().is_some_and(|group| group.actions);
+        let open_button = init.group.is_none().then(|| {
+            let open_label = crate::tr!("Open {name}").replace("{name}", &init.info.name);
+            let button = gtk::Button::builder()
+                .icon_name("go-next-symbolic")
+                .tooltip_text(&open_label)
+                .valign(gtk::Align::Center)
+                .css_classes(["flat"])
+                .build();
+            button.update_property(&[gtk::accessible::Property::Label(&open_label)]);
+            button
+        });
         let group_button = |icon: &str, tooltip: String| {
             let button = gtk::Button::builder()
                 .icon_name(icon)
                 .tooltip_text(&tooltip)
                 .valign(gtk::Align::Center)
-                .visible(actions)
                 .css_classes(["flat"])
                 .build();
             button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
             button
         };
-        let schema = init.info.schema.clone();
-        let (new_table_label, csv_label) = match schema.as_deref() {
-            Some(schema) => (
-                crate::tr!("New Table in {schema}\u{2026}").replace("{schema}", schema),
-                crate::tr!("Table from CSV in {schema}\u{2026}").replace("{schema}", schema),
-            ),
-            None => (crate::tr!("New Table\u{2026}"), crate::tr!("Table from CSV\u{2026}")),
+        let (new_table_button, csv_button) = if init.group.as_ref().is_some_and(|group| group.actions) {
+            let labels = match init.info.schema.as_deref() {
+                Some(schema) => (
+                    crate::tr!("New Table in {schema}\u{2026}").replace("{schema}", schema),
+                    crate::tr!("Table from CSV in {schema}\u{2026}").replace("{schema}", schema),
+                ),
+                None => (crate::tr!("New Table\u{2026}"), crate::tr!("Table from CSV\u{2026}")),
+            };
+            (
+                Some(group_button("list-add-symbolic", labels.0)),
+                Some(group_button("document-open-symbolic", labels.1)),
+            )
+        } else {
+            (None, None)
         };
         let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
         let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
         chevron.set_visible(init.group.as_ref().is_some_and(|group| !group.entry));
-        open_button.set_visible(init.group.is_none());
         Self {
             info: init.info,
             kind: init.kind,
@@ -314,8 +319,8 @@ impl FactoryComponent for SidebarRow {
             group: init.group,
             row: None,
             chevron,
-            new_table_button: group_button("list-add-symbolic", new_table_label),
-            csv_button: group_button("document-open-symbolic", csv_label),
+            new_table_button,
+            csv_button,
             open_button,
             popover: Rc::new(RefCell::new(None)),
             columns: super::sidebar_columns::SidebarColumns::new(init.column_source),
@@ -342,6 +347,15 @@ impl FactoryComponent for SidebarRow {
         sender: FactorySender<Self>,
     ) -> Self::Widgets {
         let widgets = view_output!();
+        if let Some(button) = &self.new_table_button {
+            widgets.row_content.append(button);
+        }
+        if let Some(button) = &self.csv_button {
+            widgets.row_content.append(button);
+        }
+        if let Some(button) = &self.open_button {
+            widgets.row_content.append(button);
+        }
         if self.group.is_some() {
             self.describe_group(&root);
             self.wire_group_buttons(&sender);
@@ -351,9 +365,10 @@ impl FactoryComponent for SidebarRow {
             return widgets;
         }
         self.columns.install(&root, &sender);
-        let sender_for_open_button = sender.clone();
-        self.open_button
-            .connect_clicked(move |_| sender_for_open_button.input(SidebarRowMsg::Open));
+        if let Some(button) = &self.open_button {
+            let sender_for_open_button = sender.clone();
+            button.connect_clicked(move |_| sender_for_open_button.input(SidebarRowMsg::Open));
+        }
 
         // Tooltip surfaces the fully-qualified name (`schema.table`)
         // for multi-schema connections so the user can disambiguate
@@ -537,12 +552,14 @@ impl SidebarRow {
     }
 
     fn wire_group_buttons(&self, sender: &FactorySender<Self>) {
-        let new_table = sender.clone();
-        self.new_table_button
-            .connect_clicked(move |_| new_table.input(SidebarRowMsg::NewTable));
-        let from_csv = sender.clone();
-        self.csv_button
-            .connect_clicked(move |_| from_csv.input(SidebarRowMsg::TableFromCsv));
+        if let Some(button) = &self.new_table_button {
+            let new_table = sender.clone();
+            button.connect_clicked(move |_| new_table.input(SidebarRowMsg::NewTable));
+        }
+        if let Some(button) = &self.csv_button {
+            let from_csv = sender.clone();
+            button.connect_clicked(move |_| from_csv.input(SidebarRowMsg::TableFromCsv));
+        }
     }
 
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
@@ -684,6 +701,17 @@ mod columns_affordance_tests {
     use super::*;
     use relm4::factory::FactoryVecDeque;
 
+    fn action_button_count(widget: &gtk::Widget) -> usize {
+        let own = usize::from(widget.is::<gtk::Button>() && !widget.is::<gtk::ToggleButton>());
+        let mut count = own;
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            child = current.next_sibling();
+            count += action_button_count(&current);
+        }
+        count
+    }
+
     fn expansion_button(widget: &gtk::Widget) -> Option<gtk::ToggleButton> {
         if let Some(button) = widget.downcast_ref::<gtk::ToggleButton>() {
             return Some(button.clone());
@@ -716,10 +744,47 @@ mod columns_affordance_tests {
         });
         while glib::MainContext::default().iteration(false) {}
         let row = list.row_at_index(0).unwrap();
+        assert_eq!(action_button_count(row.upcast_ref()), 1);
         let expander =
             expansion_button(row.upcast_ref()).expect("table columns can be expanded without opening the table");
         assert!(expander.is_focusable());
         assert!(!expander.is_active());
+
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: Some("public".into()),
+                name: "public".into(),
+            },
+            kind: SidebarObjectKind::Schema,
+            depth: 0,
+            group: Some(GroupInit {
+                label: "public".into(),
+                count: 1,
+                collapsed: false,
+                actions: true,
+                entry: false,
+            }),
+            column_source: None,
+        });
+        factory.guard().push_back(SidebarRowInit {
+            info: TableInfo {
+                schema: None,
+                name: "Roles".into(),
+            },
+            kind: SidebarObjectKind::Catalog,
+            depth: 0,
+            group: Some(GroupInit {
+                label: "Roles".into(),
+                count: 0,
+                collapsed: false,
+                actions: false,
+                entry: false,
+            }),
+            column_source: None,
+        });
+        while glib::MainContext::default().iteration(false) {}
+        assert_eq!(action_button_count(list.row_at_index(1).unwrap().upcast_ref()), 2);
+        assert_eq!(action_button_count(list.row_at_index(2).unwrap().upcast_ref()), 0);
     }
 }
 
