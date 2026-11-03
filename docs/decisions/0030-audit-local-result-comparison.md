@@ -17,7 +17,7 @@ Record a confirmed comparison as an intent and outcome pair in the existing audi
 4. Both inputs must come from one connection. A comparison across connections is refused.
 5. Inputs that are truncated, still loading, cancelled, timed out or failed are refused. A comparison never reports a difference it cannot prove.
 6. Equality uses the exact typed comparison of [ADR 0007](0007-type-and-value-preservation.md). Cells that cannot be compared (`Undecodable`) make the row `unknown`, not equal and not changed. When either result was masked by policy, the comparison says so, because different values can look the same after masking.
-7. A comparison reads at most 1,000,000 rows per side and keeps at most 100,000 differing rows. A side with more than 1,000,000 rows is refused with a message rather than compared in part; when more than 100,000 differing rows exist, the difference list is cut at the bound, the counts stay exact, and the result says it was capped. It runs off the GTK thread and stops on cancel.
+7. A comparison reads at most 1,000,000 rows per side and keeps at most 100,000 differing rows within the 64 MiB result byte budget. A side with more than 1,000,000 rows is refused with a message rather than compared in part; when more than 100,000 differing rows exist, the difference list is cut at the bound, the counts stay exact, and the result says it was capped. It runs off the GTK thread and stops on cancel.
 
 ## Rationale
 
