@@ -22,7 +22,9 @@ impl App {
         };
         let plan = self.workspace_tabs.borrow().plan_table_open(request, |id| {
             crate::services::change_tracker::with_tab_ref(id, |tracker| tracker.has_pending()).unwrap_or(false)
-                || crate::services::structure_tracker::with_tab_ref(id, |tracker| tracker.has_pending())
+                || self
+                    .structure_trackers
+                    .with_tab_ref(id, |tracker| tracker.has_pending())
                     .unwrap_or(false)
         });
         let TableOpenPlan::Append {
@@ -77,8 +79,10 @@ impl App {
         let schemas_count = self.sidebar_schemas_distinct();
         let data =
             crate::services::change_tracker::with_tab_ref(tab_id, |tracker| tracker.has_pending()).unwrap_or(false);
-        let structure =
-            crate::services::structure_tracker::with_tab_ref(tab_id, |tracker| tracker.has_pending()).unwrap_or(false);
+        let structure = self
+            .structure_trackers
+            .with_tab_ref(tab_id, |tracker| tracker.has_pending())
+            .unwrap_or(false);
         let combined_dirty = data || structure || dirty;
         if combined_dirty {
             self.keep_table_tab(tab_id);

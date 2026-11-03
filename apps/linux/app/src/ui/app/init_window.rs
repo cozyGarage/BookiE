@@ -29,6 +29,7 @@ pub(super) fn install_window_lifecycle(
     window: &adw::ApplicationWindow,
     split_view: &adw::OverlaySplitView,
     sidebar_toggle: &gtk::ToggleButton,
+    structure_trackers: &crate::services::structure_tracker::WorkspaceStructureTrackers,
     workspace: &crate::services::workspace_state::WorkspaceStore,
     sender: &ComponentSender<App>,
 ) -> WindowLifecycleHandles {
@@ -75,6 +76,7 @@ pub(super) fn install_window_lifecycle(
     let close_state_input_sender = close_request_input_sender.clone();
     let close_state_saved_for_close = window_close_state_saved.clone();
     let close_state_pending_for_close = window_close_state_pending.clone();
+    let structure_trackers = structure_trackers.clone();
     window.connect_close_request(move |w| {
         // If a Save is mid-flight (async transaction running), block
         // the close until it resolves. Without this, the completion
@@ -116,7 +118,7 @@ pub(super) fn install_window_lifecycle(
         // either source of pending changes triggers the dialog.
         let tab_ids = window_tab_ids(w);
         let has_pending = !crate::services::change_tracker::pending_tabs_for(&tab_ids).is_empty()
-            || !crate::services::structure_tracker::pending_tabs_for(&tab_ids).is_empty();
+            || !structure_trackers.pending_tabs_for(&tab_ids).is_empty();
         if !force_close_for_close.get() && has_pending {
             // Plural-form heading matches the per-tab dialog's
             // tone — factual GNOME HIG language rather than the
@@ -141,6 +143,7 @@ pub(super) fn install_window_lifecycle(
             let close_after_save_for_resp = close_after_save_for_close.clone();
             let close_window_after_save_for_resp = close_window_after_save_for_close.clone();
             let input_sender_for_resp = close_request_input_sender.clone();
+            let structure_trackers = structure_trackers.clone();
             dialog.connect_response(None, move |dlg, response| {
                 dlg.close();
                 match response {
@@ -148,8 +151,8 @@ pub(super) fn install_window_lifecycle(
                         for tab_id in crate::services::change_tracker::pending_tabs_for(&tab_ids) {
                             crate::services::change_tracker::with_tab(tab_id, |t| t.clear());
                         }
-                        for tab_id in crate::services::structure_tracker::pending_tabs_for(&tab_ids) {
-                            crate::services::structure_tracker::with_tab(tab_id, |t| t.clear());
+                        for tab_id in structure_trackers.pending_tabs_for(&tab_ids) {
+                            structure_trackers.with_tab(tab_id, |t| t.clear());
                         }
                         force_close_for_resp.set(true);
                         // Re-fire close_request — guard sees the flag,
@@ -165,7 +168,7 @@ pub(super) fn install_window_lifecycle(
                         // handlers in App::update close the window once
                         // the set drains. Any SaveFailed aborts.
                         let browse_tabs = crate::services::change_tracker::pending_tabs_for(&tab_ids);
-                        let structure_tabs = crate::services::structure_tracker::pending_tabs_for(&tab_ids);
+                        let structure_tabs = structure_trackers.pending_tabs_for(&tab_ids);
                         // Counter increments — a Table tab listed in both
                         // sets bumps to 2 so the window close waits for
                         // BOTH the browse save and the structure save.

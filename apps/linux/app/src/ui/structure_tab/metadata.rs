@@ -78,6 +78,7 @@ mod tests {
 
         let mut controller = StructureTab::builder()
             .launch(StructureTabInit {
+                structure_trackers: Default::default(),
                 tab_id: uuid::Uuid::new_v4(),
                 schema: Some("public".into()),
                 table: "items".into(),
