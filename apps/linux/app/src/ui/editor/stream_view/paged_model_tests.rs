@@ -161,6 +161,25 @@ fn too_many_wide_visible_pages_show_a_fallback_and_clear_it_after_scrolling() {
 }
 
 #[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_failed_offscreen_page_does_not_leave_a_stale_error_message() {
+    gtk4::init().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let model = PagedModel::new(&[1, 1], 1);
+    let status = gtk4::Label::new(None);
+    model.attach_status(&status);
+    model.show(0, 1);
+    model.load_from_spool(runtime.handle(), &spool, &[]);
+    wait_for_condition(|| !status.text().is_empty());
+
+    model.show(1, 1);
+    assert!(status.text().is_empty());
+}
+
+#[test]
 fn spool_page_loads_without_blocking_the_gtk_context() {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
