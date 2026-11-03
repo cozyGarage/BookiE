@@ -15,7 +15,7 @@ The window (`src/main.rs`) has:
 - A compare bar with Whole row and Key: value.
 - A virtualized grid over `uniform_list` with 36 px rows. Find, filter and compare run on the background executor and drop stale results by generation.
 
-The text fields are deliberately minimal: they append typed characters, handle Backspace and Enter, and nothing else. GPUI has no ready-made text input (see its `input.rs` example), so there is no selection, caret movement, IME or clipboard. That is a finding about the framework, not a gap in the prototype's scope.
+The text fields are deliberately minimal: they append typed characters, handle Backspace and Enter, and nothing else. There is no selection, caret movement, IME or clipboard. No SQL editor was attempted.
 
 Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. `BOOKIE_PROTOTYPE_WIDTH` and `BOOKIE_PROTOTYPE_HEIGHT` set the window size.
 
@@ -29,9 +29,7 @@ cargo deny --manifest-path experiments/gpui-grid-prototype/Cargo.toml --config d
 cargo run --release --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked
 ```
 
-The window needs a Wayland or X11 session with a Vulkan driver that can present. Under Xvfb it stops with `Failed to create surface: PlatformNotSupported`, because Mesa reports "No DRI3 support detected - required for presentation".
-
-`Cargo.lock` pins `libc` to 0.2.188. With `libc` 0.2.189 to 0.2.191 the build fails in `xattr` 0.2.3 (`cannot find value ENOATTR in crate libc`), a dependency of `gpui` through `gpui_http_client` and `zed-async-tar`. Do not run `cargo update` without checking that.
+The window needs a Wayland or X11 session with a Vulkan driver that can present.
 
 ## Scroll and memory measurement
 
@@ -48,6 +46,6 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 ## Limits
 
 - Synthetic data, no database, no typed value bridge beyond null, boolean, integer and text.
-- No accessibility tree. GPUI 0.2.2 has no AT-SPI or AccessKit code, so screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
+- No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - No text editing beyond the minimal fields above, and no SQL editor.
 - It measures one machine with one GPU driver; it does not establish performance on other hardware.
