@@ -120,18 +120,37 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     };
 
     let connection = SavedConnection {
+        socket_dir,
+        socket_path,
+        use_tls: tls_mode.encrypts(),
+        tls_mode: Some(tls_mode),
+        ..draft_connection(driver_id, name, host, port, database, username)
+    };
+
+    Ok(ParsedConnectionUrl { connection, password })
+}
+
+pub(crate) fn draft_connection(
+    driver_id: &str,
+    name: String,
+    host: String,
+    port: u16,
+    database: String,
+    username: String,
+) -> SavedConnection {
+    SavedConnection {
         auth_source: None,
         id: Uuid::new_v4(),
         name,
         driver_id: driver_id.to_string(),
         host,
         port,
-        socket_dir,
-        socket_path,
+        socket_dir: None,
+        socket_path: None,
         database,
         username,
-        use_tls: tls_mode.encrypts(),
-        tls_mode: Some(tls_mode),
+        use_tls: false,
+        tls_mode: Some(TlsMode::Disabled),
         tls_root_cert: None,
         tls_client_cert: None,
         tls_client_key: None,
@@ -143,9 +162,14 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
-    };
+    }
+}
 
-    Ok(ParsedConnectionUrl { connection, password })
+pub(crate) fn default_port(driver_id: &str) -> Option<u16> {
+    SCHEMES
+        .iter()
+        .find(|(_, driver, _)| *driver == driver_id)
+        .map(|(_, _, port)| *port)
 }
 
 enum UrlOption {
@@ -253,7 +277,7 @@ fn parse_port(port: Option<&str>, default_port: u16) -> Result<u16, StorageError
     Ok(parsed)
 }
 
-fn validate_host(host: &str) -> Result<String, StorageError> {
+pub(crate) fn validate_host(host: &str) -> Result<String, StorageError> {
     if host.is_empty() {
         return Err(invalid("the connection URL is missing a host"));
     }
