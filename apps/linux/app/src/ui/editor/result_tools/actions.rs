@@ -191,8 +191,14 @@ impl Tools {
                 self.cursor.borrow_mut().complete(generation, report);
                 self.step(forward);
             }
-            Err(FindError::Scan(ScanError::Cancelled)) => self.set_status(&crate::tr!("Search cancelled")),
-            Err(_) => self.set_status(&crate::tr!("The search could not finish")),
+            Err(FindError::Scan(ScanError::Cancelled)) => {
+                self.cursor.borrow_mut().end_search(generation);
+                self.set_status(&crate::tr!("Search cancelled"));
+            }
+            Err(_) => {
+                self.cursor.borrow_mut().end_search(generation);
+                self.set_status(&crate::tr!("The search could not finish"));
+            }
         }
     }
 

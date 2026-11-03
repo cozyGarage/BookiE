@@ -150,9 +150,12 @@ pub(super) fn go_to(
         let rows = view_rows(view.as_ref());
         match (attempt(rows, expected, tries.get()), view) {
             (Attempt::Select, Some(view)) => {
-                let source_position = view
-                    .model()
-                    .and_then(|model| position_of_source(model.upcast_ref(), row));
+                let source_position = (!continuous)
+                    .then(|| {
+                        view.model()
+                            .and_then(|model| position_of_source(model.upcast_ref(), row))
+                    })
+                    .flatten();
                 match resolve_position(continuous, row, source_position) {
                     Some(position) => select_row(&view, position),
                     None => failed(),

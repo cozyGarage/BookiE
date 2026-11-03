@@ -996,6 +996,7 @@ fn skipped_empty_stream_page_does_not_shift_retained_result_identity() {
         pinned: false,
     };
 
+    assert!(matches!(&outcome.kind, StatementOutcomeKind::Streamed(_)));
     let generation = if let StatementOutcomeKind::Streamed(result) = &outcome.kind {
         result.generation
     } else {

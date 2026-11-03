@@ -486,6 +486,18 @@ fn a_jump_selects_retries_or_gives_up_by_what_the_view_shows() {
 }
 
 #[test]
+fn a_cancelled_or_failed_search_no_longer_counts_as_running() {
+    let mut cursor = MatchCursor::default();
+    let generation = cursor.begin("needle");
+    assert!(cursor.keeps_for("needle"));
+    cursor.end_search(generation.wrapping_add(1));
+    assert!(cursor.keeps_for("needle"));
+    cursor.end_search(generation);
+    assert!(!cursor.keeps_for("needle"));
+    assert!(!cursor.has_results_for("needle"));
+}
+
+#[test]
 fn an_edit_signal_for_the_same_text_keeps_a_running_search() {
     let mut cursor = MatchCursor::default();
     let generation = cursor.begin("needle");

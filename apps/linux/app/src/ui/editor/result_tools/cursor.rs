@@ -33,6 +33,12 @@ impl MatchCursor {
         self.searching = false;
     }
 
+    pub(super) fn end_search(&mut self, generation: u64) {
+        if self.accepts(generation) {
+            self.searching = false;
+        }
+    }
+
     pub(super) fn accepts(&self, generation: u64) -> bool {
         self.generation == generation
     }
