@@ -1137,6 +1137,14 @@ pub(in crate::ui::editor) fn result_view_key(identity: StatementIdentity, result
     }
 }
 
+pub(in crate::ui::editor) fn streamed_view_key(
+    identity: StatementIdentity,
+    generation: u64,
+    page_index: usize,
+) -> ResultViewKey {
+    result_view_key(super::result_tools::stream_identity(identity, generation), page_index)
+}
+
 fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<ResultViewKey> {
     outcomes
         .iter()
@@ -1151,7 +1159,7 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
                 .iter()
                 .enumerate()
                 .filter(|&(_, row_count)| *row_count > 0)
-                .map(|(page_index, _)| result_view_key(outcome.identity, page_index))
+                .map(|(page_index, _)| streamed_view_key(outcome.identity, result.generation, page_index))
                 .collect::<Vec<_>>(),
             StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => Vec::new(),
         })

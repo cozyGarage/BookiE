@@ -9,6 +9,7 @@ pub(super) struct MatchCursor {
     current: Option<usize>,
     needle: String,
     complete: bool,
+    searching: bool,
 }
 
 impl MatchCursor {
@@ -19,6 +20,7 @@ impl MatchCursor {
         self.unsearchable = 0;
         self.current = None;
         self.complete = false;
+        self.searching = true;
         self.needle = needle.to_owned();
         self.generation
     }
@@ -28,6 +30,7 @@ impl MatchCursor {
         self.matches.clear();
         self.current = None;
         self.complete = false;
+        self.searching = false;
     }
 
     pub(super) fn accepts(&self, generation: u64) -> bool {
@@ -42,11 +45,16 @@ impl MatchCursor {
         self.capped = report.capped;
         self.unsearchable = report.unsearchable_cells;
         self.complete = true;
+        self.searching = false;
         true
     }
 
     pub(super) fn has_results_for(&self, needle: &str) -> bool {
         self.complete && self.needle == needle
+    }
+
+    pub(super) fn keeps_for(&self, needle: &str) -> bool {
+        (self.complete || self.searching) && self.needle == needle
     }
 
     pub(super) fn step(&mut self, forward: bool) -> Option<FindMatch> {

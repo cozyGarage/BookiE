@@ -106,7 +106,7 @@ impl Tools {
 
     fn entry_changed(&self) {
         let needle = self.needle();
-        if self.cursor.borrow().has_results_for(&needle) {
+        if self.cursor.borrow().keeps_for(&needle) {
             return;
         }
         self.cancel.borrow().cancel();
@@ -244,7 +244,7 @@ impl Tools {
         let ticket = Arc::new(FilterTicket::default());
         super::ticket::register(self.identity, &ticket);
         self.adopt_filter(ticket.clone());
-        let _ = self
+        let sent = self
             .sender
             .send(super::super::SqlEditorInput::FilterResults(Box::new(FilterRequest {
                 source: self.result.clone(),
@@ -254,8 +254,9 @@ impl Tools {
                     needle: needle.clone(),
                 },
                 label: needle,
-                ticket,
+                ticket: ticket.clone(),
             })));
+        super::ticket::finish_if_unsent(sent, &ticket, crate::tr!("Could not start the filter"));
     }
 
     pub(super) fn adopt_filter(self: &Rc<Self>, ticket: Arc<FilterTicket>) {

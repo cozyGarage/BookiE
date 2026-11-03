@@ -484,3 +484,35 @@ fn a_jump_selects_retries_or_gives_up_by_what_the_view_shows() {
     assert_eq!(attempt(None, None, 1), Attempt::Retry);
     assert_eq!(attempt(None, None, 1_000), Attempt::GiveUp);
 }
+
+#[test]
+fn an_edit_signal_for_the_same_text_keeps_a_running_search() {
+    let mut cursor = MatchCursor::default();
+    let generation = cursor.begin("needle");
+    assert!(cursor.keeps_for("needle"));
+    assert!(!cursor.keeps_for("other"));
+    assert!(cursor.complete(generation, report(2, false, 0)));
+    assert!(cursor.keeps_for("needle"));
+    cursor.invalidate();
+    assert!(!cursor.keeps_for("needle"));
+}
+
+#[test]
+fn a_paged_jump_never_guesses_a_row_the_sorted_model_does_not_hold() {
+    use super::jump::resolve_position;
+    assert_eq!(resolve_position(false, 4, Some(1)), Some(1));
+    assert_eq!(resolve_position(false, 4, None), None);
+    assert_eq!(resolve_position(true, 4, None), Some(4));
+}
+
+#[test]
+fn a_filter_that_could_not_be_sent_finishes_its_ticket_with_the_error() {
+    use super::ticket::{FilterTicket, finish_if_unsent};
+    let failed = FilterTicket::default();
+    finish_if_unsent(Err("closed"), &failed, "Could not start the filter".into());
+    assert!(failed.is_finished());
+    assert_eq!(failed.message(), "Could not start the filter");
+    let sent = FilterTicket::default();
+    finish_if_unsent(Ok::<(), &str>(()), &sent, "unused".into());
+    assert!(!sent.is_finished());
+}

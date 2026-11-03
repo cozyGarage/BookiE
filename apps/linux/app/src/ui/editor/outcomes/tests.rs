@@ -996,12 +996,25 @@ fn skipped_empty_stream_page_does_not_shift_retained_result_identity() {
         pinned: false,
     };
 
-    let indexes = super::result_view_keys(&[outcome])
-        .into_iter()
+    let generation = if let StatementOutcomeKind::Streamed(result) = &outcome.kind {
+        result.generation
+    } else {
+        0
+    };
+    let keys = super::result_view_keys(&[outcome]);
+    let indexes = keys
+        .iter()
         .map(|key| key.result_set_index)
         .collect::<std::collections::HashSet<_>>();
 
     assert_eq!(indexes, std::collections::HashSet::from([0, 2]));
+    for page in [0, 2] {
+        assert!(keys.contains(&super::streamed_view_key(
+            StatementIdentity::default(),
+            generation,
+            page
+        )));
+    }
 }
 
 #[tokio::test]
