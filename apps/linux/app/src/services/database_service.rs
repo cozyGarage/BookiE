@@ -342,13 +342,7 @@ impl DatabaseService {
             differing_rows,
             duration_ms,
         );
-        match self.audit.record(event).await {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                self.audit_state.disable_after_audit_failure();
-                Err(error)
-            }
-        }
+        self.audit.record(event).await
     }
 
     /// Whether a prior governed operation has an unresolved outcome.  The UI

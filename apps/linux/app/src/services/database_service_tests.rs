@@ -443,6 +443,29 @@ async fn result_compare_intent_fails_closed_when_audit_is_unavailable() {
 }
 
 #[tokio::test]
+async fn result_compare_audit_failure_does_not_disable_governed_writes() {
+    let service = DatabaseService::new_isolated();
+    let journal = service._audit_temp_dir.as_ref().unwrap().path().join("audit.jsonl");
+    let _ = std::fs::remove_file(&journal);
+    std::fs::create_dir(&journal).expect("block the journal path");
+    assert!(!service.audit_state.governed_writes_disabled());
+
+    let result = service
+        .audit_result_compare(
+            Uuid::new_v4(),
+            compare_connection(Uuid::new_v4()),
+            AuditRecordPhase::Intent,
+            AuditTerminalStatus::Pending,
+            0,
+            None,
+        )
+        .await;
+
+    assert!(result.is_err());
+    assert!(!service.audit_state.governed_writes_disabled());
+}
+
+#[tokio::test]
 async fn administrative_bundle_intent_fails_closed_when_audit_is_unavailable() {
     let audit_dir = tempfile::tempdir().expect("audit temp dir");
     let service = DatabaseService::with_audit(AuditRuntime::unavailable(), Some(audit_dir));
