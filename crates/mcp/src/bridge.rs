@@ -496,41 +496,7 @@ impl McpBridge {
             .map_err(McpToolError::from)?;
         let sql = sql.to_string();
         if preview {
-            let mut transaction = connection.begin_controlled(&control).await.map_err(|error| {
-                let mut outcome = McpToolError::from_write_error(&error);
-                if outcome.operation_outcome == crate::errors::OperationOutcome::Unknown {
-                    outcome.transaction_outcome = crate::errors::TransactionOutcome::Unknown;
-                }
-                outcome
-            })?;
-            let refused = match self.driver_id_for_controlled(connection_id, &control).await {
-                Ok(driver_id) => {
-                    preview_may_implicitly_commit(&driver_id, &sql)
-                        || touches_nontransactional_table(transaction.as_mut(), &driver_id, &sql, &control).await
-                }
-                Err(_) => true,
-            };
-            let result = if refused {
-                Err(DriverError::ReadOnly)
-            } else {
-                transaction.execute_controlled(&sql, &control).await
-            };
-            let cleanup_control = operation_control_for(CancellationToken::new(), PREVIEW_CLEANUP_TIMEOUT);
-            if let Err(error) = transaction.rollback_controlled(&cleanup_control).await {
-                return Err(McpToolError::transaction_rollback_failed(&error));
-            }
-            if refused {
-                return Err(McpToolError::preview_not_transactional());
-            }
-            let result = result.map_err(|error| {
-                let mut outcome = McpToolError::from_write_error(&error);
-                outcome.transaction_outcome = crate::errors::TransactionOutcome::RolledBack;
-                outcome
-            })?;
-            return Ok(WriteOutcome::Preview {
-                rows_affected: result.rows_affected,
-                rolled_back: true,
-            });
+            return self.preview_write(&connection, connection_id, &sql, &control).await;
         }
         let result = connection
             .execute_controlled(&sql, &control)
@@ -538,6 +504,54 @@ impl McpBridge {
             .map_err(|error| McpToolError::from_write_error(&error))?;
         Ok(WriteOutcome::Committed {
             rows_affected: result.rows_affected,
+        })
+    }
+
+    async fn preview_write(
+        &self,
+        connection: &Arc<dyn Connection>,
+        connection_id: Uuid,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<WriteOutcome, McpToolError> {
+        let driver_id = self.driver_id_for_controlled(connection_id, control).await.ok();
+        if driver_id
+            .as_deref()
+            .is_some_and(|driver| preview_may_implicitly_commit(driver, sql))
+        {
+            return Err(McpToolError::preview_not_transactional());
+        }
+        let mut transaction = connection.begin_controlled(control).await.map_err(|error| {
+            let mut outcome = McpToolError::from_write_error(&error);
+            if outcome.operation_outcome == crate::errors::OperationOutcome::Unknown {
+                outcome.transaction_outcome = crate::errors::TransactionOutcome::Unknown;
+            }
+            outcome
+        })?;
+        let refused = match &driver_id {
+            Some(driver_id) => touches_nontransactional_table(transaction.as_mut(), driver_id, sql, control).await,
+            None => true,
+        };
+        let result = if refused {
+            Err(DriverError::ReadOnly)
+        } else {
+            transaction.execute_controlled(sql, control).await
+        };
+        let cleanup_control = operation_control_for(CancellationToken::new(), PREVIEW_CLEANUP_TIMEOUT);
+        if let Err(error) = transaction.rollback_controlled(&cleanup_control).await {
+            return Err(McpToolError::transaction_rollback_failed(&error));
+        }
+        if refused {
+            return Err(McpToolError::preview_not_transactional());
+        }
+        let result = result.map_err(|error| {
+            let mut outcome = McpToolError::from_write_error(&error);
+            outcome.transaction_outcome = crate::errors::TransactionOutcome::RolledBack;
+            outcome
+        })?;
+        Ok(WriteOutcome::Preview {
+            rows_affected: result.rows_affected,
+            rolled_back: true,
         })
     }
 }

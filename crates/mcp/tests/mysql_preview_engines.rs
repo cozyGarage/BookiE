@@ -28,9 +28,16 @@ impl ConnectionProvider for Provider {
     }
 }
 
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb() {
+struct Fixture {
+    _container: testcontainers::ContainerAsync<Mysql>,
+    bridge: McpBridge,
+    token: bookie_mcp::McpToken,
+    connection_id: Uuid,
+    connection: Arc<dyn Connection>,
+    _directory: tempfile::TempDir,
+}
+
+async fn fixture() -> Fixture {
     let container = Mysql::default()
         .with_tag("8.4")
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
@@ -99,12 +106,32 @@ async fn a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb() {
         tokens,
     );
     let token = bridge.authenticate(&plaintext).unwrap();
+    Fixture {
+        _container: container,
+        bridge,
+        token,
+        connection_id,
+        connection,
+        _directory: directory,
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb() {
+    let fixture = fixture().await;
+    let (bridge, token, connection_id, connection) = (
+        &fixture.bridge,
+        &fixture.token,
+        fixture.connection_id,
+        &fixture.connection,
+    );
 
     let refused = bridge
-        .execute_write(&token, connection_id, "UPDATE legacy SET v = 2 WHERE id = 1", true)
+        .execute_write(token, connection_id, "UPDATE legacy SET v = 2 WHERE id = 1", true)
         .await;
     let allowed = bridge
-        .execute_write(&token, connection_id, "UPDATE modern SET v = 2 WHERE id = 1", true)
+        .execute_write(token, connection_id, "UPDATE modern SET v = 2 WHERE id = 1", true)
         .await;
 
     assert!(refused.is_err(), "a MyISAM preview cannot be rolled back: {refused:?}");
@@ -115,4 +142,31 @@ async fn a_preview_is_refused_for_a_myisam_table_and_still_runs_for_innodb() {
         .unwrap()
         .rows;
     assert_eq!(rows, vec![vec![Value::Int(1), Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_preview_is_refused_for_statements_that_commit_on_their_own_and_nothing_runs() {
+    let fixture = fixture().await;
+    let (bridge, token, connection_id, connection) = (
+        &fixture.bridge,
+        &fixture.token,
+        fixture.connection_id,
+        &fixture.connection,
+    );
+    for sql in [
+        "TRUNCATE TABLE modern",
+        "ALTER TABLE modern ADD COLUMN note INT",
+        "CREATE TABLE created_by_preview (id INT)",
+        "DROP TABLE modern",
+    ] {
+        let refused = bridge.execute_write(token, connection_id, sql, true).await;
+        assert!(refused.is_err(), "{sql} must not be previewed: {refused:?}");
+    }
+    let rows = connection
+        .query("SELECT (SELECT COUNT(*) FROM modern), (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'created_by_preview'), (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'modern' AND column_name = 'note')")
+        .await
+        .unwrap()
+        .rows;
+    assert_eq!(rows, vec![vec![Value::Int(1), Value::Int(0), Value::Int(0)]]);
 }

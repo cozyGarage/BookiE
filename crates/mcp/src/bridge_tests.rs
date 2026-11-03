@@ -258,6 +258,9 @@ fn a_mysql_preview_is_refused_for_statements_that_implicitly_commit() {
         "LOCK TABLES orders WRITE",
         "GRANT ALL ON *.* TO 'u'@'%'",
         "this is not sql",
+        "UPDATE orders SET note = 'x' WHERE id = 1; DROP TABLE orders",
+        "DELETE FROM orders WHERE id = 1; COMMIT",
+        "SET autocommit = 1",
     ] {
         assert!(preview_may_implicitly_commit("mysql", sql), "{sql}");
     }
