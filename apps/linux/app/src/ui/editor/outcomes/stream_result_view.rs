@@ -35,10 +35,10 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     {
         page_switcher.add_titled(&page, Some("status"), &crate::tr!("Status"));
     }
-    let initial = if matches!(result.terminal, StreamTerminal::Loading) {
-        page_switcher.first_child()
-    } else {
+    let initial = if matches!(result.terminal, StreamTerminal::Failed(_)) {
         page_switcher.last_child()
+    } else {
+        page_switcher.first_child()
     };
     if let Some(initial) = initial {
         page_switcher.set_visible_child(&initial);
