@@ -90,6 +90,13 @@ pub struct CompareRequest {
     pub key_columns: Vec<String>,
 }
 
+pub fn shared_column_names(
+    left: &[bookie_core::ColumnInfo],
+    right: &[bookie_core::ColumnInfo],
+) -> Result<Vec<String>, CompareError> {
+    CommonColumns::resolve(left, right, &[]).map(CommonColumns::into_names)
+}
+
 pub fn compare_results(
     request: &CompareRequest,
     cancel: &CancellationToken,

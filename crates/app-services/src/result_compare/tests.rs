@@ -321,3 +321,21 @@ fn a_spooled_input_with_a_wrong_row_total_is_incomplete() {
         CompareError::IncompleteInput
     );
 }
+
+#[test]
+fn shared_column_names_follow_the_left_order_and_refuse_ambiguity() {
+    let left = [column("b"), column("a"), column("only_left")];
+    let right = [column("a"), column("b"), column("only_right")];
+    assert_eq!(
+        shared_column_names(&left, &right).unwrap(),
+        vec!["b".to_string(), "a".to_string()]
+    );
+    assert_eq!(
+        shared_column_names(&[column("a"), column("a")], &right).unwrap_err(),
+        CompareError::AmbiguousColumns
+    );
+    assert_eq!(
+        shared_column_names(&[column("z")], &right).unwrap_err(),
+        CompareError::NoCommonColumns
+    );
+}

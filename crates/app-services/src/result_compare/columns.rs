@@ -55,6 +55,10 @@ impl CommonColumns {
         Ok(common)
     }
 
+    pub(crate) fn into_names(self) -> Vec<String> {
+        self.names
+    }
+
     pub(crate) fn left_indices(&self) -> &[usize] {
         &self.left
     }
