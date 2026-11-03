@@ -2,7 +2,7 @@ use std::ops::ControlFlow;
 
 use sqlparser::ast::{Ident, ObjectName, ObjectNamePart, Statement, TableFactor, Visit, Visitor};
 
-const SAFE_TABLE_FUNCTIONS: [&str; 22] = [
+const SAFE_TABLE_FUNCTIONS: &[&str] = &[
     "range",
     "generate_series",
     "generate_subscripts",
@@ -110,7 +110,7 @@ fn names_an_unlisted_catalog_source(name: &ObjectName) -> bool {
     };
     let lowered = last.value.to_ascii_lowercase();
     let catalog_name = lowered.starts_with("duckdb_") || lowered.starts_with("pragma_");
-    catalog_name && last.quote_style.is_none() && !is_safe_table_function(name)
+    catalog_name && !is_safe_table_function(name)
 }
 
 fn looks_like_a_path(name: &str) -> bool {
@@ -207,6 +207,12 @@ mod tests {
             "SELECT * FROM duckdb_temporary_files()",
             "SELECT * FROM x.unnest('x')",
             "SELECT * FROM other.range(5)",
+            "SELECT * FROM \"duckdb_secrets\"",
+            "SELECT * FROM \"main\".\"duckdb_logs\"",
+            "SELECT * FROM `duckdb_secrets`",
+            "SELECT * FROM \"DUCKDB_SETTINGS\"",
+            "DESCRIBE \"duckdb_secrets\"",
+            "SELECT * FROM pragma_database_list",
             "SELECT * FROM duckdb_logs",
             "SELECT * FROM duckdb_log_contexts",
             "SELECT * FROM duckdb_variables",
@@ -265,6 +271,9 @@ mod tests {
             "SELECT * FROM main.range(5)",
             "SELECT * FROM duckdb_columns()",
             "SELECT * FROM duckdb_tables",
+            "SELECT * FROM \"duckdb_columns\"",
+            "SELECT * FROM pragma_table_info('orders')",
+            "DESCRIBE duckdb_tables",
             "SELECT * FROM analytics.orders",
             "DESCRIBE orders",
             "SELECT * FROM \"my.db\".main.orders",
