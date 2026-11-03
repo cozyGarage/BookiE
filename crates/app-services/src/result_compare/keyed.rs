@@ -149,10 +149,8 @@ impl State {
         }
         self.summary.changed += 1;
         self.wanted.insert(key);
-        if self.collector.has_room() {
+        if self.collector.reserve_pair() {
             self.after.insert(key, right_values());
-        } else {
-            self.collector.mark_capped();
         }
     }
 
@@ -174,8 +172,7 @@ impl State {
         if unknown {
             self.collector.push(UNKNOWN_LEFT, common.project_left(row));
         } else if let Some(after) = self.after.remove(&key) {
-            self.collector.push(BEFORE, common.project_left(row));
-            self.collector.push(AFTER, after);
+            self.collector.push_reserved_pair(common.project_left(row), after);
         }
     }
 

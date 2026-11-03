@@ -293,6 +293,35 @@ fn differences_are_capped_but_still_counted() {
     assert!(report.summary.differences_capped);
 }
 
+#[test]
+fn keyed_changed_rows_beyond_the_cap_never_leave_a_dangling_before() {
+    let changed = MAX_COMPARE_DIFFERENCES / 2 + 10;
+    let left: Vec<Vec<Value>> = (0..changed as i64)
+        .map(|id| vec![Value::Int(id), Value::Text("a".into())])
+        .collect();
+    let mut right: Vec<Vec<Value>> = (0..changed as i64)
+        .map(|id| vec![Value::Int(id), Value::Text("b".into())])
+        .collect();
+    right.push(vec![Value::Int(-1), Value::Text("new".into())]);
+    let input = |rows| CompareInput::Pages(vec![result(&["id", "label"], rows)]);
+    let report = run(input(left), input(right), &["id"]).unwrap();
+    assert_eq!(report.summary.changed, changed as u64);
+    assert_eq!(report.summary.added, 1);
+    assert!(report.summary.differences_capped);
+    let rows = changes(&report);
+    assert!(rows.len() <= MAX_COMPARE_DIFFERENCES);
+    let mut index = 0;
+    while index < rows.len() {
+        match rows[index].0.as_str() {
+            "Before" => {
+                assert_eq!(rows.get(index + 1).map(|row| row.0.as_str()), Some("After"));
+                index += 2;
+            }
+            _ => index += 1,
+        }
+    }
+}
+
 fn spooled(rows_per_page: &[&[(i64, &str)]]) -> CompareInput {
     let spool = StreamResultSpoolManager::default().create().unwrap();
     let mut total = 0_u64;
