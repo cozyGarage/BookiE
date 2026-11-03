@@ -19,7 +19,6 @@ enum CandidateSource {
 pub(super) struct Candidate {
     pub(super) label: String,
     pub(super) columns: Vec<ColumnInfo>,
-    pub(super) rows: u64,
     source: CandidateSource,
 }
 
@@ -63,7 +62,6 @@ pub(super) fn candidates(outcomes: &[StatementOutcome]) -> Vec<Candidate> {
                     found.push(Candidate {
                         label: label(&outcome.sql_preview, rows, (sets.len() > 1).then_some(index)),
                         columns: set.columns.clone(),
-                        rows,
                         source: CandidateSource::Pages(vec![set.clone()]),
                     });
                 }
@@ -74,7 +72,6 @@ pub(super) fn candidates(outcomes: &[StatementOutcome]) -> Vec<Candidate> {
                 found.push(Candidate {
                     label: label(&outcome.sql_preview, rows, None),
                     columns: result.columns.clone(),
-                    rows,
                     source: CandidateSource::Spool(ScanSource::new(spool, result.columns.clone(), rows)),
                 });
             }

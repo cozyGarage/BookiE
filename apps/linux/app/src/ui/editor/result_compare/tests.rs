@@ -75,7 +75,7 @@ fn every_complete_row_set_is_a_candidate_with_its_row_count() {
     ];
     let found = candidates(&outcomes);
     assert_eq!(found.len(), 3);
-    assert_eq!(found[0].rows, 3);
+    assert!(found[0].label.contains("3 rows"));
     assert!(found[0].label.starts_with("SELECT a"));
     assert!(found[1].label.contains("#1") && found[2].label.contains("#2"));
 }
