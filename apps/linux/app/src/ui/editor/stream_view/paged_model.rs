@@ -76,6 +76,46 @@ impl PagedModel {
         self.imp().pages.borrow_mut().as_mut()?.next_request()
     }
 
+    fn visibility_callback(
+        &self,
+        runtime: &tokio::runtime::Handle,
+        spool: &bookie_app_services::stream_result_spool::StreamResultSpool,
+        columns: &[bookie_core::ColumnInfo],
+    ) -> std::rc::Rc<dyn Fn(u32, bool)> {
+        let rows = std::rc::Rc::new(RefCell::new(std::collections::BTreeSet::new()));
+        let scheduled = std::rc::Rc::new(Cell::new(false));
+        let model = self.downgrade();
+        let runtime = runtime.clone();
+        let spool = spool.clone();
+        let columns = columns.to_vec();
+        std::rc::Rc::new(move |position, visible| {
+            if visible {
+                rows.borrow_mut().insert(position);
+            } else {
+                rows.borrow_mut().remove(&position);
+            }
+            if scheduled.replace(true) {
+                return;
+            }
+            let rows = rows.clone();
+            let scheduled = scheduled.clone();
+            let model = model.clone();
+            let runtime = runtime.clone();
+            let spool = spool.clone();
+            let columns = columns.clone();
+            glib::idle_add_local_once(move || {
+                scheduled.set(false);
+                let Some(model) = model.upgrade() else { return };
+                let rows = rows.borrow();
+                let Some((&first, &last)) = rows.first().zip(rows.last()) else {
+                    return;
+                };
+                model.show(first as usize, (last - first) as usize + 1);
+                model.load_from_spool(&runtime, &spool, &columns);
+            });
+        })
+    }
+
     fn load_from_spool(
         &self,
         runtime: &tokio::runtime::Handle,
@@ -488,5 +528,76 @@ fn result_grid_reports_rows_when_realized_and_released() {
     window.set_child(gtk4::Widget::NONE);
     while context.iteration(false) {}
     assert!(visible.borrow().is_empty());
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn realized_grid_rows_load_their_spooled_values() {
+    gtk4::init().unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let column = bookie_core::ColumnInfo {
+        name: "id".into(),
+        data_type: "integer".into(),
+        nullable: false,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let result = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: vec![column.clone()],
+        rows: vec![vec![bookie_core::Value::Int(42)]].into(),
+        truncated: false,
+    });
+    runtime.block_on(spool.append_page(0, result.clone())).unwrap();
+    let model = PagedModel::new(&[1], 1);
+    let visibility = model.visibility_callback(runtime.handle(), &spool, std::slice::from_ref(&column));
+    let empty = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: vec![column.clone()],
+        rows: Vec::new().into(),
+        truncated: false,
+    });
+    let (view, selection) = crate::ui::grid::build_column_view(
+        &empty,
+        &[column],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        crate::ui::grid::TabGridContext {
+            result_model: Some(model.clone().upcast()),
+            row_visibility: Some(visibility),
+            ..Default::default()
+        },
+        None,
+        std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+    );
+    model.imp().selection.set(Some(&selection));
+    let window = gtk4::Window::builder().child(&view).build();
+    window.present();
+    let context = glib::MainContext::default();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        while context.iteration(false) {}
+        let row = model.item(0).unwrap().downcast::<RowObject>().unwrap();
+        if row.complete_cells() == Some(vec![bookie_core::Value::Int(42)]) {
+            break;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
     window.destroy();
 }
