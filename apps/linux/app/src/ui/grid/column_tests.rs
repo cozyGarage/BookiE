@@ -682,3 +682,30 @@ fn a_row_whose_key_is_shared_by_another_loaded_row_is_not_editable() {
     assert!(!row_key_is_ambiguous(&context, Some(&unique)));
     assert!(!row_key_is_ambiguous(&context, None));
 }
+
+#[test]
+fn a_changed_compare_cell_is_marked_only_when_its_source_row_and_column_are_listed() {
+    use bookie_core::{QueryResult, QueryRows};
+    let mut rows = QueryRows::new();
+    rows.push(vec![Value::Text("Before".into()), Value::Int(1)]);
+    rows.push(vec![Value::Text("After".into()), Value::Int(2)]);
+    let result = std::sync::Arc::new(QueryResult {
+        columns: vec![col("text", false), col("int4", false)],
+        rows,
+        truncated: false,
+    });
+    let changed = bookie_app_services::result_compare::ChangedCells::from_cells([(1, 1)]);
+    let context = TabGridContext {
+        changed_cells: Some(std::sync::Arc::new(changed)),
+        ..Default::default()
+    };
+    let row = crate::ui::row_object::RowObject::from_shared(&result, 1, None).unwrap();
+    assert_eq!(
+        mark_changed_cell(&context, &row, 1, Vec::new()),
+        vec!["tp-cell-changed"]
+    );
+    assert!(mark_changed_cell(&context, &row, 0, Vec::new()).is_empty());
+    let first = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();
+    assert!(mark_changed_cell(&context, &first, 1, Vec::new()).is_empty());
+    assert!(mark_changed_cell(&TabGridContext::default(), &row, 1, Vec::new()).is_empty());
+}

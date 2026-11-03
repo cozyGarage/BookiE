@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bookie_app_services::result_filter::{FilterError, FilteredResult, filter_into_spool};
-use bookie_app_services::result_predicate::{ColumnScope, ResultPredicate};
+use bookie_app_services::result_predicate::ResultPredicate;
 use bookie_app_services::result_scan::ScanSource;
 use bookie_app_services::stream_result_spool::StreamResultSpoolError;
 use relm4::ComponentSender;
@@ -19,7 +19,8 @@ use crate::ui::count_format::format_thousands;
 pub(in crate::ui) struct FilterRequest {
     pub(in crate::ui) source: StreamedResult,
     pub(in crate::ui::editor) identity: StatementIdentity,
-    pub(in crate::ui::editor) needle: String,
+    pub(in crate::ui::editor) predicate: ResultPredicate,
+    pub(in crate::ui::editor) label: String,
     pub(in crate::ui::editor) ticket: Arc<FilterTicket>,
 }
 
@@ -74,10 +75,7 @@ impl SqlEditor {
         let input = sender.input_sender().clone();
         let ticket = request.ticket.clone();
         let spawned = std::thread::Builder::new().name("result-filter".into()).spawn(move || {
-            let predicate = ResultPredicate::Contains {
-                scope: ColumnScope::Any,
-                needle: request.needle.clone(),
-            };
+            let predicate = request.predicate.clone();
             let outcome = filter_into_spool(
                 &source,
                 predicate,
@@ -113,7 +111,7 @@ impl SqlEditor {
         sender: &ComponentSender<Self>,
     ) -> String {
         let message = success_message(filtered.total_rows, filtered.unsearchable_cells);
-        let outcome = derived_outcome(request.identity, &request.source, filtered, &request.needle);
+        let outcome = derived_outcome(request.identity, &request.source, filtered, &request.label);
         let index = self.pinned.add_pin(outcome).saturating_sub(1);
         clear_results_box(&self.results_holder);
         let shown = self.pinned.displayed();

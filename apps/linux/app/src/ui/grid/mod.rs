@@ -99,6 +99,12 @@ pub enum GridMsg {
         value: bookie_core::Value,
         exclude: bool,
     },
+    FilterWholeResult {
+        identity: crate::ui::editor::StatementIdentity,
+        column: usize,
+        value: bookie_core::Value,
+        exclude: bool,
+    },
     ShowToast(String),
     GoToReference {
         column: String,
@@ -120,6 +126,8 @@ pub struct TabGridContext {
     pub local_result_sort: bool,
     pub row_mutations_allowed: bool,
     pub local_result_view: Option<local_filter::LocalResultView>,
+    pub whole_result_filter: bool,
+    pub changed_cells: Option<std::sync::Arc<bookie_app_services::result_compare::ChangedCells>>,
     pub(crate) result_model: Option<gtk4::gio::ListModel>,
     pub(crate) row_visibility: Option<std::rc::Rc<dyn Fn(u32, bool)>>,
     pub sortable_result_columns: std::collections::HashSet<usize>,
@@ -231,6 +239,7 @@ pub fn build_column_view(
                 foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
                 has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
                 local_result_view: tab_ctx.local_result_view.clone(),
+                whole_result_filter: tab_ctx.whole_result_filter,
                 snapshot_export: tab_ctx.result_model.is_none(),
             },
         );

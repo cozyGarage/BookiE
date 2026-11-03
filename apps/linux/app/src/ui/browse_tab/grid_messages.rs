@@ -55,6 +55,9 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::InsertRow => BrowseTabInput::InsertRow,
         GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
         GridMsg::FilterByValue { column, value, exclude } => BrowseTabInput::FilterByValue { column, value, exclude },
+        GridMsg::FilterWholeResult { .. } => {
+            BrowseTabInput::ShowToast(crate::tr!("Whole-result filters apply to query results"))
+        }
         GridMsg::ShowToast(message) => BrowseTabInput::ShowToast(message),
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },

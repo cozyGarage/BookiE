@@ -30,10 +30,18 @@ pub(crate) struct LocalCellFilter {
 pub(crate) struct LocalResultSettings {
     pub(crate) filter: Option<LocalCellFilter>,
     pub(crate) sort: Option<(usize, bool)>,
+    pub(crate) changed_cells: Option<Arc<bookie_app_services::result_compare::ChangedCells>>,
     selection: Option<(std::sync::Weak<QueryResult>, Arc<HashSet<usize>>)>,
 }
 
 impl LocalResultSettingsStore {
+    pub(crate) fn changed_cells(
+        &self,
+        key: ResultViewKey,
+    ) -> Option<Arc<bookie_app_services::result_compare::ChangedCells>> {
+        self.0.borrow().get(&key)?.changed_cells.clone()
+    }
+
     fn get(&self, key: ResultViewKey) -> LocalResultSettings {
         self.0.borrow().get(&key).cloned().unwrap_or_default()
     }
@@ -110,6 +118,10 @@ impl LocalResultView {
             }
         });
         view
+    }
+
+    pub(crate) fn statement_identity(&self) -> crate::ui::editor::StatementIdentity {
+        self.0.borrow().settings_key.statement_identity
     }
 
     pub(crate) fn has_filter(&self) -> bool {

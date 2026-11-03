@@ -262,6 +262,8 @@ impl BrowseTab {
             local_result_sort: false,
             row_mutations_allowed: self.allows_keyed_row_mutations(),
             local_result_view: None,
+            whole_result_filter: false,
+            changed_cells: None,
             result_model: None,
             row_visibility: None,
             sortable_result_columns: Default::default(),

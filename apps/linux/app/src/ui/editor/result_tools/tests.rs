@@ -302,3 +302,42 @@ fn filter_messages_name_the_quota_and_count_rows() {
         "Showing 12,345 matching rows in a new result · 2 cells could not be searched"
     );
 }
+
+#[test]
+fn a_cell_filter_builds_an_exact_typed_predicate_and_a_short_label() {
+    use super::cell_filter::cell_predicate;
+    let columns = [column("id"), column("name")];
+    let (predicate, label) = cell_predicate(&columns, 1, Value::Text("Ada".into()), false).unwrap();
+    assert_eq!(
+        predicate,
+        ResultPredicate::Equals {
+            column: 1,
+            value: Value::Text("Ada".into())
+        }
+    );
+    assert_eq!(label, "name = Ada");
+    let (predicate, label) = cell_predicate(&columns, 0, Value::Int(7), true).unwrap();
+    assert_eq!(
+        predicate,
+        ResultPredicate::NotEquals {
+            column: 0,
+            value: Value::Int(7)
+        }
+    );
+    assert_eq!(label, "id ≠ 7");
+    let (_, label) = cell_predicate(&columns, 1, Value::Text("x".repeat(80)), false).unwrap();
+    assert_eq!(label.chars().count(), "name = ".chars().count() + 24);
+}
+
+#[test]
+fn a_cell_filter_keeps_null_distinct_from_empty_text_and_refuses_unreadable_values() {
+    use super::cell_filter::cell_predicate;
+    let columns = [column("id")];
+    let (null, _) = cell_predicate(&columns, 0, Value::Null, false).unwrap();
+    let prepared = null.prepare(1).unwrap();
+    let mut tally = bookie_app_services::result_predicate::CellTally::default();
+    assert!(prepared.matches(&[Value::Null], &mut tally));
+    assert!(!prepared.matches(&[Value::Text(String::new())], &mut tally));
+    assert!(cell_predicate(&columns, 0, Value::Undecodable("x".into()), false).is_none());
+    assert!(cell_predicate(&columns, 3, Value::Int(1), false).is_none());
+}

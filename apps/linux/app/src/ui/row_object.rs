@@ -118,6 +118,10 @@ impl RowObject {
         Some(row)
     }
 
+    pub(crate) fn source_index(&self) -> Option<usize> {
+        self.imp().source.borrow().as_ref().map(|shared| shared.source_index)
+    }
+
     pub fn new_draft(draft_id: u64, cells: Vec<Value>) -> Self {
         let obj = Self::new(cells);
         obj.imp().draft_id.set(Some(draft_id));

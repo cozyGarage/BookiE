@@ -1,3 +1,4 @@
+mod changes;
 mod collector;
 mod columns;
 mod digest;
@@ -12,6 +13,7 @@ use thiserror::Error;
 use tokio_util::sync::CancellationToken;
 
 use crate::result_scan::{ScanError, ScanProgress};
+pub use changes::ChangedCells;
 use columns::CommonColumns;
 pub use input::CompareInput;
 
@@ -80,6 +82,7 @@ pub struct CompareSummary {
 pub struct CompareReport {
     pub summary: CompareSummary,
     pub diff: Arc<QueryResult>,
+    pub changed_cells: Arc<ChangedCells>,
     pub columns_only_left: Vec<String>,
     pub columns_only_right: Vec<String>,
 }
@@ -123,6 +126,7 @@ pub(crate) struct Outcome {
 
 impl Outcome {
     fn into_report(self, common: &CommonColumns, request: &CompareRequest) -> CompareReport {
+        let changed_cells = Arc::new(changes::changed_cells(&self.rows));
         let mut rows = QueryRows::new();
         for row in self.rows {
             let mut cells = Vec::with_capacity(row.values.len() + 1);
@@ -137,6 +141,7 @@ impl Outcome {
                 rows,
                 truncated: false,
             }),
+            changed_cells,
             columns_only_left: common.only_left(request.left.columns()),
             columns_only_right: common.only_right(request.right.columns()),
         }

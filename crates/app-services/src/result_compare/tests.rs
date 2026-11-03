@@ -150,6 +150,28 @@ fn keyed_compare_reports_changed_added_and_removed_rows() {
 }
 
 #[test]
+fn keyed_compare_marks_only_the_cells_that_changed() {
+    let left = pages(&[(1, "a"), (3, "c")]);
+    let right = pages(&[(1, "a"), (3, "changed"), (4, "d")]);
+    let report = run(left, right, &["id"]).unwrap();
+    let found = changes(&report);
+    let before = found.iter().position(|(label, _)| label == "Before").unwrap();
+    for row in [before, before + 1] {
+        assert!(report.changed_cells.contains(row, 2));
+        assert!(!report.changed_cells.contains(row, 0));
+        assert!(!report.changed_cells.contains(row, 1));
+    }
+    let added = found.iter().position(|(label, _)| label == "Added").unwrap();
+    assert!(!report.changed_cells.contains(added, 2));
+}
+
+#[test]
+fn whole_row_compare_marks_no_changed_cells() {
+    let report = run(pages(&[(1, "a")]), pages(&[(1, "b")]), &[]).unwrap();
+    assert!(report.changed_cells.is_empty());
+}
+
+#[test]
 fn keyed_compare_ignores_row_order_and_uses_only_named_keys() {
     let report = run(pages(&[(1, "a"), (2, "b")]), pages(&[(2, "b"), (1, "a")]), &["id"]).unwrap();
     assert_eq!((report.summary.equal, report.summary.changed), (2, 0));
