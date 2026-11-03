@@ -61,6 +61,15 @@ run_full() {
   echo "Driver integration: ./scripts/ci-local.sh integration"
 }
 
+run_gtk_app() {
+  echo "==> cargo clippy (GTK app)"
+  cargo clippy --locked -p bookie-app --all-targets -- -D warnings
+
+  echo "==> nextest (GTK app library and binaries)"
+  NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
+  "$NEXTEST" nextest run --locked -p bookie-app --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+}
+
 run_integration() {
   export BOOKIE_TEST_RUN_ID="ci-${$}-${RANDOM}"
   cleanup_testcontainers() {
@@ -115,6 +124,9 @@ case "$MODE" in
   full | "")
     run_full
     ;;
+  gtk-app)
+    run_gtk_app
+    ;;
   integration)
     run_integration
     ;;
@@ -125,7 +137,7 @@ case "$MODE" in
     run_release
     ;;
   *)
-    echo "usage: $0 [quick|full|widgets|integration|release]" >&2
+    echo "usage: $0 [quick|full|gtk-app|widgets|integration|release]" >&2
     exit 2
     ;;
 esac

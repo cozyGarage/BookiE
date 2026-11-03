@@ -94,7 +94,7 @@ def generate_catalog(root=ROOT):
                 "--no-wrap",
                 "--package-name=BookiE",
                 f"--package-version={package_version(root)}",
-                "--copyright-holder=BookiE contributors and TablePro Authors",
+                "--copyright-holder=BookiE contributors",
                 "--msgid-bugs-address=https://github.com/cozyGarage/BookiE/issues",
                 f"--output={generated}",
                 *relative_paths,

@@ -167,6 +167,11 @@ jobs:
       - name: Shared sccache
         if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
+      - name: Enable sccache for Rust
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: .
@@ -274,6 +279,11 @@ jobs:
       - name: Shared sccache
         if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad
+      - name: Enable sccache for Rust
+        if: github.event_name != 'workflow_dispatch' || inputs.ref == ''
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: .
@@ -283,8 +293,8 @@ jobs:
         env:
           BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: python3 scripts/run-test-layer.py change-contracts
-      - name: Unit tests (build via test)
-        run: python3 scripts/run-test-layer.py full
+      - name: GTK app unit tests (build via test)
+        run: python3 scripts/run-test-layer.py gtk-app
       - name: Isolated GTK widget regressions
         run: python3 scripts/run-test-layer.py widgets
       - name: Pre-pull app-server fixture images
