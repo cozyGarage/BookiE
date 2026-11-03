@@ -45,6 +45,10 @@ impl PinnedResults {
         self.last = vec![outcome];
     }
 
+    pub(super) fn iter(&self) -> impl Iterator<Item = &StatementOutcome> {
+        self.pins.iter().chain(self.last.iter())
+    }
+
     pub(super) fn displayed(&self) -> Vec<StatementOutcome> {
         let mut shown = self.pins.clone();
         shown.extend(self.last.iter().cloned());
@@ -102,7 +106,7 @@ impl SqlEditor {
         self.pin_button
             .set_sensitive(self.pinned.is_pinned() || self.pinned.has_results());
         self.compare_button
-            .set_sensitive(super::result_compare::can_compare(&self.pinned.displayed()));
+            .set_sensitive(super::result_compare::can_compare(self.pinned.iter()));
         self.refresh_result_exports();
         self.panel.refresh_errors(self.pinned.latest());
     }
@@ -170,6 +174,16 @@ impl SqlEditor {
         self.status
             .set_label(&crate::tr!("{n} pinned; they stay above the next run").replace("{n}", &kept));
     }
+}
+
+pub(super) fn with_pending_note(message: String, rendered: bool) -> String {
+    if rendered {
+        return message;
+    }
+    format!(
+        "{message} · {}",
+        crate::tr!("Pinned; it shows when the running query finishes")
+    )
 }
 
 pub(super) fn with_eviction_note(message: String, evicted: usize) -> String {

@@ -207,7 +207,8 @@ impl SqlEditor {
                 settings.changed_cells = Some(report.changed_cells.clone());
             },
         );
-        let (added, _) = self.pin_and_show(outcome, sender);
+        let (added, rendered) = self.pin_and_show(outcome, sender);
+        let message = crate::ui::editor::pinned::with_pending_note(message, rendered);
         crate::ui::editor::pinned::with_eviction_note(message, added.evicted)
     }
 }

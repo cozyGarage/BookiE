@@ -46,12 +46,20 @@ pub(super) fn failure_message(error: &FilterError) -> String {
     }
 }
 
-pub(super) fn success_message(rows: u64, unsearchable: u64) -> String {
-    let shown = crate::trn!(
-        "Showing {n} matching row in a new result",
-        "Showing {n} matching rows in a new result",
-        rows as usize
-    )
+pub(super) fn success_message(rows: u64, unsearchable: u64, rendered: bool) -> String {
+    let shown = if rendered {
+        crate::trn!(
+            "Showing {n} matching row in a new result",
+            "Showing {n} matching rows in a new result",
+            rows as usize
+        )
+    } else {
+        crate::trn!(
+            "{n} matching row pinned; it shows when the running query finishes",
+            "{n} matching rows pinned; they show when the running query finishes",
+            rows as usize
+        )
+    }
     .replace("{n}", &format_thousands(u128::from(rows)));
     if unsearchable == 0 {
         return shown;
@@ -133,13 +141,13 @@ impl SqlEditor {
         filtered: FilteredResult,
         sender: &ComponentSender<Self>,
     ) -> String {
-        let message = success_message(filtered.total_rows, filtered.unsearchable_cells);
+        let (total, unsearchable) = (filtered.total_rows, filtered.unsearchable_cells);
         let outcome = derived_outcome(request.identity, &request.source, filtered, &request.label);
         let (added, rendered) = self.pin_and_show(outcome, sender);
         if rendered {
             select_result_tab(&self.results_holder, added.index);
         }
-        with_eviction_note(message, added.evicted)
+        with_eviction_note(success_message(total, unsearchable, rendered), added.evicted)
     }
 }
 

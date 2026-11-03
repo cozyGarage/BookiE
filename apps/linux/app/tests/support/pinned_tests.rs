@@ -352,3 +352,12 @@ fn a_stream_still_loading_is_not_pinned() {
     assert!(!pins.has_results());
     assert_eq!(pins.pin_last(), 0);
 }
+
+#[test]
+fn a_result_that_is_not_rendered_is_reported_as_pinned() {
+    assert_eq!(with_pending_note("A".into(), true), "A");
+    assert_eq!(
+        with_pending_note("A".into(), false),
+        "A · Pinned; it shows when the running query finishes"
+    );
+}

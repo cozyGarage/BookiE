@@ -298,9 +298,13 @@ fn filter_messages_name_the_quota_and_count_rows() {
         failure_message(&FilterError::Scan(ScanError::Cancelled)),
         "Filter cancelled"
     );
-    assert_eq!(success_message(1, 0), "Showing 1 matching row in a new result");
+    assert_eq!(success_message(1, 0, true), "Showing 1 matching row in a new result");
     assert_eq!(
-        success_message(12_345, 2),
+        success_message(3, 0, false),
+        "3 matching rows pinned; they show when the running query finishes"
+    );
+    assert_eq!(
+        success_message(12_345, 2, true),
         "Showing 12,345 matching rows in a new result · 2 cells could not be searched"
     );
 }

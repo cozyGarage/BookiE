@@ -93,12 +93,12 @@ fn truncated_empty_column_and_non_grid_outcomes_are_not_candidates() {
 #[test]
 fn compare_needs_two_candidates() {
     let one = [rows_outcome("SELECT a", vec![result(&["id"], 1, false)])];
-    assert!(!can_compare(&one));
+    assert!(!can_compare(one.iter()));
     let two = [
         rows_outcome("SELECT a", vec![result(&["id"], 1, false)]),
         rows_outcome("SELECT b", vec![result(&["id"], 1, false)]),
     ];
-    assert!(can_compare(&two));
+    assert!(can_compare(two.iter()));
 }
 
 #[test]
@@ -215,4 +215,20 @@ async fn a_cancelled_comparison_records_a_cancelled_outcome() {
     ));
     let events = journal_events(&service);
     assert_eq!(events[1]["terminal_status"], "cancelled");
+}
+
+#[test]
+fn can_compare_agrees_with_the_candidate_list_and_ignores_ineligible_sets() {
+    let mixed = [
+        rows_outcome("SELECT t", vec![result(&["id"], 3, true), result(&["id"], 1, false)]),
+        outcome("SELECT failed", StatementOutcomeKind::NotRun),
+    ];
+    assert_eq!(candidates(&mixed).len(), 1);
+    assert!(!can_compare(mixed.iter()));
+    let pair = [rows_outcome(
+        "SELECT p",
+        vec![result(&["id"], 1, false), result(&["id"], 2, false)],
+    )];
+    assert_eq!(candidates(&pair).len(), 2);
+    assert!(can_compare(pair.iter()));
 }

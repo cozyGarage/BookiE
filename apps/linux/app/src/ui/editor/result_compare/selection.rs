@@ -4,7 +4,7 @@ use bookie_app_services::result_compare::{CompareError, CompareInput, shared_col
 use bookie_app_services::result_scan::ScanSource;
 use bookie_core::{ColumnInfo, QueryResult};
 
-use super::super::stream_pages::StreamTerminal;
+use super::super::stream_pages::{StreamTerminal, StreamedResult};
 use super::super::{StatementOutcome, StatementOutcomeKind};
 
 const LABEL_CHARS: usize = 48;
@@ -49,13 +49,29 @@ fn label(preview: &str, rows: u64, set: Option<usize>) -> String {
     }
 }
 
+fn row_set_eligible(set: &QueryResult) -> bool {
+    !set.truncated && !set.columns.is_empty()
+}
+
+fn streamed_eligible(result: &StreamedResult) -> bool {
+    matches!(result.terminal, StreamTerminal::Complete) && result.spool.is_some()
+}
+
+fn eligible_in(outcome: &StatementOutcome) -> usize {
+    match &outcome.kind {
+        StatementOutcomeKind::Rows(sets) => sets.iter().filter(|set| row_set_eligible(set)).count(),
+        StatementOutcomeKind::Streamed(result) => usize::from(streamed_eligible(result)),
+        _ => 0,
+    }
+}
+
 pub(super) fn candidates(outcomes: &[StatementOutcome]) -> Vec<Candidate> {
     let mut found = Vec::new();
     for outcome in outcomes {
         match &outcome.kind {
             StatementOutcomeKind::Rows(sets) => {
                 for (index, set) in sets.iter().enumerate() {
-                    if set.truncated || set.columns.is_empty() {
+                    if !row_set_eligible(set) {
                         continue;
                     }
                     let rows = set.rows.len() as u64;
@@ -66,7 +82,7 @@ pub(super) fn candidates(outcomes: &[StatementOutcome]) -> Vec<Candidate> {
                     });
                 }
             }
-            StatementOutcomeKind::Streamed(result) if matches!(result.terminal, StreamTerminal::Complete) => {
+            StatementOutcomeKind::Streamed(result) if streamed_eligible(result) => {
                 let Some(spool) = result.spool.clone() else { continue };
                 let rows = result.total_rows as u64;
                 found.push(Candidate {
@@ -85,6 +101,13 @@ pub(super) fn key_choices(left: &Candidate, right: &Candidate) -> Result<Vec<Str
     shared_column_names(&left.columns, &right.columns)
 }
 
-pub(in crate::ui::editor) fn can_compare(outcomes: &[StatementOutcome]) -> bool {
-    candidates(outcomes).len() >= 2
+pub(in crate::ui::editor) fn can_compare<'a>(outcomes: impl IntoIterator<Item = &'a StatementOutcome>) -> bool {
+    let mut eligible = 0;
+    for outcome in outcomes {
+        eligible += eligible_in(outcome);
+        if eligible >= 2 {
+            return true;
+        }
+    }
+    false
 }
