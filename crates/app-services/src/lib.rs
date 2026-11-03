@@ -4,6 +4,7 @@ pub mod column_widths;
 pub mod completion;
 pub mod completion_identifiers;
 pub mod completion_proposals;
+mod completion_relations;
 pub mod config_io;
 pub mod connection_form;
 pub mod connection_identity;
