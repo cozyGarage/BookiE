@@ -76,6 +76,41 @@ impl PagedModel {
         self.imp().pages.borrow_mut().as_mut()?.next_request()
     }
 
+    fn load_from_spool(
+        &self,
+        runtime: &tokio::runtime::Handle,
+        spool: &bookie_app_services::stream_result_spool::StreamResultSpool,
+        columns: &[bookie_core::ColumnInfo],
+    ) {
+        while let Some(index) = self.next_request() {
+            let (send, receive) = async_channel::bounded(1);
+            let worker_spool = spool.clone();
+            let worker_columns = columns.to_vec();
+            runtime.spawn(async move {
+                let _ = send.send(worker_spool.load_page(index, worker_columns).await).await;
+            });
+            let model = self.downgrade();
+            let runtime = runtime.clone();
+            let spool = spool.clone();
+            let columns = columns.to_vec();
+            glib::MainContext::ref_thread_default().spawn_local(async move {
+                let result = receive.recv().await;
+                let Some(model) = model.upgrade() else { return };
+                match result {
+                    Ok(Ok(page)) => {
+                        model.install(index, page);
+                    }
+                    _ => {
+                        if let Some(window) = model.imp().pages.borrow_mut().as_mut() {
+                            window.failed(index);
+                        }
+                    }
+                }
+                model.load_from_spool(&runtime, &spool, &columns);
+            });
+        }
+    }
+
     fn install(&self, index: u64, page: std::sync::Arc<bookie_core::QueryResult>) -> bool {
         let Some((start, count)) = self.imp().index.borrow().page_range(index) else {
             return false;
@@ -225,4 +260,107 @@ fn moving_the_window_evicts_old_values_and_allows_reloading() {
         reloaded.complete_cells(),
         Some(vec![bookie_core::Value::Text("first".into())])
     );
+}
+
+#[test]
+fn spool_page_loads_without_blocking_the_gtk_context() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: Vec::new(),
+        rows: vec![vec![bookie_core::Value::Int(42)]].into(),
+        truncated: false,
+    });
+    runtime.block_on(spool.append_page(0, page)).unwrap();
+    let context = glib::MainContext::new();
+    context
+        .with_thread_default(|| {
+            let model = PagedModel::new(&[1], 1);
+            model.show(0, 1);
+            model.load_from_spool(&runtime.handle().clone(), &spool, &[]);
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            loop {
+                while context.iteration(false) {}
+                let row = model.item(0).unwrap().downcast::<RowObject>().unwrap();
+                if row.complete_cells() == Some(vec![bookie_core::Value::Int(42)]) {
+                    break;
+                }
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        })
+        .unwrap();
+}
+
+#[test]
+fn spool_loader_starts_waiting_pages_after_inflight_reads_finish() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    for index in 0..3 {
+        let page = std::sync::Arc::new(bookie_core::QueryResult {
+            columns: Vec::new(),
+            rows: vec![vec![bookie_core::Value::Int(index)]].into(),
+            truncated: false,
+        });
+        runtime.block_on(spool.append_page(index as u64, page)).unwrap();
+    }
+    let context = glib::MainContext::new();
+    context
+        .with_thread_default(|| {
+            let model = PagedModel::new(&[1, 1, 1], 1);
+            model.show(0, 3);
+            model.load_from_spool(runtime.handle(), &spool, &[]);
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            loop {
+                while context.iteration(false) {}
+                let row = model.item(2).unwrap().downcast::<RowObject>().unwrap();
+                if row.complete_cells() == Some(vec![bookie_core::Value::Int(2)]) {
+                    break;
+                }
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        })
+        .unwrap();
+}
+
+#[test]
+fn spool_read_failure_can_be_retried_without_reloading_in_a_loop() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let context = glib::MainContext::new();
+    context
+        .with_thread_default(|| {
+            let model = PagedModel::new(&[1], 1);
+            model.show(0, 1);
+            model.load_from_spool(runtime.handle(), &spool, &[]);
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            loop {
+                while context.iteration(false) {}
+                if model.imp().pages.borrow().as_ref().unwrap().is_failed(0) {
+                    break;
+                }
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            assert!(model.next_request().is_none());
+            model.imp().pages.borrow_mut().as_mut().unwrap().retry(0);
+            assert_eq!(model.next_request(), Some(0));
+        })
+        .unwrap();
 }
