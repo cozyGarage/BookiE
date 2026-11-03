@@ -28,6 +28,7 @@ pub(super) fn enter_edit_mode(label: &CellEditor) {
 pub(super) fn setup_editable_cell(item: &gtk::ListItem, idx: usize, sender: relm4::Sender<GridMsg>) {
     let label = CellEditor::new();
     label.set_hexpand(true);
+    label.set_focusable(true);
     label.set_margin_start(8);
     label.set_margin_end(8);
     COLUMN_SLOT.set(&label, idx);
@@ -175,6 +176,7 @@ pub(super) fn install_grid_edit_triggers(view: &impl IsA<gtk::Widget>, triggers:
             return;
         };
         super::display::remember_clicked_cell(cell.upcast_ref());
+        cell.grab_focus();
         if n_press != 2 {
             return;
         }
