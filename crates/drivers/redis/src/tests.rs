@@ -703,6 +703,36 @@ fn a_host_that_would_change_the_url_is_refused() {
 }
 
 #[test]
+fn every_tls_mode_keeps_the_host_inside_the_authority() {
+    for mode in bookie_core::TlsMode::ALL {
+        let tls = bookie_core::TlsConfig {
+            mode,
+            ..Default::default()
+        };
+        for host in ["cache#insecure", "user@cache", "cache/1", "cache?x=1", "a,b", "[cache]"] {
+            let opts = ConnectOptions {
+                host: host.into(),
+                tls: tls.clone(),
+                ..Default::default()
+            };
+            assert!(connection_url(&opts).is_err(), "{mode:?} must refuse {host:?}");
+        }
+        let opts = ConnectOptions {
+            host: "cache.internal".into(),
+            port: 6380,
+            tls: tls.clone(),
+            ..Default::default()
+        };
+        let url = connection_url(&opts).unwrap();
+        let (scheme, rest) = url.split_once("://").unwrap();
+        assert_eq!(scheme, if mode.encrypts() { "rediss" } else { "redis" }, "{mode:?}");
+        assert!(rest.starts_with("cache.internal:6380/0"), "{mode:?}: {url}");
+        let expect_insecure = mode.encrypts() && !mode.verifies_cert();
+        assert_eq!(url.contains("#insecure"), expect_insecure, "{mode:?}: {url}");
+    }
+}
+
+#[test]
 fn ordinary_hosts_build_the_expected_url() {
     let mut opts = ConnectOptions {
         host: "cache.internal".into(),
