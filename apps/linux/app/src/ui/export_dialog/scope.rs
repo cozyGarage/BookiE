@@ -8,7 +8,7 @@ use super::PagedExport;
 pub(crate) enum ExportScope {
     TablePage { filtered: bool },
     QueryResult,
-    QueryRerun,
+    QueryStored,
 }
 
 pub(super) fn build(
@@ -44,15 +44,10 @@ pub(super) fn build(
         return (group, Some(choice));
     }
     let title = match scope {
-        ExportScope::QueryRerun => crate::tr!("All query rows (run again)"),
+        ExportScope::QueryStored => crate::tr!("All rows from this query result"),
         _ => crate::tr!("Loaded query result"),
     };
-    let subtitle = match scope {
-        ExportScope::QueryRerun => {
-            crate::tr!("Runs the same query again through its guarded connection and session. Data may have changed.")
-        }
-        _ => super::format_subtitle(result, paged),
-    };
+    let subtitle = super::format_subtitle(result, paged);
     group.add(&adw::ActionRow::builder().title(title).subtitle(subtitle).build());
     (group, None)
 }

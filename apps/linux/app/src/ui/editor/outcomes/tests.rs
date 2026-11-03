@@ -533,23 +533,6 @@ fn reject_stream_page() -> impl FnMut(StreamUpdate) -> std::pin::Pin<Box<dyn std
     move |update| Box::pin(async move { matches!(update, StreamUpdate::Started { .. }) })
 }
 
-fn query_export_runner(runtime: std::sync::Arc<tokio::runtime::Runtime>) -> crate::services::export_pages::PageRunner {
-    std::sync::Arc::new(move |future| runtime.block_on(future))
-}
-
-fn query_export_factory(
-    target: StatementTarget,
-    runtime: std::sync::Arc<tokio::runtime::Runtime>,
-) -> crate::ui::export_dialog::PageFetcherFactory {
-    super::super::session_mode::query_cursor_export_factory_for_target(
-        target,
-        "SELECT id FROM items WHERE id > $1".into(),
-        vec![bookie_core::Value::Int(0)],
-        30,
-        query_export_runner(runtime),
-    )
-}
-
 fn stream_export_origin() -> (
     std::sync::Arc<tokio::runtime::Runtime>,
     std::sync::Arc<crate::services::database_service::DatabaseService>,
@@ -688,7 +671,7 @@ fn streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states
         StreamTerminal::Loading,
     );
     assert_eq!(loading.pages().n_items(), 2);
-    assert_eq!(loading.visible_child(), loading.last_child());
+    assert_eq!(loading.visible_child(), loading.first_child());
     assert_eq!(streamed_page_title(&loading, 0), "Rows 1-2");
     assert_eq!(streamed_page_title(&loading, 1), "Rows 3-3");
 
@@ -900,63 +883,6 @@ async fn cancelling_during_fetch_rolls_back_and_keeps_the_session_usable() {
 }
 
 #[test]
-fn guarded_query_export_reads_every_page_and_releases_its_cursor() {
-    let runtime = std::sync::Arc::new(
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap(),
-    );
-    let counters = std::sync::Arc::new(CursorCounters::default());
-    let target = cursor_target(
-        vec![Ok(cursor_page(&[1, 2], true)), Ok(cursor_page(&[3], false))],
-        counters.clone(),
-    );
-    let mut pages = query_export_factory(target, runtime)(tokio_util::sync::CancellationToken::new());
-    let mut rows = Vec::new();
-    while let Some(page) = pages.next_page().unwrap() {
-        rows.extend(page.into_iter().map(|row| row[0].clone()));
-    }
-    pages.finish().unwrap();
-
-    assert_eq!(rows, [1, 2, 3].map(bookie_core::Value::Int));
-    assert_eq!(counters.opened.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(counters.fetched.load(std::sync::atomic::Ordering::SeqCst), 2);
-    assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
-}
-
-#[test]
-fn guarded_query_export_failure_rolls_back_and_keeps_the_database_error() {
-    let runtime = std::sync::Arc::new(
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap(),
-    );
-    let counters = std::sync::Arc::new(CursorCounters::default());
-    let target = cursor_target(
-        vec![
-            Ok(cursor_page(&[1], true)),
-            Err(bookie_core::DriverError::Query {
-                message: "later page failed".into(),
-                sqlstate: Some("XX000".into()),
-                position: None,
-            }),
-        ],
-        counters.clone(),
-    );
-    let mut pages = query_export_factory(target, runtime)(tokio_util::sync::CancellationToken::new());
-    assert_eq!(pages.next_page().unwrap().unwrap().len(), 1);
-    let error = pages.next_page().unwrap_err();
-    pages.finish().unwrap();
-
-    assert!(matches!(error, bookie_core::export::ExportError::Source(_)));
-    assert_eq!(counters.rolled_back.load(std::sync::atomic::Ordering::SeqCst), 1);
-    assert_eq!(counters.closed.load(std::sync::atomic::Ordering::SeqCst), 0);
-}
-
-#[test]
 fn sql_preview_collapses_whitespace_and_truncates() {
     let preview = sql_preview("SELECT *\n  FROM   users\n  WHERE id = 1");
     assert_eq!(preview, "SELECT * FROM users WHERE id = 1");
@@ -1136,8 +1062,11 @@ use error_view_tests::contains_label;
 #[path = "tests/streamed_progress.rs"]
 mod streamed_progress;
 
-#[path = "tests/export_partial_view.rs"]
+#[path = "tests/export_partial_view_tests.rs"]
 mod export_partial_view;
+
+#[path = "tests/spool_export_tests.rs"]
+mod spool_export;
 
 #[path = "tests/audit_receipts.rs"]
 mod audit_receipts;

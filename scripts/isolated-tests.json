@@ -575,7 +575,12 @@
     [
       "bookie-app",
       "--lib",
-      "ui::editor::outcomes::tests::export_partial_view::exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values"
+      "ui::editor::outcomes::tests::export_partial_view::an_incomplete_stream_does_not_offer_full_result_export"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::outcomes::tests::export_partial_view::a_completed_stream_offers_its_saved_result_for_export"
     ],
     [
       "bookie-app",

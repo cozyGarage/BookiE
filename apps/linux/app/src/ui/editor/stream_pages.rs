@@ -170,9 +170,18 @@ impl StreamPageCache {
         if !matches!(&terminal, StreamTerminal::Loading) && spool.is_some() {
             self.release_spooled_pages();
         }
-        let export = query
-            .zip(self.columns.clone())
-            .map(|(query, columns)| crate::ui::export_dialog::StreamExportRequest { query, columns });
+        let export = if matches!(terminal, StreamTerminal::Complete) && spool.is_some() {
+            query
+                .zip(self.columns.clone())
+                .map(|(query, columns)| crate::ui::export_dialog::StreamExportRequest {
+                    query,
+                    columns,
+                    spool: spool.clone(),
+                    total_rows: self.total_rows,
+                })
+        } else {
+            None
+        };
         StreamedResult {
             pages: self.pages.iter().map(|(_, page, _)| Arc::downgrade(page)).collect(),
             page_indices: self.pages.iter().map(|(index, _, _)| *index).collect(),

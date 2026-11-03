@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod page_index;
 mod pager;
 pub(super) use pager::build as build_pager;
 

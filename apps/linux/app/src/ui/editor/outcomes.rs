@@ -92,8 +92,6 @@ pub(crate) enum StreamUpdate {
     Started {
         identity: StatementIdentity,
         sql_preview: String,
-        sql: String,
-        params: Vec<bookie_core::Value>,
         spool: StreamResultSpool,
     },
     Page {
@@ -430,7 +428,6 @@ where
                     identity: attempt.identity,
                     preview: attempt.preview,
                     bound_sql: attempt.bound_sql.into(),
-                    bound_params: attempt.bound_params.to_vec(),
                     sql: attempt.sql,
                     control: attempt.control,
                     spool,
@@ -469,7 +466,6 @@ struct StreamExecution<'a> {
     identity: StatementIdentity,
     preview: String,
     bound_sql: String,
-    bound_params: Vec<bookie_core::Value>,
     sql: &'a str,
     control: &'a OperationControl,
     spool: StreamResultSpool,
@@ -490,17 +486,14 @@ where
         identity,
         preview,
         bound_sql,
-        bound_params,
         sql,
         control,
         spool,
     } = execution;
-    let sent = bound_sql.clone();
+    let sent = bound_sql;
     let started = stream_update(StreamUpdate::Started {
         identity,
         sql_preview: preview,
-        sql: bound_sql,
-        params: bound_params,
         spool: spool.clone(),
     })
     .await;

@@ -1,0 +1,28 @@
+:root { font: 15px system-ui, sans-serif; color: #e6e9ef; background: #111620; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1320px; margin: auto; padding: 28px; }
+.app-header, .result-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.brand { font-size: 23px; font-weight: 750; margin-right: 12px; }
+.badge { display: inline-block; border: 1px solid #3c5270; border-radius: 999px; padding: 5px 10px; color: #b7c9e5; font-size: 12px; }
+.muted { color: #a5b2c5; line-height: 1.55; }
+.welcome { display: grid; grid-template-columns: 1fr minmax(240px, 360px); gap: 28px; margin: 55px 0 35px; align-items: center; }
+.eyebrow { color: #8bb7f1; font-size: 11px; letter-spacing: .11em; font-weight: 700; }
+h1 { font-size: clamp(30px, 4vw, 46px); margin: 8px 0; }
+h2 { font-size: 19px; margin: 8px 0; }
+.card, .result { border: 1px solid #344257; border-radius: 16px; background: #1a2331; padding: 22px; }
+button { background: #84b7ff; color: #0e1a2a; border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
+button:focus-visible, .viewport:focus-visible { outline: 3px solid #c2d9ff; outline-offset: 3px; }
+.result { margin-top: 24px; }
+.result-head { margin-bottom: 18px; }
+.columns, .row { display: grid; grid-template-columns: 90px minmax(170px, 1fr) minmax(170px, 1fr) 110px; gap: 12px; align-items: center; padding: 0 12px; }
+.columns { min-width: 600px; height: 36px; color: #aec1dc; border-bottom: 1px solid #46556c; font-weight: 650; }
+.viewport { height: min(55vh, 550px); min-height: 180px; overflow: auto; position: relative; background: #111a27; }
+.height { position: relative; min-width: 600px; }
+.rows { position: absolute; left: 0; right: 0; top: 0; }
+.row { height: 36px; border-bottom: 1px solid #2c394c; font-variant-numeric: tabular-nums; }
+.row:nth-child(even) { background: #192535; }
+.cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.null { color: #b8a4d4; font-style: italic; }
+.footnote { margin-bottom: 0; font-size: 13px; }
+@media (max-width: 700px) { main { padding: 16px; } .welcome { grid-template-columns: 1fr; margin-top: 30px; } .app-header { align-items: flex-start; } }

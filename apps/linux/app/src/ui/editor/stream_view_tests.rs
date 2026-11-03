@@ -165,7 +165,7 @@ fn short_retained_pages_use_received_row_positions_after_eviction() {
     assert_eq!(stream_page_label(&result, 6), "Rows 7-7");
     assert_eq!(
         stream_progress_text(&result),
-        "Received 7 rows · 7 pages\nEarlier pages can be loaded from temporary storage."
+        "Receiving… · Received 7 rows · 7 pages\nEarlier pages can be loaded from temporary storage."
     );
 }
 

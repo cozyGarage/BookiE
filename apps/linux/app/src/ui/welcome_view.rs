@@ -24,6 +24,8 @@ pub struct WelcomeView {
     stack: gtk::Stack,
     search: gtk::SearchEntry,
     empty_filter_page: adw::StatusPage,
+    recent_group: adw::PreferencesGroup,
+    recent_items: gtk::FlowBox,
 }
 
 #[derive(Debug)]
@@ -96,6 +98,36 @@ impl SimpleComponent for WelcomeView {
             .margin_start(12)
             .margin_end(12)
             .build();
+
+        let heading = gtk::Label::builder()
+            .label(crate::tr!("Welcome to BookiE"))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["title-1"])
+            .build();
+        let introduction = gtk::Label::builder()
+            .label(crate::tr!(
+                "Choose a saved connection or add a database to get started."
+            ))
+            .xalign(0.0)
+            .wrap(true)
+            .css_classes(["dim-label"])
+            .build();
+        outer.append(&heading);
+        outer.append(&introduction);
+        let recent_items = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .max_children_per_line(3)
+            .homogeneous(true)
+            .row_spacing(8)
+            .column_spacing(8)
+            .build();
+        let recent_group = adw::PreferencesGroup::builder()
+            .title(crate::tr!("Recently opened"))
+            .visible(false)
+            .build();
+        recent_group.add(&recent_items);
+        outer.append(&recent_group);
 
         // Single CTA on the populated page: the "+" button in the
         // group header. Previously we also rendered a bottom pill
@@ -205,6 +237,8 @@ impl SimpleComponent for WelcomeView {
             stack: root.clone(),
             search,
             empty_filter_page,
+            recent_group,
+            recent_items,
         };
         ComponentParts { model, widgets: () }
     }
@@ -262,8 +296,34 @@ impl SimpleComponent for WelcomeView {
 /// being the faster option.
 const FILTER_REVEAL_THRESHOLD: usize = 6;
 
+fn recent_connections(connections: &[SavedConnection]) -> Vec<&SavedConnection> {
+    let mut recent: Vec<_> = connections
+        .iter()
+        .filter(|connection| connection.last_opened_at.is_some())
+        .collect();
+    recent.sort_by(|left, right| {
+        right
+            .last_opened_at
+            .cmp(&left.last_opened_at)
+            .then_with(|| left.name.cmp(&right.name))
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    recent.truncate(3);
+    recent
+}
+
+fn recent_connection_detail(driver: &str, environment: bookie_core::Environment) -> String {
+    let label = if environment == bookie_core::Environment::Prod {
+        crate::tr!("Production")
+    } else {
+        environment.display_name().to_owned()
+    };
+    format!("{driver} · {label}")
+}
+
 impl WelcomeView {
     fn rebuild_rows(&mut self, sender: &ComponentSender<Self>) {
+        self.rebuild_recent(sender);
         // Favourites first, then group, then name — the ordering lives
         // in bookie-storage so the same arrangement is testable
         // without a GTK main context. Recency is a deliberate casualty:
@@ -290,6 +350,52 @@ impl WelcomeView {
             "populated"
         };
         self.stack.set_visible_child_name(name);
+    }
+
+    fn rebuild_recent(&self, sender: &ComponentSender<Self>) {
+        while let Some(child) = self.recent_items.first_child() {
+            self.recent_items.remove(&child);
+        }
+        let recent = recent_connections(&self.connections);
+        self.recent_group
+            .set_visible(!recent.is_empty() && self.filter.trim().is_empty());
+        for saved in recent {
+            let driver = self
+                .registry
+                .get(&saved.driver_id)
+                .map_or_else(|| saved.driver_id.clone(), |driver| driver.display_name().to_string());
+            let name = gtk::Label::builder()
+                .label(&saved.name)
+                .xalign(0.0)
+                .ellipsize(gtk::pango::EllipsizeMode::End)
+                .build();
+            let detail = gtk::Label::builder()
+                .label(recent_connection_detail(&driver, saved.environment))
+                .xalign(0.0)
+                .ellipsize(gtk::pango::EllipsizeMode::End)
+                .css_classes(["dim-label", "caption"])
+                .build();
+            let content = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .spacing(4)
+                .margin_top(8)
+                .margin_bottom(8)
+                .margin_start(8)
+                .margin_end(8)
+                .build();
+            content.append(&name);
+            content.append(&detail);
+            let button = gtk::Button::builder().child(&content).hexpand(true).build();
+            button.add_css_class("card");
+            let label = crate::tr!("Open recent connection: {name}, {details}")
+                .replace("{name}", &saved.name)
+                .replace("{details}", &recent_connection_detail(&driver, saved.environment));
+            button.update_property(&[gtk::accessible::Property::Label(&label)]);
+            let saved = saved.clone();
+            let sender = sender.clone();
+            button.connect_clicked(move |_| sender.input(WelcomeViewInput::OpenSaved(saved.clone())));
+            self.recent_items.insert(&button, -1);
+        }
     }
 
     fn build_section(
@@ -487,5 +593,32 @@ mod tests {
     #[test]
     fn an_empty_arrangement_renders_no_sections() {
         assert!(group_sections(&[], &ConnectionOrganizationIndex::default()).is_empty());
+    }
+
+    #[test]
+    fn recent_connections_are_limited_and_ordered_by_successful_open_time() {
+        let mut connections = [
+            saved("old"),
+            saved("new"),
+            saved("middle"),
+            saved("other"),
+            saved("never"),
+        ];
+        for (connection, timestamp) in connections.iter_mut().zip([1, 4, 3, 2]) {
+            connection.last_opened_at = Some(chrono::DateTime::from_timestamp(timestamp, 0).unwrap());
+        }
+        let names: Vec<_> = recent_connections(&connections)
+            .into_iter()
+            .map(|connection| connection.name.as_str())
+            .collect();
+        assert_eq!(names, ["new", "middle", "other"]);
+    }
+
+    #[test]
+    fn recent_connection_details_make_production_visible() {
+        assert_eq!(
+            recent_connection_detail("PostgreSQL", Environment::Prod),
+            "PostgreSQL · Production"
+        );
     }
 }
