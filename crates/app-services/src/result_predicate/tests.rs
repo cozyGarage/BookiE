@@ -167,3 +167,13 @@ fn readable_bytes_search_as_text_and_as_hex() {
     assert!(matches(contains("dead", ColumnScope::Column(1)), &row));
     assert!(!matches(contains("hello", ColumnScope::Column(1)), &row));
 }
+
+#[test]
+fn an_ascii_needle_still_matches_characters_that_lowercase_to_ascii() {
+    let row = [Value::Text("Temp \u{212A}elvin \u{0130}stanbul".into())];
+    assert!(matches(contains("kelvin", ColumnScope::Any), &row));
+    assert!(matches(contains("i\u{307}stanbul", ColumnScope::Any), &row));
+    let plain = [Value::Text("Zürich Café".into())];
+    assert!(matches(contains("zür", ColumnScope::Any), &plain));
+    assert!(!matches(contains("kelvin", ColumnScope::Any), &plain));
+}

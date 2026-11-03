@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use bookie_core::Value;
 use thiserror::Error;
 
-use crate::change_tracker::KeyValue;
+use crate::value_exact::exact_equal;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ColumnScope {
@@ -41,8 +41,8 @@ pub struct PreparedPredicate {
 #[derive(Debug, Clone)]
 enum PreparedKind {
     Contains { scope: ColumnScope, needle: String },
-    Equals { column: usize, key: KeyValue },
-    NotEquals { column: usize, key: KeyValue },
+    Equals { column: usize, value: Value },
+    NotEquals { column: usize, value: Value },
 }
 
 impl ResultPredicate {
@@ -51,11 +51,11 @@ impl ResultPredicate {
             Self::Contains { scope, needle } => prepare_contains(scope, needle, column_count)?,
             Self::Equals { column, value } => PreparedKind::Equals {
                 column: checked_column(column, column_count)?,
-                key: comparable_key(&value)?,
+                value: comparable_value(value)?,
             },
             Self::NotEquals { column, value } => PreparedKind::NotEquals {
                 column: checked_column(column, column_count)?,
-                key: comparable_key(&value)?,
+                value: comparable_value(value)?,
             },
         };
         Ok(PreparedPredicate { kind })
@@ -81,25 +81,21 @@ fn checked_column(column: usize, column_count: usize) -> Result<usize, Predicate
         .ok_or(PredicateError::UnknownColumn)
 }
 
-fn comparable_key(value: &Value) -> Result<KeyValue, PredicateError> {
+fn comparable_value(value: Value) -> Result<Value, PredicateError> {
     if matches!(value, Value::Undecodable(_)) {
         return Err(PredicateError::UncomparableValue);
     }
-    Ok(KeyValue::from(value))
+    Ok(value)
 }
 
 impl PreparedPredicate {
     pub fn matches(&self, row: &[Value], tally: &mut CellTally) -> bool {
         match &self.kind {
             PreparedKind::Contains { scope, needle } => contains_in_row(row, scope, needle, tally),
-            PreparedKind::Equals { column, key } => cell_key(row, *column).is_some_and(|cell| &cell == key),
-            PreparedKind::NotEquals { column, key } => cell_key(row, *column).is_none_or(|cell| &cell != key),
+            PreparedKind::Equals { column, value } => row.get(*column).is_some_and(|cell| exact_equal(cell, value)),
+            PreparedKind::NotEquals { column, value } => row.get(*column).is_none_or(|cell| !exact_equal(cell, value)),
         }
     }
-}
-
-fn cell_key(row: &[Value], column: usize) -> Option<KeyValue> {
-    row.get(column).map(KeyValue::from)
 }
 
 fn contains_in_row(row: &[Value], scope: &ColumnScope, needle: &str, tally: &mut CellTally) -> bool {
@@ -112,7 +108,7 @@ fn contains_in_row(row: &[Value], scope: &ColumnScope, needle: &str, tally: &mut
 fn cell_contains(cell: &Value, needle: &str, tally: &mut CellTally) -> bool {
     match search_text(cell) {
         SearchText::Text(text) => contains_ignore_case(&text, needle),
-        SearchText::TextOrHex(text, hex) => contains_ignore_case(text, needle) || contains_ignore_case(&hex, needle),
+        SearchText::TextOrHex(text, bytes) => contains_ignore_case(text, needle) || contains_ignore_case(&hex_text(bytes), needle),
         SearchText::Never => false,
         SearchText::Unsearchable => {
             tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
@@ -123,7 +119,7 @@ fn cell_contains(cell: &Value, needle: &str, tally: &mut CellTally) -> bool {
 
 enum SearchText<'a> {
     Text(Cow<'a, str>),
-    TextOrHex(&'a str, String),
+    TextOrHex(&'a str, &'a [u8]),
     Never,
     Unsearchable,
 }
@@ -144,26 +140,38 @@ fn search_text(value: &Value) -> SearchText<'_> {
         Value::Uuid(value) => SearchText::Text(Cow::Owned(value.to_string())),
         Value::Json(value) => SearchText::Text(Cow::Owned(value.to_string())),
         Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
-            Ok(text) if !text.contains('\0') => SearchText::TextOrHex(text, hex_text(bytes)),
+            Ok(text) if !text.contains('\0') => SearchText::TextOrHex(text, bytes),
             _ => SearchText::Text(Cow::Owned(hex_text(bytes))),
         },
     }
 }
 
 fn hex_text(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut text = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    text
 }
 
 fn contains_ignore_case(haystack: &str, needle_lower: &str) -> bool {
-    if haystack.is_ascii() && needle_lower.is_ascii() {
-        let needle = needle_lower.as_bytes();
-        return haystack
-            .as_bytes()
-            .windows(needle.len())
-            .any(|window| window.eq_ignore_ascii_case(needle));
+    if !needle_lower.is_ascii() {
+        return haystack.to_lowercase().contains(needle_lower);
     }
-    haystack.to_lowercase().contains(needle_lower)
+    let needle = needle_lower.as_bytes();
+    if haystack
+        .as_bytes()
+        .windows(needle.len())
+        .any(|window| window.eq_ignore_ascii_case(needle))
+    {
+        return true;
+    }
+    !haystack.is_ascii() && haystack.contains(FOLDS_TO_ASCII) && haystack.to_lowercase().contains(needle_lower)
 }
+
+const FOLDS_TO_ASCII: [char; 2] = ['\u{0130}', '\u{212A}'];
 
 #[cfg(test)]
 mod tests;

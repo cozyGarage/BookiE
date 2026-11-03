@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use bookie_core::Value;
+
 use super::DiffRow;
-use super::digest::cells_digest;
 use super::keyed::{AFTER, BEFORE};
+use crate::value_exact::exact_equal;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChangedCells(HashMap<usize, Vec<usize>>);
@@ -25,6 +27,14 @@ impl ChangedCells {
     }
 }
 
+fn cell_equal(before: &[Value], after: &[Value], column: usize) -> bool {
+    match (before.get(column), after.get(column)) {
+        (Some(a), Some(b)) => exact_equal(a, b),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
 pub(crate) fn changed_cells(rows: &[DiffRow]) -> ChangedCells {
     let mut changed = HashMap::new();
     for (index, pair) in rows.windows(2).enumerate() {
@@ -33,7 +43,7 @@ pub(crate) fn changed_cells(rows: &[DiffRow]) -> ChangedCells {
             continue;
         }
         let columns: Vec<usize> = (0..before.values.len())
-            .filter(|&column| cells_digest(&before.values, &[column]) != cells_digest(&after.values, &[column]))
+            .filter(|&column| !cell_equal(&before.values, &after.values, column))
             .map(|column| column + 1)
             .collect();
         if columns.is_empty() {
