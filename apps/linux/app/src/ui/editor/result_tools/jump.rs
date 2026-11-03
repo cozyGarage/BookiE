@@ -104,8 +104,8 @@ pub(super) enum Attempt {
 
 pub(super) fn attempt(view_rows: Option<usize>, expected_rows: Option<usize>, tries: u32) -> Attempt {
     match view_rows {
-        Some(rows) if rows > 0 && expected_rows.is_none_or(|expected| expected == rows) => Attempt::Select,
-        Some(rows) if rows > 0 => Attempt::GiveUp,
+        Some(rows) if rows > 0 && expected_rows.is_none_or(|expected| rows >= expected) => Attempt::Select,
+        Some(rows) if rows > 0 && tries > MAX_RETRIES => Attempt::Select,
         _ if tries > MAX_RETRIES => Attempt::GiveUp,
         _ => Attempt::Retry,
     }

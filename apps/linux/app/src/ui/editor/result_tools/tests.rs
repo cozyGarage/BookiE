@@ -476,7 +476,8 @@ fn filtering_a_filtered_result_does_not_stack_the_export_name() {
 fn a_jump_selects_retries_or_gives_up_by_what_the_view_shows() {
     use super::jump::{Attempt, attempt};
     assert_eq!(attempt(Some(5), Some(5), 1), Attempt::Select);
-    assert_eq!(attempt(Some(3), Some(5), 1), Attempt::GiveUp);
+    assert_eq!(attempt(Some(3), Some(5), 1), Attempt::Retry);
+    assert_eq!(attempt(Some(3), Some(5), 1_000), Attempt::Select);
     assert_eq!(attempt(None, Some(5), 1), Attempt::Retry);
     assert_eq!(attempt(Some(0), Some(5), 1), Attempt::Retry);
     assert_eq!(attempt(None, Some(5), 1_000), Attempt::GiveUp);
@@ -537,4 +538,15 @@ fn a_search_ended_without_results_is_idle_and_can_be_edited() {
     assert!(cursor.has_results_for("needle"));
     cursor.end_search(generation);
     assert!(cursor.has_results_for("needle"));
+}
+
+#[test]
+fn a_running_search_for_the_same_text_is_not_restarted() {
+    let mut cursor = MatchCursor::default();
+    assert!(!cursor.is_searching_for("needle"));
+    let generation = cursor.begin("needle");
+    assert!(cursor.is_searching_for("needle"));
+    assert!(!cursor.is_searching_for("other"));
+    assert!(cursor.complete(generation, report(1, false, 0)));
+    assert!(!cursor.is_searching_for("needle"));
 }

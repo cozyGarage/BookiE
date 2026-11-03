@@ -1101,3 +1101,18 @@ mod spool_export;
 
 #[path = "tests/audit_receipts.rs"]
 mod audit_receipts;
+
+#[test]
+fn the_cell_menu_offers_a_whole_result_filter_only_for_a_complete_spooled_stream() {
+    let mut cache = super::super::stream_pages::StreamPageCache::default();
+    for terminal in [
+        StreamTerminal::Loading,
+        StreamTerminal::Cancelled,
+        StreamTerminal::TimedOut,
+    ] {
+        let result = cache.snapshot(terminal, None);
+        assert!(!super::stream_result_view::offers_whole_result_filter(&result));
+    }
+    let complete = cache.snapshot(StreamTerminal::Complete, None);
+    assert!(!super::stream_result_view::offers_whole_result_filter(&complete));
+}

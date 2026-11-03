@@ -63,6 +63,10 @@ impl MatchCursor {
         self.state == SearchState::Complete && self.needle == needle
     }
 
+    pub(super) fn is_searching_for(&self, needle: &str) -> bool {
+        self.state == SearchState::Searching && self.needle == needle
+    }
+
     pub(super) fn keeps_for(&self, needle: &str) -> bool {
         self.state != SearchState::Idle && self.needle == needle
     }

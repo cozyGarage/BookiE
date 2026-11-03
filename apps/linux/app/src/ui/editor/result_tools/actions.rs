@@ -131,6 +131,9 @@ impl Tools {
             self.step(forward);
             return;
         }
+        if self.cursor.borrow().is_searching_for(&needle) {
+            return;
+        }
         self.start_search(needle, forward);
     }
 
