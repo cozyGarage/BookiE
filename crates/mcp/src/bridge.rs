@@ -496,38 +496,7 @@ impl McpBridge {
             .map_err(McpToolError::from)?;
         let sql = sql.to_string();
         if preview {
-            let mut transaction = connection.begin_controlled(&control).await.map_err(|error| {
-                let mut outcome = McpToolError::from_write_error(&error);
-                if outcome.operation_outcome == crate::errors::OperationOutcome::Unknown {
-                    outcome.transaction_outcome = crate::errors::TransactionOutcome::Unknown;
-                }
-                outcome
-            })?;
-            let refused = match self.driver_id_for_controlled(connection_id, &control).await {
-                Ok(driver_id) => touches_nontransactional_table(transaction.as_mut(), &driver_id, &sql, &control).await,
-                Err(_) => true,
-            };
-            let result = if refused {
-                Err(DriverError::ReadOnly)
-            } else {
-                transaction.execute_controlled(&sql, &control).await
-            };
-            let cleanup_control = operation_control_for(CancellationToken::new(), PREVIEW_CLEANUP_TIMEOUT);
-            if let Err(error) = transaction.rollback_controlled(&cleanup_control).await {
-                return Err(McpToolError::transaction_rollback_failed(&error));
-            }
-            if refused {
-                return Err(McpToolError::preview_not_transactional());
-            }
-            let result = result.map_err(|error| {
-                let mut outcome = McpToolError::from_write_error(&error);
-                outcome.transaction_outcome = crate::errors::TransactionOutcome::RolledBack;
-                outcome
-            })?;
-            return Ok(WriteOutcome::Preview {
-                rows_affected: result.rows_affected,
-                rolled_back: true,
-            });
+            return self.preview_write(&connection, connection_id, &sql, &control).await;
         }
         let result = connection
             .execute_controlled(&sql, &control)
@@ -535,6 +504,50 @@ impl McpBridge {
             .map_err(|error| McpToolError::from_write_error(&error))?;
         Ok(WriteOutcome::Committed {
             rows_affected: result.rows_affected,
+        })
+    }
+
+    async fn preview_write(
+        &self,
+        connection: &Arc<dyn Connection>,
+        connection_id: Uuid,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<WriteOutcome, McpToolError> {
+        let Ok(driver_id) = self.driver_id_for_controlled(connection_id, control).await else {
+            return Err(McpToolError::preview_refused_before_start());
+        };
+        if preview_may_implicitly_commit(&driver_id, sql) {
+            return Err(McpToolError::preview_refused_before_start());
+        }
+        let mut transaction = connection.begin_controlled(control).await.map_err(|error| {
+            let mut outcome = McpToolError::from_write_error(&error);
+            if outcome.operation_outcome == crate::errors::OperationOutcome::Unknown {
+                outcome.transaction_outcome = crate::errors::TransactionOutcome::Unknown;
+            }
+            outcome
+        })?;
+        let refused = touches_nontransactional_table(transaction.as_mut(), &driver_id, sql, control).await;
+        let result = if refused {
+            Err(DriverError::ReadOnly)
+        } else {
+            transaction.execute_controlled(sql, control).await
+        };
+        let cleanup_control = operation_control_for(CancellationToken::new(), PREVIEW_CLEANUP_TIMEOUT);
+        if let Err(error) = transaction.rollback_controlled(&cleanup_control).await {
+            return Err(McpToolError::transaction_rollback_failed(&error));
+        }
+        if refused {
+            return Err(McpToolError::preview_not_transactional());
+        }
+        let result = result.map_err(|error| {
+            let mut outcome = McpToolError::from_write_error(&error);
+            outcome.transaction_outcome = crate::errors::TransactionOutcome::RolledBack;
+            outcome
+        })?;
+        Ok(WriteOutcome::Preview {
+            rows_affected: result.rows_affected,
+            rolled_back: true,
         })
     }
 }
@@ -550,6 +563,17 @@ pub struct TableSchema {
 pub enum WriteOutcome {
     Preview { rows_affected: u64, rolled_back: bool },
     Committed { rows_affected: u64 },
+}
+
+pub(crate) fn preview_may_implicitly_commit(driver_id: &str, sql: &str) -> bool {
+    driver_id == "mysql"
+        && !matches!(
+            bookie_policy::classify(sql, driver_id).class,
+            bookie_policy::StatementClass::Select
+                | bookie_policy::StatementClass::Insert
+                | bookie_policy::StatementClass::Update
+                | bookie_policy::StatementClass::Delete
+        )
 }
 
 pub(crate) fn nontransactional_engine_query(driver_id: &str, sql: &str) -> Option<String> {
