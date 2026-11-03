@@ -211,4 +211,22 @@ async fn a_preview_is_refused_for_a_myisam_table_in_another_database() {
         .unwrap()
         .rows;
     assert_eq!(rows, vec![vec![Value::Int(1)]]);
+    connection
+        .execute("CREATE TABLE other_db.modern_elsewhere (id INT PRIMARY KEY, v INT) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO other_db.modern_elsewhere VALUES (1, 1)")
+        .await
+        .unwrap();
+    for sql in [
+        "UPDATE other_db.modern_elsewhere SET v = 2 WHERE id = 1",
+        "UPDATE modern SET v = (SELECT COUNT(*) FROM information_schema.tables) WHERE id = 1",
+    ] {
+        let allowed = bridge.execute_write_structured(token, connection_id, sql, true).await;
+        assert!(
+            format!("{allowed:?}").contains("rolled_back: true"),
+            "{sql}: {allowed:?}"
+        );
+    }
 }

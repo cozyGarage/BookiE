@@ -576,20 +576,35 @@ pub(crate) fn preview_may_implicitly_commit(driver_id: &str, sql: &str) -> bool 
         )
 }
 
-pub(crate) fn nontransactional_engine_query(driver_id: &str, sql: &str) -> Option<String> {
+pub(crate) enum EngineCheck {
+    NotApplicable,
+    Refuse,
+    Query(String),
+}
+
+const SYSTEM_SCHEMAS: &str = "'information_schema', 'performance_schema', 'sys'";
+
+pub(crate) fn nontransactional_engine_check(driver_id: &str, sql: &str) -> EngineCheck {
     if driver_id != "mysql" {
-        return None;
+        return EngineCheck::NotApplicable;
     }
-    let clauses: Vec<String> = bookie_policy::classify(sql, driver_id)
-        .tables
-        .iter()
-        .filter_map(|table| table_clause(&split_qualified_name(table)))
-        .collect();
-    if clauses.is_empty() {
-        return None;
+    let tables = bookie_policy::classify(sql, driver_id).tables;
+    if tables.is_empty() {
+        return EngineCheck::NotApplicable;
     }
-    Some(format!(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE ({}) \
+    let mut clauses = Vec::with_capacity(tables.len());
+    for table in &tables {
+        let parts = split_qualified_name(table);
+        if parts.iter().any(|part| part.is_empty() || part.contains('\\')) {
+            return EngineCheck::Refuse;
+        }
+        let Some(clause) = table_clause(&parts) else {
+            return EngineCheck::Refuse;
+        };
+        clauses.push(clause);
+    }
+    EngineCheck::Query(format!(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE ({}) AND table_schema NOT IN ({SYSTEM_SCHEMAS}) \
          AND UPPER(COALESCE(engine, '')) NOT IN ('INNODB', 'NDB', 'NDBCLUSTER')",
         clauses.join(" OR ")
     ))
@@ -640,8 +655,10 @@ async fn touches_nontransactional_table(
     sql: &str,
     control: &OperationControl,
 ) -> bool {
-    let Some(query) = nontransactional_engine_query(driver_id, sql) else {
-        return false;
+    let query = match nontransactional_engine_check(driver_id, sql) {
+        EngineCheck::NotApplicable => return false,
+        EngineCheck::Refuse => return true,
+        EngineCheck::Query(query) => query,
     };
     match transaction.query_controlled(&query, control).await {
         Ok(result) => !matches!(result.rows.first().and_then(|row| row.first()), Some(Value::Int(0))),

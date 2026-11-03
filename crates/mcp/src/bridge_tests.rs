@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use super::{
-    McpBridge, McpLimits, count_from_value, count_statement, nontransactional_engine_query,
+    EngineCheck, McpBridge, McpLimits, count_from_value, count_statement, nontransactional_engine_check,
     preview_may_implicitly_commit, sql_looks_like_write, validated_identifier,
 };
 use crate::tokens::TokenStore;
@@ -285,9 +285,16 @@ fn engines_with_transactional_ddl_are_not_refused_for_ddl() {
     }
 }
 
+fn engine_query(sql: &str) -> String {
+    match nontransactional_engine_check("mysql", sql) {
+        EngineCheck::Query(query) => query,
+        _ => String::new(),
+    }
+}
+
 #[test]
 fn an_unqualified_table_is_checked_in_the_current_database() {
-    let query = nontransactional_engine_query("mysql", "UPDATE legacy SET v = 2 WHERE id = 1").unwrap();
+    let query = engine_query("UPDATE legacy SET v = 2 WHERE id = 1");
     assert!(
         query.contains("table_schema = DATABASE() AND table_name = 'legacy'"),
         "{query}"
@@ -296,7 +303,7 @@ fn an_unqualified_table_is_checked_in_the_current_database() {
 
 #[test]
 fn a_schema_qualified_table_is_checked_in_its_own_database() {
-    let query = nontransactional_engine_query("mysql", "UPDATE other_db.legacy SET v = 2 WHERE id = 1").unwrap();
+    let query = engine_query("UPDATE other_db.legacy SET v = 2 WHERE id = 1");
     assert!(
         query.contains("table_schema = 'other_db' AND table_name = 'legacy'"),
         "{query}"
@@ -309,7 +316,7 @@ fn a_schema_qualified_table_is_checked_in_its_own_database() {
 
 #[test]
 fn backticked_parts_and_dots_inside_them_are_split_correctly() {
-    let query = nontransactional_engine_query("mysql", "UPDATE `my.db`.`odd.table` SET v = 2 WHERE id = 1").unwrap();
+    let query = engine_query("UPDATE `my.db`.`odd.table` SET v = 2 WHERE id = 1");
     assert!(
         query.contains("table_schema = 'my.db' AND table_name = 'odd.table'"),
         "{query}"
@@ -317,21 +324,29 @@ fn backticked_parts_and_dots_inside_them_are_split_correctly() {
 }
 
 #[test]
-fn quotes_and_backslashes_in_names_cannot_break_out_of_the_literal() {
-    let query = nontransactional_engine_query("mysql", "UPDATE `a\\b'c`.`d\\e'f` SET v = 2 WHERE id = 1").unwrap();
+fn a_single_quote_in_a_name_cannot_break_out_of_the_literal() {
+    let query = engine_query("UPDATE `a'b`.`c'd` SET v = 2 WHERE id = 1");
     assert!(
-        query.contains("table_schema = 'a\\\\b''c' AND table_name = 'd\\\\e''f'"),
+        query.contains("table_schema = 'a''b' AND table_name = 'c''d'"),
         "{query}"
     );
 }
 
 #[test]
+fn a_name_with_a_backslash_is_refused_because_its_escaping_depends_on_the_sql_mode() {
+    assert!(matches!(
+        nontransactional_engine_check("mysql", "UPDATE `a\\b`.`c` SET v = 2 WHERE id = 1"),
+        EngineCheck::Refuse
+    ));
+    assert!(matches!(
+        nontransactional_engine_check("mysql", "UPDATE `c\\d` SET v = 2 WHERE id = 1"),
+        EngineCheck::Refuse
+    ));
+}
+
+#[test]
 fn several_tables_are_each_checked_in_their_own_database() {
-    let query = nontransactional_engine_query(
-        "mysql",
-        "UPDATE orders o JOIN other_db.legacy l ON l.id = o.id SET o.v = 2",
-    )
-    .unwrap();
+    let query = engine_query("UPDATE orders o JOIN other_db.legacy l ON l.id = o.id SET o.v = 2");
     assert!(
         query.contains("table_schema = DATABASE() AND table_name = 'orders'"),
         "{query}"
@@ -340,9 +355,26 @@ fn several_tables_are_each_checked_in_their_own_database() {
         query.contains("table_schema = 'other_db' AND table_name = 'legacy'"),
         "{query}"
     );
+    assert!(query.contains(") OR ("), "{query}");
 }
 
 #[test]
-fn only_mysql_has_an_engine_check() {
-    assert!(nontransactional_engine_query("postgres", "UPDATE t SET v = 1").is_none());
+fn the_system_schemas_never_count_as_non_transactional() {
+    let query = engine_query("INSERT INTO audit SELECT table_name FROM information_schema.tables");
+    assert!(
+        query.contains("table_schema NOT IN ('information_schema', 'performance_schema', 'sys')"),
+        "{query}"
+    );
+}
+
+#[test]
+fn only_mysql_has_an_engine_check_and_a_statement_without_tables_needs_none() {
+    assert!(matches!(
+        nontransactional_engine_check("postgres", "UPDATE t SET v = 1"),
+        EngineCheck::NotApplicable
+    ));
+    assert!(matches!(
+        nontransactional_engine_check("mysql", "SELECT 1"),
+        EngineCheck::NotApplicable
+    ));
 }
