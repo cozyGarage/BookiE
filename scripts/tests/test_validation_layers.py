@@ -249,13 +249,23 @@ class LayerRunnerTests(unittest.TestCase):
             self.assertIn(text, security)
         self.assertNotIn("continue-on-error:", security)
         build = (workflows / "build-linux.yml").read_text()
-        for layer in ["quick", "full", "drivers", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring"]:
+        for layer in ["quick", "gtk-app", "drivers", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring"]:
             self.assertIn(f"run-test-layer.py {layer}", build)
         self.assertNotIn("if-no-files-found: ignore", build)
         contracts = (workflows / "linux-ci-contracts.yml").read_text()
         self.assertIn("run-test-layer.py harness", contracts)
         for script in ["preflight.sh", "ci-local.sh"]:
             self.assertIn("scripts/test-harness.sh", (ROOT / "scripts" / script).read_text())
+
+    def test_gtk_app_layer_targets_only_the_app_unit_and_lint_checks(self):
+        layer = runner.catalog()["gtk-app"]
+        self.assertEqual(layer["steps"][0]["argv"], ["bash", "scripts/ci-local.sh", "gtk-app"])
+        script = (ROOT / "scripts/ci-local.sh").read_text()
+        gtk_app = script.split("run_gtk_app() {", 1)[1].split("run_integration()", 1)[0]
+        self.assertIn("cargo clippy --locked -p bookie-app --all-targets", gtk_app)
+        self.assertIn("nextest run --locked -p bookie-app --lib --bins", gtk_app)
+        self.assertNotIn("--workspace", gtk_app)
+        self.assertNotIn("test-sandbox.sh", gtk_app)
 
     def test_driver_layer_timeout_fits_hosted_integration_job(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

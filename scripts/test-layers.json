@@ -62,6 +62,22 @@
         }
       ]
     },
+    "gtk-app": {
+      "purpose": "GTK app Clippy and library/binary unit regressions after the non-GTK preflight tier",
+      "prerequisites": "Rust 1.98; GTK 4.24 development stack",
+      "hosted_gate": "Build Linux / fast",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "gtk-app"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
     "change-contracts": {
       "purpose": "Run focused, required regressions for changed B3 value-path Rust files",
       "prerequisites": "Python 3; Rust 1.98; mapped crates' native development libraries",
