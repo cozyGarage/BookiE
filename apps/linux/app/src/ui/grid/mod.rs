@@ -119,6 +119,7 @@ pub struct TabGridContext {
     pub local_result_sort: bool,
     pub row_mutations_allowed: bool,
     pub local_result_view: Option<local_filter::LocalResultView>,
+    pub(crate) result_model: Option<gtk4::gio::ListModel>,
     pub sortable_result_columns: std::collections::HashSet<usize>,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the
@@ -198,8 +199,11 @@ pub fn build_column_view(
     } else {
         &result.columns
     };
-    let selection = gtk4::MultiSelection::new(Some(store.clone()));
-    if let Some(local_result_view) = &tab_ctx.local_result_view {
+    let model = tab_ctx.result_model.clone().unwrap_or_else(|| store.clone().upcast());
+    let selection = gtk4::MultiSelection::new(Some(model));
+    if tab_ctx.result_model.is_none()
+        && let Some(local_result_view) = &tab_ctx.local_result_view
+    {
         local_result_view.attach(store.clone(), selection.clone());
     }
     let column_view = gtk4::ColumnView::builder()
@@ -281,11 +285,13 @@ pub fn build_column_view(
         connection_id,
         database,
     );
-    row_find::install(
-        &column_view,
-        &grid_actions,
-        columns.iter().map(|column| column.name.clone()).collect(),
-    );
+    if tab_ctx.result_model.is_none() {
+        row_find::install(
+            &column_view,
+            &grid_actions,
+            columns.iter().map(|column| column.name.clone()).collect(),
+        );
+    }
     font_zoom::install(&column_view, &grid_actions);
     column_view.insert_action_group("grid", Some(&grid_actions));
 

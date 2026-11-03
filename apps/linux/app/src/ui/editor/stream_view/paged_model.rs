@@ -389,3 +389,42 @@ fn closing_a_model_does_not_wait_for_an_inflight_spool_read() {
         })
         .unwrap();
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn result_grid_uses_the_paged_model_for_its_rows() {
+    gtk4::init().unwrap();
+    let model = PagedModel::new(&[2], 1);
+    let result = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: Vec::new(),
+        rows: Vec::new().into(),
+        truncated: false,
+    });
+    let (view, selection) = crate::ui::grid::build_column_view(
+        &result,
+        &[],
+        "",
+        None,
+        None,
+        None,
+        None,
+        None,
+        crate::ui::grid::TabGridContext {
+            result_model: Some(model.clone().upcast()),
+            ..Default::default()
+        },
+        None,
+        std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+    );
+    assert_eq!(selection.n_items(), 2);
+    assert_eq!(view.model().unwrap().n_items(), 2);
+    assert!(
+        selection
+            .item(0)
+            .unwrap()
+            .downcast::<RowObject>()
+            .unwrap()
+            .complete_cells()
+            .is_none()
+    );
+}
