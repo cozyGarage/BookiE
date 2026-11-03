@@ -62,9 +62,9 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     }
     let (remainder, query) = remainder.split_once('?').unwrap_or((remainder, ""));
     let option = query_option(driver_id, query)?;
-    let tls_mode = match option {
-        Some(UrlOption::Tls(mode)) => mode,
-        _ => TlsMode::Disabled,
+    let explicit_tls = match &option {
+        Some(UrlOption::Tls(mode)) => Some(*mode),
+        _ => None,
     };
     let socket = match option {
         Some(UrlOption::Socket(path)) => Some(path),
@@ -104,6 +104,8 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         None => split_host_port(host_port, default_port)?,
     };
     let database = decode_field(path, "database")?;
+    let local = socket.is_some() || is_loopback_host(&host);
+    let tls_mode = explicit_tls.unwrap_or(if local { TlsMode::Disabled } else { TlsMode::default() });
 
     let place = socket
         .as_ref()
@@ -137,7 +139,7 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         tls_client_key: None,
         read_only: false,
         auth_mode: AuthMode::Password,
-        environment: Environment::Local,
+        environment: if local { Environment::Local } else { Environment::Prod },
         ssh: None,
         last_opened_at: None,
         connect_timeout_secs: None,
@@ -146,6 +148,15 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     };
 
     Ok(ParsedConnectionUrl { connection, password })
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    let lowered = host.to_ascii_lowercase();
+    lowered == "localhost"
+        || lowered.ends_with(".localhost")
+        || lowered
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
 }
 
 enum UrlOption {

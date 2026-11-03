@@ -68,13 +68,63 @@ fn a_query_string_never_becomes_the_database_name() {
 }
 
 #[test]
-fn imported_urls_default_to_a_local_read_write_password_connection() {
-    let parsed = parse_connection_url("postgres://u@db.example.com/app").unwrap();
-    assert_eq!(parsed.connection.environment, Environment::Local);
-    assert_eq!(parsed.connection.auth_mode, AuthMode::Password);
-    assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::Disabled);
-    assert!(!parsed.connection.read_only);
-    assert!(parsed.connection.ssh.is_none());
+fn a_remote_url_without_a_tls_option_defaults_to_verified_tls_and_a_production_environment() {
+    for url in [
+        "postgres://u@db.example.com/app",
+        "mysql://u@10.0.0.5/app",
+        "postgres://u@[2001:db8::1]/app",
+        "redis://cache.internal:6379",
+        "mongodb://u@0.0.0.0/app",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::VerifyFull, "{url}");
+        assert!(parsed.connection.use_tls, "{url}");
+        assert_eq!(parsed.connection.environment, Environment::Prod, "{url}");
+        assert_eq!(parsed.connection.auth_mode, AuthMode::Password, "{url}");
+        assert!(!parsed.connection.read_only, "{url}");
+        assert!(parsed.connection.ssh.is_none(), "{url}");
+    }
+}
+
+#[test]
+fn a_loopback_url_without_a_tls_option_stays_a_local_cleartext_connection() {
+    for url in [
+        "postgres://u@localhost/app",
+        "postgres://u@LOCALHOST:5433/app",
+        "postgres://u@127.0.0.1/app",
+        "postgres://u@127.1.2.3/app",
+        "postgres://u@[::1]/app",
+        "mysql://u@dev.localhost/app",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.environment, Environment::Local, "{url}");
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::Disabled, "{url}");
+        assert!(!parsed.connection.use_tls, "{url}");
+    }
+}
+
+#[test]
+fn an_explicit_tls_option_is_kept_for_remote_and_loopback_hosts() {
+    let remote = parse_connection_url("postgres://u@db.example.com/app?sslmode=disable").unwrap();
+    assert_eq!(remote.connection.effective_tls_mode(), TlsMode::Disabled);
+    assert_eq!(remote.connection.environment, Environment::Prod);
+    let loopback = parse_connection_url("postgres://u@localhost/app?sslmode=require").unwrap();
+    assert_eq!(loopback.connection.effective_tls_mode(), TlsMode::Require);
+    assert_eq!(loopback.connection.environment, Environment::Local);
+}
+
+#[test]
+fn a_look_alike_host_is_not_treated_as_loopback() {
+    for url in [
+        "postgres://u@localhost.example.com/app",
+        "postgres://u@127.0.0.1.example.com/app",
+        "postgres://u@mylocalhost/app",
+        "postgres://u@128.0.0.1/app",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.environment, Environment::Prod, "{url}");
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::VerifyFull, "{url}");
+    }
 }
 
 #[test]
