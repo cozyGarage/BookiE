@@ -27,6 +27,15 @@ const SAFE_TABLE_FUNCTIONS: [&str; 22] = [
     "pragma_version",
 ];
 
+const SENSITIVE_SOURCES: [&str; 6] = [
+    "duckdb_secrets",
+    "duckdb_settings",
+    "duckdb_databases",
+    "duckdb_extensions",
+    "duckdb_temporary_files",
+    "pragma_database_list",
+];
+
 const BUILTIN_SCHEMAS: [&str; 2] = ["main", "system"];
 
 struct SourceFinder;
@@ -53,8 +62,15 @@ impl Visitor for SourceFinder {
                 name, args: Some(_), ..
             }
             | TableFactor::Function { name, .. } => !is_safe_table_function(name),
-            TableFactor::Table { name, args: None, .. } => names_a_path(name),
-            _ => false,
+            TableFactor::Table { name, args: None, .. } => names_a_path(name) || names_a_sensitive_source(name),
+            TableFactor::Derived { .. }
+            | TableFactor::NestedJoin { .. }
+            | TableFactor::Pivot { .. }
+            | TableFactor::Unpivot { .. }
+            | TableFactor::UnpivotExpr { .. }
+            | TableFactor::UNNEST { .. }
+            | TableFactor::MatchRecognize { .. } => false,
+            _ => true,
         };
         if foreign {
             ControlFlow::Break(())
@@ -85,11 +101,17 @@ fn is_safe_table_function(name: &ObjectName) -> bool {
 }
 
 fn names_a_path(name: &ObjectName) -> bool {
-    identifiers(name).any(|ident| match ident.quote_style {
+    identifiers(name).last().is_some_and(|ident| match ident.quote_style {
         Some('\'') => true,
         Some(_) => looks_like_a_path(&ident.value),
         None => false,
     })
+}
+
+fn names_a_sensitive_source(name: &ObjectName) -> bool {
+    identifiers(name)
+        .last()
+        .is_some_and(|ident| SENSITIVE_SOURCES.contains(&ident.value.to_ascii_lowercase().as_str()))
 }
 
 fn looks_like_a_path(name: &str) -> bool {

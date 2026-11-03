@@ -221,6 +221,12 @@ mod tests {
             "SELECT * FROM duckdb_temporary_files()",
             "SELECT * FROM x.unnest('x')",
             "SELECT * FROM other.range(5)",
+            "SELECT * FROM duckdb_secrets",
+            "SELECT * FROM duckdb_settings",
+            "SELECT * FROM main.duckdb_extensions",
+            "MERGE INTO t USING '/etc/x.csv' c ON t.id = c.id WHEN MATCHED THEN DELETE",
+            "MERGE INTO t USING read_avro('/x.avro') c ON t.id = c.id WHEN MATCHED THEN DELETE",
+            "UPDATE t SET v = 1 FROM '/etc/x.csv' c WHERE t.id = c.id",
         ] {
             let facts = classify(sql, "duckdb");
             assert!(facts.effects.contains(Effects::HOST_OR_FILE_ACCESS), "{sql}");
@@ -263,6 +269,8 @@ mod tests {
             "SELECT * FROM pragma_table_info('orders')",
             "SELECT * FROM main.range(5)",
             "SELECT * FROM duckdb_columns()",
+            "SELECT * FROM \"my.db\".main.orders",
+            "SELECT * FROM orders PIVOT (sum(v) FOR k IN ('a', 'b'))",
             "SELECT * FROM duckdb_functions()",
             "SELECT * FROM (VALUES (1, 'a')) AS t(a, b)",
             "SELECT * FROM orders o JOIN (VALUES (1, 'a')) v(a, b) ON v.a = o.id",
