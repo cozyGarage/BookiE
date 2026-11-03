@@ -9,6 +9,7 @@ From the repository root:
 ```bash
 node --test experiments/tauri-grid-prototype/frontend/grid.test.mjs
 cargo test --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --locked
+cargo deny --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --config deny.toml check advisories licenses
 cargo run --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --locked
 ```
 
