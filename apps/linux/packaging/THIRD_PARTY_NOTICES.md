@@ -8,24 +8,24 @@ This file records the license expressions declared by package authors and the co
 
 Packages:
 
-- `bookie-agentd 0.2.3`
-- `bookie-app 0.2.3`
-- `bookie-app-services 0.2.3`
-- `bookie-core 0.2.3`
-- `bookie-driver-clickhouse 0.2.3`
-- `bookie-driver-duckdb 0.2.3`
-- `bookie-driver-mongodb 0.2.3`
-- `bookie-driver-mssql 0.2.3`
-- `bookie-driver-mysql 0.2.3`
-- `bookie-driver-postgres 0.2.3`
-- `bookie-driver-redis 0.2.3`
-- `bookie-driver-sqlite 0.2.3`
-- `bookie-dump 0.2.3`
-- `bookie-mcp 0.2.3`
-- `bookie-policy 0.2.3`
-- `bookie-ssh 0.2.3`
-- `bookie-storage 0.2.3`
-- `bookie-transport 0.2.3`
+- `bookie-agentd 0.2.4`
+- `bookie-app 0.2.4`
+- `bookie-app-services 0.2.4`
+- `bookie-core 0.2.4`
+- `bookie-driver-clickhouse 0.2.4`
+- `bookie-driver-duckdb 0.2.4`
+- `bookie-driver-mongodb 0.2.4`
+- `bookie-driver-mssql 0.2.4`
+- `bookie-driver-mysql 0.2.4`
+- `bookie-driver-postgres 0.2.4`
+- `bookie-driver-redis 0.2.4`
+- `bookie-driver-sqlite 0.2.4`
+- `bookie-dump 0.2.4`
+- `bookie-mcp 0.2.4`
+- `bookie-policy 0.2.4`
+- `bookie-ssh 0.2.4`
+- `bookie-storage 0.2.4`
+- `bookie-transport 0.2.4`
 
 ```text
 # License
