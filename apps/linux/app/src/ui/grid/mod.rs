@@ -37,6 +37,7 @@ use column::{build_column, header_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
+pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_null_display, value_to_display_text};
 pub(crate) use value_viewer::present as present_value_viewer;
@@ -119,6 +120,8 @@ pub struct TabGridContext {
     pub local_result_sort: bool,
     pub row_mutations_allowed: bool,
     pub local_result_view: Option<local_filter::LocalResultView>,
+    pub(crate) result_model: Option<gtk4::gio::ListModel>,
+    pub(crate) row_visibility: Option<std::rc::Rc<dyn Fn(u32, bool)>>,
     pub sortable_result_columns: std::collections::HashSet<usize>,
     /// Names of columns that are part of a foreign key on this table.
     /// Marks the column header so a reference is visible before the
@@ -198,8 +201,11 @@ pub fn build_column_view(
     } else {
         &result.columns
     };
-    let selection = gtk4::MultiSelection::new(Some(store.clone()));
-    if let Some(local_result_view) = &tab_ctx.local_result_view {
+    let model = tab_ctx.result_model.clone().unwrap_or_else(|| store.clone().upcast());
+    let selection = gtk4::MultiSelection::new(Some(model));
+    if tab_ctx.result_model.is_none()
+        && let Some(local_result_view) = &tab_ctx.local_result_view
+    {
         local_result_view.attach(store.clone(), selection.clone());
     }
     let column_view = gtk4::ColumnView::builder()
@@ -225,6 +231,7 @@ pub fn build_column_view(
                 foreign_key_columns: tab_ctx.foreign_key_columns.clone(),
                 has_inbound_foreign_keys: tab_ctx.has_inbound_foreign_keys,
                 local_result_view: tab_ctx.local_result_view.clone(),
+                snapshot_export: tab_ctx.result_model.is_none(),
             },
         );
     }
@@ -281,11 +288,13 @@ pub fn build_column_view(
         connection_id,
         database,
     );
-    row_find::install(
-        &column_view,
-        &grid_actions,
-        columns.iter().map(|column| column.name.clone()).collect(),
-    );
+    if tab_ctx.result_model.is_none() {
+        row_find::install(
+            &column_view,
+            &grid_actions,
+            columns.iter().map(|column| column.name.clone()).collect(),
+        );
+    }
     font_zoom::install(&column_view, &grid_actions);
     column_view.insert_action_group("grid", Some(&grid_actions));
 

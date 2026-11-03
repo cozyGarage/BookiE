@@ -162,9 +162,9 @@ impl SqlEditor {
                     }
                 }
                 StatementOutcomeKind::Streamed(result)
-                    if !matches!(result.terminal, super::StreamTerminal::Loading) =>
+                    if matches!(result.terminal, super::StreamTerminal::Complete) =>
                 {
-                    if let Some(request) = result.export.clone() {
+                    if let Some(request) = result.export.clone().filter(|request| request.spool.is_some()) {
                         let action = gtk::gio::SimpleAction::new("all-query-rows", None);
                         let sender = self.grid_sender.clone();
                         action.connect_activate(move |_, _| {
@@ -172,7 +172,7 @@ impl SqlEditor {
                         });
                         actions.add_action(&action);
                         exports.append(
-                            Some(&crate::tr!("Export all query rows (run again)…")),
+                            Some(&crate::tr!("Export all rows from this result…")),
                             Some("editor-export.all-query-rows"),
                         );
                     }

@@ -124,10 +124,19 @@ pub(super) fn build_column(
     let column_info = info.clone();
     let column_is_editable = is_cell_editable(info);
     let tab_ctx_for_bind = tab_ctx.clone();
+    let row_positions = Rc::new(std::cell::RefCell::new(std::collections::HashMap::new()));
+    let positions_for_bind = row_positions.clone();
     factory.connect_bind(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
             return;
         };
+        if idx == 0
+            && let Some(visibility) = &tab_ctx_for_bind.row_visibility
+        {
+            let position = item.position();
+            positions_for_bind.borrow_mut().insert(item.as_ptr() as usize, position);
+            visibility(position, true);
+        }
         let Some(row) = item.item().and_downcast::<crate::ui::row_object::RowObject>() else {
             return;
         };
@@ -142,10 +151,16 @@ pub(super) fn build_column(
         );
     });
 
-    factory.connect_unbind(|_, item| {
+    let visibility = tab_ctx.row_visibility.clone();
+    factory.connect_unbind(move |_, item| {
         let Some(item) = item.downcast_ref::<gtk4::ListItem>() else {
             return;
         };
+        if let Some(visibility) = &visibility
+            && let Some(position) = row_positions.borrow_mut().remove(&(item.as_ptr() as usize))
+        {
+            visibility(position, false);
+        }
         let Some(child) = item.child() else { return };
         if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
             label.set_inline_editable(false);
@@ -239,6 +254,13 @@ fn bind_row_cell(
     context: &TabGridContext,
     column_is_editable: bool,
 ) {
+    if !row.cell_is_loaded(index) && !row.cell_is_partial(index) {
+        if let Some(label) = item.child().and_downcast::<gtk4::Label>() {
+            label.set_text(&crate::tr!("Loading…"));
+            POSITION_SLOT.set(&label, item.position());
+        }
+        return;
+    }
     row.with_cell_value(index, |source_value| {
         let identity = if context.tab_id.is_some() {
             Some(row.row_identity(&context.pk_col_indices))

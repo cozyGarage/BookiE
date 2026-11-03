@@ -17,11 +17,7 @@ use bookie_policy::{AuditReceipt, Audited, AuditedSession, PolicyGuard, Principa
 
 use super::{SqlEditor, SqlEditorInput};
 
-mod export_pages;
 mod toolbar;
-#[cfg(test)]
-pub(crate) use export_pages::query_cursor_export_factory_for_target;
-pub(crate) use export_pages::{StreamSession, query_cursor_export_factory};
 
 pub(crate) type SharedSession = Arc<tokio::sync::Mutex<Option<SessionHandle>>>;
 
@@ -261,10 +257,6 @@ impl StatementCursor {
         }
     }
 
-    pub(crate) async fn fetch_page(&self, control: &OperationControl) -> Result<QueryCursorPage, DriverError> {
-        self.fetch_page_with_audit(control).await.result
-    }
-
     pub(crate) async fn finish_with_audit(self, close_cursor: bool) -> Audited<()> {
         let StatementTarget::Session { shared, .. } = &self.target else {
             return audited_error(DriverError::Internal("cursor target is not a session".into()));
@@ -304,15 +296,6 @@ impl StatementCursor {
 }
 
 impl StatementTarget {
-    pub(crate) async fn open_query_cursor(
-        &self,
-        sql: &str,
-        params: &[Value],
-        control: &OperationControl,
-    ) -> Result<Option<StatementCursor>, DriverError> {
-        self.open_query_cursor_with_audit(sql, params, control).await.result
-    }
-
     pub(crate) async fn open_query_cursor_with_audit(
         &self,
         sql: &str,

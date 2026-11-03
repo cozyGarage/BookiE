@@ -35,8 +35,13 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     {
         page_switcher.add_titled(&page, Some("status"), &crate::tr!("Status"));
     }
-    if let Some(last) = page_switcher.last_child() {
-        page_switcher.set_visible_child(&last);
+    let initial = if matches!(result.terminal, StreamTerminal::Loading | StreamTerminal::Complete) {
+        page_switcher.first_child()
+    } else {
+        page_switcher.last_child()
+    };
+    if let Some(initial) = initial {
+        page_switcher.set_visible_child(&initial);
     }
     if let Some(sender) = sender {
         super::super::stream_view::install_page_loader(&page_switcher, result, outcome.identity, sender);
@@ -55,7 +60,25 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
         banner.set_revealed(true);
         holder.append(&banner);
     }
-    if let Some(request) = result.export.clone() {
+    append_stream_export(&holder, result, grid_sender);
+    let pager = super::super::stream_view::build_pager(&page_switcher);
+    holder.append(&pager);
+    if matches!(result.terminal, StreamTerminal::Complete) && sender.is_some() {
+        super::super::stream_view::install_continuous(&holder, &pager, &page_switcher, result, &target);
+    }
+    holder.append(&page_switcher);
+    holder.upcast()
+}
+
+fn append_stream_export(holder: &gtk::Box, result: &StreamedResult, grid_sender: &relm4::Sender<GridMsg>) {
+    if matches!(result.terminal, StreamTerminal::Loading) {
+        holder.append(&gtk::Label::new(Some(&crate::tr!(
+            "Export all rows is available when the query completes."
+        ))));
+    }
+    if matches!(result.terminal, StreamTerminal::Complete)
+        && let Some(request) = result.export.clone().filter(|request| request.spool.is_some())
+    {
         let export = gtk::Button::with_label(&crate::tr!("Export all rows…"));
         export.add_css_class("flat");
         export.connect_clicked({
@@ -65,13 +88,7 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
             }
         });
         holder.append(&export);
-        holder.append(&gtk::Label::new(Some(&crate::tr!(
-            "The query will run again through a guarded cursor."
-        ))));
     }
-    holder.append(&super::super::stream_view::build_pager(&page_switcher));
-    holder.append(&page_switcher);
-    holder.upcast()
 }
 
 pub(in crate::ui::editor) fn stream_page_container(
@@ -136,7 +153,14 @@ pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> St
         "{pages}",
         &crate::ui::count_format::format_thousands(u128::from(result.total_pages)),
     );
-    let received = format!("{rows} · {pages}");
+    let status = match result.terminal {
+        StreamTerminal::Loading => crate::tr!("Receiving…"),
+        StreamTerminal::Complete => crate::tr!("Complete"),
+        StreamTerminal::Cancelled => crate::tr!("Cancelled"),
+        StreamTerminal::TimedOut => crate::tr!("Timed out"),
+        StreamTerminal::Failed(_) => crate::tr!("Incomplete"),
+    };
+    let received = format!("{status} · {rows} · {pages}");
     if stream_retained_rows(result) == result.total_rows {
         return received;
     }

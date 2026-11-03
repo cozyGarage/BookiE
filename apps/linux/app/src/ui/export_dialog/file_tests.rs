@@ -110,7 +110,7 @@ fn a_guarded_query_export_finishes_its_source_after_writing() {
     let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let finished_source = finished.clone();
     let source = JobSource::Paged {
-        mode: super::super::PagedExportMode::GuardedQuery,
+        mode: super::super::PagedExportMode::StoredQuery,
         columns: vec![bookie_core::ColumnInfo {
             name: "id".into(),
             data_type: "BIGINT".into(),
@@ -163,7 +163,7 @@ fn a_cancelled_guarded_query_export_still_finishes_its_source() {
     let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let finished_source = finished.clone();
     let source = JobSource::Paged {
-        mode: super::super::PagedExportMode::GuardedQuery,
+        mode: super::super::PagedExportMode::StoredQuery,
         columns: vec![bookie_core::ColumnInfo {
             name: "id".into(),
             data_type: "BIGINT".into(),
@@ -213,7 +213,7 @@ fn a_failed_guarded_query_export_finishes_its_source_and_keeps_the_source_error(
     let finished = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let finished_source = finished.clone();
     let source = JobSource::Paged {
-        mode: super::super::PagedExportMode::GuardedQuery,
+        mode: super::super::PagedExportMode::StoredQuery,
         columns: Vec::new(),
         total: None,
         open: Arc::new(move |_| {

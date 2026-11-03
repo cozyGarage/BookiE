@@ -57,7 +57,6 @@ use crate::ui::grid::GridMsg;
 pub use completion::{SchemaIndex, SchemaRequest};
 pub(crate) use completion_identifiers::catalog_reference;
 pub use schema::derive_tab_label;
-pub(crate) use session_mode::{StreamSession, query_cursor_export_factory};
 pub use statement_cursor::grammar_for;
 
 use outcomes::{
@@ -1040,7 +1039,6 @@ impl SqlEditor {
             },
         );
 
-        let export_origin = origin.clone();
         let export_suggested_name = export_name_for_query(&trimmed);
         let driver_id = self
             .executions
@@ -1051,7 +1049,6 @@ impl SqlEditor {
         let stream_spool_manager = self.database.stream_result_spool_manager();
         let target = self.statement_target(conn, Some(guard));
         let lexing_source = self.lexing_source();
-        let export_session = StreamSession::of(&target);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -1069,17 +1066,13 @@ impl SqlEditor {
                     let page_sender = sender_clone.clone();
                     let stream_update = move |update| {
                         let sender = page_sender.clone();
-                        let export_origin = export_origin.clone();
                         let export_driver_id = export_driver_id.clone();
                         let export_suggested_name = export_suggested_name.clone();
-                        let export_session = export_session.clone();
                         Box::pin(async move {
                             match update {
                                 StreamUpdate::Started {
                                     identity,
                                     sql_preview,
-                                    sql,
-                                    params,
                                     spool,
                                 } => {
                                     let (accepted, delivered) = tokio::sync::oneshot::channel();
@@ -1088,16 +1081,9 @@ impl SqlEditor {
                                             generation,
                                             identity,
                                             sql_preview,
-                                            export_query: export_origin.map(|origin| {
-                                                crate::ui::export_dialog::StreamExportQuery {
-                                                    origin,
-                                                    driver_id: export_driver_id.clone(),
-                                                    sql,
-                                                    params,
-                                                    timeout_secs,
-                                                    suggested_name: export_suggested_name.clone(),
-                                                    session: export_session.clone(),
-                                                }
+                                            export_query: Some(crate::ui::export_dialog::StreamExportQuery {
+                                                driver_id: export_driver_id.clone(),
+                                                suggested_name: export_suggested_name.clone(),
                                             }),
                                             spool,
                                             accepted,

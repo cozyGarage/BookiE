@@ -562,24 +562,25 @@ impl App {
     }
 
     pub(super) fn on_export_streamed_results(&self, request: crate::ui::export_dialog::StreamExportRequest) {
-        let Some(connection) = request.query.origin.connection(&self.database) else {
-            self.show_toast(&crate::tr!("The connection for this result is no longer available."));
+        let Some(spool) = request.spool else {
+            self.show_toast(&crate::tr!("The complete query result is no longer available."));
             return;
         };
+        let fetcher =
+            crate::ui::export_dialog::spool_export_factory(spool, request.columns.clone(), request.total_rows);
         let result = QueryResult {
             columns: request.columns,
             rows: Vec::new().into(),
             truncated: false,
         };
-        let fetcher = crate::ui::editor::query_cursor_export_factory(connection, request.query.clone());
         crate::ui::export_dialog::present_with_format(
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
-                scope: crate::ui::export_dialog::ExportScope::QueryRerun,
+                scope: crate::ui::export_dialog::ExportScope::QueryStored,
                 paged: Some(crate::ui::export_dialog::PagedExport {
-                    mode: crate::ui::export_dialog::PagedExportMode::GuardedQuery,
-                    total_rows: None,
+                    mode: crate::ui::export_dialog::PagedExportMode::StoredQuery,
+                    total_rows: Some(request.total_rows),
                     open: fetcher,
                 }),
                 result: std::sync::Arc::new(result),

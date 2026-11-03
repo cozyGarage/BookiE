@@ -1,6 +1,8 @@
 mod file;
 mod scope;
+mod spool;
 pub(crate) use scope::ExportScope;
+pub(crate) use spool::spool_export_factory;
 
 use bookie_core::QueryResult;
 use bookie_core::export::{ExportError, RowPage};
@@ -44,7 +46,7 @@ impl PageFetcher {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PagedExportMode {
     FullTable,
-    GuardedQuery,
+    StoredQuery,
 }
 
 #[derive(Clone)]
@@ -56,19 +58,16 @@ pub(crate) struct PagedExport {
 
 #[derive(Debug, Clone)]
 pub(crate) struct StreamExportQuery {
-    pub(crate) origin: crate::services::catalog::CatalogOrigin,
     pub(crate) driver_id: String,
-    pub(crate) sql: String,
-    pub(crate) params: Vec<bookie_core::Value>,
-    pub(crate) timeout_secs: u32,
     pub(crate) suggested_name: String,
-    pub(crate) session: Option<crate::ui::editor::StreamSession>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct StreamExportRequest {
     pub(crate) query: StreamExportQuery,
     pub(crate) columns: Vec<bookie_core::ColumnInfo>,
+    pub(crate) spool: Option<bookie_app_services::stream_result_spool::StreamResultSpool>,
+    pub(crate) total_rows: usize,
 }
 
 pub(crate) struct ExportRequest {
@@ -175,9 +174,9 @@ impl ExportFormat {
 fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String {
     match paged {
         Some(PagedExport {
-            mode: PagedExportMode::GuardedQuery,
+            mode: PagedExportMode::StoredQuery,
             ..
-        }) => crate::tr!("All rows from a fresh guarded run of this query"),
+        }) => crate::tr!("All rows from this completed query result"),
         Some(PagedExport {
             total_rows: Some(total),
             ..

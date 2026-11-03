@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BookiE frontend experiment</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="main.mjs"></script>
+</head>
+<body>
+  <main>
+    <header class="app-header">
+      <div><span class="brand">BookiE</span><span class="badge">Synthetic data prototype</span></div>
+      <span class="muted">Frontend evaluation</span>
+    </header>
+    <section class="welcome" aria-labelledby="welcome-title">
+      <div>
+        <p class="eyebrow">YOUR WORKSPACE</p>
+        <h1 id="welcome-title">Your databases, in one place.</h1>
+        <p class="muted">Explore the layout and a large typed result. This prototype does not connect to a database.</p>
+        <button id="show-result" type="button">Open sample result</button>
+      </div>
+      <article class="card">
+        <p class="eyebrow">SAMPLE CONNECTION</p>
+        <h2>PostgreSQL</h2>
+        <p class="muted">A synthetic connection for layout evaluation</p>
+        <span class="badge">No network access</span>
+      </article>
+    </section>
+    <section id="result" class="result" hidden aria-labelledby="result-title">
+      <div class="result-head">
+        <div><p class="eyebrow">QUERY RESULT</p><h2 id="result-title">One million synthetic rows</h2></div>
+        <span id="status" role="status" aria-live="polite">Loading…</span>
+      </div>
+      <div class="columns" aria-hidden="true"><span>Row</span><span>Value</span><span>Label</span><span>State</span></div>
+      <div id="viewport" class="viewport" role="grid" aria-label="Synthetic typed results" aria-rowcount="1000000" aria-colcount="4" tabindex="0">
+        <div id="height" class="height"><div id="rows" class="rows"></div></div>
+      </div>
+      <p class="muted footnote">Scroll or use Page Up and Page Down. Integer values are transported as text to preserve their exact digits.</p>
+    </section>
+  </main>
+</body>
+</html>

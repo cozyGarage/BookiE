@@ -2,6 +2,61 @@ use super::*;
 use gtk::glib;
 
 #[test]
+#[ignore = "requires an isolated GTK display"]
+fn source_lookup_supports_alternate_models_and_refuses_unloaded_cells() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![Value::Text(
+        "whole".repeat(3000),
+    )]));
+    rows.append(&crate::ui::row_object::RowObject::unloaded(1));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    assert_eq!(source_value_at(&view, 0, 0), Some(Value::Text("whole".repeat(3000))));
+    assert_eq!(source_value_at(&view, 1, 0), None);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn copying_a_column_refuses_unloaded_rows() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::unloaded(1));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    assert_eq!(values_for_column_menu(&view, 0, 0), None);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn virtual_grid_disables_snapshot_export() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    let (sender, receiver) = relm4::channel();
+    install_grid_context_menus(
+        &view,
+        sender,
+        &[],
+        false,
+        "postgres".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: false,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            snapshot_export: false,
+        },
+    );
+    view.activate_action("cell.export", None).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    assert!(runtime.block_on(async {
+        tokio::time::timeout(std::time::Duration::from_millis(20), receiver.recv())
+            .await
+            .is_err()
+    }));
+}
+
+#[test]
 fn an_empty_read_only_grid_menu_does_not_offer_insert_row() {
     assert_eq!(empty_grid_menu(false).n_items(), 1);
 }
@@ -253,6 +308,7 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
             foreign_key_columns: ["linked".into()].into(),
             has_inbound_foreign_keys: false,
             local_result_view: Some(local.clone()),
+            snapshot_export: true,
         },
     );
     let cells = Rc::new(std::cell::RefCell::new(Vec::new()));

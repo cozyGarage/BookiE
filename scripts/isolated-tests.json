@@ -590,12 +590,67 @@
     [
       "bookie-app",
       "--lib",
-      "ui::editor::outcomes::tests::export_partial_view::exporting_after_partial_view_uses_the_guarded_query_and_its_bind_values"
+      "ui::editor::outcomes::tests::export_partial_view::an_incomplete_stream_does_not_offer_full_result_export"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::outcomes::tests::export_partial_view::a_completed_stream_offers_its_saved_result_for_export"
     ],
     [
       "bookie-app",
       "--lib",
       "ui::editor::outcomes::tests::streamed_result_widgets_keep_pages_visible_during_loading_and_terminal_states"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::loading_a_page_preserves_the_selected_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::evicting_a_page_preserves_selection"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::result_grid_uses_the_paged_model_for_its_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::result_grid_reports_rows_when_realized_and_released"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::realized_grid_rows_load_their_spooled_values"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::paged_model::tests::failed_spool_read_shows_status_and_retry_loads_the_page"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::stream_view::continuous::tests::continuous_view_loads_and_displays_spooled_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::source_lookup_supports_alternate_models_and_refuses_unloaded_cells"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::copying_a_column_refuses_unloaded_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::virtual_grid_disables_snapshot_export"
     ],
     [
       "bookie-app",

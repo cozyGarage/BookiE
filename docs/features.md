@@ -21,6 +21,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 ## Connect
 
+- The welcome screen offers up to three recently opened connections, with their driver and environment shown on each card.
 - Saved connections keep passwords in the desktop keyring (Secret Service), not in BookiE's own files.
 - SSH tunnels use the built-in client or the system OpenSSH. BookiE asks before trusting an unknown host key.
 - TLS has several strictness levels, up to checking both the certificate authority and the host name.
@@ -67,7 +68,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Syntax highlighting, code folding and a side-by-side split of the same query.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
 - Bound parameters: Write `:name` in queries; BookiE prompts for typed values before execution without string concatenation.
-- Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL. The newest page and the page currently being viewed remain in memory while later pages arrive; if a stream times out or is cancelled, received pages stay selected.
+- Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL. The first page stays selected while rows arrive, and the result shows whether it is receiving, complete or incomplete. The newest page and the page currently being viewed remain in memory while later pages arrive; if a stream times out or is cancelled, received pages stay selected. After successful completion, Export all rows reads the stored result without executing the query again.
 - Local sort and filter: Sorting and filtering loaded query results are local and do not re-execute SQL.
 - Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
 - Visual explain plans: PostgreSQL displays execution trees with relative cost bars; SQLite displays indented trees.

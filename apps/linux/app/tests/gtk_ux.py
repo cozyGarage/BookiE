@@ -2030,6 +2030,7 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing(f"Rows 1-{page_size:,}", timeout=120)
         wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
+        ui.wait_for_node_containing(f"Complete · Received {stream_rows:,} rows", timeout=180)
         scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
         ui.invoke(ui.wait_for_node(name="Next page", role=pyatspi.ROLE_PUSH_BUTTON))
@@ -2038,6 +2039,27 @@ GLib.MainLoop().run()
         wait_for_visible_marker(first_run_marker)
         ui.invoke(ui.wait_for_node(name="Previous page", role=pyatspi.ROLE_PUSH_BUTTON))
         wait_for_node_showing(f"Rows 1-{page_size:,}")
+        wait_for_visible_cell_value("1")
+        wait_for_visible_marker(first_run_marker)
+        ui.invoke(ui.wait_for_node(name="Continuous scrolling"))
+        wait_for_visible_cell_value("1")
+        deadline = time.monotonic() + 30
+        visible = None
+        while visible is None and time.monotonic() < deadline:
+            visible = next((
+                node for node in ui.descendants(ui.application_node())
+                if ui.node_name(node) == "1" and ui.node_role(node) == pyatspi.ROLE_LABEL
+                and node.getState().contains(pyatspi.STATE_SHOWING)
+            ), None)
+            if visible is None:
+                time.sleep(ui.POLL_SECONDS)
+        assert visible is not None, "continuous grid did not display its first row"
+        extents = visible.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2, button=1)
+        ui.press_x11_key("End", ("Control_L",))
+        wait_for_visible_cell_value(str(stream_rows))
+        wait_for_visible_marker(first_run_marker)
+        ui.press_x11_key("Home", ("Control_L",))
         wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
 

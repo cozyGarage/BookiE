@@ -41,6 +41,7 @@ pub(super) struct GridMenuOptions {
     pub(super) foreign_key_columns: std::collections::HashSet<String>,
     pub(super) has_inbound_foreign_keys: bool,
     pub(super) local_result_view: Option<LocalResultView>,
+    pub(super) snapshot_export: bool,
 }
 
 pub(super) fn install_grid_context_menus(
@@ -299,13 +300,7 @@ pub(super) fn install_grid_context_menus(
                 {
                     let (_, row_key) = cell_row_identity(&slot.widget);
                     if row_key.is_empty() {
-                        let Some(value) = view
-                            .model()
-                            .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
-                            .and_then(|selection| selection.model())
-                            .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok())
-                            .and_then(|store| store.source_value_at(position(slot), slot.col_index))
-                        else {
+                        let Some(value) = source_value_at(&view, position(slot), slot.col_index) else {
                             return;
                         };
                         value_viewer::present(&view, &slot.column_name, value, None);
@@ -502,6 +497,13 @@ pub(super) fn install_grid_context_menus(
     ]);
     group.add_action(&reference_action);
     group.add_action(&show_referencing_action);
+    if !options.snapshot_export
+        && let Some(action) = group
+            .lookup_action("export")
+            .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+    {
+        action.set_enabled(false);
+    }
     column_view.insert_action_group("cell", Some(&group));
     if let Some(action) = group
         .lookup_action("copy-in-clause")
@@ -750,13 +752,15 @@ fn filter_by_value_action(
 }
 
 fn source_value_at(view: &gtk::ColumnView, position: u32, column: usize) -> Option<Value> {
-    view.model()?
-        .downcast::<gtk::MultiSelection>()
+    let model = view.model()?.downcast::<gtk::MultiSelection>().ok()?.model()?;
+    if let Some(store) = model.downcast_ref::<crate::ui::row_store::RowStore>() {
+        return store.source_value_at(position, column);
+    }
+    model
+        .item(position)?
+        .downcast::<crate::ui::row_object::RowObject>()
         .ok()?
-        .model()?
-        .downcast::<crate::ui::row_store::RowStore>()
-        .ok()?
-        .source_value_at(position, column)
+        .with_cell_value(column, Clone::clone)
 }
 
 fn copy_rows_action<F>(
@@ -994,7 +998,13 @@ fn rows_for_menu(view: &gtk::ColumnView, clicked: u32) -> Option<Vec<Vec<Value>>
 fn values_for_column_menu(view: &gtk::ColumnView, clicked: u32, column: usize) -> Option<Vec<Vec<Value>>> {
     selected_row_positions(view, clicked)
         .into_iter()
-        .map(|position| row_at(view, position)?.get(column).cloned().map(|value| vec![value]))
+        .map(|position| {
+            let row = row_object_at(view, position)?;
+            if !row.cell_is_loaded(column) {
+                return None;
+            }
+            row.with_cell_value(column, |value| vec![value.clone()])
+        })
         .collect()
 }
 fn selected_row_positions(view: &gtk::ColumnView, clicked: u32) -> Vec<u32> {
