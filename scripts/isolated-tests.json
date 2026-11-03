@@ -320,6 +320,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::a_page_reload_retires_a_pending_cell_value_request"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::tests::browse_page_fetch_waits_until_the_new_columns_are_applied"
     ],
     [

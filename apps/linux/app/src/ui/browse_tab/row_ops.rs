@@ -605,6 +605,8 @@ impl BrowseTab {
 
     pub(super) fn emit_fetch_page(&self, sender: &ComponentSender<Self>) {
         self.page_requests.invalidate();
+        self.cell_value_requests.invalidate();
+        self.pending_cell_edit.borrow_mut().take();
         let _ = sender.output(BrowseTabOutput::FetchPage);
     }
 
