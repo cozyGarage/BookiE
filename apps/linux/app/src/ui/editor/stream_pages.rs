@@ -4,12 +4,7 @@ use std::sync::{Arc, Mutex, PoisonError, Weak};
 use bookie_app_services::stream_result_spool::StreamResultSpool;
 use bookie_core::{ColumnInfo, MAX_QUERY_RESULT_BYTES, QueryResult};
 
-#[derive(Debug, PartialEq, Eq)]
-pub(super) enum PageAppendError {
-    OutOfOrder,
-    SchemaChanged,
-    InvalidRowWidth,
-}
+pub(super) use bookie_app_services::stream_page_validation::PageAppendError;
 
 #[derive(Debug, Clone)]
 pub enum StreamTerminal {
@@ -93,15 +88,12 @@ impl StreamPageCache {
         result: Arc<QueryResult>,
         spooled: bool,
     ) -> Result<(), PageAppendError> {
-        if index != self.next_page {
-            return Err(PageAppendError::OutOfOrder);
-        }
-        if result.rows.iter().any(|row| row.len() != result.columns.len()) {
-            return Err(PageAppendError::InvalidRowWidth);
-        }
-        if self.columns.as_ref().is_some_and(|columns| *columns != result.columns) {
-            return Err(PageAppendError::SchemaChanged);
-        }
+        bookie_app_services::stream_page_validation::validate_page(
+            index,
+            self.next_page,
+            self.columns.as_deref(),
+            &result,
+        )?;
         if self.columns.is_none() {
             self.columns = Some(result.columns.clone());
         }
