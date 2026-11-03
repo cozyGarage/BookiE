@@ -204,7 +204,9 @@ jobs:
           ref: ${{ needs.pin-revision.outputs.revision }}
           persist-credentials: false
       - name: Build versioned executable test bundles
-        run: bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds"
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds"
       - name: Upload source-pinned default bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
