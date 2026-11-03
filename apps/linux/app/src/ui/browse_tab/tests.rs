@@ -277,12 +277,7 @@ fn browse_page_fetch_waits_until_the_new_columns_are_applied() {
             page_size: 100,
             initial_offset: 0,
             initial_sort: None,
-            persistence: crate::services::persistence_stores::PersistenceStores {
-                column_widths: None,
-                filter_settings: None,
-                csv_import_mappings: None,
-                named_filter_presets: None,
-            },
+            persistence: empty_persistence(),
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         })
         .forward(&output_sender, |output| output);
@@ -351,12 +346,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
             page_size: 100,
             initial_offset: 20_000,
             initial_sort: None,
-            persistence: crate::services::persistence_stores::PersistenceStores {
-                column_widths: None,
-                filter_settings: None,
-                csv_import_mappings: None,
-                named_filter_presets: None,
-            },
+            persistence: empty_persistence(),
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         })
         .forward(&output_sender, |output| output);
@@ -432,12 +422,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
             page_size: 2,
             initial_offset: 0,
             initial_sort: None,
-            persistence: crate::services::persistence_stores::PersistenceStores {
-                column_widths: None,
-                filter_settings: None,
-                csv_import_mappings: None,
-                named_filter_presets: None,
-            },
+            persistence: empty_persistence(),
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         })
         .forward(&output_sender, |output| output);
@@ -1156,12 +1141,7 @@ fn a_closed_browse_tab_releases_its_root_widget() {
             page_size: 100,
             initial_offset: 0,
             initial_sort: None,
-            persistence: crate::services::persistence_stores::PersistenceStores {
-                column_widths: None,
-                filter_settings: None,
-                csv_import_mappings: None,
-                named_filter_presets: None,
-            },
+            persistence: empty_persistence(),
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         })
         .detach();
@@ -1172,4 +1152,13 @@ fn a_closed_browse_tab_releases_its_root_widget() {
         std::time::Duration::from_millis(100),
     );
     assert!(root.upgrade().is_none(), "the closed browse tab root is still alive");
+}
+
+fn empty_persistence() -> crate::services::persistence_stores::PersistenceStores {
+    crate::services::persistence_stores::PersistenceStores {
+        column_widths: None,
+        filter_settings: None,
+        csv_import_mappings: None,
+        named_filter_presets: None,
+    }
 }
