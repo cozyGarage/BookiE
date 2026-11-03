@@ -11,6 +11,7 @@ fn a_filter_is_ignored_when_the_driver_cannot_filter_a_browse() {
     relm4::gtk::init().unwrap();
     let controller = BrowseTab::builder()
         .launch(BrowseTabInit {
+            change_trackers: Default::default(),
             tab_id: Uuid::new_v4(),
             schema: None,
             table: "db0".into(),
@@ -63,6 +64,7 @@ fn a_saved_filter_is_not_restored_when_the_driver_cannot_filter_a_browse() {
     assert_eq!(store.load(connection_id, None, "db0").len(), 1);
     let controller = BrowseTab::builder()
         .launch(BrowseTabInit {
+            change_trackers: Default::default(),
             tab_id: Uuid::new_v4(),
             schema: None,
             table: "db0".into(),

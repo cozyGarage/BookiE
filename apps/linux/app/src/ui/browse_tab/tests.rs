@@ -265,6 +265,7 @@ fn browse_page_fetch_waits_until_the_new_columns_are_applied() {
     });
     let mut controller = BrowseTab::builder()
         .launch(BrowseTabInit {
+            change_trackers: Default::default(),
             tab_id: Uuid::new_v4(),
             schema: Some("public".into()),
             table: "customers".into(),
@@ -338,6 +339,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
     relm4::spawn_local(async move { while output_receiver.recv().await.is_some() {} });
     let mut controller = BrowseTab::builder()
         .launch(BrowseTabInit {
+            change_trackers: Default::default(),
             tab_id: Uuid::new_v4(),
             schema: Some("public".into()),
             table: "items".into(),
@@ -418,6 +420,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
     relm4::spawn_local(async move { while output_receiver.recv().await.is_some() {} });
     let mut controller = BrowseTab::builder()
         .launch(BrowseTabInit {
+            change_trackers: Default::default(),
             tab_id: Uuid::new_v4(),
             schema: Some("main".into()),
             table: "items".into(),
@@ -1141,6 +1144,7 @@ fn a_closed_browse_tab_releases_its_root_widget() {
     relm4::gtk::init().unwrap();
     let controller = BrowseTab::builder()
         .launch(BrowseTabInit {
+            change_trackers: Default::default(),
             tab_id: Uuid::new_v4(),
             schema: Some("public".into()),
             table: "customers".into(),

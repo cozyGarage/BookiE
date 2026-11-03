@@ -3,42 +3,34 @@ pub use bookie_app_services::change_tracker::*;
 use std::cell::RefCell;
 use uuid::Uuid;
 
-thread_local! {
-    static REGISTRY: RefCell<ChangeTrackerRegistry> = RefCell::new(ChangeTrackerRegistry::new());
-}
+#[derive(Clone, Debug, Default)]
+pub struct WorkspaceChangeTrackers(std::rc::Rc<RefCell<ChangeTrackerRegistry>>);
 
-pub fn with_tab<F, R>(tab_id: Uuid, f: F) -> Option<R>
-where
-    F: FnOnce(&mut TabChangeTracker) -> R,
-{
-    REGISTRY.with(|reg| reg.borrow_mut().with_tab(tab_id, f))
-}
-
-pub fn with_tab_ref<F, R>(tab_id: Uuid, f: F) -> Option<R>
-where
-    F: FnOnce(&TabChangeTracker) -> R,
-{
-    REGISTRY.with(|reg| reg.borrow().with_tab_ref(tab_id, f))
-}
-
-pub fn open_tab(tab_id: Uuid) {
-    REGISTRY.with(|reg| reg.borrow_mut().open_tab(tab_id));
-}
-
-pub fn close_tab(tab_id: Uuid) {
-    REGISTRY.with(|reg| reg.borrow_mut().close_tab(tab_id));
-}
-
-pub fn any_pending_in(ids: impl IntoIterator<Item = Uuid>) -> bool {
-    REGISTRY.with(|reg| reg.borrow().any_pending_in(ids))
-}
-
-pub fn pending_among(ids: impl IntoIterator<Item = Uuid>) -> Vec<Uuid> {
-    REGISTRY.with(|reg| reg.borrow().pending_among(ids))
-}
-
-pub fn pending_tabs_for(tab_ids: &std::collections::HashSet<Uuid>) -> Vec<Uuid> {
-    REGISTRY.with(|reg| reg.borrow().pending_tabs_for(tab_ids))
+impl WorkspaceChangeTrackers {
+    pub fn open_tab(&self, id: Uuid) {
+        self.0.borrow_mut().open_tab(id);
+    }
+    pub fn close_tab(&self, id: Uuid) {
+        self.0.borrow_mut().close_tab(id);
+    }
+    pub fn with_tab<R>(&self, id: Uuid, f: impl FnOnce(&mut TabChangeTracker) -> R) -> Option<R> {
+        self.0.borrow_mut().with_tab(id, f)
+    }
+    pub fn with_tab_ref<R>(&self, id: Uuid, f: impl FnOnce(&TabChangeTracker) -> R) -> Option<R> {
+        self.0.borrow().with_tab_ref(id, f)
+    }
+    pub fn any_pending_in(&self, ids: impl IntoIterator<Item = Uuid>) -> bool {
+        self.0.borrow().any_pending_in(ids)
+    }
+    pub fn pending_among(&self, ids: impl IntoIterator<Item = Uuid>) -> Vec<Uuid> {
+        self.0.borrow().pending_among(ids)
+    }
+    pub fn pending_tabs_for(&self, ids: &std::collections::HashSet<Uuid>) -> Vec<Uuid> {
+        self.0.borrow().pending_tabs_for(ids)
+    }
+    pub fn subscribe(&self, id: Uuid, sender: relm4::Sender<TrackerEvent>) {
+        self.with_tab(id, |tracker| tracker.subscribe(RelmTrackerEvents(sender)));
+    }
 }
 
 #[derive(Debug)]
@@ -50,14 +42,30 @@ impl TrackerEventSink for RelmTrackerEvents {
     }
 }
 
-pub fn subscribe(tab_id: uuid::Uuid, sender: relm4::Sender<TrackerEvent>) {
-    with_tab(tab_id, |tracker| tracker.subscribe(RelmTrackerEvents(sender)));
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use bookie_core::Value;
+
+    #[test]
+    fn workspace_trackers_keep_edits_separate_and_release_them() {
+        let id = uuid::Uuid::new_v4();
+        let first = WorkspaceChangeTrackers::default();
+        let second = WorkspaceChangeTrackers::default();
+        first.open_tab(id);
+        second.open_tab(id);
+        first.with_tab(id, |tracker| {
+            tracker.track_insert(vec![Value::Int(4)]);
+        });
+        assert!(first.any_pending_in([id]));
+        assert!(!second.any_pending_in([id]));
+        let shared = first.clone();
+        drop(first);
+        assert!(shared.any_pending_in([id]));
+        shared.close_tab(id);
+        assert!(shared.with_tab_ref(id, |_| ()).is_none());
+        assert!(second.with_tab_ref(id, |_| ()).is_some());
+    }
 
     #[tokio::test]
     async fn a_deleted_rows_unique_value_can_be_added_again_in_the_same_save() {
@@ -102,12 +110,13 @@ mod tests {
 
     #[tokio::test]
     async fn the_app_bridge_delivers_row_and_pending_count_events_to_relm() {
+        let store = WorkspaceChangeTrackers::default();
         let id = uuid::Uuid::new_v4();
         let (sender, receiver) = relm4::channel();
-        open_tab(id);
-        subscribe(id, sender);
+        store.open_tab(id);
+        store.subscribe(id, sender);
         let key = RowKey::from_pk_values(&[Value::Int(7)]).unwrap();
-        with_tab(id, |tracker| {
+        store.with_tab(id, |tracker| {
             tracker.track_cell_edit(key.clone(), 1, Value::Int(1), Value::Int(2))
         });
         let event = tokio::time::timeout(std::time::Duration::from_secs(5), receiver.recv())
@@ -118,7 +127,7 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(event, Some(TrackerEvent::PendingCountChanged(1))));
-        close_tab(id);
-        assert!(with_tab_ref(id, |_| ()).is_none());
+        store.close_tab(id);
+        assert!(store.with_tab_ref(id, |_| ()).is_none());
     }
 }

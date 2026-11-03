@@ -61,6 +61,7 @@ fn projection_for_loaded_page(result: &QueryResult, projection: Option<Vec<usize
 }
 
 pub struct BrowseTabInit {
+    pub change_trackers: crate::services::change_tracker::WorkspaceChangeTrackers,
     pub tab_id: Uuid,
     pub schema: Option<String>,
     pub table: String,
@@ -77,6 +78,7 @@ pub struct BrowseTabInit {
 }
 
 pub struct BrowseTab {
+    change_trackers: crate::services::change_tracker::WorkspaceChangeTrackers,
     tab_id: Uuid,
     schema: Option<String>,
     table: String,
@@ -262,7 +264,7 @@ impl BrowseTab {
     pub fn row_cells_at(&self, position: u32) -> Option<Vec<Value>> {
         let mut cells = self.row_object_at(position)?.complete_cells()?;
         if let Some((key, _)) = self.row_key_at(position) {
-            crate::services::change_tracker::with_tab_ref(self.tab_id, |tracker| {
+            self.change_trackers.with_tab_ref(self.tab_id, |tracker| {
                 for (col, cell) in cells.iter_mut().enumerate() {
                     let current = tracker.current_cell_value(&key, col, cell).clone();
                     *cell = current;
@@ -324,7 +326,7 @@ impl SimpleComponent for BrowseTab {
         // Open this tab's pending-changeset tracker. Closed in
         // workspace_tabs::close_workspace_tab_by_id when the tab is
         // removed. Idempotent — calling twice is a no-op.
-        crate::services::change_tracker::open_tab(init.tab_id);
+        init.change_trackers.open_tab(init.tab_id);
 
         // Restore the saved filter for this (connection, schema,
         // table) up front so both the model field and the inline
@@ -633,6 +635,7 @@ impl SimpleComponent for BrowseTab {
         relm4::spawn_local(grid_receiver.forward(grid_input, grid_messages::to_input));
 
         let model = BrowseTab {
+            change_trackers: init.change_trackers,
             tab_id: init.tab_id,
             schema: init.schema,
             table: init.table,
@@ -707,7 +710,7 @@ impl SimpleComponent for BrowseTab {
         // channel is leaked into the GTK main loop via spawn_local,
         // matching how the per-tab GridMsg channel above is wired.
         let (tracker_sender, tracker_receiver) = relm4::channel::<crate::services::change_tracker::TrackerEvent>();
-        crate::services::change_tracker::subscribe(init.tab_id, tracker_sender);
+        model.change_trackers.subscribe(init.tab_id, tracker_sender);
         let input_for_tracker = sender.input_sender().clone();
         relm4::spawn_local(tracker_receiver.forward(input_for_tracker, move |event| match event {
             crate::services::change_tracker::TrackerEvent::PendingCountChanged(n) => {
