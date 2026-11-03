@@ -177,7 +177,7 @@ fn write_event_for(intent: &AuditEvent, status: AuditTerminalStatus) -> AuditEve
 fn durable_append_fails_when_data_sync_fails() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("audit.jsonl");
-    let mut file = OpenOptions::new().create(true).append(true).open(path).unwrap();
+    let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
     let error = append_to_file_with_sync(
         &mut file,
         JournalTail {
@@ -189,7 +189,33 @@ fn durable_append_fails_when_data_sync_fails() {
         |_| Err(std::io::Error::other("injected sync failure")),
     );
 
-    assert!(error.is_err());
+    assert!(matches!(&error, Err(StorageError::NotDurable(message)) if message.contains("injected sync failure")));
+    let written = std::fs::read_to_string(path).unwrap();
+    assert_eq!(
+        written.lines().count(),
+        1,
+        "the record is on disk even though it was not synced"
+    );
+}
+
+#[test]
+fn a_failed_write_is_not_reported_as_written_but_not_durable() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    std::fs::write(&path, b"").unwrap();
+    let mut read_only = OpenOptions::new().read(true).open(&path).unwrap();
+    let error = append_to_file_with_sync(
+        &mut read_only,
+        JournalTail {
+            seq: 0,
+            hash: GENESIS_HASH.to_string(),
+        },
+        sample_event(Principal::human_gui()),
+        true,
+        |_| Ok(()),
+    );
+
+    assert!(matches!(error, Err(StorageError::Io(_))));
 }
 
 #[test]

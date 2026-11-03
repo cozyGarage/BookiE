@@ -460,7 +460,7 @@ fn append_to_file_with_sync(
     file.write_all(&line)?;
     file.flush()?;
     if durable {
-        sync_data(file)?;
+        sync_data(file).map_err(|error| StorageError::NotDurable(error.to_string()))?;
     }
     Ok(JournalTail { seq, hash })
 }
@@ -858,6 +858,7 @@ impl AuditSink for AuditJournal {
         self.append_record(event, durable).await.map_err(|error| match error {
             StorageError::UnresolvedWrite => AuditError::UnresolvedWrite,
             StorageError::WriteInFlight => AuditError::WriteInFlight,
+            StorageError::NotDurable(message) => AuditError::NotDurable(message),
             error => AuditError::Persistence(error.to_string()),
         })
     }

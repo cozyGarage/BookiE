@@ -561,24 +561,29 @@ impl PolicyGuard {
             if matches!(&result, Err(AuditError::UnresolvedWrite)) {
                 self.ctx.audit_state.disable_governed_writes();
             }
-            if self
-                .record_outcome(
-                    operation,
-                    AuditOutcome {
-                        terminal_status: AuditTerminalStatus::Denied,
-                        transaction_outcome: AuditTransactionOutcome::NotApplicable,
-                        rows_affected: None,
-                        error_category: Some(AuditErrorCategory::Policy),
-                        duration_ms: 0,
-                    },
-                )
-                .await
-                .is_err()
-            {
-                self.ctx.audit_state.disable_after_audit_failure();
-            }
+            self.close_denied_intent(operation).await;
+        } else if matches!(&result, Err(AuditError::NotDurable(_))) && self.intent_is_required() {
+            self.close_denied_intent(operation).await;
         }
         result
+    }
+
+    async fn close_denied_intent(&self, operation: &AuditOperation<'_>) {
+        let closed = self
+            .record_outcome(
+                operation,
+                AuditOutcome {
+                    terminal_status: AuditTerminalStatus::Denied,
+                    transaction_outcome: AuditTransactionOutcome::NotApplicable,
+                    rows_affected: None,
+                    error_category: Some(AuditErrorCategory::Policy),
+                    duration_ms: 0,
+                },
+            )
+            .await;
+        if closed.is_err() {
+            self.ctx.audit_state.disable_after_audit_failure();
+        }
     }
 
     async fn record_outcome(&self, operation: &AuditOperation<'_>, outcome: AuditOutcome) -> Result<(), AuditError> {

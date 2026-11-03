@@ -420,6 +420,7 @@ impl Connection for AmbiguousWriteConn {
 struct SequenceAuditSink {
     failures: Mutex<Vec<AuditRecordPhase>>,
     events: Mutex<Vec<AuditEvent>>,
+    not_durable: bool,
 }
 
 impl SequenceAuditSink {
@@ -427,6 +428,14 @@ impl SequenceAuditSink {
         Self {
             failures: Mutex::new(failures),
             events: Mutex::new(Vec::new()),
+            not_durable: false,
+        }
+    }
+
+    fn written_but_not_durable(failures: Vec<AuditRecordPhase>) -> Self {
+        Self {
+            not_durable: true,
+            ..Self::new(failures)
         }
     }
 }
@@ -437,7 +446,11 @@ impl AuditSink for SequenceAuditSink {
         let mut failures = self.failures.lock().expect("failure lock");
         if failures.first() == Some(&event.phase) {
             failures.remove(0);
-            return Err(AuditError::Persistence("injected failure".into()));
+            return Err(if self.not_durable {
+                AuditError::NotDurable("injected sync failure".into())
+            } else {
+                AuditError::Persistence("injected failure".into())
+            });
         }
         drop(failures);
         self.events.lock().expect("event lock").push(event);

@@ -11,6 +11,9 @@ pub enum StorageError {
     #[error("schema error: {0}")]
     Schema(String),
 
+    #[error("audit record was written but could not be made durable: {0}")]
+    NotDurable(String),
+
     #[error("an unresolved write outcome blocks this connection")]
     UnresolvedWrite,
 

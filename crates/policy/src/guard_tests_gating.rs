@@ -279,6 +279,81 @@ async fn required_intent_failure_prevents_driver_execution() {
     assert_eq!(executes.load(Ordering::SeqCst), 0);
 }
 
+fn guard_with_audit(audit: Arc<SequenceAuditSink>, state: Arc<AuditState>, executes: Arc<AtomicUsize>) -> PolicyGuard {
+    PolicyGuard::new(
+        connection(executes, Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit,
+            state,
+        ),
+    )
+}
+
+#[tokio::test]
+async fn an_intent_written_but_not_durable_is_closed_with_a_denied_outcome() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::written_but_not_durable(vec![
+        AuditRecordPhase::Intent,
+    ]));
+    let state = Arc::new(AuditState::new());
+    let guard = guard_with_audit(audit.clone(), state.clone(), executes.clone());
+
+    let error = guard
+        .execute("INSERT INTO jobs(id) VALUES (1)")
+        .await
+        .expect_err("a required intent that is not durable must deny the write");
+
+    assert!(
+        matches!(&error, DriverError::PolicyDenied(message) if message.contains("audit intent could not be persisted"))
+    );
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+    let events = audit.events.lock().expect("events").clone();
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(events[0].phase, AuditRecordPhase::Outcome);
+    assert_eq!(events[0].terminal_status, AuditTerminalStatus::Denied);
+    assert!(!state.governed_writes_disabled());
+}
+
+#[tokio::test]
+async fn an_unrelated_persistence_failure_does_not_write_an_unpaired_outcome() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![AuditRecordPhase::Intent]));
+    let state = Arc::new(AuditState::new());
+    let guard = guard_with_audit(audit.clone(), state.clone(), executes.clone());
+
+    guard
+        .execute("INSERT INTO jobs(id) VALUES (1)")
+        .await
+        .expect_err("intent must fail");
+
+    assert!(audit.events.lock().expect("events").is_empty());
+    assert!(!state.governed_writes_disabled());
+}
+
+#[tokio::test]
+async fn a_failing_closing_outcome_locks_governed_writes() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::written_but_not_durable(vec![
+        AuditRecordPhase::Intent,
+        AuditRecordPhase::Outcome,
+    ]));
+    let state = Arc::new(AuditState::new());
+    let guard = guard_with_audit(audit.clone(), state.clone(), executes.clone());
+
+    guard
+        .execute("INSERT INTO jobs(id) VALUES (1)")
+        .await
+        .expect_err("intent must fail");
+
+    assert!(audit.events.lock().expect("events").is_empty());
+    assert!(state.governed_writes_disabled());
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+}
+
 #[tokio::test]
 async fn commit_intent_failure_prevents_inner_commit() {
     let commits = Arc::new(AtomicUsize::new(0));

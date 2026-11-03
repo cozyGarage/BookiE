@@ -18,6 +18,8 @@ pub enum AuditError {
     Unavailable(String),
     #[error("audit record could not be persisted: {0}")]
     Persistence(String),
+    #[error("audit record was written but could not be made durable: {0}")]
+    NotDurable(String),
     #[error("an unresolved write outcome blocks this connection")]
     UnresolvedWrite,
     #[error("another write is still in flight for this connection")]
