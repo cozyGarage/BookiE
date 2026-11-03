@@ -16,6 +16,7 @@ SQL_EDITOR = {
     "Unfold all": "shortcut: Ctrl+Shift+]",
     "Session": "tab-stop",
     "Pin results": "tab-stop",
+    "Compare\u2026": "tab-stop",
     "Split": "tab-stop",
     "New query (Ctrl+E)": "shortcut: Ctrl+E",
     "Close Tab": "shortcut: Ctrl+W",

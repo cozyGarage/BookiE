@@ -1820,6 +1820,24 @@ GLib.MainLoop().run()
             time.sleep(0.1)
         ui.press_x11_key("Escape")
 
+    def compare_button_opens_by_keyboard_and_reports_the_difference(database, base):
+        ui.run_sql("SELECT 1 AS alpha UNION ALL SELECT 2")
+        wait_for_result_column("alpha")
+        ui.invoke(ui.wait_for_sensitive_node("Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.run_sql("SELECT 1 AS alpha UNION ALL SELECT 3")
+        wait_for_result_column("alpha")
+        compare = ui.wait_for_sensitive_node("Compare\u2026", role=pyatspi.ROLE_PUSH_BUTTON)
+        for _ in range(60):
+            if compare.getState().contains(pyatspi.STATE_FOCUSED):
+                break
+            ui.press_x11_key("Tab")
+            time.sleep(0.15)
+        assert compare.getState().contains(pyatspi.STATE_FOCUSED), "Compare\u2026 is not reachable by Tab"
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Compare results", role=(pyatspi.ROLE_DIALOG, pyatspi.ROLE_ALERT, pyatspi.ROLE_FRAME))
+        ui.invoke(ui.wait_for_node(name="Compare", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Equal 1 \u00b7 Added 1 \u00b7 Removed 1", timeout=30)
+
     def alt_arrows_jump_between_statements(database, base):
         sql = "select 1;\nselect 2;\nselect 3"
         editor = ui.set_editor_text(sql)
@@ -3004,6 +3022,7 @@ GLib.MainLoop().run()
         connection_colour_chooser_has_an_accessible_button,
         saved_connection_row_controls_have_keyboard_focus_order,
         sql_editor_clickables_all_have_a_keyboard_path,
+        compare_button_opens_by_keyboard_and_reports_the_difference,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
         query_result_export_preserves_null_marker,
