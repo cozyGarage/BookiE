@@ -299,13 +299,7 @@ pub(super) fn install_grid_context_menus(
                 {
                     let (_, row_key) = cell_row_identity(&slot.widget);
                     if row_key.is_empty() {
-                        let Some(value) = view
-                            .model()
-                            .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
-                            .and_then(|selection| selection.model())
-                            .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok())
-                            .and_then(|store| store.source_value_at(position(slot), slot.col_index))
-                        else {
+                        let Some(value) = source_value_at(&view, position(slot), slot.col_index) else {
                             return;
                         };
                         value_viewer::present(&view, &slot.column_name, value, None);
@@ -750,13 +744,15 @@ fn filter_by_value_action(
 }
 
 fn source_value_at(view: &gtk::ColumnView, position: u32, column: usize) -> Option<Value> {
-    view.model()?
-        .downcast::<gtk::MultiSelection>()
+    let model = view.model()?.downcast::<gtk::MultiSelection>().ok()?.model()?;
+    if let Some(store) = model.downcast_ref::<crate::ui::row_store::RowStore>() {
+        return store.source_value_at(position, column);
+    }
+    model
+        .item(position)?
+        .downcast::<crate::ui::row_object::RowObject>()
         .ok()?
-        .model()?
-        .downcast::<crate::ui::row_store::RowStore>()
-        .ok()?
-        .source_value_at(position, column)
+        .with_cell_value(column, Clone::clone)
 }
 
 fn copy_rows_action<F>(

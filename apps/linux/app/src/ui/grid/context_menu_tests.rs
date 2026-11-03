@@ -2,6 +2,20 @@ use super::*;
 use gtk::glib;
 
 #[test]
+#[ignore = "requires an isolated GTK display"]
+fn source_lookup_supports_alternate_models_and_refuses_unloaded_cells() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![Value::Text(
+        "whole".repeat(3000),
+    )]));
+    rows.append(&crate::ui::row_object::RowObject::unloaded(1));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    assert_eq!(source_value_at(&view, 0, 0), Some(Value::Text("whole".repeat(3000))));
+    assert_eq!(source_value_at(&view, 1, 0), None);
+}
+
+#[test]
 fn an_empty_read_only_grid_menu_does_not_offer_insert_row() {
     assert_eq!(empty_grid_menu(false).n_items(), 1);
 }
