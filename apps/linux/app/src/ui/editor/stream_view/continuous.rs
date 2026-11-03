@@ -28,6 +28,7 @@ pub(in crate::ui::editor) fn install(
     let sender = target.grid_sender.clone();
     let connection_id = target.connection_id;
     let database = target.database.clone();
+    let initializing = std::rc::Rc::new(std::cell::Cell::new(false));
     button.connect_toggled(move |button| {
         let active = button.is_active();
         if let Some(pager) = pager.upgrade() {
@@ -37,7 +38,7 @@ pub(in crate::ui::editor) fn install(
             pages.set_visible(!active);
         }
         container.set_visible(active);
-        if !active || container.first_child().is_some() {
+        if !active || container.first_child().is_some() || initializing.replace(true) {
             return;
         }
         let model = PagedModel::new(&counts, columns.len());
@@ -47,8 +48,8 @@ pub(in crate::ui::editor) fn install(
             spool.clone(),
             columns.clone(),
             sender.clone(),
-            connection_id,
-            database.clone(),
+            (connection_id, database.clone()),
+            initializing.clone(),
         );
     });
 }
@@ -59,9 +60,13 @@ fn start_view(
     spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     columns: Vec<bookie_core::ColumnInfo>,
     sender: relm4::Sender<GridMsg>,
-    connection_id: Option<uuid::Uuid>,
-    database: Arc<crate::services::database_service::DatabaseService>,
+    connection: (
+        Option<uuid::Uuid>,
+        Arc<crate::services::database_service::DatabaseService>,
+    ),
+    initializing: std::rc::Rc<std::cell::Cell<bool>>,
 ) {
+    let (connection_id, database) = connection;
     let empty = Arc::new(bookie_core::QueryResult {
         columns: columns.clone(),
         rows: Vec::new().into(),
@@ -71,6 +76,7 @@ fn start_view(
     let runtime = relm4::spawn(async { tokio::runtime::Handle::current() });
     gtk::glib::MainContext::default().spawn_local(async move {
         let (Some(container), Ok(runtime)) = (container.upgrade(), runtime.await) else {
+            initializing.set(false);
             return;
         };
         let callback = model.visibility_callback(&runtime, &spool, &columns);
@@ -185,7 +191,10 @@ mod tests {
             .build();
         window.present();
         toggle.set_active(true);
+        toggle.set_active(false);
+        toggle.set_active(true);
         wait_for_text(holder.upcast_ref(), "0");
+        assert_eq!(count_views(holder.upcast_ref()), 1);
         let view = find_view(holder.upcast_ref()).unwrap();
         view.scroll_to(190, None, gtk::ListScrollFlags::FOCUS, None);
         wait_for_text(holder.upcast_ref(), "190");
@@ -223,6 +232,20 @@ mod tests {
             }
         }
         None
+    }
+
+    fn count_views(root: &gtk::Widget) -> usize {
+        let mut pending = vec![root.clone()];
+        let mut count = 0;
+        while let Some(widget) = pending.pop() {
+            count += usize::from(widget.is::<gtk::ColumnView>());
+            let mut child = widget.first_child();
+            while let Some(next) = child {
+                child = next.next_sibling();
+                pending.push(next);
+            }
+        }
+        count
     }
 
     fn contains_text(root: &gtk::Widget, expected: &str) -> bool {
