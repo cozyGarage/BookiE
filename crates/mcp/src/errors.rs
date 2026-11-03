@@ -60,7 +60,7 @@ impl McpToolError {
             code: "preview_not_transactional",
             operation_outcome: OperationOutcome::NotStarted,
             transaction_outcome: TransactionOutcome::RolledBack,
-            message: "The statement touches a table whose storage engine ignores transactions, so a preview would change data that a rollback cannot undo. Nothing was executed.",
+            message: "The statement either touches a table whose storage engine ignores transactions or ends the transaction on its own, so a preview would change data that a rollback cannot undo. Nothing was executed.",
             legacy_diagnostic: "preview refused: the statement touches a non-transactional table".into(),
         }
     }
