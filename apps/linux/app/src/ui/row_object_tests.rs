@@ -59,6 +59,18 @@ fn parsed_json_uses_its_serialized_size_at_the_preview_boundary() {
 }
 
 #[test]
+fn root_json_string_previews_preserve_escaped_and_multibyte_content() {
+    for text in ["\\\"".repeat(4095), "é".repeat(4096)] {
+        let json = serde_json::Value::String(text);
+        let serialized = json.to_string();
+        let preview = preview_value(&Value::Json(Box::new(json))).unwrap();
+        let end = serialized.floor_char_boundary(PREVIEW_BYTES);
+        assert_eq!(preview.byte_count, serialized.len());
+        assert_eq!(preview.value, Value::Text(serialized[..end].to_owned()));
+    }
+}
+
+#[test]
 fn a_json_value_is_measured_without_serialising_small_documents_twice() {
     assert!(!json_exceeds(&serde_json::json!({"a": 1}), 8));
     assert!(json_exceeds(&serde_json::json!({"payload": "x".repeat(20)}), 8));
