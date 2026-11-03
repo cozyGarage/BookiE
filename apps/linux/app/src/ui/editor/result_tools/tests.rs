@@ -518,13 +518,23 @@ fn a_paged_jump_never_guesses_a_row_the_sorted_model_does_not_hold() {
 }
 
 #[test]
-fn a_filter_that_could_not_be_sent_finishes_its_ticket_with_the_error() {
-    use super::ticket::{FilterTicket, finish_if_unsent};
+fn a_finished_filter_ticket_keeps_its_message_and_an_unfinished_one_does_not() {
+    use super::ticket::FilterTicket;
     let failed = FilterTicket::default();
-    finish_if_unsent(Err("closed"), &failed, "Could not start the filter".into());
+    failed.finish("The filter could not start".into());
     assert!(failed.is_finished());
-    assert_eq!(failed.message(), "Could not start the filter");
-    let sent = FilterTicket::default();
-    finish_if_unsent(Ok::<(), &str>(()), &sent, "unused".into());
-    assert!(!sent.is_finished());
+    assert_eq!(failed.message(), "The filter could not start");
+    assert!(!FilterTicket::default().is_finished());
+}
+
+#[test]
+fn a_search_ended_without_results_is_idle_and_can_be_edited() {
+    let mut cursor = MatchCursor::default();
+    let generation = cursor.begin("needle");
+    assert!(!cursor.has_results_for("needle"));
+    assert!(cursor.keeps_for("needle"));
+    assert!(cursor.complete(generation, report(1, false, 0)));
+    assert!(cursor.has_results_for("needle"));
+    cursor.end_search(generation);
+    assert!(cursor.has_results_for("needle"));
 }

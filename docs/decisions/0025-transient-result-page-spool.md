@@ -2,6 +2,7 @@
 
 - **Status**: Accepted (2026-10-27)
 - **Date**: 2026-10-25
+- **Extended by**: [ADR 0029](0029-whole-result-operations-on-the-spool.md)
 
 ## Context
 
