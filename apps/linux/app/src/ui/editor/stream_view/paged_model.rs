@@ -364,3 +364,28 @@ fn spool_read_failure_can_be_retried_without_reloading_in_a_loop() {
         })
         .unwrap();
 }
+
+#[test]
+fn closing_a_model_does_not_wait_for_an_inflight_spool_read() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let context = glib::MainContext::new();
+    context
+        .with_thread_default(|| {
+            let model = PagedModel::new(&[1], 1);
+            model.show(0, 1);
+            model.load_from_spool(runtime.handle(), &spool, &[]);
+            let weak = model.downgrade();
+            drop(model);
+            assert!(weak.upgrade().is_none());
+            runtime.block_on(async { tokio::task::yield_now().await });
+            while context.iteration(false) {}
+            assert!(weak.upgrade().is_none());
+        })
+        .unwrap();
+}
