@@ -1661,6 +1661,11 @@
       "bookie-app",
       "--lib",
       "ui::app::workspace_close::tests::force_dismissing_connection_deletion_does_not_abort"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::dismissing_bulk_delete_preserves_selected_drafts"
     ]
   ],
   "keyring": [
