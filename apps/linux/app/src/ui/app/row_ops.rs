@@ -13,6 +13,8 @@ use crate::ui::browse_tab::BrowseTabInput;
 use super::ran_statements::{finish_if_recorded, sql_without_parameters};
 use super::{App, AppMsg};
 
+const MAX_COPIED_STATEMENT_ROWS: usize = 5_000;
+
 impl App {
     /// Atomic Save handler for the inline-spreadsheet pattern.
     /// Receives a fully-materialised `Vec<(SQL, params)>` from a
@@ -122,10 +124,14 @@ impl App {
     pub(super) fn on_copy_row_as_statement(
         &self,
         tab_id: Uuid,
-        row_position: u32,
+        row_positions: &[u32],
         statement: bookie_core::sql_literal::RowStatement,
     ) {
-        let (columns, driver_id, row, table, schema) = {
+        if row_positions.len() > MAX_COPIED_STATEMENT_ROWS {
+            self.show_toast(&crate::tr!("Select fewer rows to copy as statements."));
+            return;
+        }
+        let (columns, driver_id, rows, table, schema) = {
             let tabs = self.workspace_tabs.borrow();
             let Some(controller) = tabs.get(&tab_id).and_then(|t| t.browse_controller()) else {
                 return;
@@ -138,18 +144,21 @@ impl App {
                 // any prepended drafts), not `snapshot().rows[row_position]`
                 // -- that's fetch order and drifts by one row per pending
                 // draft, copying a different row's values to the clipboard.
-                model.row_cells_at(row_position),
+                row_positions
+                    .iter()
+                    .map(|position| model.row_cells_at(*position))
+                    .collect::<Option<Vec<_>>>(),
                 model.table().to_string(),
                 model.schema().map(str::to_owned),
             )
         };
-        let Some(row) = row else {
+        let Some(rows) = rows else {
             self.show_toast(&crate::tr!(
                 "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
             ));
             return;
         };
-        let sql = match statement.build(&driver_id, schema.as_deref(), &table, &columns, &row) {
+        let sql = match statement.build_all(&driver_id, schema.as_deref(), &table, &columns, &rows) {
             Ok(sql) => sql,
             Err(error) => {
                 self.show_toast(&error_text::build_sql_message(&error));

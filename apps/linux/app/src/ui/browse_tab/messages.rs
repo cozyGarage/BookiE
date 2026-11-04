@@ -67,7 +67,7 @@ pub enum BrowseTabInput {
         row_position: u32,
         row_key: Vec<Value>,
     },
-    GridCopyRowAsStatement(u32, bookie_core::sql_literal::RowStatement),
+    GridCopyRowAsStatement(Vec<u32>, bookie_core::sql_literal::RowStatement),
     DuplicateRow {
         row_position: u32,
     },
@@ -129,7 +129,7 @@ pub enum BrowseTabOutput {
     },
     StateChanged,
     CopyRowAsStatement {
-        row_position: u32,
+        row_positions: Vec<u32>,
         statement: bookie_core::sql_literal::RowStatement,
     },
     CopyToClipboard(String),
