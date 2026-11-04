@@ -1,4 +1,4 @@
-import { visibleWindow, displayCell, windowTop, scrollTopForRow } from './grid.mjs';
+import { visibleWindow, displayCell, cellClass, windowTop, scrollTopForRow } from './grid.mjs';
 import {
   PAGE_ROWS,
   FIND_CAP,
@@ -52,7 +52,7 @@ function buildRow(record) {
   row.append(number);
   for (const cell of record.cells) {
     const item = document.createElement('span');
-    item.className = cell.kind === 'null' ? 'cell null' : 'cell';
+    item.className = cellClass(cell);
     item.setAttribute('role', 'gridcell');
     item.textContent = displayCell(cell);
     row.append(item);

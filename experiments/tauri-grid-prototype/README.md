@@ -2,7 +2,7 @@
 
 This isolated experiment compares a welcome layout and a virtualized result grid with the GTK application. It uses synthetic values only and cannot connect to a database. It is not a supported frontend, a package, or an alternative execution path. The shipped application continues to use GTK. The experiment does not establish accessibility, input-method, security, cross-platform or performance parity.
 
-The Rust commands use bounded requests and the shared `bookie-core` value type for a small synthetic fixture. Their JSON envelope represents integers as decimal strings and distinguishes null, booleans and text. Other database types are deliberately unsupported. This is not a complete value bridge, and no policy or database operations cross it.
+The Rust commands use bounded requests and the shared `bookie-core` value type for a small synthetic fixture. Their JSON envelope carries every `bookie_core::Value` variant as a kind and an exact text: integers and decimals as decimal strings, bytes as `\x` hex, dates and times as ISO text, raw JSON text with its original spacing, and an undecodable cell as `<undecodable TYPE>`. The text rules mirror the export text of `bookie-core`, so a value reads the same here as in an export. This is still not a complete value bridge: nothing is parsed back, edited or compared by type, and no policy or database operations cross it.
 
 ## Scope
 
@@ -13,6 +13,7 @@ The result screen mirrors the GTK streamed-result header so both layouts can be 
 - Find over all synthetic rows with a 10,000-match cap, "Match N of M" status, wrap-around navigation and stale-reply dropping by generation.
 - Show matching rows builds a synthetic filtered view held in Rust state, paged through `filtered_rows`.
 - A compare panel over two synthetic generators: whole-row multiset (Added and Removed) and keyed (Before and After pairs), capped at 200 shown rows.
+- A fourth **Typed** column that cycles through every value variant (float, bytes, date, time, datetime, timestamp with time zone, decimal, UUID, JSON, raw JSON text, undecodable, NULL) so the grid, Find and the filter row are exercised against exact typed text. Each kind has its own cell class; numbers align right, binary and JSON use a monospace face.
 - Row counts of 150,000, 500,000 or 1,000,000 through `?rows=` or `BOOKIE_PROTOTYPE_ROWS`.
 
 Export is inert. Nothing is read from or written to disk.

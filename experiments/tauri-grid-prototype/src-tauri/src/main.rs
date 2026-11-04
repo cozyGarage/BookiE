@@ -8,6 +8,7 @@ const ALLOWED_ROWS: [u64; 3] = [150_000, 500_000, 1_000_000];
 const MAX_BATCH: usize = 128;
 const MAX_FIND_MATCHES: usize = 10_000;
 const MAX_DIFF_ROWS: usize = 200;
+const TYPED_KINDS: u64 = 12;
 
 #[derive(Serialize)]
 struct Cell {
@@ -79,10 +80,44 @@ fn cell(value: Value) -> Result<Cell, &'static str> {
         Value::Null => ("null", None),
         Value::Bool(value) => ("boolean", Some(value.to_string())),
         Value::Int(value) => ("integer", Some(value.to_string())),
+        Value::Float(value) => ("float", Some(value.to_string())),
         Value::Text(value) => ("text", Some(value)),
-        _ => return Err("unsupported prototype value"),
+        Value::Bytes(value) => ("bytes", Some(format!("\\x{}", hex(&value)))),
+        Value::Date(value) => ("date", Some(value.to_string())),
+        Value::Time(value) => ("time", Some(value.to_string())),
+        Value::DateTime(value) => ("datetime", Some(value.to_string())),
+        Value::TimestampTz(value) => ("timestamptz", Some(value.to_rfc3339())),
+        Value::Decimal(value) => ("decimal", Some(value.to_string())),
+        Value::Uuid(value) => ("uuid", Some(value.to_string())),
+        Value::Json(value) => ("json", Some(value.to_string())),
+        Value::JsonText(value) => ("json_text", Some(value)),
+        Value::Undecodable(type_name) => ("undecodable", Some(format!("<undecodable {type_name}>"))),
     };
     Ok(Cell { kind, value })
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn typed_of(index: u64) -> Value {
+    use chrono::{NaiveDate, NaiveTime, TimeZone, Utc};
+    let date = NaiveDate::from_ymd_opt(2026, 11, 4).unwrap_or_default();
+    let time = NaiveTime::from_hms_micro_opt(23, 59, 59, 123_456).unwrap_or_default();
+    match index % TYPED_KINDS {
+        0 => Value::Float(0.1 + 0.2),
+        1 => Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef]),
+        2 => Value::Date(date),
+        3 => Value::Time(time),
+        4 => Value::DateTime(date.and_time(time)),
+        5 => Value::TimestampTz(Utc.from_utc_datetime(&date.and_time(time))),
+        6 => Value::Decimal("12345678901234567890.12345678".parse().unwrap_or_default()),
+        7 => Value::Uuid(uuid::Uuid::from_u128(0x67e5_5044_10b1_426f_9247_bb68_0e5f_e0c8)),
+        8 => Value::Json(Box::new(serde_json::json!({"a": [1, {"b": null}]}))),
+        9 => Value::JsonText("{\"raw\":  1,   \"keep\" : 2}".into()),
+        10 => Value::Undecodable("numeric(40,20)".into()),
+        _ => Value::Null,
+    }
 }
 
 fn checked_total(total: Option<u64>) -> Result<u64, &'static str> {
@@ -122,6 +157,7 @@ fn cells_of(index: u64, label: &str) -> Result<Vec<Cell>, &'static str> {
         cell(Value::Int(value_of(index)))?,
         cell(Value::Text(label.to_string()))?,
         cell(state_of(index))?,
+        cell(typed_of(index))?,
     ])
 }
 
@@ -133,6 +169,7 @@ fn column_text(index: u64, column: &str) -> Option<String> {
             Value::Bool(flag) => Some(flag.to_string()),
             _ => None,
         },
+        "typed" => cell(typed_of(index)).ok().and_then(|cell| cell.value),
         _ => None,
     }
 }
@@ -149,7 +186,7 @@ fn matches_predicate(index: u64, predicate: &Predicate) -> bool {
 }
 
 fn valid_predicate(predicate: &Predicate) -> Result<(), &'static str> {
-    let known_column = matches!(predicate.column.as_str(), "value" | "label" | "state");
+    let known_column = matches!(predicate.column.as_str(), "value" | "label" | "state" | "typed");
     let known_op = matches!(predicate.op.as_str(), "contains" | "equals" | "not_equals");
     if !known_column || !known_op || predicate.text.is_empty() || predicate.text.len() > 256 {
         return Err("invalid filter");
@@ -198,7 +235,7 @@ fn find_rows(total: Option<u64>, query: String, cap: usize, generation: u64) -> 
     let needle = query.to_lowercase();
     let mut matches = Vec::new();
     for index in 0..total {
-        let hit = ["value", "label", "state"]
+        let hit = ["value", "label", "state", "typed"]
             .iter()
             .filter_map(|column| column_text(index, column))
             .any(|text| text.to_lowercase().contains(&needle));

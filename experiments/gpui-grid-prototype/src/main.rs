@@ -8,7 +8,7 @@ use gpui::{
 };
 
 const ROW_HEIGHT: f32 = 36.0;
-const CELL_WIDTHS: [f32; 3] = [240.0, 280.0, 120.0];
+const CELL_WIDTHS: [f32; 4] = [240.0, 280.0, 120.0, 320.0];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Field {
@@ -464,7 +464,8 @@ impl Render for GridView {
             .text_color(rgb(0x9aa0b4))
             .child(cell_div(CELL_WIDTHS[0], "value".into()))
             .child(cell_div(CELL_WIDTHS[1], "label".into()))
-            .child(cell_div(CELL_WIDTHS[2], "state".into()));
+            .child(cell_div(CELL_WIDTHS[2], "state".into()))
+            .child(cell_div(CELL_WIDTHS[3], "typed".into()));
         let list = uniform_list(
             "rows",
             self.visible_count(),
@@ -499,7 +500,8 @@ impl GridView {
                 .child(cell_div(70.0, row.change.to_string()))
                 .child(cell_div(CELL_WIDTHS[0], row.cells[0].display()))
                 .child(cell_div(CELL_WIDTHS[1], row.cells[1].display()))
-                .child(cell_div(CELL_WIDTHS[2], row.cells[2].display()));
+                .child(cell_div(CELL_WIDTHS[2], row.cells[2].display()))
+                .child(cell_div(CELL_WIDTHS[3], row.cells[3].display()));
         }
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
@@ -508,6 +510,7 @@ impl GridView {
             .child(cell_div(CELL_WIDTHS[0], cells[0].display()))
             .child(cell_div(CELL_WIDTHS[1], cells[1].display()))
             .child(cell_div(CELL_WIDTHS[2], cells[2].display()))
+            .child(cell_div(CELL_WIDTHS[3], cells[3].display()))
     }
 }
 

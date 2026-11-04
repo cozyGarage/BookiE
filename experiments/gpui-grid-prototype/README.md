@@ -13,6 +13,7 @@ The window (`src/main.rs`) has:
 - One wrapping strip: progress, pager (First, Previous page, range, Next page, Last), Find with Previous and Next match and a "Match N of M" status, Show matching rows, Compare…, Export all rows… (inert) and Continuous scrolling.
 - A filter row (Ctrl+F): a WHERE expression such as `label contains 7`, Apply and Clear all.
 - A compare bar with Whole row and Key: value.
+- A fourth `typed` column that cycles through every value kind (float, bytes, date, time, datetime, timestamp with time zone, decimal, UUID, JSON, raw JSON text, undecodable, NULL), searchable with Find and the filter row.
 - A virtualized grid over `uniform_list` with 36 px rows. Find, filter and compare run on the background executor and drop stale results by generation.
 
 The text fields are deliberately minimal: they append typed characters, handle Backspace and Enter, and nothing else. There is no selection, caret movement, IME or clipboard. No SQL editor was attempted.
@@ -45,7 +46,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- Synthetic data, no database, no typed value bridge beyond null, boolean, integer and text.
+- Synthetic data, no database. The typed column carries the same kinds and exact text as the Tauri prototype, but as canonical text held by a local cell type, not by `bookie-core` values, because this experiment depends on no BookiE crate. It shows how a typed cell renders, not that the shared value type round-trips.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - No text editing beyond the minimal fields above, and no SQL editor.
 - It measures one machine with one GPU driver; it does not establish performance on other hardware.

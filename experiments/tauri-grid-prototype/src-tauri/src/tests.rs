@@ -50,7 +50,12 @@ fn find_matches_exact_integer_text_and_never_matches_null() {
     let reply = find_rows(Some(150_000), "9007199254740993".into(), 10, 1).unwrap();
     assert_eq!(reply.matches, vec![0]);
     let nulls = find_rows(Some(150_000), "null".into(), 10, 1).unwrap();
-    assert!(nulls.matches.is_empty());
+    assert!(!nulls.matches.is_empty());
+    assert!(
+        nulls.matches.iter().all(|row| row % TYPED_KINDS == 8),
+        "only the typed JSON value contains the word null; NULL cells never match: {:?}",
+        nulls.matches
+    );
 }
 
 #[test]
@@ -103,4 +108,133 @@ fn keyed_diff_reports_changed_rows_as_before_and_after_pairs() {
     let first = reply.rows.iter().position(|row| row.change == "Before").unwrap();
     assert_eq!(reply.rows[first + 1].change, "After");
     assert_eq!(reply.rows[first].cells[0].value, reply.rows[first + 1].cells[0].value);
+}
+
+fn matching(total: u64, predicate: &Predicate) -> Vec<u64> {
+    (0..total).filter(|index| matches_predicate(*index, predicate)).collect()
+}
+
+fn rendered(value: Value) -> (&'static str, Option<String>) {
+    let cell = cell(value).unwrap();
+    (cell.kind, cell.value)
+}
+
+#[test]
+fn every_core_value_variant_renders_with_its_exact_text() {
+    use chrono::{NaiveDate, NaiveTime, TimeZone, Utc};
+    let date = NaiveDate::from_ymd_opt(2026, 11, 4).unwrap();
+    let time = NaiveTime::from_hms_micro_opt(23, 59, 59, 123_456).unwrap();
+    let cases: Vec<(Value, &str, Option<&str>)> = vec![
+        (Value::Null, "null", None),
+        (Value::Bool(false), "boolean", Some("false")),
+        (Value::Int(i64::MAX), "integer", Some("9223372036854775807")),
+        (Value::Float(0.1 + 0.2), "float", Some("0.30000000000000004")),
+        (Value::Text("héllo".into()), "text", Some("héllo")),
+        (Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef]), "bytes", Some("\\xdeadbeef")),
+        (Value::Date(date), "date", Some("2026-11-04")),
+        (Value::Time(time), "time", Some("23:59:59.123456")),
+        (Value::DateTime(date.and_time(time)), "datetime", Some("2026-11-04 23:59:59.123456")),
+        (
+            Value::TimestampTz(Utc.from_utc_datetime(&date.and_time(time))),
+            "timestamptz",
+            Some("2026-11-04T23:59:59.123456+00:00"),
+        ),
+        (
+            Value::Decimal("12345678901234567890.12345678".parse().unwrap()),
+            "decimal",
+            Some("12345678901234567890.12345678"),
+        ),
+        (
+            Value::Uuid("67e55044-10b1-426f-9247-bb680e5fe0c8".parse().unwrap()),
+            "uuid",
+            Some("67e55044-10b1-426f-9247-bb680e5fe0c8"),
+        ),
+        (
+            Value::Json(Box::new(serde_json::json!({"a": [1, {"b": null}]}))),
+            "json",
+            Some(r#"{"a":[1,{"b":null}]}"#),
+        ),
+        (
+            Value::JsonText("{\"raw\":  1,   \"keep\" : 2}".into()),
+            "json_text",
+            Some("{\"raw\":  1,   \"keep\" : 2}"),
+        ),
+        (
+            Value::Undecodable("numeric(40,20)".into()),
+            "undecodable",
+            Some("<undecodable numeric(40,20)>"),
+        ),
+    ];
+    for (value, kind, text) in cases {
+        let label = format!("{value:?}");
+        assert_eq!(rendered(value), (kind, text.map(str::to_string)), "{label}");
+    }
+}
+
+#[test]
+fn raw_json_text_keeps_its_spacing_while_parsed_json_does_not() {
+    let raw = "{\"a\" :  1}";
+    assert_eq!(rendered(Value::JsonText(raw.into())).1.as_deref(), Some(raw));
+    let parsed = Value::Json(Box::new(serde_json::from_str(raw).unwrap()));
+    assert_eq!(rendered(parsed).1.as_deref(), Some(r#"{"a":1}"#));
+}
+
+#[test]
+fn rows_carry_a_fourth_typed_cell_that_cycles_through_every_variant() {
+    let rows = sample_rows(0, TYPED_KINDS as usize, None).unwrap();
+    assert!(rows.iter().all(|row| row.cells.len() == 4));
+    let kinds: Vec<&str> = rows.iter().map(|row| row.cells[3].kind).collect();
+    assert_eq!(
+        kinds,
+        [
+            "float",
+            "bytes",
+            "date",
+            "time",
+            "datetime",
+            "timestamptz",
+            "decimal",
+            "uuid",
+            "json",
+            "json_text",
+            "undecodable",
+            "null"
+        ]
+    );
+    assert_eq!(rows[0].cells[0].value.as_deref(), Some("9007199254740993"));
+}
+
+#[test]
+fn the_typed_fixture_shows_exactly_the_texts_the_gpui_prototype_pins() {
+    let rows = sample_rows(0, TYPED_KINDS as usize, None).unwrap();
+    let shown: Vec<Option<&str>> = rows.iter().map(|row| row.cells[3].value.as_deref()).collect();
+    assert_eq!(
+        shown,
+        [
+            Some("0.30000000000000004"),
+            Some("\\xdeadbeef"),
+            Some("2026-11-04"),
+            Some("23:59:59.123456"),
+            Some("2026-11-04 23:59:59.123456"),
+            Some("2026-11-04T23:59:59.123456+00:00"),
+            Some("12345678901234567890.12345678"),
+            Some("67e55044-10b1-426f-9247-bb680e5fe0c8"),
+            Some(r#"{"a":[1,{"b":null}]}"#),
+            Some("{\"raw\":  1,   \"keep\" : 2}"),
+            Some("<undecodable numeric(40,20)>"),
+            None,
+        ]
+    );
+}
+
+#[test]
+fn a_filter_and_find_can_target_the_typed_column() {
+    let hits = matching(150_000, &predicate("typed", "contains", "deadbeef"));
+    assert_eq!(hits.first().copied(), Some(1));
+    assert!(hits.iter().all(|row| row % TYPED_KINDS == 1));
+    let not_null = matching(24, &predicate("typed", "not_equals", "<undecodable numeric(40,20)>"));
+    assert_eq!(not_null.len(), 22);
+    let found = find_rows(Some(150_000), "numeric(40,20)".into(), 3, 1).unwrap();
+    assert_eq!(found.matches, vec![10, 22, 34]);
+    assert!(valid_predicate(&predicate("typed", "equals", "x")).is_ok());
 }
