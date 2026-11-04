@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use crate::ui_theme::ThemeExt;
 use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, ElementId, ElementInputHandler, Entity, EntityInputHandler,
     EventEmitter, FocusHandle, Focusable, GlobalElementId, KeyBinding, LayoutId, MouseButton, MouseDownEvent,
@@ -523,7 +524,7 @@ impl Element for TextElement {
                         point(bounds.left() + cursor_pos, bounds.top()),
                         size(px(2.), bounds.bottom() - bounds.top()),
                     ),
-                    rgb(crate::theme::Theme::current(cx).foreground),
+                    rgb(bookie_gpui_grid_prototype::theme::Theme::current(cx).foreground),
                 )),
             )
         } else {
@@ -578,7 +579,7 @@ impl Element for TextElement {
 
 impl Render for TextInput {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = crate::theme::Theme::current(cx);
+        let theme = bookie_gpui_grid_prototype::theme::Theme::current(cx);
         div()
             .flex()
             .key_context("TextInput")

@@ -7,6 +7,7 @@ use bookie_gpui_grid_prototype::cursor::Cursor;
 
 use crate::GridView;
 use crate::text_input;
+use crate::ui_theme::ThemeExt;
 
 fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
@@ -173,16 +174,21 @@ fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: 
 #[gpui::test]
 fn the_palette_switches_between_the_light_and_dark_theme(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    cx.update(|_, cx| assert!(!crate::theme::Theme::current(cx).dark, "light is the default"));
+    cx.update(|_, cx| {
+        assert!(
+            !bookie_gpui_grid_prototype::theme::Theme::current(cx).dark,
+            "light is the default"
+        )
+    });
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("dark theme");
     cx.simulate_keystrokes("enter");
-    cx.update(|_, cx| assert!(crate::theme::Theme::current(cx).dark));
+    cx.update(|_, cx| assert!(bookie_gpui_grid_prototype::theme::Theme::current(cx).dark));
     view.read_with(cx, |view, _| assert!(view.dark_mode));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("light theme");
     cx.simulate_keystrokes("enter");
-    cx.update(|_, cx| assert!(!crate::theme::Theme::current(cx).dark));
+    cx.update(|_, cx| assert!(!bookie_gpui_grid_prototype::theme::Theme::current(cx).dark));
 }
 
 #[gpui::test]
@@ -224,5 +230,58 @@ fn the_sidebar_search_takes_typed_text_and_filters_the_tree(cx: &mut TestAppCont
         assert_eq!(view.sidebar_search.read(cx).content(), "aud");
         let rows = bookie_gpui_grid_prototype::shell::tree_rows("aud", true, true);
         assert_eq!(rows.len(), 3, "connection, database and the one matching table");
+    });
+}
+
+#[gpui::test]
+fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.font_names = vec!["Foo Sans".into(), "Bar Mono".into()]
+        })
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("choose font");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, cx| {
+        assert!(
+            view.palette_open && view.palette_fonts,
+            "the palette stays open on the font list"
+        );
+        let labels: Vec<_> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].label.clone())
+            .collect();
+        assert_eq!(labels, ["Foo Sans", "Bar Mono"]);
+    });
+    cx.simulate_input("bar");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.font.as_ref(), "Bar Mono");
+        assert!(!view.palette_open && !view.palette_fonts);
+    });
+}
+
+#[gpui::test]
+fn the_palette_switches_the_theme_style_and_light_dark_keeps_it(cx: &mut TestAppContext) {
+    use bookie_gpui_grid_prototype::theme::Style;
+    let (_view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("adwaita");
+    cx.simulate_keystrokes("enter");
+    cx.update(|_, cx| {
+        assert_eq!(
+            bookie_gpui_grid_prototype::theme::Theme::current(cx).style,
+            Style::Adwaita
+        )
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("dark theme");
+    cx.simulate_keystrokes("enter");
+    cx.update(|_, cx| {
+        let theme = bookie_gpui_grid_prototype::theme::Theme::current(cx);
+        assert_eq!((theme.style, theme.dark), (Style::Adwaita, true));
     });
 }

@@ -4,6 +4,7 @@ pub mod model;
 pub mod palette;
 pub mod selection;
 pub mod shell;
+pub mod theme;
 
 #[cfg(test)]
 mod edit_tests;

@@ -1,8 +1,10 @@
 use bookie_gpui_grid_prototype::shell::{CONNECTION, DATA_TABLE, DATABASE, Tab, TreeRow, tree_rows};
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
 
-use crate::theme::Theme;
+use crate::assets::icon;
+use crate::ui_theme::ThemeExt;
 use crate::{GridView, thousands};
+use bookie_gpui_grid_prototype::theme::Theme;
 
 const TOOLBAR_HEIGHT: f32 = 40.0;
 const TAB_HEIGHT: f32 = 32.0;
@@ -16,10 +18,26 @@ fn ghost(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<D
         .items_center()
         .h(px(28.0))
         .px_2()
-        .rounded(px(4.0))
+        .rounded(px(theme.radius))
         .cursor_pointer()
         .text_color(rgb(theme.foreground))
         .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(label.into())
+}
+
+fn ghost_icon(id: &'static str, name: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .gap_1()
+        .h(px(28.0))
+        .px_2()
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
         .child(label.into())
 }
 
@@ -45,8 +63,8 @@ fn card_title(text: &str, theme: Theme) -> Div {
 
 impl GridView {
     pub fn toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let inert = |id: &'static str, label: &'static str, cx: &mut Context<Self>| {
-            ghost(id, label, theme).on_click(cx.listener(|this, _, _, cx| {
+        let inert = |id: &'static str, name: &'static str, label: &'static str, cx: &mut Context<Self>| {
+            ghost_icon(id, name, label, theme).on_click(cx.listener(|this, _, _, cx| {
                 this.status = "Synthetic prototype: nothing to open here.".into();
                 cx.notify();
             }))
@@ -66,11 +84,11 @@ impl GridView {
                     .flex()
                     .items_center()
                     .gap_1()
-                    .child(inert("new-connection", "New Connection", cx))
-                    .child(inert("data-transfer", "Data Transfer", cx))
-                    .child(inert("driver-manager", "Driver Manager", cx))
-                    .child(inert("plugin-center", "Plugin Center", cx))
-                    .child(inert("more", "More ⌄", cx)),
+                    .child(inert("new-connection", "plus", "New Connection", cx))
+                    .child(inert("data-transfer", "arrow-left-right", "Data Transfer", cx))
+                    .child(inert("driver-manager", "package", "Driver Manager", cx))
+                    .child(inert("plugin-center", "puzzle", "Plugin Center", cx))
+                    .child(inert("more", "chevron-down", "More", cx)),
             )
             .child(
                 div()
@@ -78,23 +96,29 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .child(
-                        ghost("palette", "Commands  Ctrl+Shift+P", theme)
+                        ghost_icon("palette", "command", "Commands", theme)
                             .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
                     )
                     .child(
-                        ghost("sidebar-toggle", "Sidebar  Ctrl+B", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.sidebar_open = !this.sidebar_open;
-                            cx.notify();
-                        })),
-                    )
-                    .child(
-                        ghost("theme-toggle", if theme.dark { "Light" } else { "Dark" }, theme).on_click(cx.listener(
-                            |this, _, window, cx| {
-                                this.dark_mode = !this.dark_mode;
-                                cx.set_global(Theme::current(cx).toggled());
-                                window.refresh();
+                        ghost_icon("sidebar-toggle", "panel-left", "Sidebar", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.sidebar_open = !this.sidebar_open;
+                                cx.notify();
                             },
                         )),
+                    )
+                    .child(
+                        ghost_icon(
+                            "theme-toggle",
+                            if theme.dark { "sun" } else { "moon" },
+                            if theme.dark { "Light" } else { "Dark" },
+                            theme,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.dark_mode = !this.dark_mode;
+                            Theme::current(cx).toggled().install(cx);
+                            window.refresh();
+                        })),
                     ),
             )
     }
@@ -117,18 +141,22 @@ impl GridView {
                 .h(px(26.0))
                 .pl(px(8.0 + 14.0 * depth as f32))
                 .gap_1()
-                .rounded(px(4.0))
+                .rounded(px(theme.radius))
                 .cursor_pointer()
-                .child(
-                    div()
-                        .w(px(12.0))
-                        .text_color(rgb(theme.muted_foreground))
-                        .child(match chevron {
-                            Some(true) => "▾",
-                            Some(false) => "▸",
-                            None => "",
-                        }),
-                )
+                .child(div().w(px(15.0)).flex_none().children(chevron.map(|open| {
+                    icon(
+                        if open { "chevron-down" } else { "chevron-right" },
+                        theme.muted_foreground,
+                    )
+                })))
+                .child(icon(
+                    match row {
+                        TreeRow::Connection { .. } => "database",
+                        TreeRow::Database { .. } => "folder",
+                        TreeRow::Table(_) => "table",
+                    },
+                    theme.muted_foreground,
+                ))
                 .child(label);
             let line = if current {
                 line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
@@ -207,6 +235,10 @@ impl GridView {
                 .border_r_1()
                 .border_color(rgb(theme.border))
                 .cursor_pointer()
+                .child(icon(
+                    if matches!(tab, Tab::Home) { "house" } else { "table" },
+                    if selected { theme.info } else { theme.muted_foreground },
+                ))
                 .child(tab.title());
             item = if selected {
                 item.bg(rgb(theme.background))
@@ -222,7 +254,7 @@ impl GridView {
                     div()
                         .id(("close", index))
                         .px_1()
-                        .rounded(px(4.0))
+                        .rounded(px(theme.radius))
                         .text_color(rgb(theme.muted_foreground))
                         .hover(move |style| style.bg(rgb(theme.muted)))
                         .on_mouse_down(
@@ -233,7 +265,7 @@ impl GridView {
                                 cx.notify();
                             }),
                         )
-                        .child("×"),
+                        .child(icon("x", theme.muted_foreground)),
                 );
             }
             item.on_click(cx.listener(move |this, _, window, cx| {

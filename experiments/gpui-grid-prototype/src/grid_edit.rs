@@ -6,8 +6,9 @@ use bookie_gpui_grid_prototype::model::Cell;
 use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, div, prelude::*, px, rgb};
 
 use crate::text_input::InputEvent;
-use crate::theme::Theme;
+use crate::ui_theme::ThemeExt;
 use crate::{CELL_WIDTHS, GridView, cell_div};
+use bookie_gpui_grid_prototype::theme::Theme;
 
 pub type Edits = HashMap<(u64, usize), Cell>;
 

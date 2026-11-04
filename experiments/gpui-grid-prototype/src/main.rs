@@ -1,23 +1,25 @@
 use std::ops::Range;
 use std::time::{Duration, Instant};
 
+mod assets;
 mod chrome;
 mod grid_edit;
 mod text_input;
-mod theme;
+mod ui_theme;
 
 use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
 use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
 use bookie_gpui_grid_prototype::shell::{DATA_TABLE, Tab, Tabs};
+use bookie_gpui_grid_prototype::theme::{Style, Theme};
 use gpui::{
     App, Application, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
     MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
     prelude::*, px, rgb, size, uniform_list,
 };
 use text_input::{InputEvent, TextInput};
-use theme::Theme;
+use ui_theme::ThemeExt;
 
 const ROW_HEIGHT: f32 = 26.0;
 const HEADER_HEIGHT: f32 = 28.0;
@@ -47,6 +49,9 @@ struct GridView {
     palette_index: usize,
     dark_mode: bool,
     tabs: Tabs,
+    font: gpui::SharedString,
+    font_names: Vec<String>,
+    palette_fonts: bool,
     sidebar_open: bool,
     connection_open: bool,
     database_open: bool,
@@ -85,6 +90,17 @@ fn thousands(value: u64) -> String {
     out
 }
 
+fn default_font(installed: &[String]) -> String {
+    let wanted = std::env::var("BOOKIE_PROTOTYPE_FONT").ok();
+    wanted
+        .iter()
+        .map(String::as_str)
+        .chain(["Fira Sans", "Fira Code"])
+        .find(|name| installed.iter().any(|font| font == name))
+        .unwrap_or_default()
+        .to_string()
+}
+
 fn env_number<T: std::str::FromStr>(name: &str) -> Option<T> {
     std::env::var(name).ok().and_then(|value| value.parse().ok())
 }
@@ -119,6 +135,9 @@ impl GridView {
             this.on_editor_event(event, window, cx);
         })
         .detach();
+        let mut font_names = cx.text_system().all_font_names();
+        font_names.sort();
+        font_names.dedup();
         let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
         cx.subscribe(&sidebar_search, |_, _, _: &InputEvent, cx| cx.notify())
             .detach();
@@ -154,6 +173,9 @@ impl GridView {
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
+            font: default_font(&font_names).into(),
+            font_names,
+            palette_fonts: false,
             sidebar_open: true,
             connection_open: true,
             database_open: true,
@@ -482,6 +504,17 @@ impl GridView {
     }
 
     fn palette_actions(&self) -> Vec<Action> {
+        if self.palette_fonts {
+            return self
+                .font_names
+                .iter()
+                .map(|name| Action {
+                    id: "font-choice",
+                    label: name.clone(),
+                    enabled: true,
+                })
+                .collect();
+        }
         let filtering = matches!(self.mode, Mode::Filtered { .. });
         let paged = !self.continuous;
         let action = |id, label: &str, enabled| Action {
@@ -523,6 +556,9 @@ impl GridView {
                 },
                 true,
             ),
+            action("font", "Choose font…", true),
+            action("theme-dbx", "Theme: DBX style", true),
+            action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
             action("home", "Open Home", true),
             action("table", "Open synthetic_rows", true),
             action(
@@ -543,6 +579,7 @@ impl GridView {
 
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = true;
+        self.palette_fonts = false;
         self.palette_index = 0;
         self.palette_input.update(cx, |input, cx| input.set_content("", cx));
         window.focus(&self.palette_input.read(cx).focus_handle(cx));
@@ -551,6 +588,7 @@ impl GridView {
 
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = false;
+        self.palette_fonts = false;
         window.focus(&self.focus);
         cx.notify();
     }
@@ -565,6 +603,18 @@ impl GridView {
             return;
         };
         let id = actions[index].id;
+        if id == "font" {
+            self.palette_fonts = true;
+            self.palette_index = 0;
+            self.palette_input.update(cx, |input, cx| input.set_content("", cx));
+            cx.notify();
+            return;
+        }
+        if id == "font-choice" {
+            self.font = actions[index].label.clone().into();
+            self.close_palette(window, cx);
+            return;
+        }
         self.close_palette(window, cx);
         match id {
             "first" => self.pager.first(),
@@ -591,9 +641,14 @@ impl GridView {
                 self.tabs.open_table(DATA_TABLE);
                 window.focus(&self.focus);
             }
+            "theme-dbx" | "theme-adwaita" => {
+                let style = if id == "theme-dbx" { Style::Dbx } else { Style::Adwaita };
+                Theme::current(cx).with_style(style).install(cx);
+                window.refresh();
+            }
             "theme" => {
                 self.dark_mode = !self.dark_mode;
-                cx.set_global(Theme::current(cx).toggled());
+                Theme::current(cx).toggled().install(cx);
                 window.refresh();
             }
             _ => {}
@@ -919,6 +974,7 @@ impl Render for GridView {
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
             .text_size(px(13.0))
+            .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
             .child(toolbar)
@@ -1015,9 +1071,9 @@ fn main() {
     let autoscroll: u32 = env_number("BOOKIE_PROTOTYPE_AUTOSCROLL").unwrap_or(0);
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
-    Application::new().run(move |cx: &mut App| {
+    Application::new().with_assets(assets::Assets).run(move |cx: &mut App| {
         text_input::bind_keys(cx);
-        cx.set_global(Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()));
+        Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
         let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
         let opened = cx.open_window(
             WindowOptions {

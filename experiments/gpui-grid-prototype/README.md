@@ -30,6 +30,28 @@ The look follows DBX (MIT, <https://github.com/t8y2/dbx>): its light and dark de
 
 The window also follows DBX's layout (`src/chrome.rs`, state in `src/shell.rs`), all with synthetic data: a top toolbar (New Connection, Data Transfer, Driver Manager, Plugin Center and More are inert; Commands, Sidebar and a theme switch work), a 260 px sidebar with a search box and a connection → database → table tree (click to expand; typing in the search filters the tables and expands the tree), a tab bar with a permanent Home tab and closable table tabs, a Home dashboard (statistics, Quick Start, Shortcuts, Query History), a row-number gutter and a status bar. Only `synthetic_rows` has data; the other tables open a tab that says so. Ctrl+B hides the sidebar and the command palette can open Home or the table. Light is the default. `BOOKIE_PROTOTYPE_THEME=dark` starts dark, and the command palette has **Switch to dark theme** and **Switch to light theme**. The tokens live in `src/theme.rs`. Not copied from DBX: the Geist font (the window uses the system UI font) and its canvas-drawn cells.
 
+Icons are Lucide, the set DBX uses (ISC licence, `assets/icons/LICENSE`): 20 SVGs embedded in the binary through GPUI's asset source (`src/assets.rs`) and drawn in the theme's muted colour. Our GTK application's symbolic icons are the other option; they are not wired here.
+
+The UI font defaults to the first installed of `Fira Sans` and `Fira Code`, and otherwise to the system font. Only Fira Code (monospace) is installed on the machine this was written on, so the window shows it; `sudo pacman -S ttf-fira-sans` gives the proportional one. `BOOKIE_PROTOTYPE_FONT="Some Family"` picks another at start, and the palette's **Choose font…** lists every installed family (type to filter) and applies it at once. The choice is not saved, because this experiment writes nothing to disk.
+
+There are four themes: DBX light and dark, and **Adwaita** light and dark (libadwaita's neutral surfaces, the GNOME blue `#3584e4` accent and 6 px corners, to look like our GTK application). `BOOKIE_PROTOTYPE_THEME` takes `light`, `dark`, `adwaita-light` or `adwaita-dark`. The palette has **Theme: DBX style**, **Theme: Adwaita style** and the light/dark switch, which keeps the chosen style.
+
+## Renderer boundary
+
+The planned modularisation puts application logic in app-services and leaves the application as a renderer. This prototype already splits that way, so it shows what a renderer would need. The library half (`src/lib.rs`) has no `gpui` import and is tested without a display:
+
+| Module | Holds | Would become |
+|---|---|---|
+| `model` | rows, Find, filter, compare, pager | a result service |
+| `selection` | row selection and tab-separated copy | result clipboard |
+| `edit` | typed cell validation | value editing |
+| `cursor` | active-cell movement rules | grid view-model |
+| `palette` | command matching and ordering | command registry |
+| `shell` | sidebar tree and tab model | workspace view-model |
+| `theme` | colour and size tokens | design tokens (CSS variables for a web renderer too) |
+
+The binary half is only rendering: `main.rs` (the `GridView` state and layout), `chrome.rs`, `grid_edit.rs`, `text_input.rs`, `ui_theme.rs` and `assets.rs`. `GridView` still holds both the view state and the layout; the next step is to move its state fields behind the library types so the renderer only reads them and sends intents (a key press, a click) back. The Tauri prototype follows the same split with `frontend/*.mjs` logic and `main.mjs` rendering.
+
 Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. Real keyboard, IME and mouse behavior is covered by `src/ui_tests.rs`, which drives the views through GPUI's `test-support` context (`cargo test`). A window cannot be opened under Xvfb here (no DRI3 for the Vulkan surface), so how it looks and feels has not been checked by eye.
 
 `BOOKIE_PROTOTYPE_WIDTH` and `BOOKIE_PROTOTYPE_HEIGHT` set the window size.
