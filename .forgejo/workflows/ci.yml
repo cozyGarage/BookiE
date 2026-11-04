@@ -1120,6 +1120,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
