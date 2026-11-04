@@ -29,17 +29,16 @@ pub struct WelcomeView {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum WelcomeViewInput {
     SetConnections(Vec<SavedConnection>),
     SetOrganization(ConnectionOrganizationIndex),
     FilterChanged(String),
     OpenConnect,
     ImportUrl,
-    OpenSaved(SavedConnection),
+    OpenSaved(Box<SavedConnection>),
     ToggleFavorite(Uuid),
-    Organize(SavedConnection),
-    Edit(SavedConnection),
+    Organize(Box<SavedConnection>),
+    Edit(Box<SavedConnection>),
     Duplicate(Uuid),
     Delete(Uuid),
     ExportBundle,
@@ -47,14 +46,13 @@ pub enum WelcomeViewInput {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum WelcomeViewOutput {
     OpenConnect,
     ImportUrl,
-    OpenSaved(SavedConnection),
+    OpenSaved(Box<SavedConnection>),
     ToggleFavorite(Uuid),
-    Organize(SavedConnection),
-    Edit(SavedConnection),
+    Organize(Box<SavedConnection>),
+    Edit(Box<SavedConnection>),
     Duplicate(Uuid),
     Delete(Uuid),
     ExportBundle,
@@ -393,7 +391,7 @@ impl WelcomeView {
             button.update_property(&[gtk::accessible::Property::Label(&label)]);
             let saved = saved.clone();
             let sender = sender.clone();
-            button.connect_clicked(move |_| sender.input(WelcomeViewInput::OpenSaved(saved.clone())));
+            button.connect_clicked(move |_| sender.input(WelcomeViewInput::OpenSaved(Box::new(saved.clone()))));
             self.recent_items.insert(&button, -1);
         }
     }
