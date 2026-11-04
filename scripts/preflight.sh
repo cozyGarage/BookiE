@@ -24,6 +24,7 @@ CRATES=(
   bookie-storage
   bookie-transport
   bookie-app-services
+  bookie-results
   bookie-ssh
   bookie-dump
   bookie-mcp
