@@ -8,7 +8,6 @@ use uuid::Uuid;
 
 use crate::services::change_tracker::StatementSource;
 use crate::services::error_text;
-use crate::ui::browse_tab::BrowseTabInput;
 
 use super::ran_statements::{finish_if_recorded, sql_without_parameters};
 use super::{App, AppMsg};
@@ -32,10 +31,7 @@ impl App {
         sender: ComponentSender<App>,
     ) {
         let Some(conn) = self.window_connection() else {
-            self.dispatch_to_tab(
-                tab_id,
-                BrowseTabInput::SaveFailed(save_id, crate::tr!("No active connection")),
-            );
+            self.finish_browse_save_failure(tab_id, save_id, crate::tr!("No active connection"));
             return;
         };
         self.active_browse_saves.insert(tab_id, save_id);
