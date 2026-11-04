@@ -68,13 +68,77 @@ fn a_query_string_never_becomes_the_database_name() {
 }
 
 #[test]
-fn imported_urls_default_to_a_local_read_write_password_connection() {
-    let parsed = parse_connection_url("postgres://u@db.example.com/app").unwrap();
-    assert_eq!(parsed.connection.environment, Environment::Local);
-    assert_eq!(parsed.connection.auth_mode, AuthMode::Password);
-    assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::Disabled);
-    assert!(!parsed.connection.read_only);
-    assert!(parsed.connection.ssh.is_none());
+fn a_remote_url_without_a_tls_option_defaults_to_verified_tls_and_a_production_environment() {
+    for url in [
+        "postgres://u@db.example.com/app",
+        "mysql://u@10.0.0.5/app",
+        "postgres://u@[2001:db8::1]/app",
+        "mongodb://u@0.0.0.0/app",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::VerifyFull, "{url}");
+        assert!(parsed.connection.use_tls, "{url}");
+        assert_eq!(parsed.connection.environment, Environment::Prod, "{url}");
+        assert_eq!(parsed.connection.auth_mode, AuthMode::Password, "{url}");
+        assert!(!parsed.connection.read_only, "{url}");
+        assert!(parsed.connection.ssh.is_none(), "{url}");
+    }
+}
+
+#[test]
+fn a_remote_url_for_a_driver_with_no_tls_url_option_keeps_cleartext_but_is_production() {
+    for url in [
+        "redis://cache.internal:6379",
+        "clickhouse://u@ch.example.com/db",
+        "mssql://u@sql.corp/db",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::Disabled, "{url}");
+        assert_eq!(parsed.connection.environment, Environment::Prod, "{url}");
+    }
+}
+
+#[test]
+fn a_loopback_url_without_a_tls_option_stays_a_local_cleartext_connection() {
+    for url in [
+        "postgres://u@localhost/app",
+        "postgres://u@LOCALHOST:5433/app",
+        "postgres://u@127.0.0.1/app",
+        "postgres://u@127.1.2.3/app",
+        "postgres://u@[::1]/app",
+        "postgres://u@localhost./app",
+        "postgres://u@[::ffff:127.0.0.1]/app",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.environment, Environment::Local, "{url}");
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::Disabled, "{url}");
+        assert!(!parsed.connection.use_tls, "{url}");
+    }
+}
+
+#[test]
+fn an_explicit_tls_option_is_kept_for_remote_and_loopback_hosts() {
+    let remote = parse_connection_url("postgres://u@db.example.com/app?sslmode=disable").unwrap();
+    assert_eq!(remote.connection.effective_tls_mode(), TlsMode::Disabled);
+    assert_eq!(remote.connection.environment, Environment::Prod);
+    let loopback = parse_connection_url("postgres://u@localhost/app?sslmode=require").unwrap();
+    assert_eq!(loopback.connection.effective_tls_mode(), TlsMode::Require);
+    assert_eq!(loopback.connection.environment, Environment::Local);
+}
+
+#[test]
+fn a_look_alike_host_is_not_treated_as_loopback() {
+    for url in [
+        "postgres://u@localhost.example.com/app",
+        "postgres://u@127.0.0.1.example.com/app",
+        "postgres://u@mylocalhost/app",
+        "postgres://u@128.0.0.1/app",
+        "postgres://u@dev.localhost/app",
+    ] {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.environment, Environment::Prod, "{url}");
+        assert_eq!(parsed.connection.effective_tls_mode(), TlsMode::VerifyFull, "{url}");
+    }
 }
 
 #[test]
@@ -219,4 +283,28 @@ fn a_socket_url_must_name_an_absolute_local_path_and_no_network_host() {
 fn a_semicolon_or_quote_in_the_host_cannot_reach_a_saved_record() {
     assert!(parse_connection_url("postgres://u@db'--/app").is_err());
     assert!(parse_connection_url("postgres://u@db\"/app").is_err());
+}
+
+#[test]
+fn explicit_mysql_and_mongodb_tls_options_override_the_remote_default() {
+    let off = [
+        ("mysql://u@db.example.com/app?ssl-mode=DISABLED", TlsMode::Disabled),
+        ("mysql://u@db.example.com/app?ssl-mode=REQUIRED", TlsMode::Require),
+        ("mongodb://u@db.example.com/app?tls=false", TlsMode::Disabled),
+        ("mongodb://u@db.example.com/app", TlsMode::VerifyFull),
+    ];
+    for (url, expected) in off {
+        let parsed = parse_connection_url(url).unwrap();
+        assert_eq!(parsed.connection.effective_tls_mode(), expected, "{url}");
+    }
+}
+
+#[test]
+fn a_draft_for_a_remote_host_is_production_and_one_for_this_machine_is_local() {
+    let draft = |host: &str| draft_connection("postgres", "n".into(), host.into(), 5432, String::new(), String::new());
+    assert_eq!(draft("db.example.com").environment, Environment::Prod);
+    assert_eq!(draft("10.1.2.3").environment, Environment::Prod);
+    for local in ["localhost", "LOCALHOST.", "127.0.0.1", "::1"] {
+        assert_eq!(draft(local).environment, Environment::Local, "{local}");
+    }
 }

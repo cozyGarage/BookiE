@@ -185,9 +185,12 @@ fn refresh_token_list(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpB
         let id = token.id;
         let group_c = group.clone();
         let bridge_for_revoke = mcp_bridge.clone();
-        revoke.connect_clicked(move |_| {
+        revoke.connect_clicked(move |button| {
             if let Err(e) = mcp_service::revoke_token(bridge_for_revoke.as_ref(), id) {
                 tracing::warn!(error = %e, "revoke failed");
+                let alert = adw::AlertDialog::new(Some(&tr!("Token not revoked")), Some(&e));
+                alert.add_response("close", &tr!("Close"));
+                alert.present(Some(button));
             }
             clear_and_refresh(&group_c, bridge_for_revoke.clone());
         });

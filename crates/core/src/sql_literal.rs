@@ -60,6 +60,10 @@ fn clickhouse_datetime64_fits_precision(stamp: chrono::NaiveDateTime, precision:
     (i128::from(i64::MIN)..=i128::from(i64::MAX)).contains(&ticks)
 }
 
+fn is_negative_zero(value: f64) -> bool {
+    value == 0.0 && value.is_sign_negative()
+}
+
 /// Render `value` as a SQL literal for `driver_id`.
 ///
 /// Escaping is dialect-specific and getting it wrong is not cosmetic.
@@ -87,9 +91,10 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Bool(value) => value.to_string(),
         Value::Int(value) => value.to_string(),
         Value::Float(value) if !value.is_finite() => return Err(LiteralError::NonFinite),
-        Value::Float(value) if driver_id == "sqlite" && *value == 0.0 && value.is_sign_negative() => {
+        Value::Float(value) if driver_id == "sqlite" && is_negative_zero(*value) => {
             return Err(LiteralError::Unsupported);
         }
+        Value::Float(value) if driver_id == "postgres" && is_negative_zero(*value) => "'-0'::float8".into(),
         Value::Float(value) => format!("{value:e}"),
         Value::Decimal(value) if driver_id == "duckdb" => {
             let precision = value
