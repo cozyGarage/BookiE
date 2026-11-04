@@ -53,7 +53,11 @@ pub fn present(
     let timeout = crate::services::operation_control::timeout_for(preferences, database, connection_id);
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded_with(timeout, token.clone());
-        let tables = match connection.list_tables_controlled(&control).await {
+        let listed = match schema.as_deref() {
+            Some(schema) => connection.list_tables_in(&[schema.to_string()], &control).await,
+            None => connection.list_tables_controlled(&control).await,
+        };
+        let tables = match listed {
             Ok(tables) => tables
                 .into_iter()
                 .filter(|table| schema.is_none() || table.schema == schema)

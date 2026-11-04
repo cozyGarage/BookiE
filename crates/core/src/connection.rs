@@ -192,6 +192,21 @@ pub trait Connection: Send + Sync {
     async fn list_tables_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_tables(), control).await
     }
+    /// The tables of the given schemas only. A driver that can ask its server for just those schemas overrides this,
+    /// so a catalog with many hidden schemas is not listed in full. The default lists everything and filters;
+    /// tables that carry no schema are kept because they cannot be scoped.
+    async fn list_tables_scoped(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        let mut tables = self.list_tables().await?;
+        tables.retain(|table| table.schema.as_ref().is_none_or(|schema| schemas.contains(schema)));
+        Ok(tables)
+    }
+    async fn list_tables_in(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        run_controlled(self.list_tables_scoped(schemas), control).await
+    }
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         Ok(Vec::new())
     }
