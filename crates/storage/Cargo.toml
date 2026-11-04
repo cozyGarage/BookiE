@@ -30,6 +30,7 @@ libc.workspace = true
 argon2.workspace = true
 aws-lc-rs.workspace = true
 base64.workspace = true
+quick-xml = "0.42"
 zeroize.workspace = true
 
 [dev-dependencies]
