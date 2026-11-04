@@ -174,13 +174,10 @@ impl App {
     }
 }
 
-/// The toast for a selection too large to copy as statements, or `None` when it is within the limit.
 fn copy_limit_refusal(rows: usize) -> Option<String> {
     (rows > MAX_COPIED_STATEMENT_ROWS).then(|| crate::tr!("Select fewer rows to copy as statements."))
 }
 
-/// The statement text for the selected rows, or the toast explaining why nothing is copied. `rows` is `None`
-/// when any selected row is not fully fetched.
 fn copied_statements(
     statement: RowStatement,
     driver_id: &str,
