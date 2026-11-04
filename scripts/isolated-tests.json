@@ -320,6 +320,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::a_page_reload_retires_a_pending_cell_value_request"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::tests::browse_page_fetch_waits_until_the_new_columns_are_applied"
     ],
     [
@@ -1191,6 +1196,21 @@
       "bookie-app",
       "--lib",
       "ui::grid::dialog_focus::tests::virtualized_rows_keep_the_focused_cells_identity_when_revealed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::chrome_tests::independent_browse_owners_keep_edits_and_teardown_separate"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::chrome_tests::late_save_completion_does_not_discard_new_edits"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::chrome_tests::active_save_completion_clears_submitted_edits"
     ],
     [
       "bookie-app",

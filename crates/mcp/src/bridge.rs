@@ -576,34 +576,77 @@ pub(crate) fn preview_may_implicitly_commit(driver_id: &str, sql: &str) -> bool 
         )
 }
 
-pub(crate) fn nontransactional_engine_query(driver_id: &str, sql: &str) -> Option<String> {
+pub(crate) enum EngineCheck {
+    NotApplicable,
+    Refuse,
+    Query(String),
+}
+
+const READ_ONLY_SYSTEM_SCHEMA: &str = "information_schema";
+
+pub(crate) fn nontransactional_engine_check(driver_id: &str, sql: &str) -> EngineCheck {
     if driver_id != "mysql" {
-        return None;
+        return EngineCheck::NotApplicable;
     }
-    let tables: Vec<String> = bookie_policy::classify(sql, driver_id)
-        .tables
-        .iter()
-        .map(|table| {
-            table
-                .rsplit('.')
-                .next()
-                .unwrap_or(table)
-                .trim_matches('`')
-                .replace('\'', "''")
-        })
-        .collect();
+    let tables = bookie_policy::classify(sql, driver_id).tables;
     if tables.is_empty() {
-        return None;
+        return EngineCheck::NotApplicable;
     }
-    let names = tables
-        .iter()
-        .map(|table| format!("'{table}'"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    Some(format!(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() \
-         AND table_name IN ({names}) AND UPPER(COALESCE(engine, '')) NOT IN ('INNODB', 'NDB', 'NDBCLUSTER')"
+    let mut clauses = Vec::with_capacity(tables.len());
+    for table in &tables {
+        let parts = split_qualified_name(table);
+        if parts.iter().any(|part| part.is_empty() || part.contains('\\')) {
+            return EngineCheck::Refuse;
+        }
+        let Some(clause) = table_clause(&parts) else {
+            return EngineCheck::Refuse;
+        };
+        clauses.push(clause);
+    }
+    EngineCheck::Query(format!(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE ({}) AND table_schema <> '{READ_ONLY_SYSTEM_SCHEMA}' \
+         AND UPPER(COALESCE(engine, '')) NOT IN ('INNODB', 'NDB', 'NDBCLUSTER')",
+        clauses.join(" OR ")
     ))
+}
+
+fn table_clause(parts: &[String]) -> Option<String> {
+    match parts {
+        [] => None,
+        [table] => Some(format!(
+            "(table_schema = DATABASE() AND table_name = '{}')",
+            escape_literal(table)
+        )),
+        [.., schema, table] => Some(format!(
+            "(table_schema = '{}' AND table_name = '{}')",
+            escape_literal(schema),
+            escape_literal(table)
+        )),
+    }
+}
+
+fn escape_literal(text: &str) -> String {
+    text.replace('\\', "\\\\").replace('\'', "''")
+}
+
+fn split_qualified_name(name: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    let mut characters = name.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            '`' if quoted && characters.peek() == Some(&'`') => {
+                current.push('`');
+                characters.next();
+            }
+            '`' => quoted = !quoted,
+            '.' if !quoted => parts.push(std::mem::take(&mut current)),
+            other => current.push(other),
+        }
+    }
+    parts.push(current);
+    parts
 }
 
 async fn touches_nontransactional_table(
@@ -612,8 +655,10 @@ async fn touches_nontransactional_table(
     sql: &str,
     control: &OperationControl,
 ) -> bool {
-    let Some(query) = nontransactional_engine_query(driver_id, sql) else {
-        return false;
+    let query = match nontransactional_engine_check(driver_id, sql) {
+        EngineCheck::NotApplicable => return false,
+        EngineCheck::Refuse => return true,
+        EngineCheck::Query(query) => query,
     };
     match transaction.query_controlled(&query, control).await {
         Ok(result) => !matches!(result.rows.first().and_then(|row| row.first()), Some(Value::Int(0))),

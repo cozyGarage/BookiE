@@ -24,6 +24,70 @@ fn launch_tab(read_only: bool) -> (Controller<BrowseTab>, std::sync::mpsc::Recei
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn independent_browse_owners_keep_edits_and_teardown_separate() {
+    relm4::gtk::init().unwrap();
+    let id = Uuid::new_v4();
+    let (first, first_outputs) = launch_with_read_only(id, false);
+    let (second, second_outputs) = launch_with_read_only(id, false);
+    load_two_rows(&first, &first_outputs);
+    load_two_rows(&second, &second_outputs);
+    first.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&first_outputs);
+    assert!(first.model().change_trackers.any_pending_in([id]));
+    assert!(!second.model().change_trackers.any_pending_in([id]));
+    second.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&second_outputs);
+    assert!(second.model().change_trackers.any_pending_in([id]));
+    first.sender().send(BrowseTabInput::CommitSave).unwrap();
+    assert!(
+        pump(&first_outputs)
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ExecuteTransaction { .. }))
+    );
+    first.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    pump(&first_outputs);
+    assert!(!first.model().change_trackers.any_pending_in([id]));
+    assert!(second.model().change_trackers.any_pending_in([id]));
+    first.model().change_trackers.close_tab(id);
+    assert!(first.model().change_trackers.with_tab_ref(id, |_| ()).is_none());
+    assert!(second.model().change_trackers.any_pending_in([id]));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn late_save_completion_does_not_discard_new_edits() {
+    let (controller, outputs) = launch_tab(false);
+    load_two_rows(&controller, &outputs);
+    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&outputs);
+    let id = controller.model().tab_id;
+    assert!(controller.model().change_trackers.any_pending_in([id]));
+    controller.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    pump(&outputs);
+    assert!(controller.model().change_trackers.any_pending_in([id]));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn active_save_completion_clears_submitted_edits() {
+    let (controller, outputs) = launch_tab(false);
+    load_two_rows(&controller, &outputs);
+    controller.sender().send(BrowseTabInput::InsertRow).unwrap();
+    pump(&outputs);
+    let id = controller.model().tab_id;
+    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    assert!(
+        pump(&outputs)
+            .iter()
+            .any(|output| matches!(output, BrowseTabOutput::ExecuteTransaction { .. }))
+    );
+    controller.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    pump(&outputs);
+    assert!(!controller.model().change_trackers.any_pending_in([id]));
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn a_row_count_queued_before_refresh_is_not_shown() {
     let (controller, outputs) = launch_tab(false);
     controller
@@ -55,6 +119,18 @@ fn page_size_changes_apply_after_a_failed_first_load() {
     controller.sender().send(BrowseTabInput::PageSizeChanged(500)).unwrap();
     pump(&outputs);
     assert_eq!(controller.model().page_size, 500);
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn a_page_reload_retires_a_pending_cell_value_request() {
+    let (controller, outputs) = launch_tab(false);
+    let pending = controller.model().cell_value_requests.begin();
+    assert!(controller.model().cell_value_requests.accepts(pending));
+    controller.sender().send(BrowseTabInput::PageSizeChanged(500)).unwrap();
+    pump(&outputs);
+    assert_eq!(controller.model().page_size, 500);
+    assert!(!controller.model().cell_value_requests.accepts(pending));
 }
 
 #[test]

@@ -39,6 +39,8 @@ SQL_EDITOR = {
     "Close": "shortcut: Ctrl+Q",
     "Minimize": "tab-stop",
     "Maximize": "tab-stop",
+    "Minimise": "tab-stop",
+    "Maximise": "tab-stop",
 }
 
 

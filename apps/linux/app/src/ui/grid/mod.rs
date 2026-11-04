@@ -117,6 +117,7 @@ pub enum GridMsg {
 
 #[derive(Clone, Default)]
 pub struct TabGridContext {
+    pub(crate) change_trackers: Option<crate::services::change_tracker::WorkspaceChangeTrackers>,
     pub tab_id: Option<uuid::Uuid>,
     pub pk_col_indices: Vec<usize>,
     pub projected_columns: Option<Vec<usize>>,

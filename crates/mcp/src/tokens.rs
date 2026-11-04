@@ -142,9 +142,10 @@ impl TokenStore {
     pub fn revoke(&self, id: Uuid) -> Result<(), String> {
         let _lock = acquire_process_lock(&self.path)?;
         let mut map = load_tokens(&self.path)?;
-        if let Some(token) = map.get_mut(&id) {
-            token.revoked = true;
-        }
+        let Some(token) = map.get_mut(&id) else {
+            return Err("no MCP token with that id exists".to_string());
+        };
+        token.revoked = true;
         persist_tokens(&self.path, &map)?;
         let stamp = token_file_stamp(&self.path)?;
         let mut cache = self.cache.lock().map_err(|error| error.to_string())?;

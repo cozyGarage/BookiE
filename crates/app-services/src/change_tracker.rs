@@ -58,6 +58,7 @@ pub enum UndoOp {
         prev_value: Value,
         new_value: Value,
         base: Value,
+        prev_touched: bool,
     },
     Insert {
         draft_id: u64,
@@ -170,6 +171,7 @@ impl TabChangeTracker {
             prev_value: shown_before,
             new_value: new,
             base,
+            prev_touched: false,
         });
         self.emit_changed(vec![row_key]);
     }
@@ -218,6 +220,7 @@ impl TabChangeTracker {
             && col < draft.values.len()
         {
             let prev = draft.values[col].clone();
+            let prev_touched = draft.touched.get(col).copied().unwrap_or(false);
             draft.set(col, new.clone(), true);
             self.push_undo(UndoOp::CellEdit {
                 row_key: RowKey::Draft(draft_id),
@@ -225,6 +228,7 @@ impl TabChangeTracker {
                 base: prev.clone(),
                 prev_value: prev,
                 new_value: new,
+                prev_touched,
             });
             self.emit_changed(vec![RowKey::Draft(draft_id)]);
             return true;
@@ -240,13 +244,14 @@ impl TabChangeTracker {
                 col,
                 prev_value,
                 base,
+                prev_touched,
                 ..
             } => {
                 if let RowKey::Draft(draft_id) = row_key {
                     if let Some(draft) = self.inserts.iter_mut().find(|d| d.draft_id == *draft_id)
                         && *col < draft.values.len()
                     {
-                        draft.set(*col, prev_value.clone(), !matches!(prev_value, Value::Null));
+                        draft.set(*col, prev_value.clone(), *prev_touched);
                     }
                 } else {
                     self.set_pending_edit(row_key, *col, Some(base), prev_value);

@@ -368,6 +368,7 @@ impl App {
         let read_only = self.read_only;
 
         let browse_init = BrowseTabInit {
+            change_trackers: self.change_trackers.clone(),
             tab_id,
             schema: schema.clone(),
             table: table.clone(),
@@ -605,8 +606,10 @@ impl App {
             .and_then(|t| match t {
                 WorkspaceTab::Structure(s) => self.structure_trackers.with_tab_ref(s.id, |tr| tr.has_pending()),
                 WorkspaceTab::Table(s) => {
-                    let data_dirty =
-                        crate::services::change_tracker::with_tab_ref(s.id, |tr| tr.has_pending()).unwrap_or(false);
+                    let data_dirty = self
+                        .change_trackers
+                        .with_tab_ref(s.id, |tr| tr.has_pending())
+                        .unwrap_or(false);
                     let struct_dirty = self
                         .structure_trackers
                         .with_tab_ref(s.id, |tr| tr.has_pending())
@@ -656,7 +659,10 @@ impl App {
             // branches so a Table tab whose only dirt is on the
             // Structure side doesn't try to save through the Browse
             // path (and vice versa).
-            let data_dirty = crate::services::change_tracker::with_tab_ref(id, |tr| tr.has_pending()).unwrap_or(false);
+            let data_dirty = self
+                .change_trackers
+                .with_tab_ref(id, |tr| tr.has_pending())
+                .unwrap_or(false);
             let struct_dirty = self
                 .structure_trackers
                 .with_tab_ref(id, |tr| tr.has_pending())
@@ -666,12 +672,13 @@ impl App {
                 Some(WorkspaceTab::Editor(slot)) if slot.has_unsaved_file_changes()
             );
             let structure_trackers = self.structure_trackers.clone();
+            let change_trackers = self.change_trackers.clone();
             dialog.connect_response(None, move |dlg, response| {
                 dlg.close();
                 match response {
                     "discard" => {
                         if data_dirty {
-                            crate::services::change_tracker::with_tab(id, |t| t.clear());
+                            change_trackers.with_tab(id, |t| t.clear());
                         }
                         if struct_dirty {
                             structure_trackers.with_tab(id, |t| t.clear());
@@ -794,7 +801,7 @@ impl App {
                 // entry so a re-opened tab with the same uuid (or a
                 // dropped async future from `drop_on_shutdown`) doesn't
                 // leave the save path permanently locked.
-                crate::services::change_tracker::close_tab(slot.id);
+                self.change_trackers.close_tab(slot.id);
                 self.structure_trackers.close_tab(slot.id);
                 self.structure_saves_in_flight.borrow_mut().remove(&slot.id);
             }
@@ -863,12 +870,11 @@ impl App {
 
     pub(super) fn window_has_pending(&self) -> bool {
         let ids = self.this_window_tab_ids();
-        crate::services::change_tracker::any_pending_in(ids.iter().copied())
-            || self.structure_trackers.any_pending_in(ids)
+        self.change_trackers.any_pending_in(ids.iter().copied()) || self.structure_trackers.any_pending_in(ids)
     }
 
     pub(super) fn window_pending_browse_tabs(&self) -> Vec<Uuid> {
-        crate::services::change_tracker::pending_among(self.this_window_tab_ids())
+        self.change_trackers.pending_among(self.this_window_tab_ids())
     }
 
     pub(super) fn window_pending_structure_tabs(&self) -> Vec<Uuid> {
@@ -888,7 +894,7 @@ impl App {
             match tab {
                 WorkspaceTab::Structure(slot) => self.structure_trackers.close_tab(slot.id),
                 WorkspaceTab::Table(slot) => {
-                    crate::services::change_tracker::close_tab(slot.id);
+                    self.change_trackers.close_tab(slot.id);
                     self.structure_trackers.close_tab(slot.id);
                 }
                 WorkspaceTab::Editor(_) => {}

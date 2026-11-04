@@ -159,8 +159,10 @@ impl App {
             ));
             return;
         };
-        let pending =
-            crate::services::change_tracker::with_tab_ref(tab_id, |tracker| tracker.has_pending()).unwrap_or(false);
+        let pending = self
+            .change_trackers
+            .with_tab_ref(tab_id, |tracker| tracker.has_pending())
+            .unwrap_or(false);
         let hidden_columns = if pending {
             std::collections::HashSet::new()
         } else {
@@ -685,7 +687,10 @@ impl App {
             .get(&id)
             .and_then(|tab| tab.browse_controller())
             .is_some_and(|controller| controller.model().save_in_flight());
-        let dirty = crate::services::change_tracker::with_tab_ref(id, |tr| tr.has_pending()).unwrap_or(false);
+        let dirty = self
+            .change_trackers
+            .with_tab_ref(id, |tr| tr.has_pending())
+            .unwrap_or(false);
         match refresh_decision(dirty, save_in_flight) {
             RefreshDecision::Refresh => {
                 self.dispatch_to_tab(id, BrowseTabInput::Refresh);
@@ -709,10 +714,11 @@ impl App {
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
         let workspace_tabs = self.workspace_tabs.clone();
+        let change_trackers = self.change_trackers.clone();
         dialog.connect_response(None, move |dlg: &adw::AlertDialog, response: &str| {
             dlg.close();
             if response == "discard" {
-                crate::services::change_tracker::with_tab(id, |t| t.clear());
+                change_trackers.with_tab(id, |t| t.clear());
                 if let Some(controller) = workspace_tabs.borrow().get(&id).and_then(|t| t.browse_controller()) {
                     let _ = controller.sender().send(BrowseTabInput::Refresh);
                 }

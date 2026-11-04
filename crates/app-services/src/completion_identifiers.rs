@@ -1,6 +1,6 @@
 use bookie_core::sql_dialect::quote_ident;
 use bookie_core::sql_syntax::SqlGrammar;
-use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
+use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptToken, ScriptTokenKind};
 
 pub(super) fn plan(text: &str, grammar: Option<SqlGrammar>) -> ScriptPlan {
     plan_with(text, grammar, None)
@@ -161,6 +161,75 @@ pub(super) fn words(text: &str, grammar: Option<SqlGrammar>, settings: Option<Le
         words.push(&text[start..end]);
     }
     words
+}
+
+pub(super) fn cte_names(text: &str, grammar: Option<SqlGrammar>, settings: Option<LexicalSettings>) -> Vec<String> {
+    let plan = plan_with(text, grammar, settings);
+    let tokens: Vec<_> = plan
+        .tokens(0..text.len())
+        .filter(|token| !token.kind.is_trivia())
+        .collect();
+    let mut names = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        index += 1;
+        if !is_word(text, &tokens[index - 1], "with") {
+            continue;
+        }
+        if tokens.get(index).is_some_and(|token| is_word(text, token, "recursive")) {
+            index += 1;
+        }
+        index = collect_cte_list(text, &tokens, index, &mut names);
+    }
+    names
+}
+
+fn collect_cte_list(text: &str, tokens: &[ScriptToken], mut index: usize, names: &mut Vec<String>) -> usize {
+    while let Some(name) = tokens
+        .get(index)
+        .filter(|token| matches!(token.kind, ScriptTokenKind::Word | ScriptTokenKind::QuotedIdentifier))
+    {
+        index = skip_group(tokens, index + 1);
+        if !tokens.get(index).is_some_and(|token| is_word(text, token, "as")) {
+            return index;
+        }
+        names.push(text[name.range.clone()].to_string());
+        index += 1;
+        while tokens
+            .get(index)
+            .is_some_and(|token| is_word(text, token, "not") || is_word(text, token, "materialized"))
+        {
+            index += 1;
+        }
+        index = skip_group(tokens, index);
+        if !tokens.get(index).is_some_and(|token| &text[token.range.clone()] == ",") {
+            return index;
+        }
+        index += 1;
+    }
+    index
+}
+
+fn skip_group(tokens: &[ScriptToken], index: usize) -> usize {
+    if tokens.get(index).map(|token| token.kind) != Some(ScriptTokenKind::OpenParen) {
+        return index;
+    }
+    let mut depth = 0usize;
+    for (offset, token) in tokens[index..].iter().enumerate() {
+        match token.kind {
+            ScriptTokenKind::OpenParen => depth += 1,
+            ScriptTokenKind::CloseParen => depth = depth.saturating_sub(1),
+            _ => continue,
+        }
+        if depth == 0 {
+            return index + offset + 1;
+        }
+    }
+    tokens.len()
+}
+
+fn is_word(text: &str, token: &ScriptToken, word: &str) -> bool {
+    token.kind == ScriptTokenKind::Word && text[token.range.clone()].eq_ignore_ascii_case(word)
 }
 
 pub fn catalog_reference(driver: &str, schema: Option<&str>, table: &str) -> String {

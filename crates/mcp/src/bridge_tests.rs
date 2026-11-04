@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use super::{
-    McpBridge, McpLimits, count_from_value, count_statement, preview_may_implicitly_commit, sql_looks_like_write,
-    validated_identifier,
+    EngineCheck, McpBridge, McpLimits, count_from_value, count_statement, nontransactional_engine_check,
+    preview_may_implicitly_commit, sql_looks_like_write, validated_identifier,
 };
 use crate::tokens::TokenStore;
 use bookie_core::Value;
@@ -283,4 +283,111 @@ fn engines_with_transactional_ddl_are_not_refused_for_ddl() {
     for driver in ["postgres", "sqlite"] {
         assert!(!preview_may_implicitly_commit(driver, "DROP TABLE orders"), "{driver}");
     }
+}
+
+fn engine_query(sql: &str) -> String {
+    match nontransactional_engine_check("mysql", sql) {
+        EngineCheck::Query(query) => query,
+        _ => String::new(),
+    }
+}
+
+#[test]
+fn an_unqualified_table_is_checked_in_the_current_database() {
+    let query = engine_query("UPDATE legacy SET v = 2 WHERE id = 1");
+    assert!(
+        query.contains("table_schema = DATABASE() AND table_name = 'legacy'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn a_schema_qualified_table_is_checked_in_its_own_database() {
+    let query = engine_query("UPDATE other_db.legacy SET v = 2 WHERE id = 1");
+    assert!(
+        query.contains("table_schema = 'other_db' AND table_name = 'legacy'"),
+        "{query}"
+    );
+    assert!(
+        !query.contains("table_schema = DATABASE() AND table_name = 'legacy'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn backticked_parts_and_dots_inside_them_are_split_correctly() {
+    let query = engine_query("UPDATE `my.db`.`odd.table` SET v = 2 WHERE id = 1");
+    assert!(
+        query.contains("table_schema = 'my.db' AND table_name = 'odd.table'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn a_single_quote_in_a_name_cannot_break_out_of_the_literal() {
+    let query = engine_query("UPDATE `a'b`.`c'd` SET v = 2 WHERE id = 1");
+    assert!(
+        query.contains("table_schema = 'a''b' AND table_name = 'c''d'"),
+        "{query}"
+    );
+}
+
+#[test]
+fn a_name_with_a_backslash_is_refused_because_its_escaping_depends_on_the_sql_mode() {
+    assert!(matches!(
+        nontransactional_engine_check("mysql", "UPDATE `a\\b`.`c` SET v = 2 WHERE id = 1"),
+        EngineCheck::Refuse
+    ));
+    assert!(matches!(
+        nontransactional_engine_check("mysql", "UPDATE `c\\d` SET v = 2 WHERE id = 1"),
+        EngineCheck::Refuse
+    ));
+}
+
+#[test]
+fn several_tables_are_each_checked_in_their_own_database() {
+    let query = engine_query("UPDATE orders o JOIN other_db.legacy l ON l.id = o.id SET o.v = 2");
+    assert!(
+        query.contains("table_schema = DATABASE() AND table_name = 'orders'"),
+        "{query}"
+    );
+    assert!(
+        query.contains("table_schema = 'other_db' AND table_name = 'legacy'"),
+        "{query}"
+    );
+    assert!(query.contains(") OR ("), "{query}");
+}
+
+#[test]
+fn only_the_read_only_information_schema_is_exempt_from_the_engine_check() {
+    let query = engine_query("INSERT INTO audit SELECT table_name FROM information_schema.tables");
+    assert!(query.contains("table_schema <> 'information_schema'"), "{query}");
+}
+
+#[test]
+fn writable_system_schemas_and_a_database_named_sys_are_still_checked() {
+    for sql in [
+        "UPDATE performance_schema.setup_consumers SET enabled = 'NO'",
+        "UPDATE sys.legacy SET v = 2 WHERE id = 1",
+    ] {
+        let query = engine_query(sql);
+        assert!(!query.contains("NOT IN ('information_schema'"), "{sql}: {query}");
+        assert!(query.contains("table_schema <> 'information_schema'"), "{sql}: {query}");
+        assert!(
+            query.contains("table_schema = 'performance_schema'") || query.contains("table_schema = 'sys'"),
+            "{sql}: {query}"
+        );
+    }
+}
+
+#[test]
+fn only_mysql_has_an_engine_check_and_a_statement_without_tables_needs_none() {
+    assert!(matches!(
+        nontransactional_engine_check("postgres", "UPDATE t SET v = 1"),
+        EngineCheck::NotApplicable
+    ));
+    assert!(matches!(
+        nontransactional_engine_check("mysql", "SELECT 1"),
+        EngineCheck::NotApplicable
+    ));
 }
