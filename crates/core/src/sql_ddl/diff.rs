@@ -21,18 +21,41 @@ use super::types::{BuildDdlError, DraftColumn, StructureOp, mssql_drop_default_c
 /// - Indexes / FKs matched by name and definition. A rename, or a
 ///   same-name replacement with a different definition, ⇒ `Drop` +
 ///   `Add` (no native ALTER INDEX in the supported drivers).
-#[allow(clippy::too_many_arguments)]
+pub struct TableState<'a, C> {
+    pub table: &'a str,
+    pub columns: &'a [C],
+    pub indexes: &'a [IndexInfo],
+    pub fks: &'a [ForeignKeyInfo],
+}
+
+impl<'a, C> TableState<'a, C> {
+    pub fn bare(table: &'a str, columns: &'a [C]) -> Self {
+        Self {
+            table,
+            columns,
+            indexes: &[],
+            fks: &[],
+        }
+    }
+}
+
 pub fn diff_to_ops(
     schema: Option<&str>,
-    original_table: &str,
-    current_table: &str,
-    original_columns: &[ColumnInfo],
-    current_columns: &[DraftColumn],
-    original_indexes: &[IndexInfo],
-    current_indexes: &[IndexInfo],
-    original_fks: &[ForeignKeyInfo],
-    current_fks: &[ForeignKeyInfo],
+    original: TableState<'_, ColumnInfo>,
+    current: TableState<'_, DraftColumn>,
 ) -> Vec<StructureOp> {
+    let TableState {
+        table: original_table,
+        columns: original_columns,
+        indexes: original_indexes,
+        fks: original_fks,
+    } = original;
+    let TableState {
+        table: current_table,
+        columns: current_columns,
+        indexes: current_indexes,
+        fks: current_fks,
+    } = current;
     let mut ops = Vec::new();
     let schema_owned = schema.map(ToString::to_string);
 

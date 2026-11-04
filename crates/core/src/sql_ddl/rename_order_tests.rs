@@ -1,6 +1,6 @@
 use crate::query::ColumnInfo;
 
-use super::diff::diff_to_ops;
+use super::diff::{TableState, diff_to_ops};
 use super::{DraftColumn, StructureOp, materialize_ops};
 
 fn existing(name: &str, data_type: &str) -> ColumnInfo {
@@ -59,7 +59,21 @@ fn swapping_two_column_names_renames_through_a_free_name() {
     let original = vec![existing("a", "text"), existing("b", "text")];
     let drafts = renamed_drafts(&original, &["b", "a"]);
 
-    let ops = diff_to_ops(None, "t", "t", &original, &drafts, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: "t",
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: "t",
+            columns: &drafts,
+            indexes: &[],
+            fks: &[],
+        },
+    );
 
     assert_eq!(column_names_after_renames(&original, &ops), vec!["a", "b"]);
     for driver in ["postgres", "mysql", "mssql"] {
@@ -75,7 +89,21 @@ fn temporary_names_do_not_collide_with_existing_names_in_another_case() {
         existing("BOOKIE_TMP_1", "text"),
     ];
     let drafts = renamed_drafts(&original, &["b", "a", "BOOKIE_TMP_1"]);
-    let ops = diff_to_ops(None, "t", "t", &original, &drafts, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: "t",
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: "t",
+            columns: &drafts,
+            indexes: &[],
+            fks: &[],
+        },
+    );
     let temporary = ops
         .iter()
         .find_map(|op| match op {
@@ -95,7 +123,21 @@ fn a_chain_of_renames_runs_in_dependency_order_whatever_the_column_order() {
     let original = vec![existing("a", "text"), existing("b", "text")];
     let drafts = renamed_drafts(&original, &["b", "c"]);
 
-    let ops = diff_to_ops(None, "t", "t", &original, &drafts, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: "t",
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: "t",
+            columns: &drafts,
+            indexes: &[],
+            fks: &[],
+        },
+    );
 
     assert_eq!(column_names_after_renames(&original, &ops), vec!["b", "c"]);
 }
@@ -109,7 +151,21 @@ fn a_dropped_columns_name_can_be_taken_by_another_column() {
         draft
     }];
 
-    let ops = diff_to_ops(None, "t", "t", &original, &drafts, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: "t",
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: "t",
+            columns: &drafts,
+            indexes: &[],
+            fks: &[],
+        },
+    );
 
     assert_eq!(column_names_after_renames(&original, &ops), vec!["x"]);
 }

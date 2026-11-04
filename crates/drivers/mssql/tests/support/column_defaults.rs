@@ -8,7 +8,7 @@ mod exact_grid_original;
 
 use super::{connect, start_mssql};
 use bookie_core::Value;
-use bookie_core::sql_ddl::{DraftColumn, diff_to_ops, materialize_ops};
+use bookie_core::sql_ddl::{DraftColumn, TableState, diff_to_ops, materialize_ops};
 
 #[path = "masked_column_alter.rs"]
 mod masked_column_alter;
@@ -33,7 +33,21 @@ async fn a_column_with_a_default_changes_type_and_drops() {
     let n = current.iter_mut().find(|c| c.name == "n").unwrap();
     n.data_type = "int".into();
 
-    let ops = diff_to_ops(None, "def_drop", "def_drop", &original, &current, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: "def_drop",
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: "def_drop",
+            columns: &current,
+            indexes: &[],
+            fks: &[],
+        },
+    );
     for sql in materialize_ops(&ops, "mssql").unwrap() {
         conn.execute(&sql)
             .await
