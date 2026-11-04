@@ -298,3 +298,13 @@ fn explicit_mysql_and_mongodb_tls_options_override_the_remote_default() {
         assert_eq!(parsed.connection.effective_tls_mode(), expected, "{url}");
     }
 }
+
+#[test]
+fn a_draft_for_a_remote_host_is_production_and_one_for_this_machine_is_local() {
+    let draft = |host: &str| draft_connection("postgres", "n".into(), host.into(), 5432, String::new(), String::new());
+    assert_eq!(draft("db.example.com").environment, Environment::Prod);
+    assert_eq!(draft("10.1.2.3").environment, Environment::Prod);
+    for local in ["localhost", "LOCALHOST.", "127.0.0.1", "::1"] {
+        assert_eq!(draft(local).environment, Environment::Local, "{local}");
+    }
+}
