@@ -35,13 +35,17 @@ fn grid(count: usize) -> gtk4::ColumnView {
         &[],
         "",
         None,
-        None,
-        None,
-        None,
-        None,
-        super::super::TabGridContext::default(),
-        None,
-        Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
+        },
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx: super::super::TabGridContext::default(),
+            column_widths: None,
+            database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        },
     )
     .0
 }

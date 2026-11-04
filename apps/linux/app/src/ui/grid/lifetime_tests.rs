@@ -105,14 +105,18 @@ fn retire_grid(with_menus: bool, editable: bool, rendered: bool) -> RetiredGrid 
         &result,
         &result.columns,
         "items",
-        editable.then_some(sender.clone()),
-        with_menus.then_some(sender),
         None,
-        None,
-        None,
-        tab_ctx,
-        None,
-        Arc::new(DatabaseService::new()),
+        crate::ui::grid::GridSenders {
+            edit: editable.then_some(sender.clone()),
+            menu: with_menus.then_some(sender),
+            sort: None,
+        },
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx,
+            column_widths: None,
+            database: Arc::new(DatabaseService::new()),
+        },
     );
     let view_weak = view.downgrade();
     let selection_weak = selection.downgrade();
@@ -221,13 +225,17 @@ fn a_retired_grid_does_not_retain_its_inspector_through_selection_callback() {
         &[column],
         "items",
         None,
-        None,
-        None,
-        None,
-        None,
-        TabGridContext::default(),
-        None,
-        Arc::new(DatabaseService::new()),
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
+        },
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx: TabGridContext::default(),
+            column_widths: None,
+            database: Arc::new(DatabaseService::new()),
+        },
     );
     let inspector = crate::ui::row_inspector::RowInspector::new(&view);
     let weak_view = view.downgrade();

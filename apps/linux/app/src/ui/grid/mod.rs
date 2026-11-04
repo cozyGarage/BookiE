@@ -33,7 +33,7 @@ use bookie_core::{ColumnInfo, QueryResult};
 use crate::services::database_service::DatabaseService;
 use crate::ui::row_store::RowStore;
 
-use column::{build_column, header_column, is_cell_editable};
+use column::{ColumnSpec, build_column, header_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
@@ -150,20 +150,38 @@ pub type ChoiceMap = std::rc::Rc<std::cell::RefCell<std::collections::HashMap<St
 const WIDE_TABLE_THRESHOLD: usize = 8;
 const MIN_COLUMN_WIDTH_PX: i32 = 120;
 
-#[allow(clippy::too_many_arguments)]
+pub struct GridSenders {
+    pub edit: Option<relm4::Sender<GridMsg>>,
+    pub menu: Option<relm4::Sender<GridMsg>>,
+    pub sort: Option<relm4::Sender<GridMsg>>,
+}
+
+pub struct GridEnv {
+    pub connection_id: Option<uuid::Uuid>,
+    pub tab_ctx: TabGridContext,
+    pub column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    pub database: std::sync::Arc<DatabaseService>,
+}
+
 pub fn build_column_view(
     shared: &std::sync::Arc<QueryResult>,
     schema_columns: &[ColumnInfo],
     table: &str,
-    edit_sender: Option<relm4::Sender<GridMsg>>,
-    menu_sender: Option<relm4::Sender<GridMsg>>,
     sort: Option<(usize, bool)>,
-    sort_sender: Option<relm4::Sender<GridMsg>>,
-    connection_id: Option<uuid::Uuid>,
-    tab_ctx: TabGridContext,
-    column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
-    database: std::sync::Arc<DatabaseService>,
+    senders: GridSenders,
+    env: GridEnv,
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
+    let GridSenders {
+        edit: edit_sender,
+        menu: menu_sender,
+        sort: sort_sender,
+    } = senders;
+    let GridEnv {
+        connection_id,
+        tab_ctx,
+        column_widths,
+        database,
+    } = env;
     let result: &QueryResult = shared;
     let store = match &tab_ctx.projected_columns {
         Some(indices) => match if tab_ctx.preview_redis_strings && !tab_ctx.pk_col_indices.is_empty() {
@@ -256,18 +274,18 @@ pub fn build_column_view(
     for (i, column) in columns.iter().enumerate() {
         let editable = is_cell_editable(schema_columns.get(i).unwrap_or(column));
         let header = header_column(column, schema_columns.get(i));
-        let (col, edit_trigger) = build_column(
-            &header,
-            i,
+        let spec = ColumnSpec {
             editable,
-            table.to_string(),
-            edit_sender.clone(),
+            table: table.to_string(),
+            sender: edit_sender.clone(),
             connection_id,
-            tab_ctx.clone(),
-            sort_sender.is_some() || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
+            tab_ctx: tab_ctx.clone(),
+            sort_enabled: sort_sender.is_some()
+                || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
             default_min_width,
-            column_widths.clone(),
-        );
+            column_widths: column_widths.clone(),
+        };
+        let (col, edit_trigger) = build_column(&header, i, spec);
         col.set_id(Some(&i.to_string()));
         column_view.append_column(&col);
         view_columns.push(col);
