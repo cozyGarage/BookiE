@@ -110,7 +110,6 @@ pub enum BrowseTabInput {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum BrowseTabOutput {
     OpenReferencedRow {
         schema: Option<String>,
