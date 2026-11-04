@@ -126,7 +126,6 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         socket_path,
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
-        environment: if local { Environment::Local } else { Environment::Prod },
         ..draft_connection(driver_id, name, host, port, database, username)
     };
 
@@ -141,6 +140,7 @@ pub(crate) fn draft_connection(
     database: String,
     username: String,
 ) -> SavedConnection {
+    let environment = environment_for_host(&host);
     SavedConnection {
         auth_source: None,
         id: Uuid::new_v4(),
@@ -159,7 +159,7 @@ pub(crate) fn draft_connection(
         tls_client_key: None,
         read_only: false,
         auth_mode: AuthMode::Password,
-        environment: Environment::Local,
+        environment,
         ssh: None,
         last_opened_at: None,
         connect_timeout_secs: None,
@@ -173,6 +173,14 @@ pub(crate) fn default_port(driver_id: &str) -> Option<u16> {
         .iter()
         .find(|(_, driver, _)| *driver == driver_id)
         .map(|(_, _, port)| *port)
+}
+
+fn environment_for_host(host: &str) -> Environment {
+    if is_loopback_host(host) {
+        Environment::Local
+    } else {
+        Environment::Prod
+    }
 }
 
 fn default_tls_mode(driver_id: &str, local: bool) -> TlsMode {
