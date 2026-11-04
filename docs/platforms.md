@@ -29,9 +29,7 @@ In this repository, the pin selects 1.98. Use `cargo +stable clippy ...` for the
 
 ## Package builds
 
-Use the [packaging guide](../apps/linux/packaging/README.md) to build Arch or Flatpak packages from the current source. The Arch builder retains checksummed sources and validates package contents. Its command does not create a release tag. The Debian builder remains as an internal staging step for the AppImage.
-
-The current Flatpak manifests use the GNOME 51 runtime. Use `scripts/build-flatpak.sh` to produce a local bundle.
+Use the [packaging guide](../apps/linux/packaging/README.md) to build Arch packages from the current source. The Arch builder retains checksummed sources and validates package contents. Its command does not create a release tag. The Debian builder remains as an internal staging step for the AppImage.
 
 The Arch package installs `bookie`, `bookie-agentd` and `bookie-askpass`. It replaces the legacy `tablepro` package; the first start copies legacy state, as described in the [storage guide](storage.md).
 

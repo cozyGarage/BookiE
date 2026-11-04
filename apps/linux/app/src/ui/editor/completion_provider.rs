@@ -2,6 +2,8 @@ mod model;
 
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use glib::subclass::prelude::*;
 use relm4::gtk::{self, gio, glib};
@@ -9,7 +11,7 @@ use sourceview5::prelude::*;
 use sourceview5::subclass::prelude::*;
 
 use super::completion::{SchemaIndex, SchemaRequest};
-use super::completion_proposals::candidates_with;
+use super::completion_proposals::{candidates_with, candidates_with_plan, completion_plan};
 
 pub(super) fn dismiss(view: &sourceview5::View) {
     view.completion().hide();
@@ -65,6 +67,8 @@ mod provider {
     pub struct Provider {
         pub index: RefCell<Rc<RefCell<SchemaIndex>>>,
         pub(crate) lexing: RefCell<super::super::session_lexing::KnownLexing>,
+        pub latest_request: Arc<AtomicU64>,
+        pub pending_refilter: RefCell<Option<glib::SourceId>>,
     }
 
     #[glib::object_subclass]
@@ -89,12 +93,53 @@ mod provider {
             &self,
             context: &sourceview5::CompletionContext,
         ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<gio::ListModel, glib::Error>>>> {
-            let model = self.obj().model(context);
-            Box::pin(async move { Ok(model.upcast()) })
+            let provider = self.obj().clone();
+            let context = context.clone();
+            let request = provider.begin_request();
+            Box::pin(async move {
+                let model = provider.model_async(&context, request).await;
+                let model = if provider.is_current_request(request) {
+                    model
+                } else {
+                    glib::Object::new()
+                };
+                Ok(model.upcast())
+            })
         }
 
         fn refilter(&self, context: &sourceview5::CompletionContext, _model: &gio::ListModel) {
-            context.set_proposals_for_provider(&*self.obj(), Some(&self.obj().model(context)));
+            let provider = self.obj().clone();
+            let request = provider.begin_request();
+            provider.cancel_pending_refilter();
+            let Some(buffer) = context.buffer() else {
+                context.set_proposals_for_provider(&provider, None::<&gio::ListModel>);
+                return;
+            };
+            if buffer.char_count() as usize <= super::super::sql_text::MAX_ANALYSIS_BYTES
+                && let Some(text) = super::super::sql_text::analysis_text(buffer.upcast_ref())
+            {
+                context.set_proposals_for_provider(&provider, Some(&provider.model_from_text(context, text)));
+                return;
+            }
+            let weak_provider = provider.downgrade();
+            let context = context.clone();
+            let source = glib::timeout_add_local_once(std::time::Duration::from_millis(75), move || {
+                let Some(provider) = weak_provider.upgrade() else {
+                    return;
+                };
+                provider.imp().pending_refilter.borrow_mut().take();
+                glib::MainContext::default().spawn_local(async move {
+                    let model = provider.model_async(&context, request).await;
+                    if provider.is_current_request(request) {
+                        context.set_proposals_for_provider(&provider, Some(&model));
+                    }
+                });
+            });
+            if provider.is_current_request(request) {
+                provider.imp().pending_refilter.replace(Some(source));
+            } else {
+                source.remove();
+            }
         }
 
         fn activate(&self, context: &sourceview5::CompletionContext, proposal: &sourceview5::CompletionProposal) {
@@ -138,11 +183,96 @@ pub(super) fn install(index: Rc<RefCell<SchemaIndex>>, lexing: super::session_le
 }
 
 impl Provider {
+    fn begin_request(&self) -> u64 {
+        self.imp()
+            .latest_request
+            .fetch_add(1, Ordering::Relaxed)
+            .wrapping_add(1)
+    }
+
+    fn is_current_request(&self, request: u64) -> bool {
+        self.imp().latest_request.load(Ordering::Acquire) == request
+    }
+
+    fn cancel_pending_refilter(&self) {
+        if let Some(source) = self.imp().pending_refilter.borrow_mut().take() {
+            source.remove();
+        }
+    }
+
+    async fn model_async(&self, context: &sourceview5::CompletionContext, request_id: u64) -> model::ProposalModel {
+        let Some(buffer) = context.buffer() else {
+            return glib::Object::new();
+        };
+        let Some(text) = super::sql_text::completion_text(buffer.upcast_ref()) else {
+            return glib::Object::new();
+        };
+        if text.len() <= super::sql_text::MAX_ANALYSIS_BYTES {
+            return self.model_from_text(context, text);
+        }
+        let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset();
+        let buffer_chars = buffer.char_count();
+        let source = text.to_string();
+        let cursor = super::statement_cursor::cursor_byte_offset(&source, cursor_chars as usize);
+        let index_handle = self.imp().index.borrow().clone();
+        let (grammar, schema_request) = {
+            let Ok(index) = index_handle.try_borrow() else {
+                return glib::Object::new();
+            };
+            (
+                index.grammar.unwrap_or(bookie_core::sql_syntax::SqlGrammar::PostgreSql),
+                index.request(String::new()),
+            )
+        };
+        let settings = self.imp().lexing.borrow().settings();
+        let latest_request = self.imp().latest_request.clone();
+        let plan = gio::spawn_blocking(move || {
+            (latest_request.load(Ordering::Acquire) == request_id).then(|| {
+                let plan = completion_plan(&source, grammar, settings);
+                (source, plan)
+            })
+        })
+        .await;
+        let Ok(plan) = plan else {
+            return glib::Object::new();
+        };
+        if !self.is_current_request(request_id) {
+            return glib::Object::new();
+        }
+        let Some((source, plan)) = plan else {
+            return glib::Object::new();
+        };
+        if buffer.char_count() != buffer_chars
+            || buffer.iter_at_mark(&buffer.get_insert()).offset() != cursor_chars
+            || self.imp().lexing.borrow().settings() != settings
+        {
+            return glib::Object::new();
+        }
+        let Ok(index) = index_handle.try_borrow() else {
+            return glib::Object::new();
+        };
+        if !index.accepts(&schema_request)
+            || index.grammar.unwrap_or(bookie_core::sql_syntax::SqlGrammar::PostgreSql) != grammar
+        {
+            return glib::Object::new();
+        }
+        let source: Rc<str> = source.into();
+        let candidates = candidates_with_plan(&source, cursor, &index, settings, &plan);
+        model::ProposalModel::new(candidates, source, cursor_chars, schema_request)
+    }
+
     fn model(&self, context: &sourceview5::CompletionContext) -> model::ProposalModel {
         let Some(buffer) = context.buffer() else {
             return glib::Object::new();
         };
         let Some(text) = super::sql_text::analysis_text(buffer.upcast_ref()) else {
+            return glib::Object::new();
+        };
+        self.model_from_text(context, text)
+    }
+
+    fn model_from_text(&self, context: &sourceview5::CompletionContext, text: glib::GString) -> model::ProposalModel {
+        let Some(buffer) = context.buffer() else {
             return glib::Object::new();
         };
         let source: Rc<str> = text.as_str().into();
@@ -178,7 +308,7 @@ impl Provider {
         let Ok(index) = index.try_borrow() else {
             return;
         };
-        let Some(text) = super::sql_text::analysis_text(buffer.upcast_ref()) else {
+        let Some(text) = super::sql_text::completion_text(buffer.upcast_ref()) else {
             return;
         };
         if !index.accepts(&insertion.request)

@@ -459,7 +459,7 @@ Workspace Clippy and unit checks include the DuckDB driver like every other crat
 | No embedded browser | Native GTK widgets only. |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
 | Redis topology | Single endpoint; unsupported topologies and release status are in [known limitations](docs/known-limitations.md#editing-and-connections). |
-| Packaging | GitHub releases provide Arch and Debian packages, a Flatpak bundle using GNOME 51, and an AppImage. Native package requirements are listed in [platforms](docs/platforms.md). |
+| Packaging | GitHub releases provide an Arch package and an AppImage (0.2.4 also has Debian and Flatpak; see ADRs 0031 and 0032). Native package requirements are listed in [platforms](docs/platforms.md). |
 
 ## How to read this architecture map
 
