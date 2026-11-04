@@ -620,6 +620,51 @@ fn comment_text(text: &str) -> String {
         .collect()
 }
 
+struct StatementTail {
+    in_line_comment: bool,
+    last_code: Option<char>,
+}
+
+enum ScanState {
+    Code,
+    Quoted(char),
+    LineComment,
+    BlockComment,
+}
+
+fn scan_statement_tail(query: &str, hash_comments: bool) -> StatementTail {
+    let mut state = ScanState::Code;
+    let mut last_code = None;
+    let mut chars = query.chars().peekable();
+    while let Some(c) = chars.next() {
+        state = match state {
+            ScanState::Quoted(quote) if c == quote => ScanState::Code,
+            ScanState::Quoted(quote) => ScanState::Quoted(quote),
+            ScanState::LineComment if c == '\n' || c == '\r' => ScanState::Code,
+            ScanState::LineComment => ScanState::LineComment,
+            ScanState::BlockComment if c == '*' && chars.next_if_eq(&'/').is_some() => ScanState::Code,
+            ScanState::BlockComment => ScanState::BlockComment,
+            ScanState::Code if c == '-' && chars.next_if_eq(&'-').is_some() => ScanState::LineComment,
+            ScanState::Code if c == '#' && hash_comments => ScanState::LineComment,
+            ScanState::Code if c == '/' && chars.next_if_eq(&'*').is_some() => ScanState::BlockComment,
+            ScanState::Code if matches!(c, '\'' | '"' | '`') => {
+                last_code = Some(c);
+                ScanState::Quoted(c)
+            }
+            ScanState::Code => {
+                if !c.is_whitespace() {
+                    last_code = Some(c);
+                }
+                ScanState::Code
+            }
+        };
+    }
+    StatementTail {
+        in_line_comment: matches!(state, ScanState::LineComment),
+        last_code,
+    }
+}
+
 fn sql_export_entry(entry: &Entry) -> String {
     let mut out = String::new();
     let when = chrono::DateTime::<chrono::Utc>::from(entry.executed_at).to_rfc3339();
@@ -639,11 +684,9 @@ fn sql_export_entry(entry: &Entry) -> String {
     }
     let query = entry.query.trim_end();
     out.push_str(query);
-    let last_line = query.rsplit(['\n', '\r']).next().unwrap_or(query);
-    if last_line.contains("--") || last_line.contains('#') {
-        out.push_str("\n;");
-    } else if !query.ends_with(';') {
-        out.push(';');
+    let tail = scan_statement_tail(query, matches!(entry.driver_id.as_str(), "mysql" | "mariadb"));
+    if tail.last_code != Some(';') {
+        out.push_str(if tail.in_line_comment { "\n;" } else { ";" });
     }
     out.push_str("\n\n");
     out

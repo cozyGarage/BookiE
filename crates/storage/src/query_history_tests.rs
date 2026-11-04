@@ -442,27 +442,44 @@ fn exported_sql_keeps_untrusted_text_inside_comments() {
     assert!(exported.ends_with("SELECT 1;\n\n"));
 }
 
+fn exported_tail(driver: &str, query: &str) -> String {
+    let mut entry = sample_entry();
+    entry.driver_id = driver.into();
+    entry.query = query.into();
+    let exported = sql_export_entry(&entry);
+    let body = exported.split_once('\n').map_or("", |(_, rest)| rest);
+    body.to_string()
+}
+
 #[test]
 fn an_exported_statement_ending_in_a_line_comment_is_still_terminated() {
-    let mut entry = sample_entry();
-    entry.query = "SELECT 1 -- trailing note".into();
-    let exported = sql_export_entry(&entry);
-    assert!(exported.ends_with("SELECT 1 -- trailing note\n;\n\n"), "{exported:?}");
+    assert_eq!(exported_tail("postgres", "SELECT 1 -- note"), "SELECT 1 -- note\n;\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 -- done;"),
+        "SELECT 1 -- done;\n;\n\n"
+    );
+    assert_eq!(exported_tail("mysql", "SELECT 1 # note"), "SELECT 1 # note\n;\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 -- a\r\nSELECT 2 -- b"),
+        "SELECT 1 -- a\r\nSELECT 2 -- b\n;\n\n"
+    );
+}
 
-    entry.query = "SELECT 1; -- done".into();
-    assert!(sql_export_entry(&entry).ends_with("SELECT 1; -- done\n;\n\n"));
+#[test]
+fn an_exported_statement_that_is_already_terminated_gets_no_extra_statement() {
+    assert_eq!(exported_tail("postgres", "SELECT 1; -- done"), "SELECT 1; -- done\n\n");
+    assert_eq!(exported_tail("mysql", "SELECT '#';"), "SELECT '#';\n\n");
+    assert_eq!(exported_tail("postgres", "SELECT 'a--b';"), "SELECT 'a--b';\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* note */"),
+        "SELECT 1 /* note */;\n\n"
+    );
+}
 
-    entry.query = "SELECT 1 -- done;".into();
-    assert!(sql_export_entry(&entry).ends_with("SELECT 1 -- done;\n;\n\n"));
-
-    entry.query = "SELECT 1 # note".into();
-    assert!(sql_export_entry(&entry).ends_with("SELECT 1 # note\n;\n\n"));
-
-    entry.query = "SELECT 1 -- a\r\nSELECT 2 -- b".into();
-    assert!(sql_export_entry(&entry).ends_with("-- b\n;\n\n"));
-
-    entry.query = "SELECT 1 /* note */".into();
-    assert!(sql_export_entry(&entry).ends_with("SELECT 1 /* note */;\n\n"));
+#[test]
+fn a_hash_is_a_comment_only_for_mysql_and_an_operator_elsewhere() {
+    assert_eq!(exported_tail("postgres", "SELECT 5 # 3"), "SELECT 5 # 3;\n\n");
+    assert_eq!(exported_tail("mariadb", "SELECT 5 # 3"), "SELECT 5 # 3\n;\n\n");
 }
 
 #[test]
