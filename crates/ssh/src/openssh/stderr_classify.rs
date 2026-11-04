@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use super::{OpenSshError, TimeoutPhase};
+use crate::AlgorithmClass;
+use crate::algorithm::sanitize_offer;
 
 const PROTOCOL_DETAIL_LIMIT: usize = 4096;
 
@@ -19,6 +21,7 @@ pub(crate) struct ClassifyContext<'a> {
 
 pub(crate) fn classify(status: Option<i32>, stderr: &str, context: &ClassifyContext<'_>) -> OpenSshError {
     host_key_failure(stderr, context)
+        .or_else(|| algorithm_failure(stderr))
         .or_else(|| authentication_failure(stderr))
         .or_else(|| forwarding_failure(stderr, context))
         .or_else(|| configuration_failure(stderr))
@@ -102,6 +105,19 @@ fn unknown_host_key(host: &str, algorithm: &str, fingerprint: &str, declined: bo
         fingerprint: fingerprint.to_owned(),
         declined,
     }
+}
+
+fn algorithm_failure(stderr: &str) -> Option<OpenSshError> {
+    let line = line_containing(stderr, "Unable to negotiate with ")?;
+    let rest = line.split_once("Unable to negotiate with ")?.1;
+    let (host, rest) = rest.split_once(" port ")?;
+    let (_, rest) = rest.split_once(": no matching ")?;
+    let (kind, offer) = rest.split_once(" found. Their offer: ")?;
+    Some(OpenSshError::NoAcceptableAlgorithm {
+        host: host.chars().filter(|c| !c.is_control()).take(256).collect(),
+        class: AlgorithmClass::from_openssh(kind)?,
+        offered: sanitize_offer(offer),
+    })
 }
 
 fn authentication_failure(stderr: &str) -> Option<OpenSshError> {

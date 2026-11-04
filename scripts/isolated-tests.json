@@ -1640,6 +1640,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::connection_bundle::tests::skipped_imports_are_literal_non_selectable_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
     ]
   ],
