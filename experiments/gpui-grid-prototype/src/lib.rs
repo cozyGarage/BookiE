@@ -1,3 +1,4 @@
+pub mod core_bridge;
 pub mod cursor;
 pub mod edit;
 pub mod model;
@@ -6,6 +7,8 @@ pub mod selection;
 pub mod shell;
 pub mod theme;
 
+#[cfg(test)]
+mod core_bridge_tests;
 #[cfg(test)]
 mod edit_tests;
 #[cfg(test)]

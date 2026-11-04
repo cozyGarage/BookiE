@@ -34,14 +34,24 @@ fn the_label_and_copy_limit_match_the_tauri_prototype() {
 }
 
 #[test]
-fn tsv_fields_follow_the_core_export_quoting_rules() {
-    assert_eq!(tsv_field(&Cell::Null), "\\N");
-    assert_eq!(tsv_field(&Cell::Text(String::new())), "\"\"");
-    assert_eq!(tsv_field(&Cell::Text("a\tb".into())), "\"a\tb\"");
-    assert_eq!(tsv_field(&Cell::Text("say \"hi\"".into())), "\"say \"\"hi\"\"\"");
-    assert_eq!(tsv_field(&Cell::Text("\\NN".into())), "\"\\NN\"");
-    assert_eq!(tsv_field(&Cell::Text("plain".into())), "plain");
-    assert_eq!(tsv_field(&Cell::Int(value_of(0))), "9007199254740993");
+fn copied_fields_follow_the_core_export_quoting_rules() {
+    let one = |cell: Cell| copy_tsv([vec![cell]], false);
+    assert_eq!(one(Cell::Null), "\\N");
+    assert_eq!(one(Cell::Text(String::new())), "\"\"");
+    assert_eq!(one(Cell::Text("a\tb".into())), "\"a\tb\"");
+    assert_eq!(one(Cell::Text("say \"hi\"".into())), "\"say \"\"hi\"\"\"");
+    assert_eq!(one(Cell::Text("plain".into())), "plain");
+    assert_eq!(one(Cell::Int(value_of(0))), "9007199254740993");
+}
+
+#[test]
+fn text_that_looks_like_the_null_marker_makes_core_pick_a_marker_that_cannot_collide() {
+    let text = copy_tsv([vec![Cell::Null, Cell::Text("\\N".into())]], false);
+    let fields: Vec<&str> = text.split('\t').collect();
+    assert_ne!(
+        fields[0], fields[1],
+        "NULL and the literal text must stay distinguishable: {text:?}"
+    );
 }
 
 #[test]

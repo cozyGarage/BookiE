@@ -1,7 +1,7 @@
 use super::edit::*;
 use super::model::*;
 
-fn shown(kind: &str, text: &str) -> Result<(String, String), &'static str> {
+fn shown(kind: &str, text: &str) -> Result<(String, String), String> {
     parse_edit(kind, text).map(|cell| (cell.kind().to_string(), cell.display()))
 }
 
@@ -35,7 +35,6 @@ fn an_invalid_edit_names_the_problem_in_the_same_words_as_the_tauri_prototype() 
         ("integer", "4x2", "not a whole number"),
         ("boolean", "maybe", "not true or false"),
         ("decimal", "1,5", "not a number"),
-        ("float", "NaN", "not a number"),
         ("date", "2026-13-40", "not a date"),
         ("time", "25:00", "not a time"),
         ("timestamptz", "yesterday", "not a timestamp"),
@@ -45,7 +44,7 @@ fn an_invalid_edit_names_the_problem_in_the_same_words_as_the_tauri_prototype() 
         ("bytes", "é", "not hexadecimal bytes"),
         ("undecodable", "x", "this cell cannot be edited"),
     ] {
-        assert_eq!(shown(kind, text), Err(reason), "{kind} {text}");
+        assert_eq!(shown(kind, text), Err(reason.to_string()), "{kind} {text}");
     }
 }
 
@@ -62,4 +61,9 @@ fn only_the_label_state_and_typed_columns_of_a_decodable_cell_are_editable() {
 fn null_and_raw_json_text_cells_keep_their_own_rules() {
     ok("json_text", "{\"raw\":  1}", "{\"raw\":  1}");
     assert_eq!(shown("null", "now text"), Ok(("text".into(), "now text".into())));
+}
+
+#[test]
+fn a_float_edit_follows_bookie_core_even_where_the_old_local_rule_refused() {
+    assert_eq!(shown("float", "NaN"), Ok(("float".into(), "NaN".into())));
 }

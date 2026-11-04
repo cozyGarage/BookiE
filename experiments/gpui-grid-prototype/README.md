@@ -2,7 +2,7 @@
 
 This isolated experiment renders the same synthetic result grid as `experiments/tauri-grid-prototype` with GPUI (Zed's GPU UI framework, `gpui` 0.2.2 from crates.io), so the two can be compared. It uses synthetic values only and cannot connect to a database. It is **not a supported frontend**, a package, or an alternative execution path. The shipped application continues to use GTK ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)), and the experiment is governed by [ADR 0028](../../docs/decisions/0028-isolated-frontend-experiments.md).
 
-It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on no BookiE crate.
+It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on one BookiE crate, `bookie-core` (`src/core_bridge.rs`), for typed values: cell edits are validated by `bookie_core::import::parse_cell` and copied text is rendered by `bookie_core::export::render_tsv`, exactly as in the Tauri prototype. Nothing else from BookiE is linked.
 
 ## Scope
 
@@ -85,7 +85,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- Synthetic data, no database. The typed column carries the same kinds and exact text as the Tauri prototype, but as canonical text held by a local cell type, not by `bookie-core` values, because this experiment depends on no BookiE crate. It shows how a typed cell renders, not that the shared value type round-trips.
+- Synthetic data, no database. The typed column carries the same kinds and exact text as the Tauri prototype, but as canonical text held by a local cell type, not by `bookie-core` values, because this experiment depends on `bookie-core` only. It shows how a typed cell renders, not that the shared value type round-trips.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - No text editing beyond the minimal fields above, and no SQL editor. A multi-line editor is a much larger piece (Zed's editor is its own crate) and is left until the single-line input has had real keyboard and IME feedback.
 - It measures one machine with one GPU driver; it does not establish performance on other hardware.

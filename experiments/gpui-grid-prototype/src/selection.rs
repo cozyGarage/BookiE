@@ -1,4 +1,4 @@
-use crate::model::{Cell, Column};
+use crate::model::Cell;
 
 pub const MAX_COPY_ROWS: u64 = 5_000;
 
@@ -54,33 +54,6 @@ impl Selection {
     }
 }
 
-fn quote(text: &str) -> String {
-    format!("\"{}\"", text.replace('"', "\"\""))
-}
-
-fn is_null_marker_shaped(text: &str) -> bool {
-    text.strip_prefix("\\N")
-        .is_some_and(|rest| rest.bytes().all(|byte| byte == b'N'))
-}
-
-pub fn tsv_field(cell: &Cell) -> String {
-    if matches!(cell, Cell::Null) {
-        return "\\N".into();
-    }
-    let text = cell.display();
-    if text.is_empty() || is_null_marker_shaped(&text) || text.contains(['\t', '\n', '\r', '"']) {
-        return quote(&text);
-    }
-    text
-}
-
 pub fn copy_tsv(rows: impl IntoIterator<Item = Vec<Cell>>, with_headers: bool) -> String {
-    let mut lines = Vec::new();
-    if with_headers {
-        lines.push(Column::ALL.map(Column::name).join("\t"));
-    }
-    for row in rows {
-        lines.push(row.iter().map(tsv_field).collect::<Vec<_>>().join("\t"));
-    }
-    lines.join("\n")
+    crate::core_bridge::render_tsv(rows, with_headers)
 }
