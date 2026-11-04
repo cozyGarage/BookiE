@@ -42,8 +42,8 @@ For native-library and toolchain requirements, see [platforms](../../../docs/pla
 BookiE no longer publishes a Debian package ([ADR 0031](../../../docs/decisions/0031-stop-publishing-the-debian-package.md)). The Debian builder and validator remain because the AppImage build stages its files with them. They use the workspace release version with Debian revision `-1` by default, and `DEB_VERSION` can select another revision. The command below builds a local package for development only; the result needs a system with the toolkit versions listed in [platforms](../../../docs/platforms.md) and does not replace the manual scenarios in the [verification checklist](../../../docs/manual-verification-0.2-features.md).
 
 ```bash
-DEB_VERSION=0.2.4-1 ./scripts/build-deb.sh
-sudo apt install ./apps/linux/packaging/out/bookie_0.2.4-1_amd64.deb
+DEB_VERSION=0.2.5-1 ./scripts/build-deb.sh
+sudo apt install ./apps/linux/packaging/out/bookie_0.2.5-1_amd64.deb
 ```
 
 The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-agentd`, and `/usr/bin/bookie-askpass`. It replaces and conflicts with the legacy `tablepro` package. It does not install or enable a user service.

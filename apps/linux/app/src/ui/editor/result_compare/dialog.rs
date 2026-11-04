@@ -64,10 +64,16 @@ pub(in crate::ui::editor) fn present(
     content.set_margin_bottom(18);
     content.set_margin_start(18);
     content.set_margin_end(18);
+    let scroller = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Never)
+        .vexpand(true)
+        .child(&content)
+        .build();
     let dialog = adw::Dialog::builder()
         .title(crate::tr!("Compare results"))
         .content_width(520)
-        .child(&content)
+        .content_height(520)
+        .child(&scroller)
         .build();
     let form = Rc::new(Form {
         dialog: dialog.downgrade(),

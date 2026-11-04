@@ -1,4 +1,4 @@
-project('bookie', version: '0.2.4', meson_version: '>=1.4', license: 'AGPL-3.0-or-later')
+project('bookie', version: '0.2.5', meson_version: '>=1.4', license: 'AGPL-3.0-or-later')
 
 gnome = import('gnome')
 subdir('apps/linux/data')
