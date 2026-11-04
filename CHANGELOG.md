@@ -2,6 +2,59 @@
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-04
+
+### Added
+
+- SQL completion now suggests names defined in a WITH clause of the current statement. (#2326)
+- Copy a grid row as a WHERE clause from the Copy as menu. (#2328)
+- Import connections from a DBeaver data-sources.json file, without passwords. (#2336)
+- BookiE asks before quitting while an import or backup is still running. (#2340)
+- Copy a schema diagram as Mermaid or DBML text. (#2341)
+- CSV import can skip rows the database rejects and lists each skipped row when it finishes. (#2343)
+- Save SQL snippets and insert them at the cursor from the editor toolbar. (#2344)
+- SQL completion offers the columns of a WITH clause and of a derived table in the same statement. (#2346)
+- Right-click a table to open a starter JOIN query built from its foreign keys. (#2347)
+- Import connections reads an Another Redis Desktop Manager export as Redis drafts without passwords. (#2402)
+- Import connections reads a DataGrip dataSources.xml as drafts without passwords. (#2404)
+
+### Changed
+
+- Importing a connection URL for a remote host now saves it as Production with verified TLS instead of Local without TLS. (#2337)
+- Copy as INSERT, UPDATE, DELETE and WHERE Clause now use all selected rows. (#2330)
+- Large parsed JSON previews stop counting once their size exceeds the sample budget. (#2415)
+
+### Removed
+
+- Releases no longer include a Debian package or a Flatpak bundle; use the Arch package or the AppImage. (#2342, #2395)
+
+### Fixed
+
+- SQL generated for a negative-zero float on PostgreSQL now keeps the sign. (#2351)
+- Exporting query history as SQL no longer swallows the statement terminator when a query ends in a line comment. (#2352)
+- MCP `execute_write` preview on MySQL no longer runs DDL and other implicitly committing statements. (#2329)
+- Agents can no longer read host files through DuckDB table functions or quoted file paths. (#2331)
+- Agents can no longer read DuckDB log, variable and prepared-statement catalogs, or the host environment and credential settings, as plain reads. (#2332)
+- Undoing an edit in a new row no longer replaces an explicit NULL with the column default. (#2333)
+- MCP write previews on MySQL now refuse a non-transactional table in another database. (#2334)
+- A slow View Value or cell edit no longer opens on a different row after you sort, filter or change page. (#2339)
+- Pending browse edits are preserved when an inactive save reports completion. (#2313)
+- Undoing an edit on a new row no longer replaces a NULL you typed with the column default. (#2325)
+- A database connection through an SSH tunnel now fails with a timeout instead of hanging when the SSH server never answers. (#2360)
+- ClickHouse connections to an IPv6 address no longer fail with an invalid address. (#2368)
+- Browsing Redis keys no longer fails the whole page when a hash, list, set or sorted set contains a member that is not valid text. (#2370)
+- A failure to save an audit record no longer leaves a half-recorded operation that can block later writes on that connection. (#2354)
+- An MCP client over stdio can now cancel a tool call and keeps getting answers to ping and tools/list while a slow call or an approval is pending. (#2362)
+- A terminal approval prompt in bookie-agentd no longer leaves a read running after it times out, and a late answer can no longer approve the next request. (#2364)
+- SQL completion remains available in large scripts without planning on the GTK thread. (#2379)
+- A late save result no longer clears newer table edits. (#2380)
+- A browse save without an active connection no longer leaves a close request pending. (#2380)
+
+### Security
+
+- Issuing an MCP token to a file no longer follows a symlink or writes to something that is not a regular file. (#2348)
+- Revoking an MCP token that does not exist now reports an error instead of appearing to succeed. (#2349)
+
 ## [0.2.4] - 2026-11-03
 
 ### Added
@@ -788,8 +841,9 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.3...linux
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.5...linux
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
 [0.2.3]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.3
+[0.2.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.5
