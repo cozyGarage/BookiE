@@ -289,6 +289,24 @@ async fn a_file_picked_for_import_is_read_as_dbeaver_another_redis_or_datagrip_a
         "the sibling local file supplies the user name"
     );
     assert!(names(other).await.is_err());
+    let navicat = write(
+        "connections.ncx",
+        r#"<?xml version="1.0"?><Connections Ver="1.4"><Connection ConnectionName="n" ConnType="MYSQL" Host="h" Port="3306"/></Connections>"#,
+    );
+    let resp = write(
+        "rdm.json",
+        r#"[{"name": "r", "host": "h", "namespace_separator": ":", "ssh_host": "b"}]"#,
+    );
+    let resp_ok = write(
+        "rdm_ok.json",
+        r#"[{"name": "r", "host": "h", "namespace_separator": ":"}]"#,
+    );
+    assert_eq!(names(navicat).await.unwrap(), ["mysql"]);
+    assert!(
+        names(resp).await.is_err(),
+        "a RESP SSH entry is skipped, not imported as a direct connection"
+    );
+    assert_eq!(names(resp_ok).await.unwrap(), ["redis"]);
 }
 
 #[tokio::test]

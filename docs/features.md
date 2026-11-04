@@ -30,7 +30,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - SQLite connections support attaching additional database files under custom schema aliases, enabling cross-schema queries and unified catalog browsing.
 - A connection can be filled from a URL such as `postgres://user@host:5432/db`.
 - Connections can be exported and imported. An export encrypted with a passphrase includes stored credentials. A plaintext export contains none.
-- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver folders become a connection group when present. Navicat import is not shipped yet.
+- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app (Redis Desktop Manager) `connections.json` and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver folders become a connection group when present.
 
 ## Browse and edit tables
 
