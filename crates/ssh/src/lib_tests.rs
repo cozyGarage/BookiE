@@ -414,3 +414,17 @@ fn agent_signing_failures_are_not_reported_as_server_attempt_limits() {
         super::SshError::AgentKeyLimit { refused: 2, total: 8 }
     ));
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_forward_channel_that_never_opens_fails_with_a_timeout_instead_of_hanging() {
+    let outcome = open_within(CHANNEL_OPEN_TIMEOUT, std::future::pending::<Result<(), russh::Error>>()).await;
+    assert!(matches!(outcome, Err(russh::Error::ConnectionTimeout)), "{outcome:?}");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_forward_channel_that_opens_in_time_is_passed_through_untouched() {
+    let opened = open_within(CHANNEL_OPEN_TIMEOUT, async { Ok::<_, russh::Error>(7) }).await;
+    assert!(matches!(opened, Ok(7)));
+    let refused = open_within(CHANNEL_OPEN_TIMEOUT, async { Err::<u8, _>(russh::Error::Disconnect) }).await;
+    assert!(matches!(refused, Err(russh::Error::Disconnect)), "{refused:?}");
+}

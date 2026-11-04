@@ -604,7 +604,7 @@ impl App {
             }
             SwitchDecision::DiscardChanges => {
                 for id in self.window_pending_browse_tabs() {
-                    crate::services::change_tracker::with_tab(id, |tracker| tracker.clear());
+                    self.change_trackers.with_tab(id, |tracker| tracker.clear());
                 }
                 for id in self.window_pending_structure_tabs() {
                     self.structure_trackers.with_tab(id, |tracker| tracker.clear());

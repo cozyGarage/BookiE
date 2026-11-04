@@ -555,6 +555,7 @@ impl PolicyGuard {
                 None,
                 None,
                 None,
+                None,
             )
             .await;
         if matches!(&result, Err(AuditError::UnresolvedWrite | AuditError::WriteInFlight)) {
@@ -590,6 +591,7 @@ impl PolicyGuard {
             outcome.rows_affected,
             outcome.error_category,
             Some(outcome.duration_ms),
+            None,
         )
         .await
     }
@@ -604,6 +606,7 @@ impl PolicyGuard {
         rows_affected: Option<u64>,
         error_category: Option<AuditErrorCategory>,
         duration_ms: Option<u64>,
+        rows_skipped: Option<u64>,
     ) -> Result<(), AuditError> {
         let sql_hash = hex::encode(Sha256::digest(operation.sql.as_bytes()));
         let principal = self.ctx.principal.sanitized();
@@ -632,6 +635,7 @@ impl PolicyGuard {
                 error_category,
                 error,
                 rows_affected,
+                rows_skipped,
                 duration_ms,
                 transport_attempt: None,
                 administrative_action: None,
@@ -1082,7 +1086,10 @@ mod session;
 
 pub use administrative::AdministrativeOperation;
 pub use audit_receipt::{AuditReceipt, Audited, AuditedSession};
-pub use bulk::{BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, MAX_BULK_ROW_BUDGET};
+pub use bulk::{
+    BulkBatch, BulkBatchOutcome, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, MAX_BULK_ROW_BUDGET,
+    MAX_SKIPPED_ROWS, SkippedRow,
+};
 
 #[cfg(test)]
 #[path = "guard_tests.rs"]

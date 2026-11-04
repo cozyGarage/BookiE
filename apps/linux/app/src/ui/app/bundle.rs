@@ -122,11 +122,16 @@ impl App {
 
     pub(super) fn on_import_bundle(&self, sender: ComponentSender<Self>) {
         let filter = crate::ui::connection_bundle::bundle_file_filter();
+        let filters = crate::ui::connection_bundle::bundle_file_filters(&filter);
+        let dbeaver = relm4::gtk::FileFilter::new();
+        dbeaver.set_name(Some(&crate::tr!("DBeaver data-sources.json")));
+        dbeaver.add_suffix("json");
+        filters.append(&dbeaver);
         let dialog = relm4::gtk::FileDialog::builder()
             .title(crate::tr!("Import connections"))
             .modal(true)
             .default_filter(&filter)
-            .filters(&crate::ui::connection_bundle::bundle_file_filters(&filter))
+            .filters(&filters)
             .build();
         let input = sender.input_sender().clone();
         dialog.open(Some(&self.window), relm4::gtk::gio::Cancellable::NONE, move |outcome| {
@@ -155,7 +160,13 @@ impl App {
                         Ok(ParsedBundle::Encrypted(sealed)) => {
                             sender_clone.input(AppMsg::ImportBundleEncrypted(sealed));
                         }
-                        Err(error) => sender_clone.input(AppMsg::BundleFailed(error.to_string())),
+                        Err(error) => match read_dbeaver_at(&path).await {
+                            Some(body) => match plan_from_body(&body).await {
+                                Ok(pending) => sender_clone.input(AppMsg::ImportBundlePlanned(pending)),
+                                Err(message) => sender_clone.input(AppMsg::BundleFailed(message)),
+                            },
+                            None => sender_clone.input(AppMsg::BundleFailed(error.to_string())),
+                        },
                     }
                 })
                 .drop_on_shutdown()
@@ -364,6 +375,14 @@ pub(super) fn read_bundle_file(bytes: &[u8]) -> Result<ParsedBundle, BundleError
 async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleError> {
     let bytes = read_bounded(path, bookie_storage::MAX_BUNDLE_BYTES).await?;
     read_bundle_file(&bytes)
+}
+
+async fn read_dbeaver_at(path: &std::path::Path) -> Option<bookie_storage::BundleBody> {
+    let bytes = read_bounded(path, bookie_storage::MAX_DBEAVER_BYTES).await.ok()?;
+    let text = String::from_utf8(bytes).ok()?;
+    bookie_storage::parse_dbeaver_data_sources(&text)
+        .ok()
+        .map(bookie_storage::DbeaverImport::into_body)
 }
 
 async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, BundleError> {

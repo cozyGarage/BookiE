@@ -413,6 +413,13 @@ fn candidates(
     let prefix = &statement.text[..statement.cursor];
     let scope = scope_for(prefix, statement.text, index, settings);
     let mut out: Vec<String> = Vec::new();
+    if !matches!(scope, Scope::ColumnsOf(_)) {
+        out.extend(super::completion_identifiers::cte_names(
+            statement.text,
+            index.grammar,
+            settings,
+        ));
+    }
 
     match scope {
         Scope::ColumnsOf(table) => {

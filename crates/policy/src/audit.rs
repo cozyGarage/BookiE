@@ -206,6 +206,8 @@ pub struct AuditEvent {
     pub error_category: Option<AuditErrorCategory>,
     pub error: Option<String>,
     pub rows_affected: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rows_skipped: Option<u64>,
     pub duration_ms: Option<u64>,
     /// Present only for a terminal SSH connection-attempt record. Missing on
     /// older journals; ignored by older readers, so the journal wire format
@@ -250,6 +252,7 @@ impl AuditEvent {
             error_category: None,
             error: None,
             rows_affected: None,
+            rows_skipped: None,
             duration_ms,
             transport_attempt: None,
             administrative_action: Some(AuditAdministrativeMetadata {
@@ -320,6 +323,7 @@ impl AuditEvent {
             error_category,
             error: error_category.map(sanitized_transport_error),
             rows_affected: None,
+            rows_skipped: None,
             duration_ms: Some(duration_ms),
             transport_attempt: Some(AuditTransportMetadata { client, outcome }),
             administrative_action: None,
@@ -494,6 +498,27 @@ mod tests {
             .remove("transport_attempt");
         let decoded: AuditEvent = serde_json::from_value(old_record).expect("load old journal record");
         assert!(decoded.transport_attempt.is_none());
+    }
+
+    #[test]
+    fn skipped_rows_are_written_only_when_present_and_older_records_without_them_load() {
+        let mut event = AuditEvent::administrative_action(
+            Uuid::new_v4(),
+            AuditAdministrativeAction::ResultCompare,
+            AuditRecordPhase::Outcome,
+            AuditTerminalStatus::Succeeded,
+            1,
+            None,
+        );
+        let plain = serde_json::to_value(&event).expect("serialize event");
+        assert!(plain.get("rows_skipped").is_none());
+        event.rows_skipped = Some(7);
+        let with_skips = serde_json::to_value(&event).expect("serialize event");
+        assert_eq!(with_skips["rows_skipped"], 7);
+        let decoded: AuditEvent = serde_json::from_value(with_skips).expect("load record");
+        assert_eq!(decoded.rows_skipped, Some(7));
+        let old: AuditEvent = serde_json::from_value(plain).expect("load old record");
+        assert_eq!(old.rows_skipped, None);
     }
 
     #[test]

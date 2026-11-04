@@ -9,6 +9,8 @@ use uuid::Uuid;
 
 use super::{App, AppMsg};
 
+mod busy_quit;
+
 /// Owning handles the model needs from the window-close plumbing: the
 /// close-after-save counters, the "close the window once the map
 /// drains" flag, and the in-flight transaction counter the close
@@ -30,6 +32,7 @@ pub(super) fn install_window_lifecycle(
     split_view: &adw::OverlaySplitView,
     sidebar_toggle: &gtk::ToggleButton,
     structure_trackers: &crate::services::structure_tracker::WorkspaceStructureTrackers,
+    change_trackers: &crate::services::change_tracker::WorkspaceChangeTrackers,
     workspace: &crate::services::workspace_state::WorkspaceStore,
     sender: &ComponentSender<App>,
 ) -> WindowLifecycleHandles {
@@ -45,6 +48,7 @@ pub(super) fn install_window_lifecycle(
     // a per-tab close so failures abort cleanly.
     let force_close: Rc<Cell<bool>> = Rc::new(Cell::new(false));
     let force_close_for_close = force_close.clone();
+    let busy_quit_confirmed = Rc::new(Cell::new(false));
     let workspace_flushed = Rc::new(Cell::new(false));
     let workspace_flushed_for_close = workspace_flushed.clone();
     let workspace_flush_in_progress = Rc::new(Cell::new(false));
@@ -77,7 +81,12 @@ pub(super) fn install_window_lifecycle(
     let close_state_saved_for_close = window_close_state_saved.clone();
     let close_state_pending_for_close = window_close_state_pending.clone();
     let structure_trackers = structure_trackers.clone();
+    let change_trackers = change_trackers.clone();
     window.connect_close_request(move |w| {
+        if !busy_quit_confirmed.get() && busy_quit::needed(w) {
+            busy_quit::confirm(w, busy_quit_confirmed.clone());
+            return glib::Propagation::Stop;
+        }
         // If a Save is mid-flight (async transaction running), block
         // the close until it resolves. Without this, the completion
         // handler would dispatch SaveCompleted to a tab that's
@@ -117,7 +126,7 @@ pub(super) fn install_window_lifecycle(
         // Browse + Structure tabs share the dirty-state guard:
         // either source of pending changes triggers the dialog.
         let tab_ids = window_tab_ids(w);
-        let has_pending = !crate::services::change_tracker::pending_tabs_for(&tab_ids).is_empty()
+        let has_pending = !change_trackers.pending_tabs_for(&tab_ids).is_empty()
             || !structure_trackers.pending_tabs_for(&tab_ids).is_empty();
         if !force_close_for_close.get() && has_pending {
             // Plural-form heading matches the per-tab dialog's
@@ -144,12 +153,13 @@ pub(super) fn install_window_lifecycle(
             let close_window_after_save_for_resp = close_window_after_save_for_close.clone();
             let input_sender_for_resp = close_request_input_sender.clone();
             let structure_trackers = structure_trackers.clone();
+            let change_trackers = change_trackers.clone();
             dialog.connect_response(None, move |dlg, response| {
                 dlg.close();
                 match response {
                     "discard" => {
-                        for tab_id in crate::services::change_tracker::pending_tabs_for(&tab_ids) {
-                            crate::services::change_tracker::with_tab(tab_id, |t| t.clear());
+                        for tab_id in change_trackers.pending_tabs_for(&tab_ids) {
+                            change_trackers.with_tab(tab_id, |t| t.clear());
                         }
                         for tab_id in structure_trackers.pending_tabs_for(&tab_ids) {
                             structure_trackers.with_tab(tab_id, |t| t.clear());
@@ -167,7 +177,7 @@ pub(super) fn install_window_lifecycle(
                         // the SaveCompletedForTab / StructureSaveCompleted
                         // handlers in App::update close the window once
                         // the set drains. Any SaveFailed aborts.
-                        let browse_tabs = crate::services::change_tracker::pending_tabs_for(&tab_ids);
+                        let browse_tabs = change_trackers.pending_tabs_for(&tab_ids);
                         let structure_tabs = structure_trackers.pending_tabs_for(&tab_ids);
                         // Counter increments — a Table tab listed in both
                         // sets bumps to 2 so the window close waits for
