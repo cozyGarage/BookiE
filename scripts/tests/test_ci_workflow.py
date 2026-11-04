@@ -182,6 +182,7 @@ class CiWorkflowTests(unittest.TestCase):
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             cargo_path = re.search(r"(?m)^  PATH: (.+)$", workflow).group(1)
+            self.assertIn("/opt/cargo/bin", cargo_path, name)
             self.assertIn("/home/runner/.cargo/bin", cargo_path, name)
             self.assertIn("/home/ubuntu/.cargo/bin", cargo_path, name)
 
