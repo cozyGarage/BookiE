@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 
 use bookie_core::Value;
+use bookie_core::import::{ColumnKind, parse_cell};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_ROWS: u64 = 1_000_000;
@@ -11,7 +12,7 @@ const MAX_DIFF_ROWS: usize = 200;
 const TYPED_KINDS: u64 = 12;
 const MAX_COPY_ROWS: u64 = 5_000;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct Cell {
     kind: &'static str,
     value: Option<String>,
@@ -243,7 +244,11 @@ fn startup_config() -> Config {
 
 #[tauri::command]
 fn report(line: String) {
-    let clean: String = line.chars().filter(|character| !character.is_control()).take(240).collect();
+    let clean: String = line
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(240)
+        .collect();
     println!("PROTOTYPE_REPORT {clean}");
 }
 
@@ -418,6 +423,41 @@ fn compare_rows(total: Option<u64>, keyed: bool, generation: u64) -> Result<Comp
     build_diff(checked_total(total)?, keyed, generation)
 }
 
+fn editable_kind(kind: &str) -> Option<ColumnKind> {
+    Some(match kind {
+        "boolean" => ColumnKind::Bool,
+        "integer" => ColumnKind::Int,
+        "float" => ColumnKind::Float,
+        "decimal" => ColumnKind::Decimal,
+        "date" => ColumnKind::Date,
+        "time" => ColumnKind::Time,
+        "datetime" => ColumnKind::DateTime,
+        "timestamptz" => ColumnKind::TimestampTz,
+        "uuid" => ColumnKind::Uuid,
+        "json" => ColumnKind::Json,
+        "bytes" => ColumnKind::Bytes,
+        "text" | "json_text" | "null" => ColumnKind::Text,
+        _ => return None,
+    })
+}
+
+#[tauri::command]
+fn edit_cell(kind: String, text: String, as_null: bool) -> Result<Cell, String> {
+    if as_null {
+        return Ok(Cell {
+            kind: "null",
+            value: None,
+        });
+    }
+    let column_kind = editable_kind(&kind).ok_or("this cell cannot be edited")?;
+    let value = parse_cell(&text, column_kind).map_err(|error| error.to_string())?;
+    let mut edited = cell(value).map_err(str::to_string)?;
+    if kind == "json_text" && edited.kind == "text" {
+        edited.kind = "json_text";
+    }
+    Ok(edited)
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tauri::Builder::default()
         .manage(FilterState::default())
@@ -439,6 +479,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             report,
             sample_rows,
             copy_rows,
+            edit_cell,
             find_rows,
             filter_rows,
             filtered_rows,

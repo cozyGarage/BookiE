@@ -15,6 +15,7 @@ import {
   rangeLabel,
   rowsFromQuery,
 } from './strip.mjs';
+import { commitKey, createEdits, editStatus, isEditable } from './edits.mjs';
 import { copyRequest, isSelected, selectionAfterClick, selectionLabel } from './selection.mjs';
 
 const invoke = (...args) => globalThis.__TAURI__.core.invoke(...args);
@@ -25,6 +26,8 @@ const surface = $('#height');
 const rows = $('#rows');
 const status = $('#status');
 const find = createFind();
+const edits = createEdits();
+let editing = false;
 const view = { total: 0, matched: null, page: 0, continuous: false, filterGeneration: 0, matchRow: null, selection: null };
 let generation = 0;
 let compareGeneration = 0;
@@ -59,14 +62,55 @@ function buildRow(record) {
     row.classList.add('selected');
     row.setAttribute('aria-selected', 'true');
   }
-  for (const cell of record.cells) {
+  record.cells.forEach((original, column) => {
+    const edited = edits.get(record.row_number, column);
+    const cell = edited ?? original;
     const item = document.createElement('span');
-    item.className = cellClass(cell);
+    item.className = edited ? `${cellClass(cell)} edited` : cellClass(cell);
     item.setAttribute('role', 'gridcell');
     item.textContent = displayCell(cell);
+    if (isEditable(column, cell)) item.addEventListener('dblclick', () => startEdit(item, record.row_number, column, cell));
     row.append(item);
-  }
+  });
   return row;
+}
+
+function startEdit(item, rowNumber, column, cell) {
+  if (editing) return;
+  editing = true;
+  const input = document.createElement('input');
+  input.className = 'entry cell-editor';
+  input.value = cell.kind === 'null' ? '' : cell.value;
+  input.setAttribute('aria-label', `Edit ${cell.kind} cell, Enter to apply, Escape to cancel, Ctrl+Backspace for NULL`);
+  item.replaceChildren(input);
+  input.focus();
+  input.select();
+  const finish = () => {
+    editing = false;
+    schedule();
+  };
+  const apply = async (asNull) => {
+    try {
+      const next = await invoke('edit_cell', { kind: cell.kind, text: input.value, asNull });
+      edits.set(rowNumber, column, next);
+      $('#selection-status').textContent = editStatus(edits.count());
+      finish();
+    } catch (error) {
+      input.setAttribute('aria-invalid', 'true');
+      $('#selection-status').textContent = `Not applied: ${error?.message ?? error}`;
+    }
+  };
+  input.addEventListener('keydown', (event) => {
+    const action = commitKey(event);
+    if (action === null) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (action === 'cancel') finish();
+    else void apply(action === 'null');
+  });
+  input.addEventListener('blur', () => {
+    if (editing) finish();
+  });
 }
 
 async function render() {
@@ -81,7 +125,7 @@ async function render() {
   }
   try {
     const data = await fetchRows(gridBase() + window.offset, window.limit);
-    if (current !== generation) return;
+    if (current !== generation || editing) return;
     rows.replaceChildren(...data.map(buildRow));
     const first = gridBase() + window.offset + 1;
     status.textContent = `Rows ${first.toLocaleString('en-US')}–${(first + data.length - 1).toLocaleString('en-US')} of ${datasetCount().toLocaleString('en-US')}`;
@@ -104,7 +148,8 @@ async function copySelection() {
   try {
     const text = await invoke('copy_rows', { first: range.first, last: range.last, withHeaders: false, total: view.total });
     await writeClipboard(text);
-    updateSelection(`Copied ${(range.last - range.first + 1).toLocaleString('en-US')} rows as tab-separated text.`);
+    const note = edits.inRange(range.first, range.last) ? ' Edited cells are copied with their original values.' : '';
+    updateSelection(`Copied ${(range.last - range.first + 1).toLocaleString('en-US')} rows as tab-separated text.${note}`);
   } catch (error) {
     updateSelection(`Unable to copy the selection: ${error?.message ?? error}`);
   }
@@ -364,6 +409,30 @@ async function selfTest() {
   await new Promise((resolve) => setTimeout(resolve, 300));
   const selected = document.querySelectorAll('.row.selected').length;
   await invoke('report', { line: `selected_rows_drawn=${selected} status=${$('#selection-status').textContent}` });
+  await editSelfTest();
+}
+
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function editSelfTest() {
+  const cells = () => [...document.querySelectorAll('.row')].find((row) => row.getAttribute('aria-rowindex') === '3').querySelectorAll('.cell');
+  const typeInto = async (column, text) => {
+    cells()[column + 1].dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    const input = document.querySelector('.cell-editor');
+    input.value = text;
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    await pause(300);
+    return input;
+  };
+  const bad = await typeInto(3, '2026-99-99');
+  const invalid = `${bad.getAttribute('aria-invalid')} ${$('#selection-status').textContent}`;
+  bad.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  await pause(300);
+  const good = await typeInto(3, '2026-02-03');
+  await pause(300);
+  const edited = [...document.querySelectorAll('.cell.edited')].map((node) => node.textContent);
+  await invoke('report', { line: `edit_invalid=${invalid} edit_applied=${edited.join('|')} editors_left=${document.querySelectorAll('.cell-editor').length} status=${$('#selection-status').textContent}` });
+  return good;
 }
 
 bindControls();

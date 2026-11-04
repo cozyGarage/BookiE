@@ -111,7 +111,9 @@ fn keyed_diff_reports_changed_rows_as_before_and_after_pairs() {
 }
 
 fn matching(total: u64, predicate: &Predicate) -> Vec<u64> {
-    (0..total).filter(|index| matches_predicate(*index, predicate)).collect()
+    (0..total)
+        .filter(|index| matches_predicate(*index, predicate))
+        .collect()
 }
 
 fn rendered(value: Value) -> (&'static str, Option<String>) {
@@ -133,7 +135,11 @@ fn every_core_value_variant_renders_with_its_exact_text() {
         (Value::Bytes(vec![0xde, 0xad, 0xbe, 0xef]), "bytes", Some("\\xdeadbeef")),
         (Value::Date(date), "date", Some("2026-11-04")),
         (Value::Time(time), "time", Some("23:59:59.123456")),
-        (Value::DateTime(date.and_time(time)), "datetime", Some("2026-11-04 23:59:59.123456")),
+        (
+            Value::DateTime(date.and_time(time)),
+            "datetime",
+            Some("2026-11-04 23:59:59.123456"),
+        ),
         (
             Value::TimestampTz(Utc.from_utc_datetime(&date.and_time(time))),
             "timestamptz",
@@ -256,7 +262,10 @@ fn copying_without_headers_and_every_typed_kind_stay_on_one_line_each() {
     assert_eq!(copied.lines().count(), TYPED_KINDS as usize);
     assert!(copied.lines().all(|line| line.matches('\t').count() == 3), "{copied}");
     assert!(copied.contains("<undecodable numeric(40,20)>"));
-    assert!(copied.lines().last().unwrap().ends_with("\\N"), "the last typed kind is NULL");
+    assert!(
+        copied.lines().last().unwrap().ends_with("\\N"),
+        "the last typed kind is NULL"
+    );
 }
 
 #[test]
@@ -271,4 +280,71 @@ fn copying_is_bounded_and_refuses_reversed_or_oversized_ranges() {
 fn copying_past_the_last_row_stops_at_the_end() {
     let copied = copy_rows(149_998, 150_005, false, Some(150_000)).unwrap();
     assert_eq!(copied.lines().count(), 2);
+}
+
+fn edited(kind: &str, text: &str) -> Result<(String, Option<String>), String> {
+    edit_cell(kind.into(), text.into(), false).map(|cell| (cell.kind.to_string(), cell.value))
+}
+
+#[test]
+fn an_edit_is_parsed_with_the_core_rules_and_shown_in_canonical_form() {
+    assert_eq!(edited("integer", " 42 "), Ok(("integer".into(), Some("42".into()))));
+    assert_eq!(edited("boolean", "Yes"), Ok(("boolean".into(), Some("true".into()))));
+    assert_eq!(edited("decimal", "1.50"), Ok(("decimal".into(), Some("1.50".into()))));
+    assert_eq!(
+        edited("date", "2026-02-03"),
+        Ok(("date".into(), Some("2026-02-03".into())))
+    );
+    assert_eq!(
+        edited("uuid", "67E55044-10B1-426F-9247-BB680E5FE0C8"),
+        Ok(("uuid".into(), Some("67e55044-10b1-426f-9247-bb680e5fe0c8".into())))
+    );
+    assert_eq!(
+        edited("bytes", "0xdeadbeef"),
+        Ok(("bytes".into(), Some("\\xdeadbeef".into())))
+    );
+    assert_eq!(
+        edited("json", "{\"a\": 1}"),
+        Ok(("json".into(), Some("{\"a\":1}".into())))
+    );
+    assert_eq!(
+        edited("text", "  keep spaces "),
+        Ok(("text".into(), Some("  keep spaces ".into())))
+    );
+}
+
+#[test]
+fn an_invalid_edit_names_the_problem_without_echoing_the_text() {
+    for (kind, text, reason) in [
+        ("integer", "4x2", "not a whole number"),
+        ("boolean", "maybe", "not true or false"),
+        ("decimal", "1,5", "not a number"),
+        ("date", "2026-13-40", "not a date"),
+        ("time", "25:00", "not a time"),
+        ("timestamptz", "yesterday", "not a timestamp"),
+        ("uuid", "abc", "not a UUID"),
+        ("json", "{oops", "not JSON"),
+        ("bytes", "xyz", "not hexadecimal bytes"),
+    ] {
+        let error = edited(kind, text).unwrap_err();
+        assert_eq!(error, reason, "{kind}");
+        assert!(!error.contains(text) || text.len() < 4, "{kind}");
+    }
+}
+
+#[test]
+fn null_and_read_only_cells_follow_their_own_rules() {
+    assert_eq!(
+        edit_cell("integer".into(), "ignored".into(), true).unwrap().kind,
+        "null"
+    );
+    assert_eq!(
+        edit_cell("undecodable".into(), "x".into(), false).unwrap_err(),
+        "this cell cannot be edited"
+    );
+    assert_eq!(edited("null", "now text"), Ok(("text".into(), Some("now text".into()))));
+    assert_eq!(
+        edited("json_text", "{\"raw\":  1}"),
+        Ok(("json_text".into(), Some("{\"raw\":  1}".into())))
+    );
 }
