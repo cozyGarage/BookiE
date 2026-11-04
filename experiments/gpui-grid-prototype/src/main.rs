@@ -1,23 +1,20 @@
 use std::ops::Range;
 use std::time::{Duration, Instant};
 
+mod grid_edit;
+mod text_input;
+
 use bookie_gpui_grid_prototype::model::*;
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
 use gpui::{
-    App, Application, Bounds, ClipboardItem, Context, Div, FocusHandle, Focusable, KeyDownEvent, MouseButton,
+    App, Application, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
     MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
     prelude::*, px, rgb, size, uniform_list,
 };
+use text_input::{InputEvent, TextInput};
 
 const ROW_HEIGHT: f32 = 36.0;
-const CELL_WIDTHS: [f32; 4] = [240.0, 280.0, 120.0, 320.0];
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Field {
-    None,
-    Find,
-    Filter,
-}
+pub const CELL_WIDTHS: [f32; 4] = [240.0, 280.0, 120.0, 320.0];
 
 enum Mode {
     All,
@@ -29,10 +26,12 @@ struct GridView {
     mode: Mode,
     pager: Pager,
     continuous: bool,
-    find_text: String,
-    filter_text: String,
+    find: Entity<TextInput>,
+    filter: Entity<TextInput>,
     filter_visible: bool,
-    active: Field,
+    editor: Entity<TextInput>,
+    editing: Option<grid_edit::Editing>,
+    edits: grid_edit::Edits,
     cursor: MatchCursor,
     find_capped: bool,
     compare: Option<Diff>,
@@ -78,16 +77,40 @@ impl Focusable for GridView {
 }
 
 impl GridView {
-    fn new(total: u64, started: Instant, cx: &mut Context<Self>) -> Self {
+    fn new(total: u64, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let find = cx.new(|cx| TextInput::new("Find in all rows", cx));
+        let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
+        cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
+            InputEvent::Changed => {
+                this.cursor = MatchCursor::default();
+                cx.notify();
+            }
+            InputEvent::Submit => this.run_find(true, cx),
+            InputEvent::Cancel => this.status.clear(),
+        })
+        .detach();
+        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| {
+            if *event == InputEvent::Submit {
+                this.apply_filter(cx);
+            }
+        })
+        .detach();
+        let editor = cx.new(|cx| TextInput::new("", cx));
+        cx.subscribe_in(&editor, window, |this, _, event: &InputEvent, window, cx| {
+            this.on_editor_event(event, window, cx);
+        })
+        .detach();
         GridView {
             total,
             mode: Mode::All,
             pager: Pager::new(total),
             continuous: false,
-            find_text: String::new(),
-            filter_text: String::new(),
+            find,
+            filter,
             filter_visible: false,
-            active: Field::None,
+            editor,
+            editing: None,
+            edits: Default::default(),
             cursor: MatchCursor::default(),
             find_capped: false,
             compare: None,
@@ -209,14 +232,14 @@ impl GridView {
     }
 
     fn run_find(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if self.find_text.is_empty() {
+        if self.find_text(cx).is_empty() {
             return;
         }
         if !self.cursor.matches.is_empty() && self.cursor.status(false) != "No match" {
             self.step_match(forward);
             return;
         }
-        let (total, query) = (self.total, self.find_text.clone());
+        let (total, query) = (self.total, self.find_text(cx));
         self.status = "Searching…".into();
         self.begin_background(
             cx,
@@ -245,18 +268,22 @@ impl GridView {
         self.status = self.cursor.status(self.find_capped);
     }
 
-    fn show_matching(&mut self) {
+    fn find_text(&self, cx: &App) -> String {
+        self.find.read(cx).content().to_string()
+    }
+
+    fn show_matching(&mut self, cx: &App) {
         if self.cursor.matches.is_empty() {
             return;
         }
         let kept = self.cursor.matches.iter().map(|row| *row as u32).collect();
-        let label = format!("FILTER {}", self.find_text);
+        let label = format!("FILTER {}", self.find_text(cx));
         self.set_mode(Mode::Filtered { kept, label });
         self.status = format!("Showing {} matching rows", thousands(self.dataset_count()));
     }
 
     fn apply_filter(&mut self, cx: &mut Context<Self>) {
-        let predicate = match parse_predicate(&self.filter_text) {
+        let predicate = match parse_predicate(self.filter.read(cx).content()) {
             Ok(predicate) => predicate,
             Err(message) => {
                 self.status = message.into();
@@ -264,7 +291,7 @@ impl GridView {
             }
         };
         let total = self.total;
-        let label = format!("WHERE {}", self.filter_text);
+        let label = format!("WHERE {}", self.filter.read(cx).content());
         self.status = "Filtering…".into();
         self.begin_background(
             cx,
@@ -297,42 +324,18 @@ impl GridView {
         );
     }
 
-    fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let stroke = &event.keystroke;
-        if stroke.modifiers.control && stroke.key == "f" {
-            self.filter_visible = true;
-            self.active = Field::Filter;
-            cx.notify();
+        if !stroke.modifiers.control {
             return;
         }
-        if stroke.modifiers.control && stroke.key == "c" && self.active == Field::None {
-            self.copy_selection(stroke.modifiers.shift, cx);
-            cx.notify();
-            return;
-        }
-        let field = match self.active {
-            Field::Find => &mut self.find_text,
-            Field::Filter => &mut self.filter_text,
-            Field::None => return,
-        };
         match stroke.key.as_str() {
-            "backspace" => {
-                field.pop();
-                if self.active == Field::Find {
-                    self.cursor = MatchCursor::default();
-                }
+            "f" => {
+                self.filter_visible = true;
+                window.focus(&self.filter.read(cx).focus_handle(cx));
             }
-            "escape" => self.active = Field::None,
-            "enter" if self.active == Field::Find => self.run_find(!stroke.modifiers.shift, cx),
-            "enter" => self.apply_filter(cx),
-            _ => {
-                if let (Some(text), false) = (&stroke.key_char, stroke.modifiers.control) {
-                    field.push_str(text);
-                    if self.active == Field::Find {
-                        self.cursor = MatchCursor::default();
-                    }
-                }
-            }
+            "c" if self.focus.is_focused(window) => self.copy_selection(stroke.modifiers.shift, cx),
+            _ => return,
         }
         cx.notify();
     }
@@ -433,26 +436,7 @@ fn button(id: &'static str, label: impl Into<String>) -> Stateful<Div> {
         .child(label.into())
 }
 
-fn field_box(id: &'static str, text: &str, placeholder: &str, active: bool) -> Stateful<Div> {
-    let shown = if text.is_empty() {
-        placeholder.to_string()
-    } else {
-        text.to_string()
-    };
-    div()
-        .id(id)
-        .w(px(220.0))
-        .px_2()
-        .py_1()
-        .border_1()
-        .border_color(if active { rgb(0x4c8dff) } else { rgb(0x44464f) })
-        .bg(rgb(0x14151a))
-        .text_color(if text.is_empty() { rgb(0x80838f) } else { rgb(0xe6e6e6) })
-        .cursor_text()
-        .child(shown)
-}
-
-fn cell_div(width: f32, text: String) -> Div {
+pub fn cell_div(width: f32, text: String) -> Div {
     div().w(px(width)).flex_none().px_2().overflow_hidden().child(text)
 }
 
@@ -512,21 +496,14 @@ impl Render for GridView {
                 this.pager.last();
                 cx.notify();
             })))
-            .child(
-                field_box("find", &self.find_text, "Find in all rows", self.active == Field::Find).on_click(
-                    cx.listener(|this, _, _, cx| {
-                        this.active = Field::Find;
-                        cx.notify();
-                    }),
-                ),
-            )
+            .child(div().w(px(260.0)).child(self.find.clone()))
             .child(
                 button("find-prev", "Previous match").on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
             )
             .child(button("find-next", "Next match").on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(
                 button("show", "Show matching rows").on_click(cx.listener(|this, _, _, cx| {
-                    this.show_matching();
+                    this.show_matching(cx);
                     cx.notify();
                 })),
             )
@@ -556,19 +533,7 @@ impl Render for GridView {
                 .px_2()
                 .pb_2()
                 .child(div().child("WHERE"))
-                .child(
-                    field_box(
-                        "where",
-                        &self.filter_text,
-                        "label contains 7",
-                        self.active == Field::Filter,
-                    )
-                    .w(px(420.0))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.active = Field::Filter;
-                        cx.notify();
-                    })),
-                )
+                .child(div().w(px(420.0)).child(self.filter.clone()))
                 .child(button("apply", "Apply").on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
                 .child(button("clear", "Clear all").on_click(cx.listener(|this, _, _, cx| {
                     this.clear_filter();
@@ -661,7 +626,6 @@ impl GridView {
         }
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
-        let cells = row_at(source);
         let selected = self
             .selection
             .is_some_and(|selection| selection.contains(dataset_index));
@@ -674,10 +638,10 @@ impl GridView {
                     cx.notify();
                 }),
             )
-            .child(cell_div(CELL_WIDTHS[0], cells[0].display()))
-            .child(cell_div(CELL_WIDTHS[1], cells[1].display()))
-            .child(cell_div(CELL_WIDTHS[2], cells[2].display()))
-            .child(cell_div(CELL_WIDTHS[3], cells[3].display()))
+            .child(self.data_cell(source, 0, cx))
+            .child(self.data_cell(source, 1, cx))
+            .child(self.data_cell(source, 2, cx))
+            .child(self.data_cell(source, 3, cx))
     }
 }
 
@@ -688,6 +652,7 @@ fn main() {
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
     Application::new().run(move |cx: &mut App| {
+        text_input::bind_keys(cx);
         let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
         let opened = cx.open_window(
             WindowOptions {
@@ -695,7 +660,7 @@ fn main() {
                 ..Default::default()
             },
             |window, cx| {
-                let view = cx.new(|cx| GridView::new(total, started, cx));
+                let view = cx.new(|cx| GridView::new(total, started, window, cx));
                 view.read(cx).focus.focus(window);
                 if autoscroll > 0 {
                     view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
@@ -709,3 +674,6 @@ fn main() {
         }
     });
 }
+
+#[cfg(test)]
+mod ui_tests;
