@@ -140,6 +140,9 @@ pub enum AppMsg {
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,
+    CompareSchema {
+        schema: Option<String>,
+    },
     ShowErDiagram {
         schema: Option<String>,
     },
