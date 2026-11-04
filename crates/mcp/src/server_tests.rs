@@ -241,8 +241,17 @@ impl crate::bridge::ConnectionProvider for ApprovalProvider {
     }
 }
 
-#[tokio::test]
-async fn disconnecting_during_agent_approval_records_cancellation_and_never_executes() {
+struct ApprovalFixture {
+    _directory: tempfile::TempDir,
+    bridge: Arc<McpBridge>,
+    connection_id: uuid::Uuid,
+    plaintext: String,
+    requested: Arc<Notify>,
+    audit: Arc<RecordingAudit>,
+    executions: Arc<AtomicUsize>,
+}
+
+fn approval_fixture() -> ApprovalFixture {
     let connection_id = uuid::Uuid::new_v4();
     let saved = serde_json::from_value(serde_json::json!({
         "id": connection_id,
@@ -300,6 +309,28 @@ async fn disconnecting_during_agent_approval_records_cancellation_and_never_exec
         }),
         tokens,
     ));
+    ApprovalFixture {
+        _directory: directory,
+        bridge,
+        connection_id,
+        plaintext,
+        requested,
+        audit,
+        executions,
+    }
+}
+
+#[tokio::test]
+async fn disconnecting_during_agent_approval_records_cancellation_and_never_executes() {
+    let ApprovalFixture {
+        _directory,
+        bridge,
+        connection_id,
+        plaintext,
+        requested,
+        audit,
+        executions,
+    } = approval_fixture();
 
     let probe = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = probe.local_addr().unwrap();
@@ -369,6 +400,174 @@ async fn disconnecting_during_agent_approval_records_cancellation_and_never_exec
 
     shutdown.cancel();
     assert!(server.await.expect("server task").is_ok());
+}
+
+struct StdioClient {
+    input: tokio::io::WriteHalf<tokio::io::DuplexStream>,
+    output: BufReader<tokio::io::ReadHalf<tokio::io::DuplexStream>>,
+    server: tokio::task::JoinHandle<Result<(), String>>,
+}
+
+fn start_stdio_session(bridge: Arc<McpBridge>) -> StdioClient {
+    let (client, server) = tokio::io::duplex(1 << 16);
+    let (server_read, server_write) = tokio::io::split(server);
+    let (client_read, client_write) = tokio::io::split(client);
+    let server =
+        tokio::spawn(async move { serve_json_rpc_lines(bridge, BufReader::new(server_read), server_write).await });
+    StdioClient {
+        input: client_write,
+        output: BufReader::new(client_read),
+        server,
+    }
+}
+
+impl StdioClient {
+    async fn send(&mut self, message: JsonValue) {
+        self.input.write_all(format!("{message}\n").as_bytes()).await.unwrap();
+    }
+
+    async fn next_message(&mut self, within: std::time::Duration) -> Option<JsonValue> {
+        let mut line = String::new();
+        let read = tokio::time::timeout(within, self.output.read_line(&mut line))
+            .await
+            .ok()?;
+        (read.ok()? > 0).then(|| serde_json::from_str(line.trim()).unwrap())
+    }
+
+    async fn finish(mut self) {
+        self.input.shutdown().await.unwrap();
+        let ended = tokio::time::timeout(std::time::Duration::from_secs(5), self.server).await;
+        assert!(
+            matches!(ended, Ok(Ok(Ok(())))),
+            "the session should end cleanly: {ended:?}"
+        );
+    }
+}
+
+fn pending_write(id: u64, fixture: &ApprovalFixture) -> JsonValue {
+    json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "method": "tools/call",
+        "params": {
+            "name": "execute_write",
+            "arguments": {
+                "connection_id": fixture.connection_id,
+                "sql": "INSERT INTO jobs(id) VALUES (1)",
+                "preview": false,
+                "token": fixture.plaintext,
+            }
+        }
+    })
+}
+
+const SOON: std::time::Duration = std::time::Duration::from_secs(3);
+
+async fn wait_for_approval_request(requested: &Notify) {
+    tokio::time::timeout(SOON, requested.notified())
+        .await
+        .expect("the write should reach human approval");
+}
+
+#[tokio::test]
+async fn a_ping_is_answered_while_a_tool_call_waits_for_approval() {
+    let fixture = approval_fixture();
+    let mut client = start_stdio_session(fixture.bridge.clone());
+    client.send(pending_write(1, &fixture)).await;
+    wait_for_approval_request(&fixture.requested).await;
+
+    client.send(json!({"jsonrpc": "2.0", "id": 2, "method": "ping"})).await;
+
+    let answer = client
+        .next_message(SOON)
+        .await
+        .expect("the ping must not wait for the call");
+    assert_eq!((answer["id"].clone(), answer["result"].clone()), (json!(2), json!({})));
+    assert!(
+        client
+            .next_message(std::time::Duration::from_millis(150))
+            .await
+            .is_none()
+    );
+    client.finish().await;
+    wait_for_cancelled_outcome(&fixture).await;
+}
+
+async fn wait_for_cancelled_outcome(fixture: &ApprovalFixture) {
+    tokio::time::timeout(SOON, fixture.audit.recorded.notified())
+        .await
+        .expect("a cancelled call must reach a terminal audit state");
+    let events = fixture.audit.events.lock().expect("audit events");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].phase, AuditRecordPhase::Outcome);
+    assert_eq!(events[0].terminal_status, AuditTerminalStatus::Cancelled);
+    assert_eq!(
+        fixture.executions.load(Ordering::SeqCst),
+        0,
+        "a cancelled write must not run"
+    );
+}
+
+#[tokio::test]
+async fn a_cancelled_notification_stops_the_call_records_it_and_sends_no_response() {
+    let fixture = approval_fixture();
+    let mut client = start_stdio_session(fixture.bridge.clone());
+    client.send(pending_write(7, &fixture)).await;
+    wait_for_approval_request(&fixture.requested).await;
+
+    client
+        .send(json!({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 7}}))
+        .await;
+    wait_for_cancelled_outcome(&fixture).await;
+
+    client.send(json!({"jsonrpc": "2.0", "id": 8, "method": "ping"})).await;
+    let next = client.next_message(SOON).await.expect("the ping after the cancel");
+    assert_eq!(next["id"], 8, "the cancelled call must not be answered: {next}");
+    client.finish().await;
+}
+
+#[tokio::test]
+async fn closing_the_input_cancels_calls_that_are_still_waiting() {
+    let fixture = approval_fixture();
+    let mut client = start_stdio_session(fixture.bridge.clone());
+    client.send(pending_write(1, &fixture)).await;
+    wait_for_approval_request(&fixture.requested).await;
+
+    client.finish().await;
+
+    wait_for_cancelled_outcome(&fixture).await;
+}
+
+#[tokio::test]
+async fn calls_beyond_the_concurrency_limit_are_refused_at_once() {
+    let fixture = approval_fixture();
+    let mut client = start_stdio_session(fixture.bridge.clone());
+    for id in 1..=MAX_IN_FLIGHT_CALLS as u64 + 1 {
+        client.send(pending_write(id, &fixture)).await;
+    }
+
+    let refusal = client.next_message(SOON).await.expect("the extra call must be refused");
+
+    assert_eq!(refusal["id"], MAX_IN_FLIGHT_CALLS as u64 + 1);
+    assert_eq!(refusal["error"]["code"], -32000, "{refusal}");
+    client.finish().await;
+}
+
+#[tokio::test]
+async fn a_second_call_with_the_id_of_one_in_flight_is_refused() {
+    let fixture = approval_fixture();
+    let mut client = start_stdio_session(fixture.bridge.clone());
+    client.send(pending_write(1, &fixture)).await;
+    wait_for_approval_request(&fixture.requested).await;
+
+    client.send(pending_write(1, &fixture)).await;
+
+    let refusal = client
+        .next_message(SOON)
+        .await
+        .expect("the duplicate id must be refused");
+    assert_eq!(refusal["error"]["code"], -32600, "{refusal}");
+    client.finish().await;
 }
 
 /// H-adjacent finding: tools/list disclosed the full tool catalogue to
@@ -462,7 +661,7 @@ async fn a_non_utf8_line_is_resynced_instead_of_ending_the_session() {
     let output = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let writer = RecordingWriter(output.clone());
 
-    serve_json_rpc_lines(&bridge, reader, writer).await.unwrap();
+    serve_json_rpc_lines(Arc::new(bridge), reader, writer).await.unwrap();
 
     let bytes = output.lock().unwrap().clone();
     let text = String::from_utf8(bytes).unwrap();

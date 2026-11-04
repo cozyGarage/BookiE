@@ -97,122 +97,227 @@ where
     }
 }
 
+const MAX_IN_FLIGHT_CALLS: usize = 8;
+
+type InFlight = Arc<std::sync::Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>>;
+
 /// Minimal MCP-compatible JSON-RPC loop over stdio. Speaks enough of the
 /// protocol for Cursor / Claude Code: `initialize`, `tools/list`,
 /// `tools/call`. Auth via `Authorization` in `_meta` or `params.token`.
 pub async fn serve_stdio(bridge: Arc<McpBridge>) -> Result<(), String> {
     let reader = BufReader::new(tokio::io::stdin());
-    let stdout = tokio::io::stdout();
-    serve_json_rpc_lines(&bridge, reader, stdout).await
+    serve_json_rpc_lines(bridge, reader, tokio::io::stdout()).await
 }
 
-async fn serve_json_rpc_lines<R, W>(bridge: &McpBridge, mut reader: R, mut stdout: W) -> Result<(), String>
+enum Incoming {
+    Message(JsonValue),
+    Skip,
+    End,
+}
+
+struct StdioSession<W> {
+    bridge: Arc<McpBridge>,
+    stdout: Arc<tokio::sync::Mutex<W>>,
+    in_flight: InFlight,
+}
+
+impl<W> Clone for StdioSession<W> {
+    fn clone(&self) -> Self {
+        Self {
+            bridge: self.bridge.clone(),
+            stdout: self.stdout.clone(),
+            in_flight: self.in_flight.clone(),
+        }
+    }
+}
+
+async fn serve_json_rpc_lines<R, W>(bridge: Arc<McpBridge>, mut reader: R, stdout: W) -> Result<(), String>
 where
     R: tokio::io::AsyncBufRead + Unpin,
-    W: tokio::io::AsyncWrite + Unpin,
+    W: tokio::io::AsyncWrite + Unpin + Send + 'static,
 {
-    let mut line = String::new();
+    let session = StdioSession {
+        bridge,
+        stdout: Arc::new(tokio::sync::Mutex::new(stdout)),
+        in_flight: InFlight::default(),
+    };
+    let mut calls = tokio::task::JoinSet::new();
+    let outcome = session.read_requests(&mut reader, &mut calls).await;
+    session.cancel_every_call();
+    while calls.join_next().await.is_some() {}
+    outcome
+}
 
-    loop {
+impl<W> StdioSession<W>
+where
+    W: tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    async fn read_requests<R>(&self, reader: &mut R, calls: &mut tokio::task::JoinSet<()>) -> Result<(), String>
+    where
+        R: tokio::io::AsyncBufRead + Unpin,
+    {
+        let mut line = String::new();
+        loop {
+            match self.next_message(reader, &mut line).await? {
+                Incoming::End => return Ok(()),
+                Incoming::Skip => {}
+                Incoming::Message(request) => self.handle_message(request, calls).await?,
+            }
+        }
+    }
+
+    async fn next_message<R>(&self, reader: &mut R, line: &mut String) -> Result<Incoming, String>
+    where
+        R: tokio::io::AsyncBufRead + Unpin,
+    {
         line.clear();
-        let read = (&mut reader)
-            .take(MAX_REQUEST_BYTES as u64 + 1)
-            .read_line(&mut line)
-            .await;
+        let read = (&mut *reader).take(MAX_REQUEST_BYTES as u64 + 1).read_line(line).await;
         let n = match read {
             Ok(n) => n,
-            // read_line still consumes the malformed bytes before failing
-            // the UTF-8 conversion, so the stream is resynced at the next
-            // newline -- this can recover the same way an invalid JSON
-            // line does, instead of ending the whole session.
             Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
-                write_response(
-                    &mut stdout,
-                    json!({
-                        "jsonrpc": "2.0",
-                        "id": null,
-                        "error": {"code": -32700, "message": format!("parse error: {error}")}
-                    }),
-                )
-                .await?;
-                continue;
+                self.reply(parse_error(format!("parse error: {error}"))).await?;
+                return Ok(Incoming::Skip);
             }
             Err(error) => return Err(error.to_string()),
         };
         if n == 0 {
-            break;
+            return Ok(Incoming::End);
         }
         if n > MAX_REQUEST_BYTES && !line.ends_with('\n') {
-            discard_rest_of_line(&mut reader).await?;
-            write_response(
-                &mut stdout,
-                json!({
-                    "jsonrpc": "2.0",
-                    "id": null,
-                    "error": {"code": -32600, "message": format!("request exceeds {MAX_REQUEST_BYTES} bytes")}
-                }),
-            )
-            .await?;
-            continue;
+            discard_rest_of_line(reader).await?;
+            let message = format!("request exceeds {MAX_REQUEST_BYTES} bytes");
+            self.reply(json_rpc_error(&JsonValue::Null, -32600, message)).await?;
+            return Ok(Incoming::Skip);
         }
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
+        self.parse_message(line.trim()).await
+    }
+
+    async fn parse_message(&self, text: &str) -> Result<Incoming, String> {
+        if text.is_empty() {
+            return Ok(Incoming::Skip);
         }
-        let request: JsonValue = match serde_json::from_str(trimmed) {
-            Ok(v) => v,
-            Err(e) => {
-                write_response(
-                    &mut stdout,
-                    json!({
-                        "jsonrpc": "2.0",
-                        "id": null,
-                        "error": {"code": -32700, "message": format!("parse error: {e}")}
-                    }),
-                )
-                .await?;
-                continue;
+        match serde_json::from_str(text) {
+            Ok(request) => Ok(Incoming::Message(request)),
+            Err(error) => {
+                self.reply(parse_error(format!("parse error: {error}"))).await?;
+                Ok(Incoming::Skip)
             }
-        };
+        }
+    }
+
+    async fn handle_message(&self, request: JsonValue, calls: &mut tokio::task::JoinSet<()>) -> Result<(), String> {
         let id = request.get("id").cloned().unwrap_or(JsonValue::Null);
         let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("");
         let params = request.get("params").cloned().unwrap_or(json!({}));
-
         let response = match method {
-            "initialize" => match initialize_result(&params) {
-                Ok(result) => json!({"jsonrpc": "2.0", "id": id, "result": result}),
-                Err(message) => json_rpc_error(&id, -32602, message),
+            "notifications/initialized" | "initialized" => return Ok(()),
+            "notifications/cancelled" => {
+                self.cancel_call(&params);
+                return Ok(());
+            }
+            "tools/call" => match self.start_call(id, params, calls) {
+                Some(refusal) => refusal,
+                None => return Ok(()),
             },
-            "notifications/initialized" | "initialized" => continue,
-            "tools/list" => match handle_tools_list(bridge, &params) {
-                Ok(result) => json!({"jsonrpc": "2.0", "id": id, "result": result}),
-                Err(message) => json_rpc_error(&id, -32000, message),
-            },
-            "tools/call" => match handle_tool_call(bridge, params).await {
-                Ok(content) => json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "result": {
-                        "content": [{"type": "text", "text": content.to_string()}],
-                        "isError": false
-                    }
-                }),
-                Err(error) => json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "result": tool_error_result(&error)
-                }),
-            },
-            "ping" => json!({"jsonrpc": "2.0", "id": id, "result": {}}),
-            other => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": {"code": -32601, "message": format!("method not found: {other}")}
-            }),
+            other => immediate_response(&self.bridge, other, id, &params),
         };
-        write_response(&mut stdout, response).await?;
+        self.reply(response).await
     }
-    Ok(())
+
+    fn start_call(&self, id: JsonValue, params: JsonValue, calls: &mut tokio::task::JoinSet<()>) -> Option<JsonValue> {
+        let key = id.to_string();
+        let token = {
+            let mut in_flight = self.in_flight.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if in_flight.contains_key(&key) {
+                let message = "a call with this request id is already running".to_string();
+                return Some(json_rpc_error(&id, -32600, message));
+            }
+            if in_flight.len() >= MAX_IN_FLIGHT_CALLS {
+                let message = format!("too many concurrent tool calls (limit {MAX_IN_FLIGHT_CALLS})");
+                return Some(json_rpc_error(&id, -32000, message));
+            }
+            let token = self.bridge.request_cancellation();
+            in_flight.insert(key.clone(), token.clone());
+            token
+        };
+        let session = self.clone();
+        calls.spawn(async move { session.run_call(key, id, params, token).await });
+        None
+    }
+
+    async fn run_call(
+        &self,
+        key: String,
+        id: JsonValue,
+        params: JsonValue,
+        token: tokio_util::sync::CancellationToken,
+    ) {
+        let result =
+            crate::bridge::scope_request_cancellation(token.clone(), handle_tool_call(&self.bridge, params)).await;
+        self.in_flight
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&key);
+        if token.is_cancelled() {
+            return;
+        }
+        if let Err(error) = self.reply(call_response(id, result)).await {
+            tracing::warn!(%error, "could not write an MCP response");
+        }
+    }
+
+    fn cancel_call(&self, params: &JsonValue) {
+        let Some(request_id) = params.get("requestId") else {
+            return;
+        };
+        let in_flight = self.in_flight.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(token) = in_flight.get(&request_id.to_string()) {
+            token.cancel();
+        }
+    }
+
+    fn cancel_every_call(&self) {
+        let in_flight = self.in_flight.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        in_flight.values().for_each(|token| token.cancel());
+    }
+
+    async fn reply(&self, value: JsonValue) -> Result<(), String> {
+        let mut stdout = self.stdout.lock().await;
+        write_response(&mut *stdout, value).await
+    }
+}
+
+fn parse_error(message: String) -> JsonValue {
+    json_rpc_error(&JsonValue::Null, -32700, message)
+}
+
+fn immediate_response(bridge: &McpBridge, method: &str, id: JsonValue, params: &JsonValue) -> JsonValue {
+    match method {
+        "initialize" => match initialize_result(params) {
+            Ok(result) => json!({"jsonrpc": "2.0", "id": id, "result": result}),
+            Err(message) => json_rpc_error(&id, -32602, message),
+        },
+        "tools/list" => match handle_tools_list(bridge, params) {
+            Ok(result) => json!({"jsonrpc": "2.0", "id": id, "result": result}),
+            Err(message) => json_rpc_error(&id, -32000, message),
+        },
+        "ping" => json!({"jsonrpc": "2.0", "id": id, "result": {}}),
+        other => json_rpc_error(&id, -32601, format!("method not found: {other}")),
+    }
+}
+
+fn call_response(id: JsonValue, result: Result<JsonValue, crate::errors::McpToolError>) -> JsonValue {
+    match result {
+        Ok(content) => json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "result": {
+                "content": [{"type": "text", "text": content.to_string()}],
+                "isError": false
+            }
+        }),
+        Err(error) => json!({"jsonrpc": "2.0", "id": id, "result": tool_error_result(&error)}),
+    }
 }
 
 /// Shared lookup for every method that requires a token: `params.token`,
