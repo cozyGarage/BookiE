@@ -141,10 +141,10 @@ fn label_of(index: u64) -> String {
 }
 
 fn state_of(index: u64) -> Value {
-    if index % 3 == 0 {
+    if index.is_multiple_of(3) {
         Value::Null
     } else {
-        Value::Bool(index % 2 == 0)
+        Value::Bool(index.is_multiple_of(2))
     }
 }
 
