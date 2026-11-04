@@ -149,6 +149,11 @@ pub(crate) fn draft_connection(
     username: String,
     environment: Environment,
 ) -> SavedConnection {
+    let environment = if is_loopback_host(&host) {
+        Environment::Local
+    } else {
+        Environment::Prod
+    };
     SavedConnection {
         auth_source: None,
         id: Uuid::new_v4(),
