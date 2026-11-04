@@ -121,10 +121,10 @@ impl App {
                 }
                 SessionTeardownAction::Disconnect => {}
                 SessionTeardownAction::ConnectionSwitch => {
-                    self.connection_transition = super::ConnectionTransition::Idle;
-                    self.prepared_connection = None;
-                    self.switch_saves_pending.clear();
-                    self.switch_cancel_audit_was_disabled = None;
+                    self.switch.transition = super::ConnectionTransition::Idle;
+                    self.switch.prepared = None;
+                    self.switch.saves_pending.clear();
+                    self.switch.cancel_audit_was_disabled = None;
                 }
                 SessionTeardownAction::WindowClose => {
                     self.session_teardown_pending.set(false);

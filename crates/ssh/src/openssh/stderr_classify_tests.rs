@@ -189,3 +189,56 @@ fn a_declined_prompt_reports_the_declined_key() {
         }
     );
 }
+
+fn negotiation(kind: &str, offer: &str) -> OpenSshError {
+    fixture(&format!(
+        "Unable to negotiate with 203.0.113.9 port 22: no matching {kind} found. Their offer: {offer}\n"
+    ))
+}
+
+#[test]
+fn each_refused_algorithm_class_is_named() {
+    let cases = [
+        ("host key type", "ssh-rsa", AlgorithmClass::HostKey),
+        (
+            "key exchange method",
+            "diffie-hellman-group1-sha1",
+            AlgorithmClass::KeyExchange,
+        ),
+        ("cipher", "3des-cbc,blowfish-cbc", AlgorithmClass::Cipher),
+        ("MAC", "hmac-sha1,hmac-md5", AlgorithmClass::Mac),
+    ];
+    for (kind, offer, class) in cases {
+        assert_eq!(
+            negotiation(kind, offer),
+            OpenSshError::NoAcceptableAlgorithm {
+                host: "203.0.113.9".to_owned(),
+                class,
+                offered: offer.to_owned(),
+            },
+            "{kind}"
+        );
+    }
+}
+
+#[test]
+fn the_refusal_message_names_the_class_and_the_peer_offer() {
+    let message = negotiation("host key type", "ssh-rsa").to_string();
+    assert!(message.contains("no acceptable host key algorithm"), "{message}");
+    assert!(message.contains("The server offered: ssh-rsa"), "{message}");
+}
+
+#[test]
+fn a_hostile_offer_cannot_inject_control_characters() {
+    let OpenSshError::NoAcceptableAlgorithm { offered, .. } = negotiation("cipher", "3des-cbc\x1b[31m\x07") else {
+        panic!("expected a refusal");
+    };
+    assert!(!offered.chars().any(char::is_control), "{offered:?}");
+}
+
+#[test]
+fn an_unrelated_negotiation_wording_is_not_mistaken_for_a_weak_algorithm() {
+    let other =
+        fixture("Unable to negotiate with 203.0.113.9 port 22: no matching compression found. Their offer: zlib\n");
+    assert!(matches!(other, OpenSshError::Protocol { .. }), "{other:?}");
+}

@@ -258,3 +258,26 @@ fn terminal_snapshots_keep_only_the_retained_window_and_release_on_drop() {
     drop(snapshots);
     assert!(refs.iter().all(|result| result.upgrade().is_none()));
 }
+
+#[test]
+fn independent_active_streams_release_their_own_pages() {
+    let mut caches = Vec::new();
+    let mut snapshots = Vec::new();
+    let mut pages = Vec::new();
+    for _ in 0..3 {
+        let mut cache = StreamPageCache::default();
+        let result = byte_page(4 * 1024 * 1024);
+        pages.push(Arc::downgrade(&result));
+        cache.append(0, result).unwrap();
+        snapshots.push(cache.snapshot(StreamTerminal::Loading, None));
+        caches.push(cache);
+    }
+    assert!(pages.iter().all(|page| page.upgrade().is_some()));
+    drop(caches.remove(0));
+    drop(snapshots.remove(0));
+    assert!(pages[0].upgrade().is_none());
+    assert!(pages[1..].iter().all(|page| page.upgrade().is_some()));
+    drop(snapshots);
+    drop(caches);
+    assert!(pages.iter().all(|page| page.upgrade().is_none()));
+}
