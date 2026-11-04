@@ -621,6 +621,7 @@ fn comment_text(text: &str) -> String {
 }
 
 struct StatementTail {
+    open_quote: Option<char>,
     in_line_comment: bool,
     in_block_comment: bool,
     last_code: Option<char>,
@@ -631,6 +632,19 @@ enum ScanState {
     Quoted(char),
     LineComment,
     BlockComment,
+}
+
+fn dash_comment_starts(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, mysql: bool) -> bool {
+    let mut lookahead = chars.clone();
+    lookahead.next();
+    let starts = !mysql
+        || lookahead
+            .peek()
+            .is_none_or(|next| next.is_whitespace() || next.is_control());
+    if starts {
+        chars.next();
+    }
+    starts
 }
 
 fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
@@ -650,7 +664,9 @@ fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
             ScanState::LineComment => ScanState::LineComment,
             ScanState::BlockComment if c == '*' && chars.next_if_eq(&'/').is_some() => ScanState::Code,
             ScanState::BlockComment => ScanState::BlockComment,
-            ScanState::Code if c == '-' && chars.next_if_eq(&'-').is_some() => ScanState::LineComment,
+            ScanState::Code if c == '-' && chars.peek() == Some(&'-') && dash_comment_starts(&mut chars, mysql) => {
+                ScanState::LineComment
+            }
             ScanState::Code if c == '#' && hash_comments => ScanState::LineComment,
             ScanState::Code if c == '/' && chars.next_if_eq(&'*').is_some() => ScanState::BlockComment,
             ScanState::Code if matches!(c, '\'' | '"' | '`') => {
@@ -666,6 +682,10 @@ fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
         };
     }
     StatementTail {
+        open_quote: match state {
+            ScanState::Quoted(quote) => Some(quote),
+            _ => None,
+        },
         in_line_comment: matches!(state, ScanState::LineComment),
         in_block_comment: matches!(state, ScanState::BlockComment),
         last_code,
@@ -692,8 +712,11 @@ fn sql_export_entry(entry: &Entry) -> String {
     let query = entry.query.trim_end();
     out.push_str(query);
     let tail = scan_statement_tail(query, matches!(entry.driver_id.as_str(), "mysql" | "mariadb"));
-    if tail.in_block_comment {
-        out.push_str("\n*/\n;");
+    if let Some(quote) = tail.open_quote {
+        out.push(quote);
+        out.push(';');
+    } else if tail.in_block_comment {
+        out.push_str(if tail.last_code == Some(';') { "\n*/" } else { "\n*/\n;" });
     } else if tail.last_code != Some(';') {
         out.push_str(if tail.in_line_comment { "\n;" } else { ";" });
     }

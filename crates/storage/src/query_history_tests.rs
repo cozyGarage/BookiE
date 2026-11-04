@@ -485,6 +485,22 @@ fn an_unterminated_block_comment_is_closed_before_the_terminator() {
 }
 
 #[test]
+fn an_unterminated_string_is_closed_and_a_terminated_statement_keeps_one_semicolon() {
+    assert_eq!(exported_tail("postgres", "SELECT 'abc"), "SELECT 'abc';\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1; /* note"),
+        "SELECT 1; /* note\n*/\n\n"
+    );
+}
+
+#[test]
+fn a_mysql_double_dash_needs_whitespace_to_start_a_comment() {
+    assert_eq!(exported_tail("mysql", "SELECT 5--1"), "SELECT 5--1;\n\n");
+    assert_eq!(exported_tail("mysql", "SELECT 5 -- c"), "SELECT 5 -- c\n;\n\n");
+    assert_eq!(exported_tail("postgres", "SELECT 5--1"), "SELECT 5--1\n;\n\n");
+}
+
+#[test]
 fn a_mysql_backslash_escaped_quote_does_not_end_the_string() {
     assert_eq!(exported_tail("mysql", "SELECT 'a\\' -- x'"), "SELECT 'a\\' -- x';\n\n");
 }
