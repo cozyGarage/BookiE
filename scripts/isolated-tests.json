@@ -1370,7 +1370,11 @@
     [
       "bookie-app",
       "--lib",
+<<<<<<< HEAD
       "ui::app::init_window::busy_quit::tests::with_two_windows_only_the_one_that_owns_running_work_asks_before_closing"
+=======
+      "ui::export_dialog::lifetime_tests::a_running_export_counts_as_busy_work_until_it_finishes"
+>>>>>>> feat/quit-confirm-exports
     ],
     [
       "bookie-app",
