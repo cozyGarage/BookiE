@@ -11,7 +11,9 @@ use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
 use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
-use bookie_gpui_grid_prototype::shell::{DATA_TABLE, Tab, Tabs};
+use bookie_gpui_grid_prototype::shell::{
+    DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag,
+};
 use bookie_gpui_grid_prototype::source::{Source, Synthetic};
 use bookie_gpui_grid_prototype::theme::{Style, Theme};
 use gpui::{
@@ -50,6 +52,12 @@ struct GridView {
     palette_index: usize,
     dark_mode: bool,
     tabs: Tabs,
+    runs: Vec<Run>,
+    active_run: usize,
+    summary_view: bool,
+    result_ratio: f32,
+    result_open: bool,
+    resizing_split: bool,
     font: gpui::SharedString,
     font_names: Vec<String>,
     palette_fonts: bool,
@@ -181,6 +189,12 @@ impl GridView {
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
+            runs: vec![Run { number: 1, rows: total }],
+            active_run: 0,
+            summary_view: false,
+            result_ratio: DEFAULT_RESULT_RATIO,
+            result_open: true,
+            resizing_split: false,
             font: default_font(&font_names).into(),
             font_names,
             palette_fonts: false,
@@ -268,6 +282,25 @@ impl GridView {
             selection.count(),
             if with_headers { " with headers" } else { "" }
         );
+    }
+
+    fn run_query(&mut self) {
+        let run = next_run(&self.runs);
+        self.runs.push(run);
+        self.activate_run(self.runs.len() - 1);
+    }
+
+    fn activate_run(&mut self, index: usize) {
+        let Some(run) = self.runs.get(index).copied() else {
+            return;
+        };
+        self.active_run = index;
+        self.source = std::sync::Arc::new(Synthetic { total: run.rows });
+        self.edits.clear();
+        self.compare = None;
+        self.cursor = MatchCursor::default();
+        self.set_mode(Mode::All);
+        self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
     }
 
     fn set_mode(&mut self, mode: Mode) {
@@ -432,6 +465,11 @@ impl GridView {
                 }
                 "c" if self.focus.is_focused(window) => self.copy_selection(modifiers.shift, cx),
                 "b" => self.sidebar_open = !self.sidebar_open,
+                "t" => {
+                    self.tabs.open_query();
+                    window.focus(&self.focus);
+                }
+                "enter" if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
                 _ => {}
             }
             if !matches!(key, "home" | "end") {
@@ -569,6 +607,17 @@ impl GridView {
             action("font", "Choose font…", true),
             action("theme-dbx", "Theme: DBX style", true),
             action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
+            action("query", "New query tab", true),
+            action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
+            action(
+                "results",
+                if self.result_open {
+                    "Hide the results pane"
+                } else {
+                    "Show the results pane"
+                },
+                matches!(self.tabs.current(), Tab::Query),
+            ),
             action("home", "Open Home", true),
             action("table", "Open synthetic_rows", true),
             action(
@@ -647,6 +696,12 @@ impl GridView {
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
             "home" => self.tabs.open_home(),
+            "query" => {
+                self.tabs.open_query();
+                window.focus(&self.focus);
+            }
+            "run" => self.run_query(),
+            "results" => self.result_open = !self.result_open,
             "table" => {
                 self.tabs.open_table(DATA_TABLE);
                 window.focus(&self.focus);
@@ -997,6 +1052,7 @@ impl Render for GridView {
             .child(list);
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
+            Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == DATA_TABLE => grid,
             Tab::Table(name) => self.placeholder_page(&name, theme),
         };
@@ -1014,16 +1070,23 @@ impl Render for GridView {
             .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
-            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
+            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
                 if this.resizing_sidebar {
                     this.sidebar_width = f32::from(event.position.x).clamp(180.0, 480.0);
+                    cx.notify();
+                }
+                if this.resizing_split {
+                    let height = f32::from(window.viewport_size().height) - 72.0 - 24.0;
+                    this.result_ratio = result_ratio_from_drag(f32::from(event.position.y), 72.0, height);
                     cx.notify();
                 }
             }))
             .on_mouse_up(
                 MouseButton::Left,
                 cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
-                    if std::mem::take(&mut this.resizing_sidebar) {
+                    let was_resizing =
+                        std::mem::take(&mut this.resizing_sidebar) | std::mem::take(&mut this.resizing_split);
+                    if was_resizing {
                         cx.notify();
                     }
                 }),
@@ -1134,6 +1197,9 @@ fn main() {
             |window, cx| {
                 let view = cx.new(|cx| GridView::new(total, started, window, cx));
                 view.read(cx).focus.focus(window);
+                if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
+                    view.update(cx, |view, _| view.tabs.open_query());
+                }
                 if autoscroll > 0 {
                     view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
                 }

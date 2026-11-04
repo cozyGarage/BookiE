@@ -36,6 +36,7 @@ pub fn tree_rows(search: &str, connection_open: bool, database_open: bool) -> Ve
 pub enum Tab {
     Home,
     Table(String),
+    Query,
 }
 
 impl Tab {
@@ -43,6 +44,7 @@ impl Tab {
         match self {
             Tab::Home => "Home".into(),
             Tab::Table(name) => name.clone(),
+            Tab::Query => "Query 1".into(),
         }
     }
 }
@@ -78,6 +80,16 @@ impl Tabs {
         };
     }
 
+    pub fn open_query(&mut self) {
+        self.active = match self.items.iter().position(|item| *item == Tab::Query) {
+            Some(index) => index,
+            None => {
+                self.items.push(Tab::Query);
+                self.items.len() - 1
+            }
+        };
+    }
+
     pub fn open_home(&mut self) {
         self.active = 0;
     }
@@ -93,7 +105,47 @@ impl Tabs {
     }
 
     pub fn shows_grid(&self) -> bool {
-        *self.current() == Tab::Table(DATA_TABLE.into())
+        matches!(self.current(), Tab::Query) || *self.current() == Tab::Table(DATA_TABLE.into())
+    }
+}
+
+pub const MIN_RESULT_RATIO: f32 = 0.2;
+pub const MAX_RESULT_RATIO: f32 = 0.8;
+pub const DEFAULT_RESULT_RATIO: f32 = 0.68;
+pub const RUN_ROWS: [u64; 4] = [150_000, 1_000_000, 5_000, 40];
+
+pub fn clamp_ratio(ratio: f32) -> f32 {
+    ratio.clamp(MIN_RESULT_RATIO, MAX_RESULT_RATIO)
+}
+
+pub fn result_ratio_from_drag(pointer_y: f32, top: f32, height: f32) -> f32 {
+    if height <= 0.0 {
+        return DEFAULT_RESULT_RATIO;
+    }
+    clamp_ratio(1.0 - (pointer_y - top) / height)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Run {
+    pub number: usize,
+    pub rows: u64,
+}
+
+impl Run {
+    pub fn label(self) -> String {
+        format!("Run {}", self.number)
+    }
+
+    pub fn millis(self) -> u64 {
+        self.rows / 1_000 + 3
+    }
+}
+
+pub fn next_run(existing: &[Run]) -> Run {
+    let number = existing.len() + 1;
+    Run {
+        number,
+        rows: RUN_ROWS[(number - 1) % RUN_ROWS.len()],
     }
 }
 
@@ -172,5 +224,47 @@ mod tests {
         assert_eq!(tabs.current(), &Tab::Home);
         tabs.close(9);
         assert_eq!(tabs.items.len(), 1);
+    }
+
+    #[test]
+    fn a_query_tab_opens_once_shows_the_grid_and_can_be_closed() {
+        let mut tabs = Tabs::default();
+        tabs.open_query();
+        assert_eq!(tabs.current(), &Tab::Query);
+        assert!(tabs.shows_grid());
+        tabs.open_query();
+        assert_eq!(tabs.items.len(), 3, "the query tab is reused");
+        tabs.open_table("orders");
+        assert!(!tabs.shows_grid());
+        tabs.close(2);
+        assert_eq!(tabs.current(), &Tab::Table("orders".into()));
+    }
+
+    #[test]
+    fn dragging_the_divider_gives_the_result_the_space_below_the_pointer() {
+        assert_eq!(
+            result_ratio_from_drag(172.0, 72.0, 500.0),
+            0.8,
+            "100 px below the top: clamped to the maximum"
+        );
+        assert!((result_ratio_from_drag(322.0, 72.0, 500.0) - 0.5).abs() < 1e-6);
+        assert_eq!(result_ratio_from_drag(560.0, 72.0, 500.0), MIN_RESULT_RATIO);
+        assert_eq!(result_ratio_from_drag(0.0, 0.0, 0.0), DEFAULT_RESULT_RATIO);
+    }
+
+    #[test]
+    fn each_run_gets_the_next_number_and_a_known_row_count() {
+        let mut runs = Vec::new();
+        for _ in 0..5 {
+            let run = next_run(&runs);
+            runs.push(run);
+        }
+        assert_eq!(runs.iter().map(|run| run.number).collect::<Vec<_>>(), [1, 2, 3, 4, 5]);
+        assert_eq!(
+            runs.iter().map(|run| run.rows).collect::<Vec<_>>(),
+            [150_000, 1_000_000, 5_000, 40, 150_000]
+        );
+        assert_eq!(runs[0].label(), "Run 1");
+        assert_eq!(runs[1].millis(), 1_003);
     }
 }

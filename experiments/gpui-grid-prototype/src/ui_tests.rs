@@ -340,3 +340,55 @@ fn the_view_renders_and_searches_whatever_source_it_is_given(cx: &mut TestAppCon
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert_eq!(view.cursor.matches, vec![2]));
 }
+
+#[gpui::test]
+fn ctrl_t_opens_one_query_tab_and_ctrl_enter_adds_a_run_with_its_own_result(cx: &mut TestAppContext) {
+    use bookie_gpui_grid_prototype::shell::Tab;
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &Tab::Query);
+        assert_eq!(view.runs.len(), 1);
+        assert_eq!(view.dataset_count(), 150_000);
+    });
+    cx.simulate_keystrokes("ctrl-enter");
+    view.read_with(cx, |view, _| {
+        assert_eq!((view.runs.len(), view.active_run), (2, 1));
+        assert_eq!(view.dataset_count(), 1_000_000, "the second run has its own row count");
+        assert_eq!(view.pager.page, 0);
+    });
+    cx.simulate_keystrokes("ctrl-enter ctrl-enter");
+    view.read_with(cx, |view, _| assert_eq!(view.dataset_count(), 40));
+    cx.simulate_keystrokes("ctrl-t");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.items.len(), 3, "Ctrl+T reuses the query tab")
+    });
+}
+
+#[gpui::test]
+fn selecting_an_earlier_run_restores_its_result_and_clears_the_view_state(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-enter down down");
+    view.read_with(cx, |view, _| assert!(view.cell_cursor.is_some()));
+    cx.update(|_, cx| view.update(cx, |view, _| view.activate_run(0)));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.dataset_count(), 150_000);
+        assert_eq!(view.cell_cursor, None);
+        assert!(view.selection.is_none() && view.edits.is_empty());
+        assert!(view.status.contains("Run 1"));
+    });
+}
+
+#[gpui::test]
+fn the_results_pane_can_be_hidden_and_the_summary_view_shows_the_run(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("hide the results");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert!(!view.result_open));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("show the results");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert!(view.result_open));
+}

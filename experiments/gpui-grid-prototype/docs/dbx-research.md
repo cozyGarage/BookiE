@@ -62,3 +62,35 @@ Suggested order, each step small and reversible:
 4. **Read from a real SQLite file** through `bookie-driver-sqlite` for a first end-to-end result (still a throwaway experiment, still no writes).
 
 Risks: `gpui` 0.2.2 on crates.io is not Zed's current git version, so upgrading later may need API changes; the window cannot be created under Xvfb, so automated visual checks stay limited to `test-support`; and every added crate widens the experiment's `cargo deny` surface.
+
+## Outcome of the linking steps (2026-11-04)
+
+1. **`bookie-core` dependency: done.** Edits go through `parse_cell` and copy through `render_tsv`. Comparing the old local copies with core before deleting them found two differences: core accepts `NaN` as a float, and core picks a NULL marker that cannot collide with cell text (`\NNN` when a cell contains `\N`). The prototype now follows core. ADR 0028 did not need amending for this; it restricts what an experiment connects to, not which BookiE crates it links.
+2. **`ResultSource` trait: done** (see the README).
+3. **`bookie-app-services` dependency: measured, not taken.** `bookie-core` brings 86 unique crates; `bookie-app-services` brings 426, because it links storage, policy, transport (SSH) and dump. The prototype alone is already about 680 crates with `gpui`. The pieces worth reusing (`sidebar_tree`, `result_find`, `result_filter`, `result_compare`, `workspace`) are pure logic, so the cleaner move is to split them into a light crate that both the GTK application and a GPUI renderer depend on, which matches the modularisation you described. Doing that touches the shipped workspace, so it is a proposal, not part of this experiment.
+4. **Real data: not done, needs a decision.** ADR 0028 says connecting an experimental frontend to real data requires a separate architecture and product decision. ADR 0036 (Proposed) asks for a narrow one: read a disposable SQLite fixture created by the experiment itself.
+
+## Libraries and prior art for GPUI (searched on GitHub and crates.io, 2026-11-04)
+
+| Project | What it is | Licence | Fit |
+|---|---|---|---|
+| `longbridge/gpui-component` (0.9.0) | 60+ components: virtualised **Table**, a **code-editor Input** (tree-sitter highlighting, LSP hooks), **Dock**, **Resizable**, Tree, List | Apache-2.0 | the most complete option, but it targets `gpui-pre =0.3.11`, not our `gpui 0.2.2`, so adopting it means moving the whole prototype to that GPUI line |
+| `zanmato/blanco` | a SQL client on `gpui-component` with per-backend `tree-sitter-sql-polyglot` grammars and a crate per driver | Apache-2.0 | the best reference for a SQL editor and a driver layout in GPUI |
+| `samuelcolvin/spread` | spreadsheet viewer on `gpui = "0.2.2"` (our version): `view.rs` is about 165 KB, with xlsx, parquet and csv sources | MIT | the best reference for a grid engine on the same GPUI we use |
+| `stayhydated/gpui-table`, `GuyGooL5/gpui-virtualized-table`, `dirkvdb/tabulite` | small table components | Apache-2.0, MIT, MIT | read for virtualised-table ideas; too small to adopt |
+| `fluxdb-alt/fluxDB`, `007qr/only-tables`, `NonGT/sql-honcho` | other GPUI database clients | GPL-3.0, none, MIT | read for layout ideas; `only-tables` has no licence, so do not copy from it |
+| `zed-industries/zed` crates (`editor`, `rope`, `sum_tree`, `multi_buffer`) | the real editor | mixed, mostly GPL-3.0 | a model of how a code editor is built; not a dependency |
+| `huacnlee/gpui-workspace` | dock layout extracted from Zed | GPL-3.0 | reference for panes and docks |
+
+Two licence notes: BookiE is AGPL-3.0-only (the same as TablePro), so Apache-2.0, MIT and GPL-3.0 code can be combined with it, but copying code still needs the attribution entry in `docs/adopted-code-attribution.md`. The component libraries (`Ely-GPUI-Components`, `bezel`, `guise`) have more stars but are general UI kits, not data-grid or editor engines.
+
+## What our upstream TablePro shows
+
+TablePro (`TableProApp/TablePro`, AGPL-3.0) is the project BookiE's Linux client came from. Its repository is already split the way you described:
+
+- `core/crates` is a shared Rust core used by every platform: `core` (including `browse`: page, count and export request building), `session` (connect attempts), `drivers`, `storage`, `ssh`, `net`, `mcp`, `ai`, and `ffi`, which exposes it to the Swift app.
+- Each platform is a thin renderer on top: `apple/` (Swift, macOS and iOS), `linux/crates/app` (GTK), `windows/`.
+- Its Apple data grid and result views are large and specific: per-type cell editors (array, JSON, binary, date and time, enum, foreign-key picker and preview, geometry map, image), a column jump panel, column visibility and value-filter popovers, a result-comparison grid and a row inspector.
+- Its SQL editor is a separate package (`TableProEditor`, about 280 files) built on tree-sitter.
+
+The lessons: keep query and result logic in the shared core, keep per-type cell editors as their own components, and treat the SQL editor as its own subproject rather than a widget.

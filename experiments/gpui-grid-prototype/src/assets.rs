@@ -24,6 +24,8 @@ icons!(
     "package",
     "palette",
     "panel-left",
+    "pin",
+    "play",
     "plus",
     "puzzle",
     "search",

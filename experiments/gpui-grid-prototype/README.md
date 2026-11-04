@@ -52,6 +52,10 @@ The planned modularisation puts application logic in app-services and leaves the
 
 The binary half is only rendering: `main.rs` (the `GridView` state and layout), `chrome.rs`, `grid_edit.rs`, `text_input.rs`, `ui_theme.rs` and `assets.rs`. `GridView` still holds both the view state and the layout; the next step is to move its state fields behind the library types so the renderer only reads them and sends intents (a key press, a click) back. The Tauri prototype follows the same split with `frontend/*.mjs` logic and `main.mjs` rendering.
 
+The result area follows DBX's query-tab structure (`src/chrome.rs`, model in `src/shell.rs`): **Ctrl+T** opens a Query tab with a read-only SQL pane on top, a draggable divider (the result keeps 20 to 80 percent of the height, 68 percent by default) and a result pane below. The pane header has run tabs (**Ctrl+Enter** adds a run with its own row count: 150,000, then 1,000,000, 5,000, 40, and so on), a **Table Data / Summary** switcher and a chevron that hides the pane. Selecting a run swaps its result in and clears the cursor, selection and edits. There is no real SQL editor: the text is fixed, because a multi-line editor is a separate, large piece (see `docs/dbx-research.md`).
+
+The view reads rows, Find, filter and compare from a `ResultSource` trait (`src/source.rs`); the only implementation is the synthetic generator, and a test drives the whole view from a 3-row source that is not the generator. `BOOKIE_PROTOTYPE_START=query` opens the Query tab at start.
+
 Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. Real keyboard, IME and mouse behavior is covered by `src/ui_tests.rs`, which drives the views through GPUI's `test-support` context (`cargo test`). A window cannot be opened under Xvfb here (no DRI3 for the Vulkan surface), so how it looks and feels has not been checked by eye.
 
 `BOOKIE_PROTOTYPE_WIDTH` and `BOOKIE_PROTOTYPE_HEIGHT` set the window size.
@@ -85,7 +89,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- Synthetic data, no database. The typed column carries the same kinds and exact text as the Tauri prototype, but as canonical text held by a local cell type, not by `bookie-core` values, because this experiment depends on `bookie-core` only. It shows how a typed cell renders, not that the shared value type round-trips.
+- Synthetic data, no database. The typed column carries the same kinds and exact text as the Tauri prototype, but as canonical text held by a local cell type, converted to and from `bookie_core::Value` at the edges (`src/core_bridge.rs`). A test checks every synthetic cell survives that round trip.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - No text editing beyond the minimal fields above, and no SQL editor. A multi-line editor is a much larger piece (Zed's editor is its own crate) and is left until the single-line input has had real keyboard and IME feedback.
 - It measures one machine with one GPU driver; it does not establish performance on other hardware.

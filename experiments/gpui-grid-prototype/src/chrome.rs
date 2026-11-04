@@ -1,4 +1,9 @@
 use bookie_gpui_grid_prototype::shell::{CONNECTION, DATA_TABLE, DATABASE, Tab, TreeRow, tree_rows};
+const SQL: [&str; 3] = [
+    "SELECT value, label, state, typed",
+    "FROM synthetic_rows",
+    "ORDER BY value;",
+];
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
 
 use crate::assets::icon;
@@ -255,7 +260,11 @@ impl GridView {
                 .border_color(rgb(theme.border))
                 .cursor_pointer()
                 .child(icon(
-                    if matches!(tab, Tab::Home) { "house" } else { "table" },
+                    match tab {
+                        Tab::Home => "house",
+                        Tab::Query => "play",
+                        Tab::Table(_) => "table",
+                    },
                     if selected { theme.info } else { theme.muted_foreground },
                 ))
                 .child(tab.title());
@@ -422,6 +431,185 @@ impl GridView {
             .text_color(rgb(theme.muted_foreground))
             .child("Synthetic data · no database connection")
             .child(right)
+    }
+
+    pub fn query_page(&mut self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
+        let editor = div()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .when(self.result_open, |pane| pane.h(gpui::relative(1.0 - self.result_ratio)))
+            .when(!self.result_open, |pane| pane.flex_1())
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .h(px(32.0))
+                    .px_2()
+                    .flex_none()
+                    .bg(rgb(theme.chrome))
+                    .border_b_1()
+                    .border_color(rgb(theme.border))
+                    .child(
+                        ghost_icon("run-query", "play", "Run  Ctrl+Enter", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.run_query();
+                                cx.notify();
+                            },
+                        )),
+                    )
+                    .child(div().text_color(rgb(theme.muted_foreground)).child(CONNECTION)),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .min_h_0()
+                    .p_2()
+                    .gap_3()
+                    .overflow_hidden()
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .text_color(rgb(theme.muted_foreground))
+                            .children((1..=SQL.len()).map(|number| div().h(px(20.0)).child(number.to_string()))),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .children(SQL.iter().map(|line| div().h(px(20.0)).child((*line).to_string()))),
+                    ),
+            );
+        let divider = div()
+            .id("split-divider")
+            .h(px(6.0))
+            .w_full()
+            .flex_none()
+            .cursor_row_resize()
+            .bg(rgb(theme.border))
+            .hover(move |style| style.bg(rgb(theme.info)))
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                    this.resizing_split = true;
+                    cx.stop_propagation();
+                    cx.notify();
+                }),
+            );
+        let result = self.result_pane(theme, grid, cx);
+        div()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .child(editor)
+            .children(self.result_open.then_some(divider))
+            .child(result)
+    }
+
+    fn result_pane(&mut self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
+        let run_tabs = self.runs.iter().enumerate().map(|(index, run)| {
+            let active = index == self.active_run;
+            let tab = div()
+                .id(("run", index))
+                .flex()
+                .items_center()
+                .h(px(28.0))
+                .px_2()
+                .rounded(px(theme.radius))
+                .border_1()
+                .cursor_pointer()
+                .child(format!("{} · {} rows", run.label(), thousands(run.rows)));
+            let tab = if active {
+                tab.border_color(rgb(theme.border))
+                    .bg(rgb(theme.background))
+                    .shadow_sm()
+            } else {
+                tab.border_color(rgb(theme.muted))
+                    .text_color(rgb(theme.muted_foreground))
+                    .hover(move |style| style.bg(rgb(theme.accent)))
+            };
+            tab.on_click(cx.listener(move |this, _, _, cx| {
+                this.activate_run(index);
+                cx.notify();
+            }))
+        });
+        let switch = |id: &'static str, label: &'static str, selected: bool, summary: bool, cx: &mut Context<Self>| {
+            let button = div()
+                .id(id)
+                .flex()
+                .items_center()
+                .h(px(24.0))
+                .px_2()
+                .rounded(px(theme.radius))
+                .cursor_pointer()
+                .child(label);
+            let button = if selected {
+                button.bg(rgb(theme.accent)).text_color(rgb(theme.foreground))
+            } else {
+                button.text_color(rgb(theme.muted_foreground))
+            };
+            button.on_click(cx.listener(move |this, _, _, cx| {
+                this.summary_view = summary;
+                cx.notify();
+            }))
+        };
+        let header = div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .h(px(40.0))
+            .px_2()
+            .flex_none()
+            .bg(rgb(theme.chrome))
+            .border_y_1()
+            .border_color(rgb(theme.border))
+            .child(icon("pin", theme.muted_foreground))
+            .child(div().w(px(1.0)).h(px(16.0)).bg(rgb(theme.border)))
+            .child(div().flex().flex_1().gap_1().overflow_hidden().children(run_tabs))
+            .child(switch("view-table", "Table Data", !self.summary_view, false, cx))
+            .child(switch("view-summary", "Summary", self.summary_view, true, cx))
+            .child(
+                ghost("toggle-results", "", theme)
+                    .child(icon(
+                        if self.result_open {
+                            "chevron-down"
+                        } else {
+                            "chevron-right"
+                        },
+                        theme.muted_foreground,
+                    ))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.result_open = !this.result_open;
+                        cx.notify();
+                    })),
+            );
+        let run = self.runs[self.active_run];
+        let body = if self.summary_view {
+            div()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .p_4()
+                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child("Execution summary"))
+                .child(format!("Statement: {}", SQL.join(" ")))
+                .child(format!("Rows returned: {}", thousands(run.rows)))
+                .child(format!("Elapsed: {} ms (synthetic)", run.millis()))
+                .child("Source: synthetic generator, no database")
+        } else {
+            grid
+        };
+        div()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .when(self.result_open, |pane| pane.flex_1())
+            .child(header)
+            .children(self.result_open.then_some(body))
     }
 
     pub fn viewport_rows_for(&self, window: &Window) -> usize {
