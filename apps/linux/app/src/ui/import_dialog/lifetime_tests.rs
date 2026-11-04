@@ -28,6 +28,7 @@ fn import_format_controls_release_their_source_bytes() {
     let state = Rc::new(State {
         file: FileOptions::new(&request),
         columns: ColumnSection::new(&request),
+        skip_rejected: adw::SwitchRow::new(),
         request,
     });
     connect_refresh(&state);

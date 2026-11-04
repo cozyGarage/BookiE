@@ -42,6 +42,7 @@ fn choice(create: Option<Vec<DraftColumn>>) -> ImportChoice {
         columns: Vec::new(),
         capabilities: bookie_core::DriverCapabilities::default(),
         create,
+        skip_rejected_rows: false,
     }
 }
 
@@ -97,6 +98,7 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
         columns,
         capabilities,
         create: None,
+        skip_rejected_rows: false,
     };
     let prepared = prepare_csv_plan(Uuid::new_v4(), "sqlite".into(), choice.clone()).await;
     let (plan, _) = prepared.result.expect("build import plan");
@@ -148,6 +150,114 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
         vec![
             vec![Value::Int(51), Value::Text("Ada".into())],
             vec![Value::Int(52), Value::Text("Grace".into())]
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_row_the_real_database_rejects_is_skipped_and_every_other_row_is_imported() {
+    let raw: Arc<dyn Connection> = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .expect("connect to SQLite")
+        .into();
+    let guard = PolicyGuard::new(
+        raw,
+        GuardContext {
+            connection_id: Uuid::new_v4(),
+            connection_name: "skip rejected rows test".into(),
+            driver_id: "sqlite".into(),
+            environment: Environment::Local,
+            read_only: false,
+            principal: Principal::human_gui(),
+            policy: Arc::new(PolicyConfig::default()),
+            approval: Arc::new(AutoApproveSink),
+            audit: Arc::new(TestAudit),
+            audit_state: Arc::new(AuditState::new()),
+        },
+    );
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    guard
+        .execute_controlled("CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT)", &control)
+        .await
+        .expect("create table");
+    let columns = guard
+        .fetch_columns_controlled(None, "people", &control)
+        .await
+        .expect("read table columns");
+    let bytes = b"id,name\n1,Ada\n2,Grace\n2,Duplicate\n3,Linus\n".to_vec();
+    let options = CsvImportOptions::default();
+    let sheet = read_csv(&bytes, &options, None).expect("read CSV");
+    let capabilities = bookie_core::DriverCapabilities {
+        supports_explicit_auto_increment_values: true,
+        ..bookie_core::DriverCapabilities::default()
+    };
+    let mapping = crate::ui::import_dialog::suggested_existing_mapping(capabilities, &sheet.headers, &columns);
+    let choice = ImportChoice {
+        schema: None,
+        table: "people".into(),
+        bytes,
+        options,
+        mapping,
+        columns,
+        capabilities,
+        create: None,
+        skip_rejected_rows: true,
+    };
+    let (plan, _) = prepare_csv_plan(Uuid::new_v4(), "sqlite".into(), choice.clone())
+        .await
+        .result
+        .expect("build import plan");
+    let mut scope = guard
+        .begin_bulk_insert(BulkInsertRequest {
+            schema: None,
+            table: choice.table.clone(),
+            statement: plan.statement.clone(),
+            row_budget: plan.row_count(),
+            sequence_columns: Vec::new(),
+        })
+        .await
+        .expect("approve import");
+    let mut skipped = Vec::new();
+    for rows in plan.batches(10) {
+        let outcome = guard
+            .execute_bulk_batch_skipping_failed_rows(
+                &mut scope,
+                BulkBatch {
+                    schema: None,
+                    table: &choice.table,
+                    statement: &plan.statement,
+                    rows,
+                },
+                &control,
+            )
+            .await
+            .expect("a rejected row does not stop the import");
+        skipped.extend(outcome.skipped);
+    }
+    assert_eq!(scope.skipped_rows(), 1);
+    assert_eq!(skipped.iter().map(|row| row.index).collect::<Vec<_>>(), [2]);
+    assert!(!skipped[0].reason.is_empty());
+    assert_eq!(
+        guard
+            .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+            .await
+            .expect("finish import"),
+        3
+    );
+    let result = guard
+        .query_controlled("SELECT id, name FROM people ORDER BY id", &control)
+        .await
+        .expect("verify imported rows");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("Ada".into())],
+            vec![Value::Int(2), Value::Text("Grace".into())],
+            vec![Value::Int(3), Value::Text("Linus".into())]
         ]
     );
 }
