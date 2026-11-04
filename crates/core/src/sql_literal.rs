@@ -270,6 +270,30 @@ impl RowStatement {
     }
 }
 
+impl RowStatement {
+    pub fn build_all(
+        self,
+        driver_id: &str,
+        schema: Option<&str>,
+        table: &str,
+        columns: &[ColumnInfo],
+        rows: &[Vec<Value>],
+    ) -> Result<String, BuildSqlError> {
+        let statements = rows
+            .iter()
+            .map(|row| self.build(driver_id, schema, table, columns, row))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(match self {
+            Self::Where if statements.len() > 1 => statements
+                .iter()
+                .map(|predicate| format!("({predicate})"))
+                .collect::<Vec<_>>()
+                .join("\nOR "),
+            _ => statements.join("\n"),
+        })
+    }
+}
+
 fn qualified_table_name(driver_id: &str, schema: Option<&str>, table: &str) -> String {
     match schema {
         Some(schema) => format!("{}.{}", quote_ident(driver_id, schema), quote_ident(driver_id, table)),
