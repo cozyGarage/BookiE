@@ -29,8 +29,7 @@ pub(crate) fn present_import_passphrase_dialog(
     dialog.set_default_response(Some("unlock"));
     dialog.set_close_response("cancel");
 
-    dialog.connect_response(None, move |dlg, response| {
-        dlg.close();
+    dialog.connect_response(None, move |_, response| {
         if response != "unlock" {
             return;
         }
@@ -101,11 +100,11 @@ pub(crate) fn present_import_plan_dialog(
     }
 
     for name in skipped {
-        let row = adw::ActionRow::builder()
-            .title(name)
-            .subtitle(crate::tr!("Skipped: unsupported connection"))
-            .build();
+        let row = adw::ActionRow::new();
         row.set_use_markup(false);
+        row.set_selectable(false);
+        row.set_title(name);
+        row.set_subtitle(&crate::tr!("Skipped: unsupported connection"));
         row.set_title_lines(2);
         list.append(&row);
     }
@@ -120,8 +119,7 @@ pub(crate) fn present_import_plan_dialog(
     dialog.set_close_response("cancel");
 
     let on_confirm: Rc<dyn Fn(ImportChoice)> = Rc::new(on_confirm);
-    dialog.connect_response(None, move |dlg, response| {
-        dlg.close();
+    dialog.connect_response(None, move |_, response| {
         if response != "import" {
             return;
         }

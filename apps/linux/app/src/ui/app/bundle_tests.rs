@@ -302,3 +302,21 @@ async fn peer_import_feedback_preserves_skipped_sources_and_parser_refusals() {
     std::fs::write(&path, "<project>").unwrap();
     assert!(read_peer_connections_at(&path).await.is_err());
 }
+
+#[tokio::test]
+async fn peer_import_keeps_all_supported_redis_file_shapes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("connections.ano");
+    for text in [
+        r#"[{"name":"cache","host":"h"}]"#,
+        r#"{"connections":[{"name":"cache","host":"h"}]}"#,
+        "W3sibmFtZSI6ImNhY2hlIiwiaG9zdCI6ImgifV0=",
+    ] {
+        std::fs::write(&path, text).unwrap();
+        let imported = read_peer_connections_at(&path).await.unwrap();
+        assert_eq!(imported.drafts.len(), 1);
+        assert_eq!(imported.drafts[0].driver_id, "redis");
+        assert_eq!(imported.drafts[0].name, "cache");
+        assert!(imported.skipped.is_empty());
+    }
+}

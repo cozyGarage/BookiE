@@ -88,7 +88,10 @@ fn checkbox_row(title: &str, subtitle: &str, active: bool) -> (adw::ActionRow, g
         .active(active)
         .valign(gtk::Align::Center)
         .build();
-    let row = adw::ActionRow::builder().title(title).subtitle(subtitle).build();
+    let row = adw::ActionRow::new();
+    row.set_use_markup(false);
+    row.set_title(title);
+    row.set_subtitle(subtitle);
     row.add_prefix(&check);
     row.set_activatable_widget(Some(&check));
     (row, check)
@@ -194,5 +197,47 @@ mod tests {
     #[test]
     fn nothing_ticked_exports_nothing() {
         assert!(selected_connections(&[saved("a")], &[]).is_empty());
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn skipped_imports_are_literal_non_selectable_rows() {
+        adw::init().unwrap();
+        let application = adw::Application::builder()
+            .application_id("com.bookie.linux.import-feedback-test")
+            .build();
+        application.register(None::<&gtk::gio::Cancellable>).unwrap();
+        let window = adw::ApplicationWindow::new(&application);
+        window.present();
+        present_import_plan_dialog(
+            &window,
+            &[item(ImportDisposition::New)],
+            false,
+            &["<b>unsupported & source</b>".into()],
+            |_| {},
+        );
+        let dialog = window.visible_dialog().unwrap().downcast::<adw::AlertDialog>().unwrap();
+        let body = dialog.extra_child().unwrap();
+        let scroller = body.first_child().unwrap().downcast::<gtk::ScrolledWindow>().unwrap();
+        let viewport = scroller.child().unwrap();
+        let list = viewport.first_child().unwrap().downcast::<gtk::ListBox>().unwrap();
+        let accepted = list.row_at_index(0).unwrap().downcast::<adw::ActionRow>().unwrap();
+        let skipped = list.row_at_index(1).unwrap().downcast::<adw::ActionRow>().unwrap();
+        assert_eq!(skipped.title(), "<b>unsupported & source</b>");
+        assert!(!skipped.uses_markup());
+        assert!(!skipped.is_activatable());
+        assert!(!skipped.is_selectable());
+        assert!(accepted.is_activatable());
+        assert!(!accepted.uses_markup());
+        assert!(list.row_at_index(2).is_none());
+        dialog.force_close();
+        let context = gtk::glib::MainContext::default();
+        while context.iteration(false) {}
+        present_import_passphrase_dialog(&window, |_| panic!("dismissal must not unlock a bundle"));
+        let passphrase = window.visible_dialog().unwrap();
+        passphrase.force_close();
+        while context.iteration(false) {}
+        assert!(window.visible_dialog().is_none());
+        window.close();
     }
 }
