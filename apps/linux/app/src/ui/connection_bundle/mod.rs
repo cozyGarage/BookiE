@@ -238,6 +238,12 @@ mod tests {
         passphrase.force_close();
         while context.iteration(false) {}
         assert!(window.visible_dialog().is_none());
+        present_export_dialog(&window, &[saved("synthetic")], "2026-11-04".into(), |_| {
+            panic!("dismissal must not export connections")
+        });
+        window.visible_dialog().unwrap().force_close();
+        while context.iteration(false) {}
+        assert!(window.visible_dialog().is_none());
         window.close();
     }
 }

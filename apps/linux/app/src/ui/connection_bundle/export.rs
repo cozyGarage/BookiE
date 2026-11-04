@@ -75,8 +75,7 @@ pub(crate) fn present_export_dialog(
 
     let window = parent.clone();
     let on_choice: Rc<dyn Fn(ExportChoice)> = Rc::new(on_choice);
-    dialog.connect_response(None, move |dlg, response| {
-        dlg.close();
+    dialog.connect_response(None, move |_, response| {
         if response != "export" {
             return;
         }
