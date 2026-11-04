@@ -140,11 +140,9 @@ pub(crate) fn draft_connection(
     database: String,
     username: String,
 ) -> SavedConnection {
-    let environment = if is_loopback_host(&host) {
-        Environment::Local
-    } else {
-        Environment::Prod
-    };
+    let local = is_loopback_host(&host);
+    let environment = if local { Environment::Local } else { Environment::Prod };
+    let tls_mode = default_tls_mode(driver_id, local);
     SavedConnection {
         auth_source: None,
         id: Uuid::new_v4(),
@@ -156,8 +154,8 @@ pub(crate) fn draft_connection(
         socket_path: None,
         database,
         username,
-        use_tls: false,
-        tls_mode: Some(TlsMode::Disabled),
+        use_tls: tls_mode.encrypts(),
+        tls_mode: Some(tls_mode),
         tls_root_cert: None,
         tls_client_cert: None,
         tls_client_key: None,

@@ -53,6 +53,31 @@ fn drafts_carry_host_port_user_and_engine_and_skip_unsupported_engines_by_name()
 }
 
 #[test]
+fn a_remote_draft_gets_the_url_import_tls_default_and_a_loopback_draft_stays_cleartext() {
+    let import = parse_dbeaver_data_sources(&sources()).unwrap();
+    assert!(
+        import
+            .drafts
+            .iter()
+            .all(|draft| draft.effective_tls_mode() == bookie_core::TlsMode::VerifyFull)
+    );
+    for loopback in ["localhost", "::1", "127.0.0.1"] {
+        let local = sources().replace("DB.Example.com", loopback);
+        let import = parse_dbeaver_data_sources(&local).unwrap();
+        assert_eq!(
+            import.drafts[0].environment,
+            bookie_core::Environment::Local,
+            "{loopback}"
+        );
+        assert_eq!(
+            import.drafts[0].effective_tls_mode(),
+            bookie_core::TlsMode::Disabled,
+            "{loopback}"
+        );
+    }
+}
+
+#[test]
 fn no_password_in_the_source_reaches_the_drafts() {
     let import = parse_dbeaver_data_sources(&sources()).unwrap();
     assert!(!format!("{import:?}").contains(SENTINEL));
