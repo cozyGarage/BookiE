@@ -97,6 +97,45 @@ fn a_changed_column_type_is_altered() {
 }
 
 #[test]
+fn an_altered_table_retargets_and_preserves_its_foreign_keys() {
+    let mut current_orders = table("a", "orders", vec![column("person", "integer", false, true)]);
+    current_orders.foreign_keys.push(ForeignKeyInfo {
+        name: "orders_person_fk".into(),
+        columns: vec!["person".into()],
+        ref_schema: Some("a".into()),
+        ref_table: "old_people".into(),
+        ref_columns: vec!["id".into()],
+        on_delete: None,
+        on_update: None,
+    });
+
+    let mut desired_orders = table("b", "orders", vec![column("person", "integer", false, true)]);
+    desired_orders.foreign_keys.push(ForeignKeyInfo {
+        name: "orders_person_fk".into(),
+        columns: vec!["person".into()],
+        ref_schema: Some("b".into()),
+        ref_table: "people".into(),
+        ref_columns: vec!["id".into()],
+        on_delete: None,
+        on_update: None,
+    });
+
+    let result = compare(&[current_orders], &[desired_orders]);
+
+    assert_eq!(result.altered.len(), 1);
+    assert!(
+        result.script.contains("DROP CONSTRAINT \"orders_person_fk\""),
+        "{}",
+        result.script
+    );
+    assert!(
+        result.script.contains("REFERENCES \"a\".\"people\""),
+        "{}",
+        result.script
+    );
+}
+
+#[test]
 fn a_table_only_in_the_current_schema_is_dropped_last_and_marked_destructive() {
     let extra = table("a", "legacy", vec![column("id", "integer", true, false)]);
     let mut desired = people("b");
