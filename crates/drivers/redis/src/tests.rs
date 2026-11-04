@@ -750,3 +750,27 @@ fn ordinary_hosts_build_the_expected_url() {
 fn redis_declares_that_browse_filters_are_not_supported() {
     assert!(!RedisDriver.capabilities().supports_browse_filters);
 }
+
+#[test]
+fn a_preview_of_valid_text_members_looks_exactly_as_it_did_before() {
+    let members = vec![b"alpha".to_vec(), "ünï".as_bytes().to_vec()];
+    assert_eq!(preview_members(members), Value::Text(r#"["alpha", "ünï"]"#.into()));
+}
+
+#[test]
+fn a_member_that_is_not_utf8_is_shown_as_hex_instead_of_failing_the_page() {
+    let members = vec![b"ok".to_vec(), vec![0xff, 0xfe, 0x00]];
+    assert_eq!(
+        preview_members(members),
+        Value::Text(r#"["ok", "<hex:fffe00>"]"#.into())
+    );
+}
+
+#[test]
+fn hash_fields_and_values_are_previewed_as_pairs_with_the_same_rule() {
+    let pairs = vec![(b"name".to_vec(), vec![0xc3]), (vec![0x80], b"v".to_vec())];
+    assert_eq!(
+        preview_pairs(pairs),
+        Value::Text(r#"[("name", "<hex:c3>"), ("<hex:80>", "v")]"#.into())
+    );
+}
