@@ -1,6 +1,6 @@
 use crate::query::{ColumnInfo, ForeignKeyInfo, IndexInfo};
 
-use super::diff::diff_to_ops;
+use super::diff::{TableState, diff_to_ops};
 use super::types::{validate_safe_default, validate_safe_type};
 use super::{
     BuildDdlError, DraftColumn, StructureOp, build_add_column, build_add_foreign_key, build_alter_column,
@@ -1127,7 +1127,7 @@ fn a_renamed_column_emits_the_rename_before_its_alters() {
     draft.name = "title".into();
     draft.nullable = false;
 
-    let ops = diff_to_ops(None, "t", "t", &original, &[draft], &[], &[], &[], &[]);
+    let ops = diff_to_ops(None, TableState::bare("t", &original), TableState::bare("t", &[draft]));
     let rename_at = ops
         .iter()
         .position(|op| matches!(op, StructureOp::RenameColumn { .. }))
@@ -1153,7 +1153,7 @@ fn a_pure_column_rename_emits_only_the_rename() {
     let mut draft = DraftColumn::from_info(original[0].clone());
     draft.name = "title".into();
 
-    let ops = diff_to_ops(None, "t", "t", &original, &[draft], &[], &[], &[], &[]);
+    let ops = diff_to_ops(None, TableState::bare("t", &original), TableState::bare("t", &[draft]));
     let stmts = materialize_ops(&ops, "postgres").unwrap();
     assert_eq!(
         stmts,
@@ -1167,7 +1167,7 @@ fn an_unrenamed_column_emits_no_rename() {
     let mut draft = DraftColumn::from_info(original[0].clone());
     draft.nullable = false;
 
-    let ops = diff_to_ops(None, "t", "t", &original, &[draft], &[], &[], &[], &[]);
+    let ops = diff_to_ops(None, TableState::bare("t", &original), TableState::bare("t", &[draft]));
     assert!(!ops.iter().any(|op| matches!(op, StructureOp::RenameColumn { .. })));
 }
 
@@ -1176,7 +1176,7 @@ fn a_pure_column_rename_needs_no_alter_on_any_dialect() {
     let original = vec![existing("label", "text")];
     let mut draft = DraftColumn::from_info(original[0].clone());
     draft.name = "title".into();
-    let ops = diff_to_ops(None, "t", "t", &original, &[draft], &[], &[], &[], &[]);
+    let ops = diff_to_ops(None, TableState::bare("t", &original), TableState::bare("t", &[draft]));
 
     assert!(
         !ops.iter().any(|op| matches!(op, StructureOp::AlterColumn { .. })),

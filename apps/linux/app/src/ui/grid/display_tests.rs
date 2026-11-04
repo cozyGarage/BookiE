@@ -1,4 +1,5 @@
 use super::*;
+use crate::ui::row_object::PreviewByteCount;
 
 fn metadata(data_type: &str) -> ColumnInfo {
     ColumnInfo {
@@ -255,7 +256,7 @@ fn cell_view_keeps_server_generated_null_and_preview_display_semantics() {
 
     let preview = crate::ui::row_object::CellPreview {
         value: Value::Text("sample".into()),
-        byte_count: 9000,
+        byte_count: PreviewByteCount::Exact(9000),
     };
     let view = CellView::from_preview(&preview);
     assert!(!view.inline_editable);
@@ -376,7 +377,7 @@ fn a_large_binary_value_shows_its_exact_byte_count() {
 fn text_preview_shows_nul_without_cutting_the_sample_or_changing_its_value() {
     let preview = crate::ui::row_object::CellPreview {
         value: Value::Text("before\0after".into()),
-        byte_count: 9000,
+        byte_count: PreviewByteCount::Exact(9000),
     };
     let view = CellView::from_preview(&preview);
     assert_eq!(view.text_for_bind(false), "before␀after… (9000 bytes total)");
@@ -392,7 +393,7 @@ fn preview_matrix_bounds_layout_at_unicode_and_length_boundaries() {
             for value in [Value::Text(text.clone()), Value::JsonText(text.clone())] {
                 let preview = crate::ui::row_object::CellPreview {
                     value: value.clone(),
-                    byte_count: 1_000_000,
+                    byte_count: PreviewByteCount::Exact(1_000_000),
                 };
                 let view = CellView::from_preview(&preview);
                 let sample: String = text.chars().take(512).collect();
@@ -412,7 +413,7 @@ fn oversized_text_previews_bound_layout_without_shortening_the_stored_sample() {
     for value in [Value::Text("x".repeat(8192)), Value::JsonText("x".repeat(8192))] {
         let preview = crate::ui::row_object::CellPreview {
             value: value.clone(),
-            byte_count: 1_000_000,
+            byte_count: PreviewByteCount::Exact(1_000_000),
         };
         let view = CellView::from_preview(&preview);
         assert_eq!(
@@ -429,7 +430,7 @@ fn the_visible_preview_limit_counts_unicode_characters_and_preserves_nul_markers
     let text = format!("{}\0😀tail", "é".repeat(511));
     let preview = crate::ui::row_object::CellPreview {
         value: Value::Text(text.clone()),
-        byte_count: 9000,
+        byte_count: PreviewByteCount::Exact(9000),
     };
     assert_eq!(
         CellView::from_preview(&preview).display_text,
@@ -442,9 +443,21 @@ fn the_visible_preview_limit_counts_unicode_characters_and_preserves_nul_markers
 fn value_preview_shows_sample_and_original_byte_count() {
     let preview = crate::ui::row_object::CellPreview {
         value: Value::Text("sample".into()),
-        byte_count: 9000,
+        byte_count: PreviewByteCount::Exact(9000),
     };
     assert_eq!(preview_to_display_text(&preview), "sample… (9000 bytes total)");
+}
+
+#[test]
+fn value_preview_reports_a_lower_bound_when_a_json_size_scan_stops_early() {
+    let preview = crate::ui::row_object::CellPreview {
+        value: Value::Text("sample".into()),
+        byte_count: PreviewByteCount::MoreThan(8192),
+    };
+    assert_eq!(
+        preview_to_display_text(&preview),
+        "sample… (More than 8192 bytes total)"
+    );
 }
 
 #[test]
@@ -452,7 +465,7 @@ fn multiline_preview_collapses_line_breaks_without_changing_the_value() {
     let text = "first\nsecond\r\nthird\u{2028}fourth\tlast";
     let preview = crate::ui::row_object::CellPreview {
         value: Value::Text(text.into()),
-        byte_count: text.len(),
+        byte_count: PreviewByteCount::Exact(text.len()),
     };
 
     let view = CellView::from_preview(&preview);

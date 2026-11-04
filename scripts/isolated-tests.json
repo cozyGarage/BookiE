@@ -245,7 +245,12 @@
     [
       "bookie-app",
       "--lib",
-      "ui::browse_tab::save_in_flight_tests::edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes"
+      "ui::browse_tab::save_completion_tests::edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_completion_tests::an_old_save_completion_does_not_finish_a_newer_save"
     ],
     [
       "bookie-app",
@@ -1335,6 +1340,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::import_dialog::lifetime_tests::the_skip_switch_is_off_by_default_and_its_state_reaches_the_import"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::structure_tab::lifetime_tests::closing_a_structure_tab_releases_its_generated_views"
     ],
     [
@@ -1370,7 +1380,7 @@
     [
       "bookie-app",
       "--lib",
-"ui::app::init_window::busy_quit::tests::with_two_windows_only_the_one_that_owns_running_work_asks_before_closing"
+      "ui::app::init_window::busy_quit::tests::with_two_windows_only_the_one_that_owns_running_work_asks_before_closing"
     ],
     [
       "bookie-app",

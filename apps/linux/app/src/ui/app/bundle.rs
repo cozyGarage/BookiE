@@ -127,6 +127,15 @@ impl App {
         dbeaver.set_name(Some(&crate::tr!("DBeaver data-sources.json")));
         dbeaver.add_suffix("json");
         filters.append(&dbeaver);
+        let another_redis = relm4::gtk::FileFilter::new();
+        another_redis.set_name(Some(&crate::tr!("Another Redis Desktop Manager export")));
+        another_redis.add_suffix("ano");
+        another_redis.add_suffix("json");
+        filters.append(&another_redis);
+        let datagrip = relm4::gtk::FileFilter::new();
+        datagrip.set_name(Some(&crate::tr!("DataGrip dataSources.xml")));
+        datagrip.add_suffix("xml");
+        filters.append(&datagrip);
         let dialog = relm4::gtk::FileDialog::builder()
             .title(crate::tr!("Import connections"))
             .modal(true)
@@ -160,7 +169,7 @@ impl App {
                         Ok(ParsedBundle::Encrypted(sealed)) => {
                             sender_clone.input(AppMsg::ImportBundleEncrypted(sealed));
                         }
-                        Err(error) => match read_dbeaver_at(&path).await {
+                        Err(error) => match read_peer_connections_at(&path).await {
                             Some(body) => match plan_from_body(&body).await {
                                 Ok(pending) => sender_clone.input(AppMsg::ImportBundlePlanned(pending)),
                                 Err(message) => sender_clone.input(AppMsg::BundleFailed(message)),
@@ -377,12 +386,23 @@ async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleEr
     read_bundle_file(&bytes)
 }
 
-async fn read_dbeaver_at(path: &std::path::Path) -> Option<bookie_storage::BundleBody> {
-    let bytes = read_bounded(path, bookie_storage::MAX_DBEAVER_BYTES).await.ok()?;
+async fn read_peer_connections_at(path: &std::path::Path) -> Option<bookie_storage::BundleBody> {
+    let limit = bookie_storage::MAX_DBEAVER_BYTES
+        .max(bookie_storage::MAX_ANOTHER_REDIS_BYTES)
+        .max(bookie_storage::MAX_DATAGRIP_BYTES);
+    let bytes = read_bounded(path, limit).await.ok()?;
     let text = String::from_utf8(bytes).ok()?;
-    bookie_storage::parse_dbeaver_data_sources(&text)
-        .ok()
-        .map(bookie_storage::DbeaverImport::into_body)
+    let import = if text.trim_start().starts_with('<') {
+        let local = read_bounded(&path.with_file_name("dataSources.local.xml"), limit)
+            .await
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok());
+        bookie_storage::parse_datagrip_data_sources(&text, local.as_deref())
+    } else {
+        bookie_storage::parse_dbeaver_data_sources(&text)
+            .or_else(|_| bookie_storage::parse_another_redis_connections(&text))
+    };
+    import.ok().map(bookie_storage::PeerImport::into_body)
 }
 
 async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, BundleError> {

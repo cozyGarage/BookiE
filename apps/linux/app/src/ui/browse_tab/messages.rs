@@ -97,8 +97,8 @@ pub enum BrowseTabInput {
     DiscardAll,
     PendingCountChanged(usize),
     ChangedRows(Vec<crate::services::change_tracker::RowKey>),
-    SaveCompleted,
-    SaveFailed(String),
+    SaveCompleted(uuid::Uuid),
+    SaveFailed(uuid::Uuid, String),
     FlashErrorRow(crate::services::change_tracker::StatementSource),
     CopySelectedRowsAsTsv,
     PasteNotSupported,
@@ -110,7 +110,6 @@ pub enum BrowseTabInput {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum BrowseTabOutput {
     OpenReferencedRow {
         schema: Option<String>,
@@ -148,6 +147,7 @@ pub enum BrowseTabOutput {
     ShowToast(String),
     DirtyChanged(bool),
     ExecuteTransaction {
+        save_id: uuid::Uuid,
         statements: Vec<(String, Vec<Value>)>,
         sources: Vec<crate::services::change_tracker::StatementSource>,
     },

@@ -65,7 +65,13 @@ glib::wrapper! {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CellPreview {
     pub value: Value,
-    pub byte_count: usize,
+    pub byte_count: PreviewByteCount,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviewByteCount {
+    Exact(usize),
+    MoreThan(usize),
 }
 
 impl RowObject {
@@ -318,44 +324,43 @@ fn preview_value(value: &Value) -> Option<CellPreview> {
             let (bytes, prefix) = bookie_app_services::browse_query::parse_partial(type_name)?;
             Some(CellPreview {
                 value: Value::Text(prefix.to_owned()),
-                byte_count: usize::try_from(bytes).ok()?,
+                byte_count: PreviewByteCount::Exact(usize::try_from(bytes).ok()?),
             })
         }
         Value::Text(text) if text.len() > PREVIEW_BYTES => Some(CellPreview {
             value: Value::Text(text[..text.floor_char_boundary(PREVIEW_BYTES)].to_owned()),
-            byte_count: text.len(),
+            byte_count: PreviewByteCount::Exact(text.len()),
         }),
-        Value::Json(json) if json_must_exceed_preview(json) => json_preview(json),
-        Value::Json(json) if json_exceeds(json, PREVIEW_BYTES) => json_preview(json),
+        Value::Json(json) => json_preview(json),
         Value::JsonText(json) if json.len() > PREVIEW_BYTES => Some(CellPreview {
             value: Value::JsonText(json[..json.floor_char_boundary(PREVIEW_BYTES)].to_owned()),
-            byte_count: json.len(),
+            byte_count: PreviewByteCount::Exact(json.len()),
         }),
         Value::Bytes(bytes) if bytes.len() > PREVIEW_BYTES => Some(CellPreview {
             value: Value::Bytes(bytes[..PREVIEW_BYTES].to_vec()),
-            byte_count: bytes.len(),
+            byte_count: PreviewByteCount::Exact(bytes.len()),
         }),
         _ => None,
     }
 }
 
-fn json_must_exceed_preview(json: &serde_json::Value) -> bool {
-    matches!(json, serde_json::Value::String(text) if text.len() > PREVIEW_BYTES.saturating_sub(2))
-}
-
 struct JsonPreviewWriter {
     prefix: Vec<u8>,
     byte_count: usize,
+    exceeded: bool,
 }
 
 impl std::io::Write for JsonPreviewWriter {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        self.byte_count = self
-            .byte_count
-            .checked_add(bytes.len())
-            .ok_or(std::io::ErrorKind::InvalidData)?;
-        let retained = bytes.len().min(PREVIEW_BYTES.saturating_sub(self.prefix.len()));
+        let remaining = PREVIEW_BYTES.saturating_add(1).saturating_sub(self.byte_count);
+        let counted = bytes.len().min(remaining);
+        self.byte_count += counted;
+        let retained = counted.min(PREVIEW_BYTES.saturating_sub(self.prefix.len()));
         self.prefix.extend_from_slice(&bytes[..retained]);
+        if counted < bytes.len() || self.byte_count > PREVIEW_BYTES {
+            self.exceeded = true;
+            return Err(std::io::ErrorKind::WriteZero.into());
+        }
         Ok(bytes.len())
     }
 
@@ -368,28 +373,19 @@ fn json_preview(json: &serde_json::Value) -> Option<CellPreview> {
     let mut writer = JsonPreviewWriter {
         prefix: Vec::with_capacity(PREVIEW_BYTES),
         byte_count: 0,
+        exceeded: false,
     };
-    serde_json::to_writer(&mut writer, json).ok()?;
+    let result = serde_json::to_writer(&mut writer, json);
+    if !writer.exceeded {
+        result.ok()?;
+        return None;
+    }
     let end = std::str::from_utf8(&writer.prefix).map_or_else(|error| error.valid_up_to(), str::len);
     writer.prefix.truncate(end);
     Some(CellPreview {
         value: Value::Text(String::from_utf8(writer.prefix).ok()?),
-        byte_count: writer.byte_count,
+        byte_count: PreviewByteCount::MoreThan(PREVIEW_BYTES),
     })
-}
-
-fn json_exceeds(json: &serde_json::Value, limit: usize) -> bool {
-    struct Budget(usize);
-    impl std::io::Write for Budget {
-        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-            self.0 = self.0.checked_sub(bytes.len()).ok_or(std::io::ErrorKind::WriteZero)?;
-            Ok(bytes.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-    serde_json::to_writer(Budget(limit), json).is_err()
 }
 
 #[cfg(test)]

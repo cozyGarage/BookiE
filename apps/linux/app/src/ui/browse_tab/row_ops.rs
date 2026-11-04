@@ -639,7 +639,7 @@ impl BrowseTab {
                 | BrowseTabInput::Paste(_)
                 | BrowseTabInput::PasteText(_)
         );
-        if !(self.save_in_flight.get() && changes_tracker) {
+        if !(self.save_in_flight.get().is_some() && changes_tracker) {
             return Some(msg);
         }
         self.rejected_edit_revision
@@ -651,7 +651,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_commit_save(&mut self, sender: ComponentSender<Self>) {
-        if self.save_in_flight.get() {
+        if self.save_in_flight.get().is_some() {
             return;
         }
         let columns = self.current_columns.clone();
@@ -669,14 +669,19 @@ impl BrowseTab {
                 // double-click firing two transactions and
                 // matches GNOME's standard "in-progress action"
                 // affordance (busy spinner + disabled control).
-                self.save_in_flight.set(true);
+                let save_id = uuid::Uuid::new_v4();
+                self.save_in_flight.set(Some(save_id));
                 self.save_button.set_sensitive(false);
                 self.discard_button.set_sensitive(false);
                 // SaveCompleted will refetch the page; capture
                 // the focused row's PK now so it can be re-
                 // selected after the reload.
                 self.capture_focus_for_restore();
-                let _ = sender.output(BrowseTabOutput::ExecuteTransaction { statements, sources });
+                let _ = sender.output(BrowseTabOutput::ExecuteTransaction {
+                    save_id,
+                    statements,
+                    sources,
+                });
             }
             Some(Ok(_)) => {
                 // Nothing to save (tracker empty) — refresh bar.
@@ -750,27 +755,6 @@ impl BrowseTab {
                 self.refresh_row_at(pos);
             }
         }
-    }
-
-    pub(super) fn handle_save_completed(&mut self, sender: ComponentSender<Self>) {
-        if !self.save_in_flight.replace(false) {
-            return;
-        }
-        self.change_trackers.with_tab(self.tab_id, |t| t.clear());
-        self.refresh_pending_bar(0);
-        self.save_button.set_sensitive(true);
-        self.discard_button.set_sensitive(true);
-        self.emit_fetch_page_and_count(&sender);
-    }
-
-    pub(super) fn handle_save_failed(&mut self, message: String, sender: ComponentSender<Self>) {
-        self.save_in_flight.set(false);
-        self.save_button.set_sensitive(true);
-        self.discard_button.set_sensitive(true);
-        let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-            title: crate::tr!("Save failed"),
-            body: message,
-        });
     }
 
     pub(super) fn handle_flash_error_row(&self, source: crate::services::change_tracker::StatementSource) {
@@ -970,227 +954,5 @@ fn row_key_matches(columns: &[ColumnInfo], row: &crate::ui::row_object::RowObjec
 }
 
 #[cfg(test)]
-mod row_identity_tests {
-    use super::{DuplicateRowError, duplicate_row_values, row_key_matches};
-    use bookie_core::{ColumnInfo, Value};
-
-    fn column(name: &str, primary_key: bool) -> ColumnInfo {
-        ColumnInfo {
-            name: name.into(),
-            data_type: "integer".into(),
-            nullable: false,
-            primary_key,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        }
-    }
-
-    fn matches_cells(columns: &[ColumnInfo], cells: &[Value], expected: &[Value]) -> bool {
-        let row = crate::ui::row_object::RowObject::new(cells.to_vec());
-        row_key_matches(columns, &row, expected)
-    }
-
-    #[test]
-    fn row_identity_checks_require_loaded_keys_but_not_loaded_payloads() {
-        let columns = [column("id", true), column("payload", false)];
-        let keyed = crate::ui::row_object::RowObject::new_projected(vec![Value::Int(7)], &[0], 2).unwrap();
-        assert!(row_key_matches(&columns, &keyed, &[Value::Int(7)]));
-        let key_missing =
-            crate::ui::row_object::RowObject::new_projected(vec![Value::Text("payload".into())], &[1], 2).unwrap();
-        assert!(!row_key_matches(&columns, &key_missing, &[Value::Int(7)]));
-    }
-
-    #[test]
-    fn shared_row_identity_uses_current_key_values_and_refuses_a_released_source() {
-        let columns = [column("id", true), column("payload", false)];
-        let result = std::sync::Arc::new(bookie_core::QueryResult {
-            columns: columns.to_vec(),
-            rows: vec![vec![Value::Int(7), Value::Text("payload".into())]].into(),
-            truncated: false,
-        });
-        let row = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();
-        assert!(row_key_matches(&columns, &row, &[Value::Int(7)]));
-        row.set_cell(0, Value::Int(8));
-        assert!(!row_key_matches(&columns, &row, &[Value::Int(7)]));
-        assert!(row_key_matches(&columns, &row, &[Value::Int(8)]));
-        let released = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();
-        drop(result);
-        assert!(!row_key_matches(&columns, &released, &[Value::Int(7)]));
-        assert!(row_key_matches(&columns, &row, &[Value::Int(8)]));
-    }
-
-    #[test]
-    fn wide_row_identity_checks_preserve_the_non_key_payload() {
-        let columns = [column("id", true), column("payload", false)];
-        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(7), Value::Text("x".repeat(16 * 1024 * 1024))]);
-        for _ in 0..8 {
-            assert!(row_key_matches(&columns, &row, &[Value::Int(7)]));
-        }
-        assert!(!row_key_matches(&columns, &row, &[Value::Int(8)]));
-        assert_eq!(
-            row.with_cell_value(1, |value| match value {
-                Value::Text(text) => text.len(),
-                _ => 0,
-            }),
-            Some(16 * 1024 * 1024)
-        );
-    }
-
-    #[test]
-    fn the_same_row_still_matches_its_key() {
-        let columns = [column("id", true), column("note", false)];
-        let cells = [Value::Int(7), Value::Text("a".into())];
-        assert!(matches_cells(&columns, &cells, &[Value::Int(7)]));
-    }
-
-    #[test]
-    fn a_different_row_at_the_same_position_is_refused() {
-        let columns = [column("id", true), column("note", false)];
-        let cells = [Value::Int(8), Value::Text("a".into())];
-        assert!(!matches_cells(&columns, &cells, &[Value::Int(7)]));
-    }
-
-    #[test]
-    fn editing_another_column_of_the_same_row_still_matches() {
-        let columns = [column("id", true), column("note", false)];
-        let cells = [Value::Int(7), Value::Text("edited".into())];
-        assert!(matches_cells(&columns, &cells, &[Value::Int(7)]));
-    }
-
-    #[test]
-    fn every_component_of_a_composite_key_has_to_match() {
-        let columns = [column("a", true), column("b", true), column("c", false)];
-        assert!(matches_cells(
-            &columns,
-            &[Value::Int(1), Value::Int(2), Value::Int(9)],
-            &[Value::Int(1), Value::Int(2)]
-        ));
-        assert!(!matches_cells(
-            &columns,
-            &[Value::Int(1), Value::Int(3), Value::Int(9)],
-            &[Value::Int(1), Value::Int(2)]
-        ));
-    }
-
-    #[test]
-    fn a_key_that_lost_or_gained_a_component_is_refused() {
-        let columns = [column("a", true), column("b", true)];
-        assert!(!matches_cells(
-            &columns,
-            &[Value::Int(1), Value::Int(2)],
-            &[Value::Int(1)]
-        ));
-        let one_key = [column("a", true), column("b", false)];
-        assert!(!matches_cells(
-            &one_key,
-            &[Value::Int(1), Value::Int(2)],
-            &[Value::Int(1), Value::Int(2)]
-        ));
-    }
-
-    #[test]
-    fn a_null_key_component_compares_by_value_like_any_other() {
-        let columns = [column("a", true), column("b", false)];
-        assert!(matches_cells(&columns, &[Value::Null, Value::Int(1)], &[Value::Null]));
-        assert!(!matches_cells(
-            &columns,
-            &[Value::Int(0), Value::Int(1)],
-            &[Value::Null]
-        ));
-    }
-
-    #[test]
-    fn a_table_without_a_primary_key_has_nothing_to_compare() {
-        let columns = [column("a", false)];
-        assert!(matches_cells(&columns, &[Value::Int(1)], &[]));
-    }
-
-    #[test]
-    fn duplicating_a_row_blanks_database_owned_cells_and_preserves_exact_values() {
-        let columns = [column("id", true), column("amount", false), column("note", false)];
-        let source = [
-            Value::Int(7),
-            Value::Decimal("12.30".parse().unwrap()),
-            Value::Text("keep me".into()),
-        ];
-        assert_eq!(
-            duplicate_row_values(&columns, &source),
-            Ok(vec![
-                Value::Null,
-                Value::Decimal("12.30".parse().unwrap()),
-                Value::Text("keep me".into())
-            ])
-        );
-    }
-
-    #[test]
-    fn duplicating_a_row_refuses_an_undecodable_cell_instead_of_turning_it_into_null() {
-        let columns = [column("id", true), column("amount", false)];
-        let source = [Value::Int(7), Value::Undecodable("NUMERIC".into())];
-        assert_eq!(
-            duplicate_row_values(&columns, &source),
-            Err(DuplicateRowError::Undecodable {
-                column: "amount".into()
-            })
-        );
-    }
-
-    #[test]
-    fn duplicating_a_row_carries_the_full_long_text_into_the_insert_not_the_display_text() {
-        let long_text = "é".repeat(250_000);
-        let long_utf8_bytes = "z".repeat(90_000).into_bytes();
-        let columns = [column("id", true), column("body", false), column("raw", false)];
-        let source = [
-            Value::Int(1),
-            Value::Text(long_text.clone()),
-            Value::Bytes(long_utf8_bytes.clone()),
-        ];
-        assert_ne!(
-            crate::ui::grid::value_to_display_text(&source[1]),
-            long_text,
-            "the value must be long enough for the grid to truncate it"
-        );
-
-        let values = duplicate_row_values(&columns, &source).unwrap();
-        assert_eq!(values[1], Value::Text(long_text.clone()));
-        assert_eq!(values[2], Value::Bytes(long_utf8_bytes.clone()));
-
-        let mut tracker = crate::services::change_tracker::TabChangeTracker::new();
-        tracker.track_insert(values);
-        let (statements, _) = tracker.materialize("mysql", None, "t", &columns).unwrap();
-        assert_eq!(
-            statements[0].1,
-            vec![Value::Null, Value::Text(long_text), Value::Bytes(long_utf8_bytes)]
-        );
-    }
-
-    #[test]
-    fn duplicating_a_row_refuses_a_source_with_wrong_cell_count() {
-        let columns = [column("id", true), column("note", false)];
-        for source in [
-            &[Value::Int(1)][..],
-            &[Value::Int(1), Value::Text("ok".into()), Value::Int(3)][..],
-        ] {
-            let actual = source.len();
-            assert_eq!(
-                duplicate_row_values(&columns, source),
-                Err(DuplicateRowError::CellCountMismatch { expected: 2, actual })
-            );
-        }
-    }
-
-    #[test]
-    fn a_row_shorter_than_its_columns_is_refused_rather_than_assumed_equal() {
-        let columns = [column("a", true), column("b", true)];
-        assert!(!matches_cells(
-            &columns,
-            &[Value::Int(1)],
-            &[Value::Int(1), Value::Int(2)]
-        ));
-    }
-}
+#[path = "row_identity_tests.rs"]
+mod row_identity_tests;

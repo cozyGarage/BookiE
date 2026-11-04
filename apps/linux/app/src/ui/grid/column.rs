@@ -159,11 +159,13 @@ pub(super) fn build_column(
         bind_row_cell(
             item,
             &row,
-            idx,
-            editable_for_bind,
-            &column_info,
             &tab_ctx_for_bind,
-            column_is_editable,
+            BoundColumn {
+                index: idx,
+                editable: editable_for_bind,
+                info: &column_info,
+                is_editable: column_is_editable,
+            },
         );
     });
 
@@ -261,15 +263,25 @@ pub(super) fn build_column(
     (column, edit_trigger)
 }
 
+struct BoundColumn<'a> {
+    index: usize,
+    editable: bool,
+    info: &'a ColumnInfo,
+    is_editable: bool,
+}
+
 fn bind_row_cell(
     item: &gtk4::ListItem,
     row: &crate::ui::row_object::RowObject,
-    index: usize,
-    editable: bool,
-    column: &ColumnInfo,
     context: &TabGridContext,
-    column_is_editable: bool,
+    bound: BoundColumn<'_>,
 ) {
+    let BoundColumn {
+        index,
+        editable,
+        info: column,
+        is_editable: column_is_editable,
+    } = bound;
     if !row.cell_is_loaded(index) && !row.cell_is_partial(index) {
         if let Some(label) = item.child().and_downcast::<gtk4::Label>() {
             label.set_text(&crate::tr!("Loading…"));

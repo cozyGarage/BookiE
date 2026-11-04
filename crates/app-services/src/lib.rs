@@ -27,6 +27,7 @@ pub mod result_predicate;
 pub mod result_scan;
 #[cfg(test)]
 mod result_test_support;
+pub mod schema_compare;
 pub mod single_flight;
 pub mod snippets;
 pub mod state_file;

@@ -140,6 +140,9 @@ pub enum AppMsg {
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,
+    CompareSchema {
+        schema: Option<String>,
+    },
     ShowErDiagram {
         schema: Option<String>,
     },
@@ -199,11 +202,12 @@ pub enum AppMsg {
     EndRecentTabWalk,
     ExecuteBrowseTransaction {
         tab_id: Uuid,
+        save_id: Uuid,
         statements: Vec<(String, Vec<Value>)>,
         sources: Vec<crate::services::change_tracker::StatementSource>,
     },
-    SaveCompletedForTab(Uuid, Option<String>),
-    SaveFailedForTab(Uuid, String),
+    SaveCompletedForTab(Uuid, Uuid, Option<String>),
+    SaveFailedForTab(Uuid, Uuid, String),
     FlashErrorRowForTab(Uuid, crate::services::change_tracker::StatementSource),
     SaveActiveBrowseTab,
     SaveActiveBrowseTabById(Uuid),

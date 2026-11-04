@@ -183,6 +183,8 @@ class CiJobCleanupTests(unittest.TestCase):
             workspace = Path(temporary) / "workspace"
             scripts = workspace / "src/scripts"
             scripts.mkdir(parents=True)
+            job_tmp = Path(temporary) / "job-tmp"
+            job_tmp.mkdir()
             fixture = workspace / "src/tests/fixtures/driver-tls"
             fixture.mkdir(parents=True)
             compose_file = fixture / "docker-compose.yml"
@@ -210,8 +212,11 @@ class CiJobCleanupTests(unittest.TestCase):
                 env={
                     **os.environ,
                     "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_RUN_ID": "123",
                     "GITHUB_JOB": "driver-tls",
                     "GITHUB_WORKSPACE": str(workspace),
+                    "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
+                    "TMPDIR": str(job_tmp),
                     "BOOKIE_TEST_RUN_ID": run_id,
                     "CLEANUP_CALLS": str(calls),
                 },

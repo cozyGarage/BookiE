@@ -2,6 +2,8 @@ mod audit_journal;
 mod connection_bundle;
 mod connection_bundle_crypto;
 mod connection_color;
+mod connection_import_another_redis;
+mod connection_import_datagrip;
 mod connection_import_dbeaver;
 mod connection_organization;
 mod connection_url;
@@ -26,7 +28,9 @@ pub use connection_bundle::{
 pub use connection_color::{
     CONNECTION_COLORS, CONNECTION_STRIP_CLASSES, connection_color, connection_color_css_class, connection_strip_class,
 };
-pub use connection_import_dbeaver::{DbeaverImport, MAX_DBEAVER_BYTES, parse_dbeaver_data_sources};
+pub use connection_import_another_redis::{MAX_ANOTHER_REDIS_BYTES, parse_another_redis_connections};
+pub use connection_import_datagrip::{MAX_DATAGRIP_BYTES, parse_datagrip_data_sources};
+pub use connection_import_dbeaver::{MAX_DBEAVER_BYTES, PeerImport, parse_dbeaver_data_sources};
 pub use connection_organization::{
     ConnectionOrganization, ConnectionOrganizationIndex, MAX_LABEL_LEN, MAX_ORGANIZED_CONNECTIONS,
     MAX_TAGS_PER_CONNECTION, arrange_connections, connection_matches_filter, load_organization, save_organization,
