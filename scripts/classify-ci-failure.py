@@ -3,7 +3,11 @@
 
 Usage:
   classify-ci-failure.py --log FILE
-  classify-ci-failure.py --run RUN_ID     (reads FORGEJO_API and FORGEJO_TOKEN_FILE like forgejo-gate.sh)
+  classify-ci-failure.py --run RUN_NUMBER (reads FORGEJO_API and FORGEJO_TOKEN_FILE like forgejo-gate.sh)
+
+RUN_NUMBER is the number in the run page URL (.../actions/runs/N), which is the
+run's index in the repository. The API id is a different, larger number; pass
+--api-id to give that one instead. --list prints both.
 
 The tag is advice for the person reading a red run: infrastructure failures are
 retried before anyone reads code, code failures are not. It never changes a result.
@@ -22,6 +26,7 @@ import urllib.request
 from pathlib import Path
 
 TAIL_BYTES = 400_000
+RUN_LOOKUP_LIMIT = 200
 
 SIGNATURES = [
     ("infra", "image pull timed out", r"PullImage.*RequestTimeoutError"),
@@ -90,7 +95,24 @@ def read_token():
     return Path(os.environ.get("FORGEJO_TOKEN_FILE", default)).read_text().strip()
 
 
-def classify_run(run_id, tail=0):
+def fetch_runs(limit):
+    runs = json.loads(fetch(f"{api_base()}/actions/runs?limit={limit}", read_token()))
+    return runs.get("workflow_runs", runs) if isinstance(runs, dict) else runs
+
+
+def run_id_for_number(runs, number):
+    for run in runs:
+        if run.get("index_in_repo") == number:
+            return run["id"]
+    raise SystemExit(f"no run numbered {number} among the {len(runs)} most recent runs; use --api-id for an API id")
+
+
+def resolve_run(number, api_id):
+    return number if api_id else run_id_for_number(fetch_runs(RUN_LOOKUP_LIMIT), number)
+
+
+def classify_run(number, tail=0, api_id=False):
+    run_id = resolve_run(number, api_id)
     token = read_token()
     base = api_base()
     jobs = json.loads(fetch(f"{base}/actions/runs/{run_id}/jobs", token))
@@ -105,17 +127,21 @@ def classify_run(run_id, tail=0):
     return results
 
 
+def run_line(run):
+    title = (run.get("display_title") or run.get("title") or "")[:60]
+    number = run.get("index_in_repo", "?")
+    ref = run.get("prettyref", run.get("head_branch", ""))[:28]
+    api = f"(api {run.get('id', '?')})"
+    return f"{number:>6} {api:<11} {run.get('status', '?'):10} {run.get('event', '?'):10} {ref:28} {title}"
+
+
 def list_runs(limit):
-    token = read_token()
-    base = api_base()
-    runs = json.loads(fetch(f"{base}/actions/runs?limit={limit}", token))
-    runs = runs.get("workflow_runs", runs) if isinstance(runs, dict) else runs
-    for run in runs:
-        title = (run.get("display_title") or run.get("title") or "")[:60]
-        print(f"{run.get('id', run.get('index_in_repo', '?')):>6} {run.get('status', '?'):10} {run.get('event', '?'):18} {run.get('prettyref', run.get('head_branch', ''))[:28]:28} {title}")
+    for run in fetch_runs(limit)[:limit]:
+        print(run_line(run))
 
 
-def run_jobs(run_id):
+def run_jobs(number, api_id=False):
+    run_id = resolve_run(number, api_id)
     token = read_token()
     base = api_base()
     jobs = json.loads(fetch(f"{base}/actions/runs/{run_id}/jobs", token))
@@ -128,22 +154,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--log", type=Path)
-    group.add_argument("--run", type=int)
+    group.add_argument("--run", type=int, metavar="NUMBER", help="the number in the run page URL")
     group.add_argument("--list", type=int, metavar="N", help="list the N most recent runs, any workflow, any event")
-    group.add_argument("--jobs", type=int, metavar="RUN", help="list every job of a run with its status")
+    group.add_argument("--jobs", type=int, metavar="NUMBER", help="list every job of a run with its status")
+    parser.add_argument("--api-id", action="store_true", help="treat the given run number as an API id")
     parser.add_argument("--tail", type=int, default=0, help="also print the last N log lines of each failed job")
     args = parser.parse_args()
     if args.list:
         list_runs(args.list)
         return
     if args.jobs:
-        run_jobs(args.jobs)
+        run_jobs(args.jobs, args.api_id)
         return
     if args.log:
         tag, label, evidence = classify_log(args.log.read_text(errors="replace"))
         print(f"{tag}: {label}" + (f"\n  {evidence}" if evidence else ""))
         return
-    results = classify_run(args.run, args.tail)
+    results = classify_run(args.run, args.tail, args.api_id)
     if not results:
         print("no failed jobs")
         return

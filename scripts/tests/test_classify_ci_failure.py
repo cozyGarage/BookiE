@@ -141,7 +141,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
             mock.patch.object(classifier, "fetch", side_effect=[json.dumps({"jobs": jobs}), "No such image: postgres"])
                 as fetch,
         ):
-            result = classifier.classify_run(42, tail=1)
+            result = classifier.classify_run(42, tail=1, api_id=True)
         self.assertEqual(len(result), 1)
         name, tag, _, evidence, tail = result[0]
         self.assertEqual((name, tag, evidence, tail), ("failed", "infra", "No such image: postgres", ["No such image: postgres"]))
@@ -177,7 +177,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
     def test_cli_lists_jobs_and_classifies_failed_run_with_tail(self):
         jobs_output = io.StringIO()
         with (
-            mock.patch.object(classifier.sys, "argv", ["classify", "--jobs", "42"]),
+            mock.patch.object(classifier.sys, "argv", ["classify", "--jobs", "42", "--api-id"]),
             mock.patch.object(classifier, "read_token", return_value="secret"),
             mock.patch.object(classifier, "api_base", return_value="http://forgejo/api"),
             mock.patch.object(classifier, "fetch", return_value=json.dumps([{"name": "unit", "status": "success"}])),
@@ -195,6 +195,36 @@ class ClassifyCiFailureTests(unittest.TestCase):
             classifier.main()
         self.assertIn("summary: 1 code", run_output.getvalue())
         self.assertIn("failed test", run_output.getvalue())
+
+
+    RUNS = [
+        {"id": 1839, "index_in_repo": 1828, "status": "failure", "prettyref": "ci/forgejo-pr2336-a5e4"},
+        {"id": 1828, "index_in_repo": 1817, "status": "failure", "prettyref": "pr-gate/2313"},
+    ]
+
+    def test_a_run_number_from_the_page_url_is_matched_by_its_index_not_its_api_id(self):
+        self.assertEqual(classifier.run_id_for_number(self.RUNS, 1828), 1839)
+        self.assertEqual(classifier.run_id_for_number(self.RUNS, 1817), 1828)
+
+    def test_a_run_number_that_is_not_in_the_list_is_refused_not_guessed(self):
+        with self.assertRaises(SystemExit) as refusal:
+            classifier.run_id_for_number(self.RUNS, 9999)
+        self.assertIn("9999", str(refusal.exception))
+
+    def test_the_run_listing_shows_the_page_number_first_and_the_api_id(self):
+        line = classifier.run_line(self.RUNS[0])
+        self.assertTrue(line.lstrip().startswith("1828"), line)
+        self.assertIn("api 1839", line)
+
+    def test_the_api_id_flag_skips_the_lookup(self):
+        with (
+            mock.patch.object(classifier, "read_token", return_value="t"),
+            mock.patch.object(classifier, "api_base", return_value="http://x"),
+            mock.patch.object(classifier, "fetch", return_value=json.dumps({"jobs": []})) as fetch,
+        ):
+            classifier.classify_run(1839, api_id=True)
+        self.assertEqual(fetch.call_count, 1)
+        self.assertIn("/runs/1839/jobs", fetch.call_args[0][0])
 
 
 if __name__ == "__main__":
