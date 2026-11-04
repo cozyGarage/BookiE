@@ -25,6 +25,7 @@ import gtk_active_edit
 import gtk_editor_panel
 import gtk_copy_statements
 import gtk_csv_refresh
+import gtk_schema_compare
 import gtk_catalog
 import gtk_welcome
 import gtk_connect_form
@@ -3036,6 +3037,7 @@ def main():
     scenarios.extend(gtk_deleted_drafts.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_unreadable_drafts.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_structure.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_schema_compare.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_sequences.scenarios(sys.modules[__name__]))
     selected = os.environ.get("BOOKIE_GTK_SCENARIO")
     if selected:
