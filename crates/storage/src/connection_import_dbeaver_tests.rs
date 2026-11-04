@@ -61,9 +61,26 @@ fn a_remote_draft_is_production_like_a_url_import_and_a_loopback_draft_stays_loc
             .iter()
             .all(|draft| draft.environment == bookie_core::Environment::Prod)
     );
-    let local = sources().replace("DB.Example.com", "localhost");
-    let import = parse_dbeaver_data_sources(&local).unwrap();
-    assert_eq!(import.drafts[0].environment, bookie_core::Environment::Local);
+    assert!(
+        import
+            .drafts
+            .iter()
+            .all(|draft| draft.effective_tls_mode() == bookie_core::TlsMode::VerifyFull)
+    );
+    for loopback in ["localhost", "::1", "127.0.0.1"] {
+        let local = sources().replace("DB.Example.com", loopback);
+        let import = parse_dbeaver_data_sources(&local).unwrap();
+        assert_eq!(
+            import.drafts[0].environment,
+            bookie_core::Environment::Local,
+            "{loopback}"
+        );
+        assert_eq!(
+            import.drafts[0].effective_tls_mode(),
+            bookie_core::TlsMode::Disabled,
+            "{loopback}"
+        );
+    }
 }
 
 #[test]
