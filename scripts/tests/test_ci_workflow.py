@@ -488,6 +488,17 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("prefix-key: linux-preflight", workflow)
         self.assertNotIn("prefix-key: linux-fast-gtk", workflow)
 
+    def test_quality_workflow_only_saves_caches_from_the_scheduled_default_branch(self):
+        workflow = (ROOT / ".github/workflows/linux-quality.yml").read_text().splitlines()
+        cache_steps = [
+            "\n".join(workflow[index : index + 8])
+            for index, line in enumerate(workflow)
+            if "uses: Swatinem/rust-cache@" in line
+        ]
+        self.assertEqual(len(cache_steps), 2)
+        for step in cache_steps:
+            self.assertIn("save-if: ${{ github.event_name == 'schedule' }}", step)
+
     def test_required_jobs_never_accept_failure_skip_cancel_or_missing(self):
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         self.assertEqual(checker.assess(success, "push")[0], [])
