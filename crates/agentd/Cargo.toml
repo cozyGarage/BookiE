@@ -35,6 +35,7 @@ bookie-driver-redis = { path = "../drivers/redis" }
 bookie-driver-sqlite = { path = "../drivers/sqlite" }
 async-trait.workspace = true
 chrono.workspace = true
+libc.workspace = true
 clap = { version = "4", features = ["derive"] }
 tokio.workspace = true
 tracing.workspace = true
