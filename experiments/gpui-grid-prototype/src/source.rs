@@ -48,6 +48,6 @@ mod tests {
         assert_eq!(source.total(), 1_000);
         assert_eq!(source.row(7), row_at(7));
         assert_eq!(source.find("sample 999", 10).map(|found| found.matches), Ok(vec![999]));
-        assert_eq!(source.compare(false).summary.keyed, false);
+        assert!(!source.compare(false).summary.keyed);
     }
 }
