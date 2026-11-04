@@ -192,9 +192,6 @@ pub trait Connection: Send + Sync {
     async fn list_tables_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_tables(), control).await
     }
-    /// The tables of the given schemas only. A driver that can ask its server for just those schemas overrides this,
-    /// so a catalog with many hidden schemas is not listed in full. The default lists everything and filters;
-    /// tables that carry no schema are kept because they cannot be scoped.
     async fn list_tables_scoped(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
         let mut tables = self.list_tables().await?;
         tables.retain(|table| table.schema.as_ref().is_none_or(|schema| schemas.contains(schema)));
@@ -487,6 +484,7 @@ mod controlled_default_tests {
     #[derive(Default)]
     struct SlowConnection {
         dispatched: Arc<AtomicUsize>,
+        listed: Vec<TableInfo>,
     }
 
     #[async_trait]
@@ -496,7 +494,10 @@ mod controlled_default_tests {
         }
 
         async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-            self.stall().await
+            if self.listed.is_empty() {
+                return self.stall().await;
+            }
+            Ok(self.listed.clone())
         }
 
         async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
@@ -583,6 +584,7 @@ mod controlled_default_tests {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
+            listed: Vec::new(),
         };
         let control = cancelled_control();
 
@@ -634,6 +636,7 @@ mod controlled_default_tests {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
+            listed: Vec::new(),
         };
         let control = cancelled_control();
 
@@ -649,6 +652,7 @@ mod controlled_default_tests {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
+            listed: Vec::new(),
         };
         let token = CancellationToken::new();
         let control = OperationControl::new(token.clone(), None);
@@ -683,6 +687,7 @@ mod controlled_default_tests {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
+            listed: Vec::new(),
         };
         let control = OperationControl::with_timeout(Duration::from_secs(5));
         let task = tokio::spawn(async move { connection.list_databases_controlled(&control).await });
@@ -712,6 +717,7 @@ mod controlled_default_tests {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
+            listed: Vec::new(),
         };
         let control = expired_control();
 
@@ -779,6 +785,7 @@ mod controlled_default_tests {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
+            listed: Vec::new(),
         };
 
         let error = connection
@@ -796,6 +803,7 @@ mod controlled_default_tests {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
+            listed: Vec::new(),
         };
         let control = OperationControl::new(
             CancellationToken::new(),
@@ -813,6 +821,27 @@ mod controlled_default_tests {
             "{error:?}"
         );
         assert_eq!(dispatched.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn the_default_scoped_listing_keeps_the_asked_schemas_and_tables_that_have_no_schema() {
+        let table = |schema: Option<&str>, name: &str| TableInfo {
+            schema: schema.map(str::to_string),
+            name: name.into(),
+        };
+        let connection = SlowConnection {
+            listed: vec![table(Some("a"), "x"), table(Some("b"), "y"), table(None, "plain")],
+            ..SlowConnection::default()
+        };
+        let names = |tables: Vec<TableInfo>| tables.into_iter().map(|table| table.name).collect::<Vec<_>>();
+        assert_eq!(
+            names(connection.list_tables_scoped(&["a".to_string()]).await.unwrap()),
+            ["x", "plain"]
+        );
+        assert_eq!(names(connection.list_tables_scoped(&[]).await.unwrap()), ["plain"]);
+        let control = OperationControl::new(CancellationToken::new(), None);
+        let scoped = connection.list_tables_in(&["b".to_string()], &control).await.unwrap();
+        assert_eq!(names(scoped), ["y", "plain"]);
     }
 }
 
