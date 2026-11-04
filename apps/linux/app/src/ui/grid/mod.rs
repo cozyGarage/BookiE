@@ -33,7 +33,7 @@ use bookie_core::{ColumnInfo, QueryResult};
 use crate::services::database_service::DatabaseService;
 use crate::ui::row_store::RowStore;
 
-use column::{build_column, header_column, is_cell_editable};
+use column::{ColumnSpec, build_column, header_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
@@ -256,18 +256,18 @@ pub fn build_column_view(
     for (i, column) in columns.iter().enumerate() {
         let editable = is_cell_editable(schema_columns.get(i).unwrap_or(column));
         let header = header_column(column, schema_columns.get(i));
-        let (col, edit_trigger) = build_column(
-            &header,
-            i,
+        let spec = ColumnSpec {
             editable,
-            table.to_string(),
-            edit_sender.clone(),
+            table: table.to_string(),
+            sender: edit_sender.clone(),
             connection_id,
-            tab_ctx.clone(),
-            sort_sender.is_some() || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
+            tab_ctx: tab_ctx.clone(),
+            sort_enabled: sort_sender.is_some()
+                || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
             default_min_width,
-            column_widths.clone(),
-        );
+            column_widths: column_widths.clone(),
+        };
+        let (col, edit_trigger) = build_column(&header, i, spec);
         col.set_id(Some(&i.to_string()));
         column_view.append_column(&col);
         view_columns.push(col);
