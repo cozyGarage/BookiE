@@ -252,3 +252,28 @@ async fn a_file_at_the_limit_is_read_whole() {
     std::fs::write(&path, [7u8; 16]).unwrap();
     assert_eq!(read_bounded(&path, 16).await.unwrap(), vec![7u8; 16]);
 }
+
+#[tokio::test]
+async fn a_file_picked_for_import_is_read_as_dbeaver_or_another_redis_and_otherwise_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let write = |name: &str, text: &str| {
+        let path = directory.path().join(name);
+        std::fs::write(&path, text).unwrap();
+        path
+    };
+    let dbeaver = write(
+        "data-sources.json",
+        r#"{"connections": {"a": {"provider": "postgresql", "name": "pg", "configuration": {"host": "h"}}}}"#,
+    );
+    let redis = write("connections.json", r#"[{"name": "r", "host": "h"}]"#);
+    let other = write("notes.txt", "not a connection list");
+
+    let names = |path: std::path::PathBuf| async move {
+        read_peer_connections_at(&path)
+            .await
+            .map(|body| body.connections.into_iter().map(|c| c.driver_id).collect::<Vec<_>>())
+    };
+    assert_eq!(names(dbeaver).await.unwrap(), ["postgres"]);
+    assert_eq!(names(redis).await.unwrap(), ["redis"]);
+    assert!(names(other).await.is_none());
+}

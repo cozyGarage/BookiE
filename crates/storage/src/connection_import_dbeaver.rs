@@ -12,12 +12,12 @@ const MAX_DBEAVER_CONNECTIONS: usize = 1_000;
 const MAX_FIELD_LEN: usize = 256;
 
 #[derive(Debug)]
-pub struct DbeaverImport {
+pub struct PeerImport {
     pub drafts: Vec<SavedConnection>,
     pub skipped: Vec<String>,
 }
 
-impl DbeaverImport {
+impl PeerImport {
     pub fn into_body(self) -> BundleBody {
         BundleBody {
             connections: self.drafts.iter().map(BundleConnection::from_saved).collect(),
@@ -57,12 +57,12 @@ struct PeerConfiguration {
 
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum PeerPort {
+pub(crate) enum PeerPort {
     Number(u64),
     Text(String),
 }
 
-pub fn parse_dbeaver_data_sources(input: &str) -> Result<DbeaverImport, StorageError> {
+pub fn parse_dbeaver_data_sources(input: &str) -> Result<PeerImport, StorageError> {
     if input.len() > MAX_DBEAVER_BYTES {
         return Err(refused("the file is too large to be a DBeaver connection list"));
     }
@@ -87,7 +87,7 @@ pub fn parse_dbeaver_data_sources(input: &str) -> Result<DbeaverImport, StorageE
     }
     drafts.sort_by(|a, b| a.name.cmp(&b.name));
     skipped.sort();
-    Ok(DbeaverImport { drafts, skipped })
+    Ok(PeerImport { drafts, skipped })
 }
 
 fn draft_from(peer: &PeerConnection) -> Option<SavedConnection> {
@@ -128,7 +128,7 @@ fn engine(provider: &str, url: &str) -> Option<&'static str> {
     })
 }
 
-fn port(port: Option<&PeerPort>, driver_id: &str) -> Option<u16> {
+pub(crate) fn port(port: Option<&PeerPort>, driver_id: &str) -> Option<u16> {
     let parsed = match port {
         None => return default_port(driver_id),
         Some(PeerPort::Number(number)) => u16::try_from(*number).ok()?,
@@ -138,7 +138,7 @@ fn port(port: Option<&PeerPort>, driver_id: &str) -> Option<u16> {
     (parsed != 0).then_some(parsed)
 }
 
-fn field(value: &str) -> Option<String> {
+pub(crate) fn field(value: &str) -> Option<String> {
     (value.len() <= MAX_FIELD_LEN && !value.chars().any(char::is_control)).then(|| value.to_string())
 }
 
