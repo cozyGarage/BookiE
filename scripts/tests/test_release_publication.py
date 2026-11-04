@@ -16,7 +16,7 @@ class ReleasePublicationTests(unittest.TestCase):
             base = Path(directory)
             artifacts = base / "artifacts"
             (artifacts / "translations").mkdir(parents=True)
-            for name in ["bookie.deb", "bookie.AppImage", "bookie.pkg.tar.zst", "bookie.flatpak", "release-notes.md", "translations/bookie.pot"]:
+            for name in ["bookie.AppImage", "bookie.pkg.tar.zst", "bookie.flatpak", "release-notes.md", "translations/bookie.pot"]:
                 (artifacts / name).write_text(name)
             result = subprocess.run(["bash", "-e", "-c", script], cwd=base, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -31,7 +31,7 @@ class ReleasePublicationTests(unittest.TestCase):
 
     def fixture(self):
         run = {"head_sha": "a" * 40, "head_branch": "linux-v0.2.0", "event": "push", "path": ".github/workflows/release.yml"}
-        jobs = {"jobs": [{"name": name, "conclusion": "success"} for name in ["Debian package", "Arch package", "Flatpak bundle", "AppImage"]]}
+        jobs = {"jobs": [{"name": name, "conclusion": "success"} for name in ["Arch package", "Flatpak bundle", "AppImage"]]}
         return run, jobs
 
     def test_successful_packages_can_recover_a_failed_publication(self):

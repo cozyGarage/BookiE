@@ -244,6 +244,7 @@ pub enum RowStatement {
     Insert,
     Update,
     Delete,
+    Where,
 }
 
 impl RowStatement {
@@ -259,6 +260,7 @@ impl RowStatement {
             Self::Insert => build_insert_literal(driver_id, schema, table, columns, row),
             Self::Update => build_update_literal(driver_id, schema, table, columns, row),
             Self::Delete => build_delete_literal(driver_id, schema, table, columns, row),
+            Self::Where => primary_key_predicate(driver_id, columns, row),
         }
     }
 }

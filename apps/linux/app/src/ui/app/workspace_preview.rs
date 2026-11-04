@@ -21,7 +21,9 @@ impl App {
             preview_enabled: self.preferences.load().open_tables_in_preview_tab,
         };
         let plan = self.workspace_tabs.borrow().plan_table_open(request, |id| {
-            crate::services::change_tracker::with_tab_ref(id, |tracker| tracker.has_pending()).unwrap_or(false)
+            self.change_trackers
+                .with_tab_ref(id, |tracker| tracker.has_pending())
+                .unwrap_or(false)
                 || self
                     .structure_trackers
                     .with_tab_ref(id, |tracker| tracker.has_pending())
@@ -77,8 +79,10 @@ impl App {
 
     pub(super) fn refresh_browse_tab_dirty(&self, tab_id: Uuid, dirty: bool) {
         let schemas_count = self.sidebar_schemas_distinct();
-        let data =
-            crate::services::change_tracker::with_tab_ref(tab_id, |tracker| tracker.has_pending()).unwrap_or(false);
+        let data = self
+            .change_trackers
+            .with_tab_ref(tab_id, |tracker| tracker.has_pending())
+            .unwrap_or(false);
         let structure = self
             .structure_trackers
             .with_tab_ref(tab_id, |tracker| tracker.has_pending())

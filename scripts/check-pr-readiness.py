@@ -117,13 +117,16 @@ class GitHubApi:
         self.api_url = api_url.rstrip("/")
         self.suite_matches = {}
 
-    def get(self, path):
+    def request(self, path, method="GET", body=None):
         request = Request(
             f"{self.api_url}{path}",
+            data=json.dumps(body).encode() if body is not None else None,
+            method=method,
             headers={
                 "Accept": "application/vnd.github+json",
                 "Authorization": f"Bearer {self.token}",
                 "X-GitHub-Api-Version": "2022-11-28",
+                "Content-Type": "application/json",
             },
         )
         try:
@@ -135,6 +138,37 @@ class GitHubApi:
             raise ReadinessError(f"GitHub API read failed with HTTP {error.code}") from None
         except URLError:
             raise TransientGitHubError("GitHub API is temporarily unavailable") from None
+
+    def get(self, path):
+        return self.request(path)
+
+    def create_readiness_check(self, pull_number, head_sha, external_id):
+        result = self.request(
+            f"/repos/{self.repository}/check-runs",
+            "POST",
+            {
+                "name": "Linux PR readiness",
+                "head_sha": head_sha,
+                "external_id": external_id,
+                "status": "in_progress",
+                "output": {"title": "Checking required pull request checks", "summary": f"Pull request #{pull_number}"},
+            },
+        )
+        check_id = result.get("id")
+        if not isinstance(check_id, int):
+            raise ReadinessError("GitHub API returned an invalid readiness check")
+        return check_id
+
+    def complete_readiness_check(self, check_id, conclusion, summary):
+        self.request(
+            f"/repos/{self.repository}/check-runs/{check_id}",
+            "PATCH",
+            {
+                "status": "completed",
+                "conclusion": conclusion,
+                "output": {"title": f"Required pull request checks {conclusion}", "summary": summary},
+            },
+        )
 
     def pages(self, path, key=None):
         collected = []
@@ -233,6 +267,22 @@ def main():
     if not token or not pull_number.isdigit() or not HEAD_SHA.fullmatch(head_sha):
         raise ReadinessError("Pull request readiness inputs are incomplete")
     client = GitHubApi(repository, token, os.environ.get("GITHUB_API_URL", "https://api.github.com"))
+    if os.environ.get("READINESS_RECHECK") == "true":
+        check_id = client.create_readiness_check(
+            int(pull_number), head_sha, os.environ.get("READINESS_CHECK_EXTERNAL_ID", "")
+        )
+        try:
+            result = wait_for_checks(client, int(pull_number), head_sha)
+        except ReadinessError as error:
+            client.complete_readiness_check(check_id, "failure", str(error))
+            raise
+        except Exception:
+            client.complete_readiness_check(
+                check_id, "failure", "The readiness checker failed; see the workflow logs for details."
+            )
+            raise
+        client.complete_readiness_check(check_id, "success", f"All applicable checks passed on {head_sha}.")
+        return result
     return wait_for_checks(client, int(pull_number), head_sha)
 
 

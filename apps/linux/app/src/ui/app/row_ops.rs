@@ -161,6 +161,7 @@ impl App {
             RowStatement::Insert => crate::tr!("INSERT statement copied"),
             RowStatement::Update => crate::tr!("UPDATE statement copied"),
             RowStatement::Delete => crate::tr!("DELETE statement copied"),
+            RowStatement::Where => crate::tr!("WHERE clause copied"),
         });
     }
 
