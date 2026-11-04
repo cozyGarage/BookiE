@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       artifact_run_id:
-        description: Existing tag run whose three package builds passed; leave empty to build packages
+        description: Existing tag run whose two package builds passed; leave empty to build packages
         type: string
         default: ""
       release_tag:
@@ -176,41 +176,13 @@ jobs:
             apps/linux/packaging/arch/bookie-*.pkg.tar.zst
             apps/linux/packaging/arch/bookie-*.pkg.tar.zst.sha256
 
-  flatpak:
-    name: Flatpak bundle
-    if: inputs.artifact_run_id == ''
-    needs: prepare
-    runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
-      options: --privileged
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-          ref: ${{ github.sha }}
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@401fe28a8384095fc1531b9d320b292f0ee45adb
-        with:
-          bundle: bookie.flatpak
-          manifest-path: apps/linux/flatpak/com.bookie.linux.json
-          cache-key: flatpak-release-${{ hashFiles('apps/linux/flatpak/**') }}
-          upload-artifact: false
-      - name: Checksum
-        run: sha256sum bookie.flatpak > bookie.flatpak.sha256
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: package-flatpak
-          path: |
-            bookie.flatpak
-            bookie.flatpak.sha256
-
   publish:
     name: Draft GitHub release
     if: >-
       always() && needs.prepare.result == 'success' && needs.prepare.outputs.publish == 'true' &&
       (needs.prepare.outputs.artifact_run != '' ||
-       (needs.appimage.result == 'success' && needs.arch.result == 'success' && needs.flatpak.result == 'success'))
-    needs: [prepare, appimage, arch, flatpak]
+       (needs.appimage.result == 'success' && needs.arch.result == 'success'))
+    needs: [prepare, appimage, arch]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -228,7 +200,7 @@ jobs:
         run: |
           mkdir release
           cd artifacts
-          cp -- *.AppImage *.pkg.tar.zst bookie.flatpak translations/bookie.pot ../release/
+          cp -- *.AppImage *.pkg.tar.zst translations/bookie.pot ../release/
           cp release-notes.md ../release-notes.md
           cd ../release
           sha256sum -- * > SHA256SUMS

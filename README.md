@@ -48,7 +48,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 
 ## Install
 
-The [0.2.4 release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.4) provides Debian and Arch packages, a Flatpak bundle, and an AppImage. The Debian and Arch packages are the main install paths. Library requirements and install acceptance are in [platforms](docs/platforms.md).
+The [0.2.4 release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.4) provides Debian and Arch packages, a Flatpak bundle, and an AppImage; later releases ship only the Arch package and the AppImage (ADRs 0031, 0032). The Debian and Arch packages are the main install paths. Library requirements and install acceptance are in [platforms](docs/platforms.md).
 
 The AppImage is for trying BookiE without installing it.
 
