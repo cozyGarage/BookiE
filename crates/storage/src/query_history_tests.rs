@@ -485,7 +485,7 @@ fn an_unterminated_block_comment_is_closed_before_the_terminator() {
 }
 
 #[test]
-fn an_unterminated_string_is_closed_and_a_terminated_statement_keeps_one_semicolon() {
+fn an_unterminated_string_gets_the_plain_terminator_and_a_terminated_statement_keeps_one_semicolon() {
     assert_eq!(exported_tail("postgres", "SELECT 'abc"), "SELECT 'abc;\n\n");
     assert_eq!(
         exported_tail("postgres", "SELECT $$it's -- fine$$"),
@@ -494,6 +494,18 @@ fn an_unterminated_string_is_closed_and_a_terminated_statement_keeps_one_semicol
     assert_eq!(
         exported_tail("postgres", "SELECT 1; /* note"),
         "SELECT 1; /* note\n*/\n\n"
+    );
+}
+
+#[test]
+fn a_numbered_placeholder_is_not_a_dollar_quote() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT * FROM t WHERE id = $1 -- by id"),
+        "SELECT * FROM t WHERE id = $1 -- by id\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT $1, $2 /* x */"),
+        "SELECT $1, $2 /* x */;\n\n"
     );
 }
 

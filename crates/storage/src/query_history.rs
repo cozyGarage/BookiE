@@ -647,6 +647,16 @@ fn dash_comment_starts(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, mys
     starts
 }
 
+fn has_dollar_quote(query: &str) -> bool {
+    query.match_indices('$').any(|(start, _)| {
+        let rest = &query[start + 1..];
+        let tag = rest.find('$').map(|end| &rest[..end]);
+        tag.is_some_and(|tag| {
+            tag.chars().all(|c| c.is_alphanumeric() || c == '_') && !tag.starts_with(|c: char| c.is_ascii_digit())
+        })
+    })
+}
+
 fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
     let hash_comments = mysql;
     let mut state = ScanState::Code;
@@ -712,7 +722,7 @@ fn sql_export_entry(entry: &Entry) -> String {
     let query = entry.query.trim_end();
     out.push_str(query);
     let tail = scan_statement_tail(query, matches!(entry.driver_id.as_str(), "mysql" | "mariadb"));
-    if tail.open_quote.is_some() || query.contains('$') {
+    if tail.open_quote.is_some() || has_dollar_quote(query) {
         if !query.ends_with(';') {
             out.push(';');
         }
