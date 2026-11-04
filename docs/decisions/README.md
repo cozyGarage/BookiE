@@ -80,7 +80,7 @@ Other options and why they were rejected.
 | [0030](0030-audit-local-result-comparison.md) | Audit local result comparison | Accepted | A confirmed result comparison writes a paired aggregate audit record without values. |
 | [0031](0031-stop-publishing-the-debian-package.md) | Stop publishing the Debian package | Accepted | Releases stop building the Debian package because the toolkit floor excludes stable Debian and Ubuntu; the staging builder stays for the AppImage. |
 | [0032](0032-stop-publishing-the-flatpak.md) | Stop publishing the Flatpak | Accepted | Releases ship only the Arch package and the AppImage; the Flatpak manifests, scripts and workflow are removed. |
-| [0033](0033-frozen-result-grid-columns.md) | Frozen leading columns in the result grid | Proposed | GTK4 has no frozen columns; the options are two synced column views, a custom list-view grid, or not freezing, with a spike to decide. |
+| [0033](0033-frozen-result-grid-columns.md) | Frozen leading columns in the result grid | Accepted | No frozen columns for now (GTK4 has none and a second synced view touches 19 files); revisit with a spike if wide tables become a problem. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

@@ -1,6 +1,6 @@
 # 0033: Frozen leading columns in the result grid
 
-- **Status**: Proposed (2026-11-04)
+- **Status**: Accepted (2026-11-04)
 - **Date**: 2026-11-04
 
 ## Context
@@ -11,7 +11,7 @@ Nineteen non-test files refer to `ColumnView`: grid display, columns, column ord
 
 ## Decision
 
-Not yet decided. This record asks the maintainer to choose between the options below, and recommends a spike before any production code.
+Option C below: BookiE does not freeze result-grid columns for now. The maintainer chose it on 2026-11-04, to be revisited if wide tables become a real problem. Options A and B were not rejected on merit; they cost more than the benefit justifies today.
 
 ## Options
 
@@ -19,11 +19,11 @@ Not yet decided. This record asks the maintainer to choose between the options b
 - **B. One custom widget on `GtkListView`.** Full control of layout, no sync problem. Costs: a rewrite of the grid's cells, editing, find, filter and menus. Not a slice.
 - **C. Do not freeze.** Keep the row-number column, "jump to column" and column visibility, and close #2208 as declined. No risk, but the wide-table problem stays.
 
-## Recommendation
+## If this is revisited
 
-Spike A on a throwaway branch with one frozen first column. The spike passes only if: selection and keyboard navigation stay in step across both halves; the find bar, local filter and sort still work; the context menus and cell editing find the right cell; column reorder and persisted widths still apply; and the GTK path stays async on a large loaded page (acceptance 5 of #2208). If any of these needs more than a small adapter, choose C and close #2208.
+Spike A on a throwaway branch with one frozen first column. It passes only if: selection and keyboard navigation stay in step across both halves; the find bar, local filter and sort still work; the context menus and cell editing find the right cell; column reorder and persisted widths still apply; and the GTK path stays async on a large loaded page. If any of these needs more than a small adapter, stay with C.
 
 ## Consequences
 
-- No code changes with this record.
-- If A is chosen, a follow-up ADR amendment records the chosen design before the feature lands. If C is chosen, #2208 is closed with a link here.
+- No code changes. The row-number column, "jump to column" and column visibility remain the tools for wide tables.
+- #2208 is closed as declined with a link here. A future need reopens this decision; it does not need a new record unless the chosen option changes.
