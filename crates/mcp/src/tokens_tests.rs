@@ -155,6 +155,22 @@ fn revoke_blocks() {
 }
 
 #[test]
+fn revoking_an_unknown_token_is_an_error_and_leaves_the_store_unchanged() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("tokens.json");
+    let store = TokenStore::open(path.clone()).unwrap();
+    let (meta, plain) = store
+        .issue("x".into(), TokenPermissions::ReadOnly, vec![], None)
+        .unwrap();
+    let before = std::fs::read(&path).unwrap();
+    assert!(store.revoke(Uuid::new_v4()).is_err());
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    assert!(store.authenticate(&plain).is_ok());
+    store.revoke(meta.id).unwrap();
+    store.revoke(meta.id).unwrap();
+}
+
+#[test]
 fn a_permissive_fixed_temporary_file_is_not_reused() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("tokens.json");
