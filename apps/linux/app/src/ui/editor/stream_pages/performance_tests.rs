@@ -58,50 +58,59 @@ fn snapshots_share_payloads_and_release_evicted_pages_after_the_last_owner() {
 }
 
 #[test]
-fn independent_pinned_streams_account_for_and_release_all_resident_pages() {
+fn independent_pinned_streams_release_pages_and_keep_spools_until_unpin() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
     let mut displayed = Vec::new();
     let mut pins = Vec::new();
     let mut pages = Vec::new();
-    let mut expected_bytes = 0;
 
     for _ in 0..5 {
         let mut cache = StreamPageCache::default();
+        let spool = manager.create().unwrap();
         for page_index in 0..4 {
             let page = byte_page(64 * 1024);
-            expected_bytes += page.estimated_row_bytes();
             pages.push(Arc::downgrade(&page));
+            runtime.block_on(spool.append_page(page_index, page.clone())).unwrap();
             cache.append(page_index, page).unwrap();
         }
         let outcome = StatementOutcome {
             identity: StatementIdentity::default(),
             sql_preview: "SELECT payload FROM items".into(),
             elapsed_ms: 0,
-            kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
+            kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot_with_spool(
+                StreamTerminal::Complete,
+                None,
+                0,
+                Some(spool.clone()),
+            ))),
             pinned: false,
         };
+        drop(spool);
         displayed.push(outcome.clone());
         let mut pin = PinnedResults::default();
         pin.add_pin(outcome);
         pins.push(pin);
     }
 
-    let live_pages: Vec<_> = pages.iter().filter_map(Weak::upgrade).collect();
-    assert_eq!(live_pages.len(), 20);
-    assert_eq!(
-        live_pages.iter().map(|page| page.estimated_row_bytes()).sum::<usize>(),
-        expected_bytes
-    );
-    assert!(expected_bytes <= 5 * MAX_QUERY_RESULT_BYTES);
-    drop(live_pages);
-
+    assert!(pages.iter().all(|page| page.upgrade().is_none()));
+    assert!(manager.reserved_bytes() > 0);
+    let Some(StatementOutcomeKind::Streamed(result)) = pins[0].iter().next().map(|outcome| &outcome.kind) else {
+        panic!("the pinned result is not streamed");
+    };
+    let Some(spool) = result.spool.as_ref() else {
+        panic!("the completed pinned result has no spool");
+    };
+    let restored = runtime.block_on(spool.load_page(0, result.columns.clone())).unwrap();
+    assert_eq!(restored.rows[0][0], Value::Bytes(vec![7; 64 * 1024]));
     drop(displayed);
-    assert!(pages.iter().all(|page| page.upgrade().is_some()));
+    assert!(manager.reserved_bytes() > 0);
     for pin in &mut pins {
         assert_eq!(pin.count(), 1);
         assert!(pin.unpin_all().is_empty());
     }
     drop(pins);
-    assert!(pages.iter().all(|page| page.upgrade().is_none()));
+    assert_eq!(manager.reserved_bytes(), 0);
 }
 
 #[test]
