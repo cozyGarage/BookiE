@@ -312,17 +312,13 @@ impl SshTunnel {
             };
 
             let hop_bind = if is_last { bind.clone() } else { LocalBind::Tcp };
-            let mut tunnel = open_single(
-                hop,
-                &tcp_host,
+            let route = HopRoute {
+                tcp_host: &tcp_host,
                 tcp_port,
-                fwd_host.to_string(),
+                fwd_host: fwd_host.to_string(),
                 fwd_port,
-                hop_bind,
-                unknown,
-                prompter.clone(),
-            )
-            .await?;
+            };
+            let mut tunnel = open_single(hop, route, hop_bind, unknown, prompter.clone()).await?;
 
             if is_last {
                 tunnel._upstream = upstream;
@@ -422,19 +418,28 @@ impl client::Handler for ClientHandler {
     }
 }
 
-/// Open one hop: TCP to `(tcp_host, tcp_port)`, verify host key as
-/// `cfg.host:cfg.port`, forward local listeners to `fwd_host:fwd_port`.
-#[allow(clippy::too_many_arguments)]
-async fn open_single(
-    cfg: &SshConfig,
-    tcp_host: &str,
+struct HopRoute<'a> {
+    tcp_host: &'a str,
     tcp_port: u16,
     fwd_host: String,
     fwd_port: u16,
+}
+
+/// Open one hop: TCP to `(tcp_host, tcp_port)`, verify host key as
+/// `cfg.host:cfg.port`, forward local listeners to `fwd_host:fwd_port`.
+async fn open_single(
+    cfg: &SshConfig,
+    route: HopRoute<'_>,
     bind: LocalBind,
     unknown: UnknownHostKey,
     prompter: Option<Arc<dyn Prompter>>,
 ) -> Result<SshTunnel, SshError> {
+    let HopRoute {
+        tcp_host,
+        tcp_port,
+        fwd_host,
+        fwd_port,
+    } = route;
     let session = Arc::new(connect_and_auth(cfg, tcp_host, tcp_port, unknown, prompter).await?);
     let (listener, local_port, socket_dir) = bind_local(bind).await?;
 
