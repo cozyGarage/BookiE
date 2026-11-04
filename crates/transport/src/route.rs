@@ -408,3 +408,7 @@ mod location_tests {
         assert!(!flatpak_marked(false, false));
     }
 }
+
+#[cfg(test)]
+#[path = "route_tests.rs"]
+mod error_mapping_tests;
