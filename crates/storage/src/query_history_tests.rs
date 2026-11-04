@@ -498,6 +498,23 @@ fn an_unterminated_string_gets_the_plain_terminator_and_a_terminated_statement_k
 }
 
 #[test]
+fn a_dollar_quoted_body_is_scanned_and_a_trailing_comment_is_still_terminated() {
+    assert_eq!(
+        exported_tail("postgres", "DO $$ BEGIN PERFORM 'it''s -- x'; END $$ -- note"),
+        "DO $$ BEGIN PERFORM 'it''s -- x'; END $$ -- note\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT $t$it's -- fine$t$"),
+        "SELECT $t$it's -- fine$t$;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 -- cost $a$"),
+        "SELECT 1 -- cost $a$\n;\n\n"
+    );
+    assert_eq!(exported_tail("postgres", "SELECT $$ open"), "SELECT $$ open;\n\n");
+}
+
+#[test]
 fn a_numbered_placeholder_is_not_a_dollar_quote() {
     assert_eq!(
         exported_tail("postgres", "SELECT * FROM t WHERE id = $1 -- by id"),

@@ -622,6 +622,7 @@ fn comment_text(text: &str) -> String {
 
 struct StatementTail {
     open_quote: Option<char>,
+    open_dollar: bool,
     in_line_comment: bool,
     in_block_comment: bool,
     last_code: Option<char>,
@@ -629,12 +630,13 @@ struct StatementTail {
 
 enum ScanState {
     Code,
+    Dollar(String),
     Quoted(char),
     LineComment,
     BlockComment,
 }
 
-fn dash_comment_starts(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, mysql: bool) -> bool {
+fn dash_comment_starts(chars: &mut SqlChars<'_>, mysql: bool) -> bool {
     let mut lookahead = chars.clone();
     lookahead.next();
     let starts = !mysql
@@ -647,14 +649,36 @@ fn dash_comment_starts(chars: &mut std::iter::Peekable<std::str::Chars<'_>>, mys
     starts
 }
 
-fn has_dollar_quote(query: &str) -> bool {
-    query.match_indices('$').any(|(start, _)| {
-        let rest = &query[start + 1..];
-        let tag = rest.find('$').map(|end| &rest[..end]);
-        tag.is_some_and(|tag| {
-            tag.chars().all(|c| c.is_alphanumeric() || c == '_') && !tag.starts_with(|c: char| c.is_ascii_digit())
-        })
-    })
+type SqlChars<'a> = std::iter::Peekable<std::str::Chars<'a>>;
+
+fn dollar_tag_start(chars: &mut SqlChars<'_>) -> Option<String> {
+    let mut lookahead = chars.clone();
+    let mut tag = String::new();
+    loop {
+        match lookahead.next()? {
+            '$' => break,
+            c if c.is_alphanumeric() || c == '_' => tag.push(c),
+            _ => return None,
+        }
+    }
+    if tag.starts_with(|c: char| c.is_ascii_digit()) {
+        return None;
+    }
+    for _ in 0..=tag.chars().count() {
+        chars.next();
+    }
+    Some(tag)
+}
+
+fn dollar_quote_ends(chars: &mut SqlChars<'_>, tag: &str) -> bool {
+    let mut lookahead = chars.clone();
+    let closes = tag.chars().all(|expected| lookahead.next() == Some(expected)) && lookahead.next() == Some('$');
+    if closes {
+        for _ in 0..=tag.chars().count() {
+            chars.next();
+        }
+    }
+    closes
 }
 
 fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
@@ -664,6 +688,21 @@ fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
     let mut chars = query.chars().peekable();
     while let Some(c) = chars.next() {
         state = match state {
+            ScanState::Dollar(tag) if c == '$' && dollar_quote_ends(&mut chars, &tag) => {
+                last_code = Some('$');
+                ScanState::Code
+            }
+            ScanState::Dollar(tag) => ScanState::Dollar(tag),
+            ScanState::Code if c == '$' && !mysql => match dollar_tag_start(&mut chars) {
+                Some(tag) => {
+                    last_code = Some('$');
+                    ScanState::Dollar(tag)
+                }
+                None => {
+                    last_code = Some(c);
+                    ScanState::Code
+                }
+            },
             ScanState::Quoted(_) if mysql && c == '\\' => {
                 chars.next();
                 state
@@ -696,6 +735,7 @@ fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
             ScanState::Quoted(quote) => Some(quote),
             _ => None,
         },
+        open_dollar: matches!(state, ScanState::Dollar(_)),
         in_line_comment: matches!(state, ScanState::LineComment),
         in_block_comment: matches!(state, ScanState::BlockComment),
         last_code,
@@ -722,7 +762,7 @@ fn sql_export_entry(entry: &Entry) -> String {
     let query = entry.query.trim_end();
     out.push_str(query);
     let tail = scan_statement_tail(query, matches!(entry.driver_id.as_str(), "mysql" | "mariadb"));
-    if tail.open_quote.is_some() || has_dollar_quote(query) {
+    if tail.open_quote.is_some() || tail.open_dollar {
         if !query.ends_with(';') {
             out.push(';');
         }
