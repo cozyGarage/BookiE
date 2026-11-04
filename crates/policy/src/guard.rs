@@ -102,6 +102,36 @@ struct AuditOutcome {
     duration_ms: u64,
 }
 
+struct RecordFields {
+    terminal_status: AuditTerminalStatus,
+    transaction_outcome: AuditTransactionOutcome,
+    rows_affected: Option<u64>,
+    error_category: Option<AuditErrorCategory>,
+    duration_ms: Option<u64>,
+    rows_skipped: Option<u64>,
+}
+
+impl RecordFields {
+    fn intent(operation: &AuditOperation<'_>) -> Self {
+        let transaction_outcome = if matches!(
+            operation.class,
+            AuditOperationClass::TransactionCommit | AuditOperationClass::TransactionRollback
+        ) {
+            AuditTransactionOutcome::Pending
+        } else {
+            AuditTransactionOutcome::NotApplicable
+        };
+        Self {
+            terminal_status: AuditTerminalStatus::Pending,
+            transaction_outcome,
+            rows_affected: None,
+            error_category: None,
+            duration_ms: None,
+            rows_skipped: None,
+        }
+    }
+}
+
 impl PolicyGuard {
     pub fn new(inner: Arc<dyn Connection>, ctx: GuardContext) -> Self {
         let masks_results = ctx.principal.is_agent()
@@ -540,23 +570,7 @@ impl PolicyGuard {
 
     async fn record_intent(&self, operation: &AuditOperation<'_>) -> Result<(), AuditError> {
         let result = self
-            .record(
-                operation,
-                AuditRecordPhase::Intent,
-                AuditTerminalStatus::Pending,
-                if matches!(
-                    operation.class,
-                    AuditOperationClass::TransactionCommit | AuditOperationClass::TransactionRollback
-                ) {
-                    AuditTransactionOutcome::Pending
-                } else {
-                    AuditTransactionOutcome::NotApplicable
-                },
-                None,
-                None,
-                None,
-                None,
-            )
+            .record(operation, AuditRecordPhase::Intent, RecordFields::intent(operation))
             .await;
         if matches!(&result, Err(AuditError::UnresolvedWrite | AuditError::WriteInFlight)) {
             if matches!(&result, Err(AuditError::UnresolvedWrite)) {
@@ -583,31 +597,31 @@ impl PolicyGuard {
     }
 
     async fn record_outcome(&self, operation: &AuditOperation<'_>, outcome: AuditOutcome) -> Result<(), AuditError> {
-        self.record(
-            operation,
-            AuditRecordPhase::Outcome,
-            outcome.terminal_status,
-            outcome.transaction_outcome,
-            outcome.rows_affected,
-            outcome.error_category,
-            Some(outcome.duration_ms),
-            None,
-        )
-        .await
+        let fields = RecordFields {
+            terminal_status: outcome.terminal_status,
+            transaction_outcome: outcome.transaction_outcome,
+            rows_affected: outcome.rows_affected,
+            error_category: outcome.error_category,
+            duration_ms: Some(outcome.duration_ms),
+            rows_skipped: None,
+        };
+        self.record(operation, AuditRecordPhase::Outcome, fields).await
     }
 
-    #[allow(clippy::too_many_arguments)]
     async fn record(
         &self,
         operation: &AuditOperation<'_>,
         phase: AuditRecordPhase,
-        terminal_status: AuditTerminalStatus,
-        transaction_outcome: AuditTransactionOutcome,
-        rows_affected: Option<u64>,
-        error_category: Option<AuditErrorCategory>,
-        duration_ms: Option<u64>,
-        rows_skipped: Option<u64>,
+        fields: RecordFields,
     ) -> Result<(), AuditError> {
+        let RecordFields {
+            terminal_status,
+            transaction_outcome,
+            rows_affected,
+            error_category,
+            duration_ms,
+            rows_skipped,
+        } = fields;
         let sql_hash = hex::encode(Sha256::digest(operation.sql.as_bytes()));
         let principal = self.ctx.principal.sanitized();
         let error = error_category.map(sanitized_error_detail);
