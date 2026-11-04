@@ -14,7 +14,10 @@ The result screen mirrors the GTK streamed-result header so both layouts can be 
 - Show matching rows builds a synthetic filtered view held in Rust state, paged through `filtered_rows`.
 - A compare panel over two synthetic generators: whole-row multiset (Added and Removed) and keyed (Before and After pairs), capped at 200 shown rows.
 - A fourth **Typed** column that cycles through every value variant (float, bytes, date, time, datetime, timestamp with time zone, decimal, UUID, JSON, raw JSON text, undecodable, NULL) so the grid, Find and the filter row are exercised against exact typed text. Each kind has its own cell class; numbers align right, binary and JSON use a monospace face.
+- Row selection: click selects one row, Shift-click extends a contiguous range from the anchor, Escape clears. Ctrl+C copies the selected rows (up to 5,000) as tab-separated text. The text is produced by `bookie_core::export::render_tsv`, the same renderer the product uses, so NULL is `\N`, values keep their exact digits and typed cells use the export text. A selection is a range of source row numbers, so while a filter is applied Shift-click is disabled and only single rows can be selected. Only contiguous ranges are supported; there is no Ctrl-click multi-select and no cell-level selection.
 - Row counts of 150,000, 500,000 or 1,000,000 through `?rows=` or `BOOKIE_PROTOTYPE_ROWS`.
+
+`BOOKIE_PROTOTYPE_SELFTEST=1` opens the result, selects rows 2 to 4, runs the copy path and prints one `PROTOTYPE_REPORT` line with the outcome. The self-test has no user gesture, so WebKit refuses both clipboard routes (`navigator.clipboard.writeText` and the `execCommand("copy")` fallback) and the report says so; a real Ctrl+C with a gesture has not been verified in this environment.
 
 Export is inert. Nothing is read from or written to disk.
 

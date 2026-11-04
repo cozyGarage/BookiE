@@ -61,3 +61,6 @@ button:focus-visible, .viewport:focus-visible, summary:focus-visible, .entry:foc
 @container result (max-width: 920px) { .strip-progress { flex-basis: 180px; } .range { min-width: 120px; } }
 @container result (max-width: 600px) { .strip-progress { flex-basis: 100%; } .pager { flex: 1 1 100%; justify-content: space-between; } .range { min-width: 0; flex: 1; } .find { flex-basis: 100%; } .columns, .height { min-width: 0; } .columns, .row { grid-template-columns: 56px minmax(80px, 1fr) minmax(70px, 1fr) 56px minmax(90px, 1fr); gap: 8px; padding: 0 8px; } }
 @media (max-width: 700px) { main { padding: 16px; } .welcome { grid-template-columns: 1fr; margin-top: 30px; } .app-header { align-items: flex-start; } .result { padding: 14px; } }
+
+.row.selected { background: #26405f; }
+.row { cursor: default; user-select: none; }

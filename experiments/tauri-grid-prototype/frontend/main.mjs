@@ -15,6 +15,7 @@ import {
   rangeLabel,
   rowsFromQuery,
 } from './strip.mjs';
+import { copyRequest, isSelected, selectionAfterClick, selectionLabel } from './selection.mjs';
 
 const invoke = (...args) => globalThis.__TAURI__.core.invoke(...args);
 const rowHeight = 36;
@@ -24,7 +25,7 @@ const surface = $('#height');
 const rows = $('#rows');
 const status = $('#status');
 const find = createFind();
-const view = { total: 0, matched: null, page: 0, continuous: false, filterGeneration: 0, matchRow: null };
+const view = { total: 0, matched: null, page: 0, continuous: false, filterGeneration: 0, matchRow: null, selection: null };
 let generation = 0;
 let compareGeneration = 0;
 let frame = 0;
@@ -50,6 +51,14 @@ function buildRow(record) {
   number.setAttribute('role', 'gridcell');
   number.textContent = String(record.row_number + 1);
   row.append(number);
+  row.addEventListener('click', (event) => {
+    view.selection = selectionAfterClick(view.selection, record.row_number, { shift: event.shiftKey && view.matched === null });
+    updateSelection();
+  });
+  if (isSelected(view.selection, record.row_number)) {
+    row.classList.add('selected');
+    row.setAttribute('aria-selected', 'true');
+  }
   for (const cell of record.cells) {
     const item = document.createElement('span');
     item.className = cellClass(cell);
@@ -79,6 +88,48 @@ async function render() {
   } catch {
     if (current === generation) status.textContent = 'Unable to load the synthetic result.';
   }
+}
+
+function updateSelection(note = '') {
+  $('#selection-status').textContent = note || selectionLabel(view.selection);
+  schedule();
+}
+
+async function copySelection() {
+  const range = copyRequest(view.selection);
+  if (range === null) {
+    updateSelection(view.selection ? 'Select at most 5,000 rows to copy.' : '');
+    return;
+  }
+  try {
+    const text = await invoke('copy_rows', { first: range.first, last: range.last, withHeaders: false, total: view.total });
+    await writeClipboard(text);
+    updateSelection(`Copied ${(range.last - range.first + 1).toLocaleString('en-US')} rows as tab-separated text.`);
+  } catch (error) {
+    updateSelection(`Unable to copy the selection: ${error?.message ?? error}`);
+  }
+}
+
+async function writeClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    copyThroughSelection(text);
+  }
+}
+
+function copyThroughSelection(text) {
+  const holder = document.createElement('textarea');
+  holder.value = text;
+  holder.setAttribute('readonly', '');
+  holder.style.position = 'fixed';
+  holder.style.opacity = '0';
+  document.body.append(holder);
+  holder.select();
+  const copied = document.execCommand('copy');
+  holder.remove();
+  if (!copied) throw new Error('clipboard unavailable');
 }
 
 function schedule() {
@@ -265,6 +316,15 @@ function bindFilterRow() {
     });
   }
   document.addEventListener('keydown', (event) => {
+    const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+    if (!typing && !$('#result').hidden && event.ctrlKey && event.key.toLowerCase() === 'c' && view.selection) {
+      event.preventDefault();
+      void copySelection();
+    }
+    if (!typing && event.key === 'Escape' && view.selection) {
+      view.selection = null;
+      updateSelection();
+    }
     if (event.ctrlKey && event.key.toLowerCase() === 'f' && !$('#result').hidden) {
       event.preventDefault();
       $('#filter-row').hidden = false;
@@ -293,7 +353,17 @@ async function openResult(config) {
   layoutOverflow();
   updateStrip();
   await render();
+  if (config.selftest) await selfTest();
   if (config.autoscroll_steps > 0) await autoscroll(config.autoscroll_steps);
+}
+
+async function selfTest() {
+  view.selection = selectionAfterClick(selectionAfterClick(null, 1), 3, { shift: true });
+  updateSelection();
+  await copySelection();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const selected = document.querySelectorAll('.row.selected').length;
+  await invoke('report', { line: `selected_rows_drawn=${selected} status=${$('#selection-status').textContent}` });
 }
 
 bindControls();
@@ -304,11 +374,11 @@ new ResizeObserver(() => {
 }).observe(viewport);
 new ResizeObserver(layoutOverflow).observe($('#strip'));
 
-let config = { rows: 1_000_000, autoscroll_steps: 0 };
+let config = { rows: 1_000_000, autoscroll_steps: 0, selftest: false };
 try {
   config = await invoke('startup_config');
 } catch {
-  config = { rows: 1_000_000, autoscroll_steps: 0 };
+  config = { rows: 1_000_000, autoscroll_steps: 0, selftest: false };
 }
 $('#show-result').addEventListener('click', () => void openResult(config));
-if (config.autoscroll_steps > 0) void openResult(config);
+if (config.autoscroll_steps > 0 || config.selftest) void openResult(config);

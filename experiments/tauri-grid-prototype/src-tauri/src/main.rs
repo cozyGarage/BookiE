@@ -9,6 +9,7 @@ const MAX_BATCH: usize = 128;
 const MAX_FIND_MATCHES: usize = 10_000;
 const MAX_DIFF_ROWS: usize = 200;
 const TYPED_KINDS: u64 = 12;
+const MAX_COPY_ROWS: u64 = 5_000;
 
 #[derive(Serialize)]
 struct Cell {
@@ -26,6 +27,7 @@ struct Row {
 struct Config {
     rows: u64,
     autoscroll_steps: u32,
+    selftest: bool,
 }
 
 #[derive(Serialize)]
@@ -152,13 +154,39 @@ fn row_at(index: u64) -> Result<Row, &'static str> {
     })
 }
 
+fn values_of(index: u64, label: &str) -> Vec<Value> {
+    vec![
+        Value::Int(value_of(index)),
+        Value::Text(label.to_string()),
+        state_of(index),
+        typed_of(index),
+    ]
+}
+
 fn cells_of(index: u64, label: &str) -> Result<Vec<Cell>, &'static str> {
-    Ok(vec![
-        cell(Value::Int(value_of(index)))?,
-        cell(Value::Text(label.to_string()))?,
-        cell(state_of(index))?,
-        cell(typed_of(index))?,
-    ])
+    values_of(index, label).into_iter().map(cell).collect()
+}
+
+fn copy_columns() -> Vec<bookie_core::ColumnInfo> {
+    ["value:integer", "label:text", "state:boolean", "typed:variant"]
+        .iter()
+        .map(|spec| {
+            let (name, data_type) = spec.split_once(':').unwrap_or((spec, "text"));
+            bookie_core::ColumnInfo {
+                name: name.into(),
+                data_type: data_type.into(),
+                nullable: true,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            }
+        })
+        .collect()
 }
 
 fn column_text(index: u64, column: &str) -> Option<String> {
@@ -205,7 +233,18 @@ fn startup_config() -> Config {
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(0);
-    Config { rows, autoscroll_steps }
+    let selftest = std::env::var("BOOKIE_PROTOTYPE_SELFTEST").is_ok_and(|value| value == "1");
+    Config {
+        rows,
+        autoscroll_steps,
+        selftest,
+    }
+}
+
+#[tauri::command]
+fn report(line: String) {
+    let clean: String = line.chars().filter(|character| !character.is_control()).take(240).collect();
+    println!("PROTOTYPE_REPORT {clean}");
 }
 
 #[tauri::command]
@@ -221,6 +260,26 @@ fn sample_rows(offset: u64, limit: usize, total: Option<u64>) -> Result<Vec<Row>
     let total = checked_total(total)?;
     let end = offset.saturating_add(limit as u64).min(total);
     (offset.min(total)..end).map(row_at).collect()
+}
+
+#[tauri::command]
+fn copy_rows(first: u64, last: u64, with_headers: bool, total: Option<u64>) -> Result<String, &'static str> {
+    if last < first {
+        return Err("the copy range is reversed");
+    }
+    if last - first >= MAX_COPY_ROWS {
+        return Err("the copy range exceeds the prototype limit");
+    }
+    let total = checked_total(total)?;
+    let end = last.saturating_add(1).min(total);
+    let rows: Vec<Vec<Value>> = (first.min(total)..end)
+        .map(|index| values_of(index, &label_of(index)))
+        .collect();
+    Ok(bookie_core::export::render_tsv(
+        &copy_columns(),
+        &bookie_core::QueryRows::from_rows(rows),
+        with_headers,
+    ))
 }
 
 #[tauri::command]
@@ -377,7 +436,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .invoke_handler(tauri::generate_handler![
             startup_config,
             scroll_done,
+            report,
             sample_rows,
+            copy_rows,
             find_rows,
             filter_rows,
             filtered_rows,

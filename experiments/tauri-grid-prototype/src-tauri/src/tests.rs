@@ -238,3 +238,37 @@ fn a_filter_and_find_can_target_the_typed_column() {
     assert_eq!(found.matches, vec![10, 22, 34]);
     assert!(valid_predicate(&predicate("typed", "equals", "x")).is_ok());
 }
+
+#[test]
+fn copying_rows_uses_the_product_tsv_with_exact_digits_and_the_null_marker() {
+    let copied = copy_rows(0, 2, true, None).unwrap();
+    let lines: Vec<&str> = copied.lines().collect();
+    assert_eq!(lines[0], "value\tlabel\tstate\ttyped");
+    assert_eq!(lines[1], "9007199254740993\tSample 0\t\\N\t0.30000000000000004");
+    assert_eq!(lines[2], "9007199254740994\tSample 1\tfalse\t\\xdeadbeef");
+    assert_eq!(lines[3], "9007199254740995\tSample 2\ttrue\t2026-11-04");
+    assert_eq!(lines.len(), 4);
+}
+
+#[test]
+fn copying_without_headers_and_every_typed_kind_stay_on_one_line_each() {
+    let copied = copy_rows(0, TYPED_KINDS - 1, false, None).unwrap();
+    assert_eq!(copied.lines().count(), TYPED_KINDS as usize);
+    assert!(copied.lines().all(|line| line.matches('\t').count() == 3), "{copied}");
+    assert!(copied.contains("<undecodable numeric(40,20)>"));
+    assert!(copied.lines().last().unwrap().ends_with("\\N"), "the last typed kind is NULL");
+}
+
+#[test]
+fn copying_is_bounded_and_refuses_reversed_or_oversized_ranges() {
+    assert!(copy_rows(5, 4, true, None).is_err());
+    assert!(copy_rows(0, MAX_COPY_ROWS, true, None).is_err());
+    assert!(copy_rows(0, MAX_COPY_ROWS - 1, true, None).is_ok());
+    assert!(copy_rows(0, 1, true, Some(42)).is_err());
+}
+
+#[test]
+fn copying_past_the_last_row_stops_at_the_end() {
+    let copied = copy_rows(149_998, 150_005, false, Some(150_000)).unwrap();
+    assert_eq!(copied.lines().count(), 2);
+}
