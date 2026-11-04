@@ -6,6 +6,7 @@ use bookie_gpui_grid_prototype::model::Cell;
 use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, div, prelude::*, px, rgb};
 
 use crate::text_input::InputEvent;
+use crate::theme::Theme;
 use crate::{CELL_WIDTHS, GridView, cell_div};
 
 pub type Edits = HashMap<(u64, usize), Cell>;
@@ -93,13 +94,17 @@ impl GridView {
         {
             return div().w(px(width)).flex_none().child(self.editor.clone());
         }
+        let theme = Theme::current(cx);
         let cell = self.cell_at(source, column);
         let mut item = cell_div(width, cell.display());
+        if matches!(cell, Cell::Null) {
+            item = item.italic().text_color(rgb(theme.muted_foreground));
+        }
         if self.edits.contains_key(&(source, column)) {
-            item = item.border_b_2().border_color(rgb(0xe0a96d));
+            item = item.border_b_2().border_color(rgb(theme.warning));
         }
         if self.cell_cursor == Some(Cursor { row: position, column }) {
-            item = item.border_2().border_color(rgb(0x3584e4));
+            item = item.border_2().border_color(rgb(theme.info));
         }
         item.on_mouse_down(
             MouseButton::Left,

@@ -523,7 +523,7 @@ impl Element for TextElement {
                         point(bounds.left() + cursor_pos, bounds.top()),
                         size(px(2.), bounds.bottom() - bounds.top()),
                     ),
-                    rgb(0xe6e6e6),
+                    rgb(crate::theme::Theme::current(cx).foreground),
                 )),
             )
         } else {
@@ -578,6 +578,7 @@ impl Element for TextElement {
 
 impl Render for TextInput {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = crate::theme::Theme::current(cx);
         div()
             .flex()
             .key_context("TextInput")
@@ -601,16 +602,19 @@ impl Render for TextInput {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_move(cx.listener(Self::on_mouse_move))
-            .bg(rgb(0x111318))
-            .text_color(rgb(0xe6e6e6))
+            .bg(rgb(theme.background))
+            .text_color(rgb(theme.foreground))
             .line_height(px(24.))
-            .text_size(px(14.))
+            .text_size(px(13.))
             .child(
                 div()
                     .h(px(24. + 4. * 2.))
                     .w_full()
                     .p(px(4.))
-                    .bg(rgb(0x111318))
+                    .bg(rgb(theme.background))
+                    .rounded(px(4.))
+                    .border_1()
+                    .border_color(rgb(theme.border))
                     .child(TextElement { input: cx.entity() }),
             )
     }

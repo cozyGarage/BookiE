@@ -169,3 +169,18 @@ fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: 
         assert_eq!(view.palette_index, view.palette_shown(cx).len() - 1)
     });
 }
+
+#[gpui::test]
+fn the_palette_switches_between_the_light_and_dark_theme(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| assert!(!crate::theme::Theme::current(cx).dark, "light is the default"));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("dark theme");
+    cx.simulate_keystrokes("enter");
+    cx.update(|_, cx| assert!(crate::theme::Theme::current(cx).dark));
+    view.read_with(cx, |view, _| assert!(view.dark_mode));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("light theme");
+    cx.simulate_keystrokes("enter");
+    cx.update(|_, cx| assert!(!crate::theme::Theme::current(cx).dark));
+}

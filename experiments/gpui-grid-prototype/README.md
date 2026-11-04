@@ -26,6 +26,8 @@ Double-click a label, state or typed cell to edit it. Enter applies, Escape canc
 
 Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text. The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
 
+The look follows DBX (MIT, <https://github.com/t8y2/dbx>): its light and dark design tokens from `apps/desktop/src/styles/tokens.css` (white and near-black surfaces, `#e5e5e5` borders, 4 px radii, a muted header), its data-grid constants (26 px rows, 13 px text, striped rows `#f0f0f0`, blue active row, italic muted NULL) and outline buttons. Only colour values and sizes were taken; no DBX code. Light is the default. `BOOKIE_PROTOTYPE_THEME=dark` starts dark, and the command palette has **Switch to dark theme** and **Switch to light theme**. The tokens live in `src/theme.rs`. Not copied from DBX: the left connection sidebar, the tab bar, the row-number gutter, the Geist font (the window uses the system UI font) and its canvas-drawn cells.
+
 Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. Real keyboard, IME and mouse behavior is covered by `src/ui_tests.rs`, which drives the views through GPUI's `test-support` context (`cargo test`). A window cannot be opened under Xvfb here (no DRI3 for the Vulkan surface), so how it looks and feels has not been checked by eye.
 
 `BOOKIE_PROTOTYPE_WIDTH` and `BOOKIE_PROTOTYPE_HEIGHT` set the window size.

@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 mod grid_edit;
 mod text_input;
+mod theme;
 
 use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
@@ -14,8 +15,10 @@ use gpui::{
     prelude::*, px, rgb, size, uniform_list,
 };
 use text_input::{InputEvent, TextInput};
+use theme::Theme;
 
-const ROW_HEIGHT: f32 = 36.0;
+const ROW_HEIGHT: f32 = 26.0;
+const HEADER_HEIGHT: f32 = 28.0;
 pub const CELL_WIDTHS: [f32; 4] = [240.0, 280.0, 120.0, 320.0];
 
 enum Mode {
@@ -39,6 +42,7 @@ struct GridView {
     palette_input: Entity<TextInput>,
     palette_open: bool,
     palette_index: usize,
+    dark_mode: bool,
     cursor: MatchCursor,
     find_capped: bool,
     compare: Option<Diff>,
@@ -137,6 +141,7 @@ impl GridView {
             palette_input,
             palette_open: false,
             palette_index: 0,
+            dark_mode: Theme::current(cx).dark,
             cursor: MatchCursor::default(),
             find_capped: false,
             compare: None,
@@ -492,6 +497,15 @@ impl GridView {
             action("copy", "Copy selected rows", self.selection.is_some()),
             action("clear-selection", "Clear row selection", self.selection.is_some()),
             action("edit", "Edit the active cell", self.cell_cursor.is_some()),
+            action(
+                "theme",
+                if self.dark_mode {
+                    "Switch to light theme"
+                } else {
+                    "Switch to dark theme"
+                },
+                true,
+            ),
         ]
     }
 
@@ -543,6 +557,11 @@ impl GridView {
             "copy" => self.copy_selection(false, cx),
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
+            "theme" => {
+                self.dark_mode = !self.dark_mode;
+                cx.set_global(Theme::current(cx).toggled());
+                window.refresh();
+            }
             _ => {}
         }
         cx.notify();
@@ -632,15 +651,20 @@ impl GridView {
     }
 }
 
-fn button(id: &'static str, label: impl Into<String>) -> Stateful<Div> {
+fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
+        .flex()
+        .items_center()
+        .h(px(28.0))
         .px_3()
-        .py_1()
-        .rounded_md()
-        .bg(rgb(0x2d2f36))
+        .rounded(px(4.0))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .bg(rgb(theme.background))
+        .text_color(rgb(theme.foreground))
         .cursor_pointer()
-        .hover(|style| style.bg(rgb(0x3a3d46)))
+        .hover(move |style| style.bg(rgb(theme.accent)))
         .child(label.into())
 }
 
@@ -648,21 +672,27 @@ pub fn cell_div(width: f32, text: String) -> Div {
     div().w(px(width)).flex_none().px_2().overflow_hidden().child(text)
 }
 
-fn row_div(stripe: bool, selected: bool) -> Div {
+fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
     let background = if selected {
-        rgb(0x2a4a7f)
+        theme.active_row
     } else if stripe {
-        rgb(0x202228)
+        theme.stripe
     } else {
-        rgb(0x1b1c20)
+        theme.background
     };
-    div().flex().items_center().h(px(ROW_HEIGHT)).w_full().bg(background)
+    div()
+        .flex()
+        .items_center()
+        .h(px(ROW_HEIGHT))
+        .w_full()
+        .bg(rgb(background))
 }
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.note_frame();
         self.pace_frame(window);
+        let theme = Theme::current(cx);
         self.viewport_rows = ((f32::from(window.viewport_size().height) - 130.0) / ROW_HEIGHT)
             .floor()
             .max(1.0) as usize;
@@ -689,37 +719,48 @@ impl Render for GridView {
             .items_center()
             .gap_2()
             .p_2()
+            .bg(rgb(theme.chrome))
+            .border_b_1()
+            .border_color(rgb(theme.border))
             .child(div().child(progress))
-            .child(button("first", "First").on_click(cx.listener(|this, _, _, cx| {
+            .child(button("first", "First", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.first();
                 cx.notify();
             })))
-            .child(button("prev", "Previous page").on_click(cx.listener(|this, _, _, cx| {
-                this.pager.previous();
-                cx.notify();
-            })))
+            .child(
+                button("prev", "Previous page", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.pager.previous();
+                    cx.notify();
+                })),
+            )
             .child(div().child(range_label))
-            .child(button("next", "Next page").on_click(cx.listener(|this, _, _, cx| {
-                this.pager.next();
-                cx.notify();
-            })))
-            .child(button("last", "Last").on_click(cx.listener(|this, _, _, cx| {
+            .child(
+                button("next", "Next page", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.pager.next();
+                    cx.notify();
+                })),
+            )
+            .child(button("last", "Last", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.last();
                 cx.notify();
             })))
             .child(div().w(px(260.0)).child(self.find.clone()))
             .child(
-                button("find-prev", "Previous match").on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
+                button("find-prev", "Previous match", theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
             )
-            .child(button("find-next", "Next match").on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(
-                button("show", "Show matching rows").on_click(cx.listener(|this, _, _, cx| {
+                button("find-next", "Next match", theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
+            )
+            .child(
+                button("show", "Show matching rows", theme).on_click(cx.listener(|this, _, _, cx| {
                     this.show_matching(cx);
                     cx.notify();
                 })),
             )
-            .child(button("compare", "Compare…").on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
-            .child(button("export", "Export all rows…"))
+            .child(button("compare", "Compare…", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
+            .child(button("export", "Export all rows…", theme))
             .child(
                 button(
                     "continuous",
@@ -728,6 +769,7 @@ impl Render for GridView {
                     } else {
                         "Continuous scrolling"
                     },
+                    theme,
                 )
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.continuous = !this.continuous;
@@ -735,7 +777,7 @@ impl Render for GridView {
                     cx.notify();
                 })),
             )
-            .child(div().text_color(rgb(0x9aa0b4)).child(self.status.clone()));
+            .child(div().text_color(rgb(theme.muted_foreground)).child(self.status.clone()));
         let filter_row = self.filter_visible.then(|| {
             div()
                 .flex()
@@ -745,11 +787,13 @@ impl Render for GridView {
                 .pb_2()
                 .child(div().child("WHERE"))
                 .child(div().w(px(420.0)).child(self.filter.clone()))
-                .child(button("apply", "Apply").on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
-                .child(button("clear", "Clear all").on_click(cx.listener(|this, _, _, cx| {
-                    this.clear_filter();
-                    cx.notify();
-                })))
+                .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
+                .child(
+                    button("clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {
+                        this.clear_filter();
+                        cx.notify();
+                    })),
+                )
         });
         let compare_bar = self.compare.as_ref().map(|diff| {
             let s = &diff.summary;
@@ -780,15 +824,26 @@ impl Render for GridView {
                 .px_2()
                 .pb_2()
                 .child(div().child(format!("COMPARE {summary}{capped}")))
-                .child(button("whole", "Whole row").on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
-                .child(button("keyed", "Key: value").on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))))
-                .child(button("close-compare", "Close").on_click(cx.listener(|this, _, _, cx| {
-                    this.compare = None;
-                    cx.notify();
-                })))
+                .child(
+                    button("whole", "Whole row", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+                )
+                .child(
+                    button("keyed", "Key: value", theme).on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))),
+                )
+                .child(
+                    button("close-compare", "Close", theme).on_click(cx.listener(|this, _, _, cx| {
+                        this.compare = None;
+                        cx.notify();
+                    })),
+                )
         });
-        let header = row_div(false, false)
-            .text_color(rgb(0x9aa0b4))
+        let header = row_div(false, false, theme)
+            .h(px(HEADER_HEIGHT))
+            .bg(rgb(theme.muted))
+            .border_b_1()
+            .border_color(rgb(theme.border))
+            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .text_color(rgb(theme.muted_foreground))
             .child(cell_div(CELL_WIDTHS[0], "value".into()))
             .child(cell_div(CELL_WIDTHS[1], "label".into()))
             .child(cell_div(CELL_WIDTHS[2], "state".into()))
@@ -810,9 +865,9 @@ impl Render for GridView {
             .relative()
             .flex()
             .flex_col()
-            .bg(rgb(0x1b1c20))
-            .text_color(rgb(0xe6e6e6))
-            .text_sm()
+            .bg(rgb(theme.background))
+            .text_color(rgb(theme.foreground))
+            .text_size(px(13.0))
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
             .child(strip)
@@ -826,20 +881,24 @@ impl Render for GridView {
 
 impl GridView {
     fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
+        let theme = Theme::current(cx);
         let actions = self.palette_actions();
         let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
         let selected = self.palette_index.min(shown.len().saturating_sub(1));
         let list = shown.iter().enumerate().map(|(position, index)| {
             let row = div().px_2().py_1().rounded_md().child(actions[*index].label.clone());
             if position == selected {
-                row.bg(rgb(0x2a4a7f))
+                row.bg(rgb(theme.active_row))
             } else {
                 row
             }
         });
-        let empty = shown
-            .is_empty()
-            .then(|| div().px_2().text_color(rgb(0x9aa0b4)).child("No matching command"));
+        let empty = shown.is_empty().then(|| {
+            div()
+                .px_2()
+                .text_color(rgb(theme.muted_foreground))
+                .child("No matching command")
+        });
         div().absolute().top(px(90.0)).w_full().flex().justify_center().child(
             div()
                 .w(px(520.0))
@@ -847,10 +906,11 @@ impl GridView {
                 .gap_1()
                 .flex()
                 .flex_col()
-                .rounded_lg()
+                .rounded(px(6.0))
                 .border_1()
-                .border_color(rgb(0x3a3d46))
-                .bg(rgb(0x26282f))
+                .border_color(rgb(theme.border))
+                .bg(rgb(theme.background))
+                .shadow_lg()
                 .child(self.palette_input.clone())
                 .children(list)
                 .children(empty),
@@ -858,11 +918,12 @@ impl GridView {
     }
 
     fn row_at_position(&self, position: usize, cx: &mut Context<Self>) -> Stateful<Div> {
+        let theme = Theme::current(cx);
         if let Some(diff) = &self.compare {
             let Some(row) = diff.rows.get(position) else {
-                return row_div(false, false).id(position);
+                return row_div(false, false, theme).id(position);
             };
-            return row_div(position % 2 == 1, false)
+            return row_div(position % 2 == 1, false, theme)
                 .id(position)
                 .child(cell_div(70.0, row.change.to_string()))
                 .child(cell_div(CELL_WIDTHS[0], row.cells[0].display()))
@@ -875,7 +936,7 @@ impl GridView {
         let selected = self
             .selection
             .is_some_and(|selection| selection.contains(dataset_index));
-        row_div(position % 2 == 1, selected)
+        row_div(position % 2 == 1, selected, theme)
             .id(position)
             .on_mouse_down(
                 MouseButton::Left,
@@ -899,6 +960,7 @@ fn main() {
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
     Application::new().run(move |cx: &mut App| {
         text_input::bind_keys(cx);
+        cx.set_global(Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()));
         let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
         let opened = cx.open_window(
             WindowOptions {
