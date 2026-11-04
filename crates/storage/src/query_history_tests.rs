@@ -443,6 +443,20 @@ fn exported_sql_keeps_untrusted_text_inside_comments() {
 }
 
 #[test]
+fn an_exported_statement_ending_in_a_line_comment_is_still_terminated() {
+    let mut entry = sample_entry();
+    entry.query = "SELECT 1 -- trailing note".into();
+    let exported = sql_export_entry(&entry);
+    assert!(exported.ends_with("SELECT 1 -- trailing note\n;\n\n"), "{exported:?}");
+
+    entry.query = "SELECT 1; -- done".into();
+    assert!(sql_export_entry(&entry).ends_with("SELECT 1; -- done\n;\n\n"));
+
+    entry.query = "SELECT 1 /* note */".into();
+    assert!(sql_export_entry(&entry).ends_with("SELECT 1 /* note */;\n\n"));
+}
+
+#[test]
 fn outcome_summary_reports_cancelled_before_checking_success() {
     let mut entry = sample_entry();
     entry.cancelled = true;

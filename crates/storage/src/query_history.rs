@@ -637,8 +637,13 @@ fn sql_export_entry(entry: &Entry) -> String {
             out.push('\n');
         }
     }
-    out.push_str(entry.query.trim_end());
-    if !entry.query.trim_end().ends_with(';') {
+    let query = entry.query.trim_end();
+    out.push_str(query);
+    if !query.ends_with(';') {
+        let last_line = query.rsplit(['\n', '\r']).next().unwrap_or(query);
+        if last_line.contains("--") {
+            out.push('\n');
+        }
         out.push(';');
     }
     out.push_str("\n\n");
