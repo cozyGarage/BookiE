@@ -90,6 +90,9 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Float(value) if driver_id == "sqlite" && *value == 0.0 && value.is_sign_negative() => {
             return Err(LiteralError::Unsupported);
         }
+        Value::Float(value) if driver_id == "postgres" && *value == 0.0 && value.is_sign_negative() => {
+            "'-0'::float8".into()
+        }
         Value::Float(value) => format!("{value:e}"),
         Value::Decimal(value) if driver_id == "duckdb" => {
             let precision = value

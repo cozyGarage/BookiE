@@ -133,7 +133,11 @@ fn sqlite_refuses_negative_zero_without_refusing_positive_zero() {
         Err(LiteralError::Unsupported)
     );
     assert_eq!(render_sql_literal("sqlite", &Value::Float(0.0)).unwrap(), "0e0");
-    assert_eq!(render_sql_literal("postgres", &Value::Float(-0.0)).unwrap(), "-0e0");
+    assert_eq!(
+        render_sql_literal("postgres", &Value::Float(-0.0)).unwrap(),
+        "'-0'::float8"
+    );
+    assert_eq!(render_sql_literal("postgres", &Value::Float(0.0)).unwrap(), "0e0");
 }
 
 #[test]
