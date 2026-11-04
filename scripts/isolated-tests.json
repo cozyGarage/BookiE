@@ -1656,6 +1656,11 @@
       "bookie-app",
       "--lib",
       "ui::history_dialog::confirmation_tests::preferences_history_confirmation_preserves_cancelled_rows_and_clears_only_when_confirmed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::force_dismissing_connection_deletion_does_not_abort"
     ]
   ],
   "keyring": [

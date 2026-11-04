@@ -115,3 +115,20 @@ fn response_button(widget: &gtk4::Widget, label: &str) -> Option<gtk4::Button> {
     }
     None
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn force_dismissing_connection_deletion_does_not_abort() {
+    adw::init().unwrap();
+    gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
+    relm4::main_application()
+        .register(None::<&gtk4::gio::Cancellable>)
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let controller = launch(directory.path());
+    controller.widget().present();
+    controller.emit(AppMsg::DeleteConnection(Uuid::new_v4()));
+    spin_until(|| controller.widget().visible_dialog().is_some());
+    controller.widget().visible_dialog().unwrap().force_close();
+    spin_until(|| controller.widget().visible_dialog().is_none());
+}
