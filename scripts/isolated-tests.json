@@ -925,6 +925,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::completion_provider::tests::large_sql_scripts_keep_completion_available_without_blocking_the_main_context"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::completion_provider::tests::proposals_first_requested_after_catalog_retirement_do_not_edit_the_buffer"
     ],
     [

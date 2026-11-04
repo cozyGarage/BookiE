@@ -73,14 +73,23 @@ pub(crate) fn toggle_line_comment(buffer: &gtk::TextBuffer) {
 }
 
 pub(super) const MAX_ANALYSIS_BYTES: usize = 200_000;
+pub(super) const MAX_COMPLETION_BYTES: usize = 4 * 1024 * 1024;
 
 pub(super) fn analysis_text(buffer: &gtk::TextBuffer) -> Option<gtk::glib::GString> {
-    if buffer.char_count() as usize > MAX_ANALYSIS_BYTES {
+    text_with_limit(buffer, MAX_ANALYSIS_BYTES)
+}
+
+pub(super) fn completion_text(buffer: &gtk::TextBuffer) -> Option<gtk::glib::GString> {
+    text_with_limit(buffer, MAX_COMPLETION_BYTES)
+}
+
+fn text_with_limit(buffer: &gtk::TextBuffer, max_bytes: usize) -> Option<gtk::glib::GString> {
+    if buffer.char_count() as usize > max_bytes {
         return None;
     }
     let (start, end) = buffer.bounds();
     let text = buffer.text(&start, &end, true);
-    (text.len() <= MAX_ANALYSIS_BYTES).then_some(text)
+    (text.len() <= max_bytes).then_some(text)
 }
 
 pub(super) fn read_sql_text(path: &std::path::Path, max_bytes: u64) -> Result<String, String> {
