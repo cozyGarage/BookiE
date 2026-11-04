@@ -1,11 +1,3 @@
-//! Connection drafts from a DataGrip or JetBrains IDE `dataSources.xml`.
-//!
-//! The format was read from public project files. `dataSources.xml` lists each `<data-source name uuid>` with a
-//! `<jdbc-url>`; the sibling `dataSources.local.xml` carries `<user-name>` and `<ssh-properties>` for the same uuid.
-//! Only host, port, database and user name are used. Anything in the URL after the database (properties, which
-//! may hold a password), a user-info part, and every secret element are never read. Sources that need an SSH
-//! tunnel, list several hosts or use an engine BookiE lacks are skipped by name.
-
 use std::collections::HashMap;
 
 use quick_xml::XmlVersion;
@@ -61,14 +53,11 @@ pub fn parse_datagrip_data_sources(main: &str, local: Option<&str>) -> Result<Pe
     Ok(PeerImport { drafts, skipped })
 }
 
-/// Text of the elements we use, keyed by the enclosing `data-source`. Elements are matched by their path so a
-/// `<user>` inside `<ssh-properties>` is never mistaken for the database user.
 fn walk(xml: &str, mut visit: impl FnMut(&[String], Option<&str>, &[(String, String)])) -> Result<(), StorageError> {
     let bad = || refused("the file is not a DataGrip dataSources.xml");
     let mut reader = Reader::from_str(xml);
     let mut path: Vec<String> = Vec::new();
     let mut attributes: Vec<Vec<(String, String)>> = Vec::new();
-    // Text arrives in pieces around entity references (`&amp;`), so it is gathered until the next tag.
     let mut text = String::new();
     loop {
         let event = reader.read_event().map_err(|_| bad())?;
@@ -200,8 +189,6 @@ fn draft_from(source: &Source, local: Option<&Local>) -> Option<SavedConnection>
     Some(draft_connection(driver_id, name, host, port, database, username))
 }
 
-/// Engine, host, port text and database of `jdbc:<engine>://host[:port][/database][?or;properties]`. A URL with
-/// several hosts, a user-info part or no host is not a single direct connection and gives `None`.
 fn jdbc_target(url: &str) -> Option<(&'static str, &str, Option<&str>, &str)> {
     let lower = url.to_ascii_lowercase();
     let (driver_id, prefix) = [
