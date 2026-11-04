@@ -452,6 +452,15 @@ fn an_exported_statement_ending_in_a_line_comment_is_still_terminated() {
     entry.query = "SELECT 1; -- done".into();
     assert!(sql_export_entry(&entry).ends_with("SELECT 1; -- done\n;\n\n"));
 
+    entry.query = "SELECT 1 -- done;".into();
+    assert!(sql_export_entry(&entry).ends_with("SELECT 1 -- done;\n;\n\n"));
+
+    entry.query = "SELECT 1 # note".into();
+    assert!(sql_export_entry(&entry).ends_with("SELECT 1 # note\n;\n\n"));
+
+    entry.query = "SELECT 1 -- a\r\nSELECT 2 -- b".into();
+    assert!(sql_export_entry(&entry).ends_with("-- b\n;\n\n"));
+
     entry.query = "SELECT 1 /* note */".into();
     assert!(sql_export_entry(&entry).ends_with("SELECT 1 /* note */;\n\n"));
 }

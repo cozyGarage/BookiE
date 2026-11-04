@@ -639,11 +639,10 @@ fn sql_export_entry(entry: &Entry) -> String {
     }
     let query = entry.query.trim_end();
     out.push_str(query);
-    if !query.ends_with(';') {
-        let last_line = query.rsplit(['\n', '\r']).next().unwrap_or(query);
-        if last_line.contains("--") {
-            out.push('\n');
-        }
+    let last_line = query.rsplit(['\n', '\r']).next().unwrap_or(query);
+    if last_line.contains("--") || last_line.contains('#') {
+        out.push_str("\n;");
+    } else if !query.ends_with(';') {
         out.push(';');
     }
     out.push_str("\n\n");
