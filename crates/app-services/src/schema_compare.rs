@@ -1,6 +1,6 @@
 use bookie_core::ForeignKeyInfo;
 use bookie_core::sql_ddl::{
-    BuildDdlError, DraftColumn, build_create_table, build_drop_table, diff_to_ops, materialize_ops,
+    BuildDdlError, DraftColumn, TableState, build_create_table, build_drop_table, diff_to_ops, materialize_ops,
 };
 
 use crate::er_diagram::TableRead;
@@ -116,14 +116,18 @@ fn alter(side: &Side<'_>, existing: &TableRead, target: &TableRead) -> Result<Op
         .collect();
     let ops = diff_to_ops(
         side.current_schema,
-        &existing.name,
-        &existing.name,
-        &existing.columns,
-        &drafts,
-        &[],
-        &[],
-        &existing.foreign_keys,
-        &retarget(&target.foreign_keys, side),
+        TableState {
+            table: &existing.name,
+            columns: &existing.columns,
+            indexes: &[],
+            fks: &existing.foreign_keys,
+        },
+        TableState {
+            table: &existing.name,
+            columns: &drafts,
+            indexes: &[],
+            fks: &retarget(&target.foreign_keys, side),
+        },
     );
     if ops.is_empty() {
         return Ok(None);
