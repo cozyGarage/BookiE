@@ -4,7 +4,8 @@ use bookie_core::Value;
 use chrono::{NaiveDate, NaiveTime, TimeZone, Utc};
 use rust_decimal::Decimal;
 
-use super::exact_equal;
+use bookie_results::value_exact::exact_equal;
+
 use crate::change_tracker::KeyValue;
 
 fn samples() -> Vec<Value> {
