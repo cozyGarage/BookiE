@@ -9,6 +9,8 @@ use crate::error::Error;
 use crate::protocol::auth::AuthPlugin;
 use crate::protocol::Packet;
 
+pub const PLAINTEXT_RSA_REFUSAL: &str = "refusing to send the password without TLS: the server asked for an RSA password exchange and this connection is neither TLS nor a local socket. Set TLS to Require or Verify full, or connect through a local socket";
+
 impl AuthPlugin {
     pub(super) async fn scramble(
         self,
@@ -141,6 +143,10 @@ async fn encrypt_rsa<'s>(
     if stream.is_tls {
         // If in a TLS stream, send the password directly in clear text
         return Ok(to_asciz(password));
+    }
+
+    if !stream.is_local {
+        return Err(Error::Configuration(PLAINTEXT_RSA_REFUSAL.into()));
     }
 
     // client sends a public key request
