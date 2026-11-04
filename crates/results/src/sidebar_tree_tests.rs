@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use super::*;
-use bookie_core::CatalogObjectKind;
+use bookie_core::{CatalogObject, CatalogObjectKind};
 
 fn info(schema: Option<&str>, name: &str) -> TableInfo {
     TableInfo {
@@ -21,7 +23,9 @@ fn label(node: &TreeNode) -> String {
         NodeKind::Group(GroupKind::Tables) => "Tables".into(),
         NodeKind::Group(GroupKind::Views) => "Views".into(),
         NodeKind::Group(GroupKind::Catalog) => "Catalog".into(),
-        NodeKind::Catalog(kind) => kind.as_str().into(),
+        NodeKind::Catalog(kind) | NodeKind::CatalogLoaded(kind) => kind.as_str().into(),
+        NodeKind::CatalogObject { schema, name, .. } => format!("{}.{name}", schema.as_deref().unwrap_or("-")),
+        NodeKind::CatalogMore(_) => "more".into(),
         NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
     }
 }
@@ -449,4 +453,80 @@ fn an_engine_without_catalog_kinds_gets_no_catalog_group() {
     let mut nodes = build_nodes(&[info(None, "users")], &[]);
     append_catalog_entries(&mut nodes, &[]);
     assert_eq!(labels(&nodes, &all(&nodes)), ["Tables", "  users"]);
+}
+
+fn routine(schema: &str, name: &str) -> CatalogObject {
+    CatalogObject {
+        kind: CatalogObjectKind::Routine,
+        schema: Some(schema.into()),
+        name: name.into(),
+        detail: None,
+    }
+}
+
+fn loaded(objects: Vec<CatalogObject>) -> HashMap<CatalogObjectKind, Vec<CatalogObject>> {
+    HashMap::from([(CatalogObjectKind::Routine, objects)])
+}
+
+#[test]
+fn a_loaded_kind_lists_its_objects_under_its_entry_and_an_unloaded_one_stays_a_leaf() {
+    let mut nodes = build_nodes(&[], &[]);
+    let kinds = [CatalogObjectKind::Routine, CatalogObjectKind::Trigger];
+    append_catalog_entries_with(
+        &mut nodes,
+        &kinds,
+        &loaded(vec![routine("public", "calc_tax"), routine("hr", "pay")]),
+    );
+    assert_eq!(
+        labels(&nodes, &all(&nodes)),
+        ["Catalog", "  routine", "    public.calc_tax", "    hr.pay", "  trigger"]
+    );
+    assert_eq!(nodes[1].kind, NodeKind::CatalogLoaded(CatalogObjectKind::Routine));
+    assert_eq!(nodes[1].count, 2);
+    assert_eq!(nodes[4].kind, NodeKind::Catalog(CatalogObjectKind::Trigger));
+}
+
+#[test]
+fn collapsing_a_loaded_kind_hides_its_objects_and_a_hidden_schema_hides_its_own() {
+    let mut nodes = build_nodes(&[], &[]);
+    let objects = vec![routine("public", "calc_tax"), routine("hr", "pay")];
+    append_catalog_entries_with(&mut nodes, &[CatalogObjectKind::Routine], &loaded(objects));
+    let collapsed = CollapseState::from_keys(["catalog/routine".to_string()]);
+    assert_eq!(
+        labels(&nodes, &visible_nodes(&nodes, &collapsed, "")),
+        ["Catalog", "  routine"]
+    );
+    let hidden = HashSet::from(["hr".to_string()]);
+    assert_eq!(
+        labels(
+            &nodes,
+            &visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), "", &hidden)
+        ),
+        ["Catalog", "  routine", "    public.calc_tax"]
+    );
+}
+
+#[test]
+fn more_objects_than_the_inline_limit_end_with_a_more_row() {
+    let mut nodes = build_nodes(&[], &[]);
+    let objects: Vec<_> = (0..=INLINE_CATALOG_LIMIT)
+        .map(|index| routine("public", &format!("f{index}")))
+        .collect();
+    append_catalog_entries_with(&mut nodes, &[CatalogObjectKind::Routine], &loaded(objects));
+    let shown = labels(&nodes, &all(&nodes));
+    assert_eq!(shown.len(), 2 + INLINE_CATALOG_LIMIT + 1);
+    assert_eq!(shown.last().map(String::as_str), Some("    more"));
+    assert_eq!(
+        nodes[1].count,
+        INLINE_CATALOG_LIMIT + 1,
+        "the entry counts every object, not only those shown"
+    );
+}
+
+#[test]
+fn an_empty_listing_leaves_the_entry_a_leaf() {
+    let mut nodes = build_nodes(&[], &[]);
+    append_catalog_entries_with(&mut nodes, &[CatalogObjectKind::Routine], &loaded(Vec::new()));
+    assert_eq!(nodes[1].kind, NodeKind::Catalog(CatalogObjectKind::Routine));
+    assert_eq!(nodes.len(), 2);
 }

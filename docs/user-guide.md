@@ -21,7 +21,7 @@ BookiE is a database client for Linux. It opens PostgreSQL, MySQL and MariaDB, S
 - **CLI launch**: Open databases directly from a terminal: `bookie books.db` or `bookie postgres://user@host:5432/db`.
 - **Attached SQLite databases**: The SQLite driver can use configured attachments, but the connection form does not currently provide controls to add or edit them. Existing attachment lists are preserved when editing the same connection.
 - **Bundles**: Export or import connections with optional passphrase encryption to share configurations across machines.
-- **Peer import**: Import connection drafts from DBeaver, DataGrip or Another Redis Desktop Manager. BookiE fills host, user and engine only; passwords stay out of the file. Save each draft to put credentials in Secret Service. Navicat is not supported yet.
+- **Peer import**: Import connection drafts from DBeaver, DataGrip, Navicat, RESP.app or Another Redis Desktop Manager. BookiE fills host, user and engine only; passwords stay out of the file. Save each draft to put credentials in Secret Service. Connections that use an SSH tunnel are skipped by name.
 
 ## Browse a table
 

@@ -2047,6 +2047,20 @@ GLib.MainLoop().run()
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("name", present=False)
 
+    def postgres_sidebar_catalog_lists_routines_inline(_database, _base):
+        routine = "bookie_inline_probe"
+        psql(f"CREATE OR REPLACE FUNCTION public.{routine}() RETURNS integer LANGUAGE sql AS 'SELECT 1'")
+        try:
+            ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+            ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+            ui.wait_for_node(name="people")
+            ui.wait_for_node(name=f"public.{routine}", role=pyatspi.ROLE_LIST_ITEM, present=False)
+            ui.wait_for_node(name="Functions and procedures", role=pyatspi.ROLE_LIST_ITEM)
+            ui.activate_sidebar_group("Functions and procedures")
+            ui.wait_for_node(name=f"public.{routine}", role=pyatspi.ROLE_LIST_ITEM)
+        finally:
+            psql(f"DROP FUNCTION IF EXISTS public.{routine}()")
+
     def postgres_large_stream_pages_round_trip_from_spool(database, base):
         page_size = 5000
         stream_rows = int(os.environ.get("BOOKIE_GTK_STREAM_ROWS", "150000"))
@@ -2081,7 +2095,7 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing(f"Rows 1-{page_size:,}", timeout=120)
         wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
-        wait_for_streamed_page_during_load(first_run_marker, page_size * 2)
+        wait_for_streamed_page_after_rows_arrive(first_run_marker, page_size * 2)
         ui.wait_for_node_containing(f"Complete · Received {stream_rows:,} rows", timeout=180)
         scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
@@ -2153,7 +2167,7 @@ GLib.MainLoop().run()
             time.sleep(ui.POLL_SECONDS)
         raise AssertionError(f"{name!r} was not visible")
 
-    def wait_for_streamed_page_during_load(marker, minimum_rows):
+    def wait_for_streamed_page_after_rows_arrive(marker, minimum_rows):
         deadline = time.monotonic() + 120
         progress = ""
         while time.monotonic() < deadline:
@@ -2163,17 +2177,21 @@ GLib.MainLoop().run()
                 progress = next((
                     ui.node_name(node) for node in nodes
                     if ui.node_role(node) == pyatspi.ROLE_LABEL
-                    and ui.node_name(node).startswith("Receiving… · Received ")
+                    and ui.node_name(node).startswith(("Receiving… · Received ", "Complete · Received "))
                 ), "")
                 match = re.search(r"Received ([0-9,]+) rows", progress)
-                visible_values = {
-                    ui.node_name(node) for node in nodes
-                    if ui.node_role(node) == pyatspi.ROLE_LABEL
-                    and node.getState().contains(pyatspi.STATE_SHOWING)
-                }
                 if match and int(match.group(1).replace(",", "")) >= minimum_rows:
-                    assert "1" in visible_values, "the first result page disappeared while later rows arrived"
-                    assert marker in visible_values, "the first page marker disappeared while later rows arrived"
+                    if progress.startswith("Receiving…"):
+                        visible_values = {
+                            ui.node_name(node) for node in nodes
+                            if ui.node_role(node) == pyatspi.ROLE_LABEL
+                            and node.getState().contains(pyatspi.STATE_SHOWING)
+                        }
+                        assert "1" in visible_values, "the first result page disappeared while later rows arrived"
+                        assert marker in visible_values, "the first page marker disappeared while later rows arrived"
+                    else:
+                        wait_for_visible_cell_value("1")
+                        wait_for_visible_marker(marker)
                     return
             time.sleep(ui.POLL_SECONDS)
         raise AssertionError(f"the first result page was not visible after later rows arrived: {progress!r}")
@@ -3130,6 +3148,7 @@ GLib.MainLoop().run()
         result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_session_commit_distinguishes_aborted_rollback_from_recovered_commit)
         result.append(postgres_saved_connection_browses_rows_and_values)
+        result.append(postgres_sidebar_catalog_lists_routines_inline)
         result.append(postgres_hidden_projection_refresh_and_edit_preserve_hidden_value)
         result.append(postgres_reopened_browse_tab_keeps_its_schema_after_switching)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)

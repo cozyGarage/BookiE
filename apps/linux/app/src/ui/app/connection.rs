@@ -124,6 +124,7 @@ impl App {
             "workspace ready"
         );
         self.sidebar_views = views;
+        self.reset_sidebar_catalog();
         self.restore_sidebar_state();
         self.repopulate_sidebar(&tables);
         self.rebuild_schema_filter_popover(&sender);
@@ -238,6 +239,7 @@ impl App {
         self.sidebar_nodes.borrow_mut().clear();
         self.sidebar_visible.borrow_mut().clear();
         self.sidebar_views.clear();
+        self.reset_sidebar_catalog();
         self.sidebar_factory.guard().clear();
         self.show_welcome_page(sender);
         tracing::info!("disconnected");
@@ -347,8 +349,7 @@ impl App {
         let sender_for_response = sender;
         let workspace = self.workspace.clone();
         let column_widths = self.persistence.column_widths.clone();
-        dialog.connect_response(None, move |dialog, response| {
-            dialog.close();
+        dialog.connect_response(None, move |_, response| {
             if response != "delete" {
                 return;
             }
