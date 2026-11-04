@@ -1,6 +1,6 @@
 # 0036: Experimental frontends may read a disposable SQLite fixture
 
-- **Status**: Proposed (2026-11-04)
+- **Status**: Accepted (2026-11-04)
 - **Date**: 2026-11-04
 
 ## Context
