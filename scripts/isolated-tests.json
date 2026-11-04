@@ -1370,6 +1370,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::init_window::busy_quit::tests::with_two_windows_only_the_one_that_owns_running_work_asks_before_closing"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::editing::lifetime_tests::closed_edit_popovers_release_their_widgets"
     ],
     [

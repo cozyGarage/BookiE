@@ -6,23 +6,30 @@ use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Default)]
 pub struct BusyJobs {
-    jobs: Arc<Mutex<HashMap<u64, CancellationToken>>>,
+    jobs: Arc<Mutex<HashMap<u64, (u64, CancellationToken)>>>,
     next: AtomicU64,
 }
 
 #[derive(Debug)]
 pub struct BusyJob {
     id: u64,
-    jobs: Arc<Mutex<HashMap<u64, CancellationToken>>>,
+    jobs: Arc<Mutex<HashMap<u64, (u64, CancellationToken)>>>,
 }
 
 impl BusyJobs {
+    /// A job that belongs to no particular window: it counts when the last window closes.
     pub fn begin(&self, cancel: CancellationToken) -> BusyJob {
+        self.begin_owned(0, cancel)
+    }
+
+    /// A job owned by one window (any non-zero id the caller keeps for that window), so closing that window
+    /// asks first even while other windows stay open.
+    pub fn begin_owned(&self, owner: u64, cancel: CancellationToken) -> BusyJob {
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         self.jobs
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(id, cancel);
+            .insert(id, (owner, cancel));
         BusyJob {
             id,
             jobs: Arc::clone(&self.jobs),
@@ -33,8 +40,29 @@ impl BusyJobs {
         self.jobs.lock().unwrap_or_else(PoisonError::into_inner).len()
     }
 
+    pub fn active_owned_by(&self, owner: u64) -> usize {
+        self.jobs
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .values()
+            .filter(|(job_owner, _)| *job_owner == owner)
+            .count()
+    }
+
     pub fn cancel_all(&self) {
-        for token in self.jobs.lock().unwrap_or_else(PoisonError::into_inner).values() {
+        for (_, token) in self.jobs.lock().unwrap_or_else(PoisonError::into_inner).values() {
+            token.cancel();
+        }
+    }
+
+    pub fn cancel_owned_by(&self, owner: u64) {
+        for (_, token) in self
+            .jobs
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .values()
+            .filter(|(job_owner, _)| *job_owner == owner)
+        {
             token.cancel();
         }
     }
@@ -88,6 +116,33 @@ mod tests {
         drop(jobs.begin(token.clone()));
         jobs.cancel_all();
         assert!(!token.is_cancelled());
+    }
+
+    #[test]
+    fn a_window_sees_and_cancels_only_its_own_jobs() {
+        let jobs = BusyJobs::default();
+        let (mine, theirs, loose) = (
+            CancellationToken::new(),
+            CancellationToken::new(),
+            CancellationToken::new(),
+        );
+        let _guards = [
+            jobs.begin_owned(1, mine.clone()),
+            jobs.begin_owned(2, theirs.clone()),
+            jobs.begin(loose.clone()),
+        ];
+        assert_eq!(
+            (
+                jobs.active_owned_by(1),
+                jobs.active_owned_by(2),
+                jobs.active_owned_by(3)
+            ),
+            (1, 1, 0)
+        );
+        jobs.cancel_owned_by(1);
+        assert!(mine.is_cancelled());
+        assert!(!theirs.is_cancelled() && !loose.is_cancelled());
+        assert_eq!(jobs.active(), 3);
     }
 
     #[test]
