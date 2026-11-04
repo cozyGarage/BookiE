@@ -49,6 +49,7 @@ for required in \
   usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg \
   usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml \
   usr/share/doc/bookie/LICENSE.md \
+  usr/share/doc/bookie/THIRD_PARTY_NOTICES.md \
   usr/share/doc/bookie/policy.example.toml; do
   if [[ ! -e "$stage/$required" ]]; then
     echo "package is missing /$required" >&2

@@ -34,7 +34,7 @@ if [[ "${BOOKIE_GTK_CLICKHOUSE_DBUS_ACTIVE:-0}" != "1" ]]; then
   exit $?
 fi
 
-for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool rg; do
+for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "missing required command: $command_name" >&2
     exit 1
@@ -53,8 +53,11 @@ trap cleanup EXIT
 port="$(docker port "$container" 8123/tcp | sed -n 1p)"
 port="${port##*:}"
 attempt=0
-until docker exec "$container" clickhouse-client --user=default --password=bookie \
-  --query='SELECT 1' 2>/dev/null | rg -q '^1$'; do
+while true; do
+  if response="$(docker exec "$container" clickhouse-client --user=default --password=bookie \
+    --query='SELECT 1' 2>/dev/null)" && [[ "$response" == "1" ]]; then
+    break
+  fi
   attempt=$((attempt + 1))
   if (( attempt >= 180 )); then
     docker logs "$container" >&2
