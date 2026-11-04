@@ -169,3 +169,42 @@ fn a_custom_entity_is_refused_and_never_expanded() {
         <data-source name="a" uuid="u"><jdbc-url>jdbc:mysql://h/&x;</jdbc-url></data-source></component></project>"#;
     assert!(parse_datagrip_data_sources(xml, None).is_err());
 }
+
+fn grouped_xml(groups: &[(&str, &str)]) -> String {
+    let sources: String = groups
+        .iter()
+        .map(|(name, group)| {
+            format!(
+                r#"    <data-source source="LOCAL" name="{name}" group="{group}" uuid="u-{name}">
+      <jdbc-url>jdbc:postgresql://10.0.0.5:5432/{name}</jdbc-url>
+    </data-source>
+"#
+            )
+        })
+        .collect();
+    format!(r#"<project version="4"><component name="DataSourceManagerImpl">{sources}</component></project>"#)
+}
+
+fn group_of(import: &PeerImport, name: &str) -> Option<String> {
+    let draft = import.drafts.iter().find(|draft| draft.name == name)?;
+    import.groups.get(&draft.id).cloned()
+}
+
+#[test]
+fn the_group_attribute_becomes_a_group_and_a_slash_flattens_nested_folders() {
+    let xml = grouped_xml(&[("flat", "tests"), ("nested", "prod/eu/"), ("spaced", " a /  b ")]);
+    let import = parse_datagrip_data_sources(&xml, None).unwrap();
+    assert_eq!(group_of(&import, "flat").as_deref(), Some("tests"));
+    assert_eq!(group_of(&import, "nested").as_deref(), Some("prod / eu"));
+    assert_eq!(group_of(&import, "spaced").as_deref(), Some("a / b"));
+    assert_eq!(import.into_body().organization.len(), 3);
+}
+
+#[test]
+fn ungrouped_empty_over_long_or_control_group_names_import_without_a_group() {
+    let long = "x".repeat(300);
+    let xml = grouped_xml(&[("none", ""), ("slashes", "//"), ("long", &long), ("control", "a&#9;b")]);
+    let import = parse_datagrip_data_sources(&xml, None).unwrap();
+    assert_eq!(import.drafts.len(), 4);
+    assert!(import.groups.is_empty(), "{:?}", import.groups);
+}
