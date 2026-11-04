@@ -1,3 +1,8 @@
+use std::collections::HashSet;
+
+use bookie_core::TableInfo;
+use bookie_results::sidebar_tree::{CollapseState, NodeKind, build_nodes, visible_nodes_with_hidden_schemas};
+
 pub const CONNECTION: &str = "PostgreSQL · sample";
 pub const DATABASE: &str = "sample";
 pub const DATA_TABLE: &str = "synthetic_rows";
@@ -11,12 +16,16 @@ pub enum TreeRow {
 }
 
 pub fn tree_rows(search: &str, connection_open: bool, database_open: bool) -> Vec<(usize, TreeRow)> {
-    let needle = search.trim().to_lowercase();
-    let searching = !needle.is_empty();
-    let tables: Vec<&'static str> = TABLES
-        .iter()
-        .copied()
-        .filter(|name| !searching || name.contains(&needle))
+    let searching = !search.trim().is_empty();
+    let infos: Vec<TableInfo> = TABLES.iter().map(|name| TableInfo { schema: None, name: (*name).to_string() }).collect();
+    let nodes = build_nodes(&infos, &[]);
+    let shown = visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), search, &HashSet::new());
+    let tables: Vec<&'static str> = shown
+        .into_iter()
+        .filter_map(|index| match &nodes[index].kind {
+            NodeKind::Table { name, .. } => TABLES.iter().copied().find(|table| table == name),
+            _ => None,
+        })
         .collect();
     if searching && tables.is_empty() {
         return Vec::new();
