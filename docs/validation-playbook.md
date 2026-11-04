@@ -110,7 +110,6 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | --- | --- | --- |
 | Mutation | The configured mutation workflow | Review selected, caught, missed, timed-out and unviable mutants for the exact source revision |
 | Coverage | The configured coverage workflow | Review the report and configured coverage floor for the exact source revision |
-| Flatpak | Flatpak packaging scripts | Package build only; not regression acceptance |
 | Arch / Debian candidate | [Packaging guide](../apps/linux/packaging/README.md) and packaging scripts | Immutable SHA, package checksum, validator output |
 | GTK soak | `bash scripts/test-gtk-safety.sh` | Record the tested revision and outcomes in a private verification record. |
 | Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) | VM/desktop version, Wayland session, package checksum, steps, result and screenshots in a private verification record |

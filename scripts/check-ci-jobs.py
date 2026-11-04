@@ -47,7 +47,7 @@ def main():
     results = json.loads(os.environ["CI_JOB_RESULTS"])
     failures, rows = assess(results, os.environ["GITHUB_EVENT_NAME"])
     report = "## Linux regression jobs\n\n| Job | Result | Gate |\n| --- | --- | --- |\n" + "\n".join(rows) + "\n"
-    report += "\nFlatpak packaging, mutation/coverage and installed Wayland acceptance are separate checks.\n"
+    report += "\nMutation/coverage and installed Wayland acceptance are separate checks.\n"
     print(report)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(summary).open("a") as output:
