@@ -120,6 +120,7 @@ pub enum SshError {
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const AUTH_TIMEOUT: Duration = Duration::from_secs(20);
+const CHANNEL_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(15);
 
 fn client_config() -> Config {
@@ -809,12 +810,23 @@ async fn forward_one<S>(
 where
     S: AsyncRead + AsyncWrite + Unpin + Send,
 {
-    let channel = session
-        .channel_open_direct_tcpip(remote_host, u32::from(remote_port), originator_host, originator_port)
-        .await?;
+    let channel = open_within(
+        CHANNEL_OPEN_TIMEOUT,
+        session.channel_open_direct_tcpip(remote_host, u32::from(remote_port), originator_host, originator_port),
+    )
+    .await?;
 
     relay(socket, channel, cancel).await;
     Ok(())
+}
+
+async fn open_within<T>(
+    limit: Duration,
+    open: impl std::future::Future<Output = Result<T, russh::Error>>,
+) -> Result<T, russh::Error> {
+    tokio::time::timeout(limit, open)
+        .await
+        .unwrap_or(Err(russh::Error::ConnectionTimeout))
 }
 
 trait RelayChannel {
