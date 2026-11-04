@@ -53,6 +53,20 @@ fn drafts_carry_host_port_user_and_engine_and_skip_unsupported_engines_by_name()
 }
 
 #[test]
+fn a_remote_draft_is_production_like_a_url_import_and_a_loopback_draft_stays_local() {
+    let import = parse_dbeaver_data_sources(&sources()).unwrap();
+    assert!(
+        import
+            .drafts
+            .iter()
+            .all(|draft| draft.environment == bookie_core::Environment::Prod)
+    );
+    let local = sources().replace("DB.Example.com", "localhost");
+    let import = parse_dbeaver_data_sources(&local).unwrap();
+    assert_eq!(import.drafts[0].environment, bookie_core::Environment::Local);
+}
+
+#[test]
 fn no_password_in_the_source_reaches_the_drafts() {
     let import = parse_dbeaver_data_sources(&sources()).unwrap();
     assert!(!format!("{import:?}").contains(SENTINEL));
