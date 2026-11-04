@@ -80,6 +80,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
             SidebarRowOutput::NewTable { schema } => AppMsg::NewTableTab { schema },
             SidebarRowOutput::TableFromCsv { schema } => AppMsg::CreateTableFromCsv { schema },
             SidebarRowOutput::ShowDiagram { schema } => AppMsg::ShowErDiagram { schema },
+            SidebarRowOutput::CompareSchema { schema } => AppMsg::CompareSchema { schema },
             SidebarRowOutput::HideSchema(schema) => AppMsg::HideSidebarSchema(schema),
         });
 
