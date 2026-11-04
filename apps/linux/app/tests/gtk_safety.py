@@ -1070,6 +1070,7 @@ def run_scenario(binary, scenario):
             environment=getattr(scenario, "environment", "prod"),
             mcp_token=getattr(scenario, "mcp_token", False),
         )
+        environment.update(getattr(scenario, "environment_overrides", {}))
         process = start_application(binary, environment)
         if getattr(scenario, "requires_editor", True):
             open_editor()
