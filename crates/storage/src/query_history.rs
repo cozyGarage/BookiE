@@ -621,125 +621,41 @@ fn comment_text(text: &str) -> String {
 }
 
 struct StatementTail {
-    open_quote: Option<char>,
-    open_dollar: bool,
     in_line_comment: bool,
     in_block_comment: bool,
     last_code: Option<char>,
 }
 
-enum ScanState {
-    Code,
-    Dollar(String),
-    Quoted(char),
-    LineComment,
-    BlockComment,
-}
-
-fn dash_comment_starts(chars: &mut SqlChars<'_>, mysql: bool) -> bool {
-    let mut lookahead = chars.clone();
-    lookahead.next();
-    let starts = !mysql
-        || lookahead
-            .peek()
-            .is_none_or(|next| next.is_whitespace() || next.is_control());
-    if starts {
-        chars.next();
-    }
-    starts
-}
-
-type SqlChars<'a> = std::iter::Peekable<std::str::Chars<'a>>;
-
-fn dollar_tag_start(chars: &mut SqlChars<'_>) -> Option<String> {
-    let mut lookahead = chars.clone();
-    let mut tag = String::new();
-    loop {
-        match lookahead.next()? {
-            '$' => break,
-            c if c.is_alphanumeric() || c == '_' => tag.push(c),
-            _ => return None,
-        }
-    }
-    if tag.starts_with(|c: char| c.is_ascii_digit()) {
-        return None;
-    }
-    for _ in 0..=tag.chars().count() {
-        chars.next();
-    }
-    Some(tag)
-}
-
-fn dollar_quote_ends(chars: &mut SqlChars<'_>, tag: &str) -> bool {
-    let mut lookahead = chars.clone();
-    let closes = tag.chars().all(|expected| lookahead.next() == Some(expected)) && lookahead.next() == Some('$');
-    if closes {
-        for _ in 0..=tag.chars().count() {
-            chars.next();
-        }
-    }
-    closes
-}
-
-fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
-    let hash_comments = mysql;
-    let mut state = ScanState::Code;
-    let mut last_code = None;
-    let mut chars = query.chars().peekable();
-    while let Some(c) = chars.next() {
-        state = match state {
-            ScanState::Dollar(tag) if c == '$' && dollar_quote_ends(&mut chars, &tag) => {
-                last_code = Some('$');
-                ScanState::Code
+fn scan_statement_tail(query: &str, driver_id: &str) -> StatementTail {
+    let lexer_driver = if driver_id == "mariadb" { "mysql" } else { driver_id };
+    let mut tail = StatementTail {
+        in_line_comment: false,
+        in_block_comment: false,
+        last_code: None,
+    };
+    let mut index = 0;
+    while index < query.len() {
+        let span = bookie_core::sql_lex::skip_span_at(query, index, lexer_driver).filter(|length| *length > 0);
+        let Some(length) = span else {
+            let c = query[index..].chars().next().unwrap_or(' ');
+            if !c.is_whitespace() {
+                tail.last_code = Some(c);
             }
-            ScanState::Dollar(tag) => ScanState::Dollar(tag),
-            ScanState::Code if c == '$' && !mysql => match dollar_tag_start(&mut chars) {
-                Some(tag) => {
-                    last_code = Some('$');
-                    ScanState::Dollar(tag)
-                }
-                None => {
-                    last_code = Some(c);
-                    ScanState::Code
-                }
-            },
-            ScanState::Quoted(_) if mysql && c == '\\' => {
-                chars.next();
-                state
-            }
-            ScanState::Quoted(quote) if c == quote => ScanState::Code,
-            ScanState::Quoted(quote) => ScanState::Quoted(quote),
-            ScanState::LineComment if c == '\n' || c == '\r' => ScanState::Code,
-            ScanState::LineComment => ScanState::LineComment,
-            ScanState::BlockComment if c == '*' && chars.next_if_eq(&'/').is_some() => ScanState::Code,
-            ScanState::BlockComment => ScanState::BlockComment,
-            ScanState::Code if c == '-' && chars.peek() == Some(&'-') && dash_comment_starts(&mut chars, mysql) => {
-                ScanState::LineComment
-            }
-            ScanState::Code if c == '#' && hash_comments => ScanState::LineComment,
-            ScanState::Code if c == '/' && chars.next_if_eq(&'*').is_some() => ScanState::BlockComment,
-            ScanState::Code if matches!(c, '\'' | '"' | '`') => {
-                last_code = Some(c);
-                ScanState::Quoted(c)
-            }
-            ScanState::Code => {
-                if !c.is_whitespace() {
-                    last_code = Some(c);
-                }
-                ScanState::Code
-            }
+            index += c.len_utf8();
+            continue;
         };
+        let text = &query[index..index + length];
+        let reaches_end = index + length >= query.len();
+        if text.starts_with("/*") {
+            tail.in_block_comment = reaches_end && (length < 4 || !text.ends_with("*/"));
+        } else if text.starts_with("--") || (text.starts_with('#') && lexer_driver == "mysql") {
+            tail.in_line_comment = reaches_end;
+        } else {
+            tail.last_code = text.chars().next_back();
+        }
+        index += length;
     }
-    StatementTail {
-        open_quote: match state {
-            ScanState::Quoted(quote) => Some(quote),
-            _ => None,
-        },
-        open_dollar: matches!(state, ScanState::Dollar(_)),
-        in_line_comment: matches!(state, ScanState::LineComment),
-        in_block_comment: matches!(state, ScanState::BlockComment),
-        last_code,
-    }
+    tail
 }
 
 fn sql_export_entry(entry: &Entry) -> String {
@@ -761,12 +677,8 @@ fn sql_export_entry(entry: &Entry) -> String {
     }
     let query = entry.query.trim_end();
     out.push_str(query);
-    let tail = scan_statement_tail(query, matches!(entry.driver_id.as_str(), "mysql" | "mariadb"));
-    if tail.open_quote.is_some() || tail.open_dollar {
-        if !query.ends_with(';') {
-            out.push(';');
-        }
-    } else if tail.in_block_comment {
+    let tail = scan_statement_tail(query, entry.driver_id.as_str());
+    if tail.in_block_comment {
         out.push_str(if tail.last_code == Some(';') { "\n*/" } else { "\n*/\n;" });
     } else if tail.last_code != Some(';') {
         out.push_str(if tail.in_line_comment { "\n;" } else { ";" });

@@ -515,6 +515,27 @@ fn a_dollar_quoted_body_is_scanned_and_a_trailing_comment_is_still_terminated() 
 }
 
 #[test]
+fn the_shared_lexer_rules_decide_nested_comments_escapes_brackets_and_identifiers() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* a /* b */ c */ -- x"),
+        "SELECT 1 /* a /* b */ c */ -- x\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT E'it\\'s -- x'"),
+        "SELECT E'it\\'s -- x';\n\n"
+    );
+    assert_eq!(exported_tail("mssql", "SELECT [a--b]"), "SELECT [a--b];\n\n");
+    assert_eq!(
+        exported_tail("clickhouse", "SELECT 'a\\' -- x'"),
+        "SELECT 'a\\' -- x';\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT my$col$ FROM t -- x"),
+        "SELECT my$col$ FROM t -- x\n;\n\n"
+    );
+}
+
+#[test]
 fn a_numbered_placeholder_is_not_a_dollar_quote() {
     assert_eq!(
         exported_tail("postgres", "SELECT * FROM t WHERE id = $1 -- by id"),
