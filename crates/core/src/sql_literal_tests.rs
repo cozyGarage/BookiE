@@ -127,13 +127,17 @@ fn dialect_specific_decimal_and_temporal_literals_stay_with_their_engines() {
 }
 
 #[test]
-fn sqlite_refuses_negative_zero_without_refusing_positive_zero() {
+fn negative_zero_is_refused_for_sqlite_and_kept_as_a_float8_for_postgres() {
     assert_eq!(
         render_sql_literal("sqlite", &Value::Float(-0.0)),
         Err(LiteralError::Unsupported)
     );
     assert_eq!(render_sql_literal("sqlite", &Value::Float(0.0)).unwrap(), "0e0");
-    assert_eq!(render_sql_literal("postgres", &Value::Float(-0.0)).unwrap(), "-0e0");
+    assert_eq!(
+        render_sql_literal("postgres", &Value::Float(-0.0)).unwrap(),
+        "'-0'::float8"
+    );
+    assert_eq!(render_sql_literal("postgres", &Value::Float(0.0)).unwrap(), "0e0");
 }
 
 #[test]
