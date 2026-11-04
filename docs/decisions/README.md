@@ -80,7 +80,7 @@ Other options and why they were rejected.
 | [0030](0030-audit-local-result-comparison.md) | Audit local result comparison | Accepted | A confirmed result comparison writes a paired aggregate audit record without values. |
 | [0031](0031-stop-publishing-the-debian-package.md) | Stop publishing the Debian package | Accepted | Releases stop building the Debian package because the toolkit floor excludes stable Debian and Ubuntu; the staging builder stays for the AppImage. |
 | [0032](0032-stop-publishing-the-flatpak.md) | Stop publishing the Flatpak | Accepted | Releases ship only the Arch package and the AppImage; the Flatpak manifests, scripts and workflow are removed. |
-| [0034](0034-postgres-metadata-visibility-for-restricted-roles.md) | Metadata visibility for restricted PostgreSQL roles | Proposed | `pg_tables` lists objects a role cannot reach; options are show only reachable, show and mark, or keep, with a recommended single privilege-aware rule. |
+| [0034](0034-postgres-metadata-visibility-for-restricted-roles.md) | Metadata visibility for restricted PostgreSQL roles | Accepted | Show only objects the role can reach, by one privilege-aware rule in SQL across the sidebar, completion, ER diagram, compare, MCP and statistics tools. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

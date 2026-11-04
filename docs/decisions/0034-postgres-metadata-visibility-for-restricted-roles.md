@@ -1,6 +1,6 @@
 # 0034: Metadata visibility for restricted PostgreSQL roles
 
-- **Status**: Proposed (2026-11-04)
+- **Status**: Accepted (2026-11-04)
 - **Date**: 2026-11-04
 
 ## Context
@@ -11,7 +11,7 @@ Large multi-tenant catalogs add a cost problem: every schema's tables are listed
 
 ## Decision
 
-Not yet decided. This record asks the maintainer to choose the rule, then B3 to hand off the SQL change.
+Option A below: show only reachable objects, with one rule everywhere the catalog is read. The maintainer chose it on 2026-11-04. Options B and C were rejected: B puts the logic in every consumer and still shows names the role cannot use; C keeps the invented-fact risk.
 
 ## Options
 
@@ -19,7 +19,7 @@ Not yet decided. This record asks the maintainer to choose the rule, then B3 to 
 - **B. Show everything and mark the unreachable.** List as today, mark objects the role cannot reach (dimmed, not openable) and never read or invent metadata for them. Cost: more code in every consumer, and the hidden names still appear.
 - **C. Keep today's behaviour.** Cost: the invented-fact risk in the context stays.
 
-## Recommendation
+## Rule
 
 A, with the privilege test in SQL so the cost is one catalog query, not a request per table. Add the per-connection hidden-schema set to the catalog queries so hidden schemas are never listed or read. Preserve exact identifiers, session context and stale-result refusal.
 
@@ -27,4 +27,4 @@ A, with the privilege test in SQL so the cost is one catalog query, not a reques
 
 - The PostgreSQL driver and catalog SQL are B3-owned: the change needs the handoff and the lane, project and index update that `AGENTS.md` requires.
 - Acceptance evidence is a real PostgreSQL fixture with a restricted role (`bookie_visible` reachable, `bookie_hidden` not) checked through every consumer, plus a release-tier many-schema run recording catalog latency, main-loop stalls and memory at a named commit. Synthetic measurements stay separate.
-- Until a rule is accepted, no catalog SQL changes.
+- The next step is the B3 handoff, then the SQL change and the restricted-role fixture test. No catalog SQL changes before that handoff.
