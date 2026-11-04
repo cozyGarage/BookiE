@@ -1,6 +1,7 @@
 use std::ops::Range;
 use std::time::{Duration, Instant};
 
+mod chrome;
 mod grid_edit;
 mod text_input;
 mod theme;
@@ -9,6 +10,7 @@ use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
 use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
+use bookie_gpui_grid_prototype::shell::{DATA_TABLE, Tab, Tabs};
 use gpui::{
     App, Application, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
     MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
@@ -19,6 +21,7 @@ use theme::Theme;
 
 const ROW_HEIGHT: f32 = 26.0;
 const HEADER_HEIGHT: f32 = 28.0;
+pub const GUTTER_WIDTH: f32 = 56.0;
 pub const CELL_WIDTHS: [f32; 4] = [240.0, 280.0, 120.0, 320.0];
 
 enum Mode {
@@ -43,6 +46,11 @@ struct GridView {
     palette_open: bool,
     palette_index: usize,
     dark_mode: bool,
+    tabs: Tabs,
+    sidebar_open: bool,
+    connection_open: bool,
+    database_open: bool,
+    sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
     compare: Option<Diff>,
@@ -111,6 +119,9 @@ impl GridView {
             this.on_editor_event(event, window, cx);
         })
         .detach();
+        let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
+        cx.subscribe(&sidebar_search, |_, _, _: &InputEvent, cx| cx.notify())
+            .detach();
         let palette_input = cx.new(|cx| TextInput::new("Type a command", cx));
         cx.subscribe_in(
             &palette_input,
@@ -142,6 +153,11 @@ impl GridView {
             palette_open: false,
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
+            tabs: Tabs::default(),
+            sidebar_open: true,
+            connection_open: true,
+            database_open: true,
+            sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
             compare: None,
@@ -383,6 +399,7 @@ impl GridView {
                     window.focus(&self.filter.read(cx).focus_handle(cx));
                 }
                 "c" if self.focus.is_focused(window) => self.copy_selection(modifiers.shift, cx),
+                "b" => self.sidebar_open = !self.sidebar_open,
                 _ => {}
             }
             if !matches!(key, "home" | "end") {
@@ -390,7 +407,7 @@ impl GridView {
                 return;
             }
         }
-        if self.focus.is_focused(window) && self.editing.is_none() && self.compare.is_none() {
+        if self.focus.is_focused(window) && self.editing.is_none() && self.compare.is_none() && self.tabs.shows_grid() {
             self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
         }
     }
@@ -498,6 +515,17 @@ impl GridView {
             action("clear-selection", "Clear row selection", self.selection.is_some()),
             action("edit", "Edit the active cell", self.cell_cursor.is_some()),
             action(
+                "sidebar",
+                if self.sidebar_open {
+                    "Hide the sidebar"
+                } else {
+                    "Show the sidebar"
+                },
+                true,
+            ),
+            action("home", "Open Home", true),
+            action("table", "Open synthetic_rows", true),
+            action(
                 "theme",
                 if self.dark_mode {
                     "Switch to light theme"
@@ -557,6 +585,12 @@ impl GridView {
             "copy" => self.copy_selection(false, cx),
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
+            "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "home" => self.tabs.open_home(),
+            "table" => {
+                self.tabs.open_table(DATA_TABLE);
+                window.focus(&self.focus);
+            }
             "theme" => {
                 self.dark_mode = !self.dark_mode;
                 cx.set_global(Theme::current(cx).toggled());
@@ -693,9 +727,7 @@ impl Render for GridView {
         self.note_frame();
         self.pace_frame(window);
         let theme = Theme::current(cx);
-        self.viewport_rows = ((f32::from(window.viewport_size().height) - 130.0) / ROW_HEIGHT)
-            .floor()
-            .max(1.0) as usize;
+        self.viewport_rows = self.viewport_rows_for(window);
         let (first, last) = self.pager.range();
         let title = match &self.mode {
             Mode::Filtered { label, .. } => format!("{label} · "),
@@ -844,6 +876,7 @@ impl Render for GridView {
             .border_color(rgb(theme.border))
             .font_weight(gpui::FontWeight::SEMIBOLD)
             .text_color(rgb(theme.muted_foreground))
+            .child(cell_div(GUTTER_WIDTH, "#".into()))
             .child(cell_div(CELL_WIDTHS[0], "value".into()))
             .child(cell_div(CELL_WIDTHS[1], "label".into()))
             .child(cell_div(CELL_WIDTHS[2], "state".into()))
@@ -860,6 +893,24 @@ impl Render for GridView {
         .track_scroll(self.scroll.clone())
         .flex_1();
         let palette = self.palette_open.then(|| self.palette_overlay(cx));
+        let grid = div()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .child(strip)
+            .children(filter_row)
+            .children(compare_bar)
+            .child(header)
+            .child(list);
+        let content = match self.tabs.current().clone() {
+            Tab::Home => self.home_page(theme, cx),
+            Tab::Table(name) if name == DATA_TABLE => grid,
+            Tab::Table(name) => self.placeholder_page(&name, theme),
+        };
+        let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
+        let toolbar = self.toolbar(theme, cx);
+        let tab_bar = self.tab_bar(theme, cx);
         div()
             .size_full()
             .relative()
@@ -870,11 +921,16 @@ impl Render for GridView {
             .text_size(px(13.0))
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
-            .child(strip)
-            .children(filter_row)
-            .children(compare_bar)
-            .child(header)
-            .child(list)
+            .child(toolbar)
+            .child(
+                div()
+                    .flex_1()
+                    .flex()
+                    .min_h_0()
+                    .children(sidebar)
+                    .child(div().flex_1().flex().flex_col().min_w_0().child(tab_bar).child(content)),
+            )
+            .child(self.status_bar(theme))
             .children(palette)
     }
 }
@@ -945,6 +1001,7 @@ impl GridView {
                     cx.notify();
                 }),
             )
+            .child(cell_div(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
             .child(self.data_cell(source, 0, position, cx))
             .child(self.data_cell(source, 1, position, cx))
             .child(self.data_cell(source, 2, position, cx))

@@ -184,3 +184,45 @@ fn the_palette_switches_between_the_light_and_dark_theme(cx: &mut TestAppContext
     cx.simulate_keystrokes("enter");
     cx.update(|_, cx| assert!(!crate::theme::Theme::current(cx).dark));
 }
+
+#[gpui::test]
+fn ctrl_b_hides_and_shows_the_sidebar(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.read_with(cx, |view, _| assert!(view.sidebar_open));
+    cx.simulate_keystrokes("ctrl-b");
+    view.read_with(cx, |view, _| assert!(!view.sidebar_open));
+    cx.simulate_keystrokes("ctrl-b");
+    view.read_with(cx, |view, _| assert!(view.sidebar_open));
+}
+
+#[gpui::test]
+fn the_home_tab_has_no_grid_so_arrow_keys_do_nothing_until_the_table_tab_is_back(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("open home");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert_eq!(view.tabs.active, 0));
+    cx.simulate_keystrokes("down down");
+    view.read_with(cx, |view, _| assert_eq!(view.cell_cursor, None));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("open synthetic");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert!(view.tabs.shows_grid()));
+    cx.simulate_keystrokes("down");
+    view.read_with(cx, |view, _| assert_eq!(view.cell_cursor.map(|c| c.row), Some(1)));
+}
+
+#[gpui::test]
+fn the_sidebar_search_takes_typed_text_and_filters_the_tree(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        let handle = view.read(cx).sidebar_search.read(cx).focus_handle_for_tests();
+        window.focus(&handle);
+    });
+    cx.simulate_input("aud");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sidebar_search.read(cx).content(), "aud");
+        let rows = bookie_gpui_grid_prototype::shell::tree_rows("aud", true, true);
+        assert_eq!(rows.len(), 3, "connection, database and the one matching table");
+    });
+}

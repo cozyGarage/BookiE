@@ -1,0 +1,381 @@
+use bookie_gpui_grid_prototype::shell::{CONNECTION, DATA_TABLE, DATABASE, Tab, TreeRow, tree_rows};
+use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
+
+use crate::theme::Theme;
+use crate::{GridView, thousands};
+
+const TOOLBAR_HEIGHT: f32 = 40.0;
+const TAB_HEIGHT: f32 = 32.0;
+const STATUS_HEIGHT: f32 = 24.0;
+pub const SIDEBAR_WIDTH: f32 = 260.0;
+
+fn ghost(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .h(px(28.0))
+        .px_2()
+        .rounded(px(4.0))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(label.into())
+}
+
+fn card(theme: Theme) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .rounded(px(6.0))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .bg(rgb(theme.background))
+}
+
+fn card_title(text: &str, theme: Theme) -> Div {
+    div()
+        .px_4()
+        .py_3()
+        .border_b_1()
+        .border_color(rgb(theme.border))
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .child(text.to_string())
+}
+
+impl GridView {
+    pub fn toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let inert = |id: &'static str, label: &'static str, cx: &mut Context<Self>| {
+            ghost(id, label, theme).on_click(cx.listener(|this, _, _, cx| {
+                this.status = "Synthetic prototype: nothing to open here.".into();
+                cx.notify();
+            }))
+        };
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .h(px(TOOLBAR_HEIGHT))
+            .px_2()
+            .flex_none()
+            .bg(rgb(theme.background))
+            .border_b_1()
+            .border_color(rgb(theme.border))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .child(inert("new-connection", "New Connection", cx))
+                    .child(inert("data-transfer", "Data Transfer", cx))
+                    .child(inert("driver-manager", "Driver Manager", cx))
+                    .child(inert("plugin-center", "Plugin Center", cx))
+                    .child(inert("more", "More ⌄", cx)),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .child(
+                        ghost("palette", "Commands  Ctrl+Shift+P", theme)
+                            .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
+                    )
+                    .child(
+                        ghost("sidebar-toggle", "Sidebar  Ctrl+B", theme).on_click(cx.listener(|this, _, _, cx| {
+                            this.sidebar_open = !this.sidebar_open;
+                            cx.notify();
+                        })),
+                    )
+                    .child(
+                        ghost("theme-toggle", if theme.dark { "Light" } else { "Dark" }, theme).on_click(cx.listener(
+                            |this, _, window, cx| {
+                                this.dark_mode = !this.dark_mode;
+                                cx.set_global(Theme::current(cx).toggled());
+                                window.refresh();
+                            },
+                        )),
+                    ),
+            )
+    }
+
+    pub fn sidebar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let search = self.sidebar_search.read(cx).content().to_string();
+        let rows = tree_rows(&search, self.connection_open, self.database_open);
+        let open_table = self.tabs.current().clone();
+        let tree = rows.into_iter().enumerate().map(|(index, (depth, row))| {
+            let (label, chevron) = match row {
+                TreeRow::Connection { open } => (CONNECTION.to_string(), Some(open)),
+                TreeRow::Database { open } => (DATABASE.to_string(), Some(open)),
+                TreeRow::Table(name) => (name.to_string(), None),
+            };
+            let current = matches!(row, TreeRow::Table(name) if open_table == Tab::Table(name.to_string()));
+            let line = div()
+                .id(("tree", index))
+                .flex()
+                .items_center()
+                .h(px(26.0))
+                .pl(px(8.0 + 14.0 * depth as f32))
+                .gap_1()
+                .rounded(px(4.0))
+                .cursor_pointer()
+                .child(
+                    div()
+                        .w(px(12.0))
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(match chevron {
+                            Some(true) => "▾",
+                            Some(false) => "▸",
+                            None => "",
+                        }),
+                )
+                .child(label);
+            let line = if current {
+                line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
+            } else {
+                line.hover(move |style| style.bg(rgb(theme.accent)))
+            };
+            line.on_click(cx.listener(move |this, _, window, cx| {
+                match row {
+                    TreeRow::Connection { .. } => this.connection_open = !this.connection_open,
+                    TreeRow::Database { .. } => this.database_open = !this.database_open,
+                    TreeRow::Table(name) => {
+                        this.tabs.open_table(name);
+                        if this.tabs.shows_grid() {
+                            window.focus(&this.focus);
+                        }
+                    }
+                }
+                cx.notify();
+            }))
+        });
+        let empty = (!search.trim().is_empty() && self.sidebar_matches(&search) == 0).then(|| {
+            div()
+                .p_3()
+                .text_color(rgb(theme.muted_foreground))
+                .child("No matching table")
+        });
+        div()
+            .flex()
+            .flex_col()
+            .flex_none()
+            .w(px(SIDEBAR_WIDTH))
+            .h_full()
+            .bg(rgb(theme.chrome))
+            .border_r_1()
+            .border_color(rgb(theme.border))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .h(px(36.0))
+                    .px_2()
+                    .border_b_1()
+                    .border_color(rgb(theme.border))
+                    .text_color(rgb(theme.muted_foreground))
+                    .child("Import / Export ⌄")
+                    .child(
+                        ghost("collapse-sidebar", "«", theme).on_click(cx.listener(|this, _, _, cx| {
+                            this.sidebar_open = false;
+                            cx.notify();
+                        })),
+                    ),
+            )
+            .child(div().p_2().child(self.sidebar_search.clone()))
+            .child(div().flex().flex_col().px_2().children(tree).children(empty))
+    }
+
+    fn sidebar_matches(&self, search: &str) -> usize {
+        tree_rows(search, true, true)
+            .iter()
+            .filter(|(_, row)| matches!(row, TreeRow::Table(_)))
+            .count()
+    }
+
+    pub fn tab_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let active = self.tabs.active;
+        let tabs = self.tabs.items.iter().enumerate().map(|(index, tab)| {
+            let selected = index == active;
+            let mut item = div()
+                .id(("tab", index))
+                .flex()
+                .items_center()
+                .gap_2()
+                .h_full()
+                .px_3()
+                .border_r_1()
+                .border_color(rgb(theme.border))
+                .cursor_pointer()
+                .child(tab.title());
+            item = if selected {
+                item.bg(rgb(theme.background))
+                    .text_color(rgb(theme.foreground))
+                    .border_b_2()
+                    .border_color(rgb(theme.info))
+            } else {
+                item.text_color(rgb(theme.muted_foreground))
+                    .hover(move |style| style.bg(rgb(theme.accent)))
+            };
+            if index > 0 {
+                item = item.child(
+                    div()
+                        .id(("close", index))
+                        .px_1()
+                        .rounded(px(4.0))
+                        .text_color(rgb(theme.muted_foreground))
+                        .hover(move |style| style.bg(rgb(theme.muted)))
+                        .on_mouse_down(
+                            gpui::MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                                this.tabs.close(index);
+                                cx.stop_propagation();
+                                cx.notify();
+                            }),
+                        )
+                        .child("×"),
+                );
+            }
+            item.on_click(cx.listener(move |this, _, window, cx| {
+                this.tabs.active = index;
+                if this.tabs.shows_grid() {
+                    window.focus(&this.focus);
+                }
+                cx.notify();
+            }))
+        });
+        div()
+            .flex()
+            .items_center()
+            .flex_none()
+            .h(px(TAB_HEIGHT))
+            .bg(rgb(theme.chrome))
+            .border_b_1()
+            .border_color(rgb(theme.border))
+            .children(tabs)
+    }
+
+    pub fn home_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let stat = |label: &str, value: &str| {
+            card(theme)
+                .flex_1()
+                .p_4()
+                .gap_1()
+                .child(div().text_color(rgb(theme.muted_foreground)).child(label.to_string()))
+                .child(
+                    div()
+                        .text_size(px(22.0))
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .child(value.to_string()),
+                )
+        };
+        let shortcut = |id: &'static str, label: &'static str, cx: &mut Context<Self>| {
+            ghost(id, label, theme).on_click(cx.listener(|this, _, _, cx| {
+                this.status = "Synthetic prototype: nothing to open here.".into();
+                cx.notify();
+            }))
+        };
+        div()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .p_6()
+            .bg(rgb(theme.background))
+            .child(
+                div()
+                    .flex()
+                    .gap_4()
+                    .child(stat("Connections", "1"))
+                    .child(stat("Connected", "1"))
+                    .child(stat("Database Types", "1")),
+            )
+            .child(
+                div()
+                    .flex()
+                    .gap_4()
+                    .child(
+                        card(theme)
+                            .flex_1()
+                            .child(card_title("Quick Start", theme))
+                            .child(div().p_2().child(
+                                ghost("quick-open", format!("{CONNECTION} → {DATA_TABLE}"), theme).on_click(
+                                    cx.listener(|this, _, window, cx| {
+                                        this.tabs.open_table(DATA_TABLE);
+                                        window.focus(&this.focus);
+                                        cx.notify();
+                                    }),
+                                ),
+                            )),
+                    )
+                    .child(
+                        card(theme).w(px(300.0)).child(card_title("Shortcuts", theme)).child(
+                            div()
+                                .p_2()
+                                .flex()
+                                .flex_col()
+                                .child(shortcut("s-new", "+  New Connection", cx))
+                                .child(shortcut("s-history", "History", cx))
+                                .child(shortcut("s-import", "Import Connections", cx)),
+                        ),
+                    ),
+            )
+            .child(
+                card(theme).child(card_title("Query History", theme)).child(
+                    div()
+                        .p_4()
+                        .text_color(rgb(theme.muted_foreground))
+                        .child("No SQL Library records yet"),
+                ),
+            )
+            .child(
+                div()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child("Layout prototype with synthetic data only. Open the synthetic_rows table in the sidebar."),
+            )
+    }
+
+    pub fn placeholder_page(&self, name: &str, theme: Theme) -> Div {
+        div()
+            .flex_1()
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(rgb(theme.muted_foreground))
+            .child(format!(
+                "{name} has no data in this prototype. Only synthetic_rows is populated."
+            ))
+    }
+
+    pub fn status_bar(&self, theme: Theme) -> Div {
+        let right = if self.tabs.shows_grid() {
+            format!(
+                "{} rows · {}",
+                thousands(self.dataset_count()),
+                if theme.dark { "dark" } else { "light" }
+            )
+        } else {
+            if theme.dark { "dark".into() } else { "light".into() }
+        };
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .flex_none()
+            .h(px(STATUS_HEIGHT))
+            .px_3()
+            .bg(rgb(theme.chrome))
+            .border_t_1()
+            .border_color(rgb(theme.border))
+            .text_size(px(12.0))
+            .text_color(rgb(theme.muted_foreground))
+            .child("Synthetic data · no database connection")
+            .child(right)
+    }
+
+    pub fn viewport_rows_for(&self, window: &Window) -> usize {
+        ((f32::from(window.viewport_size().height) - 250.0) / crate::ROW_HEIGHT)
+            .floor()
+            .max(1.0) as usize
+    }
+}

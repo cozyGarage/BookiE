@@ -3,6 +3,7 @@ pub mod edit;
 pub mod model;
 pub mod palette;
 pub mod selection;
+pub mod shell;
 
 #[cfg(test)]
 mod edit_tests;
