@@ -1646,6 +1646,11 @@
       "bookie-app",
       "--lib",
       "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::failure_tests::forced_connection_failure_dismissal_keeps_the_window_usable"
     ]
   ],
   "keyring": [

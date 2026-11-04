@@ -478,8 +478,7 @@ impl App {
         dialog.set_response_appearance("retry", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("retry"));
         dialog.set_close_response("close");
-        dialog.connect_response(None, move |dialog, response| {
-            dialog.close();
+        dialog.connect_response(None, move |_, response| {
             if let Some(msg) = recovery_message(response, saved.clone()) {
                 sender.input(msg);
             }
@@ -1011,3 +1010,7 @@ mod recovery_tests {
         assert!(recovery_message("", saved()).is_none());
     }
 }
+
+#[cfg(test)]
+#[path = "connection_failure_tests.rs"]
+mod failure_tests;
