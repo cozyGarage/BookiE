@@ -480,7 +480,6 @@ impl App {
     }
 }
 
-/// The alert text when an import finished but the database rejected some rows: the counts, then the list.
 fn skipped_rows_message(report: &CsvImportReport) -> String {
     crate::tr!(
         "{done} of {total} rows were written to {table}. The database rejected {skipped} rows, which were skipped and not imported."
