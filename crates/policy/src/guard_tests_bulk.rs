@@ -762,6 +762,28 @@ async fn a_row_the_database_rejects_is_skipped_and_the_rest_of_the_batch_commits
 }
 
 #[tokio::test]
+async fn cancelling_after_a_skipped_row_records_the_cancel_with_the_committed_and_skipped_counts() {
+    let (conn, _) = BulkConn::open_rejecting(vec![2]);
+    let (guard, audit, _) = approved_guard(conn, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(5)).await.unwrap();
+    let rows = rows(5);
+    guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await
+        .unwrap();
+
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Cancelled)
+        .await
+        .unwrap();
+
+    let last = terminal(&audit);
+    assert_eq!(last.terminal_status, AuditTerminalStatus::Cancelled);
+    assert_eq!(last.rows_affected, Some(4));
+    assert_eq!(last.rows_skipped, Some(1));
+}
+
+#[tokio::test]
 async fn several_bad_rows_in_one_batch_are_each_reported_with_their_own_index() {
     let (conn, _) = BulkConn::open_rejecting(vec![0, 3, 4]);
     let (guard, _, _) = approved_guard(conn, Uuid::new_v4());
