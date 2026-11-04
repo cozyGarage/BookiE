@@ -115,11 +115,11 @@ mod provider {
                 context.set_proposals_for_provider(&provider, None::<&gio::ListModel>);
                 return;
             };
-            if buffer.char_count() as usize <= super::super::sql_text::MAX_ANALYSIS_BYTES {
-                if let Some(text) = super::super::sql_text::analysis_text(buffer.upcast_ref()) {
-                    context.set_proposals_for_provider(&provider, Some(&provider.model_from_text(context, text)));
-                    return;
-                }
+            if buffer.char_count() as usize <= super::super::sql_text::MAX_ANALYSIS_BYTES
+                && let Some(text) = super::super::sql_text::analysis_text(buffer.upcast_ref())
+            {
+                context.set_proposals_for_provider(&provider, Some(&provider.model_from_text(context, text)));
+                return;
             }
             let weak_provider = provider.downgrade();
             let context = context.clone();
@@ -215,13 +215,16 @@ impl Provider {
         let source = text.to_string();
         let cursor = super::statement_cursor::cursor_byte_offset(&source, cursor_chars as usize);
         let index_handle = self.imp().index.borrow().clone();
-        let Ok(index) = index_handle.try_borrow() else {
-            return glib::Object::new();
+        let (grammar, schema_request) = {
+            let Ok(index) = index_handle.try_borrow() else {
+                return glib::Object::new();
+            };
+            (
+                index.grammar.unwrap_or(bookie_core::sql_syntax::SqlGrammar::PostgreSql),
+                index.request(String::new()),
+            )
         };
-        let grammar = index.grammar.unwrap_or(bookie_core::sql_syntax::SqlGrammar::PostgreSql);
         let settings = self.imp().lexing.borrow().settings();
-        let schema_request = index.request(String::new());
-        drop(index);
         let latest_request = self.imp().latest_request.clone();
         let plan = gio::spawn_blocking(move || {
             (latest_request.load(Ordering::Acquire) == request_id).then(|| {
