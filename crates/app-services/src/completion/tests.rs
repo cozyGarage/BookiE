@@ -127,6 +127,29 @@ fn a_cursor_after_the_last_semicolon_starts_a_new_statement() {
 }
 
 #[test]
+fn names_declared_in_a_with_clause_are_offered_as_tables() {
+    let words = candidates(
+        "WITH recent (id) AS (SELECT id FROM public.orders), \"Big Spenders\" AS MATERIALIZED (SELECT 1) SELECT * FROM |",
+    );
+    assert!(words.contains(&"recent".to_string()), "{words:?}");
+    assert!(words.contains(&"\"Big Spenders\"".to_string()), "{words:?}");
+    assert!(words.contains(&"public.users".to_string()), "{words:?}");
+}
+
+#[test]
+fn with_options_that_are_not_common_table_expressions_offer_no_names() {
+    let words = candidates("SELECT TOP 5 WITH TIES * FROM public.users WITH (NOLOCK) JOIN |");
+    assert!(!words.contains(&"TIES".to_string()), "{words:?}");
+    assert!(!words.contains(&"NOLOCK".to_string()), "{words:?}");
+}
+
+#[test]
+fn names_from_another_statement_are_not_offered() {
+    let words = candidates("WITH recent AS (SELECT 1) SELECT * FROM recent; SELECT * FROM |");
+    assert!(!words.contains(&"recent".to_string()), "{words:?}");
+}
+
+#[test]
 fn schema_requests_are_accepted_only_by_their_generation() {
     let mut index = SchemaIndex::default();
     let current = index.request("users".into());
