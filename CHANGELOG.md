@@ -17,12 +17,15 @@
 - Right-click a table to open a starter JOIN query built from its foreign keys. (#2347)
 - Import connections reads an Another Redis Desktop Manager export as Redis drafts without passwords. (#2402)
 - Import connections reads a DataGrip dataSources.xml as drafts without passwords. (#2404)
+- Importing a DBeaver connection list keeps its folders as connection groups. (#2447)
 
 ### Changed
 
 - Importing a connection URL for a remote host now saves it as Production with verified TLS instead of Local without TLS. (#2337)
 - Copy as INSERT, UPDATE, DELETE and WHERE Clause now use all selected rows. (#2330)
 - Large parsed JSON previews stop counting once their size exceeds the sample budget. (#2415)
+- BookiE asks before quitting while a result export is still running. (#2400)
+- BookiE asks before closing a window that is running an import, backup or export, even when other windows are open. (#2408)
 
 ### Removed
 
@@ -49,11 +52,15 @@
 - SQL completion remains available in large scripts without planning on the GTK thread. (#2379)
 - A late save result no longer clears newer table edits. (#2380)
 - A browse save without an active connection no longer leaves a close request pending. (#2380)
+- Connection imports show skipped unsupported connections and file parsing failures. (#2444)
+- Import dialogs safely dismiss and display connection names literally. (#2444)
 
 ### Security
 
 - Issuing an MCP token to a file no longer follows a symlink or writes to something that is not a regular file. (#2348)
 - Revoking an MCP token that does not exist now reports an error instead of appearing to succeed. (#2349)
+- SSH tunnels now refuse legacy SHA-1 ssh-rsa host keys and other weak algorithms, and the connect error names the refused class. (#2451)
+- BookiE now refuses to send a MySQL or MariaDB password over an unencrypted TCP connection when the server asks for an RSA password exchange, and tells you to turn on TLS or use a local socket. (#2450)
 
 ## [0.2.4] - 2026-11-03
 

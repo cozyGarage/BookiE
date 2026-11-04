@@ -41,7 +41,7 @@ Unless a file says otherwise, source code and documentation in this Linux reposi
 
 Packages:
 
-- `bookie-results 0.2.4`
+- `bookie-results 0.2.5`
 
 ```text
 GNU AFFERO GENERAL PUBLIC LICENSE
