@@ -457,12 +457,22 @@ fn append_to_file_with_sync(
     };
     let mut line = serde_json::to_vec(&record)?;
     line.push(b'\n');
-    file.write_all(&line)?;
-    file.flush()?;
-    if durable {
-        sync_data(file)?;
+    let length_before = file.metadata()?.len();
+    let written = file
+        .write_all(&line)
+        .and_then(|()| file.flush())
+        .and_then(|()| if durable { sync_data(file) } else { Ok(()) });
+    if let Err(error) = written {
+        remove_unconfirmed_record(file, length_before);
+        return Err(error.into());
     }
     Ok(JournalTail { seq, hash })
+}
+
+fn remove_unconfirmed_record(file: &File, length_before: u64) {
+    if let Err(error) = file.set_len(length_before) {
+        tracing::error!(%error, "an audit record that failed to persist could not be removed from the journal");
+    }
 }
 
 fn verify_locked(file: &mut File, recover_partial: bool) -> Result<VerifiedJournal, StorageError> {

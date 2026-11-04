@@ -193,6 +193,53 @@ fn durable_append_fails_when_data_sync_fails() {
 }
 
 #[test]
+fn a_record_whose_sync_failed_is_not_left_on_disk() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
+    let first = append_to_file_with_sync(
+        &mut file,
+        JournalTail {
+            seq: 0,
+            hash: GENESIS_HASH.to_string(),
+        },
+        sample_event(Principal::human_gui()),
+        true,
+        |_| Ok(()),
+    )
+    .unwrap();
+    let length_after_first = std::fs::metadata(&path).unwrap().len();
+
+    let tail_after_first = || JournalTail {
+        seq: first.seq,
+        hash: first.hash.clone(),
+    };
+    let failed = append_to_file_with_sync(
+        &mut file,
+        tail_after_first(),
+        sample_event(Principal::human_gui()),
+        true,
+        |_| Err(std::io::Error::other("injected sync failure")),
+    );
+
+    assert!(failed.is_err());
+    assert_eq!(
+        std::fs::metadata(&path).unwrap().len(),
+        length_after_first,
+        "the unconfirmed record must be removed"
+    );
+    let next = append_to_file_with_sync(
+        &mut file,
+        tail_after_first(),
+        sample_event(Principal::human_gui()),
+        true,
+        |_| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(next.seq, 2);
+}
+
+#[test]
 fn durable_creation_propagates_parent_sync_failure() {
     let dir = TempDir::new().unwrap();
     let parent = dir.path().join("journal");
