@@ -6,7 +6,7 @@ use relm4::gtk::glib;
 use relm4::{adw, gtk};
 
 use crate::services::audit_view::{
-    OperationRow, approval_label, contains_operation, matches, needs_attention, operations, status_label,
+    OperationRow, approval_label, contains_operation, matches, operations, row_needs_attention, status_label,
 };
 use crate::services::database_service::DatabaseService;
 use crate::tr;
@@ -131,6 +131,9 @@ fn operation_row(row: &OperationRow) -> adw::ExpanderRow {
     if let Some(rows) = row.rows {
         subtitle.push(tr!("rows: {n}").replace("{n}", &rows.to_string()));
     }
+    if let Some(skipped) = row.rows_skipped {
+        subtitle.push(tr!("rows skipped: {n}").replace("{n}", &skipped.to_string()));
+    }
     if let Some(ms) = row.duration_ms {
         subtitle.push(format!("{ms} ms"));
     }
@@ -141,7 +144,7 @@ fn operation_row(row: &OperationRow) -> adw::ExpanderRow {
         )))
         .subtitle(glib::markup_escape_text(&subtitle.join(" · ")))
         .build();
-    if needs_attention(row.status) {
+    if row_needs_attention(row) {
         expander.add_css_class("warning");
     }
     expander.add_row(&detail(&tr!("Operation"), &row.operation_id.to_string(), false));

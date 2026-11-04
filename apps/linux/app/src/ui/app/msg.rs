@@ -168,7 +168,7 @@ pub enum AppMsg {
     CopyToClipboard(String),
     CopyRowAsStatement {
         tab_id: Uuid,
-        row_position: u32,
+        row_positions: Vec<u32>,
         statement: bookie_core::sql_literal::RowStatement,
     },
     FetchBrowsePage(Uuid),

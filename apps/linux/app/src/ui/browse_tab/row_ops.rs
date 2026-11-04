@@ -513,12 +513,12 @@ impl BrowseTab {
 
     pub(super) fn handle_grid_copy_row_as_statement(
         &mut self,
-        row_position: u32,
+        row_positions: Vec<u32>,
         statement: bookie_core::sql_literal::RowStatement,
         sender: ComponentSender<Self>,
     ) {
         let _ = sender.output(BrowseTabOutput::CopyRowAsStatement {
-            row_position,
+            row_positions,
             statement,
         });
     }

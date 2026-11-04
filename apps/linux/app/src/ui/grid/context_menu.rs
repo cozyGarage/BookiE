@@ -371,11 +371,12 @@ pub(super) fn install_grid_context_menus(
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
                     let Some(view) = view.upgrade() else { return };
-                    if complete_row_at(&view, position(slot)).is_none() {
+                    let positions = selected_row_positions(&view, position(slot));
+                    if positions.iter().any(|row| complete_row_at(&view, *row).is_none()) {
                         sender.send(GridMsg::IncompleteRowData).ok();
                         return;
                     }
-                    sender.send(GridMsg::CopyRowAsStatement(position(slot), statement)).ok();
+                    sender.send(GridMsg::CopyRowAsStatement(positions, statement)).ok();
                 }
             })
             .build()

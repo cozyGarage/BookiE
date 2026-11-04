@@ -401,11 +401,11 @@ impl App {
                 } => AppMsg::FetchBrowseCellValue(tab_id, request, col_index, column_name, row_key),
                 BrowseTabOutput::StateChanged => AppMsg::WorkspaceTabsChanged,
                 BrowseTabOutput::CopyRowAsStatement {
-                    row_position,
+                    row_positions,
                     statement,
                 } => AppMsg::CopyRowAsStatement {
                     tab_id,
-                    row_position,
+                    row_positions,
                     statement,
                 },
                 BrowseTabOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
