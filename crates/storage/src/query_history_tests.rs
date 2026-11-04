@@ -486,7 +486,11 @@ fn an_unterminated_block_comment_is_closed_before_the_terminator() {
 
 #[test]
 fn an_unterminated_string_is_closed_and_a_terminated_statement_keeps_one_semicolon() {
-    assert_eq!(exported_tail("postgres", "SELECT 'abc"), "SELECT 'abc';\n\n");
+    assert_eq!(exported_tail("postgres", "SELECT 'abc"), "SELECT 'abc;\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT $$it's -- fine$$"),
+        "SELECT $$it's -- fine$$;\n\n"
+    );
     assert_eq!(
         exported_tail("postgres", "SELECT 1; /* note"),
         "SELECT 1; /* note\n*/\n\n"

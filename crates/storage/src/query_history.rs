@@ -712,9 +712,10 @@ fn sql_export_entry(entry: &Entry) -> String {
     let query = entry.query.trim_end();
     out.push_str(query);
     let tail = scan_statement_tail(query, matches!(entry.driver_id.as_str(), "mysql" | "mariadb"));
-    if let Some(quote) = tail.open_quote {
-        out.push(quote);
-        out.push(';');
+    if tail.open_quote.is_some() || query.contains('$') {
+        if !query.ends_with(';') {
+            out.push(';');
+        }
     } else if tail.in_block_comment {
         out.push_str(if tail.last_code == Some(';') { "\n*/" } else { "\n*/\n;" });
     } else if tail.last_code != Some(';') {
