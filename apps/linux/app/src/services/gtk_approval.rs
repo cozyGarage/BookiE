@@ -287,6 +287,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires an isolated GTK display"]
     fn the_dialog_defaults_to_deny_and_closes_as_deny() {
         use relm4::adw::prelude::*;
         relm4::adw::init().unwrap();
