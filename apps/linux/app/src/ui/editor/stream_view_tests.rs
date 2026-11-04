@@ -610,3 +610,43 @@ fn live_eviction_visits_only_pages_evicted_since_the_previous_update() {
         "each update should inspect only newly evicted pages; inspected {inspected}"
     );
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_failed_page_offers_a_retry_without_changing_pages() {
+    use std::cell::Cell;
+    use std::rc::Rc;
+    relm4::adw::init().unwrap();
+    let (sender, _) = relm4::channel::<GridMsg>();
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let pages = gtk::Stack::new();
+    let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    container.set_widget_name(&page_widget_name(42, 0));
+    let placeholder = relm4::adw::StatusPage::new();
+    placeholder.add_css_class("tp-stream-page-placeholder");
+    placeholder.add_css_class("tp-stream-page-loading");
+    container.append(&placeholder);
+    pages.add_named(&container, Some(&page_widget_name(42, 0)));
+    holder.append(&pages);
+    let retry_count = Rc::new(Cell::new(0));
+    let observed = retry_count.clone();
+    pages.connect_visible_child_notify(move |_| observed.set(observed.get() + 1));
+    complete_page_load(
+        PageLoadContext {
+            holder: &holder,
+            generation: 42,
+            index: 0,
+            identity: StatementIdentity::default(),
+            grid_sender: &sender,
+            connection_id: None,
+            database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+            settings_store: LocalResultSettingsStore::default(),
+        },
+        Err("synthetic failure".into()),
+    );
+    let retry = placeholder.child().unwrap().downcast::<gtk::Button>().unwrap();
+    assert!(retry.is_sensitive());
+    retry.emit_clicked();
+    assert_eq!(retry_count.get(), 1);
+    assert_eq!(pages.visible_child().as_ref(), Some(container.upcast_ref()));
+}
