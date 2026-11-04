@@ -609,7 +609,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_mysql_approval_dialog_runs_in_hosted_installed_gtk_acceptance(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
-        self.assertIn("Build staged release GTK binary", acceptance)
+        self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', acceptance)
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", acceptance)
         self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
 
@@ -636,8 +636,30 @@ class CiWorkflowTests(unittest.TestCase):
         release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
         self.assertIn("timeout-minutes: 45", release)
         self.assertIn("cargo build --locked --release -p bookie-app", release)
-        self.assertIn("target/release/bookie-app target/installed/usr/bin/bookie", release)
+        self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', release)
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", release)
+
+    def test_postgres_release_runs_on_the_supported_gtk_floor_with_host_docker(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
+        image = (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text()
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", release)
+        self.assertIn("--network host", release)
+        self.assertIn("bookie-ci:x:%s:%s:CI:/tmp:/usr/sbin/nologin", release)
+        self.assertIn("/etc/passwd:ro", release)
+        self.assertIn("/var/run/docker.sock:/var/run/docker.sock", release)
+        self.assertIn('"$HOME/.docker:/docker"', release)
+        for package in ["docker-compose", "gnome-keyring", "libsecret-tools", "libglib2.0-bin", "openssh-client"]:
+            with self.subTest(package=package):
+                self.assertIn(package, image)
+        for floor in [
+            "pkg-config --atleast-version=4.24 gtk4",
+            "pkg-config --atleast-version=2.88 glib-2.0",
+            "pkg-config --atleast-version=1.10 libadwaita-1",
+            "pkg-config --atleast-version=5.22 gtksourceview-5",
+        ]:
+            with self.subTest(floor=floor):
+                self.assertIn(floor, release)
 
     def test_gtk_scripts_reduce_xvfb_display_collisions(self):
         for path in [

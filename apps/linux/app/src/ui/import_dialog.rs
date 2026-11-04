@@ -54,6 +54,7 @@ pub(crate) struct ImportChoice {
     /// The table to create first, when the import is making one. The
     /// CREATE is its own governed statement, run before any row.
     pub create: Option<Vec<DraftColumn>>,
+    pub skip_rejected_rows: bool,
 }
 
 const SKIP_LABEL: &str = "Skip";
@@ -68,7 +69,21 @@ pub(crate) fn present(
     page.add(&file.group);
     let columns = ColumnSection::new(&request);
     page.add(columns.group());
-    let state = std::rc::Rc::new(State { request, file, columns });
+    let skip_rejected = adw::SwitchRow::builder()
+        .title(crate::tr!("Skip rows the database rejects"))
+        .subtitle(crate::tr!(
+            "Off: the first rejected row stops the import. On: rejected rows are skipped and listed when the import finishes."
+        ))
+        .build();
+    let errors = adw::PreferencesGroup::builder().title(crate::tr!("Errors")).build();
+    errors.add(&skip_rejected);
+    page.add(&errors);
+    let state = std::rc::Rc::new(State {
+        request,
+        file,
+        columns,
+        skip_rejected,
+    });
     state.refresh();
     connect_refresh(&state);
 
@@ -93,6 +108,7 @@ struct State {
     request: ImportRequest,
     file: FileOptions,
     columns: ColumnSection,
+    skip_rejected: adw::SwitchRow,
 }
 
 impl State {
@@ -127,6 +143,7 @@ impl State {
                 }
             },
             create,
+            skip_rejected_rows: self.skip_rejected.is_active(),
         })
     }
 }
