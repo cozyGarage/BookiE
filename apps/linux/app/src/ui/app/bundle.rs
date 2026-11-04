@@ -137,6 +137,14 @@ impl App {
         datagrip.set_name(Some(&crate::tr!("DataGrip dataSources.xml")));
         datagrip.add_suffix("xml");
         filters.append(&datagrip);
+        let navicat = relm4::gtk::FileFilter::new();
+        navicat.set_name(Some(&crate::tr!("Navicat connections.ncx")));
+        navicat.add_suffix("ncx");
+        filters.append(&navicat);
+        let resp = relm4::gtk::FileFilter::new();
+        resp.set_name(Some(&crate::tr!("RESP.app connections.json")));
+        resp.add_suffix("json");
+        filters.append(&resp);
         let dialog = relm4::gtk::FileDialog::builder()
             .title(crate::tr!("Import connections"))
             .modal(true)
@@ -400,15 +408,21 @@ async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleEr
 async fn read_peer_connections_at(path: &std::path::Path) -> Result<bookie_storage::PeerImport, String> {
     let limit = bookie_storage::MAX_DBEAVER_BYTES
         .max(bookie_storage::MAX_ANOTHER_REDIS_BYTES)
-        .max(bookie_storage::MAX_DATAGRIP_BYTES);
+        .max(bookie_storage::MAX_DATAGRIP_BYTES)
+        .max(bookie_storage::MAX_NAVICAT_BYTES)
+        .max(bookie_storage::MAX_RESP_BYTES);
     let bytes = read_bounded(path, limit).await.map_err(|error| error.to_string())?;
     let text = String::from_utf8(bytes).map_err(|_| crate::tr!("The connection file is not valid UTF-8."))?;
-    let import = if text.trim_start().starts_with('<') {
+    let import = if text.contains("<Connections") {
+        bookie_storage::parse_navicat_connections(&text)
+    } else if text.trim_start().starts_with('<') {
         let local = read_bounded(&path.with_file_name("dataSources.local.xml"), limit)
             .await
             .ok()
             .and_then(|bytes| String::from_utf8(bytes).ok());
         bookie_storage::parse_datagrip_data_sources(&text, local.as_deref())
+    } else if bookie_storage::looks_like_resp_export(&text) {
+        bookie_storage::parse_resp_connections(&text)
     } else {
         bookie_storage::parse_dbeaver_data_sources(&text)
             .or_else(|error| bookie_storage::parse_another_redis_connections(&text).map_err(|_| error))

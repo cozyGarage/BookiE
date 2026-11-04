@@ -89,7 +89,7 @@ Two licence notes: BookiE is AGPL-3.0-only (the same as TablePro), so Apache-2.0
 TablePro (`TableProApp/TablePro`, AGPL-3.0) is the project BookiE's Linux client came from. Its repository is already split the way you described:
 
 - `core/crates` is a shared Rust core used by every platform: `core` (including `browse`: page, count and export request building), `session` (connect attempts), `drivers`, `storage`, `ssh`, `net`, `mcp`, `ai`, and `ffi`, which exposes it to the Swift app.
-- Each platform is a thin renderer on top: `apple/` (Swift, macOS and iOS), `linux/crates/app` (GTK), `windows/`.
+- Each platform is a thin renderer on top: `apple/` (Swift, macOS and iOS), its Linux GTK app, `windows/`.
 - Its Apple data grid and result views are large and specific: per-type cell editors (array, JSON, binary, date and time, enum, foreign-key picker and preview, geometry map, image), a column jump panel, column visibility and value-filter popovers, a result-comparison grid and a row inspector.
 - Its SQL editor is a separate package (`TableProEditor`, about 280 files) built on tree-sitter.
 

@@ -1640,12 +1640,47 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::result_compare::dialog_tests::wide_result_keys_and_actions_remain_reachable_in_a_short_window"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::connection_bundle::tests::skipped_imports_are_literal_non_selectable_rows"
     ],
     [
       "bookie-app",
       "--lib",
       "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::forced_dirty_tab_confirmation_dismissal_preserves_the_file_and_tab"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::history_dialog::confirmation_tests::selected_history_confirmation_preserves_cancelled_rows_and_deletes_only_selected"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::history_dialog::confirmation_tests::clear_history_confirmation_preserves_cancelled_rows_and_clears_only_when_confirmed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::history_dialog::confirmation_tests::preferences_history_confirmation_preserves_cancelled_rows_and_clears_only_when_confirmed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::force_dismissing_connection_deletion_does_not_abort"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::dismissing_bulk_delete_preserves_selected_drafts"
     ]
   ],
   "keyring": [

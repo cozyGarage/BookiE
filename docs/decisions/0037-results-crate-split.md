@@ -1,6 +1,6 @@
 # 0037: Split the pure result logic into `bookie-results`
 
-- **Status**: Accepted (2026-11-04)
+- **Status**: Accepted
 - **Date**: 2026-11-04
 
 ## Context

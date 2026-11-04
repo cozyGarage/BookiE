@@ -347,8 +347,7 @@ impl App {
         let sender_for_response = sender;
         let workspace = self.workspace.clone();
         let column_widths = self.persistence.column_widths.clone();
-        dialog.connect_response(None, move |dialog, response| {
-            dialog.close();
+        dialog.connect_response(None, move |_, response| {
             if response != "delete" {
                 return;
             }

@@ -530,8 +530,7 @@ impl Component for HistoryDialog {
                 dialog.set_default_response(Some("cancel"));
                 dialog.set_close_response("cancel");
                 let s = sender;
-                dialog.connect_response(None, move |d, response| {
-                    d.close();
+                dialog.connect_response(None, move |_, response| {
                     if response == "delete" {
                         s.input(HistoryDialogInput::DeleteSelectedConfirmed);
                     }
@@ -568,8 +567,7 @@ impl Component for HistoryDialog {
                 dialog.set_default_response(Some("cancel"));
                 dialog.set_close_response("cancel");
                 let s = sender;
-                dialog.connect_response(None, move |d, response| {
-                    d.close();
+                dialog.connect_response(None, move |_, response| {
                     if response == "clear" {
                         s.input(HistoryDialogInput::ClearAllConfirmed);
                     }
@@ -1111,3 +1109,6 @@ mod export_tests;
 mod lifetime_tests;
 
 mod export;
+
+#[cfg(test)]
+mod confirmation_tests;
