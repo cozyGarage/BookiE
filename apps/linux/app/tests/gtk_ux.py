@@ -2932,12 +2932,25 @@ GLib.MainLoop().run()
                 settings.write_text(f"[Settings]\ngtk-decoration-layout={layout}\n", encoding="utf-8")
             return write
 
+        def wait_for_control(*names):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                for name in names:
+                    node = ui.find_node(name=name, role=pyatspi.ROLE_PUSH_BUTTON)
+                    if node is not None:
+                        return node
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"expected one of {names!r}:\n{ui.accessible_snapshot()}")
+
         restart(use_layout("appmenu:close"))
         ui.wait_for_node(name="Close", role=pyatspi.ROLE_PUSH_BUTTON)
-        assert ui.find_node(name="Minimize", role=pyatspi.ROLE_PUSH_BUTTON) is None, "a close-only layout showed Minimize"
+        assert all(
+            ui.find_node(name=name, role=pyatspi.ROLE_PUSH_BUTTON) is None
+            for name in ("Minimize", "Minimise")
+        ), "a close-only layout showed Minimize"
         restart(use_layout("icon:minimize,maximize,close"))
-        ui.wait_for_node(name="Minimize", role=pyatspi.ROLE_PUSH_BUTTON)
-        ui.wait_for_node(name="Maximize", role=pyatspi.ROLE_PUSH_BUTTON)
+        wait_for_control("Minimize", "Minimise")
+        wait_for_control("Maximize", "Maximise")
 
     window_controls_follow_the_desktop_button_layout.needs_restart = True
     window_controls_follow_the_desktop_button_layout.requires_editor = False

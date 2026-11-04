@@ -522,10 +522,10 @@ impl SimpleComponent for App {
             .forward(sender.input_sender(), |out| match out {
                 WelcomeViewOutput::OpenConnect => AppMsg::OpenConnect,
                 WelcomeViewOutput::ImportUrl => AppMsg::ImportConnectionUrl,
-                WelcomeViewOutput::OpenSaved(saved) => AppMsg::OpenSaved(saved),
+                WelcomeViewOutput::OpenSaved(saved) => AppMsg::OpenSaved(*saved),
                 WelcomeViewOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
-                WelcomeViewOutput::Organize(saved) => AppMsg::OrganizeConnection(saved),
-                WelcomeViewOutput::Edit(saved) => AppMsg::EditConnection(saved),
+                WelcomeViewOutput::Organize(saved) => AppMsg::OrganizeConnection(*saved),
+                WelcomeViewOutput::Edit(saved) => AppMsg::EditConnection(*saved),
                 WelcomeViewOutput::Duplicate(id) => AppMsg::DuplicateConnection(id),
                 WelcomeViewOutput::ExportBundle => AppMsg::ExportConnections,
                 WelcomeViewOutput::ImportBundle => AppMsg::ImportBundle,
