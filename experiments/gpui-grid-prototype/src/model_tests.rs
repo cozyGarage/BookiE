@@ -234,5 +234,9 @@ fn a_filter_and_find_can_target_the_typed_column() {
 fn only_the_typed_json_value_contains_the_word_null_and_a_null_cell_never_matches() {
     let found = find_rows(150_000, "null", 10).unwrap();
     assert!(!found.matches.is_empty());
-    assert!(found.matches.iter().all(|row| row % TYPED_KINDS == 8), "{:?}", found.matches);
+    assert!(
+        found.matches.iter().all(|row| row % TYPED_KINDS == 8),
+        "{:?}",
+        found.matches
+    );
 }

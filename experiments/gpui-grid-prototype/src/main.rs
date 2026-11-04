@@ -2,9 +2,11 @@ use std::ops::Range;
 use std::time::{Duration, Instant};
 
 use bookie_gpui_grid_prototype::model::*;
+use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
 use gpui::{
-    App, Application, Bounds, Context, Div, FocusHandle, Focusable, KeyDownEvent, ScrollStrategy, Stateful,
-    UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
+    App, Application, Bounds, ClipboardItem, Context, Div, FocusHandle, Focusable, KeyDownEvent, MouseButton,
+    MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
+    prelude::*, px, rgb, size, uniform_list,
 };
 
 const ROW_HEIGHT: f32 = 36.0;
@@ -35,7 +37,7 @@ struct GridView {
     find_capped: bool,
     compare: Option<Diff>,
     status: String,
-    selected: Option<u64>,
+    selection: Option<Selection>,
     generation: u64,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
@@ -57,7 +59,7 @@ fn thousands(value: u64) -> String {
     let digits = value.to_string();
     let mut out = String::new();
     for (index, ch) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index) % 3 == 0 {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
             out.push(',');
         }
         out.push(ch);
@@ -90,7 +92,7 @@ impl GridView {
             find_capped: false,
             compare: None,
             status: String::new(),
-            selected: None,
+            selection: None,
             generation: 0,
             scroll: UniformListScrollHandle::new(),
             focus: cx.focus_handle(),
@@ -111,7 +113,11 @@ impl GridView {
     }
 
     fn base(&self) -> u64 {
-        if self.continuous { 0 } else { self.pager.page * PAGE_ROWS }
+        if self.continuous {
+            0
+        } else {
+            self.pager.page * PAGE_ROWS
+        }
     }
 
     fn visible_count(&self) -> usize {
@@ -119,7 +125,11 @@ impl GridView {
             return diff.rows.len();
         }
         let remaining = self.dataset_count().saturating_sub(self.base());
-        if self.continuous { remaining as usize } else { remaining.min(PAGE_ROWS) as usize }
+        if self.continuous {
+            remaining as usize
+        } else {
+            remaining.min(PAGE_ROWS) as usize
+        }
     }
 
     fn source_row(&self, dataset_index: u64) -> u64 {
@@ -129,10 +139,39 @@ impl GridView {
         }
     }
 
+    fn dataset_index_of(&self, source: u64) -> Option<u64> {
+        match &self.mode {
+            Mode::All => Some(source),
+            Mode::Filtered { kept, .. } => kept.binary_search(&(source as u32)).ok().map(|index| index as u64),
+        }
+    }
+
+    fn click_row(&mut self, dataset_index: u64, shift: bool) {
+        self.selection = Some(Selection::after_click(self.selection, dataset_index, shift));
+        self.status = self.selection.map(Selection::label).unwrap_or_default();
+    }
+
+    fn copy_selection(&mut self, with_headers: bool, cx: &mut Context<Self>) {
+        let Some(selection) = self.selection else { return };
+        if !selection.copyable() {
+            self.status = selection.label();
+            return;
+        }
+        let rows = (selection.first()..=selection.last()).map(|index| row_at(self.source_row(index)));
+        let text = copy_tsv(rows, with_headers);
+        cx.write_to_clipboard(ClipboardItem::new_string(text));
+        let noun = if selection.count() == 1 { "row" } else { "rows" };
+        self.status = format!(
+            "Copied {} {noun}{}",
+            selection.count(),
+            if with_headers { " with headers" } else { "" }
+        );
+    }
+
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
         self.pager = Pager::new(self.dataset_count());
-        self.selected = None;
+        self.selection = None;
         self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
     }
 
@@ -142,10 +181,8 @@ impl GridView {
             self.first_frame_reported = true;
             println!("PROTOTYPE_FIRST_FRAME ms={}", self.started.elapsed().as_millis());
         }
-        if self.measuring {
-            if let Some(last) = self.last_frame {
-                self.frame_intervals.push(now - last);
-            }
+        if let (true, Some(last)) = (self.measuring, self.last_frame) {
+            self.frame_intervals.push(now - last);
         }
         self.last_frame = Some(now);
     }
@@ -181,21 +218,24 @@ impl GridView {
         }
         let (total, query) = (self.total, self.find_text.clone());
         self.status = "Searching…".into();
-        self.begin_background(cx, move || find_rows(total, &query, MAX_FIND_MATCHES), move |this, found| {
-            match found {
+        self.begin_background(
+            cx,
+            move || find_rows(total, &query, MAX_FIND_MATCHES),
+            move |this, found| match found {
                 Ok(found) => {
                     this.find_capped = found.capped;
                     this.cursor.set(found.matches);
                     this.step_match(forward);
                 }
                 Err(message) => this.status = message.into(),
-            }
-        });
+            },
+        );
     }
 
     fn step_match(&mut self, forward: bool) {
         if let Some(row) = self.cursor.step(forward) {
-            self.selected = Some(row);
+            let at = self.dataset_index_of(row);
+            self.selection = at.map(|index| Selection::after_click(None, index, false));
             if !self.continuous {
                 self.pager.contains_row(row);
             }
@@ -226,10 +266,14 @@ impl GridView {
         let total = self.total;
         let label = format!("WHERE {}", self.filter_text);
         self.status = "Filtering…".into();
-        self.begin_background(cx, move || filter_rows(total, &predicate), move |this, kept| {
-            this.set_mode(Mode::Filtered { kept, label });
-            this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
-        });
+        self.begin_background(
+            cx,
+            move || filter_rows(total, &predicate),
+            move |this, kept| {
+                this.set_mode(Mode::Filtered { kept, label });
+                this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
+            },
+        );
     }
 
     fn clear_filter(&mut self) {
@@ -242,11 +286,15 @@ impl GridView {
     fn compare(&mut self, keyed: bool, cx: &mut Context<Self>) {
         let total = self.total;
         self.status = "Comparing…".into();
-        self.begin_background(cx, move || build_diff(total, keyed), |this, diff| {
-            this.status.clear();
-            this.compare = Some(diff);
-            this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
-        });
+        self.begin_background(
+            cx,
+            move || build_diff(total, keyed),
+            |this, diff| {
+                this.status.clear();
+                this.compare = Some(diff);
+                this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+            },
+        );
     }
 
     fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
@@ -254,6 +302,11 @@ impl GridView {
         if stroke.modifiers.control && stroke.key == "f" {
             self.filter_visible = true;
             self.active = Field::Filter;
+            cx.notify();
+            return;
+        }
+        if stroke.modifiers.control && stroke.key == "c" && self.active == Field::None {
+            self.copy_selection(stroke.modifiers.shift, cx);
             cx.notify();
             return;
         }
@@ -304,7 +357,12 @@ impl GridView {
     fn report_scroll(&self, steps: u32, elapsed: u128, with_frames: bool) {
         let mut sorted: Vec<f64> = self.frame_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).collect();
         sorted.sort_by(f64::total_cmp);
-        let pick = |q: f64| sorted.get(((sorted.len() as f64 - 1.0) * q) as usize).copied().unwrap_or(0.0);
+        let pick = |q: f64| {
+            sorted
+                .get(((sorted.len() as f64 - 1.0) * q) as usize)
+                .copied()
+                .unwrap_or(0.0)
+        };
         let frames = if with_frames {
             format!(
                 " frames={} frame_p50_ms={:.2} frame_p95_ms={:.2} frame_p99_ms={:.2} frame_max_ms={:.2}",
@@ -332,7 +390,11 @@ impl GridView {
                     this.frame_intervals.clear();
                     this.last_frame = None;
                     this.measuring = true;
-                    this.pace = Some(Pace { step: 0, steps, begun: Instant::now() });
+                    this.pace = Some(Pace {
+                        step: 0,
+                        steps,
+                        begun: Instant::now(),
+                    });
                     cx.notify();
                 })
                 .ok();
@@ -352,7 +414,8 @@ impl GridView {
                 cx.background_executor().timer(Duration::from_millis(62)).await;
             }
             let elapsed = begun.elapsed().as_millis();
-            this.update(cx, |this, _| this.report_scroll(steps, elapsed, false)).ok();
+            this.update(cx, |this, _| this.report_scroll(steps, elapsed, false))
+                .ok();
         })
         .detach();
     }
@@ -371,7 +434,11 @@ fn button(id: &'static str, label: impl Into<String>) -> Stateful<Div> {
 }
 
 fn field_box(id: &'static str, text: &str, placeholder: &str, active: bool) -> Stateful<Div> {
-    let shown = if text.is_empty() { placeholder.to_string() } else { text.to_string() };
+    let shown = if text.is_empty() {
+        placeholder.to_string()
+    } else {
+        text.to_string()
+    };
     div()
         .id(id)
         .w(px(220.0))
@@ -390,7 +457,13 @@ fn cell_div(width: f32, text: String) -> Div {
 }
 
 fn row_div(stripe: bool, selected: bool) -> Div {
-    let background = if selected { rgb(0x2a4a7f) } else if stripe { rgb(0x202228) } else { rgb(0x1b1c20) };
+    let background = if selected {
+        rgb(0x2a4a7f)
+    } else if stripe {
+        rgb(0x202228)
+    } else {
+        rgb(0x1b1c20)
+    };
     div().flex().items_center().h(px(ROW_HEIGHT)).w_full().bg(background)
 }
 
@@ -422,43 +495,121 @@ impl Render for GridView {
             .gap_2()
             .p_2()
             .child(div().child(progress))
-            .child(button("first", "First").on_click(cx.listener(|this, _, _, cx| { this.pager.first(); cx.notify(); })))
-            .child(button("prev", "Previous page").on_click(cx.listener(|this, _, _, cx| { this.pager.previous(); cx.notify(); })))
+            .child(button("first", "First").on_click(cx.listener(|this, _, _, cx| {
+                this.pager.first();
+                cx.notify();
+            })))
+            .child(button("prev", "Previous page").on_click(cx.listener(|this, _, _, cx| {
+                this.pager.previous();
+                cx.notify();
+            })))
             .child(div().child(range_label))
-            .child(button("next", "Next page").on_click(cx.listener(|this, _, _, cx| { this.pager.next(); cx.notify(); })))
-            .child(button("last", "Last").on_click(cx.listener(|this, _, _, cx| { this.pager.last(); cx.notify(); })))
-            .child(field_box("find", &self.find_text, "Find in all rows", self.active == Field::Find)
-                .on_click(cx.listener(|this, _, _, cx| { this.active = Field::Find; cx.notify(); })))
-            .child(button("find-prev", "Previous match").on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
+            .child(button("next", "Next page").on_click(cx.listener(|this, _, _, cx| {
+                this.pager.next();
+                cx.notify();
+            })))
+            .child(button("last", "Last").on_click(cx.listener(|this, _, _, cx| {
+                this.pager.last();
+                cx.notify();
+            })))
+            .child(
+                field_box("find", &self.find_text, "Find in all rows", self.active == Field::Find).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        this.active = Field::Find;
+                        cx.notify();
+                    }),
+                ),
+            )
+            .child(
+                button("find-prev", "Previous match").on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
+            )
             .child(button("find-next", "Next match").on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
-            .child(button("show", "Show matching rows").on_click(cx.listener(|this, _, _, cx| { this.show_matching(); cx.notify(); })))
+            .child(
+                button("show", "Show matching rows").on_click(cx.listener(|this, _, _, cx| {
+                    this.show_matching();
+                    cx.notify();
+                })),
+            )
             .child(button("compare", "Compare…").on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
             .child(button("export", "Export all rows…"))
-            .child(button("continuous", if self.continuous { "Continuous scrolling: on" } else { "Continuous scrolling" })
-                .on_click(cx.listener(|this, _, _, cx| { this.continuous = !this.continuous; this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top); cx.notify(); })))
+            .child(
+                button(
+                    "continuous",
+                    if self.continuous {
+                        "Continuous scrolling: on"
+                    } else {
+                        "Continuous scrolling"
+                    },
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.continuous = !this.continuous;
+                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+                    cx.notify();
+                })),
+            )
             .child(div().text_color(rgb(0x9aa0b4)).child(self.status.clone()));
         let filter_row = self.filter_visible.then(|| {
-            div().flex().items_center().gap_2().px_2().pb_2()
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .pb_2()
                 .child(div().child("WHERE"))
-                .child(field_box("where", &self.filter_text, "label contains 7", self.active == Field::Filter)
+                .child(
+                    field_box(
+                        "where",
+                        &self.filter_text,
+                        "label contains 7",
+                        self.active == Field::Filter,
+                    )
                     .w(px(420.0))
-                    .on_click(cx.listener(|this, _, _, cx| { this.active = Field::Filter; cx.notify(); })))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.active = Field::Filter;
+                        cx.notify();
+                    })),
+                )
                 .child(button("apply", "Apply").on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
-                .child(button("clear", "Clear all").on_click(cx.listener(|this, _, _, cx| { this.clear_filter(); cx.notify(); })))
+                .child(button("clear", "Clear all").on_click(cx.listener(|this, _, _, cx| {
+                    this.clear_filter();
+                    cx.notify();
+                })))
         });
         let compare_bar = self.compare.as_ref().map(|diff| {
             let s = &diff.summary;
             let summary = if s.keyed {
-                format!("Equal {} · Removed {} · Changed {}", thousands(s.equal), thousands(s.removed), thousands(s.changed))
+                format!(
+                    "Equal {} · Removed {} · Changed {}",
+                    thousands(s.equal),
+                    thousands(s.removed),
+                    thousands(s.changed)
+                )
             } else {
-                format!("Equal {} · Added {} · Removed {}", thousands(s.equal), thousands(s.added), thousands(s.removed))
+                format!(
+                    "Equal {} · Added {} · Removed {}",
+                    thousands(s.equal),
+                    thousands(s.added),
+                    thousands(s.removed)
+                )
             };
-            let capped = if diff.capped { format!(" · first {MAX_DIFF_ROWS} differences shown") } else { String::new() };
-            div().flex().items_center().gap_2().px_2().pb_2()
+            let capped = if diff.capped {
+                format!(" · first {MAX_DIFF_ROWS} differences shown")
+            } else {
+                String::new()
+            };
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .pb_2()
                 .child(div().child(format!("COMPARE {summary}{capped}")))
                 .child(button("whole", "Whole row").on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
                 .child(button("keyed", "Key: value").on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))))
-                .child(button("close-compare", "Close").on_click(cx.listener(|this, _, _, cx| { this.compare = None; cx.notify(); })))
+                .child(button("close-compare", "Close").on_click(cx.listener(|this, _, _, cx| {
+                    this.compare = None;
+                    cx.notify();
+                })))
         });
         let header = row_div(false, false)
             .text_color(rgb(0x9aa0b4))
@@ -469,8 +620,10 @@ impl Render for GridView {
         let list = uniform_list(
             "rows",
             self.visible_count(),
-            cx.processor(|this, range: Range<usize>, _window, _cx| {
-                range.map(|index| this.row_at_position(index)).collect::<Vec<Div>>()
+            cx.processor(|this, range: Range<usize>, _window, cx| {
+                range
+                    .map(|index| this.row_at_position(index, cx))
+                    .collect::<Vec<Stateful<Div>>>()
             }),
         )
         .track_scroll(self.scroll.clone())
@@ -493,10 +646,13 @@ impl Render for GridView {
 }
 
 impl GridView {
-    fn row_at_position(&self, position: usize) -> Div {
+    fn row_at_position(&self, position: usize, cx: &mut Context<Self>) -> Stateful<Div> {
         if let Some(diff) = &self.compare {
-            let Some(row) = diff.rows.get(position) else { return row_div(false, false) };
+            let Some(row) = diff.rows.get(position) else {
+                return row_div(false, false).id(position);
+            };
             return row_div(position % 2 == 1, false)
+                .id(position)
                 .child(cell_div(70.0, row.change.to_string()))
                 .child(cell_div(CELL_WIDTHS[0], row.cells[0].display()))
                 .child(cell_div(CELL_WIDTHS[1], row.cells[1].display()))
@@ -506,7 +662,18 @@ impl GridView {
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
         let cells = row_at(source);
-        row_div(position % 2 == 1, self.selected == Some(source))
+        let selected = self
+            .selection
+            .is_some_and(|selection| selection.contains(dataset_index));
+        row_div(position % 2 == 1, selected)
+            .id(position)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
+                    this.click_row(dataset_index, event.modifiers.shift);
+                    cx.notify();
+                }),
+            )
             .child(cell_div(CELL_WIDTHS[0], cells[0].display()))
             .child(cell_div(CELL_WIDTHS[1], cells[1].display()))
             .child(cell_div(CELL_WIDTHS[2], cells[2].display()))

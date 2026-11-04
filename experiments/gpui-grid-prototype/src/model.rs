@@ -102,10 +102,10 @@ pub fn label_of(index: u64) -> String {
 }
 
 pub fn state_of(index: u64) -> Cell {
-    if index % 3 == 0 {
+    if index.is_multiple_of(3) {
         Cell::Null
     } else {
-        Cell::Bool(index % 2 == 0)
+        Cell::Bool(index.is_multiple_of(2))
     }
 }
 
@@ -332,11 +332,7 @@ pub fn build_diff(total: u64, keyed: bool) -> Diff {
             }
         }
     }
-    Diff {
-        summary,
-        rows,
-        capped,
-    }
+    Diff { summary, rows, capped }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

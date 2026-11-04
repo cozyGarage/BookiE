@@ -16,7 +16,9 @@ The window (`src/main.rs`) has:
 - A fourth `typed` column that cycles through every value kind (float, bytes, date, time, datetime, timestamp with time zone, decimal, UUID, JSON, raw JSON text, undecodable, NULL), searchable with Find and the filter row.
 - A virtualized grid over `uniform_list` with 36 px rows. Find, filter and compare run on the background executor and drop stale results by generation.
 
-The text fields are deliberately minimal: they append typed characters, handle Backspace and Enter, and nothing else. There is no selection, caret movement, IME or clipboard. No SQL editor was attempted.
+The text fields are deliberately minimal: they append typed characters, handle Backspace and Enter, and nothing else. There is no caret movement or IME, and no SQL editor was attempted.
+
+Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text. The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
 
 Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. `BOOKIE_PROTOTYPE_WIDTH` and `BOOKIE_PROTOTYPE_HEIGHT` set the window size.
 
