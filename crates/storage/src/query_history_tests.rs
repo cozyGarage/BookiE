@@ -442,6 +442,44 @@ fn exported_sql_keeps_untrusted_text_inside_comments() {
     assert!(exported.ends_with("SELECT 1;\n\n"));
 }
 
+fn exported_query(driver: &str, query: &str) -> String {
+    let mut entry = sample_entry();
+    entry.driver_id = driver.into();
+    entry.query = query.into();
+    let exported = sql_export_entry(&entry);
+    exported.split_once('\n').map(|(_, rest)| rest.to_string()).unwrap()
+}
+
+#[test]
+fn a_trailing_line_comment_does_not_swallow_the_terminator() {
+    assert_eq!(
+        exported_query("postgres", "SELECT 1 -- keep"),
+        "SELECT 1 -- keep\n;\n\n"
+    );
+    assert_eq!(exported_query("mysql", "SELECT 1 # keep"), "SELECT 1 # keep\n;\n\n");
+}
+
+#[test]
+fn a_semicolon_inside_a_trailing_comment_is_not_a_terminator() {
+    assert_eq!(exported_query("postgres", "SELECT 1 -- a;"), "SELECT 1 -- a;\n;\n\n");
+}
+
+#[test]
+fn a_statement_that_is_already_terminated_is_left_alone_even_with_a_comment_after_it() {
+    assert_eq!(exported_query("postgres", "SELECT 1; -- done"), "SELECT 1; -- done\n\n");
+    assert_eq!(exported_query("postgres", "SELECT 1;"), "SELECT 1;\n\n");
+}
+
+#[test]
+fn an_unterminated_statement_gets_its_terminator_on_the_same_line_when_nothing_blocks_it() {
+    assert_eq!(exported_query("postgres", "SELECT 1"), "SELECT 1;\n\n");
+    assert_eq!(exported_query("postgres", "SELECT 1 /* x */"), "SELECT 1 /* x */;\n\n");
+    assert_eq!(
+        exported_query("postgres", "SELECT '-- not a comment'"),
+        "SELECT '-- not a comment';\n\n"
+    );
+}
+
 #[test]
 fn outcome_summary_reports_cancelled_before_checking_success() {
     let mut entry = sample_entry();

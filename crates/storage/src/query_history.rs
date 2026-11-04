@@ -637,12 +637,38 @@ fn sql_export_entry(entry: &Entry) -> String {
             out.push('\n');
         }
     }
-    out.push_str(entry.query.trim_end());
-    if !entry.query.trim_end().ends_with(';') {
-        out.push(';');
-    }
+    out.push_str(&terminated(&entry.query, &entry.driver_id));
     out.push_str("\n\n");
     out
+}
+
+fn terminated(query: &str, driver_id: &str) -> String {
+    use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan, ScriptTokenKind};
+    let query = query.trim_end();
+    let grammar = grammar_for(driver_id);
+    let plan = ScriptPlan::build(query, grammar, LexicalSettings::default_for(grammar));
+    let mut line_comment_follows = false;
+    for token in plan.tokens(0..query.len()).rev() {
+        match token.kind {
+            ScriptTokenKind::LineComment => line_comment_follows = true,
+            kind if kind.is_trivia() => {}
+            ScriptTokenKind::Semicolon => return query.to_string(),
+            _ => break,
+        }
+    }
+    let separator = if line_comment_follows { "\n;" } else { ";" };
+    format!("{query}{separator}")
+}
+
+fn grammar_for(driver_id: &str) -> bookie_core::sql_syntax::SqlGrammar {
+    use bookie_core::sql_syntax::SqlGrammar;
+    match driver_id {
+        "postgres" | "duckdb" => SqlGrammar::PostgreSql,
+        "mysql" => SqlGrammar::MySql,
+        "mssql" => SqlGrammar::MsSql,
+        "clickhouse" => SqlGrammar::ClickHouse,
+        _ => SqlGrammar::Sqlite,
+    }
 }
 
 fn outcome_summary(entry: &Entry) -> String {
