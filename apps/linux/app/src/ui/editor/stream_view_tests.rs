@@ -628,6 +628,8 @@ fn a_failed_page_offers_a_retry_without_changing_pages() {
     container.append(&placeholder);
     pages.add_named(&container, Some(&page_widget_name(42, 0)));
     holder.append(&pages);
+    let window = gtk::Window::builder().child(&holder).build();
+    window.present();
     let retry_count = Rc::new(Cell::new(0));
     let observed = retry_count.clone();
     pages.connect_visible_child_notify(move |_| observed.set(observed.get() + 1));
@@ -649,4 +651,50 @@ fn a_failed_page_offers_a_retry_without_changing_pages() {
     retry.emit_clicked();
     assert_eq!(retry_count.get(), 1);
     assert_eq!(pages.visible_child().as_ref(), Some(container.upcast_ref()));
+    placeholder.add_css_class("tp-stream-page-loading");
+    complete_page_load(
+        PageLoadContext {
+            holder: &holder,
+            generation: 42,
+            index: 0,
+            identity: StatementIdentity::default(),
+            grid_sender: &sender,
+            connection_id: None,
+            database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+            settings_store: LocalResultSettingsStore::default(),
+        },
+        Err("another failure".into()),
+    );
+    placeholder
+        .child()
+        .unwrap()
+        .downcast::<gtk::Button>()
+        .unwrap()
+        .emit_clicked();
+    assert_eq!(retry_count.get(), 2);
+    placeholder.add_css_class("tp-stream-page-loading");
+    let result = page(&[42, 99]);
+    complete_page_load(
+        PageLoadContext {
+            holder: &holder,
+            generation: 42,
+            index: 0,
+            identity: StatementIdentity::default(),
+            grid_sender: &sender,
+            connection_id: None,
+            database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+            settings_store: LocalResultSettingsStore::default(),
+        },
+        Ok(result),
+    );
+    let grid = wait_for_grid(container.upcast_ref());
+    let model = grid.model().unwrap();
+    assert_eq!(model.n_items(), 2);
+    let row = model
+        .item(0)
+        .unwrap()
+        .downcast::<crate::ui::row_object::RowObject>()
+        .unwrap();
+    assert_eq!(row.complete_cells(), Some(vec![Value::Int(42)]));
+    window.destroy();
 }
