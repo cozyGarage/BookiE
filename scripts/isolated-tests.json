@@ -1335,6 +1335,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::import_dialog::lifetime_tests::the_skip_switch_is_off_by_default_and_its_state_reaches_the_import"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::structure_tab::lifetime_tests::closing_a_structure_tab_releases_its_generated_views"
     ],
     [
