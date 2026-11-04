@@ -489,6 +489,7 @@ def scenarios(ui):
             f"CREATE TABLE {table} (id integer PRIMARY KEY, marker_{index:02} text)"
             for index, table in enumerate(tables)
         ))
+        psql("; ".join(f"GRANT SELECT ON {table} TO bookie_mtls" for table in tables))
         try:
             ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
             ui.wait_for_node(name="public.release_items", role=pyatspi.ROLE_LIST_ITEM)
@@ -2080,7 +2081,7 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing(f"Rows 1-{page_size:,}", timeout=120)
         wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
-        wait_for_streamed_page_during_load(first_run_marker, page_size * 2)
+        wait_for_streamed_page_after_rows_arrive(first_run_marker, page_size * 2)
         ui.wait_for_node_containing(f"Complete · Received {stream_rows:,} rows", timeout=180)
         scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
@@ -2152,7 +2153,7 @@ GLib.MainLoop().run()
             time.sleep(ui.POLL_SECONDS)
         raise AssertionError(f"{name!r} was not visible")
 
-    def wait_for_streamed_page_during_load(marker, minimum_rows):
+    def wait_for_streamed_page_after_rows_arrive(marker, minimum_rows):
         deadline = time.monotonic() + 120
         progress = ""
         while time.monotonic() < deadline:
@@ -2162,17 +2163,21 @@ GLib.MainLoop().run()
                 progress = next((
                     ui.node_name(node) for node in nodes
                     if ui.node_role(node) == pyatspi.ROLE_LABEL
-                    and ui.node_name(node).startswith("Receiving… · Received ")
+                    and ui.node_name(node).startswith(("Receiving… · Received ", "Complete · Received "))
                 ), "")
                 match = re.search(r"Received ([0-9,]+) rows", progress)
-                visible_values = {
-                    ui.node_name(node) for node in nodes
-                    if ui.node_role(node) == pyatspi.ROLE_LABEL
-                    and node.getState().contains(pyatspi.STATE_SHOWING)
-                }
                 if match and int(match.group(1).replace(",", "")) >= minimum_rows:
-                    assert "1" in visible_values, "the first result page disappeared while later rows arrived"
-                    assert marker in visible_values, "the first page marker disappeared while later rows arrived"
+                    if progress.startswith("Receiving…"):
+                        visible_values = {
+                            ui.node_name(node) for node in nodes
+                            if ui.node_role(node) == pyatspi.ROLE_LABEL
+                            and node.getState().contains(pyatspi.STATE_SHOWING)
+                        }
+                        assert "1" in visible_values, "the first result page disappeared while later rows arrived"
+                        assert marker in visible_values, "the first page marker disappeared while later rows arrived"
+                    else:
+                        wait_for_visible_cell_value("1")
+                        wait_for_visible_marker(marker)
                     return
             time.sleep(ui.POLL_SECONDS)
         raise AssertionError(f"the first result page was not visible after later rows arrived: {progress!r}")
