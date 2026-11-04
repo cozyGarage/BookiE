@@ -235,6 +235,8 @@ impl FileOptions {
     }
 }
 
+type ResolvedTarget = (String, Vec<ColumnInfo>, Vec<Option<usize>>, Option<Vec<DraftColumn>>);
+
 enum ColumnSection {
     Existing(ExistingColumns),
     New(NewColumns),
@@ -277,8 +279,7 @@ impl ColumnSection {
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    fn resolve(&self) -> Option<(String, Vec<ColumnInfo>, Vec<Option<usize>>, Option<Vec<DraftColumn>>)> {
+    fn resolve(&self) -> Option<ResolvedTarget> {
         match self {
             Self::Existing(existing) => Some((
                 existing.table.clone(),
@@ -643,8 +644,7 @@ impl NewColumns {
         self.type_names.iter().position(|name| *name == data_type).unwrap_or(0) as u32
     }
 
-    #[allow(clippy::type_complexity)]
-    fn resolve(&self) -> Option<(String, Vec<ColumnInfo>, Vec<Option<usize>>, Option<Vec<DraftColumn>>)> {
+    fn resolve(&self) -> Option<ResolvedTarget> {
         let table = self.table.text().trim().to_owned();
         let table_ok = sql_dialect::validate_ident(&table).is_ok();
         mark(&self.table, table_ok);
