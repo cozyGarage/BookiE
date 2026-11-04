@@ -19,6 +19,7 @@ def _stage_package(
     *,
     include_schema: bool = True,
     include_askpass: bool = True,
+    include_notices: bool = True,
     package_name: str = "bookie",
     include_relations: bool = True,
 ) -> Path:
@@ -57,6 +58,11 @@ def _stage_package(
             stage / "usr/share/glib-2.0/schemas/com.bookie.linux.gschema.xml",
         )
     (stage / "usr/share/doc/bookie/LICENSE.md").write_text((source / "LICENSE.md").read_text())
+    if include_notices:
+        shutil.copyfile(
+            source / "apps/linux/packaging/THIRD_PARTY_NOTICES.md",
+            stage / "usr/share/doc/bookie/THIRD_PARTY_NOTICES.md",
+        )
     (stage / "usr/share/doc/bookie/policy.example.toml").write_text(
         (source / "apps/linux/packaging/policy.example.toml").read_text()
     )
@@ -90,6 +96,12 @@ def check_builder_builds_and_installs_the_askpass_helper(source: Path) -> None:
     assert "usr/bin/bookie-askpass" in builder, "build-deb.sh does not install the SSH askpass helper"
 
 
+def check_builder_installs_third_party_notices(source: Path) -> None:
+    builder = (source / "scripts/build-deb.sh").read_text()
+    assert "apps/linux/packaging/THIRD_PARTY_NOTICES.md" in builder
+    assert "usr/share/doc/bookie/THIRD_PARTY_NOTICES.md" in builder
+
+
 def check_package_test_reports_the_failing_command(source: Path) -> None:
     helper = source / "scripts/command-failure-context.sh"
     result = subprocess.run(
@@ -121,6 +133,7 @@ def check_deb_build_failure_reports_stderr(source: Path) -> None:
 def main() -> None:
     source = Path(__file__).resolve().parents[2]
     check_builder_builds_and_installs_the_askpass_helper(source)
+    check_builder_installs_third_party_notices(source)
     check_package_test_reports_the_failing_command(source)
     check_deb_build_failure_reports_stderr(source)
     if shutil.which("dpkg-deb") is None:
@@ -139,6 +152,10 @@ def main() -> None:
         result = subprocess.run(["bash", str(validator), str(missing_askpass)], capture_output=True, text=True)
         assert result.returncode != 0
         assert "package is missing /usr/bin/bookie-askpass" in result.stderr, result.stderr
+        missing_notices = _stage_package(source, root / "missing-notices", include_notices=False)
+        result = subprocess.run(["bash", str(validator), str(missing_notices)], capture_output=True, text=True)
+        assert result.returncode != 0
+        assert "package is missing /usr/share/doc/bookie/THIRD_PARTY_NOTICES.md" in result.stderr, result.stderr
         missing_schema = _stage_package(source, root / "missing-schema", include_schema=False)
         result = subprocess.run(["bash", str(validator), str(missing_schema)], capture_output=True, text=True)
         assert result.returncode != 0

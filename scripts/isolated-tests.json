@@ -425,7 +425,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::grid::value_viewer::tests::the_viewer_dialog_builds_and_shows_the_full_value"
+      "ui::grid::value_viewer::tests::the_viewer_dialog_shows_a_preview_and_copies_the_full_value"
     ],
     [
       "bookie-app",

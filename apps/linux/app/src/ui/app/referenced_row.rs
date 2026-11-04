@@ -4,6 +4,7 @@ use relm4::adw::prelude::*;
 
 use crate::ui::browse_tab::BrowseTabInput;
 
+use super::types::TableTabStart;
 use super::{App, WorkspaceTab};
 
 pub(super) fn choose_referenced_row(
@@ -80,6 +81,7 @@ impl App {
             self.show_toast(&error);
             return;
         }
-        self.append_table_tab(schema, table, 0, self.default_page_size, None, false, sender);
+        let start = TableTabStart::first_page(self.default_page_size, false);
+        self.append_table_tab(schema, table, start, sender);
     }
 }

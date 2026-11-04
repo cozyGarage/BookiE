@@ -191,3 +191,34 @@ impl bookie_app_services::workspace::TabContent for WorkspaceTab {
         }
     }
 }
+
+pub(super) struct TableTabStart {
+    pub(super) offset: u64,
+    pub(super) page_size: u64,
+    pub(super) sort: Option<(usize, bool)>,
+    pub(super) preview: bool,
+}
+
+impl TableTabStart {
+    pub(super) fn into_parts(self) -> (u64, u64, Option<(usize, bool)>, bool) {
+        (self.offset, self.page_size, self.sort, self.preview)
+    }
+
+    pub(super) fn new(offset: u64, page_size: u64, sort: Option<(usize, bool)>, preview: bool) -> Self {
+        Self {
+            offset,
+            page_size,
+            sort,
+            preview,
+        }
+    }
+
+    pub(super) fn first_page(page_size: u64, preview: bool) -> Self {
+        Self {
+            offset: 0,
+            page_size,
+            sort: None,
+            preview,
+        }
+    }
+}

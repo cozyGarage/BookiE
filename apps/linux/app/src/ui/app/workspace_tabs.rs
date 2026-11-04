@@ -12,7 +12,7 @@ use crate::ui::browse_tab::{BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabO
 use crate::ui::editor::{SqlEditor, SqlEditorInit, SqlEditorInput, SqlEditorOutput, derive_tab_label};
 
 use super::editor_files::initial_editor_query;
-use super::types::{CLOSED_TABS_CAPACITY, read_workspace_tab_id, write_workspace_tab_id};
+use super::types::{CLOSED_TABS_CAPACITY, TableTabStart, read_workspace_tab_id, write_workspace_tab_id};
 use super::workspace_overview::build_workspace_tab_overview;
 use super::{App, AppMsg, ClosedTabDescriptor, EditorTabSlot, WorkspaceTab};
 mod bulk_close;
@@ -243,7 +243,12 @@ impl App {
                     sort,
                     preview,
                 }) => {
-                    self.append_table_tab(schema, table, offset, page_size, sort, preview, sender.clone());
+                    self.append_table_tab(
+                        schema,
+                        table,
+                        TableTabStart::new(offset, page_size, sort, preview),
+                        sender.clone(),
+                    );
                 }
                 Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table }) => {
                     self.append_existing_structure_tab(schema, table, sender.clone());
@@ -337,17 +342,14 @@ impl App {
     /// `(schema, table)`. The DDL editor for the same table opens as
     /// a separate `WorkspaceTab::Structure` page via the sidebar
     /// right-click "Edit Structure" action (`append_existing_structure_tab`).
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn append_table_tab(
         &mut self,
         schema: Option<String>,
         table: String,
-        offset: u64,
-        page_size: u64,
-        sort: Option<(usize, bool)>,
-        preview: bool,
+        start: TableTabStart,
         sender: ComponentSender<Self>,
     ) {
+        let (offset, page_size, sort, preview) = start.into_parts();
         self.ensure_workspace_root(sender.clone());
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
@@ -1086,7 +1088,12 @@ impl App {
                 page_size,
                 sort,
             } => {
-                self.append_table_tab(schema, table, offset, page_size, sort, false, sender);
+                self.append_table_tab(
+                    schema,
+                    table,
+                    TableTabStart::new(offset, page_size, sort, false),
+                    sender,
+                );
             }
             ClosedTabDescriptor::Structure { schema, table } => {
                 self.append_existing_structure_tab(schema, table, sender);
