@@ -297,7 +297,7 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         vec![
             Cell::Int(index as i64),
             Cell::Text(format!("tiny {index}")),
-            Cell::Bool(index % 2 == 0),
+            Cell::Bool(index.is_multiple_of(2)),
             Cell::Null,
         ]
     }
