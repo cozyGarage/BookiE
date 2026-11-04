@@ -12,31 +12,13 @@ use crate::ui::browse_tab::{BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabO
 use crate::ui::editor::{SqlEditor, SqlEditorInit, SqlEditorInput, SqlEditorOutput, derive_tab_label};
 
 use super::editor_files::initial_editor_query;
-use super::types::{CLOSED_TABS_CAPACITY, read_workspace_tab_id, write_workspace_tab_id};
+use super::types::{CLOSED_TABS_CAPACITY, TableTabStart, read_workspace_tab_id, write_workspace_tab_id};
 use super::workspace_overview::build_workspace_tab_overview;
 use super::{App, AppMsg, ClosedTabDescriptor, EditorTabSlot, WorkspaceTab};
 mod bulk_close;
 use bulk_close::{add_bulk_close_actions, bulk_close_menu_model};
 mod closed_tab;
 use closed_tab::describe_closed_tab;
-
-pub(super) struct TableTabStart {
-    pub(super) offset: u64,
-    pub(super) page_size: u64,
-    pub(super) sort: Option<(usize, bool)>,
-    pub(super) preview: bool,
-}
-
-impl TableTabStart {
-    pub(super) fn first_page(page_size: u64, preview: bool) -> Self {
-        Self {
-            offset: 0,
-            page_size,
-            sort: None,
-            preview,
-        }
-    }
-}
 
 impl App {
     /// Builds the unified AdwTabOverview tree once per connection.
@@ -264,12 +246,7 @@ impl App {
                     self.append_table_tab(
                         schema,
                         table,
-                        TableTabStart {
-                            offset,
-                            page_size,
-                            sort,
-                            preview,
-                        },
+                        TableTabStart::new(offset, page_size, sort, preview),
                         sender.clone(),
                     );
                 }
@@ -372,12 +349,7 @@ impl App {
         start: TableTabStart,
         sender: ComponentSender<Self>,
     ) {
-        let TableTabStart {
-            offset,
-            page_size,
-            sort,
-            preview,
-        } = start;
+        let (offset, page_size, sort, preview) = start.into_parts();
         self.ensure_workspace_root(sender.clone());
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
@@ -1119,12 +1091,7 @@ impl App {
                 self.append_table_tab(
                     schema,
                     table,
-                    TableTabStart {
-                        offset,
-                        page_size,
-                        sort,
-                        preview: false,
-                    },
+                    TableTabStart::new(offset, page_size, sort, false),
                     sender,
                 );
             }

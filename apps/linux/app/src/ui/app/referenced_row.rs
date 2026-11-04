@@ -4,7 +4,7 @@ use relm4::adw::prelude::*;
 
 use crate::ui::browse_tab::BrowseTabInput;
 
-use super::workspace_tabs::TableTabStart;
+use super::types::TableTabStart;
 use super::{App, WorkspaceTab};
 
 pub(super) fn choose_referenced_row(

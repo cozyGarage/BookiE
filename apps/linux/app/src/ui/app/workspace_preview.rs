@@ -2,7 +2,7 @@ use relm4::ComponentSender;
 use relm4::gtk::gio;
 use uuid::Uuid;
 
-use super::workspace_tabs::TableTabStart;
+use super::types::TableTabStart;
 use super::{App, OpenMode, WorkspaceTab};
 use bookie_app_services::workspace::{TableOpenPlan, TableOpenRequest};
 
