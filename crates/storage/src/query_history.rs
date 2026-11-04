@@ -622,6 +622,7 @@ fn comment_text(text: &str) -> String {
 
 struct StatementTail {
     in_line_comment: bool,
+    in_block_comment: bool,
     last_code: Option<char>,
 }
 
@@ -632,12 +633,17 @@ enum ScanState {
     BlockComment,
 }
 
-fn scan_statement_tail(query: &str, hash_comments: bool) -> StatementTail {
+fn scan_statement_tail(query: &str, mysql: bool) -> StatementTail {
+    let hash_comments = mysql;
     let mut state = ScanState::Code;
     let mut last_code = None;
     let mut chars = query.chars().peekable();
     while let Some(c) = chars.next() {
         state = match state {
+            ScanState::Quoted(_) if mysql && c == '\\' => {
+                chars.next();
+                state
+            }
             ScanState::Quoted(quote) if c == quote => ScanState::Code,
             ScanState::Quoted(quote) => ScanState::Quoted(quote),
             ScanState::LineComment if c == '\n' || c == '\r' => ScanState::Code,
@@ -661,6 +667,7 @@ fn scan_statement_tail(query: &str, hash_comments: bool) -> StatementTail {
     }
     StatementTail {
         in_line_comment: matches!(state, ScanState::LineComment),
+        in_block_comment: matches!(state, ScanState::BlockComment),
         last_code,
     }
 }
@@ -685,7 +692,9 @@ fn sql_export_entry(entry: &Entry) -> String {
     let query = entry.query.trim_end();
     out.push_str(query);
     let tail = scan_statement_tail(query, matches!(entry.driver_id.as_str(), "mysql" | "mariadb"));
-    if tail.last_code != Some(';') {
+    if tail.in_block_comment {
+        out.push_str("\n*/\n;");
+    } else if tail.last_code != Some(';') {
         out.push_str(if tail.in_line_comment { "\n;" } else { ";" });
     }
     out.push_str("\n\n");

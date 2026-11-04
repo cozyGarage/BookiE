@@ -477,6 +477,19 @@ fn an_exported_statement_that_is_already_terminated_gets_no_extra_statement() {
 }
 
 #[test]
+fn an_unterminated_block_comment_is_closed_before_the_terminator() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* oops"),
+        "SELECT 1 /* oops\n*/\n;\n\n"
+    );
+}
+
+#[test]
+fn a_mysql_backslash_escaped_quote_does_not_end_the_string() {
+    assert_eq!(exported_tail("mysql", "SELECT 'a\\' -- x'"), "SELECT 'a\\' -- x';\n\n");
+}
+
+#[test]
 fn a_hash_is_a_comment_only_for_mysql_and_an_operator_elsewhere() {
     assert_eq!(exported_tail("postgres", "SELECT 5 # 3"), "SELECT 5 # 3;\n\n");
     assert_eq!(exported_tail("mariadb", "SELECT 5 # 3"), "SELECT 5 # 3\n;\n\n");
