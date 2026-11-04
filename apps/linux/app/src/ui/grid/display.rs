@@ -306,7 +306,14 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
 }
 
 fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
-    let total = crate::tr!("{n} bytes total").replace("{n}", &preview.byte_count.to_string());
+    let total = match preview.byte_count {
+        crate::ui::row_object::PreviewByteCount::Exact(bytes) => {
+            crate::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
+        }
+        crate::ui::row_object::PreviewByteCount::MoreThan(bytes) => {
+            crate::tr!("More than {n} bytes total").replace("{n}", &bytes.to_string())
+        }
+    };
     match &preview.value {
         Value::Text(text) | Value::JsonText(text) => {
             let end = text
