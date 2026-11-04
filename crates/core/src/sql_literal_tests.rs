@@ -127,13 +127,17 @@ fn dialect_specific_decimal_and_temporal_literals_stay_with_their_engines() {
 }
 
 #[test]
-fn sqlite_refuses_negative_zero_without_refusing_positive_zero() {
+fn negative_zero_is_refused_for_sqlite_and_kept_as_a_float8_for_postgres() {
     assert_eq!(
         render_sql_literal("sqlite", &Value::Float(-0.0)),
         Err(LiteralError::Unsupported)
     );
     assert_eq!(render_sql_literal("sqlite", &Value::Float(0.0)).unwrap(), "0e0");
-    assert_eq!(render_sql_literal("postgres", &Value::Float(-0.0)).unwrap(), "-0e0");
+    assert_eq!(
+        render_sql_literal("postgres", &Value::Float(-0.0)).unwrap(),
+        "'-0'::float8"
+    );
+    assert_eq!(render_sql_literal("postgres", &Value::Float(0.0)).unwrap(), "0e0");
 }
 
 #[test]
@@ -506,6 +510,26 @@ fn copied_update_and_delete_find_the_row_by_primary_key() {
         build_delete_literal("mysql", None, "t", &columns, &row).unwrap(),
         "DELETE FROM `t` WHERE `id` = 7;"
     );
+}
+
+#[test]
+fn a_copied_where_names_the_row_by_its_whole_primary_key_without_a_terminator() {
+    let mut tenant = column("tenant");
+    tenant.primary_key = true;
+    let mut id = column("id");
+    id.primary_key = true;
+    let columns = vec![tenant, id, column("note")];
+    let row = vec![Value::Text("a'b".into()), Value::Int(7), Value::Null];
+    assert_eq!(
+        RowStatement::Where
+            .build("postgres", Some("public"), "t", &columns, &row)
+            .unwrap(),
+        "\"tenant\" = 'a''b' AND \"id\" = 7"
+    );
+    assert!(matches!(
+        RowStatement::Where.build("postgres", None, "t", &[column("id")], &[Value::Int(1)]),
+        Err(BuildSqlError::NoPrimaryKey)
+    ));
 }
 
 #[test]
