@@ -12,6 +12,7 @@ use bookie_gpui_grid_prototype::model::*;
 use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
 use bookie_gpui_grid_prototype::shell::{DATA_TABLE, Tab, Tabs};
+use bookie_gpui_grid_prototype::source::{Source, Synthetic};
 use bookie_gpui_grid_prototype::theme::{Style, Theme};
 use gpui::{
     App, Application, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
@@ -32,7 +33,7 @@ enum Mode {
 }
 
 struct GridView {
-    total: u64,
+    source: Source,
     mode: Mode,
     pager: Pager,
     continuous: bool,
@@ -115,6 +116,11 @@ impl Focusable for GridView {
 
 impl GridView {
     fn new(total: u64, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::with_source(std::sync::Arc::new(Synthetic { total }), started, window, cx)
+    }
+
+    fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let total = source.total();
         let find = cx.new(|cx| TextInput::new("Find in all rows", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
@@ -158,7 +164,7 @@ impl GridView {
         )
         .detach();
         GridView {
-            total,
+            source,
             mode: Mode::All,
             pager: Pager::new(total),
             continuous: false,
@@ -203,7 +209,7 @@ impl GridView {
 
     fn dataset_count(&self) -> u64 {
         match &self.mode {
-            Mode::All => self.total,
+            Mode::All => self.source.total(),
             Mode::Filtered { kept, .. } => kept.len() as u64,
         }
     }
@@ -253,7 +259,7 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let rows = (selection.first()..=selection.last()).map(|index| row_at(self.source_row(index)));
+        let rows = (selection.first()..=selection.last()).map(|index| self.source.row(self.source_row(index)));
         let text = copy_tsv(rows, with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -313,11 +319,11 @@ impl GridView {
             self.step_match(forward);
             return;
         }
-        let (total, query) = (self.total, self.find_text(cx));
+        let (source, query) = (self.source.clone(), self.find_text(cx));
         self.status = "Searching…".into();
         self.begin_background(
             cx,
-            move || find_rows(total, &query, MAX_FIND_MATCHES),
+            move || source.find(&query, MAX_FIND_MATCHES),
             move |this, found| match found {
                 Ok(found) => {
                     this.find_capped = found.capped;
@@ -364,12 +370,12 @@ impl GridView {
                 return;
             }
         };
-        let total = self.total;
+        let source = self.source.clone();
         let label = format!("WHERE {}", self.filter.read(cx).content());
         self.status = "Filtering…".into();
         self.begin_background(
             cx,
-            move || filter_rows(total, &predicate),
+            move || source.filter(&predicate),
             move |this, kept| {
                 this.set_mode(Mode::Filtered { kept, label });
                 this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
@@ -385,11 +391,11 @@ impl GridView {
     }
 
     fn compare(&mut self, keyed: bool, cx: &mut Context<Self>) {
-        let total = self.total;
+        let source = self.source.clone();
         self.status = "Comparing…".into();
         self.begin_background(
             cx,
-            move || build_diff(total, keyed),
+            move || source.compare(keyed),
             |this, diff| {
                 this.status.clear();
                 this.compare = Some(diff);

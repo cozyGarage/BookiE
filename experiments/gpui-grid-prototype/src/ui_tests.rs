@@ -285,3 +285,58 @@ fn the_palette_switches_the_theme_style_and_light_dark_keeps_it(cx: &mut TestApp
         assert_eq!((theme.style, theme.dark), (Style::Adwaita, true));
     });
 }
+
+struct Tiny;
+
+impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
+    fn total(&self) -> u64 {
+        3
+    }
+
+    fn row(&self, index: u64) -> Vec<Cell> {
+        vec![
+            Cell::Int(index as i64),
+            Cell::Text(format!("tiny {index}")),
+            Cell::Bool(index % 2 == 0),
+            Cell::Null,
+        ]
+    }
+
+    fn find(&self, query: &str, _cap: usize) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+        Ok(bookie_gpui_grid_prototype::model::FindResult {
+            matches: if query == "tiny 2" { vec![2] } else { Vec::new() },
+            capped: false,
+            scanned: 3,
+        })
+    }
+
+    fn filter(&self, _predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Vec<u32> {
+        vec![1]
+    }
+
+    fn compare(&self, keyed: bool) -> bookie_gpui_grid_prototype::model::Diff {
+        bookie_gpui_grid_prototype::model::build_diff(3, keyed)
+    }
+}
+
+#[gpui::test]
+fn the_view_renders_and_searches_whatever_source_it_is_given(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let (view, cx) =
+        cx.add_window_view(|window, cx| GridView::with_source(std::sync::Arc::new(Tiny), Instant::now(), window, cx));
+    cx.update(|window, cx| window.focus(&view.read(cx).focus));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.dataset_count(), 3);
+        assert_eq!(view.cell_at(1, 1), Cell::Text("tiny 1".into()));
+    });
+    cx.update(|window, cx| {
+        let handle = view.read(cx).find.read(cx).focus_handle_for_tests();
+        window.focus(&handle);
+    });
+    cx.simulate_input("tiny 2");
+    cx.simulate_keystrokes("enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.cursor.matches, vec![2]));
+}

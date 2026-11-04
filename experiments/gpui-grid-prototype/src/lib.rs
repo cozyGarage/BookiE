@@ -5,6 +5,7 @@ pub mod model;
 pub mod palette;
 pub mod selection;
 pub mod shell;
+pub mod source;
 pub mod theme;
 
 #[cfg(test)]

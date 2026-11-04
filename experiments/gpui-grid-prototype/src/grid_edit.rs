@@ -83,7 +83,7 @@ impl GridView {
         self.edits
             .get(&(row, column))
             .cloned()
-            .unwrap_or_else(|| bookie_gpui_grid_prototype::model::row_at(row).swap_remove(column))
+            .unwrap_or_else(|| self.source.row(row).swap_remove(column))
     }
 
     pub fn data_cell(&self, source: u64, column: usize, position: usize, cx: &mut Context<Self>) -> Div {
