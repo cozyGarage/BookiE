@@ -1234,6 +1234,15 @@ def unparseable_routine_requests_human_approval(database, _base):
     assert_database_count_stable(database, 0)
 
 
+def unparseable_routine_dialog_defaults_to_deny_on_enter(database, _base):
+    run_sql("CREATE PROCEDURE p() SELECT 1")
+    wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+    wait_for_node_containing("Class: Unparseable")
+    press_x11_key("Return")
+    wait_for_node(name="Approve once", present=False)
+    assert_database_count_stable(database, 0)
+
+
 def mysql_unparseable_routine_dialog_denial_preserves_database(database, _base):
     container = os.environ["BOOKIE_GTK_MYSQL_CONTAINER"]
     open_saved_connection(MYSQL_CONNECTION_NAME)
@@ -2966,6 +2975,7 @@ def main():
         sql_character_warnings_leave_query_unchanged,
         malformed_sql_is_blocked_before_approval,
         unparseable_routine_requests_human_approval,
+        unparseable_routine_dialog_defaults_to_deny_on_enter,
         dismissed_approval_denies,
         mcp_client_disconnect_cancels_pending_approval,
         approve_once_prompts_again,
