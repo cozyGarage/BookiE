@@ -10,6 +10,38 @@ async fn open_session_is_refused() {
 }
 
 #[test]
+fn an_ipv6_host_is_bracketed_so_the_endpoint_is_a_valid_address() {
+    assert_eq!(endpoint_url("http", "::1", 8123), "http://[::1]:8123");
+    assert_eq!(endpoint_url("https", "2001:db8::7", 8443), "https://[2001:db8::7]:8443");
+    for url in [
+        endpoint_url("http", "::1", 8123),
+        endpoint_url("https", "fe80::1%eth0", 8443),
+    ] {
+        let uri: http::Uri = url.parse().unwrap();
+        assert!(uri.host().is_some_and(|host| host.starts_with('[')), "{url}");
+        assert!(uri.port_u16().is_some(), "{url}");
+    }
+}
+
+#[test]
+fn names_ipv4_addresses_and_already_bracketed_hosts_are_left_as_they_are() {
+    assert_eq!(
+        endpoint_url("http", "db.example.com", 8123),
+        "http://db.example.com:8123"
+    );
+    assert_eq!(endpoint_url("http", "10.0.0.5", 8123), "http://10.0.0.5:8123");
+    assert_eq!(endpoint_url("http", "[::1]", 8123), "http://[::1]:8123");
+}
+
+#[test]
+fn a_zone_identifier_is_percent_encoded_inside_the_brackets() {
+    assert_eq!(
+        endpoint_url("http", "fe80::1%eth0", 8123),
+        "http://[fe80::1%25eth0]:8123"
+    );
+}
+
+#[test]
 fn decimal_preservation_never_passes_through_float_or_rounds() {
     for text in [
         "12345678901234567890.12345678",
