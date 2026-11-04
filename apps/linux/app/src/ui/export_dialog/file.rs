@@ -147,7 +147,6 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
         move |_| cancel.cancel()
     });
     dialog.present(Some(parent));
-    // Held until the worker's outcome arrives, so quitting asks first while the export runs.
     let busy = bookie_app_services::busy_jobs::global()
         .begin_owned(crate::ui::progress_dialog::owner_id(parent), cancel.clone());
     let (send, recv) = async_channel::bounded(1);

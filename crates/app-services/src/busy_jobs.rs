@@ -17,13 +17,10 @@ pub struct BusyJob {
 }
 
 impl BusyJobs {
-    /// A job that belongs to no particular window: it counts when the last window closes.
     pub fn begin(&self, cancel: CancellationToken) -> BusyJob {
         self.begin_owned(0, cancel)
     }
 
-    /// A job owned by one window (any non-zero id the caller keeps for that window), so closing that window
-    /// asks first even while other windows stay open.
     pub fn begin_owned(&self, owner: u64, cancel: CancellationToken) -> BusyJob {
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         self.jobs

@@ -2,7 +2,6 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
-/// The id a window's running jobs are registered under (never 0, which means "no window").
 pub(crate) fn owner_id(window: &impl IsA<gtk::Window>) -> u64 {
     window.as_ptr() as usize as u64
 }

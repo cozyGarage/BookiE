@@ -10,7 +10,6 @@ use relm4::gtk::glib;
 const WAIT_TICK: Duration = Duration::from_millis(100);
 const MAX_WAIT_TICKS: u32 = 300;
 
-/// Closing the last window asks while any work runs; closing another window asks only for the work it owns.
 pub(super) fn needed(window: &adw::ApplicationWindow) -> bool {
     pending(window) > 0
 }
