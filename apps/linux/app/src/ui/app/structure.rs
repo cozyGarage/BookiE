@@ -23,6 +23,12 @@ use crate::ui::app::ran_statements::finish_if_recorded;
 use crate::ui::app::{App, AppMsg, WorkspaceTab};
 use crate::ui::structure_tab::{StructureMode, StructureTabInput};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StructureText {
+    CreateTable,
+    JoinSkeleton,
+}
+
 impl App {
     /// Sidebar right-click → "New Table…" or schema-header "+" button.
     pub(super) fn on_new_table_tab(&mut self, schema: Option<String>, sender: ComponentSender<Self>) {
@@ -695,6 +701,59 @@ impl App {
     /// indexes, and FKs and feeding them through
     /// `sql_ddl::materialize_ops`. Result lands in a fresh editor
     /// tab. No Structure tab is touched; the user just sees the SQL.
+    pub(super) fn on_structure_text(
+        &self,
+        schema: Option<String>,
+        table: String,
+        text: StructureText,
+        sender: ComponentSender<Self>,
+    ) {
+        match text {
+            StructureText::CreateTable => self.on_show_create_table(schema, table, sender),
+            StructureText::JoinSkeleton => self.on_show_join_skeleton(schema, table, sender),
+        }
+    }
+
+    fn on_show_join_skeleton(&self, schema: Option<String>, table: String, sender: ComponentSender<Self>) {
+        let driver_id = self.driver_id().to_string();
+        let connection_id = self.connection_id;
+        let database = self.database.clone();
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let sender_for_cmd = sender.clone();
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
+                        sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("No active connection.")));
+                        return;
+                    };
+                    let control = crate::services::operation_control::bounded(timeout_secs);
+                    let keys = match conn
+                        .fetch_foreign_keys_controlled(schema.as_deref(), &table, &control)
+                        .await
+                    {
+                        Ok(keys) => keys,
+                        Err(error) => {
+                            sender_for_cmd.input(AppMsg::ShowAlert {
+                                title: crate::tr!("Couldn't read foreign keys"),
+                                body: crate::services::error_text::driver_message(&error),
+                            });
+                            return;
+                        }
+                    };
+                    match bookie_core::join_skeleton(&driver_id, schema.as_deref(), &table, &keys) {
+                        Ok(sql) => sender_for_cmd.input(AppMsg::ShowCreateTableLoaded { sql }),
+                        Err(refusal) => sender_for_cmd.input(AppMsg::ShowAlert {
+                            title: crate::tr!("No join was built"),
+                            body: refusal.to_string(),
+                        }),
+                    }
+                })
+                .drop_on_shutdown()
+        });
+    }
+
     pub(super) fn on_show_create_table(&self, schema: Option<String>, table: String, sender: ComponentSender<Self>) {
         let driver_id = self.driver_id().to_string();
         let sender_for_cmd = sender.clone();
