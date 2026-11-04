@@ -888,6 +888,7 @@ pub fn sample_event(principal: Principal) -> AuditEvent {
         error_category: None,
         error: None,
         rows_affected: Some(1),
+        rows_skipped: None,
         duration_ms: Some(1),
         transport_attempt: None,
         administrative_action: None,
