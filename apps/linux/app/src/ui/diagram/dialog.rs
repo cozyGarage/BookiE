@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -6,7 +7,7 @@ use relm4::{adw, gtk, gtk::glib};
 use tokio_util::sync::CancellationToken;
 
 use bookie_app_services::er_diagram::read::{SchemaRead, read_schema};
-use bookie_app_services::er_diagram::{SchemaDiagram, zoom};
+use bookie_app_services::er_diagram::{SchemaDiagram, export, zoom};
 use bookie_core::{DriverCapabilities, DriverError};
 
 use super::canvas::DiagramCanvas;
@@ -24,6 +25,8 @@ struct Ui {
     list: gtk::ListBox,
     canvas: DiagramCanvas,
     zoom_label: gtk::Label,
+    export_button: gtk::MenuButton,
+    exported: Rc<RefCell<SchemaDiagram>>,
 }
 
 pub fn present(
@@ -111,9 +114,13 @@ fn build(title: &str, token: &CancellationToken) -> Ui {
             }
         }
     });
+    let toasts = adw::ToastOverlay::new();
+    toasts.set_child(Some(&stack));
+    let exported = Rc::new(RefCell::new(SchemaDiagram::default()));
+    let export_button = export_button(&exported, &toasts);
     let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&header(&canvas, &zoom_label));
-    toolbar.set_content(Some(&stack));
+    toolbar.add_top_bar(&header(&canvas, &zoom_label, &export_button));
+    toolbar.set_content(Some(&toasts));
     dialog.set_child(Some(&toolbar));
     dialog.connect_closed({
         let token = token.clone();
@@ -128,6 +135,8 @@ fn build(title: &str, token: &CancellationToken) -> Ui {
         list,
         canvas,
         zoom_label,
+        export_button,
+        exported,
     }
 }
 
@@ -175,8 +184,9 @@ fn ready_page(banner: &adw::Banner, list: &gtk::ListBox, canvas: &DiagramCanvas)
     page
 }
 
-fn header(canvas: &DiagramCanvas, zoom_label: &gtk::Label) -> adw::HeaderBar {
+fn header(canvas: &DiagramCanvas, zoom_label: &gtk::Label, export_button: &gtk::MenuButton) -> adw::HeaderBar {
     let bar = adw::HeaderBar::new();
+    bar.pack_start(export_button);
     let out = zoom_button(
         "zoom-out-symbolic",
         &tr!("Zoom out"),
@@ -203,6 +213,44 @@ fn header(canvas: &DiagramCanvas, zoom_label: &gtk::Label) -> adw::HeaderBar {
     bar.pack_end(&fit);
     bar.pack_end(&out);
     bar
+}
+
+type TextFormat = (String, String, fn(&SchemaDiagram) -> String);
+
+fn export_button(exported: &Rc<RefCell<SchemaDiagram>>, toasts: &adw::ToastOverlay) -> gtk::MenuButton {
+    let popover = gtk::Popover::new();
+    let choices = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    let formats: [TextFormat; 2] = [
+        (tr!("Copy as Mermaid"), tr!("Mermaid text copied"), export::mermaid),
+        (tr!("Copy as DBML"), tr!("DBML text copied"), export::dbml),
+    ];
+    for (label, confirmation, render) in formats {
+        let choice = gtk::Button::with_label(&label);
+        choice.add_css_class("flat");
+        choice.connect_clicked({
+            let (exported, toasts, popover) = (exported.clone(), toasts.downgrade(), popover.downgrade());
+            move |button| {
+                button.clipboard().set_text(&render(&exported.borrow()));
+                if let Some(popover) = popover.upgrade() {
+                    popover.popdown();
+                }
+                if let Some(toasts) = toasts.upgrade() {
+                    toasts.add_toast(adw::Toast::new(&confirmation));
+                }
+            }
+        });
+        choices.append(&choice);
+    }
+    popover.set_child(Some(&choices));
+    let tooltip = tr!("Copy the diagram as text");
+    let button = gtk::MenuButton::builder()
+        .icon_name("edit-copy-symbolic")
+        .tooltip_text(&tooltip)
+        .popover(&popover)
+        .sensitive(false)
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
+    button
 }
 
 fn zoom_button(
@@ -252,6 +300,8 @@ fn show_diagram(ui: &Rc<Ui>, read: SchemaRead) {
     ui.banner.set_title(&notice);
     ui.banner.set_revealed(!notice.is_empty());
     fill_list(ui, &diagram);
+    *ui.exported.borrow_mut() = diagram.clone();
+    ui.export_button.set_sensitive(true);
     ui.canvas.set_diagram(diagram);
     ui.stack.set_visible_child_name("ready");
     update_zoom(&ui.canvas, &ui.zoom_label);
