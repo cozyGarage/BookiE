@@ -24,7 +24,35 @@ def scenarios(ui):
         names = [actions.getName(index) for index in range(actions.nActions)]
         raise AssertionError(f"{row_name!r} has no {action!r} action: {names!r}")
 
-    def start_import(table, path):
+    def toggle_skip_switch():
+        row = ui.wait_for_node(name="Skip rows the database rejects")
+        switches = [
+            node
+            for node in ui.descendants(row.parent)
+            if ui.node_role(node) == ui.pyatspi.ROLE_SWITCH
+        ]
+        if not switches:
+            seen = [(ui.node_role(node), ui.node_name(node)) for node in ui.descendants(row.parent)]
+            raise AssertionError(f"no switch under the skip row: {seen!r}")
+        switch = switches[-1]
+        for _ in range(40):
+            if any(node.getState().contains(ui.pyatspi.STATE_FOCUSED) for node in switches):
+                break
+            ui.press_x11_key("Tab")
+            time.sleep(0.15)
+        assert any(node.getState().contains(ui.pyatspi.STATE_FOCUSED) for node in switches), (
+            "Tab never reached the skip switch"
+        )
+        ui.press_x11_key("space")
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while not any(node.getState().contains(ui.pyatspi.STATE_CHECKED) for node in switches) and time.monotonic() < deadline:
+            time.sleep(ui.POLL_SECONDS)
+        states = [node.getState().getStates() for node in switches]
+        assert any(node.getState().contains(ui.pyatspi.STATE_CHECKED) for node in switches), (
+            f"the skip switch did not turn on: {states!r}"
+        )
+
+    def start_import(table, path, skip_rejected=False):
         invoke_row_action(table, "sidebar-row.import-csv")
         chooser = ui.wait_for_node(name="Import CSV", role=ui.FILE_CHOOSER_ROLES)
         ui.show_file_chooser_location(chooser)
@@ -39,6 +67,8 @@ def scenarios(ui):
         if not open_button.getState().contains(ui.pyatspi.STATE_SENSITIVE):
             raise AssertionError(f"GTK chooser did not resolve the CSV path {str(path)!r}")
         ui.invoke(open_button)
+        if skip_rejected:
+            toggle_skip_switch()
         ui.invoke(ui.wait_for_node(name="Import", role=ui.pyatspi.ROLE_PUSH_BUTTON))
 
     def import_csv_into(table, path):
@@ -103,6 +133,23 @@ def scenarios(ui):
         ui.wait_for_node(name="1 unsaved change")
         assert ui.find_node(name="Discard pending changes?") is None, "the failed import prompted to discard an unrelated edit"
 
+    def import_can_skip_a_rejected_row_and_lists_it(database, base):
+        with sqlite3.connect(database) as connection:
+            connection.executemany(
+                "INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")]
+            )
+        csv_path = base / "home" / "clash-skip.csv"
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        csv_path.write_text("id,note\n3,gamma\n1,dup\n4,delta\n", encoding="utf-8")
+        start_import("safety_items", csv_path, skip_rejected=True)
+
+        ui.wait_for_node(name="Import finished with skipped rows")
+        ui.wait_for_node_containing("2 of 3 rows were written to safety_items", role=ui.pyatspi.ROLE_LABEL)
+        ui.wait_for_node_containing("Row 2:", role=ui.pyatspi.ROLE_LABEL)
+        assert notes(database) == [(1, "alpha"), (2, "beta"), (3, "gamma"), (4, "delta")], (
+            "the rejected row must be skipped and every other row imported"
+        )
+
     def import_refreshes_every_open_tab_of_the_imported_table(database, base):
         ui.run_sql("CREATE TABLE other_items(id INTEGER PRIMARY KEY, note TEXT)")
         ui.wait_for_node(name="other_items", role=ui.pyatspi.ROLE_LIST_ITEM)
@@ -134,4 +181,10 @@ def scenarios(ui):
     import_refreshes_every_open_tab_of_the_imported_table.environment = "local"
     import_refreshes_only_the_imported_table.environment = "local"
     failed_import_keeps_unrelated_edits.environment = "local"
-    return [import_refreshes_only_the_imported_table, failed_import_keeps_unrelated_edits, import_refreshes_every_open_tab_of_the_imported_table]
+    import_can_skip_a_rejected_row_and_lists_it.environment = "local"
+    return [
+        import_refreshes_only_the_imported_table,
+        failed_import_keeps_unrelated_edits,
+        import_can_skip_a_rejected_row_and_lists_it,
+        import_refreshes_every_open_tab_of_the_imported_table,
+    ]

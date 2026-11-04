@@ -38,7 +38,7 @@ mod tests;
 mod truncate_tests;
 
 pub use column::{build_add_column, build_alter_column, build_drop_column, build_rename_column, build_reorder_column};
-pub use diff::{diff_to_ops, materialize_ops};
+pub use diff::{TableState, diff_to_ops, materialize_ops};
 pub use index_fk::{
     build_add_foreign_key, build_create_index, build_drop_constraint, build_drop_foreign_key, build_drop_index,
 };

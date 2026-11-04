@@ -291,3 +291,21 @@ fn a_file_name_becomes_a_table_name_that_can_be_an_identifier() {
         "imported_table"
     );
 }
+
+#[test]
+fn the_finishing_alert_gives_the_counts_then_every_listed_row_and_the_hidden_remainder() {
+    let report = CsvImportReport {
+        schema: None,
+        table: "people".into(),
+        committed: 97,
+        total: 100,
+        error: None,
+        skipped: 3,
+        skipped_summary: "Row 2: duplicate key\nRow 9: bad value\n…and 1 more skipped rows.".into(),
+    };
+    assert_eq!(
+        skipped_rows_message(&report),
+        "97 of 100 rows were written to people. The database rejected 3 rows, which were skipped and not imported.\n\n\
+         Row 2: duplicate key\nRow 9: bad value\n…and 1 more skipped rows."
+    );
+}

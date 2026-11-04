@@ -1,6 +1,6 @@
 use crate::query::{ForeignKeyInfo, IndexInfo};
 
-use super::{StructureOp, diff_to_ops, materialize_ops};
+use super::{StructureOp, TableState, diff_to_ops, materialize_ops};
 
 fn index(name: &str, columns: &[&str], unique: bool) -> IndexInfo {
     IndexInfo {
@@ -34,14 +34,18 @@ fn diff(
 ) -> Vec<StructureOp> {
     diff_to_ops(
         None,
-        "t",
-        "t",
-        &[],
-        &[],
-        original_indexes,
-        current_indexes,
-        original_fks,
-        current_fks,
+        TableState {
+            table: "t",
+            columns: &[],
+            indexes: original_indexes,
+            fks: original_fks,
+        },
+        TableState {
+            table: "t",
+            columns: &[],
+            indexes: current_indexes,
+            fks: current_fks,
+        },
     )
 }
 

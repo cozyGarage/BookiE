@@ -6,7 +6,147 @@ use uuid::Uuid;
 use super::types::read_workspace_tab_id;
 use super::{App, AppMsg, SessionTeardownAction, WorkspaceTab};
 
+struct PendingWorkspaceTabChanges {
+    browse: bool,
+    structure: bool,
+    file: bool,
+}
+
 impl App {
+    pub(super) fn close_workspace_tab_by_id(&mut self, id: Uuid, sender: ComponentSender<Self>) {
+        let Some(tab_view) = self.workspace_tab_view.clone() else {
+            return;
+        };
+        if self.workspace_tab_has_pending_changes(id) {
+            self.prompt_close_workspace_tab(id, &tab_view, sender);
+            return;
+        }
+        self.close_workspace_tab_after_pending(id, &tab_view, sender);
+    }
+
+    fn workspace_tab_has_pending_changes(&self, id: Uuid) -> bool {
+        self.workspace_tabs
+            .borrow()
+            .get(&id)
+            .and_then(|tab| match tab {
+                WorkspaceTab::Structure(slot) => self
+                    .structure_trackers
+                    .with_tab_ref(slot.id, |tracker| tracker.has_pending()),
+                WorkspaceTab::Table(slot) => {
+                    let data_dirty = self
+                        .change_trackers
+                        .with_tab_ref(slot.id, |tracker| tracker.has_pending())
+                        .unwrap_or(false);
+                    let structure_dirty = self
+                        .structure_trackers
+                        .with_tab_ref(slot.id, |tracker| tracker.has_pending())
+                        .unwrap_or(false);
+                    Some(data_dirty || structure_dirty)
+                }
+                WorkspaceTab::Editor(slot) => Some(slot.has_unsaved_file_changes()),
+            })
+            .unwrap_or(false)
+    }
+
+    fn prompt_close_workspace_tab(&self, id: Uuid, tab_view: &adw::TabView, sender: ComponentSender<Self>) {
+        let page = self.workspace_tabs.borrow().get(&id).map(|tab| match tab {
+            WorkspaceTab::Editor(slot) => slot.page.clone(),
+            WorkspaceTab::Structure(slot) => slot.page.clone(),
+            WorkspaceTab::Table(slot) => slot.page.clone(),
+        });
+        let Some(page) = page else { return };
+        let raw_title = page.title().to_string();
+        let tab_label = raw_title.strip_prefix("• ").unwrap_or(&raw_title).to_string();
+        let dialog = adw::AlertDialog::new(None, None);
+        dialog.set_heading(Some(
+            &crate::tr!("Save changes to “{name}”?").replace("{name}", &tab_label),
+        ));
+        dialog.set_body(&crate::tr!(
+            "Unsaved changes will be permanently lost if you discard them."
+        ));
+        dialog.add_response("cancel", &crate::tr!("Cancel"));
+        dialog.add_response("discard", &crate::tr!("Discard"));
+        dialog.add_response("save", &crate::tr!("Save"));
+        dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
+        dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("save"));
+        dialog.set_close_response("cancel");
+        self.connect_pending_workspace_tab_close_response(id, &dialog, tab_view, &page, sender);
+        dialog.present(Some(&self.window));
+    }
+
+    fn connect_pending_workspace_tab_close_response(
+        &self,
+        id: Uuid,
+        dialog: &adw::AlertDialog,
+        tab_view: &adw::TabView,
+        page: &adw::TabPage,
+        sender: ComponentSender<Self>,
+    ) {
+        let changes = self.pending_workspace_tab_changes(id);
+        let tab_view_for_resp = tab_view.clone();
+        let page_for_resp = page.clone();
+        let sender_for_resp = sender;
+        let close_after_save = self.close_after_save.clone();
+        let structure_trackers = self.structure_trackers.clone();
+        let change_trackers = self.change_trackers.clone();
+        dialog.connect_response(None, move |dialog, response| {
+            dialog.close();
+            match response {
+                "discard" => {
+                    if changes.browse {
+                        change_trackers.with_tab(id, |tracker| tracker.clear());
+                    }
+                    if changes.structure {
+                        structure_trackers.with_tab(id, |tracker| tracker.clear());
+                    }
+                    sender_for_resp.input(AppMsg::CloseDiscardedWorkspaceTab(id));
+                }
+                "save" => {
+                    let pending_saves =
+                        u32::from(changes.browse) + u32::from(changes.structure) + u32::from(changes.file);
+                    if pending_saves > 0 {
+                        close_after_save.borrow_mut().begin(id, pending_saves);
+                    }
+                    tab_view_for_resp.close_page_finish(&page_for_resp, false);
+                    if changes.browse {
+                        sender_for_resp.input(AppMsg::SaveActiveBrowseTabById(id));
+                    }
+                    if changes.structure {
+                        sender_for_resp.input(AppMsg::SaveActiveStructureTabById(id));
+                    }
+                    if changes.file {
+                        sender_for_resp.input(AppMsg::SaveEditorFile {
+                            tab: id,
+                            overwrite: false,
+                        });
+                    }
+                }
+                _ => tab_view_for_resp.close_page_finish(&page_for_resp, false),
+            }
+        });
+    }
+
+    fn pending_workspace_tab_changes(&self, id: Uuid) -> PendingWorkspaceTabChanges {
+        let browse = self
+            .change_trackers
+            .with_tab_ref(id, |tracker| tracker.has_pending())
+            .unwrap_or(false);
+        let structure = self
+            .structure_trackers
+            .with_tab_ref(id, |tracker| tracker.has_pending())
+            .unwrap_or(false);
+        let file = matches!(
+            self.workspace_tabs.borrow().get(&id),
+            Some(WorkspaceTab::Editor(slot)) if slot.has_unsaved_file_changes()
+        );
+        PendingWorkspaceTabChanges {
+            browse,
+            structure,
+            file,
+        }
+    }
+
     pub(super) fn confirm_session_teardown(
         &self,
         sender: ComponentSender<Self>,

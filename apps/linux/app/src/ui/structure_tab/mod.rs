@@ -43,7 +43,7 @@ use bookie_core::{ColumnInfo, DriverCapabilities, ForeignKeyInfo, IndexInfo};
 use uuid::Uuid;
 
 use crate::ui::structure_tab_dialogs::{present_fk_dialog, present_index_dialog};
-use bookie_core::sql_ddl::{StructureOp, diff_to_ops, materialize_ops};
+use bookie_core::sql_ddl::{StructureOp, TableState, diff_to_ops, materialize_ops};
 
 mod columns;
 mod fks;
@@ -265,14 +265,18 @@ impl StructureTab {
         }
         diff_to_ops(
             self.schema.as_deref(),
-            &self.original_table_name.borrow(),
-            &self.table_name.borrow(),
-            &self.original_columns.borrow(),
-            &self.columns.borrow(),
-            &self.original_indexes.borrow(),
-            &self.indexes.borrow(),
-            &self.original_fks.borrow(),
-            &self.foreign_keys.borrow(),
+            TableState {
+                table: &self.original_table_name.borrow(),
+                columns: &self.original_columns.borrow(),
+                indexes: &self.original_indexes.borrow(),
+                fks: &self.original_fks.borrow(),
+            },
+            TableState {
+                table: &self.table_name.borrow(),
+                columns: &self.columns.borrow(),
+                indexes: &self.indexes.borrow(),
+                fks: &self.foreign_keys.borrow(),
+            },
         )
     }
 

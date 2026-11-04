@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use bookie_core::sql_ddl::{StructureOp, materialize_ops};
+use bookie_core::sql_ddl::{StructureOp, TableState, materialize_ops};
 
 use crate::{connect, start_pg};
 
@@ -63,14 +63,18 @@ async fn replacing_an_index_and_a_foreign_key_under_the_same_name_changes_the_ta
 
     let ops = bookie_core::sql_ddl::diff_to_ops(
         None,
-        "swap",
-        "swap",
-        &[],
-        &[],
-        &original_indexes,
-        &indexes,
-        &original_keys,
-        &keys,
+        TableState {
+            table: "swap",
+            columns: &[],
+            indexes: &original_indexes,
+            fks: &original_keys,
+        },
+        TableState {
+            table: "swap",
+            columns: &[],
+            indexes: &indexes,
+            fks: &keys,
+        },
     );
     assert_eq!(ops.len(), 4, "{ops:?}");
     for statement in materialize_ops(&ops, "postgres").unwrap() {
