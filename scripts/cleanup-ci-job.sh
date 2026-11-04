@@ -8,6 +8,14 @@ if [[ -n "${BOOKIE_TEST_RUN_ID:-}" && -f "$workspace/src/scripts/cleanup-testcon
   python3 "$workspace/src/scripts/cleanup-testcontainers.py" "$BOOKIE_TEST_RUN_ID" || status=$?
 fi
 
+if [[ "${GITHUB_JOB:-}" == "driver-tls" && "${BOOKIE_TEST_RUN_ID:-}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  fixture="$workspace/src/tests/fixtures/driver-tls"
+  if [[ -f "$fixture/docker-compose.yml" ]]; then
+    docker compose --project-name "$BOOKIE_TEST_RUN_ID" --project-directory "$fixture" \
+      -f "$fixture/docker-compose.yml" down --volumes --remove-orphans || status=$?
+  fi
+fi
+
 if [[ -f "$workspace/src/scripts/ci-cache.py" && "${CARGO_TARGET_DIR:-}" == /var/cache/ci/target/* ]]; then
   python3 "$workspace/src/scripts/ci-cache.py" cleanup --min-free-gib 30 || status=$?
 fi

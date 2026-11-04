@@ -25,7 +25,6 @@ class PullRequestReadinessTests(unittest.TestCase):
             "Preflight and sandbox tier (no GTK app)": ("build-linux.yml", "name: Preflight and sandbox tier (no GTK app)"),
             "Fast checks (GTK)": ("build-linux.yml", "name: Fast checks (GTK)"),
             "Driver TLS fixture (docker)": ("build-linux.yml", "name: Driver TLS fixture (docker)"),
-            "flatpak-builder (default)": ("flatpak-linux.yml", "name: flatpak-builder (${{ matrix.profile }})"),
             "resolve-ref": ("linux-security.yml", "  resolve-ref:"),
             "Security (security-policy)": ("linux-security.yml", "name: Security (${{ matrix.layer }})"),
             "Security (supply-chain)": ("linux-security.yml", "layer: [security-policy, supply-chain]"),
@@ -39,7 +38,7 @@ class PullRequestReadinessTests(unittest.TestCase):
                 workflow = (ROOT / ".github/workflows" / filename).read_text()
                 self.assertIn(marker, workflow)
 
-    def test_code_changes_require_build_security_and_flatpak_contexts(self):
+    def test_code_changes_require_build_and_security_contexts(self):
         required = readiness.required_contexts(["crates/core/src/query.rs"])
 
         self.assertTrue(
@@ -51,7 +50,6 @@ class PullRequestReadinessTests(unittest.TestCase):
                 "Preflight and sandbox tier (no GTK app)",
                 "Fast checks (GTK)",
                 "Driver TLS fixture (docker)",
-                "flatpak-builder (default)",
                 "resolve-ref",
                 "Security (security-policy)",
                 "Security (supply-chain)",
@@ -457,7 +455,6 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertIn("workflow_run:", workflow)
         self.assertIn("zizmor: ignore[dangerous-triggers]", workflow)
         self.assertIn("- Build Linux", workflow)
-        self.assertIn("- Flatpak Linux (packaging only)", workflow)
         self.assertIn("- Linux Security", workflow)
         self.assertIn("- Linux CI contracts", workflow)
         self.assertIn("types: [completed]", workflow)

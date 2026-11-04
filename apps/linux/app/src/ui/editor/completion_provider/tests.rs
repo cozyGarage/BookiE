@@ -234,6 +234,43 @@ fn proposals_first_requested_after_catalog_retirement_do_not_edit_the_buffer() {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn large_sql_scripts_keep_completion_available_without_blocking_the_main_context() {
+    gtk::init().unwrap();
+    let padding = "x".repeat(120);
+    let statement = format!("SELECT * FROM us WHERE note = '{padding}';\n");
+    let source = statement.repeat(20_000);
+    assert!(source.len() > super::super::sql_text::MAX_ANALYSIS_BYTES);
+    let index = Rc::new(RefCell::new(SchemaIndex::default()));
+    index.borrow_mut().grammar = Some(SqlGrammar::PostgreSql);
+    index.borrow_mut().set_tables(vec!["users".into()]);
+    let (view, provider, context) = fixture(&source, 0, index);
+    let idle_ran = Rc::new(std::cell::Cell::new(false));
+    let idle_observed = idle_ran.clone();
+    glib::idle_add_local_once(move || idle_observed.set(true));
+    let cursors =
+        [0, 10_000, 19_999].map(|statement_index| statement_index * statement.len() + "SELECT * FROM us".len());
+    for cursor in cursors {
+        view.buffer().place_cursor(&view.buffer().iter_at_offset(cursor as i32));
+        let model = glib::MainContext::default()
+            .block_on(provider.populate_future(&context))
+            .unwrap();
+        let found = (0..model.n_items()).any(|position| {
+            model
+                .item(position)
+                .and_then(|item| item.downcast::<Proposal>().ok())
+                .and_then(|proposal| proposal.imp().insertion.get().map(|insertion| insertion.sql == "users"))
+                .unwrap_or(false)
+        });
+        assert!(found, "no table completion at byte offset {cursor}");
+    }
+    assert!(
+        idle_ran.get(),
+        "the main context did not dispatch while completion was pending"
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn completion_resumes_after_a_large_buffer_is_replaced_with_a_small_query() {
     gtk::init().unwrap();
     let index = Rc::new(RefCell::new(SchemaIndex::default()));

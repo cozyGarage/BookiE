@@ -1,5 +1,8 @@
 use bookie_core::DriverError;
-use bookie_policy::{AuditErrorCategory, AuditEvent, AuditTerminalStatus, AuditTransportClient, AuditTransportOutcome};
+use bookie_policy::{
+    AuditConnectionIdentity, AuditErrorCategory, AuditEvent, AuditTerminalStatus, AuditTransportClient,
+    AuditTransportOutcome,
+};
 use uuid::Uuid;
 
 use crate::{SshEnvironment, SshRoute, TransportError};
@@ -23,11 +26,13 @@ pub(crate) async fn record_transport_attempt<T>(
     let (outcome, status, category) = classify_transport_result(result);
     let event = AuditEvent::transport_attempt(
         Uuid::new_v4(),
-        context.principal.clone(),
-        context.connection_id,
-        context.connection_name.clone(),
-        context.environment,
-        context.driver_id.clone(),
+        AuditConnectionIdentity {
+            principal: context.principal.clone(),
+            connection_id: context.connection_id,
+            connection_name: context.connection_name.clone(),
+            environment: context.environment,
+            driver_id: context.driver_id.clone(),
+        },
         client,
         outcome,
         status,

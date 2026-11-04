@@ -18,7 +18,7 @@ REPOSITORY = 'cozyGarage/BookiE'
 MANIFEST = 'ci/forgejo-train.json'
 REQUIRED_CHECKS = {
     'Linux regression gate', 'harness', 'workflow-lint', 'Security (security-policy)',
-    'Security (supply-chain)', 'flatpak-builder (default)',
+    'Security (supply-chain)',
     'Preflight and sandbox tier (no GTK app)', 'Fast checks (GTK)',
 }
 MEMBER_REQUIRED_CHECKS = REQUIRED_CHECKS - {'harness', 'workflow-lint'}

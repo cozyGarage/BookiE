@@ -14,7 +14,7 @@
 # sites do not block the build, but the number cannot grow.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 BASELINES="$ROOT/baselines/panic-site-baselines.txt"
 CRATES="$ROOT/crates"
 

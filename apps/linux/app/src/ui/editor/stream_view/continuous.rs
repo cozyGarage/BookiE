@@ -89,18 +89,22 @@ fn start_view(
             &columns,
             "",
             None,
-            Some(sender),
-            None,
-            None,
-            connection_id,
-            TabGridContext {
-                result_model: Some(model.clone().upcast()),
-                row_visibility: Some(callback),
-                preview_result_values: true,
-                ..Default::default()
+            crate::ui::grid::GridSenders {
+                edit: None,
+                menu: Some(sender),
+                sort: None,
             },
-            None,
-            database,
+            crate::ui::grid::GridEnv {
+                connection_id,
+                tab_ctx: TabGridContext {
+                    result_model: Some(model.clone().upcast()),
+                    row_visibility: Some(callback),
+                    preview_result_values: true,
+                    ..Default::default()
+                },
+                column_widths: None,
+                database,
+            },
         );
         model.attach_selection(&selection, &view);
         let status = gtk::Label::new(None);
