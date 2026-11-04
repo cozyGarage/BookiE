@@ -78,7 +78,7 @@ impl App {
             .as_deref()
             .and_then(|id| self.registry.get(id))
             .map_or(&[][..], |driver| driver.capabilities().catalog_object_kinds);
-        crate::services::sidebar_tree::append_catalog_entries(&mut nodes, catalog_kinds);
+        crate::services::sidebar_tree::append_catalog_entries_with(&mut nodes, catalog_kinds, &self.sidebar_catalog);
         let schema_filter_enabled = self.current_driver_id.as_deref() == Some("postgres");
         let timeout =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
@@ -370,7 +370,11 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
         NodeKind::Group(GroupKind::Tables) => crate::tr!("Tables").to_string(),
         NodeKind::Group(GroupKind::Views) => crate::tr!("Views").to_string(),
         NodeKind::Group(GroupKind::Catalog) => crate::tr!("Catalog").to_string(),
-        NodeKind::Catalog(kind) => crate::ui::catalog_dialog::kind_label(*kind),
+        NodeKind::Catalog(kind) | NodeKind::CatalogLoaded(kind) => crate::ui::catalog_dialog::kind_label(*kind),
+        NodeKind::CatalogObject { schema, name, .. } => schema
+            .as_deref()
+            .map_or_else(|| name.clone(), |schema| format!("{schema}.{name}")),
+        NodeKind::CatalogMore(_) => crate::tr!("Show all in Catalog…").to_string(),
         NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
     }
 }
@@ -386,7 +390,7 @@ fn row_for(
     let (kind, group) = match &node.kind {
         NodeKind::Table { .. } => (SidebarObjectKind::Table, None),
         NodeKind::View { .. } => (SidebarObjectKind::View, None),
-        NodeKind::Catalog(_) => (
+        NodeKind::Catalog(_) | NodeKind::CatalogObject { .. } | NodeKind::CatalogMore(_) => (
             SidebarObjectKind::Catalog,
             Some(GroupInit {
                 label: sidebar_group_label(node),
@@ -394,6 +398,16 @@ fn row_for(
                 collapsed: false,
                 actions: false,
                 entry: true,
+            }),
+        ),
+        NodeKind::CatalogLoaded(_) => (
+            SidebarObjectKind::Catalog,
+            Some(GroupInit {
+                label: sidebar_group_label(node),
+                count: node.count,
+                collapsed: !searching && collapsed.is_collapsed(&node.key),
+                actions: false,
+                entry: false,
             }),
         ),
         NodeKind::Schema | NodeKind::Group(_) => (
@@ -540,5 +554,40 @@ mod sidebar_label_tests {
         let group_init = init.group.unwrap();
         assert!(group_init.entry);
         assert_eq!(group_init.label, crate::tr!("Roles").to_string());
+    }
+
+    #[test]
+    fn loaded_catalog_kinds_are_branches_and_their_objects_are_leaf_entries() {
+        use crate::services::sidebar_tree::append_catalog_entries_with;
+        let kind = bookie_core::CatalogObjectKind::Routine;
+        let object = bookie_core::CatalogObject {
+            kind,
+            schema: Some("public".into()),
+            name: "calc_tax".into(),
+            detail: None,
+        };
+        let mut nodes = build_nodes(&[], &[]);
+        append_catalog_entries_with(
+            &mut nodes,
+            &[kind],
+            &std::collections::HashMap::from([(kind, vec![object])]),
+        );
+        let branch = nodes
+            .iter()
+            .find(|node| node.kind == NodeKind::CatalogLoaded(kind))
+            .unwrap();
+        let leaf = nodes
+            .iter()
+            .find(|node| matches!(node.kind, NodeKind::CatalogObject { .. }))
+            .unwrap();
+
+        let branch_init = row_for(branch, &Default::default(), false, false, None).group.unwrap();
+        assert!(!branch_init.entry);
+        assert_eq!(branch_init.count, 1);
+        let leaf_init = row_for(leaf, &Default::default(), false, false, None);
+        assert_eq!(leaf_init.depth, 2);
+        let leaf_group = leaf_init.group.unwrap();
+        assert!(leaf_group.entry);
+        assert_eq!(leaf_group.label, "public.calc_tax");
     }
 }
