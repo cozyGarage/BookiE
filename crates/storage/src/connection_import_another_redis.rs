@@ -1,11 +1,3 @@
-//! Connection drafts from an Another Redis Desktop Manager export (`connections.ano`).
-//!
-//! The file is the base64 of `{"connections": [...], "groups": [...]}` (or a bare connection list, which older
-//! versions wrote). The format was read from the application's source (`storage.js`, `NewConnectionDialog.vue`).
-//! Passwords (`auth`, SSH and sentinel secrets) are never declared here, so they are never read. Connections that
-//! need an SSH tunnel, a sentinel or a cluster client are skipped by name instead of being imported as a plain
-//! connection that would point at the wrong place. BookiE has no connection groups, so groups are not imported.
-
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use serde::Deserialize;
@@ -41,7 +33,6 @@ struct PeerConnection {
     cluster: bool,
     #[serde(default)]
     connection_read_only: bool,
-    // Present only when the option is switched on in the peer; the contents are never read.
     #[serde(default)]
     ssh_options: Option<IgnoredAny>,
     #[serde(default)]

@@ -382,8 +382,6 @@ async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleEr
     read_bundle_file(&bytes)
 }
 
-/// Connection drafts from another client's export: DBeaver's data-sources.json or an Another Redis Desktop
-/// Manager export. A file that is neither returns `None`, so the caller reports the bundle error instead.
 async fn read_peer_connections_at(path: &std::path::Path) -> Option<bookie_storage::BundleBody> {
     let limit = bookie_storage::MAX_DBEAVER_BYTES.max(bookie_storage::MAX_ANOTHER_REDIS_BYTES);
     let bytes = read_bounded(path, limit).await.ok()?;
