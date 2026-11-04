@@ -5,6 +5,7 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
 use crate::connection_import_dbeaver::{PeerImport, field};
+use crate::connection_organization::ConnectionOrganization;
 use crate::connection_url::{default_port, draft_connection, validate_host};
 use crate::connections::SavedConnection;
 use crate::error::StorageError;
@@ -17,6 +18,7 @@ struct Source {
     name: String,
     uuid: String,
     url: String,
+    group: String,
 }
 
 #[derive(Default)]
@@ -39,9 +41,15 @@ pub fn parse_datagrip_data_sources(main: &str, local: Option<&str>) -> Result<Pe
     let locals = local.map(read_locals).transpose()?.unwrap_or_default();
     let mut drafts = Vec::new();
     let mut skipped = Vec::new();
+    let mut groups = std::collections::BTreeMap::new();
     for source in &sources {
         match draft_from(source, locals.get(&source.uuid)) {
-            Some(draft) => drafts.push(draft),
+            Some(draft) => {
+                if let Some(group) = group_name(&source.group) {
+                    groups.insert(draft.id, group);
+                }
+                drafts.push(draft);
+            }
             None => skipped.push(display_name(source)),
         }
     }
@@ -53,8 +61,15 @@ pub fn parse_datagrip_data_sources(main: &str, local: Option<&str>) -> Result<Pe
     Ok(PeerImport {
         drafts,
         skipped,
-        groups: std::collections::BTreeMap::new(),
+        groups,
     })
+}
+
+fn group_name(raw: &str) -> Option<String> {
+    let parts: Vec<&str> = raw.split('/').map(str::trim).filter(|part| !part.is_empty()).collect();
+    let name = field(&parts.join(" / "))?;
+    ConnectionOrganization::new(Some(&name), &[], false).ok()?;
+    (!parts.is_empty()).then_some(name)
 }
 
 fn walk(xml: &str, mut visit: impl FnMut(&[String], Option<&str>, &[(String, String)])) -> Result<(), StorageError> {
@@ -126,6 +141,7 @@ fn read_sources(xml: &str) -> Result<Vec<Source>, StorageError> {
                 match key.as_str() {
                     "name" => source.name.clone_from(value),
                     "uuid" => source.uuid.clone_from(value),
+                    "group" => source.group.clone_from(value),
                     _ => {}
                 }
             }

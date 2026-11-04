@@ -147,6 +147,12 @@ pub enum AppMsg {
         schema: Option<String>,
     },
     ShowCatalogKind(bookie_core::CatalogObjectKind),
+    LoadSidebarCatalog(bookie_core::CatalogObjectKind),
+    SidebarCatalogLoaded {
+        origin: crate::services::catalog::CatalogOrigin,
+        kind: bookie_core::CatalogObjectKind,
+        result: Result<Vec<bookie_core::CatalogObject>, String>,
+    },
     ToggleAllSidebarGroups,
     ExplainActiveQuery,
     ShowPreferences,
