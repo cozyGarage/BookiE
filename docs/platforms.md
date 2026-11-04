@@ -10,9 +10,9 @@ The [GitHub release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.
 |---|---|---|---|
 | Arch Linux | x86_64 | `bookie-0.2.4-1-x86_64.pkg.tar.zst` | Install with `pacman` |
 | AppImage | x86_64 | `BookiE-0.2.4-x86_64.AppImage` | Run the downloaded file |
-| Flatpak bundle | x86_64 | `bookie.flatpak` | Install with `flatpak` |
+| Flatpak bundle (0.2.4 only) | x86_64 | `bookie.flatpak` | Install with `flatpak` |
 
-From 0.2.5 the release workflow no longer publishes a Debian package ([ADR 0031](decisions/0031-stop-publishing-the-debian-package.md)); the 0.2.4 release above still carries one. The workflow builds the Arch package against current Arch packages and the AppImage against Debian testing. The Flatpak uses the GNOME 51 runtime. Current source requirements are listed above.
+From 0.2.5 the release workflow no longer publishes a Debian package ([ADR 0031](decisions/0031-stop-publishing-the-debian-package.md)) or a Flatpak bundle ([ADR 0032](decisions/0032-stop-publishing-the-flatpak.md)); the 0.2.4 release above still carries both. The workflow builds the Arch package against current Arch packages and the AppImage against Debian testing. Current source requirements are listed above.
 
 ## Rust toolchain
 
