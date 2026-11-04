@@ -677,7 +677,6 @@ class CiWorkflowTests(unittest.TestCase):
         for path in [
             "scripts/test-gtk-widgets.sh",
             "scripts/test-gtk-safety.sh",
-            "scripts/test-flatpak-window.sh",
         ]:
             with self.subTest(path=path):
                 script = (ROOT / path).read_text()
@@ -765,7 +764,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertEqual(events, {"push", "schedule", "workflow_dispatch"})
         self.assertIn("branches: [linux]", triggers.split("  push:", 1)[1])
 
-    def test_analysis_and_flatpak_skip_docs_and_reuse_cache(self):
+    def test_analysis_skips_docs_and_reuse_cache(self):
         cancel_push_or_pr = (
             "cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}"
         )
@@ -778,15 +777,6 @@ class CiWorkflowTests(unittest.TestCase):
                 cancel_push_or_pr,
                 workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0],
             )
-        flatpak = (ROOT / ".github/workflows/flatpak-linux.yml").read_text()
-        self.assertIn(
-            "cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
-            flatpak.split("concurrency:", 1)[1].split("jobs:", 1)[0],
-        )
-        self.assertIn("hashFiles('apps/linux/flatpak/**')", flatpak)
-        self.assertNotIn("github.sha }}", flatpak.split("cache-key:", 1)[1].split("\n", 1)[0])
-        self.assertIn("""'["default"]' || '["default","development"]'""", flatpak)
-        self.assertNotIn("matrix.manifest", flatpak)
         contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
         self.assertIn(
             cancel_push_or_pr,

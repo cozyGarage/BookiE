@@ -48,22 +48,6 @@ sudo apt install ./apps/linux/packaging/out/bookie_0.2.4-1_amd64.deb
 
 The package name is `bookie`. It installs `/usr/bin/bookie`, `/usr/bin/bookie-agentd`, and `/usr/bin/bookie-askpass`. It replaces and conflicts with the legacy `tablepro` package. It does not install or enable a user service.
 
-## Flatpak builds
-
-The local helper builds `apps/linux/flatpak/com.bookie.linux.json` with GNOME 51 and writes `/tmp/bookie.flatpak`. For an isolated development install, build `apps/linux/flatpak/com.bookie.linux.Devel.json` directly. Published artifacts are listed in [platforms](../../../docs/platforms.md). From the repository root:
-
-```bash
-./scripts/build-flatpak.sh
-```
-
-The isolated development build is:
-
-```bash
-flatpak-builder --user --install build-dir apps/linux/flatpak/com.bookie.linux.Devel.json
-```
-
-A local manifest build does not publish a release or Flathub listing.
-
 ## Release versions
 
 `[workspace.package].version` in the root `Cargo.toml` is the BookiE release version. Every workspace crate inherits it. For a release or hotfix, update that value, the Meson version and the newest AppStream entry together, then regenerate `Cargo.lock`. Keep older AppStream entries and published upgrade fixtures intact. The published 0.2.0 entry is marked `type="stable"` with release date 2026-10-23.

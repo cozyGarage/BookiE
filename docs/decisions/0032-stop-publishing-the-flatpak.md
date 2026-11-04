@@ -11,7 +11,7 @@
 
 The release workflow stops building and publishing the Flatpak bundle, and the release recovery check no longer requires it. The Arch package and the AppImage must both succeed before a release is drafted.
 
-The Flatpak manifests, `scripts/build-flatpak.sh`, the packaging-only pull request workflow and the sandbox handling in the application stay in the tree, so the Flatpak can return without rework.
+The Flatpak manifests, build scripts and packaging-only workflow are removed from the tree. The desktop file, AppStream metadata and icon in `apps/linux/flatpak/` stay, because the Arch package, the AppImage and Meson install them. The application's sandbox detection also stays, for users who still run the 0.2.4 Flatpak.
 
 ## Rationale
 
@@ -20,10 +20,11 @@ Every published package is a support promise. The Flatpak carries a second runti
 ## Alternatives considered
 
 - Keep publishing the Flatpak and label it unsupported. Rejected: a published artifact reads as supported.
-- Delete the manifests and sandbox code now. Rejected: it is a larger change that is costly to undo; stopping publication is enough for 0.2.5.
+- Keep the manifests so the Flatpak can return. Rejected: unmaintained manifests rot and their packaging check would keep gating pull requests.
 
 ## Consequences
 
 - Release 0.2.4 keeps its Flatpak. Later releases do not carry one.
 - ADR 0031 still says the Flatpak is the install path on Debian-family systems; that no longer holds from 0.2.5. The AppImage is the only option there.
-- Removing the packaging-only Flatpak workflow, the manifests and the sandbox code is a later change, if the Flatpak is not coming back.
+- The `apps/linux/flatpak/` directory name is now misleading; renaming it touches Arch, AppImage, Meson and gresource paths and is a separate change.
+- Bringing the Flatpak back means restoring the manifests and workflow from git history.

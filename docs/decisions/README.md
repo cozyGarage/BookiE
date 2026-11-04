@@ -79,7 +79,7 @@ Other options and why they were rejected.
 | [0029](0029-whole-result-operations-on-the-spool.md) | Operate on a completed streamed result through the spool | Accepted | Find and Filter scan the encrypted spool without SQL; a filter writes its own derived spool. |
 | [0030](0030-audit-local-result-comparison.md) | Audit local result comparison | Accepted | A confirmed result comparison writes a paired aggregate audit record without values. |
 | [0031](0031-stop-publishing-the-debian-package.md) | Stop publishing the Debian package | Accepted | Releases stop building the Debian package because the toolkit floor excludes stable Debian and Ubuntu; the staging builder stays for the AppImage. |
-| [0032](0032-stop-publishing-the-flatpak.md) | Stop publishing the Flatpak | Accepted | Releases ship only the Arch package and the AppImage; the Flatpak manifests and sandbox handling stay in the tree. |
+| [0032](0032-stop-publishing-the-flatpak.md) | Stop publishing the Flatpak | Accepted | Releases ship only the Arch package and the AppImage; the Flatpak manifests, scripts and workflow are removed. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 
