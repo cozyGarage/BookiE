@@ -278,14 +278,18 @@ impl BrowseTab {
             &result,
             &self.current_columns,
             &self.table,
-            edit_sender,
-            Some(self.grid_sender.clone()),
             self.current_sort,
-            Some(self.grid_sender.clone()),
-            self.connection_id,
-            tab_ctx,
-            self.persistence.column_widths.clone(),
-            self.database.clone(),
+            crate::ui::grid::GridSenders {
+                edit: edit_sender,
+                menu: Some(self.grid_sender.clone()),
+                sort: Some(self.grid_sender.clone()),
+            },
+            crate::ui::grid::GridEnv {
+                connection_id: self.connection_id,
+                tab_ctx,
+                column_widths: self.persistence.column_widths.clone(),
+                database: self.database.clone(),
+            },
         );
         self.current_selection = Some(selection);
         self.current_column_view = Some(column_view.clone());

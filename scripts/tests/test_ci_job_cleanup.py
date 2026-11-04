@@ -178,6 +178,65 @@ class CiJobCleanupTests(unittest.TestCase):
                 ],
             )
 
+    def test_finalizer_removes_the_driver_tls_compose_project(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            scripts = workspace / "src/scripts"
+            scripts.mkdir(parents=True)
+            fixture = workspace / "src/tests/fixtures/driver-tls"
+            fixture.mkdir(parents=True)
+            compose_file = fixture / "docker-compose.yml"
+            compose_file.touch()
+            (scripts / "cleanup-testcontainers.py").touch()
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            python = bin_dir / "python3"
+            python.write_text(
+                "#!/usr/bin/env bash\nprintf 'python %s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
+                encoding="utf-8",
+            )
+            python.chmod(0o755)
+            docker = bin_dir / "docker"
+            docker.write_text(
+                "#!/usr/bin/env bash\nprintf 'docker %s\\n' \"$*\" >> \"$CLEANUP_CALLS\"\n",
+                encoding="utf-8",
+            )
+            docker.chmod(0o755)
+            run_id = "forgejo-123-1-driver-tls"
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                cwd=workspace,
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_JOB": "driver-tls",
+                    "GITHUB_WORKSPACE": str(workspace),
+                    "BOOKIE_TEST_RUN_ID": run_id,
+                    "CLEANUP_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                calls.read_text(encoding="utf-8").splitlines(),
+                [
+                    f"python {scripts / 'cleanup-testcontainers.py'} {run_id}",
+                    f"docker compose --project-name {run_id} --project-directory {fixture} "
+                    f"-f {compose_file} down --volumes --remove-orphans",
+                ],
+            )
+            self.assertFalse((workspace / "src").exists())
+
+    def test_driver_tls_workflow_assigns_a_run_scoped_fixture_project(self):
+        job = runner_jobs(WORKFLOWS[0])["driver-tls"]
+        run_id = "BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls"
+        self.assertIn(run_id, job)
+        script = (ROOT / "scripts/test-driver-tls.sh").read_text(encoding="utf-8")
+        self.assertIn('--project-name "${BOOKIE_TEST_RUN_ID:-driver-tls}"', script)
+
     def test_nightly_outputs_do_not_use_tmp(self):
         self.assertNotIn("/tmp/", WORKFLOWS[1].read_text(encoding="utf-8"))
 

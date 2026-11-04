@@ -61,7 +61,7 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
 
     def test_wildcard_selects_integration_targets(self):
         command = runner.commands(self.root, ['-p', 'sample', '--test', '*'])[0]
-        self.assertEqual(command, [str(self.binary)])
+        self.assertEqual(command, [str(self.binary.resolve())])
 
     def test_unknown_build_options_are_rejected(self):
         with self.assertRaises(ValueError):

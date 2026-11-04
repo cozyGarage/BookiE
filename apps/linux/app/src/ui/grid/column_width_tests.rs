@@ -75,13 +75,17 @@ fn verify_fixed_width(saved: bool, persistent: bool) {
         &columns,
         "items",
         None,
-        None,
-        None,
-        None,
-        persistent.then_some(id),
-        TabGridContext::default(),
-        persistent.then_some(store.clone()),
-        Arc::new(DatabaseService::new()),
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
+        },
+        crate::ui::grid::GridEnv {
+            connection_id: persistent.then_some(id),
+            tab_ctx: TabGridContext::default(),
+            column_widths: persistent.then_some(store.clone()),
+            database: Arc::new(DatabaseService::new()),
+        },
     );
     let window = gtk4::Window::builder()
         .default_width(500)
