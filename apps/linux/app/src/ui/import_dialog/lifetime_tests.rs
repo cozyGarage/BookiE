@@ -64,3 +64,55 @@ fn dismissing_import_setup_releases_its_callback() {
     assert!(retired.upgrade().is_none(), "closed import setup retains its callback");
     window.close();
 }
+
+fn find<T: IsA<gtk::Widget>>(root: &gtk::Widget, keep: &dyn Fn(&T) -> bool) -> Option<T> {
+    if let Some(found) = root.downcast_ref::<T>().filter(|widget| keep(widget)) {
+        return Some(found.clone());
+    }
+    let mut child = root.first_child();
+    while let Some(current) = child {
+        child = current.next_sibling();
+        if let Some(found) = find(&current, keep) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn the_skip_switch_is_off_by_default_and_its_state_reaches_the_import() {
+    adw::init().unwrap();
+    let application = adw::Application::builder()
+        .application_id("com.bookie.linux.import-skip-switch-test")
+        .build();
+    application.register(None::<&gtk::gio::Cancellable>).unwrap();
+    let window = adw::ApplicationWindow::new(&application);
+    window.present();
+    let context = gtk::glib::MainContext::default();
+
+    let mut answers = Vec::new();
+    for turn_on in [false, true] {
+        let chosen = Rc::new(std::cell::Cell::new(None));
+        present(&window, request(), {
+            let chosen = chosen.clone();
+            move |choice| chosen.set(Some(choice.skip_rejected_rows))
+        });
+        let dialog = window.visible_dialog().unwrap();
+        let root: gtk::Widget = dialog.clone().upcast();
+        let switch = find::<adw::SwitchRow>(&root, &|row| row.title() == "Skip rows the database rejects").unwrap();
+        assert!(
+            !switch.is_active(),
+            "rejected rows must not be skipped unless the user asks"
+        );
+        if turn_on {
+            switch.set_active(true);
+        }
+        let start = find::<gtk::Button>(&root, &|button| button.label().as_deref() == Some("Import")).unwrap();
+        start.emit_clicked();
+        while context.iteration(false) {}
+        answers.push(chosen.get().expect("the import started"));
+    }
+    assert_eq!(answers, [false, true]);
+    window.close();
+}

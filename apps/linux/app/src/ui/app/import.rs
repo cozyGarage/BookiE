@@ -475,17 +475,21 @@ impl App {
                 .replace("{table}", &report.table)
                 .replace("{skipped}", &report.skipped.to_string()),
         );
-        let message = crate::tr!(
-            "{done} of {total} rows were written to {table}. The database rejected {skipped} rows, which were skipped and not imported."
-        )
-        .replace("{done}", &report.committed.to_string())
-        .replace("{total}", &report.total.to_string())
-        .replace("{table}", &report.table)
-        .replace("{skipped}", &report.skipped.to_string())
-            + "\n\n"
-            + &report.skipped_summary;
+        let message = skipped_rows_message(report);
         self.show_error_alert(&crate::tr!("Import finished with skipped rows"), &message);
     }
+}
+
+fn skipped_rows_message(report: &CsvImportReport) -> String {
+    crate::tr!(
+        "{done} of {total} rows were written to {table}. The database rejected {skipped} rows, which were skipped and not imported."
+    )
+    .replace("{done}", &report.committed.to_string())
+    .replace("{total}", &report.total.to_string())
+    .replace("{table}", &report.table)
+    .replace("{skipped}", &report.skipped.to_string())
+        + "\n\n"
+        + &report.skipped_summary
 }
 
 fn skipped_note(skipped: u64, summary: &str) -> String {

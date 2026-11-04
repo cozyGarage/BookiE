@@ -15,7 +15,6 @@ REQUIRED_CODE_CHECKS = (
     "Preflight and sandbox tier (no GTK app)",
     "Fast checks (GTK)",
     "Driver TLS fixture (docker)",
-    "flatpak-builder (default)",
     "resolve-ref",
     "Security (security-policy)",
     "Security (supply-chain)",

@@ -57,15 +57,25 @@ struct ExtraSets {
     sets: Vec<QueryResult>,
 }
 
+struct StatementInput<'a> {
+    analysis: &'a crate::classify::StatementAnalysis,
+    sql: &'a str,
+    params: &'a [Value],
+    control: &'a OperationControl,
+}
+
 async fn inner_statement(
     inner: &mut Box<dyn Session>,
     extra: &mut ExtraSets,
     guard: &PolicyGuard,
-    analysis: &crate::classify::StatementAnalysis,
-    sql: &str,
-    params: &[Value],
-    control: &OperationControl,
+    input: StatementInput<'_>,
 ) -> Result<QueryResult, DriverError> {
+    let StatementInput {
+        analysis,
+        sql,
+        params,
+        control,
+    } = input;
     if !extra.collect {
         return inner.query_params_controlled(sql, params, control).await;
     }
@@ -730,10 +740,12 @@ impl PolicySession {
             &mut self.inner,
             &mut self.extra,
             &self.guard,
-            &authorization.analysis,
-            sql,
-            params,
-            control,
+            StatementInput {
+                analysis: &authorization.analysis,
+                sql,
+                params,
+                control,
+            },
         );
         let result = match writes {
             true => self.guard.caught_write("SESSION QUERY", execution).await,
@@ -781,10 +793,12 @@ impl PolicySession {
                     &mut self.inner,
                     &mut self.extra,
                     &self.guard,
-                    &authorization.analysis,
-                    sql,
-                    params,
-                    control,
+                    StatementInput {
+                        analysis: &authorization.analysis,
+                        sql,
+                        params,
+                        control,
+                    },
                 ),
             )
             .await
@@ -823,10 +837,12 @@ impl PolicySession {
                     &mut self.inner,
                     &mut self.extra,
                     &self.guard,
-                    &authorization.analysis,
-                    sql,
-                    params,
-                    control,
+                    StatementInput {
+                        analysis: &authorization.analysis,
+                        sql,
+                        params,
+                        control,
+                    },
                 ),
             )
             .await

@@ -22,7 +22,8 @@ export XDG_CONFIG_HOME
 trap teardown EXIT
 
 compose() {
-  docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
+  docker compose --project-name "${BOOKIE_TEST_RUN_ID:-driver-tls}" \
+    --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml" "$@"
 }
 
 teardown() {

@@ -473,6 +473,14 @@ fn exposed_toolbar(fixture: &EditorFixture) -> ([gtk::Button; 3], [gtk::Widget; 
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn editor_actions_fit_narrow_rows_with_running_and_retry_controls() {
+    for width in [630, 600, 910] {
+        for style in ["", ".resource-toolbar { font-size: 20px; }"] {
+            assert_editor_toolbar_fits(width, style);
+        }
+    }
+}
+
+fn assert_editor_toolbar_fits(width: i32, style: &str) {
     let fixture = EditorFixture::new();
     let root = fixture.controller.widget();
     let transaction_id = fixture.open_transaction();
@@ -490,8 +498,9 @@ fn editor_actions_fit_narrow_rows_with_running_and_retry_controls() {
     sidebar.set_size_request(370, -1);
     layout.append(&sidebar);
     layout.append(root);
+    layout.set_size_request(width + 370, -1);
     let window = gtk::Window::builder()
-        .default_width(1000)
+        .default_width(width + 370)
         .default_height(700)
         .child(&layout)
         .build();
@@ -501,71 +510,67 @@ fn editor_actions_fit_narrow_rows_with_running_and_retry_controls() {
         widget.add_css_class("resource-toolbar");
     }
     gtk::style_context_add_provider_for_display(&root.display(), &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
-    for style in ["", ".resource-toolbar { font-size: 20px; }"] {
-        css.load_from_string(style);
-        for width in [630, 600, 910] {
-            window.set_default_size(width + 370, 700);
-            let ready = std::rc::Rc::new(std::cell::Cell::new(false));
-            let observed = ready.clone();
-            let frames = std::cell::Cell::new(0);
-            window.add_tick_callback(move |_, _| {
-                frames.set(frames.get() + 1);
-                if frames.get() < 2 {
-                    return gtk::glib::ControlFlow::Continue;
-                }
-                observed.set(true);
-                gtk::glib::ControlFlow::Break
-            });
-            spin_until(|| ready.get() && root.width() > 0 && buttons.iter().all(|button| button.width() > 0));
-            assert_eq!(root.width(), width);
-            assert_eq!(sidebar.width(), 370);
-            assert!(root.width() <= width);
-            let toolbar_minimum = toolbar.measure(gtk::Orientation::Horizontal, -1).0;
-            assert!(
-                toolbar_minimum <= root.width(),
-                "toolbar minimum width exceeds editor allocation: requested={toolbar_minimum} available={}",
-                root.width()
-            );
-            for bar in &bars {
-                assert!(bar.measure(gtk::Orientation::Horizontal, -1).0 <= root.width());
-            }
-            for button in &buttons {
-                let bounds = button.compute_bounds(root).unwrap();
-                assert!(bounds.x() >= 0.0 && bounds.y() >= 0.0);
-                assert!(
-                    bounds.x() + bounds.width() <= root.width() as f32 + 0.5,
-                    "button={} requested={width} actual={} style={style} bounds={bounds:?}",
-                    button.label().unwrap_or_default(),
-                    root.width()
-                );
-                assert!(bounds.y() + bounds.height() <= root.height() as f32 + 0.5);
-                assert!(button.is_visible());
-            }
-            let model = fixture.controller.model();
-            assert_eq!(model.toolbar_transaction_id(), Some(transaction_id));
-            let mut extra: Vec<gtk::Widget> = vec![model.run_options.clone().upcast()];
-            for child in model
-                .transaction_actions
-                .row
-                .observe_children()
-                .iter::<gtk::glib::Object>()
-                .flatten()
-            {
-                if let Ok(child) = child.downcast::<gtk::FlowBoxChild>() {
-                    extra.push(child.child().unwrap());
-                }
-            }
-            for widget in extra {
-                let bounds = widget.compute_bounds(root).unwrap();
-                assert!(
-                    bounds.x() >= 0.0 && bounds.x() + bounds.width() <= root.width() as f32 + 0.5,
-                    "new action does not fit: {bounds:?}"
-                );
-                assert!(bounds.y() + bounds.height() <= root.height() as f32 + 0.5);
-            }
-            assert!(model.source_view.height() > 0);
+    css.load_from_string(style);
+    let ready = std::rc::Rc::new(std::cell::Cell::new(false));
+    let observed = ready.clone();
+    let frames = std::cell::Cell::new(0);
+    window.add_tick_callback(move |_, _| {
+        frames.set(frames.get() + 1);
+        if frames.get() < 2 {
+            return gtk::glib::ControlFlow::Continue;
+        }
+        observed.set(true);
+        gtk::glib::ControlFlow::Break
+    });
+    window.present();
+    spin_until(|| ready.get() && root.width() > 0 && buttons.iter().all(|button| button.width() > 0));
+    assert_eq!(root.width(), width, "window allocation: {}", window.width());
+    assert_eq!(sidebar.width(), 370);
+    assert!(root.width() <= width);
+    let toolbar_minimum = toolbar.measure(gtk::Orientation::Horizontal, -1).0;
+    assert!(
+        toolbar_minimum <= root.width(),
+        "toolbar minimum width exceeds editor allocation: requested={toolbar_minimum} available={}",
+        root.width()
+    );
+    for bar in &bars {
+        assert!(bar.measure(gtk::Orientation::Horizontal, -1).0 <= root.width());
+    }
+    for button in &buttons {
+        let bounds = button.compute_bounds(root).unwrap();
+        assert!(bounds.x() >= 0.0 && bounds.y() >= 0.0);
+        assert!(
+            bounds.x() + bounds.width() <= root.width() as f32 + 0.5,
+            "button={} requested={width} actual={} style={style} bounds={bounds:?}",
+            button.label().unwrap_or_default(),
+            root.width()
+        );
+        assert!(bounds.y() + bounds.height() <= root.height() as f32 + 0.5);
+        assert!(button.is_visible());
+    }
+    let model = fixture.controller.model();
+    assert_eq!(model.toolbar_transaction_id(), Some(transaction_id));
+    let mut extra: Vec<gtk::Widget> = vec![model.run_options.clone().upcast()];
+    for child in model
+        .transaction_actions
+        .row
+        .observe_children()
+        .iter::<gtk::glib::Object>()
+        .flatten()
+    {
+        if let Ok(child) = child.downcast::<gtk::FlowBoxChild>() {
+            extra.push(child.child().unwrap());
         }
     }
+    for widget in extra {
+        let bounds = widget.compute_bounds(root).unwrap();
+        assert!(
+            bounds.x() >= 0.0 && bounds.x() + bounds.width() <= root.width() as f32 + 0.5,
+            "new action does not fit: {bounds:?}"
+        );
+        assert!(bounds.y() + bounds.height() <= root.height() as f32 + 0.5);
+    }
+    assert!(model.source_view.height() > 0);
     gtk::style_context_remove_provider_for_display(&root.display(), &css);
     window.close();
 }

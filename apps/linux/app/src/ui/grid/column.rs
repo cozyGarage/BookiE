@@ -77,19 +77,32 @@ fn header_details(info: &ColumnInfo, foreign_key: bool) -> gtk4::gio::Menu {
     menu
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(super) struct ColumnSpec {
+    pub(super) editable: bool,
+    pub(super) table: String,
+    pub(super) sender: Option<relm4::Sender<GridMsg>>,
+    pub(super) connection_id: Option<uuid::Uuid>,
+    pub(super) tab_ctx: TabGridContext,
+    pub(super) sort_enabled: bool,
+    pub(super) default_min_width: Option<i32>,
+    pub(super) column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+}
+
 pub(super) fn build_column(
     info: &ColumnInfo,
     idx: usize,
-    editable: bool,
-    table: String,
-    sender: Option<relm4::Sender<GridMsg>>,
-    connection_id: Option<uuid::Uuid>,
-    tab_ctx: TabGridContext,
-    sort_enabled: bool,
-    default_min_width: Option<i32>,
-    column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    spec: ColumnSpec,
 ) -> (gtk4::ColumnViewColumn, Option<CellEditTrigger>) {
+    let ColumnSpec {
+        editable,
+        table,
+        sender,
+        connection_id,
+        tab_ctx,
+        sort_enabled,
+        default_min_width,
+        column_widths,
+    } = spec;
     let factory = gtk4::SignalListItemFactory::new();
     let edit_sender = if editable { sender.clone() } else { None };
     let readonly_sender = sender.clone();
@@ -146,11 +159,13 @@ pub(super) fn build_column(
         bind_row_cell(
             item,
             &row,
-            idx,
-            editable_for_bind,
-            &column_info,
             &tab_ctx_for_bind,
-            column_is_editable,
+            BoundColumn {
+                index: idx,
+                editable: editable_for_bind,
+                info: &column_info,
+                is_editable: column_is_editable,
+            },
         );
     });
 
@@ -248,15 +263,25 @@ pub(super) fn build_column(
     (column, edit_trigger)
 }
 
+struct BoundColumn<'a> {
+    index: usize,
+    editable: bool,
+    info: &'a ColumnInfo,
+    is_editable: bool,
+}
+
 fn bind_row_cell(
     item: &gtk4::ListItem,
     row: &crate::ui::row_object::RowObject,
-    index: usize,
-    editable: bool,
-    column: &ColumnInfo,
     context: &TabGridContext,
-    column_is_editable: bool,
+    bound: BoundColumn<'_>,
 ) {
+    let BoundColumn {
+        index,
+        editable,
+        info: column,
+        is_editable: column_is_editable,
+    } = bound;
     if !row.cell_is_loaded(index) && !row.cell_is_partial(index) {
         if let Some(label) = item.child().and_downcast::<gtk4::Label>() {
             label.set_text(&crate::tr!("Loading…"));

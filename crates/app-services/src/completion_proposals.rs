@@ -16,21 +16,36 @@ pub fn candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candidates {
 }
 
 pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: Option<LexicalSettings>) -> Candidates {
-    let cursor = floor_char_boundary(sql, cursor.min(sql.len()));
     let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
     let settings_for_grammar = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
     let plan = plan_with(sql, Some(grammar), Some(settings_for_grammar));
-    let Some(mut range) = replacement_range(cursor, &plan) else {
+    candidates_with_plan(sql, cursor, index, settings, &plan)
+}
+
+pub fn completion_plan(sql: &str, grammar: SqlGrammar, settings: Option<LexicalSettings>) -> ScriptPlan {
+    let settings = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
+    plan_with(sql, Some(grammar), Some(settings))
+}
+
+pub fn candidates_with_plan(
+    sql: &str,
+    cursor: usize,
+    index: &SchemaIndex,
+    settings: Option<LexicalSettings>,
+    plan: &ScriptPlan,
+) -> Candidates {
+    let cursor = floor_char_boundary(sql, cursor.min(sql.len()));
+    let Some(mut range) = replacement_range(cursor, plan) else {
         return Candidates {
             range: cursor..cursor,
             values: Vec::new(),
         };
     };
     let quoted = sql[range.start..].starts_with(['"', '`', '[']);
-    let shared_plan = index.grammar.map(|_| &plan);
+    let shared_plan = index.grammar.map(|_| plan);
     let scope = scope_at(sql, range.start, index, settings, shared_plan);
     if scope == Scope::Tables {
-        range.start = qualified_start(sql, range.start, &plan);
+        range.start = qualified_start(sql, range.start, plan);
     }
     let prefix = normalized(&sql[range.start..cursor]);
     let mut values = candidate_sql(sql, range.start, index, settings, Some(&prefix), shared_plan);

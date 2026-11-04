@@ -23,6 +23,7 @@ SQL_EDITOR = {
     "New connection": "tab-stop",
     "Open saved connection": "shortcut: Ctrl+P (Open Quickly lists connections)",
     "Main menu": "shortcut: F10",
+    "SQL snippets": "tab-stop",
     "Search tables": "tab-stop",
     "Refresh tables": "shortcut: Ctrl+Shift+R",
     "Collapse all": "tab-stop",

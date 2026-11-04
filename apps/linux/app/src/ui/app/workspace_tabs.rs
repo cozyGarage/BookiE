@@ -12,7 +12,7 @@ use crate::ui::browse_tab::{BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabO
 use crate::ui::editor::{SqlEditor, SqlEditorInit, SqlEditorInput, SqlEditorOutput, derive_tab_label};
 
 use super::editor_files::initial_editor_query;
-use super::types::{CLOSED_TABS_CAPACITY, read_workspace_tab_id, write_workspace_tab_id};
+use super::types::{CLOSED_TABS_CAPACITY, TableTabStart, read_workspace_tab_id, write_workspace_tab_id};
 use super::workspace_overview::build_workspace_tab_overview;
 use super::{App, AppMsg, ClosedTabDescriptor, EditorTabSlot, WorkspaceTab};
 mod bulk_close;
@@ -243,7 +243,12 @@ impl App {
                     sort,
                     preview,
                 }) => {
-                    self.append_table_tab(schema, table, offset, page_size, sort, preview, sender.clone());
+                    self.append_table_tab(
+                        schema,
+                        table,
+                        TableTabStart::new(offset, page_size, sort, preview),
+                        sender.clone(),
+                    );
                 }
                 Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table }) => {
                     self.append_existing_structure_tab(schema, table, sender.clone());
@@ -337,17 +342,14 @@ impl App {
     /// `(schema, table)`. The DDL editor for the same table opens as
     /// a separate `WorkspaceTab::Structure` page via the sidebar
     /// right-click "Edit Structure" action (`append_existing_structure_tab`).
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn append_table_tab(
         &mut self,
         schema: Option<String>,
         table: String,
-        offset: u64,
-        page_size: u64,
-        sort: Option<(usize, bool)>,
-        preview: bool,
+        start: TableTabStart,
         sender: ComponentSender<Self>,
     ) {
+        let (offset, page_size, sort, preview) = start.into_parts();
         self.ensure_workspace_root(sender.clone());
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
@@ -423,8 +425,13 @@ impl App {
                 BrowseTabOutput::ShowSelectionAlert { title, body } => AppMsg::ShowAlert { title, body },
                 BrowseTabOutput::ShowToast(msg) => AppMsg::ShowToast(msg),
                 BrowseTabOutput::DirtyChanged(dirty) => AppMsg::BrowseTabDirtyChanged(tab_id, dirty),
-                BrowseTabOutput::ExecuteTransaction { statements, sources } => AppMsg::ExecuteBrowseTransaction {
+                BrowseTabOutput::ExecuteTransaction {
+                    save_id,
+                    statements,
+                    sources,
+                } => AppMsg::ExecuteBrowseTransaction {
                     tab_id,
+                    save_id,
                     statements,
                     sources,
                 },
@@ -589,145 +596,6 @@ impl App {
         self.refresh_window_title();
         self.refresh_schema_index();
         self.persist_workspace_state();
-    }
-
-    pub(super) fn close_workspace_tab_by_id(&mut self, id: Uuid, sender: ComponentSender<Self>) {
-        let Some(tab_view) = self.workspace_tab_view.clone() else {
-            return;
-        };
-        // If this is a Browse tab with pending changeset, intercept the
-        // close with an AdwAlertDialog (Discard / Cancel). The user can
-        // also cancel close, save manually, then close — no Save-and-
-        // close branch keeps the async commit logic out of this path.
-        let pending = self
-            .workspace_tabs
-            .borrow()
-            .get(&id)
-            .and_then(|t| match t {
-                WorkspaceTab::Structure(s) => self.structure_trackers.with_tab_ref(s.id, |tr| tr.has_pending()),
-                WorkspaceTab::Table(s) => {
-                    let data_dirty = self
-                        .change_trackers
-                        .with_tab_ref(s.id, |tr| tr.has_pending())
-                        .unwrap_or(false);
-                    let struct_dirty = self
-                        .structure_trackers
-                        .with_tab_ref(s.id, |tr| tr.has_pending())
-                        .unwrap_or(false);
-                    Some(data_dirty || struct_dirty)
-                }
-                WorkspaceTab::Editor(s) => Some(s.has_unsaved_file_changes()),
-            })
-            .unwrap_or(false);
-        if pending {
-            let page = self.workspace_tabs.borrow().get(&id).map(|t| match t {
-                WorkspaceTab::Editor(s) => s.page.clone(),
-                WorkspaceTab::Structure(s) => s.page.clone(),
-                WorkspaceTab::Table(s) => s.page.clone(),
-            });
-            let Some(page) = page else { return };
-            // Tab title without the dirty bullet — the heading reads
-            // as the natural-language name of the tab (`categories`),
-            // not `• categories`. Strip a leading "• " if present.
-            let raw_title = page.title().to_string();
-            let tab_label = raw_title.strip_prefix("• ").unwrap_or(&raw_title).to_string();
-            // Cancel | Discard(destructive) | Save(suggested), Save is
-            // default. Mirrors GNOME Text Editor's close-with-unsaved
-            // template (libadwaita AdwAlertDialog reference). Naming
-            // the tab in the heading + factual body copy follows the
-            // GNOME HIG pattern for destructive-confirmation dialogs.
-            let dialog = adw::AlertDialog::new(None, None);
-            dialog.set_heading(Some(
-                &crate::tr!("Save changes to “{name}”?").replace("{name}", &tab_label),
-            ));
-            dialog.set_body(&crate::tr!(
-                "Unsaved changes will be permanently lost if you discard them."
-            ));
-            dialog.add_response("cancel", &crate::tr!("Cancel"));
-            dialog.add_response("discard", &crate::tr!("Discard"));
-            dialog.add_response("save", &crate::tr!("Save"));
-            dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
-            dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
-            dialog.set_default_response(Some("save"));
-            dialog.set_close_response("cancel");
-            let tab_view_for_resp = tab_view.clone();
-            let page_for_resp = page.clone();
-            let sender_for_resp = sender.clone();
-            let close_after_save = self.close_after_save.clone();
-            // Snapshot which trackers actually have pending changes
-            // before the dialog opens. Drives the discard + save
-            // branches so a Table tab whose only dirt is on the
-            // Structure side doesn't try to save through the Browse
-            // path (and vice versa).
-            let data_dirty = self
-                .change_trackers
-                .with_tab_ref(id, |tr| tr.has_pending())
-                .unwrap_or(false);
-            let struct_dirty = self
-                .structure_trackers
-                .with_tab_ref(id, |tr| tr.has_pending())
-                .unwrap_or(false);
-            let file_dirty = matches!(
-                self.workspace_tabs.borrow().get(&id),
-                Some(WorkspaceTab::Editor(slot)) if slot.has_unsaved_file_changes()
-            );
-            let structure_trackers = self.structure_trackers.clone();
-            let change_trackers = self.change_trackers.clone();
-            dialog.connect_response(None, move |dlg, response| {
-                dlg.close();
-                match response {
-                    "discard" => {
-                        if data_dirty {
-                            change_trackers.with_tab(id, |t| t.clear());
-                        }
-                        if struct_dirty {
-                            structure_trackers.with_tab(id, |t| t.clear());
-                        }
-                        sender_for_resp.input(AppMsg::CloseDiscardedWorkspaceTab(id));
-                    }
-                    "save" => {
-                        // Mark the tab so SaveCompletedForTab will close
-                        // it once the transaction commits. The counter
-                        // increments once per dispatched save: a Table
-                        // tab dirty on both sides bumps to 2, and the
-                        // close fires only after BOTH saves drain it.
-                        // SaveFailed removes the entry entirely and
-                        // aborts the close.
-                        let pending_saves: u32 =
-                            u32::from(data_dirty) + u32::from(struct_dirty) + u32::from(file_dirty);
-                        if pending_saves > 0 {
-                            close_after_save.borrow_mut().begin(id, pending_saves);
-                        }
-                        // Revert AdwTabView's "closing" state for now
-                        // (the user might still cancel via SaveFailed).
-                        tab_view_for_resp.close_page_finish(&page_for_resp, false);
-                        // Dispatch the right save path per dirty side.
-                        if data_dirty {
-                            sender_for_resp.input(AppMsg::SaveActiveBrowseTabById(id));
-                        }
-                        if struct_dirty {
-                            sender_for_resp.input(AppMsg::SaveActiveStructureTabById(id));
-                        }
-                        if file_dirty {
-                            sender_for_resp.input(AppMsg::SaveEditorFile {
-                                tab: id,
-                                overwrite: false,
-                            });
-                        }
-                    }
-                    _ => {
-                        // Cancel: revert AdwTabView's "closing" state
-                        // so the page stays open. Without this the X
-                        // click would still dismiss the page.
-                        tab_view_for_resp.close_page_finish(&page_for_resp, false);
-                    }
-                }
-            });
-            dialog.present(Some(&self.window));
-            return;
-        }
-
-        self.close_workspace_tab_after_pending(id, &tab_view, sender);
     }
 
     pub(super) fn close_workspace_tab_after_pending(
@@ -1086,7 +954,12 @@ impl App {
                 page_size,
                 sort,
             } => {
-                self.append_table_tab(schema, table, offset, page_size, sort, false, sender);
+                self.append_table_tab(
+                    schema,
+                    table,
+                    TableTabStart::new(offset, page_size, sort, false),
+                    sender,
+                );
             }
             ClosedTabDescriptor::Structure { schema, table } => {
                 self.append_existing_structure_tab(schema, table, sender);

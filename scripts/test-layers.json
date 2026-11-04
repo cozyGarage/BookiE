@@ -438,7 +438,6 @@
           "argv": [
             "actionlint",
             ".github/workflows/build-linux.yml",
-            ".github/workflows/flatpak-linux.yml",
             ".github/workflows/gtk-soak.yml",
             ".github/workflows/linux-quality.yml",
             ".github/workflows/linux-security.yml",

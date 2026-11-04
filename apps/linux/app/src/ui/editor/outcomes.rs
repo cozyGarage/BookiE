@@ -893,21 +893,25 @@ pub(super) fn build_result_set_widget(
         &result.columns,
         "",
         None,
-        Some(grid_sender.clone()),
-        None,
-        None,
-        connection_id,
-        TabGridContext {
-            preview_result_values: true,
-            local_result_sort: true,
-            local_result_view: Some(local_result_view.clone()),
-            whole_result_filter,
-            changed_cells,
-            sortable_result_columns: crate::ui::grid::sortable_result_columns(result),
-            ..Default::default()
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: Some(grid_sender.clone()),
+            sort: None,
         },
-        None,
-        database,
+        crate::ui::grid::GridEnv {
+            connection_id,
+            tab_ctx: TabGridContext {
+                preview_result_values: true,
+                local_result_sort: true,
+                local_result_view: Some(local_result_view.clone()),
+                whole_result_filter,
+                changed_cells,
+                sortable_result_columns: crate::ui::grid::sortable_result_columns(result),
+                ..Default::default()
+            },
+            column_widths: None,
+            database,
+        },
     );
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     holder.append(&local_result_view.controls());
