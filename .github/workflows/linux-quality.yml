@@ -77,6 +77,7 @@ jobs:
         with:
           workspaces: .
           prefix-key: linux-mutants-${{ matrix.label }}
+          save-if: ${{ github.event_name == 'schedule' }}
       - name: Install cargo-mutants
         id: mutation-tool
         run: cargo install cargo-mutants --locked --version ^27
@@ -174,6 +175,7 @@ jobs:
         with:
           workspaces: .
           prefix-key: linux-coverage
+          save-if: ${{ github.event_name == 'schedule' }}
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov --locked
       # The unit and sandbox tiers only. Driver, TLS, release and GTK

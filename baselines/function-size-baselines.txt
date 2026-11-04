@@ -55,7 +55,6 @@ crates/drivers/duckdb/src/lib.rs 1
 crates/drivers/postgres/src/lib.rs 1
 crates/drivers/redis/src/lib.rs 1
 crates/drivers/sqlite/src/lib.rs 1
-crates/mcp/src/server.rs 1
 crates/mcp/src/tools.rs 1
 crates/policy/src/classify.rs 1
 crates/policy/src/guard.rs 2
