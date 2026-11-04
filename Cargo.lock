@@ -1339,6 +1339,7 @@ dependencies = [
  "hex",
  "libc",
  "oo7",
+ "quick-xml",
  "secrecy",
  "serde",
  "serde_json",

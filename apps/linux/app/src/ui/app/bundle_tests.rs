@@ -254,7 +254,7 @@ async fn a_file_at_the_limit_is_read_whole() {
 }
 
 #[tokio::test]
-async fn a_file_picked_for_import_is_read_as_dbeaver_or_another_redis_and_otherwise_refused() {
+async fn a_file_picked_for_import_is_read_as_dbeaver_another_redis_or_datagrip_and_otherwise_refused() {
     let directory = tempfile::tempdir().unwrap();
     let write = |name: &str, text: &str| {
         let path = directory.path().join(name);
@@ -267,6 +267,14 @@ async fn a_file_picked_for_import_is_read_as_dbeaver_or_another_redis_and_otherw
     );
     let redis = write("connections.json", r#"[{"name": "r", "host": "h"}]"#);
     let other = write("notes.txt", "not a connection list");
+    let datagrip = write(
+        "dataSources.xml",
+        r#"<project><component><data-source name="d" uuid="u1"><jdbc-url>jdbc:mysql://h/db</jdbc-url></data-source></component></project>"#,
+    );
+    write(
+        "dataSources.local.xml",
+        r#"<project><component><data-source name="d" uuid="u1"><user-name>alice</user-name></data-source></component></project>"#,
+    );
 
     let names = |path: std::path::PathBuf| async move {
         read_peer_connections_at(&path)
@@ -275,5 +283,10 @@ async fn a_file_picked_for_import_is_read_as_dbeaver_or_another_redis_and_otherw
     };
     assert_eq!(names(dbeaver).await.unwrap(), ["postgres"]);
     assert_eq!(names(redis).await.unwrap(), ["redis"]);
+    let body = read_peer_connections_at(&datagrip).await.unwrap();
+    assert_eq!(
+        body.connections[0].username, "alice",
+        "the sibling local file supplies the user name"
+    );
     assert!(names(other).await.is_none());
 }
