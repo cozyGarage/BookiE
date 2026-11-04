@@ -62,9 +62,9 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     }
     let (remainder, query) = remainder.split_once('?').unwrap_or((remainder, ""));
     let option = query_option(driver_id, query)?;
-    let tls_mode = match option {
-        Some(UrlOption::Tls(mode)) => mode,
-        _ => TlsMode::Disabled,
+    let explicit_tls = match &option {
+        Some(UrlOption::Tls(mode)) => Some(*mode),
+        _ => None,
     };
     let socket = match option {
         Some(UrlOption::Socket(path)) => Some(path),
@@ -104,6 +104,8 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         None => split_host_port(host_port, default_port)?,
     };
     let database = decode_field(path, "database")?;
+    let local = socket.is_some() || is_loopback_host(&host);
+    let tls_mode = explicit_tls.unwrap_or(default_tls_mode(driver_id, local));
 
     let place = socket
         .as_ref()
@@ -120,32 +122,74 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
     };
 
     let connection = SavedConnection {
+        socket_dir,
+        socket_path,
+        use_tls: tls_mode.encrypts(),
+        tls_mode: Some(tls_mode),
+        ..draft_connection(driver_id, name, host, port, database, username)
+    };
+
+    Ok(ParsedConnectionUrl { connection, password })
+}
+
+pub(crate) fn draft_connection(
+    driver_id: &str,
+    name: String,
+    host: String,
+    port: u16,
+    database: String,
+    username: String,
+) -> SavedConnection {
+    SavedConnection {
         auth_source: None,
         id: Uuid::new_v4(),
         name,
         driver_id: driver_id.to_string(),
         host,
         port,
-        socket_dir,
-        socket_path,
+        socket_dir: None,
+        socket_path: None,
         database,
         username,
-        use_tls: tls_mode.encrypts(),
-        tls_mode: Some(tls_mode),
+        use_tls: false,
+        tls_mode: Some(TlsMode::Disabled),
         tls_root_cert: None,
         tls_client_cert: None,
         tls_client_key: None,
         read_only: false,
         auth_mode: AuthMode::Password,
-        environment: Environment::Local,
+        environment: if local { Environment::Local } else { Environment::Prod },
         ssh: None,
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
-    };
+    }
+}
 
-    Ok(ParsedConnectionUrl { connection, password })
+pub(crate) fn default_port(driver_id: &str) -> Option<u16> {
+    SCHEMES
+        .iter()
+        .find(|(_, driver, _)| *driver == driver_id)
+        .map(|(_, _, port)| *port)
+}
+
+fn default_tls_mode(driver_id: &str, local: bool) -> TlsMode {
+    let url_can_choose = matches!(driver_id, "postgres" | "mysql" | "mongodb");
+    if local || !url_can_choose {
+        TlsMode::Disabled
+    } else {
+        TlsMode::default()
+    }
+}
+
+fn is_loopback_host(host: &str) -> bool {
+    let lowered = host.to_ascii_lowercase();
+    let name = lowered.strip_suffix('.').unwrap_or(&lowered);
+    name == "localhost"
+        || name
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.to_canonical().is_loopback())
 }
 
 enum UrlOption {
@@ -253,7 +297,7 @@ fn parse_port(port: Option<&str>, default_port: u16) -> Result<u16, StorageError
     Ok(parsed)
 }
 
-fn validate_host(host: &str) -> Result<String, StorageError> {
+pub(crate) fn validate_host(host: &str) -> Result<String, StorageError> {
     if host.is_empty() {
         return Err(invalid("the connection URL is missing a host"));
     }
