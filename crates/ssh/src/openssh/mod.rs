@@ -1,5 +1,6 @@
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+mod algorithm_policy;
 mod argv;
 mod askpass_bridge;
 mod config;

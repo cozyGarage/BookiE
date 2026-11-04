@@ -1641,6 +1641,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::stream_view::tests::a_failed_page_offers_a_retry_without_changing_pages"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::connection_bundle::tests::skipped_imports_are_literal_non_selectable_rows"
     ]
   ],
   "keyring": [

@@ -29,8 +29,7 @@ pub(crate) fn present_import_passphrase_dialog(
     dialog.set_default_response(Some("unlock"));
     dialog.set_close_response("cancel");
 
-    dialog.connect_response(None, move |dlg, response| {
-        dlg.close();
+    dialog.connect_response(None, move |_, response| {
         if response != "unlock" {
             return;
         }
@@ -81,6 +80,7 @@ pub(crate) fn present_import_plan_dialog(
     parent: &adw::ApplicationWindow,
     items: &[ImportItem],
     carries_secrets: bool,
+    skipped: &[String],
     on_confirm: impl Fn(ImportChoice) + 'static,
 ) {
     let dialog = adw::AlertDialog::new(
@@ -99,6 +99,16 @@ pub(crate) fn present_import_plan_dialog(
         checks.push((item.source_id, check));
     }
 
+    for name in skipped {
+        let row = adw::ActionRow::new();
+        row.set_use_markup(false);
+        row.set_selectable(false);
+        row.set_title(name);
+        row.set_subtitle(&crate::tr!("Skipped: unsupported connection"));
+        row.set_title_lines(2);
+        list.append(&row);
+    }
+
     let replace = build_replace_switch(carries_secrets);
     dialog.set_extra_child(Some(&build_plan_body(&list, &replace, carries_secrets)));
 
@@ -109,8 +119,7 @@ pub(crate) fn present_import_plan_dialog(
     dialog.set_close_response("cancel");
 
     let on_confirm: Rc<dyn Fn(ImportChoice)> = Rc::new(on_confirm);
-    dialog.connect_response(None, move |dlg, response| {
-        dlg.close();
+    dialog.connect_response(None, move |_, response| {
         if response != "import" {
             return;
         }
