@@ -55,6 +55,8 @@ install -Dm644 apps/linux/flatpak/icons/scalable/com.bookie.linux.svg \
   "$STAGE/usr/share/icons/hicolor/scalable/apps/com.bookie.linux.svg"
 install -Dm644 apps/linux/packaging/policy.example.toml "$STAGE/usr/share/doc/bookie/policy.example.toml"
 install -Dm644 LICENSE.md "$STAGE/usr/share/doc/bookie/LICENSE.md"
+install -Dm644 apps/linux/packaging/THIRD_PARTY_NOTICES.md \
+  "$STAGE/usr/share/doc/bookie/THIRD_PARTY_NOTICES.md"
 
 mkdir -p "$STAGE/DEBIAN"
 cat >"$STAGE/DEBIAN/control" <<EOF
