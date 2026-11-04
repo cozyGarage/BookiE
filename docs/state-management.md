@@ -4,7 +4,7 @@ The `bookie-app` crate (`apps/linux/app`) uses [Relm4](https://relm4.org) on top
 
 GTK-free service modules are moving incrementally into `bookie-app-services` under [ADR 0018](decisions/0018-headless-app-services-crate.md). The app re-exports those modules from `services` so callers keep their paths; services that own GTK or application wiring stay in the app.
 
-Change and structure tracker registries live in `app-services`. Each GTK window owns its structure tracker registry and shares it with its tabs and close handlers. The change tracker adapter remains thread-local.
+Change and structure tracker registries live in `app-services`. Each GTK window owns its change and structure tracker registries and shares them with its tabs, grid and close handlers.
 
 Scoped filter presets and import mappings, preference data, quick-switcher ranking and reconnect classification/backoff also live in app-services. GSettings access, style application, translated labels, registered actions and connection-monitor runtime wiring stay in the app.
 

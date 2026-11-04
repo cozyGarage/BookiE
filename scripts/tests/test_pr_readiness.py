@@ -450,6 +450,101 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertIn("  pull-requests: read", workflow)
         self.assertNotIn("contents: write", workflow)
 
+    def test_rerun_workflow_uses_trusted_code_and_scoped_check_write_permission(self):
+        workflow = (ROOT / ".github/workflows/linux-pr-readiness-rerun.yml").read_text()
+        checkout = workflow.split("- uses: actions/checkout", 1)[1].split("\n      - name", 1)[0]
+
+        self.assertIn("workflow_run:", workflow)
+        self.assertIn("zizmor: ignore[dangerous-triggers]", workflow)
+        self.assertIn("- Build Linux", workflow)
+        self.assertIn("- Flatpak Linux (packaging only)", workflow)
+        self.assertIn("- Linux Security", workflow)
+        self.assertIn("- Linux CI contracts", workflow)
+        self.assertIn("types: [completed]", workflow)
+        self.assertIn("ref: ${{ github.sha }}", checkout)
+        self.assertIn("permissions: {}", workflow)
+        self.assertIn("      checks: write", workflow)
+        self.assertNotIn("contents: write", workflow)
+
+    def test_workflow_run_recheck_publishes_a_check_on_the_exact_pull_request_head(self):
+        class Api(readiness.GitHubApi):
+            def __init__(self):
+                super().__init__("cozyGarage/BookiE", "token", "https://api.github.com")
+                self.requests = []
+
+            def request(self, path, method="GET", body=None):
+                self.requests.append((path, method, body))
+                if method == "POST":
+                    return {"id": 42}
+                if path.endswith("/pulls/7"):
+                    return {"changed_files": 1}
+                if "/files?" in path:
+                    return [{"filename": "README.md"}]
+                if "/check-runs?" in path:
+                    return {"check_runs": []}
+                if "/check-suites/" in path:
+                    return {"head_sha": "a" * 40, "app": {"slug": "github-actions"}, "pull_requests": [{"number": 7}]}
+                return {}
+
+        values = {
+            "GITHUB_REPOSITORY": "cozyGarage/BookiE",
+            "GITHUB_TOKEN": "token",
+            "GITHUB_API_URL": "https://api.github.com",
+            "PR_NUMBER": "7",
+            "PR_HEAD_SHA": "a" * 40,
+            "READINESS_RECHECK": "true",
+            "READINESS_CHECK_EXTERNAL_ID": "run-1",
+        }
+        client = Api()
+        with (
+            patch.dict(os.environ, values, clear=True),
+            patch.object(readiness, "GitHubApi", return_value=client),
+            patch.object(readiness, "wait_for_checks", return_value=0) as wait,
+        ):
+            self.assertEqual(readiness.main(), 0)
+
+        wait.assert_called_once_with(client, 7, "a" * 40)
+        created = client.requests[0]
+        completed = client.requests[-1]
+        self.assertEqual(created[0], "/repos/cozyGarage/BookiE/check-runs")
+        self.assertEqual(created[1], "POST")
+        self.assertEqual(created[2]["head_sha"], "a" * 40)
+        self.assertEqual(completed[0], "/repos/cozyGarage/BookiE/check-runs/42")
+        self.assertEqual(completed[1], "PATCH")
+        self.assertEqual(completed[2]["conclusion"], "success")
+
+    def test_workflow_run_recheck_publishes_failed_checks_as_a_failed_head_check(self):
+        class Api(readiness.GitHubApi):
+            def __init__(self):
+                super().__init__("cozyGarage/BookiE", "token", "https://api.github.com")
+                self.requests = []
+
+            def request(self, path, method="GET", body=None):
+                self.requests.append((path, method, body))
+                return {"id": 43} if method == "POST" else {}
+
+        values = {
+            "GITHUB_REPOSITORY": "cozyGarage/BookiE",
+            "GITHUB_TOKEN": "token",
+            "PR_NUMBER": "7",
+            "PR_HEAD_SHA": "a" * 40,
+            "READINESS_RECHECK": "true",
+            "READINESS_CHECK_EXTERNAL_ID": "run-2",
+        }
+        client = Api()
+        with (
+            patch.dict(os.environ, values, clear=True),
+            patch.object(readiness, "GitHubApi", return_value=client),
+            patch.object(readiness, "wait_for_checks", side_effect=readiness.ReadinessError("required check failed")),
+        ):
+            with self.assertRaisesRegex(readiness.ReadinessError, "required check failed"):
+                readiness.main()
+
+        self.assertEqual(client.requests[-1][0], "/repos/cozyGarage/BookiE/check-runs/43")
+        self.assertEqual(client.requests[-1][1], "PATCH")
+        self.assertEqual(client.requests[-1][2]["conclusion"], "failure")
+        self.assertEqual(client.requests[-1][2]["output"]["summary"], "required check failed")
+
 
 if __name__ == "__main__":
     unittest.main()

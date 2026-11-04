@@ -469,7 +469,10 @@ impl App {
                 .get(&id)
                 .and_then(|tab| tab.browse_controller())
                 .is_some_and(|controller| controller.model().save_in_flight());
-            let dirty = crate::services::change_tracker::with_tab_ref(id, |tr| tr.has_pending()).unwrap_or(false);
+            let dirty = self
+                .change_trackers
+                .with_tab_ref(id, |tr| tr.has_pending())
+                .unwrap_or(false);
             if refresh_decision(dirty, save_in_flight) == RefreshDecision::Refresh {
                 self.dispatch_to_tab(id, BrowseTabInput::Refresh);
             }

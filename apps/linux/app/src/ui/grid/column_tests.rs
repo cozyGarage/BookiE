@@ -68,22 +68,24 @@ fn preview_binding_does_not_retain_a_second_full_value() {
 #[test]
 fn bind_state_reads_a_modified_value_once_for_display_and_editing() {
     let tab_id = uuid::Uuid::new_v4();
-    crate::services::change_tracker::open_tab(tab_id);
+    let trackers = crate::services::change_tracker::WorkspaceChangeTrackers::default();
+    trackers.open_tab(tab_id);
     let original = Value::Text("before".into());
     let updated = Value::Text("after".into());
     let key = crate::services::change_tracker::RowKey::from_pk_values(&[Value::Int(7)]).unwrap();
-    crate::services::change_tracker::with_tab(tab_id, |tracker| {
+    trackers.with_tab(tab_id, |tracker| {
         tracker.track_cell_edit(key, 1, original.clone(), updated.clone());
     });
     let row = crate::ui::row_object::RowObject::new(vec![Value::Int(7), original.clone()]);
     let context = TabGridContext {
+        change_trackers: Some(trackers.clone()),
         tab_id: Some(tab_id),
         pk_col_indices: vec![0],
         ..Default::default()
     };
     let key = crate::services::change_tracker::RowKey::from_pk_values(&[Value::Int(7)]);
     let state = state_for_bind(&context, &row, 1, key.as_ref(), &original);
-    crate::services::change_tracker::close_tab(tab_id);
+    trackers.close_tab(tab_id);
     assert_eq!(state, (true, Some(updated), vec!["tp-cell-modified"]));
 }
 
