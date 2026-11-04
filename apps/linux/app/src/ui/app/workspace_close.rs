@@ -90,40 +90,36 @@ impl App {
         let close_after_save = self.close_after_save.clone();
         let structure_trackers = self.structure_trackers.clone();
         let change_trackers = self.change_trackers.clone();
-        dialog.connect_response(None, move |dialog, response| {
-            dialog.close();
-            match response {
-                "discard" => {
-                    if changes.browse {
-                        change_trackers.with_tab(id, |tracker| tracker.clear());
-                    }
-                    if changes.structure {
-                        structure_trackers.with_tab(id, |tracker| tracker.clear());
-                    }
-                    sender_for_resp.input(AppMsg::CloseDiscardedWorkspaceTab(id));
+        dialog.connect_response(None, move |_, response| match response {
+            "discard" => {
+                if changes.browse {
+                    change_trackers.with_tab(id, |tracker| tracker.clear());
                 }
-                "save" => {
-                    let pending_saves =
-                        u32::from(changes.browse) + u32::from(changes.structure) + u32::from(changes.file);
-                    if pending_saves > 0 {
-                        close_after_save.borrow_mut().begin(id, pending_saves);
-                    }
-                    tab_view_for_resp.close_page_finish(&page_for_resp, false);
-                    if changes.browse {
-                        sender_for_resp.input(AppMsg::SaveActiveBrowseTabById(id));
-                    }
-                    if changes.structure {
-                        sender_for_resp.input(AppMsg::SaveActiveStructureTabById(id));
-                    }
-                    if changes.file {
-                        sender_for_resp.input(AppMsg::SaveEditorFile {
-                            tab: id,
-                            overwrite: false,
-                        });
-                    }
+                if changes.structure {
+                    structure_trackers.with_tab(id, |tracker| tracker.clear());
                 }
-                _ => tab_view_for_resp.close_page_finish(&page_for_resp, false),
+                sender_for_resp.input(AppMsg::CloseDiscardedWorkspaceTab(id));
             }
+            "save" => {
+                let pending_saves = u32::from(changes.browse) + u32::from(changes.structure) + u32::from(changes.file);
+                if pending_saves > 0 {
+                    close_after_save.borrow_mut().begin(id, pending_saves);
+                }
+                tab_view_for_resp.close_page_finish(&page_for_resp, false);
+                if changes.browse {
+                    sender_for_resp.input(AppMsg::SaveActiveBrowseTabById(id));
+                }
+                if changes.structure {
+                    sender_for_resp.input(AppMsg::SaveActiveStructureTabById(id));
+                }
+                if changes.file {
+                    sender_for_resp.input(AppMsg::SaveEditorFile {
+                        tab: id,
+                        overwrite: false,
+                    });
+                }
+            }
+            _ => tab_view_for_resp.close_page_finish(&page_for_resp, false),
         });
     }
 
@@ -293,3 +289,7 @@ impl App {
         true
     }
 }
+
+#[cfg(test)]
+#[path = "workspace_close_tests.rs"]
+mod tests;
