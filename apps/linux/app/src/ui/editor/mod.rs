@@ -28,6 +28,7 @@ mod run_generation;
 mod run_marks;
 mod schema;
 mod session_mode;
+mod snippet_menu;
 mod split_view;
 mod sql_text;
 mod statement_band;
@@ -70,10 +71,6 @@ use sql_text::{export_name_for_query, read_sql_text, text_to_run, toggle_line_co
 use statement_cursor::{
     PlannedStatements, adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor,
 };
-
-fn show_cancel_button(running: bool, supports_server_cancellation: bool) -> bool {
-    running && supports_server_cancellation
-}
 
 pub struct SqlEditor {
     catalog_changes: crate::services::catalog::CatalogChanges,
@@ -223,6 +220,7 @@ pub enum SqlEditorInput {
     },
     ToggleLineComment,
     ToggleFold,
+    InsertSnippet(String),
     UnfoldAll,
     ShowFind,
     Explain,
@@ -401,6 +399,7 @@ impl SimpleComponent for SqlEditor {
                         },
 
                         append = &fold_menu::build(&sender),
+                        append = &snippet_menu::build(&sender),
 
                         #[name = "session_button"]
                         append = &gtk::ToggleButton {
@@ -810,6 +809,7 @@ impl SimpleComponent for SqlEditor {
                 toggle_line_comment(&self.source_view.buffer());
             }
 
+            SqlEditorInput::InsertSnippet(body) => self.insert_snippet(&body),
             SqlEditorInput::ToggleFold => {
                 let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
                 let grammar = statement_cursor::grammar_for(&driver_id)
