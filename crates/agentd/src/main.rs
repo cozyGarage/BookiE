@@ -22,6 +22,8 @@ use drivers_redis::RedisDriver;
 use drivers_sqlite::SqliteDriver;
 use uuid::Uuid;
 
+mod tty_answer;
+
 #[derive(Parser, Debug)]
 #[command(name = "bookie-agentd", about = "Headless BookiE MCP agent daemon")]
 struct Args {
@@ -76,12 +78,11 @@ enum ApprovalMode {
 
 struct TtyApprovalSink;
 
-const MAX_TTY_ANSWER_BYTES: u64 = 64;
-
 /// How long a human has to answer one prompt before it is treated as a
 /// denial. Without this, one unanswered prompt would block every later
 /// tool call forever, since the stdio server processes requests serially.
 const APPROVAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+const APPROVAL_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
 
 #[async_trait]
 impl ApprovalSink for TtyApprovalSink {
@@ -93,7 +94,11 @@ impl ApprovalSink for TtyApprovalSink {
             sanitize_for_terminal(&req.reason),
             sanitize_for_terminal(&req.sql),
         );
-        approval_with_timeout(APPROVAL_TIMEOUT, move || ask_on_controlling_terminal(&prompt)).await
+        let deadline = std::time::Instant::now() + APPROVAL_TIMEOUT;
+        approval_with_timeout(APPROVAL_TIMEOUT + APPROVAL_GRACE, move || {
+            ask_on_controlling_terminal(&prompt, deadline)
+        })
+        .await
     }
 }
 
@@ -106,8 +111,7 @@ where
         Err(_) => {
             tracing::warn!(
                 seconds = timeout.as_secs(),
-                "approval prompt unanswered; denying (the blocking read on /dev/tty is left running \
-                 and will hold one blocking-pool thread until it eventually gets a line or the process exits)"
+                "approval prompt still running past its deadline; denying"
             );
             ApprovalOutcome::Deny
         }
@@ -145,8 +149,8 @@ fn is_invisible_format(c: char) -> bool {
     )
 }
 
-fn ask_on_controlling_terminal(prompt: &str) -> ApprovalOutcome {
-    use std::io::{BufRead, BufReader, Read, Write};
+fn ask_on_controlling_terminal(prompt: &str, deadline: std::time::Instant) -> ApprovalOutcome {
+    use std::io::Write;
 
     let terminal = match std::fs::OpenOptions::new().read(true).write(true).open("/dev/tty") {
         Ok(terminal) => terminal,
@@ -155,6 +159,7 @@ fn ask_on_controlling_terminal(prompt: &str) -> ApprovalOutcome {
             return ApprovalOutcome::Deny;
         }
     };
+    tty_answer::discard_pending_input(&terminal);
     let mut writer = match terminal.try_clone() {
         Ok(writer) => writer,
         Err(error) => {
@@ -166,11 +171,14 @@ fn ask_on_controlling_terminal(prompt: &str) -> ApprovalOutcome {
         return ApprovalOutcome::Deny;
     }
 
-    let mut answer = String::new();
-    let mut reader = BufReader::new(terminal).take(MAX_TTY_ANSWER_BYTES);
-    match reader.read_line(&mut answer) {
-        Ok(_) => outcome_for_answer(&answer),
-        Err(_) => ApprovalOutcome::Deny,
+    let mut terminal = terminal;
+    match tty_answer::read_answer(&mut terminal, deadline) {
+        Some(outcome) => outcome,
+        None => {
+            tracing::warn!("approval prompt unanswered; denying");
+            let _ = writer.write_all(b"\n[bookie-agentd] approval timed out; denied\n");
+            ApprovalOutcome::Deny
+        }
     }
 }
 

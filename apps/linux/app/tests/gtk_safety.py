@@ -1234,6 +1234,15 @@ def unparseable_routine_requests_human_approval(database, _base):
     assert_database_count_stable(database, 0)
 
 
+def unparseable_routine_dialog_defaults_to_deny_on_enter(database, _base):
+    run_sql("CREATE PROCEDURE p() SELECT 1")
+    wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+    wait_for_node_containing("Class: Unparseable")
+    press_x11_key("Return")
+    wait_for_node(name="Approve once", present=False)
+    assert_database_count_stable(database, 0)
+
+
 def mysql_unparseable_routine_dialog_denial_preserves_database(database, _base):
     container = os.environ["BOOKIE_GTK_MYSQL_CONTAINER"]
     open_saved_connection(MYSQL_CONNECTION_NAME)
@@ -2445,12 +2454,59 @@ def closing_a_clean_editor_tab_removes_it_and_keeps_the_other(database, base, re
     wait_for_node_containing("SELECT 7;", role=pyatspi.ROLE_PAGE_TAB)
 
 
+def closing_multiple_editor_tabs_leaves_a_usable_empty_workspace(database, base, restart):
+    queries = [f"SELECT {value} AS restored_tab;" for value in range(1, 5)]
+
+    def seed_editor_tabs(environment):
+        path = Path(environment["XDG_CONFIG_HOME"]) / storage_dir_name() / "workspace_state.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "connections": {
+                        "d4f5e246-c40a-4a30-90f2-39e93e94d920": {
+                            "tabs": [
+                                {"kind": "editor", "query": query, "draft_id": None} for query in queries
+                            ],
+                            "active_idx": len(queries) - 1,
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    restart(before_start=seed_editor_tabs, restored=True)
+    for query in queries:
+        wait_for_node_containing(query, role=pyatspi.ROLE_PAGE_TAB)
+    for query in reversed(queries):
+        close_buttons = [
+            node
+            for application in desktop_applications()
+            for node in descendants(application)
+            if node_name(node) == "Close Tab" and node_role(node) == pyatspi.ROLE_PUSH_BUTTON
+        ]
+        invoke(close_buttons[-1])
+        wait_for_node_containing(query, role=pyatspi.ROLE_PAGE_TAB, present=False)
+    button = wait_for_node(name="Open SQL editor", role=pyatspi.ROLE_PUSH_BUTTON)
+    time.sleep(SETTLE_SECONDS / 3)
+    bounds = button.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    assert bounds.width > 0 and bounds.height > 0, "the empty-state action has no usable allocation"
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+    run_sql("SELECT 9 AS after_multiple_close")
+    wait_for_node_containing("done in")
+
+
 closing_a_dirty_file_with_discard_closes_without_writing.environment = "local"
 closing_a_dirty_file_with_discard_closes_without_writing.needs_restart = True
 
 
 closing_a_clean_editor_tab_removes_it_and_keeps_the_other.environment = "local"
 closing_a_clean_editor_tab_removes_it_and_keeps_the_other.needs_restart = True
+
+
+closing_multiple_editor_tabs_leaves_a_usable_empty_workspace.environment = "local"
+closing_multiple_editor_tabs_leaves_a_usable_empty_workspace.needs_restart = True
 
 
 closing_a_file_tab_with_save_writes_the_file_and_closes_the_tab.environment = "local"
@@ -2919,6 +2975,7 @@ def main():
         sql_character_warnings_leave_query_unchanged,
         malformed_sql_is_blocked_before_approval,
         unparseable_routine_requests_human_approval,
+        unparseable_routine_dialog_defaults_to_deny_on_enter,
         dismissed_approval_denies,
         mcp_client_disconnect_cancels_pending_approval,
         approve_once_prompts_again,
@@ -2945,6 +3002,7 @@ def main():
         closing_a_file_tab_with_save_writes_the_file_and_closes_the_tab,
         closing_a_dirty_file_with_discard_closes_without_writing,
         closing_a_clean_editor_tab_removes_it_and_keeps_the_other,
+        closing_multiple_editor_tabs_leaves_a_usable_empty_workspace,
         skipped_restored_tabs_leave_a_usable_empty_workspace,
         oversized_restored_sql_is_not_loaded_and_remains_saved,
         switching_one_window_leaves_the_other_windows_edits,

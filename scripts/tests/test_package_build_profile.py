@@ -58,6 +58,7 @@ def _deb_checkout(root: Path) -> Path:
         "apps/linux/flatpak/icons/scalable/com.bookie.linux.svg",
         "apps/linux/data/com.bookie.linux.gschema.xml",
         "apps/linux/packaging/policy.example.toml",
+        "apps/linux/packaging/THIRD_PARTY_NOTICES.md",
     ):
         (checkout / relative).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(SOURCE / relative, checkout / relative)
