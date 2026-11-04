@@ -509,6 +509,26 @@ fn copied_update_and_delete_find_the_row_by_primary_key() {
 }
 
 #[test]
+fn a_copied_where_names_the_row_by_its_whole_primary_key_without_a_terminator() {
+    let mut tenant = column("tenant");
+    tenant.primary_key = true;
+    let mut id = column("id");
+    id.primary_key = true;
+    let columns = vec![tenant, id, column("note")];
+    let row = vec![Value::Text("a'b".into()), Value::Int(7), Value::Null];
+    assert_eq!(
+        RowStatement::Where
+            .build("postgres", Some("public"), "t", &columns, &row)
+            .unwrap(),
+        "\"tenant\" = 'a''b' AND \"id\" = 7"
+    );
+    assert!(matches!(
+        RowStatement::Where.build("postgres", None, "t", &[column("id")], &[Value::Int(1)]),
+        Err(BuildSqlError::NoPrimaryKey)
+    ));
+}
+
+#[test]
 fn copied_update_and_delete_refuse_rows_without_a_usable_key() {
     let columns = vec![column("id"), column("note")];
     let row = vec![Value::Int(7), Value::Text("x".into())];
