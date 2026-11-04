@@ -1,6 +1,6 @@
 use crate::query::ColumnInfo;
 
-use super::{DraftColumn, build_alter_column, diff_to_ops, materialize_ops};
+use super::{DraftColumn, TableState, build_alter_column, diff_to_ops, materialize_ops};
 
 fn loaded(default: Option<&str>) -> DraftColumn {
     DraftColumn::from_info(ColumnInfo {
@@ -111,7 +111,21 @@ fn index(name: &str, constraint: Option<&str>) -> crate::query::IndexInfo {
 }
 
 fn drop_statements(driver_id: &str, original: &[crate::query::IndexInfo]) -> Vec<String> {
-    let ops = super::diff::diff_to_ops(None, "t", "t", &[], &[], original, &[], &[], &[]);
+    let ops = super::diff::diff_to_ops(
+        None,
+        TableState {
+            table: "t",
+            columns: &[],
+            indexes: original,
+            fks: &[],
+        },
+        TableState {
+            table: "t",
+            columns: &[],
+            indexes: &[],
+            fks: &[],
+        },
+    );
     super::materialize_ops(&ops, driver_id).unwrap()
 }
 
@@ -272,7 +286,21 @@ fn a_sql_server_default_edit_drops_the_old_constraint_before_any_alter() {
 fn dropping_a_sql_server_column_with_a_default_drops_its_constraint_first() {
     let original = vec![named("n", Some("0")), named("plain", None), named("kept", None)];
     let current = vec![DraftColumn::from_info(named("kept", None))];
-    let ops = diff_to_ops(Some("dbo"), "t", "t", &original, &current, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        Some("dbo"),
+        TableState {
+            table: "t",
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: "t",
+            columns: &current,
+            indexes: &[],
+            fks: &[],
+        },
+    );
     let statements = materialize_ops(&ops, "mssql").unwrap();
     let drop_default = statements
         .iter()

@@ -1573,6 +1573,36 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Roll Back and Switch", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
 
+    def closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back(database, base):
+        import sqlite3
+
+        with sqlite3.connect(database) as connection:
+            connection.execute("CREATE TABLE transaction_close_probe (id INTEGER PRIMARY KEY)")
+
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("INSERT INTO transaction_close_probe(id) VALUES (1)")
+        ui.wait_for_node_containing("done in")
+
+        with sqlite3.connect(database) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM transaction_close_probe").fetchone()[0] == 0
+
+        ui.invoke_accessible_action("win.close-current")
+        ui.wait_for_node(name="Close with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Close with an open transaction?", present=False)
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.invoke_accessible_action("win.close-current")
+        ui.wait_for_node(name="Close with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Roll Back and Close", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Open SQL editor", role=pyatspi.ROLE_PUSH_BUTTON)
+
+        with sqlite3.connect(database) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM transaction_close_probe").fetchone()[0] == 0
+
     def wait_for_editor_text(expected):
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -3053,6 +3083,7 @@ GLib.MainLoop().run()
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
         switching_connection_asks_before_rolling_back_an_open_session_transaction,
+        closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,

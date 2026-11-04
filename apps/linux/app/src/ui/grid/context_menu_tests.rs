@@ -181,22 +181,28 @@ fn editable_grid_menu_offers_row_mutations_when_the_table_has_a_key() {
 fn copying_a_previewed_cell_copies_the_full_value() {
     gtk::init().unwrap();
     let full = "original".repeat(1_200);
-    let columns = vec![ColumnInfo {
-        name: "value".into(),
-        data_type: "TEXT".into(),
-        nullable: true,
-        primary_key: false,
-        is_auto_increment: false,
-        default_value: None,
-        is_generated: false,
-        comment: None,
-        collation: None,
-        enum_type: None,
-        domain_type: None,
-    }];
+    let json = Value::Json(Box::new(serde_json::json!({"payload": "json".repeat(3_000)})));
+    let json_text = crate::ui::grid::display::value_to_full_edit_text(&json);
+    let columns = ["TEXT", "JSONB"]
+        .into_iter()
+        .enumerate()
+        .map(|(index, data_type)| ColumnInfo {
+            name: if index == 0 { "value" } else { "payload" }.into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        })
+        .collect::<Vec<_>>();
     let result = std::sync::Arc::new(QueryResult {
         columns: columns.clone(),
-        rows: vec![vec![Value::Text(full.clone())]].into(),
+        rows: vec![vec![Value::Text(full.clone()), json.clone()]].into(),
         truncated: false,
     });
     let row = crate::ui::row_object::RowObject::from_shared(&result, 0, None).unwrap();
@@ -207,16 +213,22 @@ fn copying_a_previewed_cell_copies_the_full_value() {
     assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 0), full);
 
     row.preview_values_from_result();
+    assert!(row.cell_preview(0).is_some());
+    assert!(row.cell_preview(1).is_some());
     editor.set_text("preview text");
-    assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 0), full);
+    assert_eq!(
+        copy_value_text(editor.upcast_ref(), Some(&row), 0),
+        "original".repeat(1_200)
+    );
+    assert_eq!(copy_value_text(editor.upcast_ref(), Some(&row), 1), json_text);
 
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
     rows.append(&row);
     let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
     let snapshot = export_snapshot(&view, &columns, false).unwrap();
 
-    assert_eq!(snapshot.rows, vec![vec![Value::Text(full)]]);
-    assert_eq!(snapshot.columns.len(), 1);
+    assert_eq!(snapshot.rows, vec![vec![Value::Text(full), json]]);
+    assert_eq!(snapshot.columns.len(), 2);
 }
 
 #[test]

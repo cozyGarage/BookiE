@@ -1,5 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-use bookie_core::sql_ddl::{DraftColumn, StructureOp, diff_to_ops, materialize_ops};
+use bookie_core::sql_ddl::{DraftColumn, StructureOp, TableState, diff_to_ops, materialize_ops};
 use bookie_core::{ColumnInfo, Connection, ForeignKeyInfo, IndexInfo, Value};
 use bookie_release_tests::Fixture;
 
@@ -217,7 +217,21 @@ async fn an_edited_draft_applies_the_diffed_column_changes() {
     }
     drafts.push(draft("amount", "integer", true, false));
 
-    let ops = diff_to_ops(None, PARENT, PARENT, &original_columns, &drafts, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: PARENT,
+            columns: &original_columns,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: PARENT,
+            columns: &drafts,
+            indexes: &[],
+            fks: &[],
+        },
+    );
     assert!(!ops.is_empty(), "the diff must produce operations");
     apply(connection.as_ref(), &ops).await;
 
@@ -431,7 +445,21 @@ async fn column_comments_are_created_added_edited_and_cleared() {
     }
     drafts.push(commented("amount", "integer", "how much"));
 
-    let ops = diff_to_ops(None, PARENT, PARENT, &created, &drafts, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: PARENT,
+            columns: &created,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: PARENT,
+            columns: &drafts,
+            indexes: &[],
+            fks: &[],
+        },
+    );
     apply(connection.as_ref(), &ops).await;
 
     let updated = connection.fetch_columns(None, PARENT).await.expect("fetch columns");
@@ -483,7 +511,21 @@ async fn a_renamed_column_keeps_a_comment_edited_in_the_same_save() {
         }
     }
 
-    let ops = diff_to_ops(None, PARENT, PARENT, &original, &drafts, &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: PARENT,
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: PARENT,
+            columns: &drafts,
+            indexes: &[],
+            fks: &[],
+        },
+    );
     apply(connection.as_ref(), &ops).await;
 
     let updated = connection.fetch_columns(None, PARENT).await.expect("fetch columns");

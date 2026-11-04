@@ -30,7 +30,7 @@ struct WorkspacePaths {
 
 #[derive(Default)]
 struct Memory {
-    cache: HashMap<Uuid, Option<ConnectionWorkspaceState>>,
+    cache: HashMap<Uuid, Option<Arc<ConnectionWorkspaceState>>>,
     saved_at: HashMap<Uuid, u64>,
     clock: u64,
 }
@@ -54,7 +54,7 @@ struct WorkspaceQueue {
 
 struct PendingWorkspace {
     sequence: u64,
-    state: ConnectionWorkspaceState,
+    state: Arc<ConnectionWorkspaceState>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,7 +64,7 @@ pub enum WorkspaceFlushError {
 }
 
 impl WorkspaceQueue {
-    fn save(&mut self, id: Uuid, state: ConnectionWorkspaceState) {
+    fn save(&mut self, id: Uuid, state: Arc<ConnectionWorkspaceState>) {
         self.next_sequence = self.next_sequence.wrapping_add(1);
         self.pending.insert(
             id,
@@ -428,8 +428,8 @@ impl WorkspaceStore {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .cache
             .get(&id)
+            .and_then(Option::as_deref)
             .cloned()
-            .flatten()
     }
 
     pub fn load_database(&self, id: Uuid, database: &str) -> Option<ConnectionWorkspaceState> {
@@ -457,7 +457,7 @@ impl WorkspaceStore {
             .cache
             .get(&id)
         {
-            return Ok(cached.clone());
+            return Ok(cached.as_deref().cloned());
         }
         let _guard = self
             .inner
@@ -636,9 +636,10 @@ fn prefetch_connections_coordinated(
         if loaded.unreadable.contains(id) || memory.saved_at.get(id).is_some_and(|saved| *saved > started) {
             continue;
         }
-        memory
-            .cache
-            .insert(*id, loaded.state.connections.get(&id.to_string()).cloned());
+        memory.cache.insert(
+            *id,
+            loaded.state.connections.get(&id.to_string()).cloned().map(Arc::new),
+        );
     }
     if !loaded.unreadable.is_empty() {
         return Err(WorkspaceFlushError::WriteFailed);
@@ -661,7 +662,8 @@ fn save_connection_coordinated(
     memory.clock += 1;
     let clock = memory.clock;
     memory.saved_at.insert(id, clock);
-    memory.cache.insert(id, Some(state.clone()));
+    let state = Arc::new(state);
+    memory.cache.insert(id, Some(Arc::clone(&state)));
     queue.save(id, state);
     true
 }
@@ -710,7 +712,7 @@ fn run_writer(
                         pending
                             .iter()
                             .filter(|(id, _)| !queue.forgotten.contains(id))
-                            .map(|(id, entry)| (*id, entry.state.clone()))
+                            .map(|(id, entry)| (*id, entry.state.as_ref().clone()))
                             .collect()
                     };
                     workspace_disk::save_connections(path, &paths.drafts, updates).map_err(|error| {

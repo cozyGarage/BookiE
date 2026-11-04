@@ -134,6 +134,9 @@ fn retire_grid(with_menus: bool, editable: bool, rendered: bool) -> RetiredGrid 
         window.set_child(None::<&gtk4::Widget>);
         window.destroy();
         drop(window);
+    } else {
+        cells(view.upcast_ref(), &mut cell_refs);
+        assert!(cell_refs.is_empty(), "an unpresented grid must not bind row cells");
     }
     drop(view);
     drop(selection);
