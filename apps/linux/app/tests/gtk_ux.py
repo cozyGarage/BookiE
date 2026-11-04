@@ -489,6 +489,7 @@ def scenarios(ui):
             f"CREATE TABLE {table} (id integer PRIMARY KEY, marker_{index:02} text)"
             for index, table in enumerate(tables)
         ))
+        psql("; ".join(f"GRANT SELECT ON {table} TO bookie_mtls" for table in tables))
         try:
             ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
             ui.wait_for_node(name="public.release_items", role=pyatspi.ROLE_LIST_ITEM)
