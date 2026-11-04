@@ -150,20 +150,38 @@ pub type ChoiceMap = std::rc::Rc<std::cell::RefCell<std::collections::HashMap<St
 const WIDE_TABLE_THRESHOLD: usize = 8;
 const MIN_COLUMN_WIDTH_PX: i32 = 120;
 
-#[allow(clippy::too_many_arguments)]
+pub struct GridSenders {
+    pub edit: Option<relm4::Sender<GridMsg>>,
+    pub menu: Option<relm4::Sender<GridMsg>>,
+    pub sort: Option<relm4::Sender<GridMsg>>,
+}
+
+pub struct GridEnv {
+    pub connection_id: Option<uuid::Uuid>,
+    pub tab_ctx: TabGridContext,
+    pub column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    pub database: std::sync::Arc<DatabaseService>,
+}
+
 pub fn build_column_view(
     shared: &std::sync::Arc<QueryResult>,
     schema_columns: &[ColumnInfo],
     table: &str,
-    edit_sender: Option<relm4::Sender<GridMsg>>,
-    menu_sender: Option<relm4::Sender<GridMsg>>,
     sort: Option<(usize, bool)>,
-    sort_sender: Option<relm4::Sender<GridMsg>>,
-    connection_id: Option<uuid::Uuid>,
-    tab_ctx: TabGridContext,
-    column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
-    database: std::sync::Arc<DatabaseService>,
+    senders: GridSenders,
+    env: GridEnv,
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
+    let GridSenders {
+        edit: edit_sender,
+        menu: menu_sender,
+        sort: sort_sender,
+    } = senders;
+    let GridEnv {
+        connection_id,
+        tab_ctx,
+        column_widths,
+        database,
+    } = env;
     let result: &QueryResult = shared;
     let store = match &tab_ctx.projected_columns {
         Some(indices) => match if tab_ctx.preview_redis_strings && !tab_ctx.pk_col_indices.is_empty() {

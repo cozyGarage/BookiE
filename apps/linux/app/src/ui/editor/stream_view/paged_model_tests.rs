@@ -364,16 +364,20 @@ fn result_grid_uses_the_paged_model_for_its_rows() {
         &[],
         "",
         None,
-        None,
-        None,
-        None,
-        None,
-        crate::ui::grid::TabGridContext {
-            result_model: Some(model.clone().upcast()),
-            ..Default::default()
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
         },
-        None,
-        std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx: crate::ui::grid::TabGridContext {
+                result_model: Some(model.clone().upcast()),
+                ..Default::default()
+            },
+            column_widths: None,
+            database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        },
     );
     assert_eq!(selection.n_items(), 2);
     assert_eq!(view.model().unwrap().n_items(), 2);
@@ -418,23 +422,27 @@ fn result_grid_reports_rows_when_realized_and_released() {
         &columns,
         "",
         None,
-        None,
-        None,
-        None,
-        None,
-        crate::ui::grid::TabGridContext {
-            result_model: Some(model.upcast()),
-            row_visibility: Some(std::rc::Rc::new(move |row, shown| {
-                if shown {
-                    changes.borrow_mut().insert(row);
-                } else {
-                    changes.borrow_mut().remove(&row);
-                }
-            })),
-            ..Default::default()
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
         },
-        None,
-        std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx: crate::ui::grid::TabGridContext {
+                result_model: Some(model.upcast()),
+                row_visibility: Some(std::rc::Rc::new(move |row, shown| {
+                    if shown {
+                        changes.borrow_mut().insert(row);
+                    } else {
+                        changes.borrow_mut().remove(&row);
+                    }
+                })),
+                ..Default::default()
+            },
+            column_widths: None,
+            database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        },
     );
     let window = gtk4::Window::builder().child(&view).build();
     window.present();
@@ -494,17 +502,21 @@ fn realized_grid_rows_load_their_spooled_values() {
         &[column],
         "",
         None,
-        None,
-        None,
-        None,
-        None,
-        crate::ui::grid::TabGridContext {
-            result_model: Some(model.clone().upcast()),
-            row_visibility: Some(visibility),
-            ..Default::default()
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
         },
-        None,
-        std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx: crate::ui::grid::TabGridContext {
+                result_model: Some(model.clone().upcast()),
+                row_visibility: Some(visibility),
+                ..Default::default()
+            },
+            column_widths: None,
+            database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        },
     );
     model.imp().selection.set(Some(&selection));
     let window = gtk4::Window::builder().child(&view).build();
