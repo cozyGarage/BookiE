@@ -127,8 +127,8 @@ impl App {
         row_positions: &[u32],
         statement: bookie_core::sql_literal::RowStatement,
     ) {
-        if row_positions.len() > MAX_COPIED_STATEMENT_ROWS {
-            self.show_toast(&crate::tr!("Select fewer rows to copy as statements."));
+        if let Some(message) = copy_limit_refusal(row_positions.len()) {
+            self.show_toast(&message);
             return;
         }
         let (columns, driver_id, rows, table, schema) = {
@@ -152,16 +152,10 @@ impl App {
                 model.schema().map(str::to_owned),
             )
         };
-        let Some(rows) = rows else {
-            self.show_toast(&crate::tr!(
-                "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
-            ));
-            return;
-        };
-        let sql = match statement.build_all(&driver_id, schema.as_deref(), &table, &columns, &rows) {
+        let sql = match copied_statements(statement, &driver_id, schema.as_deref(), &table, &columns, rows) {
             Ok(sql) => sql,
-            Err(error) => {
-                self.show_toast(&error_text::build_sql_message(&error));
+            Err(message) => {
+                self.show_toast(&message);
                 return;
             }
         };
@@ -178,6 +172,28 @@ impl App {
         self.window.clipboard().set_text(&text);
         self.show_toast(&crate::tr!("Copied to clipboard"));
     }
+}
+
+fn copy_limit_refusal(rows: usize) -> Option<String> {
+    (rows > MAX_COPIED_STATEMENT_ROWS).then(|| crate::tr!("Select fewer rows to copy as statements."))
+}
+
+fn copied_statements(
+    statement: RowStatement,
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[bookie_core::ColumnInfo],
+    rows: Option<Vec<Vec<Value>>>,
+) -> Result<String, String> {
+    let Some(rows) = rows else {
+        return Err(crate::tr!(
+            "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
+        ));
+    };
+    statement
+        .build_all(driver_id, schema, table, columns, &rows)
+        .map_err(|error| error_text::build_sql_message(&error))
 }
 
 /// Inspect the SQL prefix of each statement and compare its expected
@@ -221,7 +237,9 @@ fn compute_concurrency_warning(statements: &[(String, Vec<Value>)], affected: &[
 /// that round-trips through any SQL client.
 #[cfg(test)]
 mod tests {
-    use super::compute_concurrency_warning;
+    use super::{MAX_COPIED_STATEMENT_ROWS, compute_concurrency_warning, copied_statements, copy_limit_refusal};
+    use bookie_core::sql_literal::RowStatement;
+    use bookie_core::{ColumnInfo, Value};
 
     fn stmt(sql: &str) -> (String, Vec<bookie_core::Value>) {
         (sql.to_string(), Vec::new())
@@ -259,6 +277,52 @@ mod tests {
     fn warning_handles_lowercase_and_whitespace() {
         let stmts = vec![stmt("  update t set x = 1 where id = 5")];
         assert!(compute_concurrency_warning(&stmts, &[0]).is_some());
+    }
+    fn column(name: &str, primary_key: bool) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
+            data_type: "text".into(),
+            nullable: true,
+            primary_key,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn a_selection_over_the_row_limit_is_refused_and_one_at_the_limit_is_not() {
+        assert!(copy_limit_refusal(MAX_COPIED_STATEMENT_ROWS).is_none());
+        let message = copy_limit_refusal(MAX_COPIED_STATEMENT_ROWS + 1).unwrap();
+        assert_eq!(message, "Select fewer rows to copy as statements.");
+    }
+
+    #[test]
+    fn copied_update_and_where_keep_null_and_empty_text_apart() {
+        let columns = vec![column("id", true), column("note", false)];
+        let rows = vec![
+            vec![Value::Int(1), Value::Text(String::new())],
+            vec![Value::Int(2), Value::Null],
+        ];
+        let update =
+            copied_statements(RowStatement::Update, "sqlite", None, "t", &columns, Some(rows.clone())).unwrap();
+        assert_eq!(
+            update,
+            "UPDATE \"t\" SET \"note\" = '' WHERE \"id\" = 1;\nUPDATE \"t\" SET \"note\" = NULL WHERE \"id\" = 2;"
+        );
+        let predicate = copied_statements(RowStatement::Where, "sqlite", None, "t", &columns, Some(rows)).unwrap();
+        assert_eq!(predicate, "(\"id\" = 1)\nOR (\"id\" = 2)");
+    }
+
+    #[test]
+    fn a_selection_with_an_unfetched_row_copies_nothing_and_says_why() {
+        let columns = vec![column("id", true)];
+        let message = copied_statements(RowStatement::Update, "sqlite", None, "t", &columns, None).unwrap_err();
+        assert!(message.starts_with("Some row values were not fetched"), "{message}");
     }
 }
 
