@@ -536,6 +536,18 @@ fn the_shared_lexer_rules_decide_nested_comments_escapes_brackets_and_identifier
 }
 
 #[test]
+fn an_unterminated_nested_block_comment_is_closed_and_a_flat_one_is_not_nested() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* a /* b */"),
+        "SELECT 1 /* a /* b */\n*/\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("mysql", "SELECT 1 /* a /* b */"),
+        "SELECT 1 /* a /* b */;\n\n"
+    );
+}
+
+#[test]
 fn a_numbered_placeholder_is_not_a_dollar_quote() {
     assert_eq!(
         exported_tail("postgres", "SELECT * FROM t WHERE id = $1 -- by id"),

@@ -626,6 +626,26 @@ struct StatementTail {
     last_code: Option<char>,
 }
 
+fn block_comment_is_open(text: &str, nested: bool) -> bool {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut index = 0;
+    while index + 1 < bytes.len() {
+        match &bytes[index..index + 2] {
+            b"/*" if nested || depth == 0 => {
+                depth += 1;
+                index += 2;
+            }
+            b"*/" if depth > 0 => {
+                depth -= 1;
+                index += 2;
+            }
+            _ => index += 1,
+        }
+    }
+    depth > 0
+}
+
 fn scan_statement_tail(query: &str, driver_id: &str) -> StatementTail {
     let lexer_driver = if driver_id == "mariadb" { "mysql" } else { driver_id };
     let mut tail = StatementTail {
@@ -647,7 +667,8 @@ fn scan_statement_tail(query: &str, driver_id: &str) -> StatementTail {
         let text = &query[index..index + length];
         let reaches_end = index + length >= query.len();
         if text.starts_with("/*") {
-            tail.in_block_comment = reaches_end && (length < 4 || !text.ends_with("*/"));
+            let nested = matches!(lexer_driver, "postgres" | "mssql");
+            tail.in_block_comment = reaches_end && block_comment_is_open(text, nested);
         } else if text.starts_with("--") || (text.starts_with('#') && lexer_driver == "mysql") {
             tail.in_line_comment = reaches_end;
         } else {
