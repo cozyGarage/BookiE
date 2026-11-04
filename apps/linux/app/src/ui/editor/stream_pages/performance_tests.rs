@@ -1,3 +1,5 @@
+use super::super::pinned::PinnedResults;
+use super::super::{StatementIdentity, StatementOutcome, StatementOutcomeKind};
 use super::tests::page;
 use super::*;
 use bookie_core::Value;
@@ -53,6 +55,53 @@ fn snapshots_share_payloads_and_release_evicted_pages_after_the_last_owner() {
     drop(first);
     drop(second);
     assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn independent_pinned_streams_account_for_and_release_all_resident_pages() {
+    let mut displayed = Vec::new();
+    let mut pins = Vec::new();
+    let mut pages = Vec::new();
+    let mut expected_bytes = 0;
+
+    for _ in 0..5 {
+        let mut cache = StreamPageCache::default();
+        for page_index in 0..4 {
+            let page = byte_page(64 * 1024);
+            expected_bytes += page.estimated_row_bytes();
+            pages.push(Arc::downgrade(&page));
+            cache.append(page_index, page).unwrap();
+        }
+        let outcome = StatementOutcome {
+            identity: StatementIdentity::default(),
+            sql_preview: "SELECT payload FROM items".into(),
+            elapsed_ms: 0,
+            kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
+            pinned: false,
+        };
+        displayed.push(outcome.clone());
+        let mut pin = PinnedResults::default();
+        pin.add_pin(outcome);
+        pins.push(pin);
+    }
+
+    let live_pages: Vec<_> = pages.iter().filter_map(Weak::upgrade).collect();
+    assert_eq!(live_pages.len(), 20);
+    assert_eq!(
+        live_pages.iter().map(|page| page.estimated_row_bytes()).sum::<usize>(),
+        expected_bytes
+    );
+    assert!(expected_bytes <= 5 * MAX_QUERY_RESULT_BYTES);
+    drop(live_pages);
+
+    drop(displayed);
+    assert!(pages.iter().all(|page| page.upgrade().is_some()));
+    for pin in &mut pins {
+        assert_eq!(pin.count(), 1);
+        assert!(pin.unpin_all().is_empty());
+    }
+    drop(pins);
+    assert!(pages.iter().all(|page| page.upgrade().is_none()));
 }
 
 #[test]
