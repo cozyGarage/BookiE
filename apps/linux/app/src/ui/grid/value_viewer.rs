@@ -248,6 +248,22 @@ mod tests {
             .unwrap()
     }
 
+    fn button_named(widget: &gtk::Widget, label: &str) -> Option<gtk::Button> {
+        if let Some(button) = widget.downcast_ref::<gtk::Button>()
+            && button.label().as_deref() == Some(label)
+        {
+            return Some(button.clone());
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            if let Some(button) = button_named(&current, label) {
+                return Some(button);
+            }
+            child = current.next_sibling();
+        }
+        None
+    }
+
     #[test]
     fn json_looking_text_preserves_duplicate_keys_numbers_and_whitespace() {
         for text in [
@@ -340,7 +356,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn the_viewer_dialog_builds_and_shows_the_full_value() {
+    fn the_viewer_dialog_shows_a_preview_and_copies_the_full_value() {
         gtk::init().unwrap();
         adw::init().unwrap();
         let view = build_text_view(&"a".repeat(64));
@@ -355,9 +371,17 @@ mod tests {
         assert!(end.has_tag(&tag));
         let window = adw::Window::new();
         window.present();
-        present(&window, "payload", Value::Text(r#"{"a":1}"#.into()), None);
+        let value = "x".repeat(1_200_000);
+        present(&window, "payload", Value::Text(value.clone()), None);
         let dialogs = window.observe_children().n_items();
         assert!(dialogs >= 1);
+        let copy = button_named(window.upcast_ref(), &crate::tr!("Copy value")).unwrap();
+        copy.emit_clicked();
+        let received = gtk::glib::MainContext::default()
+            .block_on(window.clipboard().read_text_future())
+            .unwrap()
+            .unwrap();
+        assert_eq!(received.as_str(), value);
         window.close();
     }
 }
