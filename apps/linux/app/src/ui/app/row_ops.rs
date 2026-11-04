@@ -24,16 +24,21 @@ impl App {
     /// failure, the entire transaction has already been rolled back
     /// by the driver; we just surface the error message.
     pub(super) fn on_execute_browse_transaction(
-        &self,
+        &mut self,
         tab_id: Uuid,
+        save_id: Uuid,
         statements: Vec<(String, Vec<Value>)>,
         sources: Vec<StatementSource>,
         sender: ComponentSender<App>,
     ) {
         let Some(conn) = self.window_connection() else {
-            self.dispatch_to_tab(tab_id, BrowseTabInput::SaveFailed(crate::tr!("No active connection")));
+            self.dispatch_to_tab(
+                tab_id,
+                BrowseTabInput::SaveFailed(save_id, crate::tr!("No active connection")),
+            );
             return;
         };
+        self.active_browse_saves.insert(tab_id, save_id);
         // Drivers that cannot report a row count for UPDATE / DELETE
         // return 0 for every statement, which the concurrency guard
         // below would read as "every row vanished". Skip the guard for
@@ -82,7 +87,7 @@ impl App {
                             finish_if_recorded(&mut recorded, Outcome::Success).await;
                             sender_for_cmd.input(AppMsg::RowOpStarted);
                             sender_for_cmd.input(AppMsg::WorkspaceSchemaWordsChanged);
-                            sender_for_cmd.input(AppMsg::SaveCompletedForTab(tab_id, warning));
+                            sender_for_cmd.input(AppMsg::SaveCompletedForTab(tab_id, save_id, warning));
                         }
                         Err(e) => {
                             // If the driver pinpointed which statement
@@ -104,12 +109,20 @@ impl App {
                             }
                             let msg = error_text::driver_message(&e);
                             finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
-                            sender_for_cmd.input(AppMsg::SaveFailedForTab(tab_id, msg));
+                            sender_for_cmd.input(AppMsg::SaveFailedForTab(tab_id, save_id, msg));
                         }
                     }
                 })
                 .drop_on_shutdown()
         });
+    }
+
+    pub(super) fn take_active_browse_save(&mut self, tab_id: Uuid, save_id: Uuid) -> bool {
+        if !take_save_id(&mut self.active_browse_saves, tab_id, save_id) {
+            return false;
+        }
+        self.in_flight_saves.set(self.in_flight_saves.get().saturating_sub(1));
+        true
     }
 
     pub(super) fn set_row_op_in_flight(&self, in_flight: bool) {
@@ -259,6 +272,34 @@ mod tests {
     fn warning_handles_lowercase_and_whitespace() {
         let stmts = vec![stmt("  update t set x = 1 where id = 5")];
         assert!(compute_concurrency_warning(&stmts, &[0]).is_some());
+    }
+}
+
+fn take_save_id(active: &mut std::collections::HashMap<Uuid, Uuid>, tab_id: Uuid, save_id: Uuid) -> bool {
+    if active.get(&tab_id) != Some(&save_id) {
+        return false;
+    }
+    active.remove(&tab_id);
+    true
+}
+
+#[cfg(test)]
+mod save_completion_tests {
+    use super::take_save_id;
+    use std::collections::HashMap;
+    use uuid::Uuid;
+
+    #[test]
+    fn stale_completion_keeps_the_newer_save_active() {
+        let tab_id = Uuid::new_v4();
+        let old_save = Uuid::new_v4();
+        let new_save = Uuid::new_v4();
+        let mut active = HashMap::from([(tab_id, new_save)]);
+
+        assert!(!take_save_id(&mut active, tab_id, old_save));
+        assert_eq!(active.get(&tab_id), Some(&new_save));
+        assert!(take_save_id(&mut active, tab_id, new_save));
+        assert!(!take_save_id(&mut active, tab_id, new_save));
     }
 }
 

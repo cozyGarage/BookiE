@@ -145,7 +145,7 @@ pub struct BrowseTab {
     /// here lets us emit `BrowseTabOutput::DirtyChanged` only on real
     /// transitions and avoid redundant tab-title rewrites in App.
     was_dirty: std::cell::Cell<bool>,
-    save_in_flight: std::cell::Cell<bool>,
+    save_in_flight: std::cell::Cell<Option<uuid::Uuid>>,
     /// Row identity captured before a sort/save/refresh-driven reload
     /// so the focused row can be re-selected and re-scrolled into view
     /// once the new page lands. Persisted rows match by PK; drafts
@@ -213,6 +213,9 @@ mod preview;
 pub(crate) mod reference;
 mod requests;
 mod row_ops;
+mod save_completion;
+#[cfg(test)]
+mod save_completion_tests;
 #[cfg(test)]
 mod save_in_flight_tests;
 mod selection;
@@ -240,7 +243,7 @@ impl BrowseTab {
     }
 
     pub(super) fn save_in_flight(&self) -> bool {
-        self.save_in_flight.get()
+        self.save_in_flight.get().is_some()
     }
 
     pub fn snapshot(&self) -> Option<QueryResult> {
@@ -675,7 +678,7 @@ impl SimpleComponent for BrowseTab {
             read_only_banner,
             no_pk_banner,
             was_dirty: std::cell::Cell::new(false),
-            save_in_flight: std::cell::Cell::new(false),
+            save_in_flight: std::cell::Cell::new(None),
             pending_focus_restore: std::cell::RefCell::new(None),
             paginator_label: paginator.paginator_label,
             selection_label: paginator.selection_label,
@@ -1077,8 +1080,8 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::DiscardAll => self.handle_discard_all(sender),
             BrowseTabInput::PendingCountChanged(n) => self.handle_pending_count_changed(n, sender),
             BrowseTabInput::ChangedRows(keys) => self.handle_changed_rows(keys),
-            BrowseTabInput::SaveCompleted => self.handle_save_completed(sender),
-            BrowseTabInput::SaveFailed(message) => self.handle_save_failed(message, sender),
+            BrowseTabInput::SaveCompleted(save_id) => self.handle_save_completed(save_id, sender),
+            BrowseTabInput::SaveFailed(save_id, message) => self.handle_save_failed(save_id, message, sender),
             BrowseTabInput::FlashErrorRow(source) => self.handle_flash_error_row(source),
             BrowseTabInput::FocusInsertedDraft => self.handle_focus_inserted_draft(),
             BrowseTabInput::Undo => self.handle_undo(),

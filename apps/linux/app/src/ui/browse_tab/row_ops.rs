@@ -639,7 +639,7 @@ impl BrowseTab {
                 | BrowseTabInput::Paste(_)
                 | BrowseTabInput::PasteText(_)
         );
-        if !(self.save_in_flight.get() && changes_tracker) {
+        if !(self.save_in_flight.get().is_some() && changes_tracker) {
             return Some(msg);
         }
         self.rejected_edit_revision
@@ -651,7 +651,7 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_commit_save(&mut self, sender: ComponentSender<Self>) {
-        if self.save_in_flight.get() {
+        if self.save_in_flight.get().is_some() {
             return;
         }
         let columns = self.current_columns.clone();
@@ -669,14 +669,19 @@ impl BrowseTab {
                 // double-click firing two transactions and
                 // matches GNOME's standard "in-progress action"
                 // affordance (busy spinner + disabled control).
-                self.save_in_flight.set(true);
+                let save_id = uuid::Uuid::new_v4();
+                self.save_in_flight.set(Some(save_id));
                 self.save_button.set_sensitive(false);
                 self.discard_button.set_sensitive(false);
                 // SaveCompleted will refetch the page; capture
                 // the focused row's PK now so it can be re-
                 // selected after the reload.
                 self.capture_focus_for_restore();
-                let _ = sender.output(BrowseTabOutput::ExecuteTransaction { statements, sources });
+                let _ = sender.output(BrowseTabOutput::ExecuteTransaction {
+                    save_id,
+                    statements,
+                    sources,
+                });
             }
             Some(Ok(_)) => {
                 // Nothing to save (tracker empty) — refresh bar.
@@ -750,27 +755,6 @@ impl BrowseTab {
                 self.refresh_row_at(pos);
             }
         }
-    }
-
-    pub(super) fn handle_save_completed(&mut self, sender: ComponentSender<Self>) {
-        if !self.save_in_flight.replace(false) {
-            return;
-        }
-        self.change_trackers.with_tab(self.tab_id, |t| t.clear());
-        self.refresh_pending_bar(0);
-        self.save_button.set_sensitive(true);
-        self.discard_button.set_sensitive(true);
-        self.emit_fetch_page_and_count(&sender);
-    }
-
-    pub(super) fn handle_save_failed(&mut self, message: String, sender: ComponentSender<Self>) {
-        self.save_in_flight.set(false);
-        self.save_button.set_sensitive(true);
-        self.discard_button.set_sensitive(true);
-        let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-            title: crate::tr!("Save failed"),
-            body: message,
-        });
     }
 
     pub(super) fn handle_flash_error_row(&self, source: crate::services::change_tracker::StatementSource) {

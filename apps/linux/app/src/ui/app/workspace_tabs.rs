@@ -423,8 +423,13 @@ impl App {
                 BrowseTabOutput::ShowSelectionAlert { title, body } => AppMsg::ShowAlert { title, body },
                 BrowseTabOutput::ShowToast(msg) => AppMsg::ShowToast(msg),
                 BrowseTabOutput::DirtyChanged(dirty) => AppMsg::BrowseTabDirtyChanged(tab_id, dirty),
-                BrowseTabOutput::ExecuteTransaction { statements, sources } => AppMsg::ExecuteBrowseTransaction {
+                BrowseTabOutput::ExecuteTransaction {
+                    save_id,
+                    statements,
+                    sources,
+                } => AppMsg::ExecuteBrowseTransaction {
                     tab_id,
+                    save_id,
                     statements,
                     sources,
                 },
