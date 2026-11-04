@@ -29,6 +29,7 @@ SQL_EDITOR = {
     "Expand all": "tab-stop",
     "Tables sidebar": "tab-stop",
     "Run options": "tab-stop",
+    "SQL snippets": "tab-stop",
     "Show columns": "tab-stop",
     "Results": "shortcut: Ctrl+J",
     "Errors": "tab-stop",
