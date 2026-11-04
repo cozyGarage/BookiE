@@ -37,6 +37,26 @@ fn outcome_for_response(response: &str) -> ApprovalOutcome {
     ApprovalOutcome::Deny
 }
 
+fn build_approval_dialog(
+    heading: &str,
+    body: &str,
+    extra_child: &impl relm4::gtk::prelude::IsA<relm4::gtk::Widget>,
+) -> relm4::adw::AlertDialog {
+    use relm4::adw::prelude::*;
+    let dialog = relm4::adw::AlertDialog::builder()
+        .heading(heading)
+        .body(body)
+        .extra_child(extra_child)
+        .build();
+    dialog.add_response(DENY_RESPONSE, "Deny");
+    dialog.add_response(APPROVE_ONCE_RESPONSE, "Approve once");
+    dialog.set_response_appearance(DENY_RESPONSE, relm4::adw::ResponseAppearance::Destructive);
+    dialog.set_response_appearance(APPROVE_ONCE_RESPONSE, relm4::adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some(DENY_RESPONSE));
+    dialog.set_close_response(CLOSE_RESPONSE);
+    dialog
+}
+
 fn truncate_sql(sql: &str) -> String {
     let mut chars = sql.chars();
     let preview: String = chars.by_ref().take(MAX_SQL_PREVIEW_CHARS).collect();
@@ -147,17 +167,7 @@ impl ApprovalSink for GtkApprovalSink {
                 .max_content_height(360)
                 .child(&sql_view)
                 .build();
-            let dialog = adw::AlertDialog::builder()
-                .heading(&heading_c)
-                .body(&body_c)
-                .extra_child(&sql_scroll)
-                .build();
-            dialog.add_response(DENY_RESPONSE, "Deny");
-            dialog.add_response(APPROVE_ONCE_RESPONSE, "Approve once");
-            dialog.set_response_appearance(DENY_RESPONSE, adw::ResponseAppearance::Destructive);
-            dialog.set_response_appearance(APPROVE_ONCE_RESPONSE, adw::ResponseAppearance::Suggested);
-            dialog.set_default_response(Some(DENY_RESPONSE));
-            dialog.set_close_response(CLOSE_RESPONSE);
+            let dialog = build_approval_dialog(&heading_c, &body_c, &sql_scroll);
 
             let timer = Arc::new(Mutex::new(None::<glib::SourceId>));
             let timer_response = timer.clone();
@@ -274,6 +284,19 @@ mod tests {
         req.facts.tables.push("jobs".into());
         req.preview = Some("tables: jobs".into());
         assert!(approval_body(&req).contains("tables: jobs"));
+    }
+
+    #[test]
+    fn the_dialog_defaults_to_deny_and_closes_as_deny() {
+        use relm4::adw::prelude::*;
+        relm4::adw::init().unwrap();
+        let scroll = relm4::gtk::ScrolledWindow::new();
+        let dialog = build_approval_dialog("Approve write: db", "body", &scroll);
+        assert_eq!(dialog.default_response().as_deref(), Some(DENY_RESPONSE));
+        assert_eq!(dialog.close_response().as_str(), DENY_RESPONSE);
+        assert_ne!(DENY_RESPONSE, APPROVE_ONCE_RESPONSE);
+        assert!(dialog.has_response(DENY_RESPONSE));
+        assert!(dialog.has_response(APPROVE_ONCE_RESPONSE));
     }
 
     #[test]
