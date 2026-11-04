@@ -44,6 +44,9 @@ The window needs a Wayland or X11 session with a Vulkan driver that can present.
 
 ## Scroll and memory measurement
 
+To measure both prototypes the same way, run `experiments/profile.sh` from a desktop session (`ROWS=500000 RUNS=5 experiments/profile.sh` changes the size). It builds both in release mode and prints one JSON line per run: scroll time, and resident and proportional memory (for Tauri, the app plus the WebKit processes). Compare `elapsed_ms` and the `pss_kib` peaks, and the GPUI frame-paced `frame_p95_ms`. Close other heavy applications first and repeat a run; one machine and one GPU driver is all this shows.
+
+
 ```bash
 cargo build --release --locked --manifest-path experiments/gpui-grid-prototype/Cargo.toml
 node experiments/gpui-grid-prototype/measure.mjs --rows=150000 --steps=120 --runs=3
