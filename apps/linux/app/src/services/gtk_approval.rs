@@ -139,7 +139,7 @@ impl ApprovalSink for GtkApprovalSink {
         let connection_id = req.connection_id;
         glib::MainContext::default().invoke(move || {
             use relm4::adw::prelude::*;
-            use relm4::{adw, gtk};
+            use relm4::gtk;
 
             if tokio::time::Instant::now() >= deadline {
                 if let Ok(mut guard) = tx.lock()

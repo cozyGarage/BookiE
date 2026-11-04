@@ -208,3 +208,9 @@ Press Ctrl+? for the full list. The most used:
 Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Results** and **Errors** are one switcher with the active view marked: choosing **Results** while Errors is shown returns to the existing result selector, and choosing it again hides the panel. **Errors** shows a count only when the latest run failed, and lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
 
 Drag the divider to resize the panel. **Maximize results** hides the SQL area; **Restore editor** returns to the previous divider position and SQL focus. Hiding a maximized panel also restores the editor. Panel size is retained within the open editor, not across an application restart. Closing the query releases its panel with the rest of that editor.
+
+## Third-party license notices
+
+The Arch and Debian packages install generated dependency notices at `/usr/share/doc/bookie/THIRD_PARTY_NOTICES.md`. Read the file with a text editor or `less /usr/share/doc/bookie/THIRD_PARTY_NOTICES.md`. The generated source copy is [THIRD_PARTY_NOTICES.md](../apps/linux/packaging/THIRD_PARTY_NOTICES.md).
+
+These notices describe the packaged Rust dependency graph. System libraries have their own distribution-provided license records; the generated file is not a complete inventory of those libraries. The About dialog shows BookiE's own license.
