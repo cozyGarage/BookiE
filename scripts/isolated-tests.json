@@ -245,6 +245,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::referenced_row::tests::force_dismissing_referenced_row_choice_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_completion_tests::edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes"
     ],
     [
