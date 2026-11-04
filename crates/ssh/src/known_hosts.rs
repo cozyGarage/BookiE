@@ -36,15 +36,26 @@ pub(super) fn verify_or_learn(
     }
 }
 
+pub(super) struct HostKeyCheck<'a> {
+    pub(super) host: &'a str,
+    pub(super) port: u16,
+    pub(super) key: &'a PublicKey,
+    pub(super) known_hosts: &'a Path,
+    pub(super) fingerprint: &'a str,
+}
+
 pub(super) async fn verify_or_prompt(
-    host: &str,
-    port: u16,
-    key: &PublicKey,
-    known_hosts: &Path,
-    fingerprint: &str,
+    check: HostKeyCheck<'_>,
     prompter: &dyn Prompter,
     prompt_events: &tokio::sync::mpsc::UnboundedSender<HostKeyPromptEvent>,
 ) -> HostKeyOutcome {
+    let HostKeyCheck {
+        host,
+        port,
+        key,
+        known_hosts,
+        fingerprint,
+    } = check;
     match check_known_host(host, port, key, known_hosts, fingerprint) {
         Ok(true) => HostKeyOutcome::Trusted,
         Ok(false) => {

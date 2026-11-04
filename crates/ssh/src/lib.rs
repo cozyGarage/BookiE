@@ -389,11 +389,13 @@ impl client::Handler for ClientHandler {
         let outcome = match &self.prompter {
             Some(prompter) => {
                 known_hosts::verify_or_prompt(
-                    &self.target_host,
-                    self.target_port,
-                    key,
-                    &self.known_hosts_path,
-                    &fingerprint,
+                    known_hosts::HostKeyCheck {
+                        host: &self.target_host,
+                        port: self.target_port,
+                        key,
+                        known_hosts: &self.known_hosts_path,
+                        fingerprint: &fingerprint,
+                    },
                     prompter.as_ref(),
                     &self.prompt_events,
                 )
@@ -773,15 +775,20 @@ async fn forwarder_loop(
             accept = listener.accept() => match accept {
                 Ok((socket, originator_host, originator_port)) => {
                     let session = session.clone();
-                    let remote_host = remote_host.clone();
+                    let target = ForwardTarget {
+                        originator_host,
+                        originator_port,
+                        remote_host: remote_host.clone(),
+                        remote_port,
+                    };
                     let cancel = cancel.clone();
                     tokio::spawn(async move {
                         let forwarded = match socket {
                             LocalStream::Tcp(stream) => {
-                                forward_one(session, stream, originator_host, originator_port, remote_host, remote_port, cancel).await
+                                forward_one(session, stream, target, cancel).await
                             }
                             LocalStream::Socket(stream) => {
-                                forward_one(session, stream, originator_host, originator_port, remote_host, remote_port, cancel).await
+                                forward_one(session, stream, target, cancel).await
                             }
                         };
                         if let Err(e) = forwarded {
@@ -803,13 +810,17 @@ async fn forwarder_loop(
     }
 }
 
-async fn forward_one<S>(
-    session: Arc<Handle<ClientHandler>>,
-    socket: S,
+struct ForwardTarget {
     originator_host: String,
     originator_port: u32,
     remote_host: String,
     remote_port: u16,
+}
+
+async fn forward_one<S>(
+    session: Arc<Handle<ClientHandler>>,
+    socket: S,
+    target: ForwardTarget,
     cancel: CancellationToken,
 ) -> Result<(), russh::Error>
 where
@@ -817,7 +828,12 @@ where
 {
     let channel = open_within(
         CHANNEL_OPEN_TIMEOUT,
-        session.channel_open_direct_tcpip(remote_host, u32::from(remote_port), originator_host, originator_port),
+        session.channel_open_direct_tcpip(
+            target.remote_host,
+            u32::from(target.remote_port),
+            target.originator_host,
+            target.originator_port,
+        ),
     )
     .await?;
 
