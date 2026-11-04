@@ -9,7 +9,7 @@
 //!   cargo test -p bookie-driver-postgres --test restricted_role_catalog -- --include-ignored
 //! ```
 
-use bookie_core::{ConnectOptions, DatabaseDriver};
+use bookie_core::{CatalogObjectKind, ConnectOptions, DatabaseDriver};
 use drivers_postgres::PgDriver;
 
 fn options(user: &str, password: &str) -> ConnectOptions {
@@ -44,6 +44,18 @@ const SEED: &[&str] = &[
     "GRANT USAGE ON SCHEMA bookie_vis_visible TO bookie_vis_restricted",
     "GRANT SELECT ON bookie_vis_visible.shown, bookie_vis_visible.shown_view, bookie_vis_visible.shown_mat TO bookie_vis_restricted",
     "GRANT USAGE ON SCHEMA bookie_vis_usage TO bookie_vis_restricted",
+    "CREATE FUNCTION bookie_vis_visible.open_fn() RETURNS int LANGUAGE sql AS 'SELECT 1'",
+    "CREATE FUNCTION bookie_vis_visible.closed_fn() RETURNS int LANGUAGE sql AS 'SELECT 1'",
+    "REVOKE EXECUTE ON FUNCTION bookie_vis_visible.closed_fn() FROM PUBLIC",
+    "CREATE FUNCTION bookie_vis_visible.trg() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'",
+    "CREATE TRIGGER open_trg BEFORE INSERT ON bookie_vis_visible.shown FOR EACH ROW EXECUTE FUNCTION bookie_vis_visible.trg()",
+    "CREATE TRIGGER closed_trg BEFORE INSERT ON bookie_vis_visible.denied FOR EACH ROW EXECUTE FUNCTION bookie_vis_visible.trg()",
+    "CREATE SEQUENCE bookie_vis_visible.open_seq",
+    "CREATE SEQUENCE bookie_vis_visible.closed_seq",
+    "GRANT USAGE ON SEQUENCE bookie_vis_visible.open_seq TO bookie_vis_restricted",
+    "CREATE TYPE bookie_vis_visible.open_type AS ENUM ('a')",
+    "CREATE TYPE bookie_vis_visible.closed_type AS ENUM ('a')",
+    "REVOKE USAGE ON TYPE bookie_vis_visible.closed_type FROM PUBLIC",
 ];
 
 const CLEANUP: &[&str] = &[
@@ -52,6 +64,19 @@ const CLEANUP: &[&str] = &[
     "DROP SCHEMA IF EXISTS bookie_vis_usage CASCADE",
     "DROP ROLE IF EXISTS bookie_vis_restricted",
 ];
+
+fn object_names(objects: &[bookie_core::CatalogObject]) -> Vec<String> {
+    objects
+        .iter()
+        .filter(|object| {
+            object
+                .schema
+                .as_deref()
+                .is_some_and(|schema| schema.starts_with("bookie_vis_"))
+        })
+        .map(|object| format!("{}.{}", object.schema.as_deref().unwrap_or_default(), object.name))
+        .collect()
+}
 
 fn names(objects: &[bookie_core::TableInfo]) -> Vec<String> {
     objects
@@ -88,13 +113,24 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
         let views = names(&restricted.list_views().await.expect("restricted views"));
         let admin_tables = names(&admin.list_tables().await.expect("admin tables"));
         let admin_views = names(&admin.list_views().await.expect("admin views"));
-        (tables, views, admin_tables, admin_views)
+        let mut objects = Vec::new();
+        for kind in [
+            CatalogObjectKind::Routine,
+            CatalogObjectKind::Trigger,
+            CatalogObjectKind::Sequence,
+            CatalogObjectKind::Type,
+            CatalogObjectKind::Grant,
+        ] {
+            let listed = restricted.list_objects(kind, None).await.expect("restricted objects");
+            objects.push(object_names(&listed));
+        }
+        (tables, views, admin_tables, admin_views, objects)
     }
     .await;
     for statement in CLEANUP {
         admin.execute(statement).await.expect(statement);
     }
-    let (tables, views, admin_tables, admin_views) = outcome;
+    let (tables, views, admin_tables, admin_views, objects) = outcome;
 
     assert_eq!(
         tables,
@@ -116,4 +152,32 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
         ]
     );
     assert_eq!(admin_views.len(), 3, "{admin_views:?}");
+    assert_eq!(
+        objects[0],
+        ["bookie_vis_visible.open_fn", "bookie_vis_visible.trg"],
+        "a routine the role cannot execute is not listed"
+    );
+    assert_eq!(
+        objects[1],
+        ["bookie_vis_visible.open_trg"],
+        "a trigger on a table the role cannot reach is not listed"
+    );
+    assert_eq!(
+        objects[2],
+        ["bookie_vis_visible.open_seq"],
+        "a sequence the role cannot use is not listed"
+    );
+    assert_eq!(
+        objects[3],
+        ["bookie_vis_visible.open_type"],
+        "a type the role cannot use is not listed"
+    );
+    assert!(
+        objects[4]
+            .iter()
+            .all(|name| !name.contains("denied") && !name.contains("secret") && !name.ends_with(".t")),
+        "grants of unreachable relations are not listed: {:?}",
+        objects[4]
+    );
+    assert!(!objects[4].is_empty(), "grants of reachable relations still are");
 }

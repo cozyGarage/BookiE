@@ -8,7 +8,10 @@ pub(crate) const SUPPORTED_KINDS: &[CatalogObjectKind] = &CatalogObjectKind::ALL
 
 const USER_SCHEMA: &str = "n.nspname NOT IN ('pg_catalog', 'information_schema') \
      AND n.nspname NOT LIKE 'pg\\_toast%' AND n.nspname NOT LIKE 'pg\\_temp\\_%' \
-     AND ($1::text IS NULL OR n.nspname = $1)";
+     AND ($1::text IS NULL OR n.nspname = $1) \
+     AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')";
+
+const TABLE_REACHABLE: &str = "pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')";
 
 fn not_generated(catalog: &str, oid: &str) -> String {
     format!(
@@ -25,7 +28,7 @@ fn routines_sql() -> String {
                  ELSE 'function' END || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')'
          FROM pg_catalog.pg_proc p
          JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
-         WHERE {USER_SCHEMA} AND {generated}
+         WHERE {USER_SCHEMA} AND {generated} AND pg_catalog.has_function_privilege(p.oid, 'EXECUTE')
          ORDER BY 1, 2, 3 LIMIT $2"
     )
 }
@@ -36,7 +39,7 @@ fn triggers_sql() -> String {
          FROM pg_catalog.pg_trigger t
          JOIN pg_catalog.pg_class c ON c.oid = t.tgrelid
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-         WHERE NOT t.tgisinternal AND {USER_SCHEMA}
+         WHERE NOT t.tgisinternal AND {USER_SCHEMA} AND {TABLE_REACHABLE}
          ORDER BY 1, 2, 3 LIMIT $2"
     )
 }
@@ -47,7 +50,7 @@ fn sequences_sql() -> String {
          FROM pg_catalog.pg_sequence s
          JOIN pg_catalog.pg_class c ON c.oid = s.seqrelid
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-         WHERE {USER_SCHEMA}
+         WHERE {USER_SCHEMA} AND pg_catalog.has_sequence_privilege(s.seqrelid, 'USAGE,SELECT,UPDATE')
          ORDER BY 1, 2 LIMIT $2"
     )
 }
@@ -62,7 +65,7 @@ fn types_sql() -> String {
          JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
          LEFT JOIN pg_catalog.pg_class c ON c.oid = t.typrelid
          WHERE t.typtype IN ('e', 'c', 'd', 'r') AND (t.typtype <> 'c' OR c.relkind = 'c')
-             AND {USER_SCHEMA} AND {generated}
+             AND {USER_SCHEMA} AND {generated} AND pg_catalog.has_type_privilege(t.oid, 'USAGE')
          ORDER BY 1, 2 LIMIT $2"
     )
 }
@@ -75,7 +78,7 @@ fn grants_sql() -> String {
          FROM pg_catalog.pg_class c
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
          CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))) a
-         WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f') AND {USER_SCHEMA}
+         WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f') AND {USER_SCHEMA} AND {TABLE_REACHABLE}
          GROUP BY n.nspname, c.relname, a.grantee
          ORDER BY 1, 2, 3 LIMIT $2"
     )
