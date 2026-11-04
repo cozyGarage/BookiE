@@ -15,28 +15,6 @@ fn cancel_browse_save_intents(
     close_window_after_save.set(false);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::cancel_browse_save_intents;
-    use bookie_app_services::workspace::CloseAfterSave;
-    use std::cell::Cell;
-    use uuid::Uuid;
-
-    #[test]
-    fn failed_browse_save_cancels_tab_and_window_close_intents() {
-        let tab_id = Uuid::new_v4();
-        let mut close_after_save = CloseAfterSave::default();
-        close_after_save.begin(tab_id, 2);
-        let close_window_after_save = Cell::new(true);
-
-        cancel_browse_save_intents(&mut close_after_save, &close_window_after_save, tab_id);
-
-        assert_eq!(close_after_save.remaining(&tab_id), None);
-        assert!(close_after_save.is_empty());
-        assert!(!close_window_after_save.get());
-    }
-}
-
 impl App {
     pub(super) fn on_browse_save_completed(
         &mut self,
@@ -80,5 +58,27 @@ impl App {
         );
         self.dispatch_to_tab(tab_id, BrowseTabInput::SaveFailed(save_id, message));
         self.connection_switch_save_failed();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cancel_browse_save_intents;
+    use bookie_app_services::workspace::CloseAfterSave;
+    use std::cell::Cell;
+    use uuid::Uuid;
+
+    #[test]
+    fn failed_browse_save_cancels_tab_and_window_close_intents() {
+        let tab_id = Uuid::new_v4();
+        let mut close_after_save = CloseAfterSave::default();
+        close_after_save.begin(tab_id, 2);
+        let close_window_after_save = Cell::new(true);
+
+        cancel_browse_save_intents(&mut close_after_save, &close_window_after_save, tab_id);
+
+        assert_eq!(close_after_save.remaining(&tab_id), None);
+        assert!(close_after_save.is_empty());
+        assert!(!close_window_after_save.get());
     }
 }
