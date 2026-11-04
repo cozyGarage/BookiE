@@ -9,7 +9,6 @@ use bookie_gpui_grid_prototype::theme::Theme;
 const TOOLBAR_HEIGHT: f32 = 40.0;
 const TAB_HEIGHT: f32 = 32.0;
 const STATUS_HEIGHT: f32 = 24.0;
-pub const SIDEBAR_WIDTH: f32 = 260.0;
 
 fn ghost(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
     div()
@@ -184,10 +183,11 @@ impl GridView {
                 .child("No matching table")
         });
         div()
+            .relative()
             .flex()
             .flex_col()
             .flex_none()
-            .w(px(SIDEBAR_WIDTH))
+            .w(px(self.sidebar_width))
             .h_full()
             .bg(rgb(theme.chrome))
             .border_r_1()
@@ -212,6 +212,25 @@ impl GridView {
             )
             .child(div().p_2().child(self.sidebar_search.clone()))
             .child(div().flex().flex_col().px_2().children(tree).children(empty))
+            .child(
+                div()
+                    .id("sidebar-resize")
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .h_full()
+                    .w(px(5.0))
+                    .cursor_col_resize()
+                    .hover(move |style| style.bg(rgb(theme.info)))
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                            this.resizing_sidebar = true;
+                            cx.stop_propagation();
+                            cx.notify();
+                        }),
+                    ),
+            )
     }
 
     fn sidebar_matches(&self, search: &str) -> usize {

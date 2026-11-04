@@ -53,6 +53,8 @@ struct GridView {
     font_names: Vec<String>,
     palette_fonts: bool,
     sidebar_open: bool,
+    sidebar_width: f32,
+    resizing_sidebar: bool,
     connection_open: bool,
     database_open: bool,
     sidebar_search: Entity<TextInput>,
@@ -177,6 +179,8 @@ impl GridView {
             font_names,
             palette_fonts: false,
             sidebar_open: true,
+            sidebar_width: 260.0,
+            resizing_sidebar: false,
             connection_open: true,
             database_open: true,
             sidebar_search,
@@ -757,8 +761,35 @@ fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<
         .child(label.into())
 }
 
+pub fn flex_cell(width: f32) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .h_full()
+        .px_2()
+        .flex_basis(px(width))
+        .flex_grow()
+        .flex_shrink()
+        .min_w(px(width * 0.4))
+        .overflow_hidden()
+        .whitespace_nowrap()
+        .text_ellipsis()
+}
+
+pub fn fixed_cell(width: f32, text: String) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .h_full()
+        .px_2()
+        .w(px(width))
+        .flex_none()
+        .overflow_hidden()
+        .child(text)
+}
+
 pub fn cell_div(width: f32, text: String) -> Div {
-    div().w(px(width)).flex_none().px_2().overflow_hidden().child(text)
+    flex_cell(width).child(text)
 }
 
 fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
@@ -931,7 +962,7 @@ impl Render for GridView {
             .border_color(rgb(theme.border))
             .font_weight(gpui::FontWeight::SEMIBOLD)
             .text_color(rgb(theme.muted_foreground))
-            .child(cell_div(GUTTER_WIDTH, "#".into()))
+            .child(fixed_cell(GUTTER_WIDTH, "#".into()))
             .child(cell_div(CELL_WIDTHS[0], "value".into()))
             .child(cell_div(CELL_WIDTHS[1], "label".into()))
             .child(cell_div(CELL_WIDTHS[2], "state".into()))
@@ -977,6 +1008,20 @@ impl Render for GridView {
             .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
+            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, _, cx| {
+                if this.resizing_sidebar {
+                    this.sidebar_width = f32::from(event.position.x).clamp(180.0, 480.0);
+                    cx.notify();
+                }
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
+                    if std::mem::take(&mut this.resizing_sidebar) {
+                        cx.notify();
+                    }
+                }),
+            )
             .child(toolbar)
             .child(
                 div()
@@ -1037,7 +1082,7 @@ impl GridView {
             };
             return row_div(position % 2 == 1, false, theme)
                 .id(position)
-                .child(cell_div(70.0, row.change.to_string()))
+                .child(fixed_cell(70.0, row.change.to_string()))
                 .child(cell_div(CELL_WIDTHS[0], row.cells[0].display()))
                 .child(cell_div(CELL_WIDTHS[1], row.cells[1].display()))
                 .child(cell_div(CELL_WIDTHS[2], row.cells[2].display()))
@@ -1057,7 +1102,7 @@ impl GridView {
                     cx.notify();
                 }),
             )
-            .child(cell_div(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
+            .child(fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
             .child(self.data_cell(source, 0, position, cx))
             .child(self.data_cell(source, 1, position, cx))
             .child(self.data_cell(source, 2, position, cx))

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use bookie_gpui_grid_prototype::cursor::Cursor;
 use bookie_gpui_grid_prototype::edit::{is_editable, parse_edit};
 use bookie_gpui_grid_prototype::model::Cell;
-use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, div, prelude::*, px, rgb};
+use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, prelude::*, rgb};
 
 use crate::text_input::InputEvent;
 use crate::ui_theme::ThemeExt;
@@ -93,7 +93,7 @@ impl GridView {
             .as_ref()
             .is_some_and(|e| e.row == source && e.column == column)
         {
-            return div().w(px(width)).flex_none().child(self.editor.clone());
+            return crate::flex_cell(width).px_0().child(self.editor.clone());
         }
         let theme = Theme::current(cx);
         let cell = self.cell_at(source, column);
@@ -105,7 +105,7 @@ impl GridView {
             item = item.border_b_2().border_color(rgb(theme.warning));
         }
         if self.cell_cursor == Some(Cursor { row: position, column }) {
-            item = item.border_2().border_color(rgb(theme.info));
+            item = item.border_2().border_color(rgb(theme.info)).bg(rgb(theme.background));
         }
         item.on_mouse_down(
             MouseButton::Left,
