@@ -34,7 +34,7 @@ if [[ "${BOOKIE_GTK_MONGODB_DBUS_ACTIVE:-0}" != "1" ]]; then
   exit $?
 fi
 
-for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool rg; do
+for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool grep; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "missing required command: $command_name" >&2
     exit 1
@@ -50,7 +50,10 @@ trap cleanup EXIT
 port="$(docker port "$container" 27017/tcp | sed -n 1p)"
 port="${port##*:}"
 attempt=0
-until docker exec "$container" mongosh --quiet --eval 'db.adminCommand("ping").ok' | rg -q '^1$'; do
+while true; do
+  if response="$(docker exec "$container" mongosh --quiet --eval 'db.adminCommand("ping").ok')" && [[ "$response" == "1" ]]; then
+    break
+  fi
   attempt=$((attempt + 1))
   if (( attempt >= 180 )); then
     docker logs "$container" >&2
