@@ -30,7 +30,6 @@ thiserror.workspace = true
 serde.workspace = true
 tracing.workspace = true
 serde_json.workspace = true
-secrecy.workspace = true
 tempfile.workspace = true
 rust_decimal.workspace = true
 tokio.workspace = true
@@ -38,6 +37,7 @@ tokio-util.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+secrecy.workspace = true
 async-trait.workspace = true
 bookie-driver-postgres = { path = "../drivers/postgres" }
 bookie-driver-mysql = { path = "../drivers/mysql" }
