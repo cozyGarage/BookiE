@@ -101,6 +101,33 @@ fn connection(query: &str) -> ConnectionWorkspaceState {
 }
 
 #[test]
+fn saving_caches_and_queues_one_shared_query_allocation() {
+    let memory = Mutex::new(Memory::default());
+    let queue = Mutex::new(WorkspaceQueue::default());
+    let id = Uuid::new_v4();
+    let query = "x".repeat(1024);
+
+    save_connection_coordinated(&memory, &queue, id, connection(&query), None);
+
+    let memory = memory.lock().unwrap();
+    let cached = memory.cache.get(&id).and_then(Option::as_ref).unwrap();
+    let cached_query = match &cached.tabs[0] {
+        WorkspaceTabRecord::Editor { query, .. } => Some(query.as_str()),
+        _ => None,
+    };
+    let queue = queue.lock().unwrap();
+    let pending = &queue.pending.get(&id).unwrap().state;
+    let pending_query = match &pending.tabs[0] {
+        WorkspaceTabRecord::Editor { query, .. } => Some(query.as_str()),
+        _ => None,
+    };
+
+    assert_eq!(cached_query, Some(query.as_str()));
+    assert_eq!(pending_query, Some(query.as_str()));
+    assert_eq!(cached_query.map(str::as_ptr), pending_query.map(str::as_ptr));
+}
+
+#[test]
 fn workspace_store_state_is_shared_only_with_its_clones() {
     let dir = tempfile::tempdir().unwrap();
     let path = Some(dir.path().join("workspace.json"));
@@ -115,7 +142,7 @@ fn workspace_store_state_is_shared_only_with_its_clones() {
         .lock()
         .unwrap()
         .cache
-        .insert(id, Some(connection("SELECT 1")));
+        .insert(id, Some(Arc::new(connection("SELECT 1"))));
 
     assert!(clone.load_connection(id).is_some());
     assert!(separate.load_connection(id).is_none());
@@ -126,9 +153,9 @@ fn workspace_queue_coalesces_each_connection_to_its_newest_state() {
     let mut queue = WorkspaceQueue::default();
     let first = Uuid::new_v4();
     let second = Uuid::new_v4();
-    queue.save(first, connection("SELECT 1"));
-    queue.save(second, connection("SELECT 2"));
-    queue.save(first, connection("SELECT 3"));
+    queue.save(first, Arc::new(connection("SELECT 1")));
+    queue.save(second, Arc::new(connection("SELECT 2")));
+    queue.save(first, Arc::new(connection("SELECT 3")));
 
     let pending = queue.take_pending();
     assert_eq!(pending.len(), 2);
@@ -140,8 +167,8 @@ fn workspace_queue_coalesces_each_connection_to_its_newest_state() {
 #[test]
 fn workspace_queue_flush_waits_for_all_prior_window_saves() {
     let mut queue = WorkspaceQueue::default();
-    queue.save(Uuid::new_v4(), connection("SELECT 1"));
-    queue.save(Uuid::new_v4(), connection("SELECT 2"));
+    queue.save(Uuid::new_v4(), Arc::new(connection("SELECT 1")));
+    queue.save(Uuid::new_v4(), Arc::new(connection("SELECT 2")));
     let (sender, receiver) = mpsc::channel();
     queue.flush(sender);
 
@@ -156,7 +183,7 @@ fn workspace_queue_flush_waits_for_all_prior_window_saves() {
 fn workspace_queue_failed_write_is_not_acknowledged_as_persisted() {
     let mut queue = WorkspaceQueue::default();
     let id = Uuid::new_v4();
-    queue.save(id, connection("SELECT 1"));
+    queue.save(id, Arc::new(connection("SELECT 1")));
     let pending = queue.take_pending();
     let (sender, receiver) = mpsc::channel();
     queue.flush(sender);
@@ -178,7 +205,7 @@ fn workspace_queue_flush_during_a_write_does_not_enqueue_a_duplicate_wake() {
         queue: Arc::clone(&queue),
     };
     let id = Uuid::new_v4();
-    queue.lock().unwrap().save(id, connection("SELECT 1"));
+    queue.lock().unwrap().save(id, Arc::new(connection("SELECT 1")));
     assert!(wake_writer(&writer));
     assert_eq!(receiver.try_recv(), Ok(()));
 
@@ -209,7 +236,7 @@ fn workspace_queue_flush_during_a_write_does_not_enqueue_a_duplicate_wake() {
 fn workspace_queue_failed_write_requires_a_successful_retry() {
     let mut queue = WorkspaceQueue::default();
     let id = Uuid::new_v4();
-    queue.save(id, connection("SELECT 1"));
+    queue.save(id, Arc::new(connection("SELECT 1")));
     let failed = queue.take_pending();
     let (failed_sender, failed_receiver) = mpsc::channel();
     queue.flush(failed_sender);
@@ -234,11 +261,11 @@ fn workspace_queue_preserves_saves_queued_during_an_older_write() {
     let mut queue = WorkspaceQueue::default();
     let first = Uuid::new_v4();
     let second = Uuid::new_v4();
-    queue.save(first, connection("SELECT 1"));
+    queue.save(first, Arc::new(connection("SELECT 1")));
     let first_batch = queue.take_pending();
 
-    queue.save(second, connection("SELECT 2"));
-    queue.save(first, connection("SELECT 3"));
+    queue.save(second, Arc::new(connection("SELECT 2")));
+    queue.save(first, Arc::new(connection("SELECT 3")));
     let (sender, receiver) = mpsc::channel();
     queue.flush(sender);
 
@@ -258,9 +285,9 @@ fn workspace_queue_preserves_saves_queued_during_an_older_write() {
 fn failed_older_write_does_not_replace_newer_pending_state() {
     let mut queue = WorkspaceQueue::default();
     let id = Uuid::new_v4();
-    queue.save(id, connection("SELECT 1"));
+    queue.save(id, Arc::new(connection("SELECT 1")));
     let failed = queue.take_pending();
-    queue.save(id, connection("SELECT 2"));
+    queue.save(id, Arc::new(connection("SELECT 2")));
 
     queue.restore_pending(failed);
 

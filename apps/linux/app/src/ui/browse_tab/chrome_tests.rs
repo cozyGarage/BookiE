@@ -3,7 +3,7 @@ use relm4::gtk::prelude::*;
 use relm4::{ComponentController, Controller, gtk};
 use uuid::Uuid;
 
-use super::save_in_flight_tests::{column, launch_with_read_only, load_two_rows, pump};
+use super::save_in_flight_tests::{column, launch_with_read_only, load_two_rows, pump, transaction_save_id};
 use super::{BrowseTab, BrowseTabInput, BrowseTabOutput};
 
 fn descendants(root: &gtk::Widget) -> Vec<gtk::Widget> {
@@ -39,12 +39,16 @@ fn independent_browse_owners_keep_edits_and_teardown_separate() {
     pump(&second_outputs);
     assert!(second.model().change_trackers.any_pending_in([id]));
     first.sender().send(BrowseTabInput::CommitSave).unwrap();
+    let started = pump(&first_outputs);
     assert!(
-        pump(&first_outputs)
+        started
             .iter()
             .any(|output| matches!(output, BrowseTabOutput::ExecuteTransaction { .. }))
     );
-    first.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    first
+        .sender()
+        .send(BrowseTabInput::SaveCompleted(transaction_save_id(&started)))
+        .unwrap();
     pump(&first_outputs);
     assert!(!first.model().change_trackers.any_pending_in([id]));
     assert!(second.model().change_trackers.any_pending_in([id]));
@@ -62,7 +66,10 @@ fn late_save_completion_does_not_discard_new_edits() {
     pump(&outputs);
     let id = controller.model().tab_id;
     assert!(controller.model().change_trackers.any_pending_in([id]));
-    controller.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::SaveCompleted(Uuid::new_v4()))
+        .unwrap();
     pump(&outputs);
     assert!(controller.model().change_trackers.any_pending_in([id]));
 }
@@ -76,12 +83,16 @@ fn active_save_completion_clears_submitted_edits() {
     pump(&outputs);
     let id = controller.model().tab_id;
     controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    let started = pump(&outputs);
     assert!(
-        pump(&outputs)
+        started
             .iter()
             .any(|output| matches!(output, BrowseTabOutput::ExecuteTransaction { .. }))
     );
-    controller.sender().send(BrowseTabInput::SaveCompleted).unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::SaveCompleted(transaction_save_id(&started)))
+        .unwrap();
     pump(&outputs);
     assert!(!controller.model().change_trackers.any_pending_in([id]));
 }
