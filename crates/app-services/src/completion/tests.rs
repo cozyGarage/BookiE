@@ -150,6 +150,59 @@ fn names_from_another_statement_are_not_offered() {
 }
 
 #[test]
+fn a_cte_with_a_column_list_offers_exactly_those_columns() {
+    let words = candidates("WITH recent (a, b) AS (SELECT id, total FROM public.orders) SELECT recent.| FROM recent");
+    assert_eq!(words, ["a", "b"]);
+}
+
+#[test]
+fn a_cte_without_a_column_list_offers_its_select_list_names() {
+    let words = candidates(
+        "WITH t AS (SELECT o.id, o.total AS amount, count(*) n, o.total + 1 FROM public.orders o) SELECT t.| FROM t",
+    );
+    assert_eq!(words, ["amount", "id", "n"]);
+}
+
+#[test]
+fn a_star_in_a_cte_expands_to_the_columns_of_its_table() {
+    let words = candidates("WITH t AS (SELECT * FROM public.orders) SELECT t.| FROM t");
+    assert_eq!(words, ["id", "total", "user_id"]);
+}
+
+#[test]
+fn an_alias_of_a_cte_offers_the_cte_columns() {
+    let words = candidates("WITH t AS (SELECT id AS ident FROM public.users) SELECT x.| FROM t x");
+    assert_eq!(words, ["ident"]);
+}
+
+#[test]
+fn unqualified_columns_include_those_of_a_cte_in_the_from_clause() {
+    let words = candidates("WITH t AS (SELECT id AS ident FROM public.users) SELECT | FROM t");
+    assert!(words.contains(&"ident".to_string()), "{words:?}");
+}
+
+#[test]
+fn a_derived_table_alias_offers_the_names_its_subquery_selects() {
+    let words = candidates("SELECT d.| FROM (SELECT id AS ident, email FROM public.users) AS d");
+    assert_eq!(words, ["email", "ident"]);
+}
+
+#[test]
+fn a_case_expression_is_not_mistaken_for_a_column_alias() {
+    let words =
+        candidates("WITH t AS (SELECT CASE WHEN id > 1 THEN 1 ELSE 0 END, email FROM public.users) SELECT t.| FROM t");
+    assert_eq!(words, ["email"]);
+}
+
+#[test]
+fn cte_columns_do_not_leak_into_another_statement() {
+    let words =
+        candidates("WITH t AS (SELECT id AS ident FROM public.users) SELECT 1; SELECT t.| FROM public.orders t");
+    assert!(!words.contains(&"ident".to_string()), "{words:?}");
+    assert!(words.contains(&"total".to_string()), "{words:?}");
+}
+
+#[test]
 fn schema_requests_are_accepted_only_by_their_generation() {
     let mut index = SchemaIndex::default();
     let current = index.request("users".into());
