@@ -398,7 +398,7 @@ async fn key_row_into(
     let preview = match key_type.as_str() {
         "string" => string_preview(conn, key).await?,
         "hash" => {
-            let (_, v): (u64, Vec<(String, String)>) = redis::cmd("HSCAN")
+            let (_, v): (u64, HashEntries) = redis::cmd("HSCAN")
                 .arg(key)
                 .arg(0)
                 .arg("COUNT")
@@ -406,14 +406,14 @@ async fn key_row_into(
                 .query_async(conn)
                 .await
                 .map_err(map_redis_error)?;
-            Value::Text(format!("{v:?}"))
+            preview_pairs(v)
         }
         "list" => {
-            let v: Vec<String> = conn.lrange(key, 0, 20).await.map_err(map_redis_error)?;
-            Value::Text(format!("{v:?}"))
+            let v: Vec<Vec<u8>> = conn.lrange(key, 0, 20).await.map_err(map_redis_error)?;
+            preview_members(v)
         }
         "set" => {
-            let (_, v): (u64, Vec<String>) = redis::cmd("SSCAN")
+            let (_, v): (u64, Vec<Vec<u8>>) = redis::cmd("SSCAN")
                 .arg(key)
                 .arg(0)
                 .arg("COUNT")
@@ -421,11 +421,11 @@ async fn key_row_into(
                 .query_async(conn)
                 .await
                 .map_err(map_redis_error)?;
-            Value::Text(format!("{v:?}"))
+            preview_members(v)
         }
         "zset" => {
-            let v: Vec<String> = conn.zrange(key, 0, 20).await.map_err(map_redis_error)?;
-            Value::Text(format!("{v:?}"))
+            let v: Vec<Vec<u8>> = conn.zrange(key, 0, 20).await.map_err(map_redis_error)?;
+            preview_members(v)
         }
         other => Value::Text(format!("<{other}>")),
     };
@@ -436,6 +436,28 @@ async fn key_row_into(
         preview,
     ]);
     Ok(())
+}
+
+type HashEntries = Vec<(Vec<u8>, Vec<u8>)>;
+
+fn preview_text(bytes: Vec<u8>) -> String {
+    String::from_utf8(bytes).unwrap_or_else(|error| {
+        let hex: String = error.into_bytes().iter().map(|byte| format!("{byte:02x}")).collect();
+        format!("<hex:{hex}>")
+    })
+}
+
+fn preview_members(members: Vec<Vec<u8>>) -> Value {
+    let text: Vec<String> = members.into_iter().map(preview_text).collect();
+    Value::Text(format!("{text:?}"))
+}
+
+fn preview_pairs(pairs: HashEntries) -> Value {
+    let text: Vec<(String, String)> = pairs
+        .into_iter()
+        .map(|(field, value)| (preview_text(field), preview_text(value)))
+        .collect();
+    Value::Text(format!("{text:?}"))
 }
 
 fn redis_value_to_result(value: RedisValue) -> QueryResult {

@@ -7,6 +7,7 @@ use relm4::factory::FactoryVecDeque;
 use relm4::prelude::*;
 use relm4::{adw, gtk};
 
+use super::structure::StructureText;
 use super::{App, AppMsg, AppWidgets, OpenMode};
 use crate::services::sidebar_tree::{CollapseState, NodeKind, TreeNode, visible_nodes_with_hidden_schemas};
 use crate::ui::sidebar_row::{SidebarRow, SidebarRowOutput};
@@ -62,9 +63,16 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
                 open_mode: OpenMode::NewTab,
             },
             SidebarRowOutput::EditStructure { schema, name } => AppMsg::EditStructureTab { schema, table: name },
-            SidebarRowOutput::ShowCreateTable { schema, name } => {
-                AppMsg::ShowCreateTableForExisting { schema, table: name }
-            }
+            SidebarRowOutput::ShowCreateTable { schema, name } => AppMsg::TableText {
+                schema,
+                table: name,
+                text: StructureText::CreateTable,
+            },
+            SidebarRowOutput::JoinReferenced { schema, name } => AppMsg::TableText {
+                schema,
+                table: name,
+                text: StructureText::JoinSkeleton,
+            },
             SidebarRowOutput::ImportCsv { schema, name } => AppMsg::ImportCsvIntoTable { schema, table: name },
             SidebarRowOutput::RenameTable { schema, name } => AppMsg::RenameTablePrompt { schema, table: name },
             SidebarRowOutput::TruncateTable { schema, name } => AppMsg::TruncateTablePrompt { schema, table: name },

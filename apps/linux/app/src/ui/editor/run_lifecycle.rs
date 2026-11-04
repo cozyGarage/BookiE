@@ -3,6 +3,10 @@ use relm4::ComponentSender;
 
 const STALE_RESULTS_CLASS: &str = "tp-stale-results";
 
+pub(super) fn show_cancel_button(running: bool, supports_server_cancellation: bool) -> bool {
+    running && supports_server_cancellation
+}
+
 pub(super) fn dim_previous_results(holder: &gtk::Box) {
     if holder.first_child().is_some() {
         holder.add_css_class(STALE_RESULTS_CLASS);

@@ -442,6 +442,141 @@ fn exported_sql_keeps_untrusted_text_inside_comments() {
     assert!(exported.ends_with("SELECT 1;\n\n"));
 }
 
+fn exported_tail(driver: &str, query: &str) -> String {
+    let mut entry = sample_entry();
+    entry.driver_id = driver.into();
+    entry.query = query.into();
+    let exported = sql_export_entry(&entry);
+    let body = exported.split_once('\n').map_or("", |(_, rest)| rest);
+    body.to_string()
+}
+
+#[test]
+fn an_exported_statement_ending_in_a_line_comment_is_still_terminated() {
+    assert_eq!(exported_tail("postgres", "SELECT 1 -- note"), "SELECT 1 -- note\n;\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 -- done;"),
+        "SELECT 1 -- done;\n;\n\n"
+    );
+    assert_eq!(exported_tail("mysql", "SELECT 1 # note"), "SELECT 1 # note\n;\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 -- a\r\nSELECT 2 -- b"),
+        "SELECT 1 -- a\r\nSELECT 2 -- b\n;\n\n"
+    );
+}
+
+#[test]
+fn an_exported_statement_that_is_already_terminated_gets_no_extra_statement() {
+    assert_eq!(exported_tail("postgres", "SELECT 1; -- done"), "SELECT 1; -- done\n\n");
+    assert_eq!(exported_tail("mysql", "SELECT '#';"), "SELECT '#';\n\n");
+    assert_eq!(exported_tail("postgres", "SELECT 'a--b';"), "SELECT 'a--b';\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* note */"),
+        "SELECT 1 /* note */;\n\n"
+    );
+}
+
+#[test]
+fn an_unterminated_block_comment_is_closed_before_the_terminator() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* oops"),
+        "SELECT 1 /* oops\n*/\n;\n\n"
+    );
+}
+
+#[test]
+fn an_unterminated_string_gets_the_plain_terminator_and_a_terminated_statement_keeps_one_semicolon() {
+    assert_eq!(exported_tail("postgres", "SELECT 'abc"), "SELECT 'abc;\n\n");
+    assert_eq!(
+        exported_tail("postgres", "SELECT $$it's -- fine$$"),
+        "SELECT $$it's -- fine$$;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1; /* note"),
+        "SELECT 1; /* note\n*/\n\n"
+    );
+}
+
+#[test]
+fn a_dollar_quoted_body_is_scanned_and_a_trailing_comment_is_still_terminated() {
+    assert_eq!(
+        exported_tail("postgres", "DO $$ BEGIN PERFORM 'it''s -- x'; END $$ -- note"),
+        "DO $$ BEGIN PERFORM 'it''s -- x'; END $$ -- note\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT $t$it's -- fine$t$"),
+        "SELECT $t$it's -- fine$t$;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 -- cost $a$"),
+        "SELECT 1 -- cost $a$\n;\n\n"
+    );
+    assert_eq!(exported_tail("postgres", "SELECT $$ open"), "SELECT $$ open;\n\n");
+}
+
+#[test]
+fn the_shared_lexer_rules_decide_nested_comments_escapes_brackets_and_identifiers() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* a /* b */ c */ -- x"),
+        "SELECT 1 /* a /* b */ c */ -- x\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT E'it\\'s -- x'"),
+        "SELECT E'it\\'s -- x';\n\n"
+    );
+    assert_eq!(exported_tail("mssql", "SELECT [a--b]"), "SELECT [a--b];\n\n");
+    assert_eq!(
+        exported_tail("clickhouse", "SELECT 'a\\' -- x'"),
+        "SELECT 'a\\' -- x';\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT my$col$ FROM t -- x"),
+        "SELECT my$col$ FROM t -- x\n;\n\n"
+    );
+}
+
+#[test]
+fn an_unterminated_nested_block_comment_is_closed_and_a_flat_one_is_not_nested() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT 1 /* a /* b */"),
+        "SELECT 1 /* a /* b */\n*/\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("mysql", "SELECT 1 /* a /* b */"),
+        "SELECT 1 /* a /* b */;\n\n"
+    );
+}
+
+#[test]
+fn a_numbered_placeholder_is_not_a_dollar_quote() {
+    assert_eq!(
+        exported_tail("postgres", "SELECT * FROM t WHERE id = $1 -- by id"),
+        "SELECT * FROM t WHERE id = $1 -- by id\n;\n\n"
+    );
+    assert_eq!(
+        exported_tail("postgres", "SELECT $1, $2 /* x */"),
+        "SELECT $1, $2 /* x */;\n\n"
+    );
+}
+
+#[test]
+fn a_mysql_double_dash_needs_whitespace_to_start_a_comment() {
+    assert_eq!(exported_tail("mysql", "SELECT 5--1"), "SELECT 5--1;\n\n");
+    assert_eq!(exported_tail("mysql", "SELECT 5 -- c"), "SELECT 5 -- c\n;\n\n");
+    assert_eq!(exported_tail("postgres", "SELECT 5--1"), "SELECT 5--1\n;\n\n");
+}
+
+#[test]
+fn a_mysql_backslash_escaped_quote_does_not_end_the_string() {
+    assert_eq!(exported_tail("mysql", "SELECT 'a\\' -- x'"), "SELECT 'a\\' -- x';\n\n");
+}
+
+#[test]
+fn a_hash_is_a_comment_only_for_mysql_and_an_operator_elsewhere() {
+    assert_eq!(exported_tail("postgres", "SELECT 5 # 3"), "SELECT 5 # 3;\n\n");
+    assert_eq!(exported_tail("mariadb", "SELECT 5 # 3"), "SELECT 5 # 3\n;\n\n");
+}
+
 #[test]
 fn outcome_summary_reports_cancelled_before_checking_success() {
     let mut entry = sample_entry();
