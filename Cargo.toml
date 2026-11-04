@@ -5,6 +5,7 @@ members = [
     "crates/app-services",
     "crates/core",
     "crates/policy",
+    "crates/results",
     "tests/release",
     "crates/mcp",
     "crates/agentd",
