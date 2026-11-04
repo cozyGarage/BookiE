@@ -5,6 +5,7 @@ use tokio_util::sync::CancellationToken;
 pub(crate) struct CancellableDialog {
     dialog: adw::Dialog,
     cancel: CancellationToken,
+    _busy: bookie_app_services::busy_jobs::BusyJob,
 }
 
 impl CancellableDialog {
@@ -44,7 +45,12 @@ impl CancellableDialog {
             }
         });
         dialog.present(Some(parent));
-        Self { dialog, cancel }
+        let busy = bookie_app_services::busy_jobs::global().begin(cancel.clone());
+        Self {
+            dialog,
+            cancel,
+            _busy: busy,
+        }
     }
 
     pub(crate) fn cancel_token(&self) -> CancellationToken {
@@ -88,6 +94,28 @@ mod tests {
             ));
             progress.close();
         }
+        window.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_progress_dialog_counts_as_running_work_until_it_is_dropped() {
+        gtk::init().unwrap();
+        adw::init().unwrap();
+        let application = gtk::Application::new(None::<&str>, gtk::gio::ApplicationFlags::NON_UNIQUE);
+        application.register(None::<&gtk::gio::Cancellable>).unwrap();
+        let window = adw::ApplicationWindow::new(&application);
+        window.present();
+        let jobs = bookie_app_services::busy_jobs::global();
+        assert_eq!(jobs.active(), 0);
+        let progress = CancellableDialog::present(&window, "Importing into example", &[]);
+        assert_eq!(jobs.active(), 1);
+        let token = progress.cancel_token();
+        jobs.cancel_all();
+        assert!(token.is_cancelled());
+        progress.close();
+        drop(progress);
+        assert_eq!(jobs.active(), 0);
         window.close();
     }
 }

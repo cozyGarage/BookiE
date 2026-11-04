@@ -444,6 +444,7 @@
             ".github/workflows/linux-security.yml",
             ".github/workflows/linux-ci-contracts.yml",
             ".github/workflows/linux-pr-readiness.yml",
+            ".github/workflows/linux-pr-readiness-rerun.yml",
             ".github/workflows/release.yml"
           ],
           "timeout_seconds": 120,

@@ -2019,14 +2019,16 @@ GLib.MainLoop().run()
     def postgres_large_stream_pages_round_trip_from_spool(database, base):
         page_size = 5000
         stream_rows = int(os.environ.get("BOOKIE_GTK_STREAM_ROWS", "150000"))
+        payload_bytes = int(os.environ.get("BOOKIE_GTK_STREAM_CELL_BYTES", "2048"))
         assert stream_rows >= 2 * page_size and stream_rows % page_size == 0
+        assert 1 <= payload_bytes <= 2048
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
         ui.invoke(ui.wait_for_node(name="Open SQL editor"))
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql(
             "SELECT value AS id, md5(transaction_timestamp()::text) AS run_marker, "
-            f"repeat('x', 2048) AS payload FROM generate_series(1, {stream_rows}) AS value"
+            f"repeat('x', {payload_bytes}) AS payload FROM generate_series(1, {stream_rows}) AS value"
         )
         deadline = time.monotonic() + 120
         first_run_marker = None

@@ -1,5 +1,5 @@
 use super::*;
-use crate::guard::{BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope};
+use crate::guard::{BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, MAX_SKIPPED_ROWS};
 
 const INSERT: &str = "INSERT INTO people (id, name) VALUES ($1, $2)";
 
@@ -7,9 +7,23 @@ struct BulkConn {
     batches: Arc<Mutex<Vec<usize>>>,
     fails_from_batch: usize,
     failure: fn() -> DriverError,
+    rejected_ids: Vec<i64>,
 }
 
 impl BulkConn {
+    fn open_rejecting(rejected_ids: Vec<i64>) -> (Arc<dyn Connection>, Arc<Mutex<Vec<usize>>>) {
+        let batches = Arc::new(Mutex::new(Vec::new()));
+        (
+            Arc::new(Self {
+                batches: batches.clone(),
+                fails_from_batch: usize::MAX,
+                failure: query_error,
+                rejected_ids,
+            }),
+            batches,
+        )
+    }
+
     fn open(fails_from_batch: usize) -> (Arc<dyn Connection>, Arc<Mutex<Vec<usize>>>) {
         Self::open_failing_with(fails_from_batch, query_error)
     }
@@ -24,6 +38,7 @@ impl BulkConn {
                 batches: batches.clone(),
                 fails_from_batch,
                 failure,
+                rejected_ids: Vec::new(),
             }),
             batches,
         )
@@ -58,6 +73,15 @@ impl Connection for BulkConn {
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
         let mut batches = self.batches.lock().expect("batch lock");
+        let rejected = statements
+            .iter()
+            .position(|(_, params)| matches!(params.first(), Some(Value::Int(id)) if self.rejected_ids.contains(id)));
+        if let Some(statement_index) = rejected {
+            return Err(DriverError::Transaction {
+                statement_index,
+                source: Box::new(query_error()),
+            });
+        }
         if batches.len() + 1 >= self.fails_from_batch {
             return Err((self.failure)());
         }
@@ -700,4 +724,150 @@ async fn a_batch_that_may_have_committed_ends_the_import_as_unknown_and_stops_go
     assert_eq!(outcome.terminal_status, AuditTerminalStatus::Unknown);
     assert_eq!(outcome.transaction_outcome, AuditTransactionOutcome::Unknown);
     assert!(state.governed_writes_disabled());
+}
+
+fn terminal(audit: &SequenceAuditSink) -> AuditEvent {
+    events(audit).pop().expect("a terminal event")
+}
+
+#[tokio::test]
+async fn a_row_the_database_rejects_is_skipped_and_the_rest_of_the_batch_commits() {
+    let (conn, batches) = BulkConn::open_rejecting(vec![2]);
+    let (guard, audit, _) = approved_guard(conn, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(5)).await.unwrap();
+    let rows = rows(5);
+
+    let outcome = guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await
+        .unwrap();
+
+    assert_eq!(outcome.written, 4);
+    assert_eq!(outcome.skipped.iter().map(|row| row.index).collect::<Vec<_>>(), [2]);
+    assert!(!outcome.skipped[0].reason.is_empty());
+    assert_eq!(scope.committed_rows(), 4);
+    assert!(
+        scope.is_open(),
+        "a confirmed rollback of one row does not end the approval"
+    );
+    assert_eq!(*batches.lock().unwrap(), [4], "only the retried batch committed");
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .unwrap();
+    let last = terminal(&audit);
+    assert_eq!(last.terminal_status, AuditTerminalStatus::Succeeded);
+    assert_eq!(last.rows_affected, Some(4));
+    assert_eq!(last.rows_skipped, Some(1));
+}
+
+#[tokio::test]
+async fn several_bad_rows_in_one_batch_are_each_reported_with_their_own_index() {
+    let (conn, _) = BulkConn::open_rejecting(vec![0, 3, 4]);
+    let (guard, _, _) = approved_guard(conn, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(6)).await.unwrap();
+    let rows = rows(6);
+
+    let outcome = guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        outcome.skipped.iter().map(|row| row.index).collect::<Vec<_>>(),
+        [0, 3, 4]
+    );
+    assert_eq!(outcome.written, 3);
+    end_quietly(&guard, &mut scope).await;
+}
+
+#[tokio::test]
+async fn an_import_with_no_skipped_rows_records_no_skip_count() {
+    let (conn, _) = BulkConn::open_rejecting(vec![]);
+    let (guard, audit, _) = approved_guard(conn, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(3)).await.unwrap();
+    let rows = rows(3);
+    guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await
+        .unwrap();
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .unwrap();
+    assert_eq!(terminal(&audit).rows_skipped, None);
+}
+
+#[tokio::test]
+async fn an_ambiguous_failure_still_ends_the_approval_instead_of_skipping() {
+    let (conn, _) = BulkConn::open_failing_with(1, || DriverError::Disconnected);
+    let (guard, _, _) = approved_guard(conn, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(3)).await.unwrap();
+    let rows = rows(3);
+
+    let result = guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await;
+
+    assert!(matches!(result, Err(DriverError::Disconnected)));
+    assert!(!scope.is_open());
+    assert_eq!(scope.committed_rows(), 0);
+    end_quietly(&guard, &mut scope).await;
+}
+
+#[tokio::test]
+async fn a_plain_query_error_that_names_no_row_is_not_skipped() {
+    let (conn, _) = BulkConn::open_failing_with(1, query_error);
+    let (guard, _, _) = approved_guard(conn, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(3)).await.unwrap();
+    let rows = rows(3);
+
+    let result = guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await;
+
+    assert!(result.is_err());
+    assert!(!scope.is_open());
+    end_quietly(&guard, &mut scope).await;
+}
+
+#[tokio::test]
+async fn more_failing_rows_than_the_limit_stop_the_import_with_an_error() {
+    let ids: Vec<i64> = (0..=MAX_SKIPPED_ROWS as i64).collect();
+    let (conn, _) = BulkConn::open_rejecting(ids);
+    let (guard, audit, _) = approved_guard(conn, Uuid::new_v4());
+    let total = MAX_SKIPPED_ROWS as usize + 5;
+    let mut scope = guard.begin_bulk_insert(request(total as u64)).await.unwrap();
+    let rows = rows(total);
+
+    let result = guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await;
+
+    let error = result.unwrap_err();
+    assert!(matches!(error, DriverError::Query { .. }), "{error:?}");
+    assert!(!scope.is_open());
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Failed(&error))
+        .await
+        .unwrap();
+    let last = terminal(&audit);
+    assert_eq!(last.terminal_status, AuditTerminalStatus::Failed);
+    assert_eq!(last.rows_skipped, Some(MAX_SKIPPED_ROWS));
+}
+
+#[tokio::test]
+async fn the_skipping_path_denies_a_batch_for_another_table_before_reaching_the_driver() {
+    let (conn, batches) = BulkConn::open_rejecting(vec![]);
+    let (guard, _, _) = approved_guard(conn, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(3)).await.unwrap();
+    let rows = rows(3);
+
+    let result = guard
+        .execute_bulk_batch_skipping_failed_rows(&mut scope, batch(INSERT, "orders", &rows), &control())
+        .await;
+
+    assert!(matches!(result, Err(DriverError::PolicyDenied(_))));
+    assert!(batches.lock().unwrap().is_empty());
+    end_quietly(&guard, &mut scope).await;
 }

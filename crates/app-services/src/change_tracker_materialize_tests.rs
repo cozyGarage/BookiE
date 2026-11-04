@@ -438,6 +438,23 @@ fn undoing_back_to_the_untouched_draft_value_lets_the_default_apply_again() {
 }
 
 #[test]
+fn undoing_an_edit_back_to_a_null_the_user_typed_keeps_that_null_over_the_default() {
+    let mut defaulted = schema();
+    defaulted[0].is_auto_increment = true;
+    defaulted[1].default_value = Some("'new'::text".into());
+    let mut tracker = TabChangeTracker::new();
+    let RowKey::Draft(draft) = tracker.track_insert(vec![Value::Null, Value::Null, Value::Null]) else {
+        panic!("a draft key")
+    };
+    tracker.track_draft_cell_edit(draft, 1, Value::Null);
+    tracker.track_draft_cell_edit(draft, 1, Value::Text("x".into()));
+    tracker.undo().unwrap();
+
+    let (statements, _) = tracker.materialize("postgres", None, "t", &defaulted).unwrap();
+    assert_eq!(statements[0].0, r#"INSERT INTO "t" ("note", "label") VALUES ($1, $2)"#);
+}
+
+#[test]
 fn a_deleted_row_is_not_also_updated() {
     let mut tracker = TabChangeTracker::new();
     tracker.track_cell_edit(key(1), 1, Value::Text("a".into()), Value::Text("b".into()));

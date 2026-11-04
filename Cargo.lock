@@ -908,6 +908,7 @@ dependencies = [
  "bookie-transport",
  "chrono",
  "clap",
+ "libc",
  "tempfile",
  "tokio",
  "tracing",
