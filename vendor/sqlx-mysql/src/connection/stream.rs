@@ -26,6 +26,7 @@ pub struct MySqlStream<S = Box<dyn Socket>> {
     pub(crate) sequence_id: u8,
     pub(crate) waiting: VecDeque<Waiting>,
     pub(crate) is_tls: bool,
+    pub(crate) is_local: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -63,6 +64,7 @@ impl<S: Socket> MySqlStream<S> {
             sequence_id: 0,
             socket: BufferedSocket::new(socket),
             is_tls: false,
+            is_local: options.socket.is_some(),
         }
     }
 
@@ -228,6 +230,7 @@ impl<S: Socket> MySqlStream<S> {
             sequence_id: self.sequence_id,
             waiting: self.waiting,
             is_tls: self.is_tls,
+            is_local: self.is_local,
         }
     }
 }

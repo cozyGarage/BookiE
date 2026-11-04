@@ -970,7 +970,6 @@ dependencies = [
 name = "bookie-app-services"
 version = "0.2.5"
 dependencies = [
- "aes-gcm",
  "async-trait",
  "bookie-core",
  "bookie-driver-mssql",
@@ -979,17 +978,15 @@ dependencies = [
  "bookie-driver-sqlite",
  "bookie-dump",
  "bookie-policy",
+ "bookie-results",
  "bookie-ssh",
  "bookie-storage",
  "bookie-transport",
  "chrono",
- "getrandom 0.3.4",
- "rmp-serde",
  "rust_decimal",
  "secrecy",
  "serde",
  "serde_json",
- "sha2 0.11.1",
  "tempfile",
  "testcontainers",
  "testcontainers-modules",
@@ -1304,6 +1301,28 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "bookie-results"
+version = "0.2.4"
+dependencies = [
+ "aes-gcm",
+ "bookie-core",
+ "chrono",
+ "getrandom 0.3.4",
+ "rmp-serde",
+ "rust_decimal",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
  "uuid",
 ]
 

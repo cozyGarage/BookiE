@@ -12,6 +12,7 @@ struct MapStream {
     capabilities: Capabilities,
     sequence_id: u8,
     waiting: VecDeque<Waiting>,
+    is_local: bool,
 }
 
 pub(super) async fn maybe_upgrade<S: Socket>(
@@ -81,6 +82,7 @@ pub(super) async fn maybe_upgrade<S: Socket>(
             capabilities: stream.capabilities,
             sequence_id: stream.sequence_id,
             waiting: stream.waiting,
+            is_local: stream.is_local,
         },
     )
     .await
@@ -97,6 +99,7 @@ impl WithSocket for MapStream {
             sequence_id: self.sequence_id,
             waiting: self.waiting,
             is_tls: true,
+            is_local: self.is_local,
         }
     }
 }

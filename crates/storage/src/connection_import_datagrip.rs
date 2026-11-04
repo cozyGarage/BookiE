@@ -50,7 +50,11 @@ pub fn parse_datagrip_data_sources(main: &str, local: Option<&str>) -> Result<Pe
     }
     drafts.sort_by(|a, b| a.name.cmp(&b.name));
     skipped.sort();
-    Ok(PeerImport { drafts, skipped })
+    Ok(PeerImport {
+        drafts,
+        skipped,
+        groups: std::collections::BTreeMap::new(),
+    })
 }
 
 fn walk(xml: &str, mut visit: impl FnMut(&[String], Option<&str>, &[(String, String)])) -> Result<(), StorageError> {

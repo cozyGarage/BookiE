@@ -23,7 +23,7 @@ DuckDB is a built-in driver. The diagrams below give the detail.
 
 | Path | Holds |
 | --- | --- |
-| `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `app-services`, `dump`, `mcp`, `agentd`, and `drivers/*`. None depends on GTK. |
+| `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, and `drivers/*`. None depends on GTK. |
 | `apps/linux/` | The GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
 | `tests/` | Cross-crate test crates (`release/`, `driver-tls/`), fixtures and shared test data (`data/`). Unit tests stay beside their code; per-crate integration tests stay in `crates/<name>/tests`. |
 | `scripts/`, `ci/`, `vendor/`, `docs/` | Tooling, CI helpers, vendored patches and documentation. |
@@ -162,7 +162,8 @@ flowchart TB
 | `bookie-agentd` | Headless MCP composition root. Cargo binary `bookie-agentd`; installed as `bookie-agentd`. |
 | `bookie-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
 | `bookie-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Production dependency: `core`. |
-| `bookie-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core`, `dump`, `policy`, `storage` and `transport`. |
+| `bookie-results` | Pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree). Depends only on `core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)). |
+| `bookie-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core`, `results`, `dump`, `policy`, `storage` and `transport`. |
 | `bookie-storage` | Saved connections, Secret Service, query history, audit journal. |
 | `bookie-ssh` | Built-in `russh` tunnels and optional system OpenSSH backend. |
 | `bookie-transport` | Saved-connection → dial options, SSH chain, tunnel, TLS service identity. |
@@ -249,7 +250,8 @@ bookie-agentd ────┘
 
 bookie-release-tests ──► mcp, policy, storage, transport, ssh, drivers, core
 bookie-driver-tls-tests ──► transport, ssh, drivers, core
-bookie-app-services ──► dump, policy, storage, transport, core
+bookie-app-services ──► results, dump, policy, storage, transport, core
+bookie-results ──► core
 
 bookie-mcp        ──► policy, storage, core
 bookie-transport  ──► storage, ssh, policy, core

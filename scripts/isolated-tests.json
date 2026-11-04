@@ -1636,6 +1636,16 @@
       "bookie-app",
       "--lib",
       "ui::editor::result_compare::dialog_tests::a_failed_comparison_keeps_the_dialog_and_its_choices_and_a_success_closes_it"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::connection_bundle::tests::skipped_imports_are_literal_non_selectable_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
     ]
   ],
   "keyring": [
