@@ -20,6 +20,11 @@ RUN apt-get update \
         clang \
         dbus-daemon \
         docker-cli \
+        docker-compose \
+        gnome-keyring \
+        libsecret-tools \
+        libglib2.0-bin \
+        openssh-client \
         xvfb \
         xauth \
         at-spi2-core \
