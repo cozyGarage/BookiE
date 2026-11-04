@@ -9,6 +9,7 @@ use bookie_core::{Connection, OperationControl, Session, sql_syntax::SqlGrammar}
 use tokio_util::sync::CancellationToken;
 
 use super::completion_identifiers::{bare_reference, normalized, split_table_reference, table_key, words};
+use super::completion_relations::{Lookup, relations};
 
 pub const SQL_KEYWORDS: &str = "\
 SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE \
@@ -413,18 +414,26 @@ fn candidates(
     let prefix = &statement.text[..statement.cursor];
     let scope = scope_for(prefix, statement.text, index, settings);
     let mut out: Vec<String> = Vec::new();
+    let relations = relations(statement.text, index.grammar, settings);
+    let lookup = Lookup {
+        relations: &relations,
+        text: statement.text,
+        index,
+        settings,
+    };
     if !matches!(scope, Scope::ColumnsOf(_)) {
-        out.extend(super::completion_identifiers::cte_names(
-            statement.text,
-            index.grammar,
-            settings,
-        ));
+        out.extend(lookup.local_candidates(&column_sql));
     }
 
     match scope {
         Scope::ColumnsOf(table) => {
-            if let Some(columns) = index.columns_for(&table) {
-                out.extend(columns.iter().map(|column| column_sql(column)));
+            match lookup.columns_after(trailing_qualifier(prefix, index.grammar, settings).as_deref(), &table) {
+                Some(columns) => out.extend(columns.iter().map(|column| column_sql(column))),
+                None => {
+                    if let Some(columns) = index.columns_for(&table) {
+                        out.extend(columns.iter().map(|column| column_sql(column)));
+                    }
+                }
             }
         }
         Scope::Tables => {
@@ -435,7 +444,9 @@ fn candidates(
         }
         Scope::TablesAndColumns(tables) => {
             for table in &tables {
-                if let Some(columns) = index.columns_for(table) {
+                if let Some(columns) = lookup.columns(table) {
+                    out.extend(columns.iter().map(|column| column_sql(column)));
+                } else if let Some(columns) = index.columns_for(table) {
                     out.extend(columns.iter().map(|column| column_sql(column)));
                 }
             }
@@ -656,7 +667,7 @@ fn resolve_qualifier(qualifier: &str, references: &[(String, Option<String>)], g
     qualifier.to_string()
 }
 
-fn table_references(
+pub(super) fn table_references(
     statement: &str,
     grammar: Option<SqlGrammar>,
     settings: Option<LexicalSettings>,

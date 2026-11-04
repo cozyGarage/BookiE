@@ -316,7 +316,11 @@ class CiCacheTests(unittest.TestCase):
             with self.lock.open('r+') as lock:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             status = Path(f'/proc/{int(child_pid.read_text())}/stat')
-            self.assertTrue(not status.exists() or status.read_text().split()[2] == 'Z')
+            try:
+                process_state = status.read_text().split()[2]
+            except FileNotFoundError:
+                process_state = 'Z'
+            self.assertEqual(process_state, 'Z')
         finally:
             for pid_file in (child_pid, shell_pid):
                 if pid_file.exists():

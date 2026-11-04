@@ -620,6 +620,65 @@ fn comment_text(text: &str) -> String {
         .collect()
 }
 
+struct StatementTail {
+    in_line_comment: bool,
+    in_block_comment: bool,
+    last_code: Option<char>,
+}
+
+fn block_comment_is_open(text: &str, nested: bool) -> bool {
+    let bytes = text.as_bytes();
+    let mut depth = 0usize;
+    let mut index = 0;
+    while index + 1 < bytes.len() {
+        match &bytes[index..index + 2] {
+            b"/*" if nested || depth == 0 => {
+                depth += 1;
+                index += 2;
+            }
+            b"*/" if depth > 0 => {
+                depth -= 1;
+                index += 2;
+            }
+            _ => index += 1,
+        }
+    }
+    depth > 0
+}
+
+fn scan_statement_tail(query: &str, driver_id: &str) -> StatementTail {
+    let lexer_driver = if driver_id == "mariadb" { "mysql" } else { driver_id };
+    let mut tail = StatementTail {
+        in_line_comment: false,
+        in_block_comment: false,
+        last_code: None,
+    };
+    let mut index = 0;
+    while index < query.len() {
+        let span = bookie_core::sql_lex::skip_span_at(query, index, lexer_driver).filter(|length| *length > 0);
+        let Some(length) = span else {
+            let c = query[index..].chars().next().unwrap_or(' ');
+            if !c.is_whitespace() {
+                tail.last_code = Some(c);
+            }
+            index += c.len_utf8();
+            continue;
+        };
+        let text = &query[index..index + length];
+        let reaches_end = index + length >= query.len();
+        if text.starts_with("/*") {
+            let nested = matches!(lexer_driver, "postgres" | "mssql");
+            tail.in_block_comment = reaches_end && block_comment_is_open(text, nested);
+        } else if text.starts_with("--") || (text.starts_with('#') && lexer_driver == "mysql") {
+            tail.in_line_comment = reaches_end;
+        } else {
+            tail.last_code = text.chars().next_back();
+        }
+        index += length;
+    }
+    tail
+}
+
 fn sql_export_entry(entry: &Entry) -> String {
     let mut out = String::new();
     let when = chrono::DateTime::<chrono::Utc>::from(entry.executed_at).to_rfc3339();
@@ -637,9 +696,13 @@ fn sql_export_entry(entry: &Entry) -> String {
             out.push('\n');
         }
     }
-    out.push_str(entry.query.trim_end());
-    if !entry.query.trim_end().ends_with(';') {
-        out.push(';');
+    let query = entry.query.trim_end();
+    out.push_str(query);
+    let tail = scan_statement_tail(query, entry.driver_id.as_str());
+    if tail.in_block_comment {
+        out.push_str(if tail.last_code == Some(';') { "\n*/" } else { "\n*/\n;" });
+    } else if tail.last_code != Some(';') {
+        out.push_str(if tail.in_line_comment { "\n;" } else { ";" });
     }
     out.push_str("\n\n");
     out

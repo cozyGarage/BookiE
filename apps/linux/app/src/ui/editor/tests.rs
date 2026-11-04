@@ -1,4 +1,5 @@
-use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text, show_cancel_button};
+use super::run_lifecycle::show_cancel_button;
+use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text};
 use std::io::Write;
 
 #[test]
