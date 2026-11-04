@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bookie_gpui_grid_prototype::cursor::Cursor;
 use bookie_gpui_grid_prototype::edit::{is_editable, parse_edit};
 use bookie_gpui_grid_prototype::model::Cell;
 use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, div, prelude::*, px, rgb};
@@ -83,7 +84,7 @@ impl GridView {
             .unwrap_or_else(|| bookie_gpui_grid_prototype::model::row_at(row).swap_remove(column))
     }
 
-    pub fn data_cell(&self, source: u64, column: usize, cx: &mut Context<Self>) -> Div {
+    pub fn data_cell(&self, source: u64, column: usize, position: usize, cx: &mut Context<Self>) -> Div {
         let width = CELL_WIDTHS[column];
         if self
             .editing
@@ -97,9 +98,13 @@ impl GridView {
         if self.edits.contains_key(&(source, column)) {
             item = item.border_b_2().border_color(rgb(0xe0a96d));
         }
+        if self.cell_cursor == Some(Cursor { row: position, column }) {
+            item = item.border_2().border_color(rgb(0x3584e4));
+        }
         item.on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                this.cell_cursor = Some(Cursor { row: position, column });
                 if event.click_count == 2 {
                     this.start_edit(source, column, window, cx);
                     cx.stop_propagation();

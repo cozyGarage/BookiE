@@ -3,12 +3,15 @@ use std::time::Instant;
 use bookie_gpui_grid_prototype::model::Cell;
 use gpui::{TestAppContext, VisualTestContext};
 
+use bookie_gpui_grid_prototype::cursor::Cursor;
+
 use crate::GridView;
 use crate::text_input;
 
 fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::new(150_000, Instant::now(), window, cx));
+    cx.update(|window, cx| window.focus(&view.read(cx).focus));
     cx.run_until_parked();
     (view, cx)
 }
@@ -67,5 +70,102 @@ fn the_find_field_takes_typed_text_and_enter_runs_the_search(cx: &mut TestAppCon
     view.read_with(cx, |view, cx| {
         assert_eq!(view.find.read(cx).content(), "sample 149999");
         assert_eq!(view.cursor.matches, vec![149_999]);
+    });
+}
+
+#[gpui::test]
+fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("down down right");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 2, column: 1 }));
+        assert_eq!(view.status, "Row 3, Label");
+    });
+    cx.simulate_keystrokes("space");
+    view.read_with(cx, |view, _| assert_eq!(view.selection.map(|s| s.count()), Some(1)));
+    cx.simulate_keystrokes("shift-down shift-down");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.selection.map(|s| s.count()), Some(3));
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 4, column: 1 }));
+    });
+}
+
+#[gpui::test]
+fn the_cursor_crosses_to_the_next_page_and_back(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-end");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 4_999, column: 3 }));
+        assert_eq!(view.pager.page, 0);
+    });
+    cx.simulate_keystrokes("down");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.pager.page, 1);
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 0, column: 3 }));
+    });
+    cx.simulate_keystrokes("up");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.pager.page, 0);
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 4_999, column: 3 }));
+    });
+}
+
+#[gpui::test]
+fn enter_on_the_active_cell_opens_the_editor_and_an_uneditable_cell_says_so(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("down right enter");
+    view.read_with(cx, |view, _| {
+        let editing = view.editing.as_ref().expect("the label cell opens its editor");
+        assert_eq!((editing.row, editing.column), (1, 1));
+    });
+    cx.simulate_keystrokes("escape");
+    cx.simulate_keystrokes("home enter");
+    view.read_with(cx, |view, _| {
+        assert!(view.editing.is_none());
+        assert_eq!(view.status, "This cell cannot be edited");
+    });
+}
+
+#[gpui::test]
+fn the_palette_filters_runs_and_closes_on_escape(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    view.read_with(cx, |view, _| assert!(view.palette_open));
+    cx.simulate_input("last page");
+    view.read_with(cx, |view, cx| {
+        let labels: Vec<_> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].label.clone())
+            .collect();
+        assert_eq!(labels, ["Go to last page"]);
+    });
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert!(!view.palette_open);
+        assert_eq!(view.pager.page, 29);
+    });
+    cx.simulate_keystrokes("ctrl-shift-p escape");
+    view.read_with(cx, |view, _| assert!(!view.palette_open));
+}
+
+#[gpui::test]
+fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    view.read_with(cx, |view, cx| {
+        let ids: Vec<_> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].id)
+            .collect();
+        assert!(!ids.contains(&"clear-filter") && !ids.contains(&"copy") && !ids.contains(&"edit"));
+        assert!(ids.contains(&"last"));
+    });
+    cx.simulate_keystrokes("down");
+    view.read_with(cx, |view, _| assert_eq!(view.palette_index, 1));
+    cx.simulate_keystrokes("up up");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.palette_index, view.palette_shown(cx).len() - 1)
     });
 }

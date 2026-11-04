@@ -4,7 +4,9 @@ use std::time::{Duration, Instant};
 mod grid_edit;
 mod text_input;
 
+use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
+use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
 use gpui::{
     App, Application, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
@@ -32,6 +34,11 @@ struct GridView {
     editor: Entity<TextInput>,
     editing: Option<grid_edit::Editing>,
     edits: grid_edit::Edits,
+    cell_cursor: Option<Cursor>,
+    viewport_rows: usize,
+    palette_input: Entity<TextInput>,
+    palette_open: bool,
+    palette_index: usize,
     cursor: MatchCursor,
     find_capped: bool,
     compare: Option<Diff>,
@@ -100,6 +107,20 @@ impl GridView {
             this.on_editor_event(event, window, cx);
         })
         .detach();
+        let palette_input = cx.new(|cx| TextInput::new("Type a command", cx));
+        cx.subscribe_in(
+            &palette_input,
+            window,
+            |this, _, event: &InputEvent, window, cx| match event {
+                InputEvent::Changed => {
+                    this.palette_index = 0;
+                    cx.notify();
+                }
+                InputEvent::Submit => this.run_palette(window, cx),
+                InputEvent::Cancel => this.close_palette(window, cx),
+            },
+        )
+        .detach();
         GridView {
             total,
             mode: Mode::All,
@@ -111,6 +132,11 @@ impl GridView {
             editor,
             editing: None,
             edits: Default::default(),
+            cell_cursor: None,
+            viewport_rows: 10,
+            palette_input,
+            palette_open: false,
+            palette_index: 0,
             cursor: MatchCursor::default(),
             find_capped: false,
             compare: None,
@@ -195,6 +221,7 @@ impl GridView {
         self.mode = mode;
         self.pager = Pager::new(self.dataset_count());
         self.selection = None;
+        self.cell_cursor = None;
         self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
     }
 
@@ -326,16 +353,197 @@ impl GridView {
 
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let stroke = &event.keystroke;
-        if !stroke.modifiers.control {
+        let modifiers = stroke.modifiers;
+        let key = stroke.key.as_str();
+        if self.palette_open {
+            match key {
+                "down" | "up" => {
+                    let count = self.palette_shown(cx).len();
+                    self.palette_index = palette_step(self.palette_index, count, key == "down");
+                    cx.notify();
+                }
+                "escape" => self.close_palette(window, cx),
+                _ => {}
+            }
             return;
         }
-        match stroke.key.as_str() {
-            "f" => {
+        if modifiers.control && modifiers.shift && key == "p" {
+            self.open_palette(window, cx);
+            return;
+        }
+        if modifiers.control {
+            match key {
+                "f" => {
+                    self.filter_visible = true;
+                    window.focus(&self.filter.read(cx).focus_handle(cx));
+                }
+                "c" if self.focus.is_focused(window) => self.copy_selection(modifiers.shift, cx),
+                _ => {}
+            }
+            if !matches!(key, "home" | "end") {
+                cx.notify();
+                return;
+            }
+        }
+        if self.focus.is_focused(window) && self.editing.is_none() && self.compare.is_none() {
+            self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
+        }
+    }
+
+    fn grid_key(&mut self, key: &str, shift: bool, ctrl: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let rows = self.visible_count();
+        match key {
+            "space" => {
+                if let Some(cursor) = self.cell_cursor {
+                    self.click_row(self.base() + cursor.row as u64, false);
+                }
+            }
+            "enter" | "f2" => {
+                if let Some(cursor) = self.cell_cursor {
+                    let source = self.source_row(self.base() + cursor.row as u64);
+                    self.start_edit(source, cursor.column, window, cx);
+                }
+            }
+            "down" if self.cell_cursor.is_some_and(|c| c.row + 1 == rows) && self.next_page() => {
+                self.place_cursor(Some(Cursor {
+                    row: 0,
+                    column: self.cell_cursor.map_or(0, |c| c.column),
+                }));
+            }
+            "up" if self.cell_cursor.is_some_and(|c| c.row == 0) && self.previous_page() => {
+                let last = self.visible_count().saturating_sub(1);
+                self.place_cursor(Some(Cursor {
+                    row: last,
+                    column: self.cell_cursor.map_or(0, |c| c.column),
+                }));
+            }
+            _ => {
+                let Some(next) = move_cursor(self.cell_cursor, key, rows, self.viewport_rows, ctrl) else {
+                    return;
+                };
+                self.place_cursor(Some(next));
+                if shift && matches!(key, "up" | "down") {
+                    self.click_row(self.base() + next.row as u64, true);
+                }
+            }
+        }
+        cx.notify();
+    }
+
+    fn next_page(&mut self) -> bool {
+        let moved = !self.continuous && self.pager.page + 1 < self.pager.pages();
+        if moved {
+            self.pager.next();
+        }
+        moved
+    }
+
+    fn previous_page(&mut self) -> bool {
+        let moved = !self.continuous && self.pager.page > 0;
+        if moved {
+            self.pager.previous();
+        }
+        moved
+    }
+
+    fn place_cursor(&mut self, cursor: Option<Cursor>) {
+        let previous = self.cell_cursor.map_or(0, |c| c.row);
+        self.cell_cursor = cursor;
+        let Some(cursor) = cursor else { return };
+        let strategy = if cursor.row < previous {
+            ScrollStrategy::Top
+        } else {
+            ScrollStrategy::Bottom
+        };
+        self.scroll.scroll_to_item(cursor.row, strategy);
+        self.status = cursor.label();
+    }
+
+    fn palette_actions(&self) -> Vec<Action> {
+        let filtering = matches!(self.mode, Mode::Filtered { .. });
+        let paged = !self.continuous;
+        let action = |id, label: &str, enabled| Action {
+            id,
+            label: label.to_string(),
+            enabled,
+        };
+        vec![
+            action("first", "Go to first page", paged),
+            action("previous", "Go to previous page", paged && self.pager.page > 0),
+            action(
+                "next",
+                "Go to next page",
+                paged && self.pager.page + 1 < self.pager.pages(),
+            ),
+            action("last", "Go to last page", paged),
+            action("find", "Find in all rows", !filtering),
+            action("filter", "Filter rows (WHERE)", true),
+            action("clear-filter", "Clear filter", filtering),
+            action("compare", "Compare results", true),
+            action(
+                "continuous",
+                if self.continuous {
+                    "Switch to paged scrolling"
+                } else {
+                    "Switch to continuous scrolling"
+                },
+                true,
+            ),
+            action("copy", "Copy selected rows", self.selection.is_some()),
+            action("clear-selection", "Clear row selection", self.selection.is_some()),
+            action("edit", "Edit the active cell", self.cell_cursor.is_some()),
+        ]
+    }
+
+    fn palette_shown(&self, cx: &App) -> Vec<usize> {
+        palette_matches(self.palette_input.read(cx).content(), &self.palette_actions())
+    }
+
+    fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_open = true;
+        self.palette_index = 0;
+        self.palette_input.update(cx, |input, cx| input.set_content("", cx));
+        window.focus(&self.palette_input.read(cx).focus_handle(cx));
+        cx.notify();
+    }
+
+    fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_open = false;
+        window.focus(&self.focus);
+        cx.notify();
+    }
+
+    fn run_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let actions = self.palette_actions();
+        let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
+        let Some(index) = shown
+            .get(self.palette_index.min(shown.len().saturating_sub(1)))
+            .copied()
+        else {
+            return;
+        };
+        let id = actions[index].id;
+        self.close_palette(window, cx);
+        match id {
+            "first" => self.pager.first(),
+            "previous" => self.pager.previous(),
+            "next" => self.pager.next(),
+            "last" => self.pager.last(),
+            "find" => window.focus(&self.find.read(cx).focus_handle(cx)),
+            "filter" => {
                 self.filter_visible = true;
                 window.focus(&self.filter.read(cx).focus_handle(cx));
             }
-            "c" if self.focus.is_focused(window) => self.copy_selection(stroke.modifiers.shift, cx),
-            _ => return,
+            "clear-filter" => self.clear_filter(),
+            "compare" => self.compare(false, cx),
+            "continuous" => {
+                self.continuous = !self.continuous;
+                self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+            }
+            "copy" => self.copy_selection(false, cx),
+            "clear-selection" => self.selection = None,
+            "edit" => self.grid_key("enter", false, false, window, cx),
+            _ => {}
         }
         cx.notify();
     }
@@ -455,6 +663,9 @@ impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.note_frame();
         self.pace_frame(window);
+        self.viewport_rows = ((f32::from(window.viewport_size().height) - 130.0) / ROW_HEIGHT)
+            .floor()
+            .max(1.0) as usize;
         let (first, last) = self.pager.range();
         let title = match &self.mode {
             Mode::Filtered { label, .. } => format!("{label} · "),
@@ -593,8 +804,10 @@ impl Render for GridView {
         )
         .track_scroll(self.scroll.clone())
         .flex_1();
+        let palette = self.palette_open.then(|| self.palette_overlay(cx));
         div()
             .size_full()
+            .relative()
             .flex()
             .flex_col()
             .bg(rgb(0x1b1c20))
@@ -607,10 +820,43 @@ impl Render for GridView {
             .children(compare_bar)
             .child(header)
             .child(list)
+            .children(palette)
     }
 }
 
 impl GridView {
+    fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
+        let actions = self.palette_actions();
+        let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
+        let selected = self.palette_index.min(shown.len().saturating_sub(1));
+        let list = shown.iter().enumerate().map(|(position, index)| {
+            let row = div().px_2().py_1().rounded_md().child(actions[*index].label.clone());
+            if position == selected {
+                row.bg(rgb(0x2a4a7f))
+            } else {
+                row
+            }
+        });
+        let empty = shown
+            .is_empty()
+            .then(|| div().px_2().text_color(rgb(0x9aa0b4)).child("No matching command"));
+        div().absolute().top(px(90.0)).w_full().flex().justify_center().child(
+            div()
+                .w(px(520.0))
+                .p_2()
+                .gap_1()
+                .flex()
+                .flex_col()
+                .rounded_lg()
+                .border_1()
+                .border_color(rgb(0x3a3d46))
+                .bg(rgb(0x26282f))
+                .child(self.palette_input.clone())
+                .children(list)
+                .children(empty),
+        )
+    }
+
     fn row_at_position(&self, position: usize, cx: &mut Context<Self>) -> Stateful<Div> {
         if let Some(diff) = &self.compare {
             let Some(row) = diff.rows.get(position) else {
@@ -638,10 +884,10 @@ impl GridView {
                     cx.notify();
                 }),
             )
-            .child(self.data_cell(source, 0, cx))
-            .child(self.data_cell(source, 1, cx))
-            .child(self.data_cell(source, 2, cx))
-            .child(self.data_cell(source, 3, cx))
+            .child(self.data_cell(source, 0, position, cx))
+            .child(self.data_cell(source, 1, position, cx))
+            .child(self.data_cell(source, 2, position, cx))
+            .child(self.data_cell(source, 3, position, cx))
     }
 }
 
