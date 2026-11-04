@@ -125,10 +125,45 @@ fn force_dismissing_connection_deletion_does_not_abort() {
         .register(None::<&gtk4::gio::Cancellable>)
         .unwrap();
     let directory = tempfile::tempdir().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let saved = bookie_storage::SavedConnection {
+        id: Uuid::new_v4(),
+        name: "synthetic".into(),
+        driver_id: "postgres".into(),
+        host: "localhost".into(),
+        port: 5432,
+        database: "test".into(),
+        username: "test".into(),
+        auth_source: None,
+        socket_dir: None,
+        socket_path: None,
+        use_tls: false,
+        tls_mode: Some(bookie_core::TlsMode::Disabled),
+        tls_root_cert: None,
+        tls_client_cert: None,
+        tls_client_key: None,
+        read_only: false,
+        auth_mode: bookie_core::AuthMode::Password,
+        environment: bookie_core::Environment::Local,
+        ssh: None,
+        last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
+        attached_databases: Vec::new(),
+    };
+    runtime
+        .block_on(bookie_storage::save_connections(std::slice::from_ref(&saved)))
+        .unwrap();
     let controller = launch(directory.path());
     controller.widget().present();
-    controller.emit(AppMsg::DeleteConnection(Uuid::new_v4()));
+    controller.emit(AppMsg::DeleteConnection(saved.id));
     spin_until(|| controller.widget().visible_dialog().is_some());
     controller.widget().visible_dialog().unwrap().force_close();
     spin_until(|| controller.widget().visible_dialog().is_none());
+    let retained = runtime.block_on(bookie_storage::load_connections()).unwrap();
+    assert!(
+        retained
+            .iter()
+            .any(|entry| entry.id == saved.id && entry.name == saved.name)
+    );
 }
