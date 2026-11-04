@@ -81,6 +81,7 @@ pub(crate) fn present_import_plan_dialog(
     parent: &adw::ApplicationWindow,
     items: &[ImportItem],
     carries_secrets: bool,
+    skipped: &[String],
     on_confirm: impl Fn(ImportChoice) + 'static,
 ) {
     let dialog = adw::AlertDialog::new(
@@ -97,6 +98,16 @@ pub(crate) fn present_import_plan_dialog(
         let (row, check) = checkbox_row(&item.connection.name, &subtitle, true);
         list.append(&row);
         checks.push((item.source_id, check));
+    }
+
+    for name in skipped {
+        let row = adw::ActionRow::builder()
+            .title(name)
+            .subtitle(crate::tr!("Skipped: unsupported connection"))
+            .build();
+        row.set_use_markup(false);
+        row.set_title_lines(2);
+        list.append(&row);
     }
 
     let replace = build_replace_switch(carries_secrets);

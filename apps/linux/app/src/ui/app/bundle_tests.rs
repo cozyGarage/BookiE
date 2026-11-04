@@ -279,14 +279,26 @@ async fn a_file_picked_for_import_is_read_as_dbeaver_another_redis_or_datagrip_a
     let names = |path: std::path::PathBuf| async move {
         read_peer_connections_at(&path)
             .await
-            .map(|body| body.connections.into_iter().map(|c| c.driver_id).collect::<Vec<_>>())
+            .map(|imported| imported.drafts.into_iter().map(|c| c.driver_id).collect::<Vec<_>>())
     };
     assert_eq!(names(dbeaver).await.unwrap(), ["postgres"]);
     assert_eq!(names(redis).await.unwrap(), ["redis"]);
     let body = read_peer_connections_at(&datagrip).await.unwrap();
     assert_eq!(
-        body.connections[0].username, "alice",
+        body.drafts[0].username, "alice",
         "the sibling local file supplies the user name"
     );
-    assert!(names(other).await.is_none());
+    assert!(names(other).await.is_err());
+}
+
+#[tokio::test]
+async fn peer_import_feedback_preserves_skipped_sources_and_parser_refusals() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("data-sources.json");
+    std::fs::write(&path, r#"{"connections":{"a":{"provider":"postgresql","name":"accepted","configuration":{"host":"h"}},"b":{"provider":"unsupported","name":"skipped source"}}}"#).unwrap();
+    let imported = read_peer_connections_at(&path).await.unwrap();
+    assert_eq!(imported.drafts.len(), 1);
+    assert_eq!(imported.skipped, ["skipped source"]);
+    std::fs::write(&path, "<project>").unwrap();
+    assert!(read_peer_connections_at(&path).await.is_err());
 }
