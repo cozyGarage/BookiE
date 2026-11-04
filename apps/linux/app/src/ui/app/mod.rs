@@ -1,6 +1,7 @@
 mod app_helpers;
 mod backup;
 mod browse;
+mod browse_save;
 mod bundle;
 mod connection;
 mod database_switcher;
@@ -218,6 +219,7 @@ pub struct App {
     /// blocks while this is > 0 so an async transaction never commits
     /// after the tab / window has been torn down.
     in_flight_saves: std::rc::Rc<std::cell::Cell<usize>>,
+    active_browse_saves: std::collections::HashMap<Uuid, Uuid>,
     session_teardown_ready: std::rc::Rc<std::cell::Cell<bool>>,
     session_teardown_pending: std::rc::Rc<std::cell::Cell<bool>>,
     /// Structure tabs currently mid-DDL-transaction. A second Ctrl+S
@@ -629,6 +631,7 @@ impl SimpleComponent for App {
             close_after_save: window_handles.close_after_save,
             close_window_after_save: window_handles.close_window_after_save,
             in_flight_saves: window_handles.in_flight_saves,
+            active_browse_saves: std::collections::HashMap::new(),
             session_teardown_ready: window_handles.session_teardown_ready,
             session_teardown_pending: window_handles.session_teardown_pending,
             structure_saves_in_flight: std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashSet::new())),
@@ -805,52 +808,17 @@ impl SimpleComponent for App {
             AppMsg::WorkspaceSchemaWordsChanged => self.refresh_schema_index(),
             AppMsg::ExecuteBrowseTransaction {
                 tab_id,
+                save_id,
                 statements,
                 sources,
             } => {
-                self.on_execute_browse_transaction(tab_id, statements, sources, sender);
+                self.on_execute_browse_transaction(tab_id, save_id, statements, sources, sender);
             }
-            AppMsg::SaveCompletedForTab(tab_id, warning) => {
-                self.set_row_op_in_flight(false);
-                self.in_flight_saves.set(self.in_flight_saves.get().saturating_sub(1));
-                // GNOME HIG toast pattern: confirm one-shot events.
-                // Concurrency warning takes precedence (it implicitly
-                // confirms the save *and* explains the partial-match);
-                // otherwise the plain "Saved" reads as a successful
-                // commit. No Undo button — the transaction has already
-                // committed; users have explicit Ctrl+Z before Save.
-                // 4s timeout (vs the default 5) so the success toast
-                // doesn't hang around long after the user has moved on.
-                let msg = warning.unwrap_or_else(|| crate::tr!("Saved"));
-                let toast = adw::Toast::builder().title(msg).timeout(4).build();
-                self.toast_overlay.add_toast(toast);
-                self.dispatch_to_tab(tab_id, BrowseTabInput::SaveCompleted);
-                // If the user picked Save in a close-confirmation
-                // dialog, fire the close now that the commit succeeded.
-                // The counter ensures a tab with BOTH browse-dirty and
-                // structure-dirty waits for both saves before closing.
-                let drained = self.close_after_save.borrow_mut().complete(&tab_id);
-                if drained {
-                    self.request_workspace_tab_close(tab_id);
-                }
-                // If we're in a window-close-Save-all flow and the map
-                // just drained, the window can finally close.
-                if self.close_window_after_save.get() && self.close_after_save.borrow().is_empty() {
-                    self.close_window_after_save.set(false);
-                    self.window.close();
-                }
-                self.connection_switch_save_succeeded(tab_id, sender);
+            AppMsg::SaveCompletedForTab(tab_id, save_id, warning) => {
+                self.on_browse_save_completed(tab_id, save_id, warning, sender);
             }
-            AppMsg::SaveFailedForTab(tab_id, message) => {
-                self.set_row_op_in_flight(false);
-                self.in_flight_saves.set(self.in_flight_saves.get().saturating_sub(1));
-                // Abort any close-after-save intent: the commit failed,
-                // so we keep the tab open and let the user see the
-                // error and retry. Window-close intent is also cleared.
-                self.close_after_save.borrow_mut().cancel(&tab_id);
-                self.close_window_after_save.set(false);
-                self.dispatch_to_tab(tab_id, BrowseTabInput::SaveFailed(message));
-                self.connection_switch_save_failed();
+            AppMsg::SaveFailedForTab(tab_id, save_id, message) => {
+                self.on_browse_save_failed(tab_id, save_id, message);
             }
             AppMsg::FlashErrorRowForTab(tab_id, source) => {
                 self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source));
