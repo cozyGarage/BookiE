@@ -82,6 +82,18 @@ pub struct AppInit {
 
 use bookie_app_services::workspace::{CloseAfterSave, WorkspaceTabs};
 
+struct ConnectionSwitch {
+    /// Serialized connection-switch state. The candidate is fully validated
+    /// before it can replace the active connection.
+    transition: ConnectionTransition,
+    prepared: Option<crate::services::connection_service::PreparedConnection>,
+    saves_pending: std::collections::HashMap<Uuid, u32>,
+    /// Audit safety state captured before cancelling running work for a
+    /// connection switch. If cancellation makes a previously safe state
+    /// ambiguous, the candidate is discarded and the old workspace remains.
+    cancel_audit_was_disabled: Option<bool>,
+}
+
 pub struct App {
     change_trackers: crate::services::change_tracker::WorkspaceChangeTrackers,
     structure_trackers: crate::services::structure_tracker::WorkspaceStructureTrackers,
@@ -194,15 +206,7 @@ pub struct App {
     /// run and dropped when it reaches its terminal state.
     csv_import_progress: Option<crate::ui::import_dialog::ImportProgress>,
     backup_progress: Option<crate::ui::progress_dialog::CancellableDialog>,
-    /// Serialized connection-switch state. The candidate is fully validated
-    /// before it can replace the active connection.
-    connection_transition: ConnectionTransition,
-    prepared_connection: Option<crate::services::connection_service::PreparedConnection>,
-    switch_saves_pending: std::collections::HashMap<Uuid, u32>,
-    /// Audit safety state captured before cancelling running work for a
-    /// connection switch. If cancellation makes a previously safe state
-    /// ambiguous, the candidate is discarded and the old workspace remains.
-    switch_cancel_audit_was_disabled: Option<bool>,
+    switch: ConnectionSwitch,
     grid_close: grid_close::GridCloseState,
     close_after_save: std::rc::Rc<std::cell::RefCell<CloseAfterSave>>,
     /// Set when the user picked "Save" on the *window*-close dialog.
@@ -623,10 +627,12 @@ impl SimpleComponent for App {
             connection_id: None,
             csv_import_progress: None,
             backup_progress: None,
-            connection_transition: ConnectionTransition::Idle,
-            prepared_connection: None,
-            switch_saves_pending: std::collections::HashMap::new(),
-            switch_cancel_audit_was_disabled: None,
+            switch: ConnectionSwitch {
+                transition: ConnectionTransition::Idle,
+                prepared: None,
+                saves_pending: std::collections::HashMap::new(),
+                cancel_audit_was_disabled: None,
+            },
             grid_close: grid_close::GridCloseState::new(window_handles.grid_edits_ready),
             close_after_save: window_handles.close_after_save,
             close_window_after_save: window_handles.close_window_after_save,
@@ -744,10 +750,10 @@ impl SimpleComponent for App {
             AppMsg::CancelSessionTeardown(action) => match action {
                 SessionTeardownAction::WindowClose => self.session_teardown_pending.set(false),
                 SessionTeardownAction::ConnectionSwitch => {
-                    self.connection_transition = ConnectionTransition::Idle;
-                    self.prepared_connection = None;
-                    self.switch_saves_pending.clear();
-                    self.switch_cancel_audit_was_disabled = None;
+                    self.switch.transition = ConnectionTransition::Idle;
+                    self.switch.prepared = None;
+                    self.switch.saves_pending.clear();
+                    self.switch.cancel_audit_was_disabled = None;
                 }
                 SessionTeardownAction::CloseTab(_) | SessionTeardownAction::Disconnect => {}
             },
