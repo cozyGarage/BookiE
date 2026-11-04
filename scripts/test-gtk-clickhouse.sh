@@ -34,7 +34,7 @@ if [[ "${BOOKIE_GTK_CLICKHOUSE_DBUS_ACTIVE:-0}" != "1" ]]; then
   exit $?
 fi
 
-for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool grep; do
+for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "missing required command: $command_name" >&2
     exit 1
