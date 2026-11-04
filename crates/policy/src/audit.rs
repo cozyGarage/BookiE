@@ -329,6 +329,7 @@ impl AuditEvent {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuditConnectionIdentity {
     pub principal: Principal,
     pub connection_id: Uuid,
