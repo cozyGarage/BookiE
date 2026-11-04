@@ -81,6 +81,7 @@ Other options and why they were rejected.
 | [0031](0031-stop-publishing-the-debian-package.md) | Stop publishing the Debian package | Accepted | Releases stop building the Debian package because the toolkit floor excludes stable Debian and Ubuntu; the staging builder stays for the AppImage. |
 | [0032](0032-stop-publishing-the-flatpak.md) | Stop publishing the Flatpak | Accepted | Releases ship only the Arch package and the AppImage; the Flatpak manifests, scripts and workflow are removed. |
 | [0034](0034-postgres-metadata-visibility-for-restricted-roles.md) | Metadata visibility for restricted PostgreSQL roles | Accepted | Show only objects the role can reach, by one privilege-aware rule in SQL across the sidebar, completion, ER diagram, compare, MCP and statistics tools. |
+| [0035](0035-schema-compare-opt-in.md) | Same-engine schema compare ships opt-in | Accepted | Keep the compare code, show its menu entry only when `BOOKIE_SCHEMA_COMPARE` is set until the dialect and DDL profile ADR exists. |
 | [0033](0033-frozen-result-grid-columns.md) | Frozen leading columns in the result grid | Proposed | GTK4 has no frozen columns; the options are two synced column views, a custom list-view grid, or not freezing, with a spike to decide. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
