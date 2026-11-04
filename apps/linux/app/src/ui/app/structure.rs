@@ -615,10 +615,7 @@ impl App {
                     self,
                     schema.clone(),
                     name.clone(),
-                    0,
-                    self.default_page_size,
-                    None,
-                    false,
+                    super::workspace_tabs::TableTabStart::first_page(self.default_page_size, false),
                     sender.clone(),
                 );
                 sender.input(AppMsg::SchemaChanged {

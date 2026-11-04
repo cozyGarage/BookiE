@@ -2,6 +2,7 @@ use relm4::ComponentSender;
 use relm4::gtk::gio;
 use uuid::Uuid;
 
+use super::workspace_tabs::TableTabStart;
 use super::{App, OpenMode, WorkspaceTab};
 use bookie_app_services::workspace::{TableOpenPlan, TableOpenRequest};
 
@@ -48,7 +49,8 @@ impl App {
         if let Some(id) = promote {
             self.keep_table_tab(id);
         }
-        self.append_table_tab(schema, name, 0, self.default_page_size, None, is_preview, sender);
+        let start = TableTabStart::first_page(self.default_page_size, is_preview);
+        self.append_table_tab(schema, name, start, sender);
     }
 
     fn select_table_tab(&self, id: Uuid) {
