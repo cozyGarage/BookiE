@@ -74,7 +74,11 @@ pub fn parse_another_redis_connections(input: &str) -> Result<PeerImport, Storag
     }
     drafts.sort_by(|a, b| a.name.cmp(&b.name));
     skipped.sort();
-    Ok(PeerImport { drafts, skipped })
+    Ok(PeerImport {
+        drafts,
+        skipped,
+        groups: std::collections::BTreeMap::new(),
+    })
 }
 
 fn decode(input: &str) -> Result<String, StorageError> {
