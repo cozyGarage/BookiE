@@ -324,7 +324,10 @@ fn projected_browse_rows_preview_long_values_without_losing_the_key() {
     assert!(row.cell_preview(2).is_some());
     assert!(!row.cell_is_loaded(1));
     assert_eq!(row.cell_value(2), Value::Text(text.clone()));
-    assert_eq!(row.cell_preview(2).unwrap().byte_count, text.len());
+    assert_eq!(
+        row.cell_preview(2).unwrap().byte_count,
+        crate::ui::row_object::PreviewByteCount::Exact(text.len())
+    );
     assert!(
         row.complete_cells().is_none(),
         "the projected hidden column is still unfetched"
@@ -351,9 +354,18 @@ fn arbitrary_query_previews_can_recover_full_values_from_the_shared_result() {
     let row = store.item(0).and_downcast::<RowObject>().unwrap();
 
     assert_eq!(row.cell_value(0), Value::Int(7));
-    assert_eq!(row.cell_preview(1).unwrap().byte_count, 9000);
-    assert_eq!(row.cell_preview(2).unwrap().byte_count, bytes.len());
-    assert!(row.cell_preview(3).unwrap().byte_count > 9000);
+    assert_eq!(
+        row.cell_preview(1).unwrap().byte_count,
+        crate::ui::row_object::PreviewByteCount::Exact(9000)
+    );
+    assert_eq!(
+        row.cell_preview(2).unwrap().byte_count,
+        crate::ui::row_object::PreviewByteCount::Exact(bytes.len())
+    );
+    assert_eq!(
+        row.cell_preview(3).unwrap().byte_count,
+        crate::ui::row_object::PreviewByteCount::MoreThan(8192)
+    );
     assert_eq!(store.source_value_at(0, 1), Some(Value::Text("x".repeat(9000))));
     assert_eq!(store.source_value_at(0, 2), Some(Value::Bytes(bytes)));
     assert_eq!(store.source_value_at(0, 3), Some(Value::Json(Box::new(json.clone()))));
@@ -395,7 +407,10 @@ fn redis_previews_only_string_values_and_preserves_keys_and_other_types() {
     let string_row = store.item(0).and_downcast::<RowObject>().unwrap();
     let hash_row = store.item(1).and_downcast::<RowObject>().unwrap();
     assert_eq!(string_row.cell_value(0), Value::Text("str-key".into()));
-    assert_eq!(string_row.cell_preview(3).unwrap().byte_count, long.len());
+    assert_eq!(
+        string_row.cell_preview(3).unwrap().byte_count,
+        crate::ui::row_object::PreviewByteCount::Exact(long.len())
+    );
     assert_eq!(hash_row.cell_value(3), Value::Text(long));
     assert!(hash_row.cell_preview(3).is_none());
 }

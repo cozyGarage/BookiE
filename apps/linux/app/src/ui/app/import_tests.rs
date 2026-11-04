@@ -291,3 +291,115 @@ fn a_file_name_becomes_a_table_name_that_can_be_an_identifier() {
         "imported_table"
     );
 }
+
+#[test]
+fn the_finishing_alert_gives_the_counts_then_every_listed_row_and_the_hidden_remainder() {
+    let report = CsvImportReport {
+        schema: None,
+        table: "people".into(),
+        committed: 97,
+        total: 100,
+        error: None,
+        skipped: 3,
+        skipped_summary: "Row 2: duplicate key\nRow 9: bad value\n…and 1 more skipped rows.".into(),
+    };
+    assert_eq!(
+        skipped_rows_message(&report),
+        "97 of 100 rows were written to people. The database rejected 3 rows, which were skipped and not imported.\n\n\
+         Row 2: duplicate key\nRow 9: bad value\n…and 1 more skipped rows."
+    );
+}
+
+#[derive(Default)]
+struct RecordedImportAudit(std::sync::Mutex<Vec<AuditEvent>>);
+
+#[async_trait::async_trait]
+impl AuditSink for RecordedImportAudit {
+    async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
+        self.0.lock().unwrap().push(event);
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn confirmed_import_cancellation_preserves_commits_and_allows_the_next_write() {
+    let raw = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let state = Arc::new(AuditState::new());
+    let audit = Arc::new(RecordedImportAudit::default());
+    let guard = PolicyGuard::new(
+        raw.into(),
+        GuardContext {
+            connection_id: Uuid::new_v4(),
+            connection_name: "Import cancellation contract".into(),
+            driver_id: "sqlite".into(),
+            environment: Environment::Prod,
+            read_only: false,
+            principal: Principal::human_gui(),
+            policy: Arc::new(PolicyConfig::default()),
+            approval: Arc::new(AutoApproveSink),
+            audit: audit.clone(),
+            audit_state: state.clone(),
+        },
+    );
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    guard
+        .execute_controlled("CREATE TABLE people (id INTEGER PRIMARY KEY)", &control)
+        .await
+        .unwrap();
+    let statement = "INSERT INTO people (id) VALUES (?)";
+    let mut scope = guard
+        .begin_bulk_insert(BulkInsertRequest {
+            schema: None,
+            table: "people".into(),
+            statement: statement.into(),
+            row_budget: 2,
+            sequence_columns: Vec::new(),
+        })
+        .await
+        .unwrap();
+    let rows = vec![vec![Value::Int(1)]];
+    guard
+        .execute_bulk_batch(
+            &mut scope,
+            BulkBatch {
+                schema: None,
+                table: "people",
+                statement,
+                rows: &rows,
+            },
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        guard
+            .finish_bulk_insert(&mut scope, BulkInsertEnd::Cancelled)
+            .await
+            .unwrap(),
+        1
+    );
+    let events = audit.0.lock().unwrap().clone();
+    let terminal = events.last().unwrap();
+    assert_eq!(terminal.terminal_status, bookie_policy::AuditTerminalStatus::Cancelled);
+    assert_eq!(terminal.rows_affected, Some(1));
+    assert_eq!(
+        terminal.transaction_outcome,
+        bookie_policy::AuditTransactionOutcome::Committed
+    );
+    assert!(!state.governed_writes_disabled());
+    guard
+        .execute_controlled("INSERT INTO people VALUES (2)", &control)
+        .await
+        .unwrap();
+    let result = guard
+        .query_controlled("SELECT id FROM people ORDER BY id", &control)
+        .await
+        .unwrap();
+    assert_eq!(result.rows, vec![vec![Value::Int(1)], vec![Value::Int(2)]]);
+}

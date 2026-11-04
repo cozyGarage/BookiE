@@ -5,6 +5,7 @@ members = [
     "crates/app-services",
     "crates/core",
     "crates/policy",
+    "crates/results",
     "tests/release",
     "crates/mcp",
     "crates/agentd",
@@ -23,7 +24,7 @@ members = [
     "crates/drivers/sqlite",
 ]
 [workspace.package]
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.98"
 license = "AGPL-3.0-or-later"

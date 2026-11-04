@@ -61,11 +61,11 @@ impl App {
         prefill: Option<crate::ui::connect_dialog::ConnectionPrefill>,
         sender: ComponentSender<Self>,
     ) {
-        if self.connection_transition != ConnectionTransition::Idle || self.dialog.is_some() {
+        if self.switch.transition != ConnectionTransition::Idle || self.dialog.is_some() {
             self.show_toast(&crate::tr!("A connection change is already in progress."));
             return;
         }
-        self.connection_transition = ConnectionTransition::Connecting;
+        self.switch.transition = ConnectionTransition::Connecting;
         let dialog = ConnectDialog::builder()
             .launch(ConnectDialogInit {
                 registry: self.registry.clone(),
@@ -141,7 +141,7 @@ impl App {
     }
 
     pub(super) fn on_disconnect(&mut self, sender: ComponentSender<Self>) {
-        if self.connection_transition != ConnectionTransition::Idle {
+        if self.switch.transition != ConnectionTransition::Idle {
             self.show_toast(&crate::tr!(
                 "Finish or cancel the connection change before disconnecting."
             ));
@@ -203,10 +203,10 @@ impl App {
         // Invalidate any candidate left behind by a stale dialog callback.
         // A late preparation result is rejected unless the transition is
         // still `Connecting`, so it cannot reconnect after this teardown.
-        self.prepared_connection = None;
-        self.switch_saves_pending.clear();
-        self.switch_cancel_audit_was_disabled = None;
-        self.connection_transition = ConnectionTransition::Idle;
+        self.switch.prepared = None;
+        self.switch.saves_pending.clear();
+        self.switch.cancel_audit_was_disabled = None;
+        self.switch.transition = ConnectionTransition::Idle;
         // Persist + tear down workspace tabs before dropping the
         // connection (persist needs the active connection_id).
         self.teardown_workspace_tabs();
@@ -347,8 +347,7 @@ impl App {
         let sender_for_response = sender;
         let workspace = self.workspace.clone();
         let column_widths = self.persistence.column_widths.clone();
-        dialog.connect_response(None, move |dialog, response| {
-            dialog.close();
+        dialog.connect_response(None, move |_, response| {
             if response != "delete" {
                 return;
             }
@@ -363,12 +362,12 @@ impl App {
     }
 
     pub(super) fn on_open_saved(&mut self, saved: SavedConnection, sender: ComponentSender<Self>) {
-        if self.connection_transition != ConnectionTransition::Idle {
+        if self.switch.transition != ConnectionTransition::Idle {
             self.show_toast(&crate::tr!("A connection change is already in progress."));
             return;
         }
         self.connections_popover.popdown();
-        self.connection_transition = ConnectionTransition::Connecting;
+        self.switch.transition = ConnectionTransition::Connecting;
         self.set_loading_page(
             &crate::tr!("Connecting…"),
             &crate::tr!("Opening {name}").replace("{name}", &saved.name),
@@ -416,11 +415,11 @@ impl App {
     pub(super) fn on_connection_cancelled(&mut self) {
         self.connect_cancel = None;
         self.pending_database_switch = None;
-        if self.connection_transition != ConnectionTransition::Connecting || self.prepared_connection.is_some() {
+        if self.switch.transition != ConnectionTransition::Connecting || self.switch.prepared.is_some() {
             return;
         }
-        self.connection_transition = ConnectionTransition::Idle;
-        self.switch_cancel_audit_was_disabled = None;
+        self.switch.transition = ConnectionTransition::Idle;
+        self.switch.cancel_audit_was_disabled = None;
         self.dismiss_loading_page();
         self.show_toast(&crate::tr!("Connection cancelled."));
     }
@@ -430,11 +429,11 @@ impl App {
         prepared: Box<connection_service::PreparedConnection>,
         sender: ComponentSender<Self>,
     ) {
-        if self.connection_transition != ConnectionTransition::Connecting {
+        if self.switch.transition != ConnectionTransition::Connecting {
             tracing::warn!("discarding stale prepared connection");
             return;
         }
-        if self.prepared_connection.is_some() {
+        if self.switch.prepared.is_some() {
             tracing::warn!("discarding duplicate prepared connection");
             return;
         }
@@ -445,8 +444,8 @@ impl App {
         }
         self.connect_cancel = None;
         self.dismiss_loading_page();
-        self.prepared_connection = Some(*prepared);
-        self.connection_transition = ConnectionTransition::AwaitingDecision;
+        self.switch.prepared = Some(*prepared);
+        self.switch.transition = ConnectionTransition::AwaitingDecision;
         self.continue_connection_switch(sender);
     }
 
@@ -456,15 +455,15 @@ impl App {
         saved: SavedConnection,
         sender: ComponentSender<Self>,
     ) {
-        if self.connection_transition != ConnectionTransition::Connecting {
+        if self.switch.transition != ConnectionTransition::Connecting {
             tracing::warn!(error = %message, "discarding stale connection failure");
             return;
         }
         self.connect_cancel = None;
         self.pending_database_switch = None;
-        self.connection_transition = ConnectionTransition::Idle;
-        self.prepared_connection = None;
-        self.switch_cancel_audit_was_disabled = None;
+        self.switch.transition = ConnectionTransition::Idle;
+        self.switch.prepared = None;
+        self.switch.cancel_audit_was_disabled = None;
         self.dismiss_loading_page();
         tracing::warn!(error = %message, "candidate connection failed");
         self.show_connection_failed_alert(&message, saved, sender);
@@ -489,35 +488,35 @@ impl App {
 
     pub(super) fn on_connect_dialog_closed(&mut self) {
         self.dialog = None;
-        if self.connection_transition == ConnectionTransition::Connecting && self.prepared_connection.is_none() {
-            self.connection_transition = ConnectionTransition::Idle;
-            self.switch_cancel_audit_was_disabled = None;
+        if self.switch.transition == ConnectionTransition::Connecting && self.switch.prepared.is_none() {
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.cancel_audit_was_disabled = None;
         }
     }
 
     /// Advance a prepared connection only when the old workspace is safe to
     /// release. Called after preparation and every editor/save completion.
     pub(super) fn continue_connection_switch(&mut self, sender: ComponentSender<Self>) {
-        if self.prepared_connection.is_none() {
+        if self.switch.prepared.is_none() {
             return;
         }
-        match self.connection_transition {
+        match self.switch.transition {
             ConnectionTransition::WaitingForRuns if self.any_editor_running() => return,
-            ConnectionTransition::WaitingForSaves if !self.switch_saves_pending.is_empty() => return,
+            ConnectionTransition::WaitingForSaves if !self.switch.saves_pending.is_empty() => return,
             ConnectionTransition::Connecting | ConnectionTransition::Idle => return,
             _ => {}
         }
 
-        if self.connection_transition == ConnectionTransition::WaitingForRuns {
-            let was_disabled = self.switch_cancel_audit_was_disabled.take().unwrap_or(false);
+        if self.switch.transition == ConnectionTransition::WaitingForRuns {
+            let was_disabled = self.switch.cancel_audit_was_disabled.take().unwrap_or(false);
             if !was_disabled
                 && self
                     .connection_id
                     .is_some_and(|id| self.database.governed_writes_disabled(id))
             {
-                self.prepared_connection = None;
-                self.switch_saves_pending.clear();
-                self.connection_transition = ConnectionTransition::Idle;
+                self.switch.prepared = None;
+                self.switch.saves_pending.clear();
+                self.switch.transition = ConnectionTransition::Idle;
                 self.show_toast(&crate::tr!(
                     "Connection switch stopped because a running operation has an unknown outcome."
                 ));
@@ -526,7 +525,7 @@ impl App {
         }
 
         if self.any_editor_running() {
-            self.connection_transition = ConnectionTransition::AwaitingDecision;
+            self.switch.transition = ConnectionTransition::AwaitingDecision;
             let dialog = adw::AlertDialog::new(
                 Some(&crate::tr!("Cancel running queries and switch?")),
                 Some(&crate::tr!(
@@ -553,7 +552,7 @@ impl App {
 
         let has_pending = self.window_has_pending();
         if has_pending {
-            self.connection_transition = ConnectionTransition::AwaitingDecision;
+            self.switch.transition = ConnectionTransition::AwaitingDecision;
             let dialog = adw::AlertDialog::new(
                 Some(&crate::tr!("Save changes before switching?")),
                 Some(&crate::tr!(
@@ -587,18 +586,18 @@ impl App {
     pub(super) fn on_connection_switch_decision(&mut self, decision: SwitchDecision, sender: ComponentSender<Self>) {
         match decision {
             SwitchDecision::Stay => {
-                self.prepared_connection = None;
-                self.switch_saves_pending.clear();
-                self.switch_cancel_audit_was_disabled = None;
-                self.connection_transition = ConnectionTransition::Idle;
+                self.switch.prepared = None;
+                self.switch.saves_pending.clear();
+                self.switch.cancel_audit_was_disabled = None;
+                self.switch.transition = ConnectionTransition::Idle;
                 self.show_toast(&crate::tr!("Connection switch cancelled."));
             }
             SwitchDecision::CancelRuns => {
-                self.switch_cancel_audit_was_disabled = Some(
+                self.switch.cancel_audit_was_disabled = Some(
                     self.connection_id
                         .is_some_and(|id| self.database.governed_writes_disabled(id)),
                 );
-                self.connection_transition = ConnectionTransition::WaitingForRuns;
+                self.switch.transition = ConnectionTransition::WaitingForRuns;
                 self.cancel_all_editor_runs();
                 self.continue_connection_switch(sender);
             }
@@ -614,14 +613,14 @@ impl App {
             SwitchDecision::SaveChanges => {
                 let browse = self.window_pending_browse_tabs();
                 let structure = self.window_pending_structure_tabs();
-                self.switch_saves_pending.clear();
+                self.switch.saves_pending.clear();
                 for id in browse.iter().copied() {
-                    *self.switch_saves_pending.entry(id).or_insert(0) += 1;
+                    *self.switch.saves_pending.entry(id).or_insert(0) += 1;
                 }
                 for id in structure.iter().copied() {
-                    *self.switch_saves_pending.entry(id).or_insert(0) += 1;
+                    *self.switch.saves_pending.entry(id).or_insert(0) += 1;
                 }
-                self.connection_transition = ConnectionTransition::WaitingForSaves;
+                self.switch.transition = ConnectionTransition::WaitingForSaves;
                 for id in browse {
                     sender.input(AppMsg::SaveActiveBrowseTabById(id));
                 }
@@ -650,7 +649,7 @@ impl App {
     }
 
     pub(super) fn finish_activate_prepared_connection(&mut self, sender: ComponentSender<Self>) {
-        let Some(prepared) = self.prepared_connection.take() else {
+        let Some(prepared) = self.switch.prepared.take() else {
             return;
         };
         // Check before touching any of this window's own state. Reconnecting
@@ -660,9 +659,9 @@ impl App {
         // never needs to roll back a half-finished switch.
         let target_id = prepared.id();
         if self.connection_id != Some(target_id) && self.database.is_active(target_id) {
-            self.connection_transition = ConnectionTransition::Idle;
-            self.switch_saves_pending.clear();
-            self.switch_cancel_audit_was_disabled = None;
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.saves_pending.clear();
+            self.switch.cancel_audit_was_disabled = None;
             self.show_toast(&crate::tr!("This connection is already open in another window."));
             return; // `prepared` drops here, closing the connection it dialled.
         }
@@ -686,9 +685,9 @@ impl App {
             // check above and here; the GTK main loop makes that
             // effectively impossible, but stay fail-closed rather than
             // unwrap a connection-stealing race.
-            self.connection_transition = ConnectionTransition::Idle;
-            self.switch_saves_pending.clear();
-            self.switch_cancel_audit_was_disabled = None;
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.saves_pending.clear();
+            self.switch.cancel_audit_was_disabled = None;
             self.connected = false;
             super::sidebar_state::hide_sidebar(&self.split_view, &self.sidebar_reveal);
             self.set_sidebar_connected(false);
@@ -697,33 +696,33 @@ impl App {
             self.show_toast(&crate::tr!("This connection is already open in another window."));
             return;
         };
-        self.connection_transition = ConnectionTransition::Idle;
-        self.switch_saves_pending.clear();
-        self.switch_cancel_audit_was_disabled = None;
+        self.switch.transition = ConnectionTransition::Idle;
+        self.switch.saves_pending.clear();
+        self.switch.cancel_audit_was_disabled = None;
         self.on_connected(activated, sender);
     }
 
     pub(super) fn connection_switch_save_succeeded(&mut self, tab_id: Uuid, sender: ComponentSender<Self>) {
-        if self.connection_transition != ConnectionTransition::WaitingForSaves {
+        if self.switch.transition != ConnectionTransition::WaitingForSaves {
             return;
         }
-        if let Some(remaining) = self.switch_saves_pending.get_mut(&tab_id) {
+        if let Some(remaining) = self.switch.saves_pending.get_mut(&tab_id) {
             *remaining = remaining.saturating_sub(1);
             if *remaining == 0 {
-                self.switch_saves_pending.remove(&tab_id);
+                self.switch.saves_pending.remove(&tab_id);
             }
         }
         self.continue_connection_switch(sender);
     }
 
     pub(super) fn connection_switch_save_failed(&mut self) {
-        if self.connection_transition != ConnectionTransition::WaitingForSaves {
+        if self.switch.transition != ConnectionTransition::WaitingForSaves {
             return;
         }
-        self.switch_saves_pending.clear();
-        self.prepared_connection = None;
-        self.switch_cancel_audit_was_disabled = None;
-        self.connection_transition = ConnectionTransition::Idle;
+        self.switch.saves_pending.clear();
+        self.switch.prepared = None;
+        self.switch.cancel_audit_was_disabled = None;
+        self.switch.transition = ConnectionTransition::Idle;
         self.show_toast(&crate::tr!(
             "Connection switch stopped because changes could not be saved."
         ));

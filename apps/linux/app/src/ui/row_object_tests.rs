@@ -5,40 +5,43 @@ use gtk4::prelude::ListModelExt;
 use std::sync::Arc;
 
 #[test]
-fn json_preview_writer_counts_all_bytes_without_growing_past_its_sample() {
+fn json_preview_writer_stops_after_one_byte_past_its_sample() {
     let mut writer = JsonPreviewWriter {
         prefix: Vec::with_capacity(PREVIEW_BYTES),
         byte_count: 0,
+        exceeded: false,
     };
     let chunk = vec![b'x'; PREVIEW_BYTES * 8];
-    std::io::Write::write_all(&mut writer, &chunk).unwrap();
-    std::io::Write::write_all(&mut writer, &chunk).unwrap();
-    assert_eq!(writer.byte_count, PREVIEW_BYTES * 16);
+    assert!(std::io::Write::write_all(&mut writer, &chunk).is_err());
+    assert_eq!(writer.byte_count, PREVIEW_BYTES + 1);
+    assert!(writer.exceeded);
     assert_eq!(writer.prefix, vec![b'x'; PREVIEW_BYTES]);
     assert_eq!(writer.prefix.capacity(), PREVIEW_BYTES);
 }
 
 #[test]
-fn json_preview_writer_refuses_an_overflowing_byte_count() {
-    let mut writer = JsonPreviewWriter {
-        prefix: Vec::new(),
-        byte_count: usize::MAX,
-    };
-    let error = std::io::Write::write(&mut writer, b"x").unwrap_err();
-    assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
-    assert_eq!(writer.byte_count, usize::MAX);
-    assert!(writer.prefix.is_empty());
-}
-
-#[test]
-fn a_large_parsed_json_preview_keeps_its_sample_and_exact_serialized_byte_count() {
+fn a_large_parsed_json_preview_keeps_its_sample_and_reports_a_lower_bound() {
     let value = Value::Json(Box::new(serde_json::Value::String("x".repeat(8 * 1024 * 1024))));
     let preview = preview_value(&value).unwrap();
-    assert_eq!(preview.byte_count, 8 * 1024 * 1024 + 2);
+    assert_eq!(preview.byte_count, PreviewByteCount::MoreThan(PREVIEW_BYTES));
     assert_eq!(preview.value, Value::Text(format!("\"{}", "x".repeat(8191))));
     assert!(
         matches!(&value, Value::Json(json) if matches!(json.as_ref(), serde_json::Value::String(text) if text.len() == 8 * 1024 * 1024))
     );
+}
+
+#[test]
+fn a_json_preview_does_not_replace_the_full_typed_cell_value() {
+    let source = Value::Json(Box::new(serde_json::json!({"payload": "x".repeat(100_000)})));
+    let expected = source.clone();
+    let row = RowObject::new(vec![source]);
+    row.preview_values_from_result();
+
+    assert_eq!(
+        row.cell_preview(0).unwrap().byte_count,
+        PreviewByteCount::MoreThan(PREVIEW_BYTES)
+    );
+    assert!(row.with_cell_value(0, |value| value == &expected).unwrap());
 }
 
 #[test]
@@ -47,7 +50,7 @@ fn parsed_json_preview_matches_serialized_escapes_and_utf8_boundaries() {
     let serialized = json.to_string();
     let preview = preview_value(&Value::Json(Box::new(json))).unwrap();
     let end = serialized.floor_char_boundary(8192);
-    assert_eq!(preview.byte_count, serialized.len());
+    assert_eq!(preview.byte_count, PreviewByteCount::MoreThan(PREVIEW_BYTES));
     assert_eq!(preview.value, Value::Text(serialized[..end].to_owned()));
 }
 
@@ -55,7 +58,7 @@ fn parsed_json_preview_matches_serialized_escapes_and_utf8_boundaries() {
 fn parsed_json_uses_its_serialized_size_at_the_preview_boundary() {
     assert!(preview_value(&Value::Json(Box::new(serde_json::Value::String("x".repeat(8190))))).is_none());
     let preview = preview_value(&Value::Json(Box::new(serde_json::Value::String("x".repeat(8191))))).unwrap();
-    assert_eq!(preview.byte_count, 8193);
+    assert_eq!(preview.byte_count, PreviewByteCount::MoreThan(PREVIEW_BYTES));
 }
 
 #[test]
@@ -63,18 +66,21 @@ fn root_json_string_previews_preserve_escaped_and_multibyte_content() {
     for text in ["\\\"".repeat(4095), "\\\"".repeat(4096), "é".repeat(4096)] {
         let json = serde_json::Value::String(text);
         let serialized = json.to_string();
-        let preview = preview_value(&Value::Json(Box::new(json))).unwrap();
+        let preview = preview_value(&Value::Json(Box::new(json)));
+        if serialized.len() <= PREVIEW_BYTES {
+            assert!(preview.is_none());
+            continue;
+        }
+        let preview = preview.unwrap();
         let end = serialized.floor_char_boundary(PREVIEW_BYTES);
-        assert_eq!(preview.byte_count, serialized.len());
+        assert_eq!(preview.byte_count, PreviewByteCount::MoreThan(PREVIEW_BYTES));
         assert_eq!(preview.value, Value::Text(serialized[..end].to_owned()));
     }
 }
 
 #[test]
-fn json_size_probe_respects_the_serialized_byte_limit() {
-    assert!(!json_exceeds(&serde_json::json!({"a": 1}), 8));
-    assert!(json_exceeds(&serde_json::json!({"payload": "x".repeat(20)}), 8));
-    assert!(!json_exceeds(&serde_json::json!("12345"), 7));
+fn json_preview_is_absent_when_the_serialized_value_fits_the_byte_limit() {
+    assert!(preview_value(&Value::Json(Box::new(serde_json::json!({"a": 1})))).is_none());
 }
 
 #[test]
@@ -112,7 +118,10 @@ fn shared_result_rows_do_not_clone_large_cell_payloads_into_row_objects() {
         .unwrap();
     assert_eq!(row_pointer, source_pointer);
     assert_eq!(row.cell_value(0), Value::Text(payload.clone()));
-    assert_eq!(row.cell_preview(0).unwrap().byte_count, payload.len());
+    assert_eq!(
+        row.cell_preview(0).unwrap().byte_count,
+        PreviewByteCount::Exact(payload.len())
+    );
 }
 
 #[test]
@@ -159,7 +168,7 @@ fn a_server_cut_cell_shows_its_prefix_and_blocks_row_copy_and_export() {
 
     let preview = row.cell_preview(1).expect("the cut cell previews its prefix");
     assert_eq!(preview.value, Value::Text("begin".into()));
-    assert_eq!(preview.byte_count, 2_097_152);
+    assert_eq!(preview.byte_count, PreviewByteCount::Exact(2_097_152));
     assert!(row.cell_is_partial(1));
     assert!(!row.cell_is_partial(0));
     assert!(!row.cell_is_loaded(1));
@@ -225,7 +234,7 @@ fn long_cells_keep_an_eight_kib_preview_and_primary_keys_remain_loaded() {
     assert_eq!(row.cell_value(1), Value::Text(text.clone()));
     let preview = row.cell_preview(1).unwrap();
     assert_eq!(preview.value, Value::Text("x".repeat(8191)));
-    assert_eq!(preview.byte_count, text.len());
+    assert_eq!(preview.byte_count, PreviewByteCount::Exact(text.len()));
     assert_eq!(row.complete_cells(), Some(vec![Value::Int(7), Value::Text(text)]));
 }
 
@@ -243,6 +252,6 @@ fn previews_keep_the_byte_boundary_and_cover_json_and_binary_values() {
     ]);
     row.preview_long_values(&[0]);
     assert_eq!(row.cell_preview(1).unwrap().value, Value::Bytes(bytes[..8192].to_vec()));
-    assert_eq!(row.cell_preview(1).unwrap().byte_count, 8193);
+    assert_eq!(row.cell_preview(1).unwrap().byte_count, PreviewByteCount::Exact(8193));
     assert!(row.cell_preview(2).is_some());
 }

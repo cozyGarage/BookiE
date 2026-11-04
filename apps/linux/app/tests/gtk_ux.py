@@ -489,6 +489,7 @@ def scenarios(ui):
             f"CREATE TABLE {table} (id integer PRIMARY KEY, marker_{index:02} text)"
             for index, table in enumerate(tables)
         ))
+        psql("; ".join(f"GRANT SELECT ON {table} TO bookie_mtls" for table in tables))
         try:
             ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
             ui.wait_for_node(name="public.release_items", role=pyatspi.ROLE_LIST_ITEM)
@@ -1573,6 +1574,36 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Roll Back and Switch", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
 
+    def closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back(database, base):
+        import sqlite3
+
+        with sqlite3.connect(database) as connection:
+            connection.execute("CREATE TABLE transaction_close_probe (id INTEGER PRIMARY KEY)")
+
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("INSERT INTO transaction_close_probe(id) VALUES (1)")
+        ui.wait_for_node_containing("done in")
+
+        with sqlite3.connect(database) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM transaction_close_probe").fetchone()[0] == 0
+
+        ui.invoke_accessible_action("win.close-current")
+        ui.wait_for_node(name="Close with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Close with an open transaction?", present=False)
+        ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.invoke_accessible_action("win.close-current")
+        ui.wait_for_node(name="Close with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Roll Back and Close", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Open SQL editor", role=pyatspi.ROLE_PUSH_BUTTON)
+
+        with sqlite3.connect(database) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM transaction_close_probe").fetchone()[0] == 0
+
     def wait_for_editor_text(expected):
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -2050,7 +2081,7 @@ GLib.MainLoop().run()
         ui.wait_for_node_containing(f"Rows 1-{page_size:,}", timeout=120)
         wait_for_visible_cell_value("1")
         wait_for_visible_marker(first_run_marker)
-        wait_for_streamed_page_during_load(first_run_marker, page_size * 2)
+        wait_for_streamed_page_after_rows_arrive(first_run_marker, page_size * 2)
         ui.wait_for_node_containing(f"Complete · Received {stream_rows:,} rows", timeout=180)
         scheme = os.environ.get("ADW_DEBUG_COLOR_SCHEME", "prefer-light")
         capture_grid_navigation_artifact(f"postgres-stream-{stream_rows}-{scheme}-first-page")
@@ -2122,7 +2153,7 @@ GLib.MainLoop().run()
             time.sleep(ui.POLL_SECONDS)
         raise AssertionError(f"{name!r} was not visible")
 
-    def wait_for_streamed_page_during_load(marker, minimum_rows):
+    def wait_for_streamed_page_after_rows_arrive(marker, minimum_rows):
         deadline = time.monotonic() + 120
         progress = ""
         while time.monotonic() < deadline:
@@ -2132,17 +2163,21 @@ GLib.MainLoop().run()
                 progress = next((
                     ui.node_name(node) for node in nodes
                     if ui.node_role(node) == pyatspi.ROLE_LABEL
-                    and ui.node_name(node).startswith("Receiving… · Received ")
+                    and ui.node_name(node).startswith(("Receiving… · Received ", "Complete · Received "))
                 ), "")
                 match = re.search(r"Received ([0-9,]+) rows", progress)
-                visible_values = {
-                    ui.node_name(node) for node in nodes
-                    if ui.node_role(node) == pyatspi.ROLE_LABEL
-                    and node.getState().contains(pyatspi.STATE_SHOWING)
-                }
                 if match and int(match.group(1).replace(",", "")) >= minimum_rows:
-                    assert "1" in visible_values, "the first result page disappeared while later rows arrived"
-                    assert marker in visible_values, "the first page marker disappeared while later rows arrived"
+                    if progress.startswith("Receiving…"):
+                        visible_values = {
+                            ui.node_name(node) for node in nodes
+                            if ui.node_role(node) == pyatspi.ROLE_LABEL
+                            and node.getState().contains(pyatspi.STATE_SHOWING)
+                        }
+                        assert "1" in visible_values, "the first result page disappeared while later rows arrived"
+                        assert marker in visible_values, "the first page marker disappeared while later rows arrived"
+                    else:
+                        wait_for_visible_cell_value("1")
+                        wait_for_visible_marker(marker)
                     return
             time.sleep(ui.POLL_SECONDS)
         raise AssertionError(f"the first result page was not visible after later rows arrived: {progress!r}")
@@ -2932,12 +2967,25 @@ GLib.MainLoop().run()
                 settings.write_text(f"[Settings]\ngtk-decoration-layout={layout}\n", encoding="utf-8")
             return write
 
+        def wait_for_control(*names):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                for name in names:
+                    node = ui.find_node(name=name, role=pyatspi.ROLE_PUSH_BUTTON)
+                    if node is not None:
+                        return node
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"expected one of {names!r}:\n{ui.accessible_snapshot()}")
+
         restart(use_layout("appmenu:close"))
         ui.wait_for_node(name="Close", role=pyatspi.ROLE_PUSH_BUTTON)
-        assert ui.find_node(name="Minimize", role=pyatspi.ROLE_PUSH_BUTTON) is None, "a close-only layout showed Minimize"
+        assert all(
+            ui.find_node(name=name, role=pyatspi.ROLE_PUSH_BUTTON) is None
+            for name in ("Minimize", "Minimise")
+        ), "a close-only layout showed Minimize"
         restart(use_layout("icon:minimize,maximize,close"))
-        ui.wait_for_node(name="Minimize", role=pyatspi.ROLE_PUSH_BUTTON)
-        ui.wait_for_node(name="Maximize", role=pyatspi.ROLE_PUSH_BUTTON)
+        wait_for_control("Minimize", "Minimise")
+        wait_for_control("Maximize", "Maximise")
 
     window_controls_follow_the_desktop_button_layout.needs_restart = True
     window_controls_follow_the_desktop_button_layout.requires_editor = False
@@ -3040,6 +3088,7 @@ GLib.MainLoop().run()
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
         switching_connection_asks_before_rolling_back_an_open_session_transaction,
+        closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,

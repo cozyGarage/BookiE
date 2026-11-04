@@ -30,6 +30,37 @@ pub(crate) enum StructureText {
 }
 
 impl App {
+    pub(super) fn on_show_er_diagram(&self, schema: Option<String>) {
+        crate::ui::diagram::present(
+            self.window.upcast_ref::<relm4::gtk::Window>(),
+            schema,
+            self.connection_id,
+            &self.database,
+            &self.preferences,
+            crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
+            self.catalog_dialog_cancel.borrow().clone(),
+        );
+    }
+
+    pub(super) fn on_compare_schema(&self, schema: Option<String>, sender: &ComponentSender<Self>) {
+        let script_sender = sender.input_sender().clone();
+        crate::ui::schema_compare::present(
+            self.window.upcast_ref::<relm4::gtk::Window>(),
+            crate::ui::schema_compare::CompareRequest {
+                schema,
+                connection_id: self.connection_id,
+                driver_id: self.driver_id().to_string(),
+                capabilities: crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
+                scope: self.catalog_dialog_cancel.borrow().clone(),
+            },
+            &self.database,
+            &self.preferences,
+            move |sql| {
+                let _ = script_sender.send(AppMsg::ShowCreateTableLoaded { sql });
+            },
+        );
+    }
+
     /// Sidebar right-click → "New Table…" or schema-header "+" button.
     pub(super) fn on_new_table_tab(&mut self, schema: Option<String>, sender: ComponentSender<Self>) {
         if !self.connected {

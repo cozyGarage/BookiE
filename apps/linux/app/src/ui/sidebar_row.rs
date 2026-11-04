@@ -147,11 +147,15 @@ pub enum SidebarRowMsg {
     TableFromCsv,
     HideSchema,
     ShowDiagram,
+    CompareSchema,
 }
 
 #[derive(Debug)]
 pub enum SidebarRowOutput {
     ShowDiagram {
+        schema: Option<String>,
+    },
+    CompareSchema {
         schema: Option<String>,
     },
     NewTable {
@@ -534,6 +538,7 @@ impl FactoryComponent for SidebarRow {
             SidebarRowMsg::TableFromCsv => SidebarRowOutput::TableFromCsv { schema },
             SidebarRowMsg::HideSchema => SidebarRowOutput::HideSchema(schema.unwrap_or_default()),
             SidebarRowMsg::ShowDiagram => SidebarRowOutput::ShowDiagram { schema },
+            SidebarRowMsg::CompareSchema => SidebarRowOutput::CompareSchema { schema },
         };
         let _ = sender.output(output);
     }
@@ -578,9 +583,8 @@ impl SidebarRow {
     }
 
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
-        let menu = gtk::gio::Menu::new();
-        menu.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
-        menu.append(Some(&crate::tr!("Hide schema")), Some("sidebar-row.hide-schema"));
+        let compare_enabled = std::env::var_os("BOOKIE_SCHEMA_COMPARE").is_some();
+        let menu = schema_menu(compare_enabled);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(root);
         let sender_for_hide = sender.clone();
@@ -591,8 +595,15 @@ impl SidebarRow {
         let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
             .activate(move |_, _, _| sender_for_diagram.input(SidebarRowMsg::ShowDiagram))
             .build();
+        let sender_for_compare = sender.clone();
+        let compare_action = gtk::gio::ActionEntry::builder("compare-schema")
+            .activate(move |_, _, _| sender_for_compare.input(SidebarRowMsg::CompareSchema))
+            .build();
         let group = gtk::gio::SimpleActionGroup::new();
         group.add_action_entries([hide_action, diagram_action]);
+        if compare_enabled {
+            group.add_action_entries([compare_action]);
+        }
         root.insert_action_group("sidebar-row", Some(&group));
         let popover_for_unmap = popover.clone();
         root.connect_unmap(move |_| popover_for_unmap.popdown());
@@ -619,10 +630,39 @@ impl SidebarRow {
     }
 }
 
+fn schema_menu(compare_enabled: bool) -> gtk::gio::Menu {
+    let menu = gtk::gio::Menu::new();
+    menu.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
+    if compare_enabled {
+        menu.append(
+            Some(&crate::tr!("Compare with another schema…")),
+            Some("sidebar-row.compare-schema"),
+        );
+    }
+    menu.append(Some(&crate::tr!("Hide schema")), Some("sidebar-row.hide-schema"));
+    menu
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use relm4::factory::FactoryVecDeque;
+
+    #[test]
+    fn schema_compare_menu_requires_explicit_opt_in() {
+        use gtk::gio::prelude::MenuModelExt;
+
+        for enabled in [false, true] {
+            let menu = schema_menu(enabled);
+            let actions: Vec<_> = (0..menu.n_items())
+                .filter_map(|index| menu.item_attribute_value(index, "action", None))
+                .filter_map(|value| value.get::<String>())
+                .collect();
+            assert_eq!(actions.contains(&"sidebar-row.compare-schema".to_owned()), enabled);
+            assert!(actions.contains(&"sidebar-row.show-diagram".to_owned()));
+            assert!(actions.contains(&"sidebar-row.hide-schema".to_owned()));
+        }
+    }
 
     fn pump() {
         let context = glib::MainContext::default();

@@ -21,6 +21,7 @@ use super::{App, AppMsg};
 pub(crate) struct PendingImport {
     pub(crate) plan: ImportPlan,
     pub(crate) secrets: Vec<bookie_storage::BundleSecrets>,
+    pub(crate) skipped: Vec<String>,
 }
 
 impl std::fmt::Debug for PendingImport {
@@ -127,6 +128,23 @@ impl App {
         dbeaver.set_name(Some(&crate::tr!("DBeaver data-sources.json")));
         dbeaver.add_suffix("json");
         filters.append(&dbeaver);
+        let another_redis = relm4::gtk::FileFilter::new();
+        another_redis.set_name(Some(&crate::tr!("Another Redis Desktop Manager export")));
+        another_redis.add_suffix("ano");
+        another_redis.add_suffix("json");
+        filters.append(&another_redis);
+        let datagrip = relm4::gtk::FileFilter::new();
+        datagrip.set_name(Some(&crate::tr!("DataGrip dataSources.xml")));
+        datagrip.add_suffix("xml");
+        filters.append(&datagrip);
+        let navicat = relm4::gtk::FileFilter::new();
+        navicat.set_name(Some(&crate::tr!("Navicat connections.ncx")));
+        navicat.add_suffix("ncx");
+        filters.append(&navicat);
+        let resp = relm4::gtk::FileFilter::new();
+        resp.set_name(Some(&crate::tr!("RESP.app connections.json")));
+        resp.add_suffix("json");
+        filters.append(&resp);
         let dialog = relm4::gtk::FileDialog::builder()
             .title(crate::tr!("Import connections"))
             .modal(true)
@@ -160,13 +178,22 @@ impl App {
                         Ok(ParsedBundle::Encrypted(sealed)) => {
                             sender_clone.input(AppMsg::ImportBundleEncrypted(sealed));
                         }
-                        Err(error) => match read_dbeaver_at(&path).await {
-                            Some(body) => match plan_from_body(&body).await {
-                                Ok(pending) => sender_clone.input(AppMsg::ImportBundlePlanned(pending)),
+                        Err(BundleError::NotABundle | BundleError::Malformed) => {
+                            match read_peer_connections_at(&path).await {
+                                Ok(mut imported) => {
+                                    let skipped = std::mem::take(&mut imported.skipped);
+                                    match plan_from_body(&imported.into_body()).await {
+                                        Ok(mut pending) => {
+                                            pending.skipped = skipped;
+                                            sender_clone.input(AppMsg::ImportBundlePlanned(pending));
+                                        }
+                                        Err(message) => sender_clone.input(AppMsg::BundleFailed(message)),
+                                    }
+                                }
                                 Err(message) => sender_clone.input(AppMsg::BundleFailed(message)),
-                            },
-                            None => sender_clone.input(AppMsg::BundleFailed(error.to_string())),
-                        },
+                            }
+                        }
+                        Err(error) => sender_clone.input(AppMsg::BundleFailed(error.to_string())),
                     }
                 })
                 .drop_on_shutdown()
@@ -224,6 +251,7 @@ impl App {
             &self.window,
             &pending.plan.items,
             carries_secrets,
+            &pending.skipped,
             move |choice: ImportChoice| {
                 let _ = input.send(AppMsg::ImportBundleConfirmed(choice));
             },
@@ -377,12 +405,29 @@ async fn read_bundle_at(path: &std::path::Path) -> Result<ParsedBundle, BundleEr
     read_bundle_file(&bytes)
 }
 
-async fn read_dbeaver_at(path: &std::path::Path) -> Option<bookie_storage::BundleBody> {
-    let bytes = read_bounded(path, bookie_storage::MAX_DBEAVER_BYTES).await.ok()?;
-    let text = String::from_utf8(bytes).ok()?;
-    bookie_storage::parse_dbeaver_data_sources(&text)
-        .ok()
-        .map(bookie_storage::DbeaverImport::into_body)
+async fn read_peer_connections_at(path: &std::path::Path) -> Result<bookie_storage::PeerImport, String> {
+    let limit = bookie_storage::MAX_DBEAVER_BYTES
+        .max(bookie_storage::MAX_ANOTHER_REDIS_BYTES)
+        .max(bookie_storage::MAX_DATAGRIP_BYTES)
+        .max(bookie_storage::MAX_NAVICAT_BYTES)
+        .max(bookie_storage::MAX_RESP_BYTES);
+    let bytes = read_bounded(path, limit).await.map_err(|error| error.to_string())?;
+    let text = String::from_utf8(bytes).map_err(|_| crate::tr!("The connection file is not valid UTF-8."))?;
+    let import = if text.contains("<Connections") {
+        bookie_storage::parse_navicat_connections(&text)
+    } else if text.trim_start().starts_with('<') {
+        let local = read_bounded(&path.with_file_name("dataSources.local.xml"), limit)
+            .await
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok());
+        bookie_storage::parse_datagrip_data_sources(&text, local.as_deref())
+    } else if bookie_storage::looks_like_resp_export(&text) {
+        bookie_storage::parse_resp_connections(&text)
+    } else {
+        bookie_storage::parse_dbeaver_data_sources(&text)
+            .or_else(|error| bookie_storage::parse_another_redis_connections(&text).map_err(|_| error))
+    };
+    import.map_err(|error| error.to_string())
 }
 
 async fn read_bounded(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, BundleError> {
@@ -418,6 +463,7 @@ async fn plan_from_body(body: &bookie_storage::BundleBody) -> Result<PendingImpo
     Ok(PendingImport {
         plan,
         secrets: body.secrets.clone(),
+        skipped: Vec::new(),
     })
 }
 

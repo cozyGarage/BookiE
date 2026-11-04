@@ -252,3 +252,89 @@ async fn a_file_at_the_limit_is_read_whole() {
     std::fs::write(&path, [7u8; 16]).unwrap();
     assert_eq!(read_bounded(&path, 16).await.unwrap(), vec![7u8; 16]);
 }
+
+#[tokio::test]
+async fn a_file_picked_for_import_is_read_as_dbeaver_another_redis_or_datagrip_and_otherwise_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let write = |name: &str, text: &str| {
+        let path = directory.path().join(name);
+        std::fs::write(&path, text).unwrap();
+        path
+    };
+    let dbeaver = write(
+        "data-sources.json",
+        r#"{"connections": {"a": {"provider": "postgresql", "name": "pg", "configuration": {"host": "h"}}}}"#,
+    );
+    let redis = write("connections.json", r#"[{"name": "r", "host": "h"}]"#);
+    let other = write("notes.txt", "not a connection list");
+    let datagrip = write(
+        "dataSources.xml",
+        r#"<project><component><data-source name="d" uuid="u1"><jdbc-url>jdbc:mysql://h/db</jdbc-url></data-source></component></project>"#,
+    );
+    write(
+        "dataSources.local.xml",
+        r#"<project><component><data-source name="d" uuid="u1"><user-name>alice</user-name></data-source></component></project>"#,
+    );
+
+    let names = |path: std::path::PathBuf| async move {
+        read_peer_connections_at(&path)
+            .await
+            .map(|imported| imported.drafts.into_iter().map(|c| c.driver_id).collect::<Vec<_>>())
+    };
+    assert_eq!(names(dbeaver).await.unwrap(), ["postgres"]);
+    assert_eq!(names(redis).await.unwrap(), ["redis"]);
+    let body = read_peer_connections_at(&datagrip).await.unwrap();
+    assert_eq!(
+        body.drafts[0].username, "alice",
+        "the sibling local file supplies the user name"
+    );
+    assert!(names(other).await.is_err());
+    let navicat = write(
+        "connections.ncx",
+        r#"<?xml version="1.0"?><Connections Ver="1.4"><Connection ConnectionName="n" ConnType="MYSQL" Host="h" Port="3306"/></Connections>"#,
+    );
+    let resp = write(
+        "rdm.json",
+        r#"[{"name": "r", "host": "h", "namespace_separator": ":", "ssh_host": "b"}]"#,
+    );
+    let resp_ok = write(
+        "rdm_ok.json",
+        r#"[{"name": "r", "host": "h", "namespace_separator": ":"}]"#,
+    );
+    assert_eq!(names(navicat).await.unwrap(), ["mysql"]);
+    assert!(
+        names(resp).await.is_err(),
+        "a RESP SSH entry is skipped, not imported as a direct connection"
+    );
+    assert_eq!(names(resp_ok).await.unwrap(), ["redis"]);
+}
+
+#[tokio::test]
+async fn peer_import_feedback_preserves_skipped_sources_and_parser_refusals() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("data-sources.json");
+    std::fs::write(&path, r#"{"connections":{"a":{"provider":"postgresql","name":"accepted","configuration":{"host":"h"}},"b":{"provider":"unsupported","name":"skipped source"}}}"#).unwrap();
+    let imported = read_peer_connections_at(&path).await.unwrap();
+    assert_eq!(imported.drafts.len(), 1);
+    assert_eq!(imported.skipped, ["skipped source"]);
+    std::fs::write(&path, "<project>").unwrap();
+    assert!(read_peer_connections_at(&path).await.is_err());
+}
+
+#[tokio::test]
+async fn peer_import_keeps_all_supported_redis_file_shapes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("connections.ano");
+    for text in [
+        r#"[{"name":"cache","host":"h"}]"#,
+        r#"{"connections":[{"name":"cache","host":"h"}]}"#,
+        "W3sibmFtZSI6ImNhY2hlIiwiaG9zdCI6ImgifV0=",
+    ] {
+        std::fs::write(&path, text).unwrap();
+        let imported = read_peer_connections_at(&path).await.unwrap();
+        assert_eq!(imported.drafts.len(), 1);
+        assert_eq!(imported.drafts[0].driver_id, "redis");
+        assert_eq!(imported.drafts[0].name, "cache");
+        assert!(imported.skipped.is_empty());
+    }
+}

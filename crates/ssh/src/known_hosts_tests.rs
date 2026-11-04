@@ -79,11 +79,13 @@ async fn a_declined_host_key_sends_its_fingerprint_to_the_handshake() {
     let (decliner, _) = recording_prompter(false);
     let (prompt_events, mut prompt_event_receiver) = tokio::sync::mpsc::unbounded_channel();
     let outcome = verify_or_prompt(
-        "bastion.example.com",
-        2222,
-        &key,
-        &path,
-        "SHA256:declined",
+        HostKeyCheck {
+            host: "bastion.example.com",
+            port: 2222,
+            key: &key,
+            known_hosts: &path,
+            fingerprint: "SHA256:declined",
+        },
         &decliner,
         &prompt_events,
     )
@@ -111,11 +113,13 @@ async fn built_in_host_key_trust_is_persisted_only_after_acceptance() {
     let (decliner, prompts) = recording_prompter(false);
     let (prompt_events, _prompt_event_receiver) = tokio::sync::mpsc::unbounded_channel();
     let declined = verify_or_prompt(
-        "bastion.example.com",
-        2222,
-        &key,
-        &path,
-        "SHA256:abc",
+        HostKeyCheck {
+            host: "bastion.example.com",
+            port: 2222,
+            key: &key,
+            known_hosts: &path,
+            fingerprint: "SHA256:abc",
+        },
         &decliner,
         &prompt_events,
     )
@@ -130,11 +134,13 @@ async fn built_in_host_key_trust_is_persisted_only_after_acceptance() {
 
     let (acceptor, _) = recording_prompter(true);
     let accepted = verify_or_prompt(
-        "bastion.example.com",
-        2222,
-        &key,
-        &path,
-        "SHA256:abc",
+        HostKeyCheck {
+            host: "bastion.example.com",
+            port: 2222,
+            key: &key,
+            known_hosts: &path,
+            fingerprint: "SHA256:abc",
+        },
         &acceptor,
         &prompt_events,
     )
@@ -153,11 +159,13 @@ async fn a_changed_builtin_host_key_is_refused_without_prompting_or_overwriting(
     let (acceptor, prompts) = recording_prompter(true);
     let (prompt_events, _prompt_event_receiver) = tokio::sync::mpsc::unbounded_channel();
     let outcome = verify_or_prompt(
-        "bastion.example.com",
-        22,
-        &changed,
-        &path,
-        "changed",
+        HostKeyCheck {
+            host: "bastion.example.com",
+            port: 22,
+            key: &changed,
+            known_hosts: &path,
+            fingerprint: "changed",
+        },
         &acceptor,
         &prompt_events,
     )

@@ -782,7 +782,7 @@ fn generated_column(name: &str) -> ColumnInfo {
     column
 }
 
-fn edit(controller: &relm4::Controller<BrowseTab>, col_index: usize, new_value: &str) {
+pub(super) fn edit(controller: &relm4::Controller<BrowseTab>, col_index: usize, new_value: &str) {
     controller
         .sender()
         .send(BrowseTabInput::GridCellEdited {
@@ -795,7 +795,7 @@ fn edit(controller: &relm4::Controller<BrowseTab>, col_index: usize, new_value: 
         .unwrap();
 }
 
-fn pending(controller: &relm4::Controller<BrowseTab>) -> usize {
+pub(super) fn pending(controller: &relm4::Controller<BrowseTab>) -> usize {
     controller
         .model()
         .change_trackers
@@ -803,54 +803,21 @@ fn pending(controller: &relm4::Controller<BrowseTab>) -> usize {
         .unwrap_or(0)
 }
 
-fn transactions(outputs: &[BrowseTabOutput]) -> usize {
+pub(super) fn transactions(outputs: &[BrowseTabOutput]) -> usize {
     outputs
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ExecuteTransaction { .. }))
         .count()
 }
 
-#[test]
-#[ignore = "requires isolated GTK display"]
-fn edits_and_a_second_save_are_ignored_until_the_save_in_flight_finishes() {
-    relm4::gtk::init().unwrap();
-    let tab_id = Uuid::new_v4();
-    let (mut controller, observed) = launch(tab_id);
-    load_two_rows(&controller, &observed);
-
-    edit(&controller, 1, "first");
-    pump(&observed);
-    assert_eq!(pending(&controller), 1);
-    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
-    assert_eq!(transactions(&pump(&observed)), 1, "the first save starts a transaction");
-
-    edit(&controller, 2, "during the save");
-    let during = pump(&observed);
-    assert_eq!(
-        pending(&controller),
-        1,
-        "an edit made while saving must not enter the tracker"
-    );
-    assert!(
-        during
-            .iter()
-            .any(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
-    );
-    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
-    assert_eq!(transactions(&pump(&observed)), 0, "a second save must not start");
-    controller
-        .sender()
-        .send(BrowseTabInput::SaveFailed("lost".into()))
-        .unwrap();
-    pump(&observed);
-    edit(&controller, 2, "after the save");
-    pump(&observed);
-    assert_eq!(
-        pending(&controller),
-        2,
-        "edits are accepted again once the save has ended"
-    );
-    controller.detach_runtime();
+pub(super) fn transaction_save_id(outputs: &[BrowseTabOutput]) -> Uuid {
+    outputs
+        .iter()
+        .find_map(|output| match output {
+            BrowseTabOutput::ExecuteTransaction { save_id, .. } => Some(*save_id),
+            _ => None,
+        })
+        .expect("save transaction output")
 }
 
 fn queue_edit_and_flush(
@@ -932,6 +899,7 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
     controller.sender().send(BrowseTabInput::CommitSave).unwrap();
     let started = pump(&observed);
     assert_eq!(transactions(&started), 1);
+    let save_id = transaction_save_id(&started);
     controller
         .model()
         .current_selection
@@ -992,7 +960,7 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
     }
     controller
         .sender()
-        .send(BrowseTabInput::SaveFailed("fixture cleanup".into()))
+        .send(BrowseTabInput::SaveFailed(save_id, "fixture cleanup".into()))
         .unwrap();
     pump(&observed);
     controller.sender().send(BrowseTabInput::DiscardAll).unwrap();
@@ -1198,3 +1166,6 @@ fn undoing_a_second_edit_keeps_the_persisted_original_for_later_edits_and_the_sa
     assert!(!statements[0].1.contains(&Value::Text("b".into())));
     controller.detach_runtime();
 }
+
+#[path = "bulk_cancel_tests.rs"]
+mod bulk_cancel_tests;

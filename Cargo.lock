@@ -888,7 +888,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-agentd"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -918,7 +918,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-app"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-channel",
  "async-trait",
@@ -968,9 +968,8 @@ dependencies = [
 
 [[package]]
 name = "bookie-app-services"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
- "aes-gcm",
  "async-trait",
  "bookie-core",
  "bookie-driver-mssql",
@@ -979,17 +978,15 @@ dependencies = [
  "bookie-driver-sqlite",
  "bookie-dump",
  "bookie-policy",
+ "bookie-results",
  "bookie-ssh",
  "bookie-storage",
  "bookie-transport",
  "chrono",
- "getrandom 0.3.4",
- "rmp-serde",
  "rust_decimal",
  "secrecy",
  "serde",
  "serde_json",
- "sha2 0.11.1",
  "tempfile",
  "testcontainers",
  "testcontainers-modules",
@@ -1002,7 +999,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-core"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "calamine",
@@ -1027,7 +1024,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-clickhouse"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1055,7 +1052,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-duckdb"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1069,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-mongodb"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1090,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-mssql"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1112,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-mysql"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1136,7 +1133,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-postgres"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1162,7 +1159,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-redis"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1176,7 +1173,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-sqlite"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1197,7 +1194,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-tls-tests"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "bookie-core",
  "bookie-driver-clickhouse",
@@ -1214,7 +1211,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-dump"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "bookie-core",
  "secrecy",
@@ -1230,7 +1227,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-mcp"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "axum",
@@ -1260,7 +1257,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-policy"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1290,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-release-tests"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1308,8 +1305,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "bookie-results"
+version = "0.2.5"
+dependencies = [
+ "aes-gcm",
+ "bookie-core",
+ "chrono",
+ "getrandom 0.3.4",
+ "rmp-serde",
+ "rust_decimal",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "bookie-ssh"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "libc",
@@ -1327,7 +1346,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-storage"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "argon2",
  "async-trait",
@@ -1339,6 +1358,7 @@ dependencies = [
  "hex",
  "libc",
  "oo7",
+ "quick-xml",
  "secrecy",
  "serde",
  "serde_json",
@@ -1354,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-transport"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "async-trait",
  "bookie-core",

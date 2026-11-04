@@ -54,12 +54,11 @@ pub enum ConnectionRowMsg {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum ConnectionRowOutput {
-    Open(SavedConnection),
+    Open(Box<SavedConnection>),
     ToggleFavorite(Uuid),
-    Organize(SavedConnection),
-    Edit(SavedConnection),
+    Organize(Box<SavedConnection>),
+    Edit(Box<SavedConnection>),
     Duplicate(Uuid),
     Delete(Uuid),
 }
@@ -135,16 +134,16 @@ impl FactoryComponent for ConnectionRow {
     fn update(&mut self, msg: Self::Input, sender: FactorySender<Self>) {
         match msg {
             ConnectionRowMsg::Open => {
-                let _ = sender.output(ConnectionRowOutput::Open(self.saved.clone()));
+                let _ = sender.output(ConnectionRowOutput::Open(Box::new(self.saved.clone())));
             }
             ConnectionRowMsg::ToggleFavorite => {
                 let _ = sender.output(ConnectionRowOutput::ToggleFavorite(self.saved.id));
             }
             ConnectionRowMsg::Organize => {
-                let _ = sender.output(ConnectionRowOutput::Organize(self.saved.clone()));
+                let _ = sender.output(ConnectionRowOutput::Organize(Box::new(self.saved.clone())));
             }
             ConnectionRowMsg::Edit => {
-                let _ = sender.output(ConnectionRowOutput::Edit(self.saved.clone()));
+                let _ = sender.output(ConnectionRowOutput::Edit(Box::new(self.saved.clone())));
             }
             ConnectionRowMsg::Duplicate => {
                 let _ = sender.output(ConnectionRowOutput::Duplicate(self.saved.id));

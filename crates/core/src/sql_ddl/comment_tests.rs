@@ -1,6 +1,6 @@
 use crate::query::ColumnInfo;
 
-use super::diff::diff_to_ops;
+use super::diff::{TableState, diff_to_ops};
 use super::types::{
     ColumnCommentCapability, CommentPlacement, column_comment_capability, column_comment_placement,
     validate_safe_comment,
@@ -101,7 +101,21 @@ fn a_comment_only_edit_raises_an_alter_on_every_writable_dialect() {
         let column = edited(None, Some("why it exists"));
         assert!(column.differs_beyond_name(), "{driver_id}");
         let original = vec![column.original.clone().unwrap_or_else(|| info(None))];
-        let ops = diff_to_ops(None, "t", "t", &original, &[column], &[], &[], &[], &[]);
+        let ops = diff_to_ops(
+            None,
+            TableState {
+                table: "t",
+                columns: &original,
+                indexes: &[],
+                fks: &[],
+            },
+            TableState {
+                table: "t",
+                columns: &[column],
+                indexes: &[],
+                fks: &[],
+            },
+        );
         assert!(
             ops.iter().any(|op| matches!(op, StructureOp::AlterColumn { .. })),
             "{driver_id} must raise an alter for a comment-only edit: {ops:?}"
@@ -332,7 +346,21 @@ fn a_comment_edited_in_the_same_save_as_a_rename_uses_the_new_name() {
     column.name = "title".into();
     column.comment = Some("why it exists".into());
     let original = vec![column.original.clone().unwrap_or_else(|| info(None))];
-    let ops = diff_to_ops(None, "t", "t", &original, &[column], &[], &[], &[], &[]);
+    let ops = diff_to_ops(
+        None,
+        TableState {
+            table: "t",
+            columns: &original,
+            indexes: &[],
+            fks: &[],
+        },
+        TableState {
+            table: "t",
+            columns: &[column],
+            indexes: &[],
+            fks: &[],
+        },
+    );
     let stmts = materialize_ops(&ops, "postgres").unwrap();
     assert_eq!(
         stmts,

@@ -225,7 +225,14 @@ fn write_ssh_config(master_dir: &Path, timeouts: &OpenSshTimeouts) -> Result<Pat
         .mode(0o600)
         .open(&path)
         .map_err(|error| unsafe_dir(&path, error))?;
-    let config = format!(
+    let config = ssh_config_text(timeouts);
+    file.write_all(config.as_bytes())
+        .map_err(|error| unsafe_dir(&path, error))?;
+    Ok(path)
+}
+
+pub(super) fn ssh_config_text(timeouts: &OpenSshTimeouts) -> String {
+    format!(
         "Host *\n\
          ControlMaster=no\n\
          ControlPath=none\n\
@@ -249,16 +256,15 @@ fn write_ssh_config(master_dir: &Path, timeouts: &OpenSshTimeouts) -> Result<Pat
          ServerAliveInterval={}\n\
          ServerAliveCountMax={}\n\
          LogLevel=INFO\n\
+         {}\
          Include /etc/ssh/ssh_config\n\
          Include ~/.ssh/config\n\
          ProxyCommand=none\n",
         timeouts.connect.as_secs().max(1),
         timeouts.keepalive_interval.as_secs(),
         timeouts.keepalive_max,
-    );
-    file.write_all(config.as_bytes())
-        .map_err(|error| unsafe_dir(&path, error))?;
-    Ok(path)
+        super::algorithm_policy::config_lines(),
+    )
 }
 
 fn spawn_master(
