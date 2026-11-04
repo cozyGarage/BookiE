@@ -9,19 +9,21 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UnixListener};
 use tokio_util::sync::CancellationToken;
 
-use russh::ChannelMsg;
 use russh::client::{self, Config, Handle};
 use russh::keys::agent::AgentIdentity;
-use russh::keys::ssh_key::{HashAlg, PublicKey};
+use russh::keys::ssh_key::{Algorithm, EcdsaCurve, HashAlg, PublicKey};
 use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
+use russh::{ChannelMsg, Preferred};
 
 use crate::openssh::Prompter;
 
+mod algorithm;
 mod handshake;
 mod known_hosts;
 use handshake::{HandshakeWaitError, HostKeyPromptEvent, wait_for_handshake};
 use known_hosts::HostKeyOutcome;
 pub mod openssh;
+pub use algorithm::AlgorithmClass;
 pub use known_hosts::default_known_hosts_path;
 
 const LOCAL_BIND_HOST: &str = "127.0.0.1";
@@ -107,6 +109,12 @@ pub enum SshError {
     KnownHosts(String),
     #[error("ssh-agent: {0}")]
     Agent(String),
+    #[error(
+        "the SSH server offers no acceptable {class} algorithm. BookiE refuses weak ones (SHA-1 ssh-rsa, 3DES, \
+         Blowfish, RC4, SHA-1 and MD5 MACs, SHA-1 key exchange). The server offered: {offered}. \
+         Enable a modern {class} algorithm on the SSH server."
+    )]
+    NoAcceptableAlgorithm { class: AlgorithmClass, offered: String },
     #[error("ssh: {0}")]
     Ssh(#[from] russh::Error),
     #[error("{stage} to {host}:{port} did not complete within {seconds} seconds")]
@@ -123,10 +131,33 @@ const AUTH_TIMEOUT: Duration = Duration::from_secs(20);
 const CHANNEL_OPEN_TIMEOUT: Duration = Duration::from_secs(15);
 const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(15);
 
+static HOST_KEY_ALGORITHMS: [Algorithm; 6] = [
+    Algorithm::Ed25519,
+    Algorithm::Ecdsa {
+        curve: EcdsaCurve::NistP256,
+    },
+    Algorithm::Ecdsa {
+        curve: EcdsaCurve::NistP384,
+    },
+    Algorithm::Ecdsa {
+        curve: EcdsaCurve::NistP521,
+    },
+    Algorithm::Rsa {
+        hash: Some(HashAlg::Sha512),
+    },
+    Algorithm::Rsa {
+        hash: Some(HashAlg::Sha256),
+    },
+];
+
 fn client_config() -> Config {
     Config {
         nodelay: true,
         keepalive_interval: Some(KEEPALIVE_INTERVAL),
+        preferred: Preferred {
+            key: std::borrow::Cow::Borrowed(&HOST_KEY_ALGORITHMS),
+            ..Preferred::DEFAULT
+        },
         ..Default::default()
     }
 }
@@ -735,8 +766,18 @@ fn map_connect_error(
         },
         Some(HostKeyOutcome::KnownHostsIo(e)) => SshError::KnownHosts(e),
         Some(HostKeyOutcome::Unknown { fingerprint }) => unknown_host_key(host, port, fingerprint, known_hosts),
-        _ => SshError::Connect(err.to_string()),
+        _ => algorithm_refusal(&err).unwrap_or_else(|| SshError::Connect(err.to_string())),
     }
+}
+
+fn algorithm_refusal(error: &russh::Error) -> Option<SshError> {
+    let russh::Error::NoCommonAlgo { kind, theirs, .. } = error else {
+        return None;
+    };
+    Some(SshError::NoAcceptableAlgorithm {
+        class: AlgorithmClass::from_russh(kind)?,
+        offered: algorithm::offered_names(theirs),
+    })
 }
 
 fn unknown_host_key(host: &str, port: u16, fingerprint: String, known_hosts: &Path) -> SshError {

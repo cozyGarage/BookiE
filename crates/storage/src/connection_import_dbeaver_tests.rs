@@ -118,3 +118,60 @@ fn the_import_body_holds_every_draft_and_no_secrets() {
     assert!(body.secrets.is_empty());
     assert!(!serde_json::to_string(&body).unwrap().contains(SENTINEL));
 }
+
+const FOLDERS: &str = r#"{
+  "folders": {"Prod": {}, "EU": {"parent": "Prod"}, "Loop": {"parent": "Loop"}},
+  "connections": {
+    "a": {"provider": "postgresql", "name": "Nested", "folder": "EU", "configuration": {"host": "h1"}},
+    "b": {"provider": "postgresql", "name": "Top", "folder": "Prod", "configuration": {"host": "h2"}},
+    "c": {"provider": "postgresql", "name": "Plain", "configuration": {"host": "h3"}},
+    "d": {"provider": "postgresql", "name": "Cyclic", "folder": "Loop", "configuration": {"host": "h4"}}
+  }
+}"#;
+
+fn group_of(import: &PeerImport, name: &str) -> Option<String> {
+    let draft = import.drafts.iter().find(|draft| draft.name == name)?;
+    import.groups.get(&draft.id).cloned()
+}
+
+#[test]
+fn a_nested_folder_becomes_one_flattened_group() {
+    let import = parse_dbeaver_data_sources(FOLDERS).unwrap();
+    assert_eq!(group_of(&import, "Nested").as_deref(), Some("Prod / EU"));
+    assert_eq!(group_of(&import, "Top").as_deref(), Some("Prod"));
+    assert_eq!(group_of(&import, "Plain"), None);
+}
+
+#[test]
+fn a_cyclic_folder_chain_is_bounded() {
+    let import = parse_dbeaver_data_sources(FOLDERS).unwrap();
+    let group = group_of(&import, "Cyclic").unwrap();
+    assert!(group.split(" / ").count() <= MAX_FOLDER_DEPTH, "{group}");
+}
+
+#[test]
+fn the_import_body_carries_the_groups_and_no_secrets() {
+    let import = parse_dbeaver_data_sources(FOLDERS).unwrap();
+    let nested = import.drafts.iter().find(|draft| draft.name == "Nested").unwrap().id;
+    let plain = import.drafts.iter().find(|draft| draft.name == "Plain").unwrap().id;
+    let body = import.into_body();
+    assert_eq!(
+        body.organization.get(&nested).and_then(|entry| entry.group.as_deref()),
+        Some("Prod / EU")
+    );
+    assert!(!body.organization.contains_key(&plain));
+    assert!(body.secrets.is_empty());
+}
+
+#[test]
+fn a_folder_name_with_control_characters_leaves_the_connection_ungrouped_but_imported() {
+    let json = "{\"folders\": {}, \"connections\": {\"a\": {\"provider\": \"postgresql\", \"name\": \"X\", \"folder\": \"bad\\u0007name\", \"configuration\": {\"host\": \"h\"}}}}";
+    let import = parse_dbeaver_data_sources(json).unwrap();
+    assert_eq!(import.drafts.len(), 1);
+    let body = import.into_body();
+    assert!(
+        body.organization.values().all(|entry| entry.group.is_none()),
+        "{:?}",
+        body.organization
+    );
+}

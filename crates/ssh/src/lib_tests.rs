@@ -428,3 +428,77 @@ async fn a_forward_channel_that_opens_in_time_is_passed_through_untouched() {
     let refused = open_within(CHANNEL_OPEN_TIMEOUT, async { Err::<u8, _>(russh::Error::Disconnect) }).await;
     assert!(matches!(refused, Err(russh::Error::Disconnect)), "{refused:?}");
 }
+
+fn names<T: AsRef<str>>(items: &[T]) -> Vec<&str> {
+    items.iter().map(AsRef::as_ref).collect()
+}
+
+#[test]
+fn the_built_in_client_never_offers_a_weak_algorithm() {
+    let preferred = client_config().preferred;
+    assert!(!preferred.key.contains(&Algorithm::Rsa { hash: None }));
+    assert!(!preferred.key.iter().any(|key| matches!(key, Algorithm::Dsa)));
+    for cipher in names(&preferred.cipher) {
+        assert!(
+            !["cbc", "3des", "blowfish", "arcfour", "rc4"]
+                .iter()
+                .any(|weak| cipher.contains(weak)),
+            "{cipher}"
+        );
+    }
+    for mac in names(&preferred.mac) {
+        assert!(!mac.contains("sha1") && !mac.contains("md5"), "{mac}");
+    }
+    for kex in names(&preferred.kex) {
+        assert!(!kex.contains("sha1"), "{kex}");
+    }
+}
+
+#[test]
+fn the_built_in_client_still_offers_the_modern_algorithms() {
+    let preferred = client_config().preferred;
+    for key in [
+        Algorithm::Ed25519,
+        Algorithm::Rsa {
+            hash: Some(HashAlg::Sha256),
+        },
+        Algorithm::Rsa {
+            hash: Some(HashAlg::Sha512),
+        },
+    ] {
+        assert!(preferred.key.contains(&key), "{key:?}");
+    }
+    assert!(names(&preferred.cipher).contains(&"chacha20-poly1305@openssh.com"));
+    assert!(names(&preferred.cipher).contains(&"aes256-gcm@openssh.com"));
+    assert!(names(&preferred.mac).contains(&"hmac-sha2-256-etm@openssh.com"));
+    assert!(names(&preferred.kex).contains(&"curve25519-sha256"));
+}
+
+#[test]
+fn a_failed_negotiation_maps_to_its_named_class_and_compression_stays_generic() {
+    let refusal = |kind| russh::Error::NoCommonAlgo {
+        kind,
+        ours: Vec::new(),
+        theirs: vec!["ssh-rsa".to_owned(), "ssh-dss".to_owned()],
+    };
+    match algorithm_refusal(&refusal(russh::AlgorithmKind::Key)) {
+        Some(SshError::NoAcceptableAlgorithm { class, offered }) => {
+            assert_eq!(class, AlgorithmClass::HostKey);
+            assert_eq!(offered, "ssh-rsa, ssh-dss");
+        }
+        other => panic!("{other:?}"),
+    }
+    assert!(algorithm_refusal(&refusal(russh::AlgorithmKind::Compression)).is_none());
+    assert!(algorithm_refusal(&russh::Error::Kex).is_none());
+}
+
+#[test]
+fn the_refusal_message_names_the_class_and_the_offer() {
+    let message = SshError::NoAcceptableAlgorithm {
+        class: AlgorithmClass::Cipher,
+        offered: "3des-cbc".into(),
+    }
+    .to_string();
+    assert!(message.contains("no acceptable cipher algorithm"), "{message}");
+    assert!(message.contains("The server offered: 3des-cbc"), "{message}");
+}

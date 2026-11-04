@@ -179,3 +179,15 @@ fn a_tunnelled_connection_dials_the_forwarded_socket_and_verifies_the_service_ho
     assert_eq!(mysql_opts.get_port(), 3306);
     assert_eq!(mysql_opts.get_socket(), Some(&directory.join(FORWARDED_SOCKET_NAME)));
 }
+
+#[test]
+fn a_refused_plaintext_password_exchange_is_a_policy_refusal_naming_the_fix() {
+    let message = "refusing to send the password without TLS: set TLS to Require or Verify full, or connect through a local socket";
+    let mapped = map_sqlx_error(sqlx::Error::Configuration(message.into()));
+    assert!(
+        matches!(&mapped, DriverError::PolicyDenied(text) if text == message),
+        "{mapped:?}"
+    );
+    let other = map_sqlx_error(sqlx::Error::Configuration("unrelated option".into()));
+    assert!(matches!(other, DriverError::Internal(_)), "{other:?}");
+}

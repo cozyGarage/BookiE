@@ -1,6 +1,6 @@
 use bookie_core::Value;
 
-pub(crate) fn exact_equal(left: &Value, right: &Value) -> bool {
+pub fn exact_equal(left: &Value, right: &Value) -> bool {
     match (left, right) {
         (Value::Null, Value::Null) => true,
         (Value::Bool(a), Value::Bool(b)) => a == b,
@@ -19,6 +19,3 @@ pub(crate) fn exact_equal(left: &Value, right: &Value) -> bool {
         _ => false,
     }
 }
-
-#[cfg(test)]
-mod tests;

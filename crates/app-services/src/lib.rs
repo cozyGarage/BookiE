@@ -1,3 +1,11 @@
+pub use bookie_results::{
+    result_compare, result_filter, result_find, result_predicate, result_scan, sidebar_tree, stream_result_spool,
+    value_exact,
+};
+
+#[cfg(test)]
+mod value_exact_agreement_tests;
+
 pub mod approval_wait;
 pub mod busy_jobs;
 pub mod catalog_changes;
@@ -20,22 +28,13 @@ pub mod preparation;
 pub mod read_scopes;
 pub mod recent_tabs;
 pub mod request_generation;
-pub mod result_compare;
-pub mod result_filter;
-pub mod result_find;
-pub mod result_predicate;
-pub mod result_scan;
-#[cfg(test)]
-mod result_test_support;
 pub mod schema_compare;
 pub mod single_flight;
 pub mod snippets;
 pub mod state_file;
 pub mod stream_page_validation;
-pub mod stream_result_spool;
 pub mod structure_metadata;
 pub mod structure_tracker;
-mod value_exact;
 pub mod window_state;
 pub mod workspace;
 
@@ -53,5 +52,4 @@ pub mod preferences;
 pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
-pub mod sidebar_tree;
 pub mod sql_text;

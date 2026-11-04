@@ -19,9 +19,8 @@ name = "sidebar_search"
 harness = false
 
 [dependencies]
-aes-gcm.workspace = true
-getrandom.workspace = true
 bookie-core = { path = "../core" }
+bookie-results = { path = "../results" }
 bookie-dump = { path = "../dump" }
 bookie-policy = { path = "../policy" }
 bookie-transport = { path = "../transport" }
@@ -31,10 +30,8 @@ thiserror.workspace = true
 serde.workspace = true
 tracing.workspace = true
 serde_json.workspace = true
-sha2.workspace = true
 secrecy.workspace = true
 tempfile.workspace = true
-rmp-serde.workspace = true
 rust_decimal.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
