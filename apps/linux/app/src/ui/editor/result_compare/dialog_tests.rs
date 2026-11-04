@@ -171,3 +171,50 @@ fn a_failed_comparison_keeps_the_dialog_and_its_choices_and_a_success_closes_it(
     settle();
     assert_eq!(compare_buttons(&root), 0);
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn wide_result_keys_and_actions_remain_reachable_in_a_short_window() {
+    gtk::init().unwrap();
+    adw::init().unwrap();
+    let window = adw::Window::builder().default_width(640).default_height(500).build();
+    window.present();
+    let names: Vec<String> = (0..80).map(|index| format!("column_{index:03}")).collect();
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    let outcomes = [
+        rows_outcome("SELECT a", vec![result(&names, 1, false)]),
+        rows_outcome("SELECT b", vec![result(&names, 1, false)]),
+    ];
+    let (sender, _receiver) = relm4::channel();
+    present(&window, candidates(&outcomes), sender);
+    settle();
+    let root: gtk::Widget = window.clone().upcast();
+    let keys = checks(&root);
+    assert_eq!(keys.len(), 80);
+    let last = keys
+        .iter()
+        .find(|key| key.label().as_deref() == Some("column_079"))
+        .unwrap();
+    let css = gtk::CssProvider::new();
+    gtk::style_context_add_provider_for_display(&root.display(), &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    for style in ["", "label, button, checkbutton { font-size: 20px; }"] {
+        css.load_from_string(style);
+        settle();
+        for widget in [
+            last.upcast_ref::<gtk::Widget>(),
+            button(&root, "Compare").upcast_ref(),
+            button(&root, "Cancel").upcast_ref(),
+        ] {
+            assert!(widget.grab_focus());
+            settle();
+            let bounds = widget.compute_bounds(&root).unwrap();
+            assert!(
+                bounds.y() >= 0.0 && bounds.y() + bounds.height() <= root.height() as f32,
+                "focused control outside window: {bounds:?}; height {}",
+                root.height()
+            );
+        }
+    }
+    gtk::style_context_remove_provider_for_display(&root.display(), &css);
+    window.close();
+}
