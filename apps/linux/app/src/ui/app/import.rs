@@ -19,6 +19,8 @@ use crate::services::csv_import_mappings::CsvMappingScope;
 use crate::services::error_text;
 use crate::ui::import_dialog::{ImportChoice, ImportMode, ImportRequest};
 
+mod skips;
+
 use super::browse::{RefreshDecision, refresh_decision};
 use super::types::WorkspaceTab;
 use super::{App, AppMsg, BrowseTabInput};
@@ -47,6 +49,22 @@ pub struct CsvImportReport {
     pub committed: u64,
     pub total: u64,
     pub error: Option<String>,
+    pub skipped: u64,
+    pub skipped_summary: String,
+}
+
+impl CsvImportReport {
+    fn stopped(schema: Option<String>, table: String, total: u64, error: String) -> Self {
+        Self {
+            schema,
+            table,
+            committed: 0,
+            total,
+            error: Some(error),
+            skipped: 0,
+            skipped_summary: String::new(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -409,6 +427,7 @@ impl App {
                         table: choice.table,
                         token,
                         timeout_secs,
+                        skip_rejected_rows: choice.skip_rejected_rows,
                     };
                     let report = run.execute(&sender_for_cmd).await;
                     sender_for_cmd.input(AppMsg::CsvImportFinished(Box::new(report)));
@@ -429,6 +448,10 @@ impl App {
         }
         self.refresh_import_targets(report.schema.as_deref(), &report.table);
         let Some(error) = report.error else {
+            if report.skipped > 0 {
+                self.report_skipped_rows(&report);
+                return;
+            }
             self.show_toast(
                 &crate::tr!("Imported {done} rows into {table}")
                     .replace("{done}", &report.committed.to_string())
@@ -436,15 +459,42 @@ impl App {
             );
             return;
         };
-        self.show_error_alert(
-            &crate::tr!("Import stopped"),
-            &crate::tr!("{done} of {total} rows were written to {table} before the import stopped. {error}")
-                .replace("{done}", &report.committed.to_string())
-                .replace("{total}", &report.total.to_string())
-                .replace("{table}", &report.table)
-                .replace("{error}", &error),
-        );
+        let message = crate::tr!("{done} of {total} rows were written to {table} before the import stopped. {error}")
+            .replace("{done}", &report.committed.to_string())
+            .replace("{total}", &report.total.to_string())
+            .replace("{table}", &report.table)
+            .replace("{error}", &error)
+            + &skipped_note(report.skipped, &report.skipped_summary);
+        self.show_error_alert(&crate::tr!("Import stopped"), &message);
     }
+
+    fn report_skipped_rows(&self, report: &CsvImportReport) {
+        self.show_toast(
+            &crate::tr!("Imported {done} rows into {table}; {skipped} skipped")
+                .replace("{done}", &report.committed.to_string())
+                .replace("{table}", &report.table)
+                .replace("{skipped}", &report.skipped.to_string()),
+        );
+        let message = crate::tr!(
+            "{done} of {total} rows were written to {table}. The database rejected {skipped} rows, which were skipped and not imported."
+        )
+        .replace("{done}", &report.committed.to_string())
+        .replace("{total}", &report.total.to_string())
+        .replace("{table}", &report.table)
+        .replace("{skipped}", &report.skipped.to_string())
+            + "\n\n"
+            + &report.skipped_summary;
+        self.show_error_alert(&crate::tr!("Import finished with skipped rows"), &message);
+    }
+}
+
+fn skipped_note(skipped: u64, summary: &str) -> String {
+    if skipped == 0 {
+        return String::new();
+    }
+    crate::tr!("\n\n{skipped} rows were skipped before the import stopped.\n{summary}")
+        .replace("{skipped}", &skipped.to_string())
+        .replace("{summary}", summary)
 }
 
 impl App {
@@ -525,19 +575,14 @@ struct ImportRun {
     table: String,
     token: CancellationToken,
     timeout_secs: u32,
+    skip_rejected_rows: bool,
 }
 
 impl ImportRun {
     async fn execute(self, sender: &ComponentSender<App>) -> CsvImportReport {
         let total = self.plan.row_count();
         if let Err(message) = self.create_table().await {
-            return CsvImportReport {
-                schema: self.schema.clone(),
-                table: self.table,
-                committed: 0,
-                total,
-                error: Some(message),
-            };
+            return CsvImportReport::stopped(self.schema.clone(), self.table, total, message);
         }
         let request = BulkInsertRequest {
             schema: self.schema.clone(),
@@ -558,16 +603,12 @@ impl ImportRun {
         let mut scope = match self.guard.begin_bulk_insert(request).await {
             Ok(scope) => scope,
             Err(error) => {
-                return CsvImportReport {
-                    schema: self.schema.clone(),
-                    table: self.table,
-                    committed: 0,
-                    total,
-                    error: Some(error_text::driver_message(&error)),
-                };
+                let message = error_text::driver_message(&error);
+                return CsvImportReport::stopped(self.schema.clone(), self.table, total, message);
             }
         };
-        let outcome = self.run_batches(&mut scope, sender).await;
+        let mut skips = skips::SkipLog::default();
+        let outcome = self.run_batches(&mut scope, sender, &mut skips).await;
         let end = match &outcome {
             Ok(()) => BulkInsertEnd::Completed,
             Err(BatchStop::Cancelled) => BulkInsertEnd::Cancelled,
@@ -584,6 +625,8 @@ impl ImportRun {
             committed,
             total,
             error: stop_message(outcome),
+            skipped: skips.total(),
+            skipped_summary: skips.summary(),
         }
     }
 
@@ -603,8 +646,10 @@ impl ImportRun {
         &self,
         scope: &mut bookie_policy::BulkInsertScope,
         sender: &ComponentSender<App>,
+        skips: &mut skips::SkipLog,
     ) -> Result<(), BatchStop> {
         let mut committed = 0;
+        let mut offered = 0u64;
         for rows in self.plan.batches(DEFAULT_IMPORT_BATCH_ROWS) {
             if self.token.is_cancelled() {
                 return Err(BatchStop::Cancelled);
@@ -616,7 +661,19 @@ impl ImportRun {
                 statement: &self.plan.statement,
                 rows,
             };
-            match self.guard.execute_bulk_batch(scope, batch, &control).await {
+            let written = if self.skip_rejected_rows {
+                self.guard
+                    .execute_bulk_batch_skipping_failed_rows(scope, batch, &control)
+                    .await
+                    .map(|outcome| {
+                        skips.record(offered, &outcome.skipped);
+                        outcome.written
+                    })
+            } else {
+                self.guard.execute_bulk_batch(scope, batch, &control).await
+            };
+            offered += rows.len() as u64;
+            match written {
                 Ok(written) => committed += written,
                 Err(DriverError::Cancelled) => return Err(BatchStop::Cancelled),
                 Err(error) => return Err(BatchStop::Failed(error)),

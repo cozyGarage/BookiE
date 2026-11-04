@@ -131,6 +131,34 @@ fn an_existing_loose_token_file_is_made_owner_only_before_the_token_is_written()
 }
 
 #[test]
+fn a_token_file_path_that_is_a_symlink_is_refused_and_its_target_is_untouched() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let target = dir.path().join("precious");
+    std::fs::write(&target, "keep me").unwrap();
+    let link = dir.path().join("token");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+
+    assert!(write_token_file(&link, "secret").is_err());
+
+    assert_eq!(std::fs::read_to_string(&target).unwrap(), "keep me");
+}
+
+#[test]
+fn a_token_file_path_that_is_not_a_regular_file_is_refused() {
+    let dir = tempfile::TempDir::new().unwrap();
+    assert!(write_token_file(dir.path(), "secret").is_err());
+}
+
+#[test]
+fn rewriting_a_longer_token_file_leaves_no_old_bytes_behind() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("token");
+    std::fs::write(&path, "a much longer previous token value").unwrap();
+    write_token_file(&path, "new").unwrap();
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+}
+
+#[test]
 fn sanitize_for_terminal_removes_text_direction_overrides_and_invisible_characters() {
     let hostile = "DROP TABLE a\u{202E}; SELECT 1 --\u{2066}x\u{2069}\u{200B}y\u{2028}z\u{FEFF}\u{061C}\u{2060}";
     let sanitized = sanitize_for_terminal(hostile);

@@ -189,13 +189,24 @@ fn write_token_file(path: &std::path::Path, plaintext: &str) -> Result<(), Strin
     let mut handle = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
-        .truncate(true)
+        .custom_flags(libc::O_NOFOLLOW)
         .mode(0o600)
         .open(path)
         .map_err(|e| format!("{}: {e}", path.display()))?;
+    if !handle
+        .metadata()
+        .map_err(|e| format!("{}: {e}", path.display()))?
+        .is_file()
+    {
+        return Err(format!(
+            "{}: the token file path must be a regular file",
+            path.display()
+        ));
+    }
     handle
         .set_permissions(std::fs::Permissions::from_mode(0o600))
         .map_err(|e| format!("{}: {e}", path.display()))?;
+    handle.set_len(0).map_err(|e| format!("{}: {e}", path.display()))?;
     handle
         .write_all(plaintext.as_bytes())
         .map_err(|e| format!("{}: {e}", path.display()))?;

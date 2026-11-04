@@ -383,6 +383,7 @@ pub(super) fn install_grid_context_menus(
     let copy_row_action = copy_row_entry("copy-row-insert", RowStatement::Insert);
     let copy_row_update_action = copy_row_entry("copy-row-update", RowStatement::Update);
     let copy_row_delete_action = copy_row_entry("copy-row-delete", RowStatement::Delete);
+    let copy_row_where_action = copy_row_entry("copy-row-where", RowStatement::Where);
     let insert_row_action = {
         let sender = sender.clone();
         gio::ActionEntry::builder("insert-row")
@@ -494,6 +495,7 @@ pub(super) fn install_grid_context_menus(
         copy_row_action,
         copy_row_update_action,
         copy_row_delete_action,
+        copy_row_where_action,
         insert_row_action,
         set_null_action,
         delete_row_action,
@@ -603,6 +605,7 @@ fn build_copy_as_menu(insert_copy: bool) -> gio::Menu {
         copy_as.append(Some(&crate::tr!("INSERT Statement")), Some("cell.copy-row-insert"));
         copy_as.append(Some(&crate::tr!("UPDATE Statement")), Some("cell.copy-row-update"));
         copy_as.append(Some(&crate::tr!("DELETE Statement")), Some("cell.copy-row-delete"));
+        copy_as.append(Some(&crate::tr!("WHERE Clause")), Some("cell.copy-row-where"));
     }
     copy_as
 }
