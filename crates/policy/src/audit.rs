@@ -284,20 +284,22 @@ impl AuditEvent {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn transport_attempt(
         operation_id: Uuid,
-        principal: Principal,
-        connection_id: Uuid,
-        connection_name: String,
-        environment: Environment,
-        driver_id: String,
+        connection: AuditConnectionIdentity,
         client: AuditTransportClient,
         outcome: AuditTransportOutcome,
         terminal_status: AuditTerminalStatus,
         error_category: Option<AuditErrorCategory>,
         duration_ms: u64,
     ) -> Self {
+        let AuditConnectionIdentity {
+            principal,
+            connection_id,
+            connection_name,
+            environment,
+            driver_id,
+        } = connection;
         Self {
             timestamp: chrono::Utc::now(),
             operation_id,
@@ -325,6 +327,14 @@ impl AuditEvent {
             administrative_action: None,
         }
     }
+}
+
+pub struct AuditConnectionIdentity {
+    pub principal: Principal,
+    pub connection_id: Uuid,
+    pub connection_name: String,
+    pub environment: Environment,
+    pub driver_id: String,
 }
 
 fn sanitized_transport_error(category: AuditErrorCategory) -> String {
@@ -471,11 +481,13 @@ mod tests {
     fn transport_records_are_terminal_and_older_records_without_transport_metadata_load() {
         let event = AuditEvent::transport_attempt(
             Uuid::new_v4(),
-            Principal::human_gui(),
-            Uuid::new_v4(),
-            "local db".into(),
-            Environment::Local,
-            "postgres".into(),
+            AuditConnectionIdentity {
+                principal: Principal::human_gui(),
+                connection_id: Uuid::new_v4(),
+                connection_name: "local db".into(),
+                environment: Environment::Local,
+                driver_id: "postgres".into(),
+            },
             AuditTransportClient::BuiltinSsh,
             AuditTransportOutcome::Connected,
             AuditTerminalStatus::Succeeded,
