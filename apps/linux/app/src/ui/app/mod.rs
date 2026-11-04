@@ -24,6 +24,7 @@ mod row_ops;
 mod schema_index;
 mod session_teardown;
 mod shortcuts;
+mod sidebar_catalog;
 mod sidebar_layout;
 mod sidebar_state;
 mod status_pages;
@@ -126,6 +127,8 @@ pub struct App {
     schema_filter_list: gtk::Box,
     sidebar_views: Vec<bookie_core::TableInfo>,
     sidebar_tables: Vec<bookie_core::TableInfo>,
+    sidebar_catalog: std::collections::HashMap<bookie_core::CatalogObjectKind, Vec<bookie_core::CatalogObject>>,
+    sidebar_catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     catalog_generation: std::cell::Cell<u64>,
     catalog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
     catalog_dialog_cancel: std::cell::RefCell<tokio_util::sync::CancellationToken>,
@@ -574,6 +577,8 @@ impl SimpleComponent for App {
             schema_filter_list,
             sidebar_views: Vec::new(),
             sidebar_tables: Vec::new(),
+            sidebar_catalog: Default::default(),
+            sidebar_catalog_cancel: Default::default(),
             catalog_generation: std::cell::Cell::new(0),
             catalog_cancel: Default::default(),
             catalog_dialog_cancel: Default::default(),
@@ -1021,6 +1026,10 @@ impl SimpleComponent for App {
             }
             AppMsg::ShowCatalog => self.show_catalog(None),
             AppMsg::ShowCatalogKind(kind) => self.show_catalog(Some(kind)),
+            AppMsg::LoadSidebarCatalog(kind) => self.on_load_sidebar_catalog(kind, &sender),
+            AppMsg::SidebarCatalogLoaded { origin, kind, result } => {
+                self.on_sidebar_catalog_loaded(&origin, kind, result);
+            }
             AppMsg::ToggleAllSidebarGroups => self.toggle_all_sidebar_groups(),
             AppMsg::ShowErDiagram { schema } => self.on_show_er_diagram(schema),
             AppMsg::CompareSchema { schema } => self.on_compare_schema(schema, &sender),
