@@ -83,6 +83,8 @@ Other options and why they were rejected.
 | [0034](0034-postgres-metadata-visibility-for-restricted-roles.md) | Metadata visibility for restricted PostgreSQL roles | Accepted | Show only objects the role can reach, by one privilege-aware rule in SQL across the sidebar, completion, ER diagram, compare, MCP and statistics tools. |
 | [0035](0035-schema-compare-opt-in.md) | Same-engine schema compare ships opt-in | Accepted | Keep the compare code, show its menu entry only when `BOOKIE_SCHEMA_COMPARE` is set until the dialect and DDL profile ADR exists. |
 | [0037](0037-results-crate-split.md) | Split the pure result logic into `bookie-results` | Accepted | Move compare, filter, find, predicate, scan, spool, exact values and the sidebar tree into a crate that depends only on `core`; app-services re-exports them. |
+| [0037](0037-results-crate-split.md) | Split the pure result logic into `bookie-results` | Proposed | Move compare, filter, find, predicate, scan, spool, exact values and the sidebar tree into a crate that depends only on `core`; app-services re-exports them. |
+| [0038](0038-audit-sql-hash-key.md) | Key the audit journal's SQL hash | Proposed | Use a per-install key and HMAC-SHA-256 for `sql_hash`, so a leaked journal cannot be matched against candidate statements. |
 | [0033](0033-frozen-result-grid-columns.md) | Frozen leading columns in the result grid | Proposed | GTK4 has no frozen columns; the options are two synced column views, a custom list-view grid, or not freezing, with a spike to decide. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
