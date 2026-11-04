@@ -61,6 +61,9 @@ async fn an_unavailable_mysql_server_is_classified_as_connection_refused() {
 #[path = "support/local_socket.rs"]
 mod local_socket;
 
+#[path = "support/plaintext_password.rs"]
+mod plaintext_password;
+
 async fn start_mysql() -> (shared_container::TestDatabase, ConnectOptions) {
     shared_container::start_mysql().await
 }

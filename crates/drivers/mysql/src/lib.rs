@@ -1014,6 +1014,8 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
     }
 }
 
+const PLAINTEXT_PASSWORD_REFUSAL: &str = "refusing to send the password without TLS";
+
 fn map_sqlx_error(err: sqlx::Error) -> DriverError {
     use sqlx::Error::*;
     match err {
@@ -1028,6 +1030,9 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         }
         Io(_) => DriverError::Disconnected,
         Tls(e) => DriverError::Tls(e.to_string()),
+        Configuration(e) if e.to_string().starts_with(PLAINTEXT_PASSWORD_REFUSAL) => {
+            DriverError::PolicyDenied(e.to_string())
+        }
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
     }

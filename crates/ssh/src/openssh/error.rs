@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
+use crate::AlgorithmClass;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeoutPhase {
     Handshake,
@@ -45,6 +47,16 @@ pub enum OpenSshError {
     },
     #[error("the host key for {host} is revoked")]
     HostKeyRevoked { host: String, detail: String },
+    #[error(
+        "the SSH server {host} offers no acceptable {class} algorithm. BookiE refuses weak ones (SHA-1 ssh-rsa, 3DES, \
+         Blowfish, RC4, SHA-1 and MD5 MACs, SHA-1 key exchange). The server offered: {offered}. \
+         Enable a modern {class} algorithm on the SSH server."
+    )]
+    NoAcceptableAlgorithm {
+        host: String,
+        class: AlgorithmClass,
+        offered: String,
+    },
     #[error("the SSH server {host} rejected authentication for {user}")]
     AuthenticationRejected {
         user: String,

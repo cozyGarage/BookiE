@@ -1666,6 +1666,16 @@
       "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::dismissing_bulk_delete_preserves_selected_drafts"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::connection_bundle::tests::skipped_imports_are_literal_non_selectable_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
     ]
   ],
   "keyring": [
