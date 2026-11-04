@@ -1665,7 +1665,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::browse_tab::save_in_flight_tests::dismissing_bulk_delete_preserves_selected_drafts"
+      "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::dismissing_bulk_delete_preserves_selected_drafts"
     ]
   ],
   "keyring": [
