@@ -44,11 +44,13 @@ fn drafts_carry_host_port_user_and_engine_and_skip_unsupported_engines_by_name()
         ),
         ("postgres", "db.example.com", 5433, "orders", "alice")
     );
+    assert_eq!(pg.environment, bookie_core::Environment::Local);
     let mysql = &import.drafts[1];
     assert_eq!(
         (mysql.driver_id.as_str(), mysql.port, mysql.username.as_str()),
         ("mysql", 3306, "")
     );
+    assert_eq!(mysql.environment, bookie_core::Environment::Local);
     assert_eq!(import.skipped, ["Legacy Oracle"]);
 }
 

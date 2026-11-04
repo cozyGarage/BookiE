@@ -126,7 +126,15 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         socket_path,
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
-        ..draft_connection(driver_id, name, host, port, database, username)
+        ..draft_connection(
+            driver_id,
+            name,
+            host,
+            port,
+            database,
+            username,
+            if local { Environment::Local } else { Environment::Prod },
+        )
     };
 
     Ok(ParsedConnectionUrl { connection, password })
@@ -139,6 +147,7 @@ pub(crate) fn draft_connection(
     port: u16,
     database: String,
     username: String,
+    environment: Environment,
 ) -> SavedConnection {
     SavedConnection {
         auth_source: None,
@@ -158,7 +167,7 @@ pub(crate) fn draft_connection(
         tls_client_key: None,
         read_only: false,
         auth_mode: AuthMode::Password,
-        environment: if local { Environment::Local } else { Environment::Prod },
+        environment,
         ssh: None,
         last_opened_at: None,
         connect_timeout_secs: None,

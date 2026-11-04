@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use bookie_core::Environment;
 use serde::Deserialize;
 
 use crate::connection_bundle::{BundleBody, BundleConnection};
@@ -102,7 +103,15 @@ fn draft_from(peer: &PeerConnection) -> Option<SavedConnection> {
     } else {
         field(peer.name.trim())?
     };
-    Some(draft_connection(driver_id, name, host, port, database, username))
+    Some(draft_connection(
+        driver_id,
+        name,
+        host,
+        port,
+        database,
+        username,
+        Environment::Local,
+    ))
 }
 
 fn engine(provider: &str, url: &str) -> Option<&'static str> {
