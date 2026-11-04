@@ -398,12 +398,14 @@ impl PolicyGuard {
             .record(
                 &scope.operation(),
                 AuditRecordPhase::Outcome,
-                terminal_status,
-                transaction_outcome,
-                Some(committed),
-                error_category,
-                Some(scope.started.elapsed().as_millis() as u64),
-                rows_skipped,
+                RecordFields {
+                    terminal_status,
+                    transaction_outcome,
+                    rows_affected: Some(committed),
+                    error_category,
+                    duration_ms: Some(scope.started.elapsed().as_millis() as u64),
+                    rows_skipped,
+                },
             )
             .await;
         self.handle_write_outcome_failure(audit_result)?;
