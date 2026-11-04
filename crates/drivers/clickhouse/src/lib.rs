@@ -81,7 +81,7 @@ impl DatabaseDriver for ClickhouseDriver {
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let scheme = if opts.tls.mode.encrypts() { "https" } else { "http" };
-        let url = format!("{scheme}://{}:{}", opts.host, opts.port);
+        let url = endpoint_url(scheme, &opts.host, opts.port);
         let http =
             HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls, opts.service_address().0)?);
         let mut client = clickhouse::Client::with_http_client(http)
@@ -110,6 +110,13 @@ impl DatabaseDriver for ClickhouseDriver {
         };
         Ok(Box::new(ClickhouseConnection { client, database }))
     }
+}
+
+fn endpoint_url(scheme: &str, host: &str, port: u16) -> String {
+    if host.contains(':') && !host.starts_with('[') {
+        return format!("{scheme}://[{}]:{port}", host.replace('%', "%25"));
+    }
+    format!("{scheme}://{host}:{port}")
 }
 
 /// The catalog queries filter `system.tables` / `system.columns` by an
