@@ -135,9 +135,8 @@ pub enum ConnectDialogOutput {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum ConnectDialogCmd {
-    Result(Result<connection_service::PreparedConnection, String>),
+    Result(Result<Box<connection_service::PreparedConnection>, String>),
     Cancelled,
     TestResult(Result<usize, String>),
 }
@@ -528,7 +527,7 @@ impl Component for ConnectDialog {
                             })
                             .await;
                             let message = match result {
-                                Ok(Some(prepared)) => ConnectDialogCmd::Result(Ok(prepared)),
+                                Ok(Some(prepared)) => ConnectDialogCmd::Result(Ok(Box::new(prepared))),
                                 Ok(None) => ConnectDialogCmd::Cancelled,
                                 Err(error) => ConnectDialogCmd::Result(Err(error)),
                             };
@@ -667,7 +666,7 @@ impl Component for ConnectDialog {
             ConnectDialogCmd::Cancelled => self.show_toast(&crate::tr!("Connection cancelled.")),
             ConnectDialogCmd::Result(Ok(prepared)) => {
                 tracing::info!(driver = %prepared.driver_id, table_count = prepared.tables.len(), "connection prepared");
-                let _ = sender.output(ConnectDialogOutput::Prepared(Box::new(prepared)));
+                let _ = sender.output(ConnectDialogOutput::Prepared(prepared));
                 root.close();
             }
             ConnectDialogCmd::Result(Err(e)) => {
