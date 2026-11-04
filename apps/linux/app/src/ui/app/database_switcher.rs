@@ -178,7 +178,7 @@ impl App {
             return;
         }
         saved.database = name.clone();
-        if !stage_database_switch(&mut self.pending_database_switch, self.connection_transition, id, name) {
+        if !stage_database_switch(&mut self.pending_database_switch, self.switch.transition, id, name) {
             self.on_open_saved(saved, sender);
             return;
         }
