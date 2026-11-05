@@ -53,6 +53,18 @@ fn grid_cell_view_borrows_short_utf8_bytes_without_changing_display() {
 }
 
 #[test]
+fn grid_cell_view_bounds_byte_classification_and_keeps_the_full_value_available() {
+    let text = "large text bytes".repeat(GRID_CELL_DISPLAY_MAX_CHARS / 4 + 1);
+    let value = Value::Bytes(text.as_bytes().to_vec());
+    let view = cell_view(&value, &metadata("text"));
+
+    assert_eq!(view.display_text, format!("<{} bytes>", text.len()));
+    assert!(view.truncated);
+    assert!(!view.inline_editable);
+    assert_eq!(value_to_full_edit_text(&value), text);
+}
+
+#[test]
 fn grid_cell_view_bounds_long_text_and_keeps_full_value_formatting_available() {
     let value = Value::Text("a".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 10));
     let view = cell_view(&value, &metadata("text"));
