@@ -40,6 +40,15 @@ cargo deny --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml
 cargo run --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --locked
 ```
 
+For the headless selection, edit and keyboard-navigation smoke check, build the debug binary and run:
+
+```bash
+cargo build --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --locked
+node experiments/tauri-grid-prototype/selftest.mjs /path/to/debug/bookie-tauri-grid-prototype
+```
+
+The launcher requires `dbus-run-session` and `xvfb-run`. It forces the GTK X11 backend inside its isolated display, checks the reported selection, committed edit and keyboard cursor, then terminates its own process group. It fails after 30 seconds or if any outcome is missing. An inherited Wayland session can otherwise bypass Xvfb and leave animation-frame rendering inactive. The check does not establish clipboard access without a user gesture, native Wayland behavior or accessibility acceptance.
+
 Select **Open sample result**. `BOOKIE_PROTOTYPE_ROWS`, `BOOKIE_PROTOTYPE_WIDTH` and `BOOKIE_PROTOTYPE_HEIGHT` choose the synthetic size and window size for a run. Only a small window of rows is requested at a time; the prototype caps requests, matches and the scroll surface.
 
 ## Scroll and memory measurement
