@@ -167,8 +167,7 @@ impl App {
             dialog.set_default_response(Some("cancel"));
             dialog.set_close_response("cancel");
             let sender_for_resp = sender.clone();
-            dialog.connect_response(None, move |dlg, response| {
-                dlg.close();
+            dialog.connect_response(None, move |_, response| {
                 if response == "discard" {
                     sender_for_resp.input(AppMsg::ForceDisconnect);
                 }
@@ -1015,3 +1014,7 @@ mod recovery_tests {
 #[cfg(test)]
 #[path = "connection_failure_tests.rs"]
 mod failure_tests;
+
+#[cfg(test)]
+#[path = "connection_dismiss_tests.rs"]
+mod dismiss_tests;

@@ -1716,6 +1716,11 @@
       "bookie-app",
       "--lib",
       "ui::app::connection::failure_tests::forced_connection_failure_dismissal_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::dismiss_tests::force_dismissing_disconnect_confirmation_preserves_the_dirty_editor"
     ]
   ],
   "keyring": [
