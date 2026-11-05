@@ -270,6 +270,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::referenced_row::tests::force_dismissing_referenced_row_choice_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::session_teardown::tests::a_window_close_whose_sessions_cannot_close_offers_to_close_anyway"
     ],
     [
@@ -1706,6 +1711,11 @@
       "bookie-app",
       "--lib",
       "ui::theme::tests::given_gruvbox_when_warning_text_is_styled_then_it_is_distinct_and_readable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::failure_tests::forced_connection_failure_dismissal_keeps_the_window_usable"
     ]
   ],
   "keyring": [
