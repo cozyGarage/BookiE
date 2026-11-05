@@ -242,8 +242,7 @@ impl BrowseTab {
             dialog.set_default_response(Some("cancel"));
             dialog.set_close_response("cancel");
             let pending = std::cell::RefCell::new(Some((snapshot, draft_ids)));
-            dialog.connect_response(None, move |dlg, response| {
-                dlg.close();
+            dialog.connect_response(None, move |_, response| {
                 if response == "delete"
                     && let Some((s, d)) = pending.borrow_mut().take()
                 {

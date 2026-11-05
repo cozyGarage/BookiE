@@ -435,6 +435,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::bulk_delete_cancel_preserves_selection_and_confirm_removes_drafts_once"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_edit"
     ],
     [
