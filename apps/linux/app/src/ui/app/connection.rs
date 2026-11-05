@@ -538,8 +538,7 @@ impl App {
             dialog.set_default_response(Some("stay"));
             dialog.set_close_response("stay");
             let response_sender = sender.clone();
-            dialog.connect_response(None, move |dialog, response| {
-                dialog.close();
+            dialog.connect_response(None, move |_, response| {
                 response_sender.input(AppMsg::ConnectionSwitchDecision(if response == "cancel-runs" {
                     SwitchDecision::CancelRuns
                 } else {
@@ -567,8 +566,7 @@ impl App {
             dialog.set_default_response(Some("save"));
             dialog.set_close_response("stay");
             let response_sender = sender.clone();
-            dialog.connect_response(None, move |dialog, response| {
-                dialog.close();
+            dialog.connect_response(None, move |_, response| {
                 let decision = match response {
                     "discard" => SwitchDecision::DiscardChanges,
                     "save" => SwitchDecision::SaveChanges,

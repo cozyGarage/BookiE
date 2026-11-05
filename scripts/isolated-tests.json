@@ -1721,6 +1721,16 @@
       "bookie-app",
       "--lib",
       "ui::app::connection::dismiss_tests::force_dismissing_disconnect_confirmation_preserves_the_dirty_editor"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::dismiss_tests::force_dismissing_pending_connection_switch_preserves_workspace"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::dismiss_tests::force_dismissing_running_query_switch_preserves_the_editor"
     ]
   ],
   "keyring": [
