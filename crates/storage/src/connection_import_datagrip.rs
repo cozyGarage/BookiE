@@ -4,7 +4,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
-use crate::connection_import_dbeaver::{PeerImport, field};
+use crate::connection_import_peer::{PeerImport, field, refused, skipped_label};
 use crate::connection_organization::ConnectionOrganization;
 use crate::connection_url::{default_port, draft_connection, validate_host};
 use crate::connections::SavedConnection;
@@ -246,16 +246,7 @@ fn jdbc_target(url: &str) -> Option<(&'static str, &str, Option<&str>, &str)> {
 }
 
 fn display_name(source: &Source) -> String {
-    let name = if source.name.trim().is_empty() {
-        source.uuid.as_str()
-    } else {
-        source.name.trim()
-    };
-    name.chars().filter(|c| !c.is_control()).take(256).collect()
-}
-
-fn refused(message: &str) -> StorageError {
-    StorageError::Schema(message.to_string())
+    skipped_label(&source.name, &source.uuid)
 }
 
 #[cfg(test)]
