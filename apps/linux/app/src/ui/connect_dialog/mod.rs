@@ -227,7 +227,10 @@ impl Component for ConnectDialog {
             .title(crate::tr!("Socket directory"))
             .text("/run/postgresql")
             .build();
-        let resolved_socket = adw::ActionRow::builder().title(crate::tr!("Resolved socket")).build();
+        let resolved_socket = adw::ActionRow::builder()
+            .use_markup(false)
+            .title(crate::tr!("Resolved socket"))
+            .build();
         let database = adw::EntryRow::builder().title(crate::tr!("Database")).build();
         let database_file_picker = browse::attach_database_file_picker(&database);
         database_file_picker.set_visible(false);
@@ -356,6 +359,7 @@ impl Component for ConnectDialog {
             move || sender.input(ConnectDialogInput::Submit)
         });
         let test_banner = adw::Banner::new("");
+        test_banner.set_use_markup(false);
         let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
         page.set_vexpand(true);
         body.append(&test_banner);
@@ -855,7 +859,7 @@ impl ConnectDialog {
     }
 
     fn show_toast(&self, message: &str) {
-        self.toast_overlay.add_toast(adw::Toast::new(message));
+        self.toast_overlay.add_toast(crate::ui::plain_text::toast(message));
     }
 
     /// Disable Connect / Test while an async op is in flight and

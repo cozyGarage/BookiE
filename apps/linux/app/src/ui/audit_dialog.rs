@@ -95,7 +95,7 @@ async fn load_recent_operations(
         Err(error) => {
             status.set_icon_name(Some("dialog-warning-symbolic"));
             status.set_title(&tr!("The audit journal could not be read"));
-            status.set_description(Some(&error));
+            status.set_description(Some(&crate::ui::plain_text::escape_markup(&error)));
         }
     }
 }

@@ -61,7 +61,7 @@ fn present(
             .iter()
             .zip(columns.iter())
             .map(|(name, column)| {
-                let row = adw::SwitchRow::builder().title(name.as_str()).build();
+                let row = adw::SwitchRow::builder().use_markup(false).title(name.as_str()).build();
                 row.set_active(column.upgrade().is_none_or(|column| column.is_visible()));
                 group.add(&row);
                 row

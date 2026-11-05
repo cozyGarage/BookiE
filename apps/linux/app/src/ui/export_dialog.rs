@@ -309,6 +309,7 @@ fn present_export(
     let formats = available_formats(&driver_id, paged.as_ref());
     let labels: Vec<&str> = formats.iter().map(|format| format.label()).collect();
     let format_row = adw::ComboRow::builder()
+        .use_markup(false)
         .title(crate::tr!("Format"))
         .subtitle(format_subtitle(&result, paged.as_ref()))
         .model(&gtk::StringList::new(&labels))

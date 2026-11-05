@@ -802,6 +802,7 @@ impl HistoryDialog {
         let title = preview_title(&entry.query);
         let subtitle = format_subtitle(entry);
         let row = adw::ActionRow::builder()
+            .use_markup(false)
             .title(&title)
             .subtitle(&subtitle)
             .activatable(true)

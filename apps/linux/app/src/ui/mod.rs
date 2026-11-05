@@ -22,6 +22,7 @@ mod import_dialog;
 mod leak_probe;
 mod mcp_preferences;
 mod parameters_dialog;
+mod plain_text;
 mod popover;
 mod preferences;
 mod progress_dialog;

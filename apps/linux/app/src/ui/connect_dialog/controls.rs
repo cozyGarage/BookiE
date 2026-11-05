@@ -66,7 +66,7 @@ pub(super) fn choice_row(
     subtitle: Option<String>,
     labels: Vec<String>,
 ) -> (adw::ActionRow, AccessibleChoice) {
-    let row = adw::ActionRow::builder().title(&title).build();
+    let row = adw::ActionRow::builder().use_markup(false).title(&title).build();
     if let Some(subtitle) = subtitle {
         row.set_subtitle(&subtitle);
     }
@@ -138,7 +138,11 @@ pub(super) fn timeout_rows() -> (adw::ActionRow, gtk::SpinButton, adw::ActionRow
 }
 
 fn timeout_row(title: &str, subtitle: &str, maximum: f64) -> (adw::ActionRow, gtk::SpinButton) {
-    let row = adw::ActionRow::builder().title(title).subtitle(subtitle).build();
+    let row = adw::ActionRow::builder()
+        .use_markup(false)
+        .title(title)
+        .subtitle(subtitle)
+        .build();
     let input = gtk::SpinButton::with_range(0.0, maximum, 1.0);
     center_in_row(&input);
     input.update_property(&[gtk::accessible::Property::Label(title)]);

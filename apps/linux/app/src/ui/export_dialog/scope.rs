@@ -48,7 +48,13 @@ pub(super) fn build(
         _ => crate::tr!("Loaded query result"),
     };
     let subtitle = super::format_subtitle(result, paged);
-    group.add(&adw::ActionRow::builder().title(title).subtitle(subtitle).build());
+    group.add(
+        &adw::ActionRow::builder()
+            .use_markup(false)
+            .title(title)
+            .subtitle(subtitle)
+            .build(),
+    );
     (group, None)
 }
 
