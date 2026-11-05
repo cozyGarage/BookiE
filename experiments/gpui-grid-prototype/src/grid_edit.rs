@@ -96,8 +96,14 @@ impl GridView {
             return crate::flex_cell(width).px_0().child(self.editor.clone());
         }
         let theme = Theme::current(cx);
-        let cell = self.cell_at(source, column);
-        let mut item = cell_div(width, cell.display());
+        let row;
+        let cell = if let Some(cell) = self.edits.get(&(source, column)) {
+            cell
+        } else {
+            row = self.source.row(source);
+            &row[column]
+        };
+        let mut item = cell_div(width, bookie_gpui_grid_prototype::preview::cell_preview(cell));
         if matches!(cell, Cell::Null) {
             item = item.italic().text_color(rgb(theme.muted_foreground));
         }

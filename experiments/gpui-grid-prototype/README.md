@@ -36,6 +36,8 @@ The UI font defaults to the first installed of `Fira Sans` and `Fira Code`, and 
 
 There are four themes: DBX light and dark, and **Adwaita** light and dark (libadwaita's neutral surfaces, the GNOME blue `#3584e4` accent and 6 px corners, to look like our GTK application). `BOOKIE_PROTOTYPE_THEME` takes `light`, `dark`, `adwaita-light` or `adwaita-dark`. The palette has **Theme: DBX style**, **Theme: Adwaita style** and the light/dark switch, which keeps the chosen style.
 
+Visible cell text is limited to 512 Unicode characters before layout. Line breaks, tabs and NULs use visible markers. Byte cells show at most 16 bytes in hexadecimal plus their exact byte count. These previews apply to normal and comparison rows; editing and copying still use full values. The synthetic source still constructs an owned row for each request, so this does not bound source allocation or establish real-result performance.
+
 ## Renderer boundary
 
 The planned modularisation puts application logic in app-services and leaves the application as a renderer. This prototype already splits that way, so it shows what a renderer would need. The library half (`src/lib.rs`) has no `gpui` import and is tested without a display:
