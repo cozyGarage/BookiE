@@ -245,6 +245,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::init_window::confirmation_tests::force_dismissing_window_close_confirmation_keeps_the_window_open"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::init_workspace::tests::saved_connections_popover_stays_inside_narrow_windows"
     ],
     [

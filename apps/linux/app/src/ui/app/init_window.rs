@@ -11,6 +11,13 @@ use super::{App, AppMsg};
 
 mod busy_quit;
 
+fn connect_close_confirmation_response(dialog: &adw::AlertDialog, on_response: impl Fn(&str) + 'static) {
+    dialog.connect_response(None, move |_, response| on_response(response));
+}
+
+#[cfg(test)]
+mod confirmation_tests;
+
 /// Owning handles the model needs from the window-close plumbing: the
 /// close-after-save counters, the "close the window once the map
 /// drains" flag, and the in-flight transaction counter the close
@@ -154,8 +161,7 @@ pub(super) fn install_window_lifecycle(
             let input_sender_for_resp = close_request_input_sender.clone();
             let structure_trackers = structure_trackers.clone();
             let change_trackers = change_trackers.clone();
-            dialog.connect_response(None, move |dlg, response| {
-                dlg.close();
+            connect_close_confirmation_response(&dialog, move |response| {
                 match response {
                     "discard" => {
                         for tab_id in change_trackers.pending_tabs_for(&tab_ids) {
