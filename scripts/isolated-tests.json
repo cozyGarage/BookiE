@@ -204,6 +204,11 @@
   "gtk": [
     [
       "bookie-app",
+      "--test=cli_info",
+      "information_flags_exit_without_display_or_profile_access"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
     ],
@@ -215,7 +220,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::app::connection::failure_tests::forced_connection_failure_dismissal_keeps_the_window_usable"
+      "ui::app::browse::tests::force_dismissing_refresh_confirmation_does_not_abort"
     ],
     [
       "bookie-app",
@@ -265,6 +270,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::referenced_row::tests::force_dismissing_referenced_row_choice_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::session_teardown::tests::a_window_close_whose_sessions_cannot_close_offers_to_close_anyway"
     ],
     [
@@ -291,6 +301,11 @@
       "bookie-app",
       "--lib",
       "ui::app::sidebar_state::tests::the_sidebar_stays_closed_in_a_narrow_window_and_never_opens_empty"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::structure::confirmation_tests::force_dismissing_a_table_confirmation_does_not_run_its_action"
     ],
     [
       "bookie-app",
@@ -1080,6 +1095,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::a_failed_page_offers_a_retry_without_changing_pages"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::a_loaded_page_replaces_only_its_matching_generation_placeholder"
     ],
     [
@@ -1694,18 +1714,8 @@
     ],
     [
       "bookie-app",
-      "--test=cli_info",
-      "information_flags_exit_without_display_or_profile_access"
-    ],
-    [
-      "bookie-app",
       "--lib",
-      "ui::app::browse::tests::force_dismissing_refresh_confirmation_does_not_abort"
-    ],
-    [
-      "bookie-app",
-      "--lib",
-      "ui::app::structure::confirmation_tests::force_dismissing_a_table_confirmation_does_not_run_its_action"
+      "ui::app::connection::failure_tests::forced_connection_failure_dismissal_keeps_the_window_usable"
     ]
   ],
   "keyring": [
