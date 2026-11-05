@@ -204,6 +204,11 @@
   "gtk": [
     [
       "bookie-app",
+      "--test=cli_info",
+      "information_flags_exit_without_display_or_profile_access"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
     ],
@@ -250,7 +255,22 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::organization::lifetime_tests::force_dismissing_connection_url_import_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::organization::lifetime_tests::force_dismissing_group_and_tags_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::organization::tests::changing_a_connection_colour_updates_the_retained_tab_bar"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::referenced_row::tests::force_dismissing_referenced_row_choice_keeps_the_window_usable"
     ],
     [
       "bookie-app",
@@ -1075,6 +1095,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::a_failed_page_offers_a_retry_without_changing_pages"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::a_loaded_page_replaces_only_its_matching_generation_placeholder"
     ],
     [
@@ -1736,11 +1761,6 @@
       "bookie-app",
       "--lib",
       "ui::theme::tests::given_gruvbox_when_warning_text_is_styled_then_it_is_distinct_and_readable"
-    ],
-    [
-      "bookie-app",
-      "--test=cli_info",
-      "information_flags_exit_without_display_or_profile_access"
     ]
   ],
   "keyring": [
