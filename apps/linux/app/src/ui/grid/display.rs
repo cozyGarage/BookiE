@@ -14,6 +14,7 @@ use crate::services::preferences::NullDisplayPref;
 const DISPLAY_TEXT_MAX_CHARS: usize = 10_000;
 const DISPLAY_TEXT_BYTES_THRESHOLD: usize = DISPLAY_TEXT_MAX_CHARS * 4;
 const GRID_CELL_DISPLAY_MAX_CHARS: usize = 512;
+const GRID_CELL_DISPLAY_MAX_BYTES: usize = GRID_CELL_DISPLAY_MAX_CHARS * 4;
 
 thread_local! {
     static NULL_DISPLAY: Cell<NullDisplayPref> = const { Cell::new(NullDisplayPref::Standard) };
@@ -116,6 +117,9 @@ pub(super) fn cell_view_with_column_editability<'a>(
 fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
     match value {
         Value::Text(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, true, None),
+        Value::Bytes(bytes) if bytes.len() > GRID_CELL_DISPLAY_MAX_BYTES => {
+            (Cow::Owned(format!("<{} bytes>", bytes.len())), true)
+        }
         Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
             Ok(text) if !text.contains('\0') => {
                 text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None)
