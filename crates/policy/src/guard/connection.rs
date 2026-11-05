@@ -62,6 +62,10 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn list_tables_in(&self, s: &[String], c: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
+        self.governed_list_tables_in(s, c).await
+    }
+
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         let operation = self.metadata_operation("LIST VIEWS", Vec::new());
         self.prepare_governed_read(&operation).await?;

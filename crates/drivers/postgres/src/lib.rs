@@ -200,6 +200,31 @@ impl Connection for PgConnection {
             .collect())
     }
 
+    async fn list_tables_scoped(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT n.nspname, c.relname
+             FROM pg_catalog.pg_class c
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+             WHERE c.relkind IN ('r', 'p')
+               AND n.nspname = ANY($1)
+               AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+               AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+               AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+             ORDER BY n.nspname, c.relname",
+        )
+        .bind(schemas)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| TableInfo {
+                schema: Some(r.get::<String, _>(0)),
+                name: r.get::<String, _>(1),
+            })
+            .collect())
+    }
+
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         let rows = sqlx::query(
             "SELECT n.nspname, c.relname

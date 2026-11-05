@@ -1096,6 +1096,7 @@ mod audit_receipt;
 mod bulk;
 mod connection;
 mod panic_boundary;
+mod scoped_tables;
 mod session;
 
 pub use administrative::AdministrativeOperation;
