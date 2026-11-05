@@ -104,8 +104,7 @@ impl App {
         let id = saved.id;
         let favorite = current.favorite;
         let input_sender = sender.input_sender().clone();
-        dialog.connect_response(None, move |dlg, response| {
-            dlg.close();
+        dialog.connect_response(None, move |_, response| {
             if response != "save" {
                 return;
             }
@@ -176,8 +175,7 @@ impl App {
         dialog.set_close_response("cancel");
 
         let input_sender = sender.input_sender().clone();
-        dialog.connect_response(None, move |dlg, response| {
-            dlg.close();
+        dialog.connect_response(None, move |_, response| {
             if response != "import" {
                 return;
             }
