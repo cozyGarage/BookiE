@@ -174,7 +174,7 @@ impl GridView {
                     TreeRow::Table(name) => {
                         this.tabs.open_table(name);
                         if this.tabs.shows_grid() {
-                            window.focus(&this.focus);
+                            window.focus(&this.focus, cx);
                         }
                     }
                 }
@@ -299,7 +299,7 @@ impl GridView {
             item.on_click(cx.listener(move |this, _, window, cx| {
                 this.tabs.active = index;
                 if this.tabs.shows_grid() {
-                    window.focus(&this.focus);
+                    window.focus(&this.focus, cx);
                 }
                 cx.notify();
             }))
@@ -362,7 +362,7 @@ impl GridView {
                                 ghost("quick-open", format!("{CONNECTION} → {DATA_TABLE}"), theme).on_click(
                                     cx.listener(|this, _, window, cx| {
                                         this.tabs.open_table(DATA_TABLE);
-                                        window.focus(&this.focus);
+                                        window.focus(&this.focus, cx);
                                         cx.notify();
                                     }),
                                 ),

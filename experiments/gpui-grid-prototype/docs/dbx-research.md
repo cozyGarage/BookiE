@@ -94,3 +94,5 @@ TablePro (`TableProApp/TablePro`, AGPL-3.0) is the project BookiE's Linux client
 - Its SQL editor is a separate package (`TableProEditor`, about 280 files) built on tree-sitter.
 
 The lessons: keep query and result logic in the shared core, keep per-type cell editors as their own components, and treat the SQL editor as its own subproject rather than a widget.
+
+Update 2026-11-05: the prototype now builds on `gpui-pre =0.3.11` with `gpui-kit =0.9.0` (ADR 0039); the `gpui =0.2.2` pin mentioned above is gone.

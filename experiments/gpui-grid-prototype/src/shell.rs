@@ -17,7 +17,13 @@ pub enum TreeRow {
 
 pub fn tree_rows(search: &str, connection_open: bool, database_open: bool) -> Vec<(usize, TreeRow)> {
     let searching = !search.trim().is_empty();
-    let infos: Vec<TableInfo> = TABLES.iter().map(|name| TableInfo { schema: None, name: (*name).to_string() }).collect();
+    let infos: Vec<TableInfo> = TABLES
+        .iter()
+        .map(|name| TableInfo {
+            schema: None,
+            name: (*name).to_string(),
+        })
+        .collect();
     let nodes = build_nodes(&infos, &[]);
     let shown = visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), search, &HashSet::new());
     let tables: Vec<&'static str> = shown
