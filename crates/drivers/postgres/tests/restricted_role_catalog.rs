@@ -112,6 +112,18 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
         let tables = names(&restricted.list_tables().await.expect("restricted tables"));
         let views = names(&restricted.list_views().await.expect("restricted views"));
         let admin_tables = names(&admin.list_tables().await.expect("admin tables"));
+        let scoped = names(
+            &restricted
+                .list_tables_scoped(&["bookie_vis_visible".to_string(), "bookie_vis_hidden".to_string()])
+                .await
+                .expect("scoped tables"),
+        );
+        let admin_scoped = names(
+            &admin
+                .list_tables_scoped(&["bookie_vis_usage".to_string()])
+                .await
+                .expect("admin scoped tables"),
+        );
         let admin_views = names(&admin.list_views().await.expect("admin views"));
         let mut objects = Vec::new();
         for kind in [
@@ -124,13 +136,13 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
             let listed = restricted.list_objects(kind, None).await.expect("restricted objects");
             objects.push(object_names(&listed));
         }
-        (tables, views, admin_tables, admin_views, objects)
+        (tables, views, admin_tables, admin_views, objects, scoped, admin_scoped)
     }
     .await;
     for statement in CLEANUP {
         admin.execute(statement).await.expect(statement);
     }
-    let (tables, views, admin_tables, admin_views, objects) = outcome;
+    let (tables, views, admin_tables, admin_views, objects, scoped, admin_scoped) = outcome;
 
     assert_eq!(
         tables,
@@ -180,4 +192,14 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
         objects[4]
     );
     assert!(!objects[4].is_empty(), "grants of reachable relations still are");
+    assert_eq!(
+        scoped,
+        ["bookie_vis_visible.shown"],
+        "scoping to two schemas keeps the visibility rule: the hidden schema and denied table stay out"
+    );
+    assert_eq!(
+        admin_scoped,
+        ["bookie_vis_usage.t"],
+        "scoping returns only the asked schema"
+    );
 }

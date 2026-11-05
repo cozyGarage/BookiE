@@ -59,6 +59,18 @@ impl Connection for SessionConnection {
         self.inner.list_tables_controlled(control).await
     }
 
+    async fn list_tables_scoped(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        self.inner.list_tables_scoped(schemas).await
+    }
+
+    async fn list_tables_in(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        self.inner.list_tables_in(schemas, control).await
+    }
+
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.inner.list_views().await
     }

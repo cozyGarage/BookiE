@@ -167,8 +167,7 @@ impl App {
             dialog.set_default_response(Some("cancel"));
             dialog.set_close_response("cancel");
             let sender_for_resp = sender.clone();
-            dialog.connect_response(None, move |dlg, response| {
-                dlg.close();
+            dialog.connect_response(None, move |_, response| {
                 if response == "discard" {
                     sender_for_resp.input(AppMsg::ForceDisconnect);
                 }
@@ -539,8 +538,7 @@ impl App {
             dialog.set_default_response(Some("stay"));
             dialog.set_close_response("stay");
             let response_sender = sender.clone();
-            dialog.connect_response(None, move |dialog, response| {
-                dialog.close();
+            dialog.connect_response(None, move |_, response| {
                 response_sender.input(AppMsg::ConnectionSwitchDecision(if response == "cancel-runs" {
                     SwitchDecision::CancelRuns
                 } else {
@@ -568,8 +566,7 @@ impl App {
             dialog.set_default_response(Some("save"));
             dialog.set_close_response("stay");
             let response_sender = sender.clone();
-            dialog.connect_response(None, move |dialog, response| {
-                dialog.close();
+            dialog.connect_response(None, move |_, response| {
                 let decision = match response {
                     "discard" => SwitchDecision::DiscardChanges,
                     "save" => SwitchDecision::SaveChanges,
@@ -1015,3 +1012,7 @@ mod recovery_tests {
 #[cfg(test)]
 #[path = "connection_failure_tests.rs"]
 mod failure_tests;
+
+#[cfg(test)]
+#[path = "connection_dismiss_tests.rs"]
+mod dismiss_tests;

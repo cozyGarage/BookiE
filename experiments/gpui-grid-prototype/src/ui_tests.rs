@@ -12,7 +12,10 @@ use crate::ui_theme::ThemeExt;
 fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::new(150_000, Instant::now(), window, cx));
-    cx.update(|window, cx| window.focus(&view.read(cx).focus));
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
     cx.run_until_parked();
     (view, cx)
 }
@@ -62,7 +65,7 @@ fn the_find_field_takes_typed_text_and_enter_runs_the_search(cx: &mut TestAppCon
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
         let handle = view.read(cx).find.read(cx).focus_handle_for_tests();
-        window.focus(&handle);
+        window.focus(&handle, cx);
     });
     cx.simulate_input("sample 149999");
     cx.simulate_keystrokes("enter");
@@ -223,7 +226,7 @@ fn the_sidebar_search_takes_typed_text_and_filters_the_tree(cx: &mut TestAppCont
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
         let handle = view.read(cx).sidebar_search.read(cx).focus_handle_for_tests();
-        window.focus(&handle);
+        window.focus(&handle, cx);
     });
     cx.simulate_input("aud");
     view.read_with(cx, |view, cx| {
@@ -324,7 +327,10 @@ fn the_view_renders_and_searches_whatever_source_it_is_given(cx: &mut TestAppCon
     cx.update(text_input::bind_keys);
     let (view, cx) =
         cx.add_window_view(|window, cx| GridView::with_source(std::sync::Arc::new(Tiny), Instant::now(), window, cx));
-    cx.update(|window, cx| window.focus(&view.read(cx).focus));
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert_eq!(view.dataset_count(), 3);
@@ -332,7 +338,7 @@ fn the_view_renders_and_searches_whatever_source_it_is_given(cx: &mut TestAppCon
     });
     cx.update(|window, cx| {
         let handle = view.read(cx).find.read(cx).focus_handle_for_tests();
-        window.focus(&handle);
+        window.focus(&handle, cx);
     });
     cx.simulate_input("tiny 2");
     cx.simulate_keystrokes("enter");

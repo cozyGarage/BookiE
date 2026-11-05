@@ -29,7 +29,7 @@ impl GridView {
 
     fn stop_edit(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.editing = None;
-        window.focus(&self.focus);
+        window.focus(&self.focus, cx);
         cx.notify();
     }
 
@@ -75,7 +75,7 @@ impl GridView {
             kind: cell.kind(),
         });
         self.editor.update(cx, |editor, cx| editor.set_content(&text, cx));
-        window.focus(&self.editor.read(cx).focus_handle(cx));
+        window.focus(&self.editor.read(cx).focus_handle(cx), cx);
         cx.notify();
     }
 

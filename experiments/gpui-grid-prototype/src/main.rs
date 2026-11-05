@@ -17,7 +17,7 @@ use bookie_gpui_grid_prototype::shell::{
 use bookie_gpui_grid_prototype::source::{Source, Synthetic};
 use bookie_gpui_grid_prototype::theme::{Style, Theme};
 use gpui::{
-    App, Application, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
+    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
     MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
     prelude::*, px, rgb, size, uniform_list,
 };
@@ -461,13 +461,13 @@ impl GridView {
             match key {
                 "f" => {
                     self.filter_visible = true;
-                    window.focus(&self.filter.read(cx).focus_handle(cx));
+                    window.focus(&self.filter.read(cx).focus_handle(cx), cx);
                 }
                 "c" if self.focus.is_focused(window) => self.copy_selection(modifiers.shift, cx),
                 "b" => self.sidebar_open = !self.sidebar_open,
                 "t" => {
                     self.tabs.open_query();
-                    window.focus(&self.focus);
+                    window.focus(&self.focus, cx);
                 }
                 "enter" if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
                 _ => {}
@@ -641,14 +641,14 @@ impl GridView {
         self.palette_fonts = false;
         self.palette_index = 0;
         self.palette_input.update(cx, |input, cx| input.set_content("", cx));
-        window.focus(&self.palette_input.read(cx).focus_handle(cx));
+        window.focus(&self.palette_input.read(cx).focus_handle(cx), cx);
         cx.notify();
     }
 
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = false;
         self.palette_fonts = false;
-        window.focus(&self.focus);
+        window.focus(&self.focus, cx);
         cx.notify();
     }
 
@@ -680,10 +680,10 @@ impl GridView {
             "previous" => self.pager.previous(),
             "next" => self.pager.next(),
             "last" => self.pager.last(),
-            "find" => window.focus(&self.find.read(cx).focus_handle(cx)),
+            "find" => window.focus(&self.find.read(cx).focus_handle(cx), cx),
             "filter" => {
                 self.filter_visible = true;
-                window.focus(&self.filter.read(cx).focus_handle(cx));
+                window.focus(&self.filter.read(cx).focus_handle(cx), cx);
             }
             "clear-filter" => self.clear_filter(),
             "compare" => self.compare(false, cx),
@@ -698,13 +698,13 @@ impl GridView {
             "home" => self.tabs.open_home(),
             "query" => {
                 self.tabs.open_query();
-                window.focus(&self.focus);
+                window.focus(&self.focus, cx);
             }
             "run" => self.run_query(),
             "results" => self.result_open = !self.result_open,
             "table" => {
                 self.tabs.open_table(DATA_TABLE);
-                window.focus(&self.focus);
+                window.focus(&self.focus, cx);
             }
             "theme-dbx" | "theme-adwaita" => {
                 let style = if id == "theme-dbx" { Style::Dbx } else { Style::Adwaita };
@@ -829,8 +829,8 @@ pub fn flex_cell(width: f32) -> Div {
         .h_full()
         .px_2()
         .flex_basis(px(width))
-        .flex_grow()
-        .flex_shrink()
+        .flex_grow(1.0)
+        .flex_shrink(1.0)
         .min_w(px(width * 0.4))
         .overflow_hidden()
         .whitespace_nowrap()
@@ -1037,7 +1037,7 @@ impl Render for GridView {
                     .collect::<Vec<Stateful<Div>>>()
             }),
         )
-        .track_scroll(self.scroll.clone())
+        .track_scroll(&self.scroll)
         .flex_1();
         let palette = self.palette_open.then(|| self.palette_overlay(cx));
         let grid = div()
@@ -1185,32 +1185,35 @@ fn main() {
     let autoscroll: u32 = env_number("BOOKIE_PROTOTYPE_AUTOSCROLL").unwrap_or(0);
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
-    Application::new().with_assets(assets::Assets).run(move |cx: &mut App| {
-        text_input::bind_keys(cx);
-        Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
-        let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
-        let opened = cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
-            |window, cx| {
-                let view = cx.new(|cx| GridView::new(total, started, window, cx));
-                view.read(cx).focus.focus(window);
-                if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
-                    view.update(cx, |view, _| view.tabs.open_query());
-                }
-                if autoscroll > 0 {
-                    view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
-                }
-                view
-            },
-        );
-        if let Err(error) = opened {
-            eprintln!("could not open a window: {error}");
-            std::process::exit(2);
-        }
-    });
+    gpui_platform::application()
+        .with_assets(assets::Assets)
+        .run(move |cx: &mut App| {
+            text_input::bind_keys(cx);
+            Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
+            let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
+            let opened = cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    ..Default::default()
+                },
+                |window, cx| {
+                    let view = cx.new(|cx| GridView::new(total, started, window, cx));
+                    let focus = view.read(cx).focus.clone();
+                    focus.focus(window, cx);
+                    if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
+                        view.update(cx, |view, _| view.tabs.open_query());
+                    }
+                    if autoscroll > 0 {
+                        view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
+                    }
+                    view
+                },
+            );
+            if let Err(error) = opened {
+                eprintln!("could not open a window: {error}");
+                std::process::exit(2);
+            }
+        });
 }
 
 #[cfg(test)]
