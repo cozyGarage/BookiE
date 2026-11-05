@@ -2,7 +2,7 @@
 
 This isolated experiment compares a welcome layout and a virtualized result grid with the GTK application. It uses synthetic values only and cannot connect to a database. It is not a supported frontend, a package, or an alternative execution path. The shipped application continues to use GTK. The experiment does not establish accessibility, input-method, security, cross-platform or performance parity.
 
-The Rust commands use bounded requests and the shared `bookie-core` value type for a small synthetic fixture. Their JSON envelope carries every `bookie_core::Value` variant as a kind and an exact text: integers and decimals as decimal strings, bytes as `\x` hex, dates and times as ISO text, raw JSON text with its original spacing, and an undecodable cell as `<undecodable TYPE>`. The text rules mirror the export text of `bookie-core`, so a value reads the same here as in an export. This is still not a complete value bridge: nothing is parsed back, edited or compared by type, and no policy or database operations cross it.
+The Rust commands use bounded requests and the shared `bookie-core` value type for a small synthetic fixture. Display batches cap each cell at 512 Unicode characters or 16 binary bytes, with a `previewed` flag. Explicit editing retrieves the original cell through a checked row/column request; a reply from an older view is discarded. Copy still reads original values in Rust. The exact-value envelope carries every `bookie_core::Value` variant as a kind and canonical text: integers and decimals as decimal strings, bytes as `\x` hex, dates and times as ISO text, raw JSON text with its original spacing, and an undecodable cell as `<undecodable TYPE>`. The text rules mirror the export text of `bookie-core`, so a value reads the same here as in an export. This remains an experimental value bridge: edits use the core parser, but no policy or database operations cross it.
 
 ## Scope
 
@@ -23,13 +23,15 @@ Double-click a label, state or typed cell to edit it in place. Enter applies, Es
 
 `BOOKIE_PROTOTYPE_SELFTEST=1` opens the result, selects rows 2 to 4, runs the copy path and prints a `PROTOTYPE_REPORT` line with the copy outcome, then drives the editor through the DOM (an invalid date is refused, a valid one is applied and marked) and prints a second line. The self-test has no user gesture, so WebKit refuses both clipboard routes (`navigator.clipboard.writeText` and the `execCommand("copy")` fallback) and the report says so; a real Ctrl+C with a gesture has not been verified in this environment.
 
+The self-test forces preview metadata on a small synthetic cell and verifies that editing retrieves the full value. This checks the IPC edit path, not native performance with oversized values.
+
 The self-test also drives the cursor and the palette through the DOM: three keys put the cursor on row 3 of the Label column, Space selects the row, and Ctrl+Shift+P with `last page` moves to page 200 of 200 and closes the dialog.
 
 Export is inert. Nothing is read from or written to disk.
 
 ## Run and test
 
-Visible cells render at most 512 Unicode characters, with visible markers for line breaks, tabs and NULs. Binary cells render at most 16 bytes in hexadecimal and their exact byte count. Editing and copying still use the full original values. The [shared large-cell inputs](../fixtures/README.md) exercise the same synthetic cases as the GPUI formatter tests. This bounds DOM text preparation, not the result payload sent over IPC.
+Visible cells render at most 512 Unicode characters, with visible markers for line breaks, tabs and NULs. Binary cells render at most 16 bytes in hexadecimal and their exact byte count. Editing and copying still use the full original values. The [shared large-cell inputs](../fixtures/README.md) exercise the same synthetic cases as the GPUI formatter tests. Display-batch payloads are bounded before IPC as well as before DOM insertion. Explicit full-value requests and copy operations still carry complete values. JSON objects are currently serialized in full in Rust before their display prefix is taken; this does not bound serialization CPU or all transient allocations.
 
 From the repository root:
 

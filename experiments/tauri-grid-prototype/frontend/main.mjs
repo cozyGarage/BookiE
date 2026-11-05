@@ -15,7 +15,7 @@ import {
   rangeLabel,
   rowsFromQuery,
 } from './strip.mjs';
-import { commitKey, createEdits, editStatus, isEditable } from './edits.mjs';
+import { commitKey, createEdits, editStatus, isEditable, loadEditCell } from './edits.mjs';
 import { copyRequest, isSelected, selectionAfterClick, selectionLabel } from './selection.mjs';
 import { cursorLabel, moveCursor, scrollTopToReveal } from './cursor.mjs';
 import { paletteMatches, paletteSelection } from './palette.mjs';
@@ -82,9 +82,29 @@ function buildRow(record, local) {
   return row;
 }
 
-function startEdit(item, rowNumber, column, cell) {
+async function startEdit(item, rowNumber, column, cell) {
   if (editing) return;
   editing = true;
+  if (cell.previewed) {
+    const current = generation;
+    try {
+      cell = await loadEditCell(
+        cell,
+        () => invoke('full_cell', { row: rowNumber, column, total: view.total }),
+        () => current === generation && item.isConnected,
+      );
+    } catch {
+      editing = false;
+      $('#selection-status').textContent = 'Unable to load the full cell value.';
+      schedule();
+      return;
+    }
+    if (cell === null) {
+      editing = false;
+      schedule();
+      return;
+    }
+  }
   const input = document.createElement('input');
   input.className = 'entry cell-editor';
   input.value = cell.kind === 'null' ? '' : cell.value;
@@ -566,7 +586,18 @@ async function selfTest() {
   const selected = document.querySelectorAll('.row.selected').length;
   await invoke('report', { line: `selected_rows_drawn=${selected} status=${$('#selection-status').textContent}` });
   await editSelfTest();
+  await previewEditSelfTest();
   await navigationSelfTest();
+}
+
+async function previewEditSelfTest() {
+  const item = document.querySelector('.row[aria-rowindex="1"]').querySelectorAll('.cell')[2];
+  const expected = await invoke('full_cell', { row: 0, column: 1, total: view.total });
+  await startEdit(item, 0, 1, { kind: 'text', value: 'preview…', previewed: true });
+  const input = document.querySelector('.cell-editor');
+  await invoke('report', { line: `exact_cell_loaded=${input?.value === expected.value}` });
+  input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  await pause(300);
 }
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

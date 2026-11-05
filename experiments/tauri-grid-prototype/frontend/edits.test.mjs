@@ -1,6 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { commitKey, createEdits, editStatus, isEditable } from './edits.mjs';
+import { commitKey, createEdits, editStatus, isEditable, loadEditCell } from './edits.mjs';
+
+test('opening a preview loads the exact value and ordinary cells need no request', async () => {
+  const exact = { kind: 'text', value: '💾'.repeat(4096), previewed: false };
+  let requests = 0;
+  const load = async () => { requests += 1; return exact; };
+  const preview = { kind: 'text', value: 'partial…', previewed: true };
+  assert.equal(await loadEditCell(preview, load, () => true), exact);
+  assert.equal(requests, 1);
+  assert.equal(await loadEditCell(exact, load, () => true), exact);
+  assert.equal(requests, 1);
+  assert.equal(preview.value, 'partial…');
+});
+
+test('a full value reply for a replaced view never seeds the editor', async () => {
+  let finish;
+  let current = true;
+  const pending = loadEditCell(
+    { kind: 'bytes', value: '\\xab…', previewed: true },
+    () => new Promise((resolve) => { finish = resolve; }),
+    () => current,
+  );
+  current = false;
+  finish({ kind: 'bytes', value: '\\xabcdef', previewed: false });
+  assert.equal(await pending, null);
+});
+
+test('a failed or still-previewed reply cannot become editable content', async () => {
+  const preview = { kind: 'text', value: 'partial…', previewed: true };
+  await assert.rejects(loadEditCell(preview, async () => preview, () => true));
+  await assert.rejects(loadEditCell(preview, async () => { throw new Error('unavailable'); }, () => true));
+  assert.equal(await loadEditCell(preview, async () => { throw new Error('unavailable'); }, () => false), null);
+});
 
 test('edits are kept per row and column and can be looked up by row range', () => {
   const edits = createEdits();
