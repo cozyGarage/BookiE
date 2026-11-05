@@ -372,6 +372,46 @@ fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_lim
     });
 }
 
+#[gpui::test]
+fn composed_text_selects_inside_its_replacement_after_a_unicode_prefix(cx: &mut TestAppContext) {
+    use gpui::EntityInputHandler;
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        let input = view.read(cx).find.clone();
+        input.update(cx, |input, cx| {
+            input.set_content("α OLD tail", cx);
+            input.replace_and_mark_text_in_range(Some(2..5), "💾é", Some(2..3), window, cx);
+            assert_eq!(input.content(), "α 💾é tail");
+            assert_eq!(input.selected_text_range(false, window, cx).unwrap().range, 4..5);
+            input.replace_text_in_range(None, "X", window, cx);
+            assert_eq!(input.content(), "α X tail");
+        });
+    });
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn platform_input_flattens_newlines_like_single_line_paste(cx: &mut TestAppContext) {
+    use gpui::EntityInputHandler;
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        let focus = view.read(cx).find.read(cx).focus_handle_for_tests();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_input("first\nsecond");
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| assert_eq!(view.find.read(cx).content(), "first second"));
+    cx.update(|window, cx| {
+        let input = view.read(cx).find.clone();
+        input.update(cx, |input, cx| {
+            input.replace_and_mark_text_in_range(Some(0..12), "a\n💾", Some(0..4), window, cx);
+            assert_eq!(input.content(), "a 💾");
+            assert_eq!(input.selected_text_range(false, window, cx).unwrap().range, 0..4);
+        });
+    });
+    cx.run_until_parked();
+}
+
 impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
     fn total(&self) -> u64 {
         3
