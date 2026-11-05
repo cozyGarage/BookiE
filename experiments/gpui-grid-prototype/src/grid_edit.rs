@@ -69,6 +69,11 @@ impl GridView {
         } else {
             cell.display()
         };
+        if text.contains('\n') {
+            self.status = "Multiline values cannot be edited in this single-line prototype".into();
+            cx.notify();
+            return;
+        }
         self.editing = Some(Editing {
             row,
             column,

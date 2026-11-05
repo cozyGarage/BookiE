@@ -334,6 +334,44 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), full));
 }
 
+#[gpui::test]
+fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let text = format!("{}\0tail", "💾".repeat(8_192));
+    let bytes = vec![0xab; 1_000_000];
+    let json = format!("{{\"raw\":  \"{}\"}}", "x".repeat(1_000_000));
+    view.update(cx, |view, cx| {
+        view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+        view.edits.insert((0, 1), Cell::Text(text.clone()));
+        view.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
+        view.edits.insert((1, 3), Cell::JsonText(json.clone()));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_at(0, 3), Cell::Bytes(bytes));
+        assert_eq!(view.cell_at(1, 3), Cell::JsonText(json));
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), text));
+}
+
+#[gpui::test]
+fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_limit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let value = Cell::Text("first\nsecond".into());
+    view.update(cx, |view, _| {
+        view.edits.insert((0, 1), value.clone());
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.editing.is_none());
+        assert_eq!(view.edits.get(&(0, 1)), Some(&value));
+        assert!(view.status.contains("single-line"));
+    });
+}
+
 impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
     fn total(&self) -> u64 {
         3
