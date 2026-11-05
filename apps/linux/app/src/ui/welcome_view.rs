@@ -424,9 +424,7 @@ impl WelcomeView {
         }
         drop(guard);
 
-        let section = adw::PreferencesGroup::builder()
-            .title(group.map_or_else(|| crate::tr!("Ungrouped"), str::to_owned))
-            .build();
+        let section = section_group(group);
         section.add(factory.widget());
         self.sections_box.append(&section);
         factory
@@ -489,6 +487,13 @@ fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
     content.append(&imports);
     page.set_child(Some(&content));
     page
+}
+
+pub(crate) fn section_group(group: Option<&str>) -> adw::PreferencesGroup {
+    let title = group.map_or_else(|| crate::tr!("Ungrouped"), str::to_owned);
+    adw::PreferencesGroup::builder()
+        .title(crate::ui::plain_text::escape_markup(&title))
+        .build()
 }
 
 #[cfg(test)]

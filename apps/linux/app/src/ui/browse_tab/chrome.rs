@@ -466,7 +466,7 @@ impl BrowseTab {
             .build();
         let page = adw::StatusPage::builder()
             .title(title)
-            .description(description)
+            .description(crate::ui::plain_text::escape_markup(description))
             .child(&spinner)
             .build();
         self.replace_status_child("loading", &page);
@@ -479,7 +479,7 @@ impl BrowseTab {
         let page = adw::StatusPage::builder()
             .icon_name("dialog-error-symbolic")
             .title(crate::tr!("Couldn't load rows"))
-            .description(message)
+            .description(crate::ui::plain_text::escape_markup(message))
             .child(&retry_button(sender))
             .build();
         self.replace_status_child("error", &page);

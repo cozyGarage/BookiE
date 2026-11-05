@@ -1,5 +1,5 @@
+use relm4::ComponentSender;
 use relm4::adw::prelude::*;
-use relm4::{ComponentSender, adw};
 use uuid::Uuid;
 
 use crate::ui::browse_tab::BrowseTabInput;
@@ -28,7 +28,8 @@ impl App {
         }
         self.set_row_op_in_flight(false);
         let msg = warning.unwrap_or_else(|| crate::tr!("Saved"));
-        let toast = adw::Toast::builder().title(msg).timeout(4).build();
+        let toast = crate::ui::plain_text::toast(&msg);
+        toast.set_timeout(4);
         self.toast_overlay.add_toast(toast);
         self.dispatch_to_tab(tab_id, BrowseTabInput::SaveCompleted(save_id));
         let drained = self.close_after_save.borrow_mut().complete(&tab_id);

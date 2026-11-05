@@ -225,6 +225,7 @@ pub fn present(
         .map(|store| store.path().display().to_string())
         .unwrap_or_else(|| format!("$XDG_CONFIG_HOME/{}/history.db", crate::config::storage_dir_name()));
     let storage_row = adw::ActionRow::builder()
+        .use_markup(false)
         .title(crate::tr!("Storage location"))
         .subtitle(&storage_subtitle)
         .build();

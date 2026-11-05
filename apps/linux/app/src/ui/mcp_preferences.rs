@@ -36,6 +36,7 @@ pub fn build_page(
             tr!("Database operations are disabled. Fix policy.toml and reopen Preferences or restart BookiE.")
         };
         let row = adw::ActionRow::builder()
+            .use_markup(false)
             .title(tr!("Policy file could not be reloaded"))
             .subtitle(advice)
             .build();
@@ -169,6 +170,7 @@ fn refresh_token_list(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpB
             continue;
         }
         let row = adw::ActionRow::builder()
+            .use_markup(false)
             .title(&token.name)
             .subtitle(format!(
                 "{} · {}",

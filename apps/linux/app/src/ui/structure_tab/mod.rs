@@ -498,7 +498,11 @@ fn clear_box(b: &gtk::Box) {
 /// Foreign Key) is the only thing that varies between the columns,
 /// indexes, and FKs views.
 fn append_add_button(list: &gtk::ListBox, label: &str, on_activate: impl Fn() + 'static) -> adw::ActionRow {
-    let row = adw::ActionRow::builder().title(label).activatable(true).build();
+    let row = adw::ActionRow::builder()
+        .use_markup(false)
+        .title(label)
+        .activatable(true)
+        .build();
     row.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
     row.connect_activated(move |_| on_activate());
     list.append(&row);
@@ -874,7 +878,8 @@ impl SimpleComponent for StructureTab {
                 // a modal AdwAlertDialog would duplicate the same
                 // text and force the user to dismiss it before they
                 // can see the page.
-                self.error_status.set_description(Some(&message));
+                self.error_status
+                    .set_description(Some(&crate::ui::plain_text::escape_markup(&message)));
                 self.inner_stack.set_visible_child_name("error");
                 // Bail out of the refetch window even on failure so
                 // recompute_dirty_state doesn't stay frozen if the user
