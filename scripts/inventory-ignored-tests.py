@@ -128,6 +128,8 @@ for path in sorted(
             tier, enable = "Release", POSTGRES_RELEASE_RUNNER
         elif "socket" in relative:
             tier, enable = "Socket", "scripts/test-postgres-socket.sh"
+        elif "restricted_role_catalog" in relative:
+            tier, enable = "Smoke", "VISIBILITY_PG_* env against a disposable PostgreSQL superuser (see the test's module comment)"
         elif "smoke_local" in relative:
             tier, enable = "Smoke", "scripts/smoke-postgres.sh against disposable DB"
         elif "Secret Service" in reason or "secret" in relative:
