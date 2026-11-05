@@ -179,10 +179,14 @@ impl Connection for PgConnection {
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         let rows = sqlx::query(
-            "SELECT schemaname, tablename
-             FROM pg_tables
-             WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
-             ORDER BY schemaname, tablename",
+            "SELECT n.nspname, c.relname
+             FROM pg_catalog.pg_class c
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+             WHERE c.relkind IN ('r', 'p')
+               AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+               AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+               AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+             ORDER BY n.nspname, c.relname",
         )
         .fetch_all(&self.pool)
         .await
@@ -198,13 +202,14 @@ impl Connection for PgConnection {
 
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         let rows = sqlx::query(
-            "SELECT schemaname, viewname FROM (
-                 SELECT schemaname, viewname FROM pg_views
-                 UNION ALL
-                 SELECT schemaname, matviewname FROM pg_matviews
-             ) AS relations
-             WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
-             ORDER BY schemaname, viewname",
+            "SELECT n.nspname, c.relname
+             FROM pg_catalog.pg_class c
+             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+             WHERE c.relkind IN ('v', 'm')
+               AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+               AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+               AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+             ORDER BY n.nspname, c.relname",
         )
         .fetch_all(&self.pool)
         .await
