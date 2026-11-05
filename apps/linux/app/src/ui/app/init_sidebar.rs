@@ -106,7 +106,11 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
                     open_mode: OpenMode::SwitchOrAppend,
                 });
             }
-            NodeKind::Catalog(kind) => activate_sender.input(AppMsg::ShowCatalogKind(*kind)),
+            NodeKind::Catalog(kind) => activate_sender.input(AppMsg::LoadSidebarCatalog(*kind)),
+            NodeKind::CatalogObject { kind, .. } | NodeKind::CatalogMore(kind) => {
+                activate_sender.input(AppMsg::ShowCatalogKind(*kind));
+            }
+            NodeKind::CatalogLoaded(_) => activate_sender.input(AppMsg::ToggleSidebarGroup(node.key.clone())),
             NodeKind::Schema | NodeKind::Group(_) => {
                 activate_sender.input(AppMsg::ToggleSidebarGroup(node.key.clone()));
             }

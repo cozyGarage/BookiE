@@ -197,8 +197,7 @@ pub fn present(
         alert.set_default_response(Some("cancel"));
         alert.set_close_response("cancel");
         let history = history_for_clear.clone();
-        alert.connect_response(None, move |dlg, response| {
-            dlg.close();
+        alert.connect_response(None, move |_, response| {
             if response == "clear" {
                 let history = history.clone();
                 relm4::spawn(async move {
