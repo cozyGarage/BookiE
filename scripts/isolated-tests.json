@@ -1100,6 +1100,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::retrying_a_failed_page_reads_the_retained_spool_and_renders_its_rows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::a_loaded_page_replaces_only_its_matching_generation_placeholder"
     ],
     [
