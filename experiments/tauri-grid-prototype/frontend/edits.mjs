@@ -32,7 +32,7 @@ export function createEdits() {
 }
 
 export function isEditable(column, cell) {
-  return EDITABLE_COLUMNS.has(column) && cell.kind !== 'undecodable';
+  return EDITABLE_COLUMNS.has(column) && cell.kind !== 'undecodable' && !/[\r\n]/u.test(cell.value ?? '');
 }
 
 export function editStatus(count) {

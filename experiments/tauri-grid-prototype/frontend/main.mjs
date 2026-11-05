@@ -105,6 +105,12 @@ async function startEdit(item, rowNumber, column, cell) {
       return;
     }
   }
+  if (!isEditable(column, cell)) {
+    editing = false;
+    $('#selection-status').textContent = 'This value cannot be edited in the single-line prototype.';
+    schedule();
+    return;
+  }
   const input = document.createElement('input');
   input.className = 'entry cell-editor';
   input.value = cell.kind === 'null' ? '' : cell.value;
@@ -597,6 +603,11 @@ async function previewEditSelfTest() {
   const input = document.querySelector('.cell-editor');
   await invoke('report', { line: `exact_cell_loaded=${input?.value === expected.value}` });
   input?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  await pause(300);
+  const multiline = { kind: 'text', value: 'first\nsecond', previewed: false };
+  const target = document.querySelector('.row[aria-rowindex="1"]').querySelectorAll('.cell')[2];
+  await startEdit(target, 0, 1, multiline);
+  await invoke('report', { line: `multiline_preserved=${multiline.value === 'first\nsecond'} multiline_editor_refused=${document.querySelector('.cell-editor') === null}` });
   await pause(300);
 }
 

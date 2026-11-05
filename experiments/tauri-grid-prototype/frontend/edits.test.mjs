@@ -56,6 +56,26 @@ test('only the label, state and typed columns of a decodable cell can be edited'
   assert.equal(isEditable(3, { kind: 'undecodable' }), false);
 });
 
+test('multiline values cannot enter the single-line editor and retain their original text', () => {
+  for (const separator of ['\n', '\r', '\r\n']) {
+    const cell = { kind: 'text', value: `first${separator}second` };
+    assert.equal(isEditable(1, cell), false);
+    assert.equal(cell.value, `first${separator}second`);
+  }
+  assert.equal(isEditable(1, { kind: 'text', value: 'single line' }), true);
+});
+
+test('a preview hiding a later newline cannot become an editable flattened value', async () => {
+  const value = `${'x'.repeat(4096)}\nlast`;
+  const exact = await loadEditCell(
+    { kind: 'text', value: 'short preview…', previewed: true },
+    async () => ({ kind: 'text', value, previewed: false }),
+    () => true,
+  );
+  assert.equal(isEditable(1, exact), false);
+  assert.equal(exact.value, value);
+});
+
 test('the status says the edits are local and counts them', () => {
   assert.equal(editStatus(0), '');
   assert.match(editStatus(1), /^1 cell edited in this view only/);
