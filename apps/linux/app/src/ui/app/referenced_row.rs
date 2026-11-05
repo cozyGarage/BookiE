@@ -7,6 +7,9 @@ use crate::ui::browse_tab::BrowseTabInput;
 use super::types::TableTabStart;
 use super::{App, WorkspaceTab};
 
+#[cfg(test)]
+mod tests;
+
 pub(super) fn choose_referenced_row(
     parent: &adw::ApplicationWindow,
     targets: Vec<crate::ui::browse_tab::reference::ReferencedRowTarget>,
@@ -28,8 +31,7 @@ pub(super) fn choose_referenced_row(
         let label = format!("{} → {}{}", target.foreign_key, schema, target.table);
         dialog.add_response(&response, &label);
     }
-    dialog.connect_response(None, move |dialog, response| {
-        dialog.close();
+    dialog.connect_response(None, move |_, response| {
         let Some(index) = response
             .strip_prefix("foreign-key-")
             .and_then(|value| value.parse::<usize>().ok())
