@@ -16,6 +16,16 @@ export function displayCell(cell) {
   return cell.kind === 'null' ? 'NULL' : cell.value;
 }
 
+const KINDS = new Set([
+  'null', 'boolean', 'integer', 'float', 'text', 'bytes', 'date', 'time', 'datetime',
+  'timestamptz', 'decimal', 'uuid', 'json', 'json_text', 'undecodable',
+]);
+
+export function cellClass(cell) {
+  const kind = KINDS.has(cell.kind) ? cell.kind : 'text';
+  return kind === 'null' ? 'cell null' : `cell kind-${kind}`;
+}
+
 export function windowTop(scrollTop, height, limit, rowHeight) {
   return Math.max(0, Math.min(scrollTop, height - limit * rowHeight));
 }

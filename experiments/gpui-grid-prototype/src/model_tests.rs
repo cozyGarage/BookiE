@@ -163,3 +163,80 @@ fn the_match_cursor_wraps_both_ways_and_names_its_position() {
     cursor.set(vec![5]);
     assert_eq!(cursor.step(false), Some(5));
 }
+
+#[test]
+fn the_typed_column_cycles_through_the_same_kinds_as_the_tauri_prototype() {
+    let kinds: Vec<&str> = (0..TYPED_KINDS).map(|index| typed_of(index).kind()).collect();
+    assert_eq!(
+        kinds,
+        [
+            "float",
+            "bytes",
+            "date",
+            "time",
+            "datetime",
+            "timestamptz",
+            "decimal",
+            "uuid",
+            "json",
+            "json_text",
+            "undecodable",
+            "null"
+        ]
+    );
+    assert_eq!(typed_of(TYPED_KINDS).kind(), "float");
+    assert!(row_at(7).len() == 4 && row_at(7)[3] == typed_of(7));
+}
+
+#[test]
+fn every_kind_displays_the_same_exact_text_as_the_tauri_prototype() {
+    let shown: Vec<String> = (0..TYPED_KINDS).map(|index| typed_of(index).display()).collect();
+    assert_eq!(
+        shown,
+        [
+            "0.30000000000000004",
+            "\\xdeadbeef",
+            "2026-11-04",
+            "23:59:59.123456",
+            "2026-11-04 23:59:59.123456",
+            "2026-11-04T23:59:59.123456+00:00",
+            "12345678901234567890.12345678",
+            "67e55044-10b1-426f-9247-bb680e5fe0c8",
+            r#"{"a":[1,{"b":null}]}"#,
+            "{\"raw\":  1,   \"keep\" : 2}",
+            "<undecodable numeric(40,20)>",
+            "NULL"
+        ]
+    );
+}
+
+#[test]
+fn bytes_float_and_undecodable_render_by_their_own_rules() {
+    assert_eq!(Cell::Bytes(vec![]).display(), "\\x");
+    assert_eq!(Cell::Bytes(vec![0x00, 0xff]).display(), "\\x00ff");
+    assert_eq!(Cell::Float(1.0).display(), "1");
+    assert_eq!(Cell::Undecodable("geometry".into()).display(), "<undecodable geometry>");
+}
+
+#[test]
+fn a_filter_and_find_can_target_the_typed_column() {
+    let predicate = parse_predicate("typed contains deadbeef").unwrap();
+    let hits = filter_rows(150_000, &predicate);
+    assert_eq!(hits.first().copied(), Some(1));
+    assert!(hits.iter().all(|row| u64::from(*row) % TYPED_KINDS == 1));
+    let not_undecodable = parse_predicate("typed != <undecodable numeric(40,20)>").unwrap();
+    assert_eq!(filter_rows(24, &not_undecodable).len(), 22);
+    let found = find_rows(150_000, "numeric(40,20)", 3).unwrap();
+    assert_eq!(found.matches, vec![10, 22, 34]);
+}
+
+#[test]
+fn only_the_typed_json_value_contains_the_word_null_and_a_null_cell_never_matches() {
+    let found = find_rows(150_000, "null", 10).unwrap();
+    assert!(!found.matches.is_empty());
+    assert!(
+        found.matches.iter().all(|row| row % TYPED_KINDS == 8),
+        "{:?}",
+        found.matches
+    );
+}

@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::connection_import_dbeaver::{PeerImport, PeerPort, field, port};
+use crate::connection_import_peer::{PeerImport, PeerPort, field, port, refused, skipped_label};
 use crate::connection_url::{draft_connection, validate_host};
 use crate::connections::SavedConnection;
 use crate::error::StorageError;
@@ -97,16 +97,7 @@ fn draft_from(peer: &PeerConnection) -> Option<SavedConnection> {
 }
 
 fn display_name(peer: &PeerConnection) -> String {
-    let name = if peer.name.trim().is_empty() {
-        peer.host.trim()
-    } else {
-        peer.name.trim()
-    };
-    name.chars().filter(|c| !c.is_control()).take(256).collect()
-}
-
-fn refused(message: &str) -> StorageError {
-    StorageError::Schema(message.to_string())
+    skipped_label(&peer.name, peer.host.trim())
 }
 
 #[cfg(test)]
