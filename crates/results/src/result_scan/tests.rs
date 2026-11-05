@@ -36,6 +36,18 @@ fn a_cancelled_scan_stops_before_the_next_page() {
 }
 
 #[test]
+fn cancellation_during_the_last_page_is_not_reported_as_complete() {
+    let source = source_of(vec![numbered(0, 2)]);
+    let cancel = CancellationToken::new();
+    let error = scan_pages(&source, &cancel, &ScanProgress::default(), |_, _| {
+        cancel.cancel();
+        Ok(ControlFlow::Continue(()))
+    })
+    .unwrap_err();
+    assert_eq!(error, ScanError::Cancelled);
+}
+
+#[test]
 fn a_cancelled_token_prevents_any_page_from_loading() {
     let source = source_of(vec![numbered(0, 2)]);
     let cancel = CancellationToken::new();
