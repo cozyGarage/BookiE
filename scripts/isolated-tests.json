@@ -215,6 +215,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::browse::tests::force_dismissing_refresh_confirmation_does_not_abort"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::environment_marker::tests::the_badge_and_header_tint_follow_the_connection_environment"
     ],
     [
