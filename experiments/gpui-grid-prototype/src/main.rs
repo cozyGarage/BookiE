@@ -1,21 +1,33 @@
 use std::ops::Range;
 use std::time::{Duration, Instant};
 
+mod assets;
+mod chrome;
+mod grid_edit;
+mod text_input;
+mod ui_theme;
+
+use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
-use gpui::{
-    App, Application, Bounds, Context, Div, FocusHandle, Focusable, KeyDownEvent, ScrollStrategy, Stateful,
-    UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
+use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
+use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
+use bookie_gpui_grid_prototype::shell::{
+    DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag,
 };
+use bookie_gpui_grid_prototype::source::{Source, Synthetic};
+use bookie_gpui_grid_prototype::theme::{Style, Theme};
+use gpui::{
+    App, Application, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
+    MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
+    prelude::*, px, rgb, size, uniform_list,
+};
+use text_input::{InputEvent, TextInput};
+use ui_theme::ThemeExt;
 
-const ROW_HEIGHT: f32 = 36.0;
-const CELL_WIDTHS: [f32; 3] = [240.0, 280.0, 120.0];
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Field {
-    None,
-    Find,
-    Filter,
-}
+const ROW_HEIGHT: f32 = 26.0;
+const HEADER_HEIGHT: f32 = 28.0;
+pub const GUTTER_WIDTH: f32 = 56.0;
+pub const CELL_WIDTHS: [f32; 4] = [240.0, 280.0, 120.0, 320.0];
 
 enum Mode {
     All,
@@ -23,19 +35,43 @@ enum Mode {
 }
 
 struct GridView {
-    total: u64,
+    source: Source,
     mode: Mode,
     pager: Pager,
     continuous: bool,
-    find_text: String,
-    filter_text: String,
+    find: Entity<TextInput>,
+    filter: Entity<TextInput>,
     filter_visible: bool,
-    active: Field,
+    editor: Entity<TextInput>,
+    editing: Option<grid_edit::Editing>,
+    edits: grid_edit::Edits,
+    cell_cursor: Option<Cursor>,
+    viewport_rows: usize,
+    palette_input: Entity<TextInput>,
+    palette_open: bool,
+    palette_index: usize,
+    dark_mode: bool,
+    tabs: Tabs,
+    runs: Vec<Run>,
+    active_run: usize,
+    summary_view: bool,
+    result_ratio: f32,
+    result_open: bool,
+    resizing_split: bool,
+    font: gpui::SharedString,
+    font_names: Vec<String>,
+    palette_fonts: bool,
+    sidebar_open: bool,
+    sidebar_width: f32,
+    resizing_sidebar: bool,
+    connection_open: bool,
+    database_open: bool,
+    sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
     compare: Option<Diff>,
     status: String,
-    selected: Option<u64>,
+    selection: Option<Selection>,
     generation: u64,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
@@ -57,12 +93,23 @@ fn thousands(value: u64) -> String {
     let digits = value.to_string();
     let mut out = String::new();
     for (index, ch) in digits.chars().enumerate() {
-        if index > 0 && (digits.len() - index) % 3 == 0 {
+        if index > 0 && (digits.len() - index).is_multiple_of(3) {
             out.push(',');
         }
         out.push(ch);
     }
     out
+}
+
+fn default_font(installed: &[String]) -> String {
+    let wanted = std::env::var("BOOKIE_PROTOTYPE_FONT").ok();
+    wanted
+        .iter()
+        .map(String::as_str)
+        .chain(["Fira Sans", "Fira Code"])
+        .find(|name| installed.iter().any(|font| font == name))
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn env_number<T: std::str::FromStr>(name: &str) -> Option<T> {
@@ -76,21 +123,92 @@ impl Focusable for GridView {
 }
 
 impl GridView {
-    fn new(total: u64, started: Instant, cx: &mut Context<Self>) -> Self {
+    fn new(total: u64, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::with_source(std::sync::Arc::new(Synthetic { total }), started, window, cx)
+    }
+
+    fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let total = source.total();
+        let find = cx.new(|cx| TextInput::new("Find in all rows", cx));
+        let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
+        cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
+            InputEvent::Changed => {
+                this.cursor = MatchCursor::default();
+                cx.notify();
+            }
+            InputEvent::Submit => this.run_find(true, cx),
+            InputEvent::Cancel => this.status.clear(),
+        })
+        .detach();
+        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| {
+            if *event == InputEvent::Submit {
+                this.apply_filter(cx);
+            }
+        })
+        .detach();
+        let editor = cx.new(|cx| TextInput::new("", cx));
+        cx.subscribe_in(&editor, window, |this, _, event: &InputEvent, window, cx| {
+            this.on_editor_event(event, window, cx);
+        })
+        .detach();
+        let mut font_names = cx.text_system().all_font_names();
+        font_names.sort();
+        font_names.dedup();
+        let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
+        cx.subscribe(&sidebar_search, |_, _, _: &InputEvent, cx| cx.notify())
+            .detach();
+        let palette_input = cx.new(|cx| TextInput::new("Type a command", cx));
+        cx.subscribe_in(
+            &palette_input,
+            window,
+            |this, _, event: &InputEvent, window, cx| match event {
+                InputEvent::Changed => {
+                    this.palette_index = 0;
+                    cx.notify();
+                }
+                InputEvent::Submit => this.run_palette(window, cx),
+                InputEvent::Cancel => this.close_palette(window, cx),
+            },
+        )
+        .detach();
         GridView {
-            total,
+            source,
             mode: Mode::All,
             pager: Pager::new(total),
             continuous: false,
-            find_text: String::new(),
-            filter_text: String::new(),
+            find,
+            filter,
             filter_visible: false,
-            active: Field::None,
+            editor,
+            editing: None,
+            edits: Default::default(),
+            cell_cursor: None,
+            viewport_rows: 10,
+            palette_input,
+            palette_open: false,
+            palette_index: 0,
+            dark_mode: Theme::current(cx).dark,
+            tabs: Tabs::default(),
+            runs: vec![Run { number: 1, rows: total }],
+            active_run: 0,
+            summary_view: false,
+            result_ratio: DEFAULT_RESULT_RATIO,
+            result_open: true,
+            resizing_split: false,
+            font: default_font(&font_names).into(),
+            font_names,
+            palette_fonts: false,
+            sidebar_open: true,
+            sidebar_width: 260.0,
+            resizing_sidebar: false,
+            connection_open: true,
+            database_open: true,
+            sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
             compare: None,
             status: String::new(),
-            selected: None,
+            selection: None,
             generation: 0,
             scroll: UniformListScrollHandle::new(),
             focus: cx.focus_handle(),
@@ -105,13 +223,17 @@ impl GridView {
 
     fn dataset_count(&self) -> u64 {
         match &self.mode {
-            Mode::All => self.total,
+            Mode::All => self.source.total(),
             Mode::Filtered { kept, .. } => kept.len() as u64,
         }
     }
 
     fn base(&self) -> u64 {
-        if self.continuous { 0 } else { self.pager.page * PAGE_ROWS }
+        if self.continuous {
+            0
+        } else {
+            self.pager.page * PAGE_ROWS
+        }
     }
 
     fn visible_count(&self) -> usize {
@@ -119,7 +241,11 @@ impl GridView {
             return diff.rows.len();
         }
         let remaining = self.dataset_count().saturating_sub(self.base());
-        if self.continuous { remaining as usize } else { remaining.min(PAGE_ROWS) as usize }
+        if self.continuous {
+            remaining as usize
+        } else {
+            remaining.min(PAGE_ROWS) as usize
+        }
     }
 
     fn source_row(&self, dataset_index: u64) -> u64 {
@@ -129,10 +255,59 @@ impl GridView {
         }
     }
 
+    fn dataset_index_of(&self, source: u64) -> Option<u64> {
+        match &self.mode {
+            Mode::All => Some(source),
+            Mode::Filtered { kept, .. } => kept.binary_search(&(source as u32)).ok().map(|index| index as u64),
+        }
+    }
+
+    fn click_row(&mut self, dataset_index: u64, shift: bool) {
+        self.selection = Some(Selection::after_click(self.selection, dataset_index, shift));
+        self.status = self.selection.map(Selection::label).unwrap_or_default();
+    }
+
+    fn copy_selection(&mut self, with_headers: bool, cx: &mut Context<Self>) {
+        let Some(selection) = self.selection else { return };
+        if !selection.copyable() {
+            self.status = selection.label();
+            return;
+        }
+        let rows = (selection.first()..=selection.last()).map(|index| self.source.row(self.source_row(index)));
+        let text = copy_tsv(rows, with_headers);
+        cx.write_to_clipboard(ClipboardItem::new_string(text));
+        let noun = if selection.count() == 1 { "row" } else { "rows" };
+        self.status = format!(
+            "Copied {} {noun}{}",
+            selection.count(),
+            if with_headers { " with headers" } else { "" }
+        );
+    }
+
+    fn run_query(&mut self) {
+        let run = next_run(&self.runs);
+        self.runs.push(run);
+        self.activate_run(self.runs.len() - 1);
+    }
+
+    fn activate_run(&mut self, index: usize) {
+        let Some(run) = self.runs.get(index).copied() else {
+            return;
+        };
+        self.active_run = index;
+        self.source = std::sync::Arc::new(Synthetic { total: run.rows });
+        self.edits.clear();
+        self.compare = None;
+        self.cursor = MatchCursor::default();
+        self.set_mode(Mode::All);
+        self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
+    }
+
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
         self.pager = Pager::new(self.dataset_count());
-        self.selected = None;
+        self.selection = None;
+        self.cell_cursor = None;
         self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
     }
 
@@ -142,10 +317,8 @@ impl GridView {
             self.first_frame_reported = true;
             println!("PROTOTYPE_FIRST_FRAME ms={}", self.started.elapsed().as_millis());
         }
-        if self.measuring {
-            if let Some(last) = self.last_frame {
-                self.frame_intervals.push(now - last);
-            }
+        if let (true, Some(last)) = (self.measuring, self.last_frame) {
+            self.frame_intervals.push(now - last);
         }
         self.last_frame = Some(now);
     }
@@ -172,30 +345,33 @@ impl GridView {
     }
 
     fn run_find(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if self.find_text.is_empty() {
+        if self.find_text(cx).is_empty() {
             return;
         }
         if !self.cursor.matches.is_empty() && self.cursor.status(false) != "No match" {
             self.step_match(forward);
             return;
         }
-        let (total, query) = (self.total, self.find_text.clone());
+        let (source, query) = (self.source.clone(), self.find_text(cx));
         self.status = "Searching…".into();
-        self.begin_background(cx, move || find_rows(total, &query, MAX_FIND_MATCHES), move |this, found| {
-            match found {
+        self.begin_background(
+            cx,
+            move || source.find(&query, MAX_FIND_MATCHES),
+            move |this, found| match found {
                 Ok(found) => {
                     this.find_capped = found.capped;
                     this.cursor.set(found.matches);
                     this.step_match(forward);
                 }
                 Err(message) => this.status = message.into(),
-            }
-        });
+            },
+        );
     }
 
     fn step_match(&mut self, forward: bool) {
         if let Some(row) = self.cursor.step(forward) {
-            self.selected = Some(row);
+            let at = self.dataset_index_of(row);
+            self.selection = at.map(|index| Selection::after_click(None, index, false));
             if !self.continuous {
                 self.pager.contains_row(row);
             }
@@ -205,31 +381,39 @@ impl GridView {
         self.status = self.cursor.status(self.find_capped);
     }
 
-    fn show_matching(&mut self) {
+    fn find_text(&self, cx: &App) -> String {
+        self.find.read(cx).content().to_string()
+    }
+
+    fn show_matching(&mut self, cx: &App) {
         if self.cursor.matches.is_empty() {
             return;
         }
         let kept = self.cursor.matches.iter().map(|row| *row as u32).collect();
-        let label = format!("FILTER {}", self.find_text);
+        let label = format!("FILTER {}", self.find_text(cx));
         self.set_mode(Mode::Filtered { kept, label });
         self.status = format!("Showing {} matching rows", thousands(self.dataset_count()));
     }
 
     fn apply_filter(&mut self, cx: &mut Context<Self>) {
-        let predicate = match parse_predicate(&self.filter_text) {
+        let predicate = match parse_predicate(self.filter.read(cx).content()) {
             Ok(predicate) => predicate,
             Err(message) => {
                 self.status = message.into();
                 return;
             }
         };
-        let total = self.total;
-        let label = format!("WHERE {}", self.filter_text);
+        let source = self.source.clone();
+        let label = format!("WHERE {}", self.filter.read(cx).content());
         self.status = "Filtering…".into();
-        self.begin_background(cx, move || filter_rows(total, &predicate), move |this, kept| {
-            this.set_mode(Mode::Filtered { kept, label });
-            this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
-        });
+        self.begin_background(
+            cx,
+            move || source.filter(&predicate),
+            move |this, kept| {
+                this.set_mode(Mode::Filtered { kept, label });
+                this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
+            },
+        );
     }
 
     fn clear_filter(&mut self) {
@@ -240,46 +424,299 @@ impl GridView {
     }
 
     fn compare(&mut self, keyed: bool, cx: &mut Context<Self>) {
-        let total = self.total;
+        let source = self.source.clone();
         self.status = "Comparing…".into();
-        self.begin_background(cx, move || build_diff(total, keyed), |this, diff| {
-            this.status.clear();
-            this.compare = Some(diff);
-            this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
-        });
+        self.begin_background(
+            cx,
+            move || source.compare(keyed),
+            |this, diff| {
+                this.status.clear();
+                this.compare = Some(diff);
+                this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+            },
+        );
     }
 
-    fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let stroke = &event.keystroke;
-        if stroke.modifiers.control && stroke.key == "f" {
-            self.filter_visible = true;
-            self.active = Field::Filter;
+        let modifiers = stroke.modifiers;
+        let key = stroke.key.as_str();
+        if self.palette_open {
+            match key {
+                "down" | "up" => {
+                    let count = self.palette_shown(cx).len();
+                    self.palette_index = palette_step(self.palette_index, count, key == "down");
+                    cx.notify();
+                }
+                "escape" => self.close_palette(window, cx),
+                _ => {}
+            }
+            return;
+        }
+        if modifiers.control && modifiers.shift && key == "p" {
+            self.open_palette(window, cx);
+            return;
+        }
+        if modifiers.control {
+            match key {
+                "f" => {
+                    self.filter_visible = true;
+                    window.focus(&self.filter.read(cx).focus_handle(cx));
+                }
+                "c" if self.focus.is_focused(window) => self.copy_selection(modifiers.shift, cx),
+                "b" => self.sidebar_open = !self.sidebar_open,
+                "t" => {
+                    self.tabs.open_query();
+                    window.focus(&self.focus);
+                }
+                "enter" if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
+                _ => {}
+            }
+            if !matches!(key, "home" | "end") {
+                cx.notify();
+                return;
+            }
+        }
+        if self.focus.is_focused(window) && self.editing.is_none() && self.compare.is_none() && self.tabs.shows_grid() {
+            self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
+        }
+    }
+
+    fn grid_key(&mut self, key: &str, shift: bool, ctrl: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let rows = self.visible_count();
+        match key {
+            "space" => {
+                if let Some(cursor) = self.cell_cursor {
+                    self.click_row(self.base() + cursor.row as u64, false);
+                }
+            }
+            "enter" | "f2" => {
+                if let Some(cursor) = self.cell_cursor {
+                    let source = self.source_row(self.base() + cursor.row as u64);
+                    self.start_edit(source, cursor.column, window, cx);
+                }
+            }
+            "down" if self.cell_cursor.is_some_and(|c| c.row + 1 == rows) && self.next_page() => {
+                self.place_cursor(Some(Cursor {
+                    row: 0,
+                    column: self.cell_cursor.map_or(0, |c| c.column),
+                }));
+            }
+            "up" if self.cell_cursor.is_some_and(|c| c.row == 0) && self.previous_page() => {
+                let last = self.visible_count().saturating_sub(1);
+                self.place_cursor(Some(Cursor {
+                    row: last,
+                    column: self.cell_cursor.map_or(0, |c| c.column),
+                }));
+            }
+            _ => {
+                let Some(next) = move_cursor(self.cell_cursor, key, rows, self.viewport_rows, ctrl) else {
+                    return;
+                };
+                self.place_cursor(Some(next));
+                if shift && matches!(key, "up" | "down") {
+                    self.click_row(self.base() + next.row as u64, true);
+                }
+            }
+        }
+        cx.notify();
+    }
+
+    fn next_page(&mut self) -> bool {
+        let moved = !self.continuous && self.pager.page + 1 < self.pager.pages();
+        if moved {
+            self.pager.next();
+        }
+        moved
+    }
+
+    fn previous_page(&mut self) -> bool {
+        let moved = !self.continuous && self.pager.page > 0;
+        if moved {
+            self.pager.previous();
+        }
+        moved
+    }
+
+    fn place_cursor(&mut self, cursor: Option<Cursor>) {
+        let previous = self.cell_cursor.map_or(0, |c| c.row);
+        self.cell_cursor = cursor;
+        let Some(cursor) = cursor else { return };
+        let strategy = if cursor.row < previous {
+            ScrollStrategy::Top
+        } else {
+            ScrollStrategy::Bottom
+        };
+        self.scroll.scroll_to_item(cursor.row, strategy);
+        self.status = cursor.label();
+    }
+
+    fn palette_actions(&self) -> Vec<Action> {
+        if self.palette_fonts {
+            return self
+                .font_names
+                .iter()
+                .map(|name| Action {
+                    id: "font-choice",
+                    label: name.clone(),
+                    enabled: true,
+                })
+                .collect();
+        }
+        let filtering = matches!(self.mode, Mode::Filtered { .. });
+        let paged = !self.continuous;
+        let action = |id, label: &str, enabled| Action {
+            id,
+            label: label.to_string(),
+            enabled,
+        };
+        vec![
+            action("first", "Go to first page", paged),
+            action("previous", "Go to previous page", paged && self.pager.page > 0),
+            action(
+                "next",
+                "Go to next page",
+                paged && self.pager.page + 1 < self.pager.pages(),
+            ),
+            action("last", "Go to last page", paged),
+            action("find", "Find in all rows", !filtering),
+            action("filter", "Filter rows (WHERE)", true),
+            action("clear-filter", "Clear filter", filtering),
+            action("compare", "Compare results", true),
+            action(
+                "continuous",
+                if self.continuous {
+                    "Switch to paged scrolling"
+                } else {
+                    "Switch to continuous scrolling"
+                },
+                true,
+            ),
+            action("copy", "Copy selected rows", self.selection.is_some()),
+            action("clear-selection", "Clear row selection", self.selection.is_some()),
+            action("edit", "Edit the active cell", self.cell_cursor.is_some()),
+            action(
+                "sidebar",
+                if self.sidebar_open {
+                    "Hide the sidebar"
+                } else {
+                    "Show the sidebar"
+                },
+                true,
+            ),
+            action("font", "Choose font…", true),
+            action("theme-dbx", "Theme: DBX style", true),
+            action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
+            action("query", "New query tab", true),
+            action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
+            action(
+                "results",
+                if self.result_open {
+                    "Hide the results pane"
+                } else {
+                    "Show the results pane"
+                },
+                matches!(self.tabs.current(), Tab::Query),
+            ),
+            action("home", "Open Home", true),
+            action("table", "Open synthetic_rows", true),
+            action(
+                "theme",
+                if self.dark_mode {
+                    "Switch to light theme"
+                } else {
+                    "Switch to dark theme"
+                },
+                true,
+            ),
+        ]
+    }
+
+    fn palette_shown(&self, cx: &App) -> Vec<usize> {
+        palette_matches(self.palette_input.read(cx).content(), &self.palette_actions())
+    }
+
+    fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_open = true;
+        self.palette_fonts = false;
+        self.palette_index = 0;
+        self.palette_input.update(cx, |input, cx| input.set_content("", cx));
+        window.focus(&self.palette_input.read(cx).focus_handle(cx));
+        cx.notify();
+    }
+
+    fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_open = false;
+        self.palette_fonts = false;
+        window.focus(&self.focus);
+        cx.notify();
+    }
+
+    fn run_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let actions = self.palette_actions();
+        let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
+        let Some(index) = shown
+            .get(self.palette_index.min(shown.len().saturating_sub(1)))
+            .copied()
+        else {
+            return;
+        };
+        let id = actions[index].id;
+        if id == "font" {
+            self.palette_fonts = true;
+            self.palette_index = 0;
+            self.palette_input.update(cx, |input, cx| input.set_content("", cx));
             cx.notify();
             return;
         }
-        let field = match self.active {
-            Field::Find => &mut self.find_text,
-            Field::Filter => &mut self.filter_text,
-            Field::None => return,
-        };
-        match stroke.key.as_str() {
-            "backspace" => {
-                field.pop();
-                if self.active == Field::Find {
-                    self.cursor = MatchCursor::default();
-                }
+        if id == "font-choice" {
+            self.font = actions[index].label.clone().into();
+            self.close_palette(window, cx);
+            return;
+        }
+        self.close_palette(window, cx);
+        match id {
+            "first" => self.pager.first(),
+            "previous" => self.pager.previous(),
+            "next" => self.pager.next(),
+            "last" => self.pager.last(),
+            "find" => window.focus(&self.find.read(cx).focus_handle(cx)),
+            "filter" => {
+                self.filter_visible = true;
+                window.focus(&self.filter.read(cx).focus_handle(cx));
             }
-            "escape" => self.active = Field::None,
-            "enter" if self.active == Field::Find => self.run_find(!stroke.modifiers.shift, cx),
-            "enter" => self.apply_filter(cx),
-            _ => {
-                if let (Some(text), false) = (&stroke.key_char, stroke.modifiers.control) {
-                    field.push_str(text);
-                    if self.active == Field::Find {
-                        self.cursor = MatchCursor::default();
-                    }
-                }
+            "clear-filter" => self.clear_filter(),
+            "compare" => self.compare(false, cx),
+            "continuous" => {
+                self.continuous = !self.continuous;
+                self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
             }
+            "copy" => self.copy_selection(false, cx),
+            "clear-selection" => self.selection = None,
+            "edit" => self.grid_key("enter", false, false, window, cx),
+            "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "home" => self.tabs.open_home(),
+            "query" => {
+                self.tabs.open_query();
+                window.focus(&self.focus);
+            }
+            "run" => self.run_query(),
+            "results" => self.result_open = !self.result_open,
+            "table" => {
+                self.tabs.open_table(DATA_TABLE);
+                window.focus(&self.focus);
+            }
+            "theme-dbx" | "theme-adwaita" => {
+                let style = if id == "theme-dbx" { Style::Dbx } else { Style::Adwaita };
+                Theme::current(cx).with_style(style).install(cx);
+                window.refresh();
+            }
+            "theme" => {
+                self.dark_mode = !self.dark_mode;
+                Theme::current(cx).toggled().install(cx);
+                window.refresh();
+            }
+            _ => {}
         }
         cx.notify();
     }
@@ -304,7 +741,12 @@ impl GridView {
     fn report_scroll(&self, steps: u32, elapsed: u128, with_frames: bool) {
         let mut sorted: Vec<f64> = self.frame_intervals.iter().map(|d| d.as_secs_f64() * 1000.0).collect();
         sorted.sort_by(f64::total_cmp);
-        let pick = |q: f64| sorted.get(((sorted.len() as f64 - 1.0) * q) as usize).copied().unwrap_or(0.0);
+        let pick = |q: f64| {
+            sorted
+                .get(((sorted.len() as f64 - 1.0) * q) as usize)
+                .copied()
+                .unwrap_or(0.0)
+        };
         let frames = if with_frames {
             format!(
                 " frames={} frame_p50_ms={:.2} frame_p95_ms={:.2} frame_p99_ms={:.2} frame_max_ms={:.2}",
@@ -332,7 +774,11 @@ impl GridView {
                     this.frame_intervals.clear();
                     this.last_frame = None;
                     this.measuring = true;
-                    this.pace = Some(Pace { step: 0, steps, begun: Instant::now() });
+                    this.pace = Some(Pace {
+                        step: 0,
+                        steps,
+                        begun: Instant::now(),
+                    });
                     cx.notify();
                 })
                 .ok();
@@ -352,52 +798,83 @@ impl GridView {
                 cx.background_executor().timer(Duration::from_millis(62)).await;
             }
             let elapsed = begun.elapsed().as_millis();
-            this.update(cx, |this, _| this.report_scroll(steps, elapsed, false)).ok();
+            this.update(cx, |this, _| this.report_scroll(steps, elapsed, false))
+                .ok();
         })
         .detach();
     }
 }
 
-fn button(id: &'static str, label: impl Into<String>) -> Stateful<Div> {
+fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
+        .flex()
+        .items_center()
+        .h(px(28.0))
         .px_3()
-        .py_1()
-        .rounded_md()
-        .bg(rgb(0x2d2f36))
+        .rounded(px(4.0))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .bg(rgb(theme.background))
+        .text_color(rgb(theme.foreground))
         .cursor_pointer()
-        .hover(|style| style.bg(rgb(0x3a3d46)))
+        .hover(move |style| style.bg(rgb(theme.accent)))
         .child(label.into())
 }
 
-fn field_box(id: &'static str, text: &str, placeholder: &str, active: bool) -> Stateful<Div> {
-    let shown = if text.is_empty() { placeholder.to_string() } else { text.to_string() };
+pub fn flex_cell(width: f32) -> Div {
     div()
-        .id(id)
-        .w(px(220.0))
+        .flex()
+        .items_center()
+        .h_full()
         .px_2()
-        .py_1()
-        .border_1()
-        .border_color(if active { rgb(0x4c8dff) } else { rgb(0x44464f) })
-        .bg(rgb(0x14151a))
-        .text_color(if text.is_empty() { rgb(0x80838f) } else { rgb(0xe6e6e6) })
-        .cursor_text()
-        .child(shown)
+        .flex_basis(px(width))
+        .flex_grow()
+        .flex_shrink()
+        .min_w(px(width * 0.4))
+        .overflow_hidden()
+        .whitespace_nowrap()
+        .text_ellipsis()
 }
 
-fn cell_div(width: f32, text: String) -> Div {
-    div().w(px(width)).flex_none().px_2().overflow_hidden().child(text)
+pub fn fixed_cell(width: f32, text: String) -> Div {
+    div()
+        .flex()
+        .items_center()
+        .h_full()
+        .px_2()
+        .w(px(width))
+        .flex_none()
+        .overflow_hidden()
+        .child(text)
 }
 
-fn row_div(stripe: bool, selected: bool) -> Div {
-    let background = if selected { rgb(0x2a4a7f) } else if stripe { rgb(0x202228) } else { rgb(0x1b1c20) };
-    div().flex().items_center().h(px(ROW_HEIGHT)).w_full().bg(background)
+pub fn cell_div(width: f32, text: String) -> Div {
+    flex_cell(width).child(text)
+}
+
+fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
+    let background = if selected {
+        theme.active_row
+    } else if stripe {
+        theme.stripe
+    } else {
+        theme.background
+    };
+    div()
+        .flex()
+        .items_center()
+        .h(px(ROW_HEIGHT))
+        .w_full()
+        .bg(rgb(background))
 }
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.note_frame();
         self.pace_frame(window);
+        let theme = Theme::current(cx);
+        self.viewport_rows = self.viewport_rows_for(window);
         let (first, last) = self.pager.range();
         let title = match &self.mode {
             Mode::Filtered { label, .. } => format!("{label} · "),
@@ -421,93 +898,284 @@ impl Render for GridView {
             .items_center()
             .gap_2()
             .p_2()
+            .bg(rgb(theme.chrome))
+            .border_b_1()
+            .border_color(rgb(theme.border))
             .child(div().child(progress))
-            .child(button("first", "First").on_click(cx.listener(|this, _, _, cx| { this.pager.first(); cx.notify(); })))
-            .child(button("prev", "Previous page").on_click(cx.listener(|this, _, _, cx| { this.pager.previous(); cx.notify(); })))
+            .child(button("first", "First", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.pager.first();
+                cx.notify();
+            })))
+            .child(
+                button("prev", "Previous page", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.pager.previous();
+                    cx.notify();
+                })),
+            )
             .child(div().child(range_label))
-            .child(button("next", "Next page").on_click(cx.listener(|this, _, _, cx| { this.pager.next(); cx.notify(); })))
-            .child(button("last", "Last").on_click(cx.listener(|this, _, _, cx| { this.pager.last(); cx.notify(); })))
-            .child(field_box("find", &self.find_text, "Find in all rows", self.active == Field::Find)
-                .on_click(cx.listener(|this, _, _, cx| { this.active = Field::Find; cx.notify(); })))
-            .child(button("find-prev", "Previous match").on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
-            .child(button("find-next", "Next match").on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
-            .child(button("show", "Show matching rows").on_click(cx.listener(|this, _, _, cx| { this.show_matching(); cx.notify(); })))
-            .child(button("compare", "Compare…").on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
-            .child(button("export", "Export all rows…"))
-            .child(button("continuous", if self.continuous { "Continuous scrolling: on" } else { "Continuous scrolling" })
-                .on_click(cx.listener(|this, _, _, cx| { this.continuous = !this.continuous; this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top); cx.notify(); })))
-            .child(div().text_color(rgb(0x9aa0b4)).child(self.status.clone()));
+            .child(
+                button("next", "Next page", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.pager.next();
+                    cx.notify();
+                })),
+            )
+            .child(button("last", "Last", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.pager.last();
+                cx.notify();
+            })))
+            .child(div().w(px(260.0)).child(self.find.clone()))
+            .child(
+                button("find-prev", "Previous match", theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
+            )
+            .child(
+                button("find-next", "Next match", theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
+            )
+            .child(
+                button("show", "Show matching rows", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.show_matching(cx);
+                    cx.notify();
+                })),
+            )
+            .child(button("compare", "Compare…", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
+            .child(button("export", "Export all rows…", theme))
+            .child(
+                button(
+                    "continuous",
+                    if self.continuous {
+                        "Continuous scrolling: on"
+                    } else {
+                        "Continuous scrolling"
+                    },
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.continuous = !this.continuous;
+                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+                    cx.notify();
+                })),
+            )
+            .child(div().text_color(rgb(theme.muted_foreground)).child(self.status.clone()));
         let filter_row = self.filter_visible.then(|| {
-            div().flex().items_center().gap_2().px_2().pb_2()
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .pb_2()
                 .child(div().child("WHERE"))
-                .child(field_box("where", &self.filter_text, "label contains 7", self.active == Field::Filter)
-                    .w(px(420.0))
-                    .on_click(cx.listener(|this, _, _, cx| { this.active = Field::Filter; cx.notify(); })))
-                .child(button("apply", "Apply").on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
-                .child(button("clear", "Clear all").on_click(cx.listener(|this, _, _, cx| { this.clear_filter(); cx.notify(); })))
+                .child(div().w(px(420.0)).child(self.filter.clone()))
+                .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
+                .child(
+                    button("clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {
+                        this.clear_filter();
+                        cx.notify();
+                    })),
+                )
         });
         let compare_bar = self.compare.as_ref().map(|diff| {
             let s = &diff.summary;
             let summary = if s.keyed {
-                format!("Equal {} · Removed {} · Changed {}", thousands(s.equal), thousands(s.removed), thousands(s.changed))
+                format!(
+                    "Equal {} · Removed {} · Changed {}",
+                    thousands(s.equal),
+                    thousands(s.removed),
+                    thousands(s.changed)
+                )
             } else {
-                format!("Equal {} · Added {} · Removed {}", thousands(s.equal), thousands(s.added), thousands(s.removed))
+                format!(
+                    "Equal {} · Added {} · Removed {}",
+                    thousands(s.equal),
+                    thousands(s.added),
+                    thousands(s.removed)
+                )
             };
-            let capped = if diff.capped { format!(" · first {MAX_DIFF_ROWS} differences shown") } else { String::new() };
-            div().flex().items_center().gap_2().px_2().pb_2()
+            let capped = if diff.capped {
+                format!(" · first {MAX_DIFF_ROWS} differences shown")
+            } else {
+                String::new()
+            };
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2()
+                .pb_2()
                 .child(div().child(format!("COMPARE {summary}{capped}")))
-                .child(button("whole", "Whole row").on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
-                .child(button("keyed", "Key: value").on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))))
-                .child(button("close-compare", "Close").on_click(cx.listener(|this, _, _, cx| { this.compare = None; cx.notify(); })))
+                .child(
+                    button("whole", "Whole row", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+                )
+                .child(
+                    button("keyed", "Key: value", theme).on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))),
+                )
+                .child(
+                    button("close-compare", "Close", theme).on_click(cx.listener(|this, _, _, cx| {
+                        this.compare = None;
+                        cx.notify();
+                    })),
+                )
         });
-        let header = row_div(false, false)
-            .text_color(rgb(0x9aa0b4))
+        let header = row_div(false, false, theme)
+            .h(px(HEADER_HEIGHT))
+            .bg(rgb(theme.muted))
+            .border_b_1()
+            .border_color(rgb(theme.border))
+            .font_weight(gpui::FontWeight::SEMIBOLD)
+            .text_color(rgb(theme.muted_foreground))
+            .child(fixed_cell(GUTTER_WIDTH, "#".into()))
             .child(cell_div(CELL_WIDTHS[0], "value".into()))
             .child(cell_div(CELL_WIDTHS[1], "label".into()))
-            .child(cell_div(CELL_WIDTHS[2], "state".into()));
+            .child(cell_div(CELL_WIDTHS[2], "state".into()))
+            .child(cell_div(CELL_WIDTHS[3], "typed".into()));
         let list = uniform_list(
             "rows",
             self.visible_count(),
-            cx.processor(|this, range: Range<usize>, _window, _cx| {
-                range.map(|index| this.row_at_position(index)).collect::<Vec<Div>>()
+            cx.processor(|this, range: Range<usize>, _window, cx| {
+                range
+                    .map(|index| this.row_at_position(index, cx))
+                    .collect::<Vec<Stateful<Div>>>()
             }),
         )
         .track_scroll(self.scroll.clone())
         .flex_1();
-        div()
-            .size_full()
+        let palette = self.palette_open.then(|| self.palette_overlay(cx));
+        let grid = div()
+            .flex_1()
             .flex()
             .flex_col()
-            .bg(rgb(0x1b1c20))
-            .text_color(rgb(0xe6e6e6))
-            .text_sm()
-            .track_focus(&self.focus)
-            .on_key_down(cx.listener(Self::key_down))
+            .min_h_0()
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
             .child(header)
-            .child(list)
+            .child(list);
+        let content = match self.tabs.current().clone() {
+            Tab::Home => self.home_page(theme, cx),
+            Tab::Query => self.query_page(theme, grid, cx),
+            Tab::Table(name) if name == DATA_TABLE => grid,
+            Tab::Table(name) => self.placeholder_page(&name, theme),
+        };
+        let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
+        let toolbar = self.toolbar(theme, cx);
+        let tab_bar = self.tab_bar(theme, cx);
+        div()
+            .size_full()
+            .relative()
+            .flex()
+            .flex_col()
+            .bg(rgb(theme.background))
+            .text_color(rgb(theme.foreground))
+            .text_size(px(13.0))
+            .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
+            .track_focus(&self.focus)
+            .on_key_down(cx.listener(Self::key_down))
+            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
+                if this.resizing_sidebar {
+                    this.sidebar_width = f32::from(event.position.x).clamp(180.0, 480.0);
+                    cx.notify();
+                }
+                if this.resizing_split {
+                    let height = f32::from(window.viewport_size().height) - 72.0 - 24.0;
+                    this.result_ratio = result_ratio_from_drag(f32::from(event.position.y), 72.0, height);
+                    cx.notify();
+                }
+            }))
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
+                    let was_resizing =
+                        std::mem::take(&mut this.resizing_sidebar) | std::mem::take(&mut this.resizing_split);
+                    if was_resizing {
+                        cx.notify();
+                    }
+                }),
+            )
+            .child(toolbar)
+            .child(
+                div()
+                    .flex_1()
+                    .flex()
+                    .min_h_0()
+                    .children(sidebar)
+                    .child(div().flex_1().flex().flex_col().min_w_0().child(tab_bar).child(content)),
+            )
+            .child(self.status_bar(theme))
+            .children(palette)
     }
 }
 
 impl GridView {
-    fn row_at_position(&self, position: usize) -> Div {
+    fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
+        let theme = Theme::current(cx);
+        let actions = self.palette_actions();
+        let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
+        let selected = self.palette_index.min(shown.len().saturating_sub(1));
+        let list = shown.iter().enumerate().map(|(position, index)| {
+            let row = div().px_2().py_1().rounded_md().child(actions[*index].label.clone());
+            if position == selected {
+                row.bg(rgb(theme.active_row))
+            } else {
+                row
+            }
+        });
+        let empty = shown.is_empty().then(|| {
+            div()
+                .px_2()
+                .text_color(rgb(theme.muted_foreground))
+                .child("No matching command")
+        });
+        div().absolute().top(px(90.0)).w_full().flex().justify_center().child(
+            div()
+                .w(px(520.0))
+                .p_2()
+                .gap_1()
+                .flex()
+                .flex_col()
+                .rounded(px(6.0))
+                .border_1()
+                .border_color(rgb(theme.border))
+                .bg(rgb(theme.background))
+                .shadow_lg()
+                .child(self.palette_input.clone())
+                .children(list)
+                .children(empty),
+        )
+    }
+
+    fn row_at_position(&self, position: usize, cx: &mut Context<Self>) -> Stateful<Div> {
+        let theme = Theme::current(cx);
         if let Some(diff) = &self.compare {
-            let Some(row) = diff.rows.get(position) else { return row_div(false, false) };
-            return row_div(position % 2 == 1, false)
-                .child(cell_div(70.0, row.change.to_string()))
+            let Some(row) = diff.rows.get(position) else {
+                return row_div(false, false, theme).id(position);
+            };
+            return row_div(position % 2 == 1, false, theme)
+                .id(position)
+                .child(fixed_cell(70.0, row.change.to_string()))
                 .child(cell_div(CELL_WIDTHS[0], row.cells[0].display()))
                 .child(cell_div(CELL_WIDTHS[1], row.cells[1].display()))
-                .child(cell_div(CELL_WIDTHS[2], row.cells[2].display()));
+                .child(cell_div(CELL_WIDTHS[2], row.cells[2].display()))
+                .child(cell_div(CELL_WIDTHS[3], row.cells[3].display()));
         }
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
-        let cells = row_at(source);
-        row_div(position % 2 == 1, self.selected == Some(source))
-            .child(cell_div(CELL_WIDTHS[0], cells[0].display()))
-            .child(cell_div(CELL_WIDTHS[1], cells[1].display()))
-            .child(cell_div(CELL_WIDTHS[2], cells[2].display()))
+        let selected = self
+            .selection
+            .is_some_and(|selection| selection.contains(dataset_index));
+        row_div(position % 2 == 1, selected, theme)
+            .id(position)
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
+                    this.click_row(dataset_index, event.modifiers.shift);
+                    cx.notify();
+                }),
+            )
+            .child(fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
+            .child(self.data_cell(source, 0, position, cx))
+            .child(self.data_cell(source, 1, position, cx))
+            .child(self.data_cell(source, 2, position, cx))
+            .child(self.data_cell(source, 3, position, cx))
     }
 }
 
@@ -517,7 +1185,9 @@ fn main() {
     let autoscroll: u32 = env_number("BOOKIE_PROTOTYPE_AUTOSCROLL").unwrap_or(0);
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
-    Application::new().run(move |cx: &mut App| {
+    Application::new().with_assets(assets::Assets).run(move |cx: &mut App| {
+        text_input::bind_keys(cx);
+        Theme::named(std::env::var("BOOKIE_PROTOTYPE_THEME").ok().as_deref()).install(cx);
         let bounds = Bounds::centered(None, size(px(width), px(height)), cx);
         let opened = cx.open_window(
             WindowOptions {
@@ -525,8 +1195,11 @@ fn main() {
                 ..Default::default()
             },
             |window, cx| {
-                let view = cx.new(|cx| GridView::new(total, started, cx));
+                let view = cx.new(|cx| GridView::new(total, started, window, cx));
                 view.read(cx).focus.focus(window);
+                if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
+                    view.update(cx, |view, _| view.tabs.open_query());
+                }
                 if autoscroll > 0 {
                     view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
                 }
@@ -539,3 +1212,6 @@ fn main() {
         }
     });
 }
+
+#[cfg(test)]
+mod ui_tests;

@@ -18,6 +18,7 @@ pub(super) fn metadata_availability(mode: StructureMode, supported: bool) -> Met
 
 pub(super) fn metadata_notice_row(title: &str, description: &str) -> relm4::adw::ActionRow {
     let row = relm4::adw::ActionRow::builder()
+        .use_markup(false)
         .title(title)
         .subtitle(description)
         .build();

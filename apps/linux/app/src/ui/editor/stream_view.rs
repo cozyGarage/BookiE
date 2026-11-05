@@ -367,7 +367,7 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
         Err(message) => {
             if let Some(status) = current.downcast_ref::<relm4::adw::StatusPage>() {
                 status.set_title(&crate::tr!("Could not load this result page"));
-                status.set_description(Some(&message));
+                status.set_description(Some(&crate::ui::plain_text::escape_markup(&message)));
                 if let Some(pages) = container.parent().and_downcast::<gtk::Stack>() {
                     let retry = gtk::Button::with_label(&crate::tr!("Retry loading page"));
                     let pages = pages.downgrade();

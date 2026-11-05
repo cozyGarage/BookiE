@@ -797,7 +797,7 @@ impl SimpleComponent for SqlEditor {
                 self.offer_longer_timeout(secs, timed_out_sql);
                 let page = adw::StatusPage::builder()
                     .title(crate::tr!("Query timed out"))
-                    .description(&reason)
+                    .description(crate::ui::plain_text::escape_markup(&reason))
                     .icon_name("dialog-warning-symbolic")
                     .vexpand(true)
                     .build();

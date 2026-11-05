@@ -99,7 +99,11 @@ fn choice_button(choice: &DatabaseChoice, sender: &ComponentSender<App>) -> gtk:
 }
 
 fn message_row(title: &str, subtitle: &str) -> adw::ActionRow {
-    adw::ActionRow::builder().title(title).subtitle(subtitle).build()
+    adw::ActionRow::builder()
+        .use_markup(false)
+        .title(title)
+        .subtitle(subtitle)
+        .build()
 }
 
 impl App {

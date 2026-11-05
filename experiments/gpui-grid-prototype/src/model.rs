@@ -3,23 +3,86 @@ pub const DEFAULT_ROWS: u64 = 1_000_000;
 pub const MAX_FIND_MATCHES: usize = 10_000;
 pub const MAX_DIFF_ROWS: usize = 200;
 pub const PAGE_ROWS: u64 = 5_000;
+pub const TYPED_KINDS: u64 = 12;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Cell {
     Null,
     Bool(bool),
     Int(i64),
+    Float(f64),
     Text(String),
+    Bytes(Vec<u8>),
+    Date(String),
+    Time(String),
+    DateTime(String),
+    TimestampTz(String),
+    Decimal(String),
+    Uuid(String),
+    Json(String),
+    JsonText(String),
+    Undecodable(String),
 }
 
 impl Cell {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Cell::Null => "null",
+            Cell::Bool(_) => "boolean",
+            Cell::Int(_) => "integer",
+            Cell::Float(_) => "float",
+            Cell::Text(_) => "text",
+            Cell::Bytes(_) => "bytes",
+            Cell::Date(_) => "date",
+            Cell::Time(_) => "time",
+            Cell::DateTime(_) => "datetime",
+            Cell::TimestampTz(_) => "timestamptz",
+            Cell::Decimal(_) => "decimal",
+            Cell::Uuid(_) => "uuid",
+            Cell::Json(_) => "json",
+            Cell::JsonText(_) => "json_text",
+            Cell::Undecodable(_) => "undecodable",
+        }
+    }
+
     pub fn display(&self) -> String {
         match self {
             Cell::Null => "NULL".into(),
             Cell::Bool(value) => value.to_string(),
             Cell::Int(value) => value.to_string(),
-            Cell::Text(value) => value.clone(),
+            Cell::Float(value) => value.to_string(),
+            Cell::Bytes(value) => {
+                let hex: String = value.iter().map(|byte| format!("{byte:02x}")).collect();
+                format!("\\x{hex}")
+            }
+            Cell::Undecodable(type_name) => format!("<undecodable {type_name}>"),
+            Cell::Text(value)
+            | Cell::Date(value)
+            | Cell::Time(value)
+            | Cell::DateTime(value)
+            | Cell::TimestampTz(value)
+            | Cell::Decimal(value)
+            | Cell::Uuid(value)
+            | Cell::Json(value)
+            | Cell::JsonText(value) => value.clone(),
         }
+    }
+}
+
+pub fn typed_of(index: u64) -> Cell {
+    match index % TYPED_KINDS {
+        0 => Cell::Float(0.1 + 0.2),
+        1 => Cell::Bytes(vec![0xde, 0xad, 0xbe, 0xef]),
+        2 => Cell::Date("2026-11-04".into()),
+        3 => Cell::Time("23:59:59.123456".into()),
+        4 => Cell::DateTime("2026-11-04 23:59:59.123456".into()),
+        5 => Cell::TimestampTz("2026-11-04T23:59:59.123456+00:00".into()),
+        6 => Cell::Decimal("12345678901234567890.12345678".into()),
+        7 => Cell::Uuid("67e55044-10b1-426f-9247-bb680e5fe0c8".into()),
+        8 => Cell::Json(r#"{"a":[1,{"b":null}]}"#.into()),
+        9 => Cell::JsonText("{\"raw\":  1,   \"keep\" : 2}".into()),
+        10 => Cell::Undecodable("numeric(40,20)".into()),
+        _ => Cell::Null,
     }
 }
 
@@ -39,10 +102,10 @@ pub fn label_of(index: u64) -> String {
 }
 
 pub fn state_of(index: u64) -> Cell {
-    if index % 3 == 0 {
+    if index.is_multiple_of(3) {
         Cell::Null
     } else {
-        Cell::Bool(index % 2 == 0)
+        Cell::Bool(index.is_multiple_of(2))
     }
 }
 
@@ -51,6 +114,7 @@ pub fn cells_of(index: u64, label: &str) -> Vec<Cell> {
         Cell::Int(value_of(index)),
         Cell::Text(label.to_string()),
         state_of(index),
+        typed_of(index),
     ]
 }
 
@@ -66,6 +130,10 @@ pub fn column_text(index: u64, column: Column) -> Option<String> {
             Cell::Bool(flag) => Some(flag.to_string()),
             _ => None,
         },
+        Column::Typed => match typed_of(index) {
+            Cell::Null => None,
+            cell => Some(cell.display()),
+        },
     }
 }
 
@@ -74,16 +142,18 @@ pub enum Column {
     Value,
     Label,
     State,
+    Typed,
 }
 
 impl Column {
-    pub const ALL: [Column; 3] = [Column::Value, Column::Label, Column::State];
+    pub const ALL: [Column; 4] = [Column::Value, Column::Label, Column::State, Column::Typed];
 
     pub fn parse(name: &str) -> Option<Column> {
         match name {
             "value" => Some(Column::Value),
             "label" => Some(Column::Label),
             "state" => Some(Column::State),
+            "typed" => Some(Column::Typed),
             _ => None,
         }
     }
@@ -93,6 +163,7 @@ impl Column {
             Column::Value => "value",
             Column::Label => "label",
             Column::State => "state",
+            Column::Typed => "typed",
         }
     }
 }
@@ -203,7 +274,7 @@ pub struct DiffSummary {
     pub changed: u64,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct DiffRow {
     pub change: &'static str,
     pub cells: Vec<Cell>,
@@ -261,11 +332,7 @@ pub fn build_diff(total: u64, keyed: bool) -> Diff {
             }
         }
     }
-    Diff {
-        summary,
-        rows,
-        capped,
-    }
+    Diff { summary, rows, capped }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

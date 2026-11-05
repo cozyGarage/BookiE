@@ -191,12 +191,16 @@ struct FileOptions {
     null_marker: adw::EntryRow,
 }
 
+pub(crate) fn file_group(path: &std::path::Path) -> adw::PreferencesGroup {
+    adw::PreferencesGroup::builder()
+        .title(crate::tr!("File"))
+        .description(crate::ui::plain_text::escape_markup(&path.display().to_string()))
+        .build()
+}
+
 impl FileOptions {
     fn new(request: &ImportRequest) -> Self {
-        let group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("File"))
-            .description(request.path.display().to_string())
-            .build();
+        let group = file_group(&request.path);
         let delimiter = delimiter_row(request.format.delimiter);
         let header = adw::SwitchRow::builder()
             .title(crate::tr!("First row names the columns"))
@@ -338,6 +342,7 @@ impl ExistingColumns {
             .iter()
             .map(|column| {
                 let row = adw::ComboRow::builder()
+                    .use_markup(false)
                     .title(&column.name)
                     .subtitle(column_subtitle(*capabilities, column))
                     .build();
@@ -756,6 +761,7 @@ fn starting_encoding(bytes: &[u8]) -> u32 {
 
 fn choice_row(title: &str, labels: &[&str]) -> adw::ComboRow {
     adw::ComboRow::builder()
+        .use_markup(false)
         .title(title)
         .model(&gtk::StringList::new(labels))
         .build()

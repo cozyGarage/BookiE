@@ -1605,6 +1605,56 @@
     [
       "bookie-app",
       "--lib",
+      "ui::plain_text::tests::a_banner_without_markup_shows_a_hostile_title_literally"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_preferences_group_left_unescaped_loses_a_title_with_markup_characters"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_preferences_group_with_an_escaped_title_and_description_shows_both_literally"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_row_left_with_default_markup_does_not_show_the_same_text"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_row_without_markup_shows_a_hostile_title_and_subtitle_literally"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_status_page_description_through_the_helper_shows_server_text_literally"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_status_page_description_without_the_helper_does_not_show_the_same_text"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_toast_shows_its_message_literally"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::a_welcome_screen_group_named_with_markup_characters_shows_its_name"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::plain_text::tests::the_import_file_group_shows_a_path_with_markup_characters_literally"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::progress_dialog::tests::a_progress_dialog_counts_as_running_work_until_it_is_dropped"
     ],
     [

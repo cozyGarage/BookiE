@@ -388,10 +388,12 @@ impl SimpleComponent for BrowseTab {
         // ActionBar footer ("N unsaved changes / Discard / Save") —
         // an additional banner would just duplicate that signal.
         let read_only_banner = adw::Banner::builder()
+            .use_markup(false)
             .title(crate::tr!("Read-only connection. Editing disabled."))
             .revealed(init.read_only)
             .build();
         let no_pk_banner = adw::Banner::builder()
+            .use_markup(false)
             .title(crate::tr!(
                 "This table has no primary key. Row order is not stable; use the SQL editor to modify rows."
             ))

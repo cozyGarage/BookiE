@@ -49,7 +49,10 @@ fn present_form(window: &gtk::Window, names: Vec<String>, on_values: ValueSink, 
         .build();
     let mut rows = Vec::with_capacity(names.len());
     for name in &names {
-        let entry = adw::EntryRow::builder().title(format!(":{name}")).build();
+        let entry = adw::EntryRow::builder()
+            .use_markup(false)
+            .title(format!(":{name}"))
+            .build();
         let kinds = gtk::DropDown::from_strings(&kind_labels);
         kinds.set_valign(gtk::Align::Center);
         kinds.set_tooltip_text(Some(&tr!("How the value is sent to the database")));

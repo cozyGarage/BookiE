@@ -32,6 +32,7 @@ pub(in crate::ui::editor) fn build_streamed_result_widget(
     holder.append(&header);
     if let Some(notice) = stream_terminal_notice(result) {
         let banner = adw::Banner::new(&notice);
+        banner.set_use_markup(false);
         banner.set_revealed(true);
         holder.append(&banner);
     }

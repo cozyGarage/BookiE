@@ -199,9 +199,13 @@ name = "bookie-tauri-grid-prototype"
 version = "0.1.0"
 dependencies = [
  "bookie-core",
+ "chrono",
+ "rust_decimal",
  "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
+ "uuid",
 ]
 
 [[package]]
