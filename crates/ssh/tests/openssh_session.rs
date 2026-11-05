@@ -71,10 +71,14 @@ impl Prompter for ScriptedPrompter {
 }
 
 async fn start() -> TestResult<Fixture> {
+    start_with_script(SSHD_SCRIPT).await
+}
+
+async fn start_with_script(script: &str) -> TestResult<Fixture> {
     let container = GenericImage::new("alpine", "3.22")
         .with_exposed_port(2222.tcp())
         .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
-        .with_cmd(["sh", "-c", SSHD_SCRIPT])
+        .with_cmd(["sh", "-c", script])
         .start()
         .await?;
     let host = container.get_host().await?.to_string();
@@ -723,4 +727,47 @@ async fn openssh_authenticates_with_a_key_held_by_ssh_agent() {
     assert!(session.master_pid().is_some_and(process_alive));
     session.shutdown().await;
     drop(agent);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn openssh_refuses_a_sha1_rsa_host_key_before_requesting_credentials() {
+    let script = SSHD_SCRIPT.replace(
+        "-o PasswordAuthentication=yes",
+        "-o HostKeyAlgorithms=ssh-rsa -o PasswordAuthentication=yes",
+    );
+    let fixture = start_with_script(&script).await.unwrap();
+    let (result, prompter) = connect(&fixture, &config(&fixture, password("s3cret")), Vec::new()).await;
+    assert!(matches!(
+        result,
+        Err(OpenSshError::NoAcceptableAlgorithm {
+            class: bookie_ssh::AlgorithmClass::HostKey,
+            ..
+        })
+    ));
+    assert!(prompter.asked().is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn openssh_refuses_a_sha1_rsa_jump_host_before_requesting_credentials() {
+    let script = SSHD_SCRIPT.replace(
+        "-o PasswordAuthentication=yes",
+        "-o HostKeyAlgorithms=ssh-rsa -o PasswordAuthentication=yes",
+    );
+    let jump = start_with_script(&script).await.unwrap();
+    let target = start().await.unwrap();
+    let mut configuration = config(&target, password("s3cret"));
+    configuration
+        .jump_hosts
+        .push(SshDestination::new(&jump.host, Some(jump.port), Some("deploy".to_owned())).unwrap());
+    let (result, prompter) = connect(&target, &configuration, Vec::new()).await;
+    assert!(matches!(
+        result,
+        Err(OpenSshError::NoAcceptableAlgorithm {
+            class: bookie_ssh::AlgorithmClass::HostKey,
+            ..
+        })
+    ));
+    assert!(prompter.asked().is_empty());
 }
