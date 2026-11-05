@@ -58,9 +58,6 @@ pub(super) fn prepare_private_file(path: &Path) -> std::io::Result<()> {
 }
 
 fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     let name = path
         .file_name()
@@ -71,20 +68,27 @@ fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let serial = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     temp_name.push(format!(".tmp-{}-{serial}", std::process::id()));
     let temp = parent.join(temp_name);
+    replace_from_temporary(path, &temp, bytes)
+}
+
+fn replace_from_temporary(path: &Path, temp: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(temp)?;
     let written = (|| {
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&temp)?;
         file.write_all(bytes)?;
         file.sync_all()?;
-        std::fs::rename(&temp, path)?;
+        std::fs::rename(temp, path)?;
         std::fs::File::open(parent)?.sync_all()
     })();
     if written.is_err() {
-        let _ = std::fs::remove_file(&temp);
+        let _ = std::fs::remove_file(temp);
     }
     written
 }
@@ -92,6 +96,42 @@ fn write_durably(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn existing_temporary_files_and_symlinks_are_refused_without_changing_any_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("settings.json");
+        let existing = dir.path().join("existing.tmp");
+        let victim = dir.path().join("unrelated.txt");
+        let link = dir.path().join("link.tmp");
+        std::fs::write(&target, b"settings").unwrap();
+        std::fs::write(&existing, b"temporary owner").unwrap();
+        std::fs::write(&victim, b"unrelated").unwrap();
+        std::os::unix::fs::symlink(&victim, &link).unwrap();
+        for temp in [&existing, &link] {
+            assert_eq!(
+                replace_from_temporary(&target, temp, b"replacement")
+                    .unwrap_err()
+                    .kind(),
+                std::io::ErrorKind::AlreadyExists
+            );
+        }
+        assert_eq!(std::fs::read(&target).unwrap(), b"settings");
+        assert_eq!(std::fs::read(&existing).unwrap(), b"temporary owner");
+        assert_eq!(std::fs::read(&victim).unwrap(), b"unrelated");
+        assert!(std::fs::symlink_metadata(link).unwrap().file_type().is_symlink());
+    }
+
+    #[test]
+    fn a_failed_publication_removes_only_the_temporary_file_it_created() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target-directory");
+        let temp = dir.path().join("owned.tmp");
+        std::fs::create_dir(&target).unwrap();
+        assert!(replace_from_temporary(&target, &temp, b"replacement").is_err());
+        assert!(!temp.exists());
+        assert!(target.is_dir());
+    }
 
     #[test]
     fn a_rewrite_replaces_the_content_and_leaves_no_temporary_file() {
