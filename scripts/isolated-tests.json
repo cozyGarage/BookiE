@@ -1686,6 +1686,11 @@
       "bookie-app",
       "--lib",
       "ui::app::init_window::confirmation_tests::force_dismissing_window_close_confirmation_keeps_the_window_open"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::structure::confirmation_tests::force_dismissing_a_table_confirmation_does_not_run_its_action"
     ]
   ],
   "keyring": [
