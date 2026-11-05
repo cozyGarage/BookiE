@@ -715,17 +715,22 @@ impl App {
         dialog.set_close_response("cancel");
         let workspace_tabs = self.workspace_tabs.clone();
         let change_trackers = self.change_trackers.clone();
-        dialog.connect_response(None, move |dlg: &adw::AlertDialog, response: &str| {
-            dlg.close();
-            if response == "discard" {
-                change_trackers.with_tab(id, |t| t.clear());
-                if let Some(controller) = workspace_tabs.borrow().get(&id).and_then(|t| t.browse_controller()) {
-                    let _ = controller.sender().send(BrowseTabInput::Refresh);
-                }
+        connect_refresh_response(&dialog, move || {
+            change_trackers.with_tab(id, |t| t.clear());
+            if let Some(controller) = workspace_tabs.borrow().get(&id).and_then(|t| t.browse_controller()) {
+                let _ = controller.sender().send(BrowseTabInput::Refresh);
             }
         });
         dialog.present(Some(&self.window));
     }
+}
+
+fn connect_refresh_response(dialog: &adw::AlertDialog, on_discard: impl Fn() + 'static) {
+    dialog.connect_response(None, move |_, response| {
+        if response == "discard" {
+            on_discard();
+        }
+    });
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -837,13 +842,52 @@ fn page_fetcher_factory(
 
 #[cfg(test)]
 mod tests {
+    use relm4::adw::prelude::*;
+
     use super::{
-        RefreshDecision, browse_cell_value_query, columns_read_is_current, refresh_decision, row_count_from_result,
-        single_cell_value,
+        RefreshDecision, browse_cell_value_query, columns_read_is_current, connect_refresh_response, refresh_decision,
+        row_count_from_result, single_cell_value,
     };
     use crate::services::read_scopes::{ReadScope, ReadScopes};
     use bookie_core::{ColumnInfo, QueryResult, Value};
     use uuid::Uuid;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn force_dismissing_refresh_confirmation_does_not_abort() {
+        relm4::adw::init().unwrap();
+        relm4::gtk::gio::resources_register_include!("bookie.gresource").unwrap();
+        let application = relm4::main_application();
+        application.register(None::<&relm4::gtk::gio::Cancellable>).unwrap();
+        let window = relm4::adw::ApplicationWindow::new(&application);
+        window.present();
+        spin_until(|| window.is_mapped());
+        let dialog = relm4::adw::AlertDialog::new(None, None);
+        dialog.set_close_response("cancel");
+        let discarded = std::rc::Rc::new(std::cell::Cell::new(false));
+        let discarded_for_response = discarded.clone();
+        connect_refresh_response(&dialog, move || discarded_for_response.set(true));
+        let closed = std::rc::Rc::new(std::cell::Cell::new(false));
+        let closed_for_signal = closed.clone();
+        dialog.connect_closed(move |_| closed_for_signal.set(true));
+        dialog.present(Some(&window));
+        spin_until(|| dialog.is_mapped());
+
+        dialog.force_close();
+        spin_until(|| closed.get());
+
+        assert!(!discarded.get());
+    }
+
+    fn spin_until(mut condition: impl FnMut() -> bool) {
+        let context = relm4::gtk::glib::MainContext::default();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !condition() && std::time::Instant::now() < deadline {
+            context.iteration(false);
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert!(condition());
+    }
 
     #[test]
     fn a_late_column_read_after_a_newer_schema_refresh_is_discarded() {

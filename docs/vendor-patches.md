@@ -7,7 +7,7 @@ BookiE maintains patched dependency snapshots under `vendor/`, applied through t
 | Dependency | Behavior required by BookiE |
 |---|---|
 | PostgreSQL driver | Bound SCRAM work; preserve quoted text `NULL` in arrays; recognize multirange metadata for explicit refusal; resolve nested type metadata within a bound; support selected server-formatted text results; support protocol cancellation; expose session parameters used by SQL lexing. |
-| MySQL driver | Preserve `ENUM` and `SET` text under binary collation; report `SET` column names; reject malformed or oversized packets with protocol errors; refuse the in-band RSA password exchange without TLS or a local socket. |
+| MySQL driver | Preserve `ENUM` and `SET` text under binary collation; report `SET` column names; reject malformed or oversized packets with protocol errors; refuse the in-band RSA password exchange without TLS or a local socket (an SSH-forwarded socket counts as local, so that connection is protected only as far as the SSH server). |
 | MongoDB driver | Bound SCRAM work and verify the server nonce; preserve TLS hostname verification when connecting through a tunnel. |
 | Redis driver | Preserve TLS hostname verification when connecting through a tunnel. |
 
