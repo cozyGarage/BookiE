@@ -291,6 +291,49 @@ fn the_palette_switches_the_theme_style_and_light_dark_keeps_it(cx: &mut TestApp
 
 struct Tiny;
 
+struct CountingSource(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
+    fn total(&self) -> u64 {
+        3
+    }
+
+    fn row(&self, index: u64) -> Vec<Cell> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        bookie_gpui_grid_prototype::source::ResultSource::row(&Tiny, index)
+    }
+
+    fn find(&self, query: &str, cap: usize) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::find(&Tiny, query, cap)
+    }
+
+    fn filter(&self, predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Vec<u32> {
+        bookie_gpui_grid_prototype::source::ResultSource::filter(&Tiny, predicate)
+    }
+
+    fn compare(&self, keyed: bool) -> bookie_gpui_grid_prototype::model::Diff {
+        bookie_gpui_grid_prototype::source::ResultSource::compare(&Tiny, keyed)
+    }
+}
+
+#[gpui::test]
+fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &mut TestAppContext) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let requests = std::sync::Arc::new(AtomicUsize::new(0));
+    let source = std::sync::Arc::new(CountingSource(requests.clone()));
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.run_until_parked();
+    let full = "💾".repeat(10_000);
+    view.update(cx, |view, cx| {
+        view.edits.insert((1, 1), Cell::Text(full.clone()));
+        requests.store(0, Ordering::Relaxed);
+        let _ = view.row_at_position(1, cx);
+        assert_eq!(requests.load(Ordering::Relaxed), 1);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
+    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), full));
+}
+
 impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
     fn total(&self) -> u64 {
         3

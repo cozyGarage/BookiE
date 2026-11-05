@@ -1160,6 +1160,7 @@ impl GridView {
         }
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
+        let cells = self.source.row(source);
         let selected = self
             .selection
             .is_some_and(|selection| selection.contains(dataset_index));
@@ -1173,10 +1174,10 @@ impl GridView {
                 }),
             )
             .child(fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
-            .child(self.data_cell(source, 0, position, cx))
-            .child(self.data_cell(source, 1, position, cx))
-            .child(self.data_cell(source, 2, position, cx))
-            .child(self.data_cell(source, 3, position, cx))
+            .child(self.data_cell(source, 0, position, &cells[0], cx))
+            .child(self.data_cell(source, 1, position, &cells[1], cx))
+            .child(self.data_cell(source, 2, position, &cells[2], cx))
+            .child(self.data_cell(source, 3, position, &cells[3], cx))
     }
 }
 
