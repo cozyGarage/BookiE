@@ -270,6 +270,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::referenced_row::tests::force_dismissing_referenced_row_choice_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::session_teardown::tests::a_window_close_whose_sessions_cannot_close_offers_to_close_anyway"
     ],
     [
