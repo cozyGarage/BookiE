@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { visibleWindow, displayCell, windowTop, scrollTopForRow } from './grid.mjs';
+import { visibleWindow, displayCell, cellClass, windowTop, scrollTopForRow } from './grid.mjs';
 
 test('virtual rows stay bounded and cover the beginning and end', () => {
   const first = visibleWindow(0, 360, 36, 1_000_000);
@@ -37,4 +37,16 @@ test('jumping to a row scrolls to a position whose window contains that row', ()
     }
   }
   assert.equal(scrollTopForRow(5, 360, 36, 0), 0);
+});
+
+test('every value kind gets its own class and null keeps its italic style', () => {
+  assert.equal(cellClass({ kind: 'null', value: null }), 'cell null');
+  assert.equal(cellClass({ kind: 'decimal', value: '1.50' }), 'cell kind-decimal');
+  assert.equal(cellClass({ kind: 'json_text', value: '{}' }), 'cell kind-json_text');
+  assert.equal(cellClass({ kind: 'undecodable', value: '<undecodable numeric>' }), 'cell kind-undecodable');
+});
+
+test('an unknown kind falls back to plain text and cannot inject a class name', () => {
+  assert.equal(cellClass({ kind: 'x" onclick="evil', value: 'a' }), 'cell kind-text');
+  assert.equal(displayCell({ kind: 'bytes', value: '\\xdeadbeef' }), '\\xdeadbeef');
 });
