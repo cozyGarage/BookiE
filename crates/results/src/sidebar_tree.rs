@@ -1,6 +1,8 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use bookie_core::{CatalogObjectKind, TableInfo};
+use bookie_core::{CatalogObject, CatalogObjectKind, TableInfo};
+
+pub const INLINE_CATALOG_LIMIT: usize = 200;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupKind {
@@ -13,9 +15,22 @@ pub enum GroupKind {
 pub enum NodeKind {
     Schema,
     Group(GroupKind),
-    Table { schema: Option<String>, name: String },
-    View { schema: Option<String>, name: String },
+    Table {
+        schema: Option<String>,
+        name: String,
+    },
+    View {
+        schema: Option<String>,
+        name: String,
+    },
     Catalog(CatalogObjectKind),
+    CatalogLoaded(CatalogObjectKind),
+    CatalogObject {
+        kind: CatalogObjectKind,
+        schema: Option<String>,
+        name: String,
+    },
+    CatalogMore(CatalogObjectKind),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,7 +45,10 @@ pub struct TreeNode {
 
 impl TreeNode {
     fn is_branch(&self) -> bool {
-        matches!(self.kind, NodeKind::Schema | NodeKind::Group(_))
+        matches!(
+            self.kind,
+            NodeKind::Schema | NodeKind::Group(_) | NodeKind::CatalogLoaded(_)
+        )
     }
 
     fn matches_search(&self, query: &str) -> bool {
@@ -161,6 +179,14 @@ pub fn build_nodes(tables: &[TableInfo], views: &[TableInfo]) -> Vec<TreeNode> {
 }
 
 pub fn append_catalog_entries(nodes: &mut Vec<TreeNode>, kinds: &[CatalogObjectKind]) {
+    append_catalog_entries_with(nodes, kinds, &HashMap::new());
+}
+
+pub fn append_catalog_entries_with(
+    nodes: &mut Vec<TreeNode>,
+    kinds: &[CatalogObjectKind],
+    loaded: &HashMap<CatalogObjectKind, Vec<CatalogObject>>,
+) {
     if kinds.is_empty() {
         return;
     }
@@ -174,14 +200,49 @@ pub fn append_catalog_entries(nodes: &mut Vec<TreeNode>, kinds: &[CatalogObjectK
         parent: None,
     });
     for kind in kinds {
+        let objects = loaded.get(kind).filter(|objects| !objects.is_empty());
+        let entry_index = nodes.len();
         nodes.push(TreeNode {
             depth: 1,
             key: format!("catalog/{}", kind.as_str()),
-            kind: NodeKind::Catalog(*kind),
+            kind: objects.map_or(NodeKind::Catalog(*kind), |_| NodeKind::CatalogLoaded(*kind)),
             schema: None,
-            count: 0,
+            count: objects.map_or(0, Vec::len),
             parent: Some(group_index),
         });
+        for object in objects.into_iter().flatten().take(INLINE_CATALOG_LIMIT) {
+            nodes.push(catalog_object_node(*kind, object, entry_index));
+        }
+        if objects.is_some_and(|objects| objects.len() > INLINE_CATALOG_LIMIT) {
+            nodes.push(TreeNode {
+                depth: 2,
+                key: format!("catalog/{}/more", kind.as_str()),
+                kind: NodeKind::CatalogMore(*kind),
+                schema: None,
+                count: 0,
+                parent: Some(entry_index),
+            });
+        }
+    }
+}
+
+fn catalog_object_node(kind: CatalogObjectKind, object: &CatalogObject, parent: usize) -> TreeNode {
+    TreeNode {
+        depth: 2,
+        key: format!(
+            "catalog/{}/{}/{}",
+            kind.as_str(),
+            key_part(object.schema.as_deref().unwrap_or_default()),
+            key_part(&object.name)
+        ),
+        kind: NodeKind::CatalogObject {
+            kind,
+            schema: object.schema.clone(),
+            name: object.name.clone(),
+        },
+        schema: object.schema.clone(),
+        count: 0,
+        parent: Some(parent),
     }
 }
 

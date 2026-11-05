@@ -28,9 +28,10 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Each connection has an environment: Local, Dev, Staging or Prod. A Prod connection shows a red badge, a tinted header and `[Production]` in the window title.
 - A read-only connection refuses every change.
 - SQLite connections support attaching additional database files under custom schema aliases, enabling cross-schema queries and unified catalog browsing.
+- The sidebar Catalog group lists functions, procedures and triggers (and the other catalog kinds the engine supports). Click a kind to load its objects under it, up to 200 shown; schemas hidden in the sidebar filter stay hidden. Click an object, or "Show all in Catalog…", to open the Catalog dialog on that kind.
 - A connection can be filled from a URL such as `postgres://user@host:5432/db`.
 - Connections can be exported and imported. An export encrypted with a passphrase includes stored credentials. A plaintext export contains none.
-- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver folders become a connection group when present. Navicat import is not shipped yet.
+- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app (Redis Desktop Manager) `connections.json` and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver folders become a connection group when present.
 
 ## Browse and edit tables
 

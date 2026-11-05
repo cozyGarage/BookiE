@@ -1166,3 +1166,6 @@ fn undoing_a_second_edit_keeps_the_persisted_original_for_later_edits_and_the_sa
     assert!(!statements[0].1.contains(&Value::Text("b".into())));
     controller.detach_runtime();
 }
+
+#[path = "bulk_cancel_tests.rs"]
+mod bulk_cancel_tests;
