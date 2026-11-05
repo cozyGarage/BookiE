@@ -1033,6 +1033,9 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         Configuration(e) if e.to_string().starts_with(PLAINTEXT_PASSWORD_REFUSAL) => {
             DriverError::PolicyDenied(e.to_string())
         }
+        Protocol(message) if message.starts_with("mysql_cleartext_plugin disabled") => DriverError::PolicyDenied(
+            "Cleartext MySQL password authentication is disabled. Configure the server account to use a supported authentication plugin, such as caching_sha2_password, and require TLS.".into(),
+        ),
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
     }

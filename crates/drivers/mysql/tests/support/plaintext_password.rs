@@ -189,7 +189,11 @@ async fn an_initial_cleartext_plugin_handshake_never_receives_the_password() {
         .await
         .unwrap()
         .unwrap();
-    assert!(result.is_err());
+    assert!(
+        matches!(result, Err(DriverError::PolicyDenied(_))),
+        "{:?}",
+        result.err()
+    );
     assert!(packet.is_none_or(|(_, payload)| {
         !payload
             .windows(b"never-sent-0b7f".len())
@@ -279,4 +283,36 @@ async fn mariadb_caching_sha2_login_refuses_unprotected_tcp_and_accepts_tls() {
     );
     let allowed = MysqlDriver.connect(credentials(TlsMode::Require)).await;
     assert!(allowed.is_ok(), "{:?}", allowed.err());
+}
+
+#[tokio::test]
+async fn a_cleartext_authentication_switch_is_a_policy_refusal_without_a_password_response() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        send(&mut socket, 0, &handshake("mysql_native_password")).await;
+        let (sequence, _) = receive(&mut socket).await.unwrap();
+        send(
+            &mut socket,
+            sequence + 1,
+            b"\xfemysql_clear_password\x00abcdefghijabcdefghij\x00",
+        )
+        .await;
+        receive(&mut socket).await
+    });
+    let mut options = options(TlsMode::Disabled);
+    options.host = "127.0.0.1".into();
+    options.port = port;
+    let result = tokio::time::timeout(Duration::from_secs(10), MysqlDriver.connect(options))
+        .await
+        .unwrap();
+    assert!(matches!(result, Err(DriverError::PolicyDenied(_))));
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), server)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_none()
+    );
 }
