@@ -175,3 +175,72 @@ fn a_folder_name_with_control_characters_leaves_the_connection_ungrouped_but_imp
         body.organization
     );
 }
+
+fn json_with_folder(folders: &str, folder: &str) -> String {
+    format!(
+        r#"{{"folders": {folders}, "connections": {{"a": {{"provider": "postgresql", "name": "X", "folder": "{folder}", "configuration": {{"host": "h"}}}}}}}}"#
+    )
+}
+
+fn group_for(folders: &str, folder: &str) -> Option<String> {
+    let import = parse_dbeaver_data_sources(&json_with_folder(folders, folder)).unwrap();
+    group_of(&import, "X")
+}
+
+#[test]
+fn a_documented_slash_path_becomes_one_flattened_group() {
+    assert_eq!(group_for("{}", "prod/finance").as_deref(), Some("prod / finance"));
+    assert_eq!(group_for("{}", "prod").as_deref(), Some("prod"));
+    assert_eq!(group_for("{}", "a/b/c").as_deref(), Some("a / b / c"));
+}
+
+#[test]
+fn empty_and_padded_path_segments_are_dropped() {
+    assert_eq!(group_for("{}", " prod // finance/ ").as_deref(), Some("prod / finance"));
+    assert_eq!(group_for("{}", "/").as_deref(), None);
+    assert_eq!(group_for("{}", "").as_deref(), None);
+}
+
+#[test]
+fn a_parent_listed_for_a_full_path_does_not_repeat_the_prefix() {
+    let folders = r#"{"prod/finance": {"parent": "prod"}, "prod": {}}"#;
+    assert_eq!(group_for(folders, "prod/finance").as_deref(), Some("prod / finance"));
+}
+
+#[test]
+fn a_parent_listed_for_a_leaf_name_is_prepended() {
+    let folders = r#"{"EU": {"parent": "Prod"}, "Prod": {}}"#;
+    assert_eq!(group_for(folders, "EU").as_deref(), Some("Prod / EU"));
+}
+
+#[test]
+fn a_two_folder_parent_cycle_ends_without_repeating_a_name() {
+    let folders = r#"{"A": {"parent": "B"}, "B": {"parent": "A"}}"#;
+    assert_eq!(group_for(folders, "A").as_deref(), Some("B / A"));
+}
+
+#[test]
+fn a_folder_path_deeper_than_the_limit_keeps_the_innermost_levels() {
+    let path = (1..=12).map(|level| format!("s{level}")).collect::<Vec<_>>().join("/");
+    let group = group_for("{}", &path).unwrap();
+    let levels: Vec<&str> = group.split(" / ").collect();
+    assert_eq!(levels.len(), MAX_FOLDER_DEPTH, "{group}");
+    assert_eq!((levels[0], levels[levels.len() - 1]), ("s5", "s12"));
+}
+
+#[test]
+fn an_unexpected_folders_shape_never_refuses_the_connections() {
+    for folders in [
+        "[]",
+        "\"text\"",
+        "null",
+        "5",
+        "{\"a\": true}",
+        "{\"a\": 5}",
+        "{\"a\": {\"parent\": null}}",
+    ] {
+        let import = parse_dbeaver_data_sources(&json_with_folder(folders, "a"))
+            .unwrap_or_else(|error| panic!("folders {folders} refused the file: {error}"));
+        assert_eq!(import.drafts.len(), 1, "{folders}");
+    }
+}

@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::Deserialize;
+use serde::de::IgnoredAny;
 
 use uuid::Uuid;
 
@@ -45,7 +46,27 @@ impl PeerImport {
 struct Sources {
     connections: BTreeMap<String, PeerConnection>,
     #[serde(default)]
-    folders: BTreeMap<String, PeerFolder>,
+    folders: Folders,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Folders {
+    Map(BTreeMap<String, FolderEntry>),
+    Other(IgnoredAny),
+}
+
+impl Default for Folders {
+    fn default() -> Self {
+        Self::Map(BTreeMap::new())
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum FolderEntry {
+    Object(PeerFolder),
+    Other(IgnoredAny),
 }
 
 #[derive(Default, Deserialize)]
@@ -125,15 +146,38 @@ pub fn parse_dbeaver_data_sources(input: &str) -> Result<PeerImport, StorageErro
     })
 }
 
-fn group_name(folders: &BTreeMap<String, PeerFolder>, folder: &str) -> Option<String> {
-    let mut names: Vec<&str> = Vec::new();
-    let mut current = folder.trim();
-    while !current.is_empty() && names.len() < MAX_FOLDER_DEPTH {
-        names.push(current);
-        current = folders.get(current).map_or("", |parent| parent.parent.trim());
+fn parent_of<'a>(folders: &'a Folders, name: &str) -> &'a str {
+    match folders {
+        Folders::Map(map) => match map.get(name) {
+            Some(FolderEntry::Object(folder)) => folder.parent.trim(),
+            _ => "",
+        },
+        Folders::Other(_) => "",
     }
-    names.reverse();
-    (!names.is_empty()).then(|| names.join(" / "))
+}
+
+fn group_name(folders: &Folders, folder: &str) -> Option<String> {
+    let segments: Vec<&str> = folder
+        .split('/')
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .collect();
+    let mut top = *segments.first()?;
+    let mut seen = vec![top];
+    let mut ancestors: Vec<&str> = Vec::new();
+    while ancestors.len() + segments.len() < MAX_FOLDER_DEPTH {
+        let parent = parent_of(folders, top);
+        if parent.is_empty() || seen.contains(&parent) {
+            break;
+        }
+        ancestors.push(parent);
+        seen.push(parent);
+        top = parent;
+    }
+    ancestors.reverse();
+    ancestors.extend(segments);
+    let start = ancestors.len().saturating_sub(MAX_FOLDER_DEPTH);
+    Some(ancestors[start..].join(" / "))
 }
 
 fn draft_from(peer: &PeerConnection) -> Option<SavedConnection> {
