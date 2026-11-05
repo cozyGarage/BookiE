@@ -20,6 +20,7 @@ class MutationWorkflowTests(unittest.TestCase):
             self.assertIn(f"package: bookie-core, shard: {shard}/4", mutation)
         for shard in range(2):
             self.assertIn(f"package: bookie-policy, shard: {shard}/2", mutation)
+        self.assertIn("package: bookie-results, shard: 0/1", mutation)
         self.assertIn("name: mutants-${{ matrix.label }}-${{ github.run_id }}", mutation)
         self.assertIn("if-no-files-found: error", mutation)
         triggers = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
