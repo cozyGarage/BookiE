@@ -69,6 +69,11 @@ impl GridView {
         } else {
             cell.display()
         };
+        if text.contains('\n') {
+            self.status = "Multiline values cannot be edited in this single-line prototype".into();
+            cx.notify();
+            return;
+        }
         self.editing = Some(Editing {
             row,
             column,
@@ -86,7 +91,7 @@ impl GridView {
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
     }
 
-    pub fn data_cell(&self, source: u64, column: usize, position: usize, cx: &mut Context<Self>) -> Div {
+    pub fn data_cell(&self, source: u64, column: usize, position: usize, cell: &Cell, cx: &mut Context<Self>) -> Div {
         let width = CELL_WIDTHS[column];
         if self
             .editing
@@ -96,8 +101,8 @@ impl GridView {
             return crate::flex_cell(width).px_0().child(self.editor.clone());
         }
         let theme = Theme::current(cx);
-        let cell = self.cell_at(source, column);
-        let mut item = cell_div(width, cell.display());
+        let cell = self.edits.get(&(source, column)).unwrap_or(cell);
+        let mut item = cell_div(width, bookie_gpui_grid_prototype::preview::cell_preview(cell));
         if matches!(cell, Cell::Null) {
             item = item.italic().text_color(rgb(theme.muted_foreground));
         }

@@ -3,6 +3,7 @@ pub mod cursor;
 pub mod edit;
 pub mod model;
 pub mod palette;
+pub mod preview;
 pub mod selection;
 pub mod shell;
 pub mod source;

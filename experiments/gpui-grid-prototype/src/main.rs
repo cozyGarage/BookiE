@@ -10,6 +10,7 @@ mod ui_theme;
 use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
 use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
+use bookie_gpui_grid_prototype::preview::cell_preview;
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
 use bookie_gpui_grid_prototype::shell::{
     DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag,
@@ -1152,13 +1153,14 @@ impl GridView {
             return row_div(position % 2 == 1, false, theme)
                 .id(position)
                 .child(fixed_cell(70.0, row.change.to_string()))
-                .child(cell_div(CELL_WIDTHS[0], row.cells[0].display()))
-                .child(cell_div(CELL_WIDTHS[1], row.cells[1].display()))
-                .child(cell_div(CELL_WIDTHS[2], row.cells[2].display()))
-                .child(cell_div(CELL_WIDTHS[3], row.cells[3].display()));
+                .child(cell_div(CELL_WIDTHS[0], cell_preview(&row.cells[0])))
+                .child(cell_div(CELL_WIDTHS[1], cell_preview(&row.cells[1])))
+                .child(cell_div(CELL_WIDTHS[2], cell_preview(&row.cells[2])))
+                .child(cell_div(CELL_WIDTHS[3], cell_preview(&row.cells[3])));
         }
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
+        let cells = self.source.row(source);
         let selected = self
             .selection
             .is_some_and(|selection| selection.contains(dataset_index));
@@ -1172,10 +1174,10 @@ impl GridView {
                 }),
             )
             .child(fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
-            .child(self.data_cell(source, 0, position, cx))
-            .child(self.data_cell(source, 1, position, cx))
-            .child(self.data_cell(source, 2, position, cx))
-            .child(self.data_cell(source, 3, position, cx))
+            .child(self.data_cell(source, 0, position, &cells[0], cx))
+            .child(self.data_cell(source, 1, position, &cells[1], cx))
+            .child(self.data_cell(source, 2, position, &cells[2], cx))
+            .child(self.data_cell(source, 3, position, &cells[3], cx))
     }
 }
 

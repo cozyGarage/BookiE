@@ -22,7 +22,7 @@ The grid has a keyboard cell cursor (`src/cursor.rs`). Click a cell or focus the
 
 Ctrl+Shift+P opens a command palette (`src/palette.rs` and an overlay in `src/main.rs`), as in Zed: type letters of a command, Up and Down choose, Enter runs, Escape closes. It lists page navigation, Find, Filter, Clear filter, Compare, the paged and continuous modes, Copy, Clear selection and Edit the active cell, and hides commands that do not apply. It reuses the same `TextInput` as Find, so it also checks that component's keyboard and IME handling in a second place.
 
-Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as the Tauri prototype (and so as `bookie_core::import::parse_cell`), without depending on any BookiE crate. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere and Copy still uses the original values.
+Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as the Tauri prototype (and so as `bookie_core::import::parse_cell`), without depending on any BookiE crate. Opening a value containing a newline is refused with a single-line editor notice, preserving its full value. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere and Copy still uses the original values.
 
 Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text. The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
 
@@ -36,7 +36,11 @@ The UI font defaults to the first installed of `Fira Sans` and `Fira Code`, and 
 
 There are four themes: DBX light and dark, and **Adwaita** light and dark (libadwaita's neutral surfaces, the GNOME blue `#3584e4` accent and 6 px corners, to look like our GTK application). `BOOKIE_PROTOTYPE_THEME` takes `light`, `dark`, `adwaita-light` or `adwaita-dark`. The palette has **Theme: DBX style**, **Theme: Adwaita style** and the light/dark switch, which keeps the chosen style.
 
+Visible cell text is limited to 512 Unicode characters before layout. Line breaks, tabs and NULs use visible markers. Byte cells show at most 16 bytes in hexadecimal plus their exact byte count. These previews apply to normal and comparison rows; editing and copying still use full values. Painting requests each visible row once and shares it across its four cells. The synthetic source still constructs an owned row for each request, so this does not bound source allocation or establish real-result performance.
+
 ## Renderer boundary
+
+The formatter tests expand the [shared large-cell inputs](../fixtures/README.md), also used by the Tauri frontend tests. They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
 
 The planned modularisation puts application logic in app-services and leaves the application as a renderer. This prototype already splits that way, so it shows what a renderer would need. The library half (`src/lib.rs`) has no `gpui` import and is tested without a display:
 

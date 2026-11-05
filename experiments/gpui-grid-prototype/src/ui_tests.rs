@@ -291,6 +291,127 @@ fn the_palette_switches_the_theme_style_and_light_dark_keeps_it(cx: &mut TestApp
 
 struct Tiny;
 
+struct CountingSource(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
+    fn total(&self) -> u64 {
+        3
+    }
+
+    fn row(&self, index: u64) -> Vec<Cell> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        bookie_gpui_grid_prototype::source::ResultSource::row(&Tiny, index)
+    }
+
+    fn find(&self, query: &str, cap: usize) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::find(&Tiny, query, cap)
+    }
+
+    fn filter(&self, predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Vec<u32> {
+        bookie_gpui_grid_prototype::source::ResultSource::filter(&Tiny, predicate)
+    }
+
+    fn compare(&self, keyed: bool) -> bookie_gpui_grid_prototype::model::Diff {
+        bookie_gpui_grid_prototype::source::ResultSource::compare(&Tiny, keyed)
+    }
+}
+
+#[gpui::test]
+fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &mut TestAppContext) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let requests = std::sync::Arc::new(AtomicUsize::new(0));
+    let source = std::sync::Arc::new(CountingSource(requests.clone()));
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.run_until_parked();
+    let full = "💾".repeat(10_000);
+    view.update(cx, |view, cx| {
+        view.edits.insert((1, 1), Cell::Text(full.clone()));
+        requests.store(0, Ordering::Relaxed);
+        let _ = view.row_at_position(1, cx);
+        assert_eq!(requests.load(Ordering::Relaxed), 1);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
+    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), full));
+}
+
+#[gpui::test]
+fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let text = format!("{}\0tail", "💾".repeat(8_192));
+    let bytes = vec![0xab; 1_000_000];
+    let json = format!("{{\"raw\":  \"{}\"}}", "x".repeat(1_000_000));
+    view.update(cx, |view, cx| {
+        view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+        view.edits.insert((0, 1), Cell::Text(text.clone()));
+        view.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
+        view.edits.insert((1, 3), Cell::JsonText(json.clone()));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_at(0, 3), Cell::Bytes(bytes));
+        assert_eq!(view.cell_at(1, 3), Cell::JsonText(json));
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), text));
+}
+
+#[gpui::test]
+fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_limit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let value = Cell::Text("first\nsecond".into());
+    view.update(cx, |view, _| {
+        view.edits.insert((0, 1), value.clone());
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.editing.is_none());
+        assert_eq!(view.edits.get(&(0, 1)), Some(&value));
+        assert!(!view.status.is_empty());
+    });
+}
+
+#[gpui::test]
+fn composed_text_selects_inside_its_replacement_after_a_unicode_prefix(cx: &mut TestAppContext) {
+    use gpui::EntityInputHandler;
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        let input = view.read(cx).find.clone();
+        input.update(cx, |input, cx| {
+            input.set_content("α OLD tail", cx);
+            input.replace_and_mark_text_in_range(Some(2..5), "💾é", Some(2..3), window, cx);
+            assert_eq!(input.content(), "α 💾é tail");
+            assert_eq!(input.selected_text_range(false, window, cx).unwrap().range, 4..5);
+            input.replace_text_in_range(None, "X", window, cx);
+            assert_eq!(input.content(), "α X tail");
+        });
+    });
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn platform_input_flattens_newlines_like_single_line_paste(cx: &mut TestAppContext) {
+    use gpui::EntityInputHandler;
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        let focus = view.read(cx).find.read(cx).focus_handle_for_tests();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_input("first\nsecond");
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| assert_eq!(view.find.read(cx).content(), "first second"));
+    cx.update(|window, cx| {
+        let input = view.read(cx).find.clone();
+        input.update(cx, |input, cx| {
+            input.replace_and_mark_text_in_range(Some(0..12), "a\n💾", Some(0..4), window, cx);
+            assert_eq!(input.content(), "a 💾");
+            assert_eq!(input.selected_text_range(false, window, cx).unwrap().range, 0..4);
+        });
+    });
+    cx.run_until_parked();
+}
+
 impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
     fn total(&self) -> u64 {
         3

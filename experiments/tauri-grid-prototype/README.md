@@ -29,6 +29,8 @@ Export is inert. Nothing is read from or written to disk.
 
 ## Run and test
 
+Visible cells render at most 512 Unicode characters, with visible markers for line breaks, tabs and NULs. Binary cells render at most 16 bytes in hexadecimal and their exact byte count. Editing and copying still use the full original values. The [shared large-cell inputs](../fixtures/README.md) exercise the same synthetic cases as the GPUI formatter tests. This bounds DOM text preparation, not the result payload sent over IPC.
+
 From the repository root:
 
 ```bash

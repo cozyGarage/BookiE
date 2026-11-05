@@ -1,6 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { visibleWindow, displayCell, cellClass, windowTop, scrollTopForRow } from './grid.mjs';
+
+test('shared large cells keep exact source values while visible text stays bounded', () => {
+  const cases = JSON.parse(readFileSync(new URL('../../fixtures/large-cells.json', import.meta.url), 'utf8'));
+  for (const fixture of cases) {
+    const value = fixture.prefix + fixture.unit.repeat(fixture.repeats) + fixture.suffix;
+    const cell = { kind: fixture.kind, value };
+    const shown = displayCell(cell);
+    assert.ok([...shown].length <= 576, fixture.name);
+    assert.ok(shown.includes('…'), fixture.name);
+    assert.ok(!/[\n\r\t\0]/u.test(shown), fixture.name);
+    assert.equal(cell.value, value, fixture.name);
+  }
+});
+
+test('display limits count Unicode characters and bytes without splitting their encodings', () => {
+  assert.equal(displayCell({ kind: 'text', value: '💾'.repeat(512) }), '💾'.repeat(512));
+  assert.equal(displayCell({ kind: 'text', value: '💾'.repeat(513) }), `${'💾'.repeat(512)}…`);
+  assert.equal(displayCell({ kind: 'bytes', value: `\\x${'ab'.repeat(16)}` }), `\\x${'ab'.repeat(16)}`);
+  assert.equal(displayCell({ kind: 'bytes', value: `\\x${'ab'.repeat(17)}` }), `\\x${'ab'.repeat(16)}… (17 bytes total)`);
+});
 
 test('virtual rows stay bounded and cover the beginning and end', () => {
   const first = visibleWindow(0, 360, 36, 1_000_000);
