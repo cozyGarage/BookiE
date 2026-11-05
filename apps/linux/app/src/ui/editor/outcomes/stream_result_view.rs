@@ -76,7 +76,7 @@ fn build_page_stack(
         page_switcher.set_visible_child(&initial);
     }
     if let Some(sender) = sender {
-        super::super::stream_view::install_page_loader(&page_switcher, result, outcome.identity, sender);
+        super::super::stream_view::install_page_loader(&page_switcher, result, outcome.identity, sender.input_sender());
     }
     page_switcher
 }

@@ -94,6 +94,59 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
     (outcome, result)
 }
 
+fn page_load_request(
+    receiver: &relm4::Receiver<crate::ui::editor::SqlEditorInput>,
+) -> (
+    u64,
+    u64,
+    StatementIdentity,
+    bookie_app_services::stream_result_spool::StreamResultSpool,
+    Vec<ColumnInfo>,
+) {
+    let Some(crate::ui::editor::SqlEditorInput::Stream(crate::ui::editor::streaming::Input::LoadPage {
+        generation,
+        index,
+        identity,
+        spool,
+        columns,
+    })) = receiver.recv_sync()
+    else {
+        panic!("page visibility did not request the saved page");
+    };
+    (generation, index, identity, spool, columns)
+}
+
+fn complete_page_load_result(
+    runtime: &tokio::runtime::Runtime,
+    holder: &gtk::Box,
+    grid_sender: &relm4::Sender<GridMsg>,
+    request: (
+        u64,
+        u64,
+        StatementIdentity,
+        bookie_app_services::stream_result_spool::StreamResultSpool,
+        Vec<ColumnInfo>,
+    ),
+) {
+    let (generation, index, identity, spool, columns) = request;
+    let result = runtime
+        .block_on(spool.load_page(index, columns))
+        .map_err(|error| error.to_string());
+    complete_page_load(
+        PageLoadContext {
+            holder,
+            generation,
+            index,
+            identity,
+            grid_sender,
+            connection_id: None,
+            database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+            settings_store: LocalResultSettingsStore::default(),
+        },
+        result,
+    );
+}
+
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
@@ -696,5 +749,94 @@ fn a_failed_page_offers_a_retry_without_changing_pages() {
         .downcast::<crate::ui::row_object::RowObject>()
         .unwrap();
     assert_eq!(row.complete_cells(), Some(vec![Value::Int(42)]));
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn retrying_a_failed_page_reads_the_retained_spool_and_renders_its_rows() {
+    use futures::FutureExt;
+    relm4::adw::init().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let (outcome, mut result) = streamed(&[0], Vec::new(), 1);
+    result.generation = 42;
+    result.columns = page(&[42]).columns.clone();
+    result.spool = Some(spool.clone());
+    let (sender, receiver) = relm4::channel::<crate::ui::editor::SqlEditorInput>();
+    let grid_sender = relm4::channel::<GridMsg>().0;
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let pages = gtk::Stack::new();
+    let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let page_name = page_widget_name(result.generation, 0);
+    container.set_widget_name(&page_name);
+    container.append(&crate::ui::editor::outcomes::stream_result_view::stream_page_placeholder(&result, 0));
+    pages.add_named(&container, Some(&page_name));
+    pages.set_visible_child(&container);
+    holder.append(&pages);
+    let window = gtk::Window::builder().child(&holder).build();
+    window.present();
+    install_page_loader(&pages, &result, outcome.identity, &sender);
+
+    complete_page_load_result(&runtime, &holder, &grid_sender, page_load_request(&receiver));
+    let placeholder = container
+        .first_child()
+        .unwrap()
+        .downcast::<relm4::adw::StatusPage>()
+        .unwrap();
+    let retry = placeholder.child().unwrap().downcast::<gtk::Button>().unwrap();
+    assert!(retry.is_focusable());
+    runtime.block_on(spool.append_page(0, page(&[42]))).unwrap();
+    retry.emit_clicked();
+    assert!(placeholder.has_css_class("tp-stream-page-loading"));
+    assert!(placeholder.child().is_none());
+    retry.emit_clicked();
+    assert!(pages.visible_child().is_some_and(|visible| visible == container));
+
+    complete_page_load_result(&runtime, &holder, &grid_sender, page_load_request(&receiver));
+    assert!(
+        receiver.recv().now_or_never().flatten().is_none(),
+        "one retry must issue only one load"
+    );
+    let grid = wait_for_grid(&container.clone().upcast());
+    let row = grid
+        .model()
+        .unwrap()
+        .item(0)
+        .unwrap()
+        .downcast::<crate::ui::row_object::RowObject>()
+        .unwrap();
+    assert_eq!(row.complete_cells(), Some(vec![Value::Int(42)]));
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_page_without_a_retained_copy_keeps_its_unavailable_state() {
+    relm4::adw::init().unwrap();
+    let (outcome, mut result) = streamed(&[0], Vec::new(), 1);
+    result.generation = 42;
+    let (sender, _) = relm4::channel::<crate::ui::editor::SqlEditorInput>();
+    let pages = gtk::Stack::new();
+    let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let page_name = page_widget_name(result.generation, 0);
+    container.set_widget_name(&page_name);
+    container.append(&crate::ui::editor::outcomes::stream_result_view::stream_page_placeholder(&result, 0));
+    pages.add_named(&container, Some(&page_name));
+    pages.set_visible_child(&container);
+    let window = gtk::Window::builder().child(&pages).build();
+    window.present();
+    install_page_loader(&pages, &result, outcome.identity, &sender);
+
+    let status = container
+        .first_child()
+        .unwrap()
+        .downcast::<relm4::adw::StatusPage>()
+        .unwrap();
+    assert!(!status.title().is_empty());
+    assert!(status.child().is_none());
+    assert!(!status.has_css_class("tp-stream-page-loading"));
     window.destroy();
 }

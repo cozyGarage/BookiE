@@ -181,7 +181,7 @@ pub(super) fn install_page_loader(
     pages: &gtk::Stack,
     result: &StreamedResult,
     identity: super::StatementIdentity,
-    sender: &relm4::ComponentSender<super::SqlEditor>,
+    sender: &relm4::Sender<super::SqlEditorInput>,
 ) {
     let spool = result.spool.clone();
     let resident_pages = result.resident_pages.clone();
@@ -221,7 +221,7 @@ struct VisiblePageLoadContext<'a> {
     resident_pages: &'a super::stream_pages::ResidentPageStore,
     spool: Option<&'a bookie_app_services::stream_result_spool::StreamResultSpool>,
     columns: &'a [bookie_core::ColumnInfo],
-    sender: &'a relm4::ComponentSender<super::SqlEditor>,
+    sender: &'a relm4::Sender<super::SqlEditorInput>,
 }
 
 fn handle_visible_child_change(
@@ -263,9 +263,9 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
             status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
         }
-        context
+        let _ = context
             .sender
-            .input(super::SqlEditorInput::Stream(super::streaming::Input::PageLoaded {
+            .send(super::SqlEditorInput::Stream(super::streaming::Input::PageLoaded {
                 generation: context.generation,
                 index,
                 identity: context.identity,
@@ -283,9 +283,9 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
     if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
         status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
     }
-    context
+    let _ = context
         .sender
-        .input(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
+        .send(super::SqlEditorInput::Stream(super::streaming::Input::LoadPage {
             generation: context.generation,
             index,
             identity: context.identity,
