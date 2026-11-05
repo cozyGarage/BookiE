@@ -113,7 +113,7 @@ fn build_column_checklist(columns: &[DraftColumn]) -> (gtk::ListBox, ColumnCheck
     list.add_css_class("boxed-list");
     let checks: ColumnChecks = Rc::new(RefCell::new(Vec::new()));
     for col in columns {
-        let row = adw::ActionRow::builder().title(&col.name).build();
+        let row = adw::ActionRow::builder().use_markup(false).title(&col.name).build();
         let check = gtk::CheckButton::new();
         check.set_valign(gtk::Align::Center);
         row.add_suffix(&check);

@@ -43,11 +43,9 @@ impl App {
         } else {
             format!("{title} · {description}")
         };
-        let toast = adw::Toast::builder()
-            .title(&body)
-            .timeout(0)
-            .button_label(crate::tr!("Cancel"))
-            .build();
+        let toast = crate::ui::plain_text::toast(&body);
+        toast.set_timeout(0);
+        toast.set_button_label(Some(&crate::tr!("Cancel")));
         let cancel_sender = sender.clone();
         toast.connect_button_clicked(move |_| cancel_sender.input(AppMsg::CancelConnect));
         self.toast_overlay.add_toast(toast.clone());
@@ -69,7 +67,7 @@ impl App {
     }
 
     pub(super) fn show_toast(&self, msg: &str) {
-        self.toast_overlay.add_toast(adw::Toast::new(msg));
+        self.toast_overlay.add_toast(crate::ui::plain_text::toast(msg));
     }
 
     pub(super) fn show_error_alert(&self, title: &str, message: &str) {

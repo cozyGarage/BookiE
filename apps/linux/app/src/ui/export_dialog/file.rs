@@ -188,7 +188,7 @@ pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, 
         match outcome {
             Ok(Ok(())) => {
                 if let Some(toast) = toast.upgrade() {
-                    toast.add_toast(adw::Toast::new(
+                    toast.add_toast(crate::ui::plain_text::toast(
                         &crate::tr!("Exported {n} rows to {path}")
                             .replace("{n}", &final_count.load(Ordering::Relaxed).to_string())
                             .replace("{path}", &path.display().to_string()),

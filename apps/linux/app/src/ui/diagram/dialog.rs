@@ -99,7 +99,7 @@ fn build(title: &str, token: &CancellationToken) -> Ui {
         .selection_mode(gtk::SelectionMode::Single)
         .build();
     list.add_css_class("navigation-sidebar");
-    let banner = adw::Banner::builder().revealed(false).build();
+    let banner = adw::Banner::builder().revealed(false).use_markup(false).build();
     let stack = gtk::Stack::new();
     let progress = gtk::Label::new(Some(&tr!("Reading tables…")));
     let failure = adw::StatusPage::builder().icon_name("dialog-warning-symbolic").build();
@@ -235,7 +235,7 @@ fn export_button(exported: &Rc<RefCell<SchemaDiagram>>, toasts: &adw::ToastOverl
                     popover.popdown();
                 }
                 if let Some(toasts) = toasts.upgrade() {
-                    toasts.add_toast(adw::Toast::new(&confirmation));
+                    toasts.add_toast(crate::ui::plain_text::toast(&confirmation));
                 }
             }
         });
@@ -282,8 +282,9 @@ fn show_failure(ui: &Ui, token: &CancellationToken, error: &DriverError) {
         return;
     }
     ui.failure.set_title(&tr!("The diagram could not be built"));
-    ui.failure
-        .set_description(Some(&crate::services::error_text::driver_message(error)));
+    ui.failure.set_description(Some(&crate::ui::plain_text::escape_markup(
+        &crate::services::error_text::driver_message(error),
+    )));
     ui.stack.set_visible_child_name("failure");
 }
 
