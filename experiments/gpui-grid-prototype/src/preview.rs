@@ -75,4 +75,31 @@ mod tests {
         assert_eq!(cell_preview(&Cell::Int(9_007_199_254_740_993)), "9007199254740993");
         assert_eq!(cell_preview(&Cell::Null), "NULL");
     }
+
+    #[test]
+    fn shared_large_cells_keep_exact_values_across_preview_and_core_conversion() {
+        let fixtures: serde_json::Value =
+            serde_json::from_str(include_str!("../../fixtures/large-cells.json")).unwrap();
+        for fixture in fixtures.as_array().unwrap() {
+            let value = format!(
+                "{}{}{}",
+                fixture["prefix"].as_str().unwrap(),
+                fixture["unit"]
+                    .as_str()
+                    .unwrap()
+                    .repeat(fixture["repeats"].as_u64().unwrap() as usize),
+                fixture["suffix"].as_str().unwrap()
+            );
+            let cell = crate::edit::parse_edit(fixture["kind"].as_str().unwrap(), &value).unwrap();
+            let shown = cell_preview(&cell);
+            assert!(shown.chars().count() <= 576);
+            assert!(shown.contains('…'));
+            assert!(!shown.contains(['\n', '\r', '\t', '\0']));
+            assert_eq!(cell.display(), value);
+            assert_eq!(
+                crate::core_bridge::value_to_cell(crate::core_bridge::cell_to_value(&cell)),
+                cell
+            );
+        }
+    }
 }
