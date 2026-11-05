@@ -204,6 +204,11 @@
   "gtk": [
     [
       "bookie-app",
+      "--test=cli_info",
+      "information_flags_exit_without_display_or_profile_access"
+    ],
+    [
+      "bookie-app",
       "--lib",
       "services::gtk_approval::tests::the_dialog_defaults_to_deny_and_closes_as_deny"
     ],
@@ -211,6 +216,11 @@
       "bookie-app",
       "--lib",
       "tests::startup_reaches_the_application_loop_with_supported_toolkits"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::browse::tests::force_dismissing_refresh_confirmation_does_not_abort"
     ],
     [
       "bookie-app",
@@ -276,6 +286,11 @@
       "bookie-app",
       "--lib",
       "ui::app::sidebar_state::tests::the_sidebar_stays_closed_in_a_narrow_window_and_never_opens_empty"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::structure::confirmation_tests::force_dismissing_a_table_confirmation_does_not_run_its_action"
     ],
     [
       "bookie-app",
@@ -1681,11 +1696,6 @@
       "bookie-app",
       "--lib",
       "ui::theme::tests::given_gruvbox_when_warning_text_is_styled_then_it_is_distinct_and_readable"
-    ],
-    [
-      "bookie-app",
-      "--test=cli_info",
-      "information_flags_exit_without_display_or_profile_access"
     ]
   ],
   "keyring": [

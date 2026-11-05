@@ -204,6 +204,18 @@ def scenarios(ui):
     def active_cell_edit_survives_cancelled_disconnect(database, base):
         cancel_close_and_save(database, "win.disconnect", "Discard pending changes?")
 
+    def active_cell_edit_survives_cancelled_refresh(database, _base):
+        begin_edit(database)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        ui.press_x11_key("F5")
+        ui.wait_for_node(name="Discard pending changes?")
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Discard pending changes?", present=False)
+        ui.wait_for_node(name="1 unsaved change")
+        assert notes(database) == [(1, "alpha"), (2, "beta")], "refresh committed the edit"
+        save_and_assert_notes(database)
+
     def active_cell_edit_discards_when_disconnect_is_confirmed(database, base):
         begin_edit(database)
         ui.invoke_accessible_action("win.disconnect")
@@ -321,6 +333,7 @@ def scenarios(ui):
         active_cell_edit_saves_before_window_close,
         active_cell_edit_keeps_its_preview_when_another_table_opens,
         active_cell_edit_survives_cancelled_disconnect,
+        active_cell_edit_survives_cancelled_refresh,
         active_cell_edit_discards_when_disconnect_is_confirmed,
         active_cell_edit_saves_when_close_button_targets_an_inactive_tab,
         active_cell_edit_survives_cancelled_close_other_tabs,

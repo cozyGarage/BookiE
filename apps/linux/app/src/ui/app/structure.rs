@@ -23,6 +23,14 @@ use crate::ui::app::ran_statements::finish_if_recorded;
 use crate::ui::app::{App, AppMsg, WorkspaceTab};
 use crate::ui::structure_tab::{StructureMode, StructureTabInput};
 
+fn connect_confirmation_response(dialog: &adw::AlertDialog, on_response: impl Fn(&str) + 'static) {
+    dialog.connect_response(None, move |_, response| on_response(response));
+}
+
+#[cfg(test)]
+#[path = "structure_confirmation_tests.rs"]
+mod confirmation_tests;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum StructureText {
     CreateTable,
@@ -135,8 +143,7 @@ impl App {
         dialog.set_response_appearance("truncate", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
-        dialog.connect_response(None, move |dlg, response| {
-            dlg.close();
+        connect_confirmation_response(&dialog, move |response| {
             if response == "truncate" {
                 sender.input(AppMsg::TruncateTableConfirmed {
                     origin: origin.clone(),
@@ -225,8 +232,7 @@ impl App {
         dialog.set_response_appearance("rename", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("rename"));
         dialog.set_close_response("cancel");
-        dialog.connect_response(None, move |dlg, response| {
-            dlg.close();
+        connect_confirmation_response(&dialog, move |response| {
             let new_name = entry.text().trim().to_string();
             if response == "rename" && new_name != table {
                 sender.input(AppMsg::RenameTableConfirmed {
@@ -314,8 +320,7 @@ impl App {
         let sender_for_resp = sender.clone();
         let schema_for_resp = schema.clone();
         let table_for_resp = table.clone();
-        dialog.connect_response(None, move |dlg, response| {
-            dlg.close();
+        connect_confirmation_response(&dialog, move |response| {
             if response == "drop" {
                 sender_for_resp.input(AppMsg::DropTableConfirmed {
                     origin: origin.clone(),
