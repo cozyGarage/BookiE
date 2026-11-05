@@ -1110,6 +1110,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::a_page_without_a_retained_copy_keeps_its_unavailable_state"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::a_loaded_page_replaces_only_its_matching_generation_placeholder"
     ],
     [

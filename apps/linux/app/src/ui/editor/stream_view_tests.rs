@@ -811,3 +811,32 @@ fn retrying_a_failed_page_reads_the_retained_spool_and_renders_its_rows() {
     assert_eq!(row.complete_cells(), Some(vec![Value::Int(42)]));
     window.destroy();
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn a_page_without_a_retained_copy_keeps_its_unavailable_state() {
+    relm4::adw::init().unwrap();
+    let (outcome, mut result) = streamed(&[0], Vec::new(), 1);
+    result.generation = 42;
+    let (sender, _) = relm4::channel::<crate::ui::editor::SqlEditorInput>();
+    let pages = gtk::Stack::new();
+    let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let page_name = page_widget_name(result.generation, 0);
+    container.set_widget_name(&page_name);
+    container.append(&crate::ui::editor::outcomes::stream_result_view::stream_page_placeholder(&result, 0));
+    pages.add_named(&container, Some(&page_name));
+    pages.set_visible_child(&container);
+    let window = gtk::Window::builder().child(&pages).build();
+    window.present();
+    install_page_loader(&pages, &result, outcome.identity, &sender);
+
+    let status = container
+        .first_child()
+        .unwrap()
+        .downcast::<relm4::adw::StatusPage>()
+        .unwrap();
+    assert!(!status.title().is_empty());
+    assert!(status.child().is_none());
+    assert!(!status.has_css_class("tp-stream-page-loading"));
+    window.destroy();
+}
