@@ -4,8 +4,8 @@ A release is a tag named `linux-vX.Y.Z` on the protected `linux` branch. The Git
 
 ## Before tagging
 
-1. Merge the reviewed release change to `linux` with the workspace version, Meson version and newest AppStream entry set to the same `X.Y.Z` value. Run `python3 scripts/check-release-version.py`.
-2. Confirm each user-facing squash commit has a `Release-Note: <Category>: <text>` trailer, or `Release-Note: none`. Do not edit `CHANGELOG.md`; see [ADR 0022](decisions/0022-release-notes-from-merge-commits.md).
+1. Merge the reviewed release change to `linux`. It sets the workspace version, Meson version and newest AppStream entry to the same `X.Y.Z` value, regenerates `Cargo.lock` with `cargo update --workspace` and `apps/linux/packaging/THIRD_PARTY_NOTICES.md` with `python3 scripts/update-third-party-notices.py` (preflight fails on stale notices once the version changes), and adds a `## [X.Y.Z]` section to `CHANGELOG.md`. Run `python3 scripts/check-release-version.py` and `python3 scripts/release-notes.py notes X.Y.Z`.
+2. Build that changelog section from the `Release-Note:` trailers with `python3 scripts/release-notes.py assemble --since <previous tag> --until HEAD`, and fix by hand what the trailers got wrong. A squash commit on `linux` cannot be amended, so a commit with no trailer or an unknown category is reported and must be written or dropped on purpose, and a note that names something the release no longer ships must be corrected. Pull requests carry a `Release-Note: <Category>: <text>` line, or `Release-Note: none`, and the category is one of Added, Changed, Deprecated, Removed, Fixed or Security. Only the release pull request edits `CHANGELOG.md`. The release workflow reads the committed section with `release-notes.py notes <version>` and fails when it is missing or empty. [ADR 0022](decisions/0022-release-notes-from-merge-commits.md) describes assembling the notes from trailers at release time; the workflow does not do that yet.
 3. Confirm the merge commit is on `linux` and required checks apply to its exact revision.
 
 ## Build and publish
