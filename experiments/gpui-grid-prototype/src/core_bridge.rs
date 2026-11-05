@@ -22,7 +22,6 @@ fn column_kind(kind: &str) -> Option<ColumnKind> {
 }
 
 pub fn cell_to_value(cell: &Cell) -> Value {
-    let text = cell.display();
     match cell {
         Cell::Null => Value::Null,
         Cell::Bool(value) => Value::Bool(*value),
@@ -32,13 +31,13 @@ pub fn cell_to_value(cell: &Cell) -> Value {
         Cell::JsonText(value) => Value::JsonText(value.clone()),
         Cell::Undecodable(type_name) => Value::Undecodable(type_name.clone()),
         Cell::Bytes(value) => Value::Bytes(value.clone()),
-        Cell::Date(_) => reparse(ColumnKind::Date, &text),
-        Cell::Time(_) => reparse(ColumnKind::Time, &text),
-        Cell::DateTime(_) => reparse(ColumnKind::DateTime, &text),
-        Cell::TimestampTz(_) => reparse(ColumnKind::TimestampTz, &text),
-        Cell::Decimal(_) => reparse(ColumnKind::Decimal, &text),
-        Cell::Uuid(_) => reparse(ColumnKind::Uuid, &text),
-        Cell::Json(_) => reparse(ColumnKind::Json, &text),
+        Cell::Date(text) => reparse(ColumnKind::Date, text),
+        Cell::Time(text) => reparse(ColumnKind::Time, text),
+        Cell::DateTime(text) => reparse(ColumnKind::DateTime, text),
+        Cell::TimestampTz(text) => reparse(ColumnKind::TimestampTz, text),
+        Cell::Decimal(text) => reparse(ColumnKind::Decimal, text),
+        Cell::Uuid(text) => reparse(ColumnKind::Uuid, text),
+        Cell::Json(text) => reparse(ColumnKind::Json, text),
     }
 }
 
