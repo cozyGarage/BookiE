@@ -256,6 +256,9 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
         return;
     };
     placeholder.add_css_class("tp-stream-page-loading");
+    if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+        status.set_child(gtk::Widget::NONE);
+    }
     if let Some(page) = context.resident_pages.get(index) {
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
             status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
@@ -365,6 +368,16 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
             if let Some(status) = current.downcast_ref::<relm4::adw::StatusPage>() {
                 status.set_title(&crate::tr!("Could not load this result page"));
                 status.set_description(Some(&message));
+                if let Some(pages) = container.parent().and_downcast::<gtk::Stack>() {
+                    let retry = gtk::Button::with_label(&crate::tr!("Retry loading page"));
+                    let pages = pages.downgrade();
+                    retry.connect_clicked(move |_| {
+                        if let Some(pages) = pages.upgrade() {
+                            pages.notify("visible-child");
+                        }
+                    });
+                    status.set_child(Some(&retry));
+                }
             }
             current.remove_css_class("tp-stream-page-loading");
         }
