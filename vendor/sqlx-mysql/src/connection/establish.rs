@@ -8,6 +8,7 @@ use crate::net::{Socket, WithSocket};
 use crate::protocol::connect::{
     AuthSwitchRequest, AuthSwitchResponse, Handshake, HandshakeResponse,
 };
+use crate::protocol::auth::AuthPlugin;
 use crate::protocol::Capabilities;
 use crate::{MySqlConnectOptions, MySqlConnection, MySqlSslMode};
 
@@ -63,6 +64,9 @@ impl<'a> DoHandshake<'a> {
         let handshake: Handshake = stream.recv_packet().await?.decode()?;
 
         let mut plugin = handshake.auth_plugin;
+        if matches!(plugin, Some(AuthPlugin::MySqlClearPassword)) && !options.enable_cleartext_plugin {
+            return Err(err_protocol!("mysql_cleartext_plugin disabled"));
+        }
         let nonce = handshake.auth_plugin_data;
 
         // FIXME: server version parse is a bit ugly
