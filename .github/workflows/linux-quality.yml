@@ -43,6 +43,7 @@ jobs:
           - {label: core-2, package: bookie-core, shard: 1/4}
           - {label: core-3, package: bookie-core, shard: 2/4}
           - {label: core-4, package: bookie-core, shard: 3/4}
+          - {label: results, package: bookie-results, shard: 0/1}
           - {label: policy-1, package: bookie-policy, shard: 0/2}
           - {label: policy-2, package: bookie-policy, shard: 1/2}
           - {label: ssh, package: bookie-ssh, shard: 0/1}
