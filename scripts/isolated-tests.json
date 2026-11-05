@@ -255,6 +255,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::organization::lifetime_tests::force_dismissing_connection_url_import_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::organization::lifetime_tests::force_dismissing_group_and_tags_keeps_the_window_usable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::organization::tests::changing_a_connection_colour_updates_the_retained_tab_bar"
     ],
     [
