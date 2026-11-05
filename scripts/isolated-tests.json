@@ -1766,6 +1766,11 @@
       "bookie-app",
       "--lib",
       "ui::theme::tests::given_gruvbox_when_warning_text_is_styled_then_it_is_distinct_and_readable"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::connection::failure_tests::forced_connection_failure_dismissal_keeps_the_window_usable"
     ]
   ],
   "keyring": [
