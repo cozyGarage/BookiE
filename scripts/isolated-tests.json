@@ -435,7 +435,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::confirming_bulk_delete_removes_selected_drafts_once"
+      "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::bulk_delete_cancel_preserves_selection_and_confirm_removes_drafts_once"
     ],
     [
       "bookie-app",

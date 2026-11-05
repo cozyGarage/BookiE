@@ -63,7 +63,7 @@ fn dismissing_bulk_delete_preserves_selected_drafts() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
-fn confirming_bulk_delete_removes_selected_drafts_once() {
+fn bulk_delete_cancel_preserves_selection_and_confirm_removes_drafts_once() {
     use relm4::adw::prelude::*;
     relm4::adw::init().unwrap();
     let app = relm4::adw::Application::builder()
@@ -90,6 +90,17 @@ fn confirming_bulk_delete_removes_selected_drafts_once() {
     for index in 0..10 {
         selection.select_item(index, false);
     }
+    controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
+    pump(&observed);
+    let dialog = window.visible_dialog().unwrap();
+    button(&dialog.upcast::<relm4::gtk::Widget>(), "Cancel")
+        .expect("cancel button is visible")
+        .emit_clicked();
+    pump(&observed);
+    assert_eq!(pending(&controller), 10);
+    assert_eq!(selection.n_items(), 12);
+    assert!((0..10).all(|index| selection.is_selected(index)));
+
     controller.sender().send(BrowseTabInput::DeleteSelectedRow).unwrap();
     pump(&observed);
     let dialog = window.visible_dialog().unwrap();
