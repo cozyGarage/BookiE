@@ -7,6 +7,7 @@ fn rows(sql: &str) -> StatementOutcome {
     StatementOutcome {
         identity: super::super::StatementIdentity::default(),
         sql_preview: sql.into(),
+        sql: sql.into(),
         elapsed_ms: 1,
         kind: StatementOutcomeKind::Rows(Vec::new()),
         pinned: false,

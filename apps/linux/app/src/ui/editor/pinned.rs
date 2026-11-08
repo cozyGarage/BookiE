@@ -1,5 +1,5 @@
 use super::stream_pages::StreamTerminal;
-use super::{SqlEditor, StatementOutcome, StatementOutcomeKind, clear_results_box, render_outcomes};
+use super::{SqlEditor, StatementOutcome, StatementOutcomeKind, render_outcomes};
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 
@@ -119,9 +119,9 @@ impl SqlEditor {
         let added = self.pinned.add_pin(outcome);
         let rendered = self.run_generation.active.is_empty();
         if rendered {
-            clear_results_box(&self.results_holder);
+            self.clear_result_surface();
             render_outcomes(
-                &self.results_holder,
+                self.results_surface(),
                 &self.pinned.displayed(),
                 &self.grid_sender,
                 self.connection_id,
@@ -135,11 +135,11 @@ impl SqlEditor {
     }
 
     pub(super) fn show_pins_above(&mut self, page: &impl IsA<gtk::Widget>, sender: &relm4::ComponentSender<Self>) {
-        clear_results_box(&self.results_holder);
+        self.clear_result_surface();
         let pins = self.pinned.show(Vec::new());
         if !pins.is_empty() {
             render_outcomes(
-                &self.results_holder,
+                self.results_surface(),
                 &pins,
                 &self.grid_sender,
                 self.connection_id,
@@ -148,7 +148,7 @@ impl SqlEditor {
                 Some(sender),
             );
         }
-        self.results_holder.append(page);
+        self.results_surface().append(page);
         self.refresh_pin_button();
     }
 
@@ -156,9 +156,9 @@ impl SqlEditor {
         if self.pinned.is_pinned() {
             let remaining = self.pinned.unpin_all();
             self.refresh_pin_button();
-            clear_results_box(&self.results_holder);
+            self.clear_result_surface();
             render_outcomes(
-                &self.results_holder,
+                self.results_surface(),
                 &remaining,
                 &self.grid_sender,
                 self.connection_id,

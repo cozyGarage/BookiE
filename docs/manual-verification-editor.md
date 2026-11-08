@@ -87,6 +87,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Editor bottom panel
 
+- [ ] With a query result visible, hide the Results panel, then press Ctrl+Alt+G to reopen it and focus the active result grid. Press Ctrl+Alt+E to return focus to the SQL editor. Repeat with multiple result sets selected and with a browse-table tab active; confirm the shortcuts follow the selected tab and never execute a query.
 - [ ] On the target desktop, run a query with a unique visible value, hide/show Results by button and Ctrl+J from SQL and the result grid, and confirm the same result and selection remain.
 - [ ] Resize the divider, maximize/restore, and hide while maximized. Confirm the normal divider size and the previously focused SQL split are restored.
 - [ ] Check 1,200 px with normal SQL text and 802 px with a 20-point SQL font in light/dark themes. Every panel control remains reachable.

@@ -77,6 +77,7 @@ fn independent_pinned_streams_release_pages_and_keep_spools_until_unpin() {
         let outcome = StatementOutcome {
             identity: StatementIdentity::default(),
             sql_preview: "SELECT payload FROM items".into(),
+            sql: "SELECT payload FROM items".into(),
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot_with_spool(
                 StreamTerminal::Complete,

@@ -251,6 +251,7 @@ mod tests {
         let outcome = |kind| StatementOutcome {
             identity: super::super::StatementIdentity::default(),
             sql_preview: String::new(),
+            sql: String::new(),
             elapsed_ms: 0,
             kind,
             pinned: false,

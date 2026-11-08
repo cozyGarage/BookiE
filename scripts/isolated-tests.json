@@ -335,6 +335,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::focus_grid_targets_the_current_browse_view"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::a_page_reload_retires_a_pending_cell_value_request"
     ],
     [
@@ -791,6 +796,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::panel_tests::hiding_results_falls_back_when_the_remembered_sql_split_was_closed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::dispatch_tests::panel_tests::keyboard_shortcuts_move_focus_between_editor_and_result_grid"
     ],
     [
       "bookie-app",

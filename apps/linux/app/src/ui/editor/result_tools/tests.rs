@@ -447,6 +447,7 @@ fn a_cell_filter_picks_the_result_it_was_started_from_when_the_same_sql_is_pinne
         StatementOutcome {
             identity: StatementIdentity::default(),
             sql_preview: "SELECT 1".into(),
+            sql: "SELECT 1".into(),
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Streamed(Box::new(result)),
             pinned: false,
