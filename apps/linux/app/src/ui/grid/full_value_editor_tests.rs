@@ -1,6 +1,5 @@
 use super::*;
 use futures::FutureExt;
-use sourceview5::prelude::*;
 
 #[test]
 fn text_payload_preserves_empty_and_multiline_values_exactly() {

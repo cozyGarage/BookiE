@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use bookie_core::QueryResult;
 use relm4::adw::prelude::*;
-use relm4::gtk::prelude::*;
 use relm4::{adw, gtk};
 
 use super::stream_view::visible_page_index;
@@ -134,7 +133,6 @@ mod tests {
                     (0..columns)
                         .map(|_| bookie_core::Value::Text("x".into()))
                         .collect::<Vec<_>>()
-                        .into()
                 })
                 .collect::<Vec<_>>()
                 .into(),
