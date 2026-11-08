@@ -78,6 +78,7 @@ aws-lc-rs = { version = "1", default-features = false, features = ["aws-lc-sys"]
 base64 = "0.22"
 zeroize = { version = "1", features = ["alloc"] }
 hex = "0.4"
+unicode-width = "0.2"
 glob = "0.3"
 libc = "0.2"
 regex = "1"
