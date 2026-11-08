@@ -92,6 +92,7 @@ pub enum SqlEditorInput {
     ToggleBookmark,
     JumpBookmark {
         forward: bool,
+        pane: super::EditorPane,
     },
     ClearBookmarks,
     ToggleLineComment,

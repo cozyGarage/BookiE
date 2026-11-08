@@ -2,7 +2,7 @@ use relm4::ComponentSender;
 use relm4::gtk;
 use relm4::gtk::prelude::*;
 
-use super::{SqlEditor, SqlEditorInput};
+use super::{EditorPane, SqlEditor, SqlEditorInput};
 
 pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
     let content = gtk::Box::builder()
@@ -23,13 +23,19 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
         sender,
         crate::tr!("Next bookmark"),
         crate::tr!("Jump to the next bookmarked line"),
-        || SqlEditorInput::JumpBookmark { forward: true },
+        || SqlEditorInput::JumpBookmark {
+            forward: true,
+            pane: EditorPane::Primary,
+        },
     ));
     content.append(&action(
         sender,
         crate::tr!("Previous bookmark"),
         crate::tr!("Jump to the previous bookmarked line"),
-        || SqlEditorInput::JumpBookmark { forward: false },
+        || SqlEditorInput::JumpBookmark {
+            forward: false,
+            pane: EditorPane::Primary,
+        },
     ));
     content.append(&action(
         sender,

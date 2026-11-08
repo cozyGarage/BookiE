@@ -66,7 +66,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 ## SQL line bookmarks
 
 - [ ] Place the cursor on several lines and press Ctrl+F2 (or use the bookmark toolbar menu). Each bookmarked line shows a gutter marker in light and dark themes, including the split pane.
-- [ ] Press Ctrl+Shift+Down and Ctrl+Shift+Up to move between bookmarks without wrapping past the first or last mark.
+- [ ] Press Ctrl+Shift+Down and Ctrl+Shift+Up in either split pane to move between bookmarks without wrapping past the first or last mark; the pane that receives the shortcut scrolls the target line into view.
 - [ ] Click a bookmark-only gutter marker to clear that line. Click a fold marker still unfolds the block.
 - [ ] Choose Clear bookmarks from the menu: every bookmark in that buffer is gone. Editing the SQL leaves bookmarks in place (they track the buffer).
 
