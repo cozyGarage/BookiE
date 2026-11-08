@@ -26,6 +26,7 @@ fn a_filter_is_ignored_when_the_driver_cannot_filter_a_browse() {
             persistence: crate::services::persistence_stores::PersistenceStores {
                 column_widths: None,
                 filter_settings: None,
+                highlight_settings: None,
                 csv_import_mappings: None,
                 named_filter_presets: None,
             },
@@ -79,6 +80,7 @@ fn a_saved_filter_is_not_restored_when_the_driver_cannot_filter_a_browse() {
             persistence: crate::services::persistence_stores::PersistenceStores {
                 column_widths: None,
                 filter_settings: Some(store),
+                highlight_settings: None,
                 csv_import_mappings: None,
                 named_filter_presets: None,
             },

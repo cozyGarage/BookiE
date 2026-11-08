@@ -21,6 +21,7 @@ fn launch(directory: &std::path::Path) -> relm4::Controller<App> {
             persistence: persistence_stores::PersistenceStores {
                 column_widths: None,
                 filter_settings: None,
+                highlight_settings: None,
                 csv_import_mappings: None,
                 named_filter_presets: None,
             },

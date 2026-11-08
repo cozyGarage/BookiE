@@ -15,6 +15,7 @@ mod editing;
 mod export;
 mod font_zoom;
 pub(crate) mod full_value_editor;
+mod highlight_paint;
 #[cfg(test)]
 mod lifetime_tests;
 pub(crate) mod local_filter;
@@ -129,6 +130,7 @@ pub struct TabGridContext {
     pub local_result_view: Option<local_filter::LocalResultView>,
     pub whole_result_filter: bool,
     pub changed_cells: Option<std::sync::Arc<bookie_app_services::result_compare::ChangedCells>>,
+    pub highlight_rules: Option<std::sync::Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>>,
     pub(crate) result_model: Option<gtk4::gio::ListModel>,
     pub(crate) row_visibility: Option<std::rc::Rc<dyn Fn(u32, bool)>>,
     pub sortable_result_columns: std::collections::HashSet<usize>,
