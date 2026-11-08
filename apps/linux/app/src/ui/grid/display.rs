@@ -7,9 +7,10 @@ use std::sync::OnceLock;
 use gtk4::glib;
 use gtk4::prelude::*;
 
+use bookie_app_services::value_display::format_temporal_for_display;
 use bookie_core::{ColumnInfo, Value};
 
-use crate::services::preferences::NullDisplayPref;
+use crate::services::preferences::{DateFormatPref, NullDisplayPref};
 
 const DISPLAY_TEXT_MAX_CHARS: usize = 10_000;
 const DISPLAY_TEXT_BYTES_THRESHOLD: usize = DISPLAY_TEXT_MAX_CHARS * 4;
@@ -18,10 +19,19 @@ const GRID_CELL_DISPLAY_MAX_BYTES: usize = GRID_CELL_DISPLAY_MAX_CHARS * 4;
 
 thread_local! {
     static NULL_DISPLAY: Cell<NullDisplayPref> = const { Cell::new(NullDisplayPref::Standard) };
+    static DATE_FORMAT: Cell<DateFormatPref> = const { Cell::new(DateFormatPref::Iso) };
 }
 
 pub fn set_null_display(style: NullDisplayPref) {
     NULL_DISPLAY.set(style);
+}
+
+pub fn set_date_format(format: DateFormatPref) {
+    DATE_FORMAT.set(format);
+}
+
+pub fn date_format() -> DateFormatPref {
+    DATE_FORMAT.get()
 }
 
 pub fn editable_null_sentinel() -> String {
@@ -176,7 +186,13 @@ pub fn value_to_display_text(value: &Value) -> String {
     match value {
         Value::Text(text) => text_to_display_text(text),
         Value::Json(json) => json_to_display_text(json),
-        other => value_to_text(other, truncate_for_display),
+        other => {
+            if let Some(text) = format_temporal_for_display(other, DATE_FORMAT.get()) {
+                text
+            } else {
+                value_to_text(other, truncate_for_display)
+            }
+        }
     }
 }
 

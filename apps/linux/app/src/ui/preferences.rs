@@ -2,7 +2,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
 
-use crate::services::preferences::{ColorSchemePref, NullDisplayPref, PreferencesStore, ThemePref};
+use crate::services::preferences::{ColorSchemePref, DateFormatPref, NullDisplayPref, PreferencesStore, ThemePref};
 use crate::ui::count_format::format_thousands;
 
 /// Must match `browse_tab`'s own `PAGE_SIZE_OPTIONS` (duplicated there and
@@ -142,7 +142,31 @@ pub fn present(
         }
     });
 
+    let date_row = adw::ComboRow::new();
+    date_row.set_title(&crate::tr!("Date format"));
+    date_row.set_subtitle(&crate::tr!(
+        "How dates and timestamps appear in the grid. Copy and edit keep the database text."
+    ));
+    let date_choices = date_format_choices();
+    date_row.set_model(Some(&gtk::StringList::new(
+        &date_choices.iter().map(String::as_str).collect::<Vec<_>>(),
+    )));
+    date_row.set_selected(current.date_format.index());
+    date_row.connect_selected_notify({
+        let preferences = preferences.clone();
+        let root = parent.upcast_ref::<gtk::Widget>().clone();
+        move |row| {
+            let format = DateFormatPref::from_index(row.selected());
+            crate::ui::grid::set_date_format(format);
+            crate::ui::grid::refresh_date_displays_under(&root);
+            if let Err(error) = preferences.update(|prefs| prefs.date_format = format) {
+                tracing::warn!(%error, "preferences: date format rejected");
+            }
+        }
+    });
+
     browse_group.add(&null_row);
+    browse_group.add(&date_row);
     browse_group.add(&page_size_row);
     browse_group.add(&confirm_row);
     browse_group.add(&preview_tab_row);
@@ -377,6 +401,17 @@ fn null_display_choices() -> [String; 3] {
     ]
 }
 
+fn date_format_choices() -> [String; 6] {
+    [
+        crate::tr!("ISO 8601"),
+        crate::tr!("ISO date"),
+        crate::tr!("US long"),
+        crate::tr!("US short"),
+        crate::tr!("EU long"),
+        crate::tr!("EU short"),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,6 +435,15 @@ mod tests {
             crate::tr!("<NULL>")
         );
         assert_eq!(value_to_display_text(&Value::Null), crate::tr!("NULL"));
+    }
+
+    #[test]
+    fn date_format_choices_cover_every_preference_row() {
+        assert_eq!(date_format_choices().len(), DateFormatPref::ALL.len());
+        for (index, format) in DateFormatPref::ALL.into_iter().enumerate() {
+            assert_eq!(DateFormatPref::from_index(index as u32), format);
+            assert!(!date_format_choices()[index].is_empty());
+        }
     }
 
     /// The stored default must always be one of the choices the per-tab
