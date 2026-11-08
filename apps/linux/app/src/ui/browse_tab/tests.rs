@@ -1158,6 +1158,7 @@ fn empty_persistence() -> crate::services::persistence_stores::PersistenceStores
     crate::services::persistence_stores::PersistenceStores {
         column_widths: None,
         filter_settings: None,
+        highlight_settings: None,
         csv_import_mappings: None,
         named_filter_presets: None,
     }

@@ -1,6 +1,6 @@
 pub use bookie_results::{
-    result_compare, result_filter, result_find, result_predicate, result_scan, sidebar_tree, stream_result_spool,
-    value_exact,
+    highlight_match, result_compare, result_filter, result_find, result_predicate, result_scan, sidebar_tree,
+    stream_result_spool, value_exact,
 };
 
 #[cfg(test)]
@@ -23,6 +23,7 @@ pub mod editor_panel;
 pub mod enum_input;
 pub mod er_diagram;
 pub mod filter_settings;
+pub mod highlight_settings;
 pub mod ordered_refresh;
 pub mod preparation;
 pub mod read_scopes;

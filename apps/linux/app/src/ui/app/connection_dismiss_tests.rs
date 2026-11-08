@@ -90,6 +90,7 @@ fn dirty_editor() -> DirtyEditor {
             persistence: persistence_stores::PersistenceStores {
                 column_widths: None,
                 filter_settings: None,
+                highlight_settings: None,
                 csv_import_mappings: None,
                 named_filter_presets: None,
             },
