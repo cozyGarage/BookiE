@@ -418,6 +418,15 @@ fn the_date_format_survives_a_gsettings_round_trip_and_defaults_to_iso() {
 }
 
 #[test]
+fn show_invisible_characters_survives_a_gsettings_round_trip_and_defaults_on() {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/show-invisible/", |prefs| {
+        prefs.show_invisible_characters = false;
+    });
+    assert!(before.show_invisible_characters);
+    assert!(!after.show_invisible_characters);
+}
+
+#[test]
 fn color_scheme_rows_keys_and_styles_agree() {
     for (position, scheme) in ColorSchemePref::ALL.into_iter().enumerate() {
         assert_eq!(scheme.index() as usize, position);

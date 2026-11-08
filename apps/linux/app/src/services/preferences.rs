@@ -188,6 +188,7 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         editor_vim_mode: settings.boolean("editor-vim-mode"),
         null_display: NullDisplayPref::from_key(settings.string("null-display").as_str()),
         date_format: DateFormatPref::from_key(settings.string("date-format").as_str()),
+        show_invisible_characters: settings.boolean("show-invisible-characters"),
         open_tables_in_preview_tab: settings.boolean("open-tables-in-preview-tab"),
     }
 }
@@ -207,6 +208,7 @@ fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), S
         settings.set_boolean("editor-vim-mode", prefs.editor_vim_mode),
         settings.set_string("null-display", prefs.null_display.key()),
         settings.set_string("date-format", prefs.date_format.key()),
+        settings.set_boolean("show-invisible-characters", prefs.show_invisible_characters),
         settings.set_boolean("open-tables-in-preview-tab", prefs.open_tables_in_preview_tab),
     ];
     if let Some(error) = writes.into_iter().find_map(Result::err) {

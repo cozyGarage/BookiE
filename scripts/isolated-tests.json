@@ -1450,6 +1450,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::full_value_editor::tests::the_value_editor_marks_whitespace_only_when_preferences_ask"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::lifetime_tests::a_dropped_result_grid_releases_its_page"
     ],
     [
