@@ -71,6 +71,7 @@ fn wide_grid(base: u64) -> (gtk4::ColumnView, gtk4::MultiSelection, gtk4::Window
                 ..Default::default()
             },
             column_widths: None,
+            highlight_settings: None,
             database: Arc::new(DatabaseService::new()),
         },
     );

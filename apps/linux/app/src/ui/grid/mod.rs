@@ -17,6 +17,8 @@ mod export;
 mod font_zoom;
 pub(crate) mod full_value_editor;
 mod highlight_paint;
+mod highlight_rules;
+pub(crate) use highlight_rules::HighlightPersist;
 #[cfg(test)]
 mod lifetime_tests;
 pub(crate) mod local_filter;
@@ -124,6 +126,7 @@ pub enum GridMsg {
     ShowReferencingRows {
         row: Vec<(String, bookie_core::Value)>,
     },
+    HighlightRulesChanged,
 }
 
 #[derive(Clone, Default)]
@@ -173,6 +176,7 @@ pub struct GridEnv {
     pub connection_id: Option<uuid::Uuid>,
     pub tab_ctx: TabGridContext,
     pub column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    pub highlight_settings: Option<HighlightPersist>,
     pub database: std::sync::Arc<DatabaseService>,
 }
 
@@ -193,6 +197,7 @@ pub fn build_column_view(
         connection_id,
         tab_ctx,
         column_widths,
+        highlight_settings,
         database,
     } = env;
     let result: &QueryResult = shared;
@@ -355,6 +360,13 @@ pub fn build_column_view(
             },
         );
     }
+    highlight_rules::install(
+        &column_view,
+        &grid_actions,
+        columns.iter().map(|column| column.name.clone()).collect(),
+        highlight_settings,
+        menu_sender.clone(),
+    );
     font_zoom::install(&column_view, &grid_actions);
     column_view.insert_action_group("grid", Some(&grid_actions));
     row_number_column::fit(&column_view, tab_ctx.row_number_base);

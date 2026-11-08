@@ -51,6 +51,7 @@ pub enum BrowseTabInput {
         exclude: bool,
     },
     ShowToast(String),
+    HighlightRulesChanged,
     GoToReference {
         column: String,
         row: Vec<(String, Value)>,

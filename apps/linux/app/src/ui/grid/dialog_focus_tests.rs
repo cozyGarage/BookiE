@@ -56,6 +56,7 @@ fn grid(count: usize) -> gtk4::ColumnView {
             connection_id: None,
             tab_ctx: super::super::TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         },
     )

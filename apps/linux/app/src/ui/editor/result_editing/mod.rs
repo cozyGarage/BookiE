@@ -459,6 +459,7 @@ impl SqlEditor {
                     ..Default::default()
                 },
                 column_widths: None,
+                highlight_settings: None,
                 database: self.database.clone(),
             },
         );

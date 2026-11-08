@@ -376,6 +376,7 @@ fn result_grid_uses_the_paged_model_for_its_rows() {
                 ..Default::default()
             },
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         },
     );
@@ -441,6 +442,7 @@ fn result_grid_reports_rows_when_realized_and_released() {
                 ..Default::default()
             },
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         },
     );
@@ -515,6 +517,7 @@ fn realized_grid_rows_load_their_spooled_values() {
                 ..Default::default()
             },
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         },
     );

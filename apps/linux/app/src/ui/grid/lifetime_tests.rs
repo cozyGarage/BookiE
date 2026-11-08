@@ -115,6 +115,7 @@ fn retire_grid(with_menus: bool, editable: bool, rendered: bool) -> RetiredGrid 
             connection_id: None,
             tab_ctx,
             column_widths: None,
+            highlight_settings: None,
             database: Arc::new(DatabaseService::new()),
         },
     );
@@ -237,6 +238,7 @@ fn a_retired_grid_does_not_retain_its_inspector_through_selection_callback() {
             connection_id: None,
             tab_ctx: TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: Arc::new(DatabaseService::new()),
         },
     );
