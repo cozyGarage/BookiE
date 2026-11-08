@@ -7,6 +7,7 @@ pub use bookie_results::{
 mod value_exact_agreement_tests;
 
 pub mod approval_wait;
+pub mod audit_view;
 pub mod busy_jobs;
 pub mod catalog_changes;
 pub mod column_widths;
