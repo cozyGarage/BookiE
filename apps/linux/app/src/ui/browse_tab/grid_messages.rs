@@ -10,25 +10,13 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             col_index,
             new_value,
             row_key,
-        } => BrowseTabInput::GridCellEdited {
-            row_position,
-            col_index,
-            new_value,
-            value: None,
-            row_key,
-        },
+        } => cell_edited_input(row_position, col_index, new_value, None, row_key),
         GridMsg::CellEditedValue {
             row_position,
             col_index,
             value,
             row_key,
-        } => BrowseTabInput::GridCellEdited {
-            row_position,
-            col_index,
-            new_value: String::new(),
-            value: Some(value),
-            row_key,
-        },
+        } => cell_edited_input(row_position, col_index, String::new(), Some(value), row_key),
         GridMsg::CopyToClipboard(text) => BrowseTabInput::GridCopyToClipboard(text),
         GridMsg::FetchCellValue {
             col_index,
@@ -61,6 +49,23 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::ShowToast(message) => BrowseTabInput::ShowToast(message),
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
+        GridMsg::HighlightRulesChanged => BrowseTabInput::HighlightRulesChanged,
+    }
+}
+
+fn cell_edited_input(
+    row_position: u32,
+    col_index: usize,
+    new_value: String,
+    value: Option<bookie_core::Value>,
+    row_key: Vec<bookie_core::Value>,
+) -> BrowseTabInput {
+    BrowseTabInput::GridCellEdited {
+        row_position,
+        col_index,
+        new_value,
+        value,
+        row_key,
     }
 }
 

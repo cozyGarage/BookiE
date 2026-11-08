@@ -103,6 +103,7 @@ fn start_view(
                     ..Default::default()
                 },
                 column_widths: None,
+                highlight_settings: None,
                 database,
             },
         );

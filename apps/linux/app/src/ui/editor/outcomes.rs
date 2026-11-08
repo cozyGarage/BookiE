@@ -837,6 +837,7 @@ pub(super) fn build_result_set_widget(
                 ..Default::default()
             },
             column_widths: None,
+            highlight_settings: None,
             database,
         },
     );
