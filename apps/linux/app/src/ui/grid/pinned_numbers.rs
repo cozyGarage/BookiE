@@ -65,7 +65,6 @@ mod imp {
             {
                 adjustment.disconnect(handler);
             }
-            self.parent_dispose();
         }
     }
 
@@ -196,12 +195,8 @@ fn install(pinned: &PinnedNumbers, view: &gtk::ColumnView, backing: &gtk::Box, h
     if let Some(overlay) = pinned.child().and_downcast::<gtk::Overlay>() {
         let weak = pinned.downgrade();
         overlay.connect_get_child_position(move |overlay, child| {
-            let Some(pinned) = weak.upgrade() else {
-                return None;
-            };
-            let Some(header) = pinned.imp().gutter_header.get() else {
-                return None;
-            };
+            let pinned = weak.upgrade()?;
+            let header = pinned.imp().gutter_header.get()?;
             if child != header.upcast_ref::<gtk::Widget>() {
                 return None;
             }
@@ -237,9 +232,8 @@ pub(super) fn sync(pinned: &PinnedNumbers) {
     if let Some(column) = row_number_column::row_numbers_column(view) {
         backing.set_width_request(column.fixed_width());
     }
-    let scrolled = imp
-        .hadjustment
-        .borrow()
+    let scrolled = pinned
+        .hadjustment()
         .as_ref()
         .is_some_and(|adjustment| adjustment.value() > 0.0);
     backing.set_visible(scrolled);
@@ -351,10 +345,12 @@ fn snapshot_column(
     }
 }
 
+#[cfg(test)]
 pub(super) fn gutter_backing(view: &gtk::ColumnView) -> Option<gtk::Box> {
     pinned_for(view)?.imp().gutter_backing.get().cloned()
 }
 
+#[cfg(test)]
 fn pinned_for(view: &gtk::ColumnView) -> Option<PinnedNumbers> {
     view.parent()
         .and_then(|overlay| overlay.parent())
