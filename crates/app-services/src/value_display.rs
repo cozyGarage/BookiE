@@ -119,10 +119,15 @@ fn bytes_paint_text(bytes: &[u8]) -> String {
 fn bytes_copy_text(bytes: &[u8]) -> String {
     match std::str::from_utf8(bytes) {
         Ok(text) if !text.contains('\0') => text.to_owned(),
-        _ => format!(
-            "\\x{}",
-            bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
-        ),
+        _ => {
+            let mut result = String::with_capacity(bytes.len().saturating_mul(2).saturating_add(2));
+            result.push_str("\\x");
+            for &byte in bytes {
+                result.push(char::from(b"0123456789abcdef"[usize::from(byte >> 4)]));
+                result.push(char::from(b"0123456789abcdef"[usize::from(byte & 15)]));
+            }
+            result
+        }
     }
 }
 
