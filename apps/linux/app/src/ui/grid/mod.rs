@@ -410,10 +410,7 @@ pub fn build_column_view(
     (column_view, selection)
 }
 
-fn sort_keys_from_sorter(
-    sorter: &gtk4::ColumnViewSorter,
-    columns: &[gtk4::ColumnViewColumn],
-) -> Vec<(usize, bool)> {
+fn sort_keys_from_sorter(sorter: &gtk4::ColumnViewSorter, columns: &[gtk4::ColumnViewColumn]) -> Vec<(usize, bool)> {
     let mut keys = Vec::new();
     for position in 0..sorter.n_sort_columns() {
         let (column, order) = sorter.nth_sort_column(position);
