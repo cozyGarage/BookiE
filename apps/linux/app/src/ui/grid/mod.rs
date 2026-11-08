@@ -11,10 +11,12 @@ mod column_width_tests;
 mod context_menu;
 mod dialog_focus;
 mod display;
+mod display_refresh;
 mod editing;
 mod export;
 mod font_zoom;
 pub(crate) mod full_value_editor;
+mod highlight_paint;
 #[cfg(test)]
 mod lifetime_tests;
 pub(crate) mod local_filter;
@@ -39,7 +41,10 @@ use context_menu::install_grid_context_menus;
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
 pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
-pub use display::{focused_cell_identity, last_clicked_cell, set_null_display, value_to_display_text};
+pub use display::{
+    date_format, focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text,
+};
+pub use display_refresh::refresh_date_displays_under;
 pub(crate) use value_viewer::present as present_value_viewer;
 
 pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
@@ -129,6 +134,7 @@ pub struct TabGridContext {
     pub local_result_view: Option<local_filter::LocalResultView>,
     pub whole_result_filter: bool,
     pub changed_cells: Option<std::sync::Arc<bookie_app_services::result_compare::ChangedCells>>,
+    pub highlight_rules: Option<std::sync::Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>>,
     pub(crate) result_model: Option<gtk4::gio::ListModel>,
     pub(crate) row_visibility: Option<std::rc::Rc<dyn Fn(u32, bool)>>,
     pub sortable_result_columns: std::collections::HashSet<usize>,

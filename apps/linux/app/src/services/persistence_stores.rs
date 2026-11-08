@@ -1,12 +1,14 @@
 use super::column_widths::ColumnWidthStore;
 use super::csv_import_mappings::CsvMappingStore;
 use super::filter_settings::FilterSettingsStore;
+use super::highlight_settings::HighlightSettingsStore;
 use super::named_filter_presets::NamedFilterPresetsStore;
 
 #[derive(Clone)]
 pub struct PersistenceStores {
     pub column_widths: Option<ColumnWidthStore>,
     pub filter_settings: Option<FilterSettingsStore>,
+    pub highlight_settings: Option<HighlightSettingsStore>,
     pub csv_import_mappings: Option<CsvMappingStore>,
     pub named_filter_presets: Option<NamedFilterPresetsStore>,
 }
@@ -16,6 +18,7 @@ impl PersistenceStores {
         Self {
             column_widths: ColumnWidthStore::open(),
             filter_settings: FilterSettingsStore::open(),
+            highlight_settings: HighlightSettingsStore::open(),
             csv_import_mappings: CsvMappingStore::open(),
             named_filter_presets: NamedFilterPresetsStore::open(),
         }
@@ -31,6 +34,11 @@ impl PersistenceStores {
             && let Err(error) = store.flush()
         {
             tracing::warn!(%error, "filter settings flush failed");
+        }
+        if let Some(store) = &self.highlight_settings
+            && let Err(error) = store.flush()
+        {
+            tracing::warn!(%error, "highlight settings flush failed");
         }
         if let Some(store) = &self.csv_import_mappings
             && let Err(error) = store.flush()

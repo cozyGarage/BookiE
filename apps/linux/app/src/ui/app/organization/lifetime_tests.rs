@@ -36,6 +36,7 @@ fn app_controller() -> (relm4::Controller<App>, tempfile::TempDir) {
             persistence: persistence_stores::PersistenceStores {
                 column_widths: None,
                 filter_settings: None,
+                highlight_settings: None,
                 csv_import_mappings: None,
                 named_filter_presets: None,
             },
