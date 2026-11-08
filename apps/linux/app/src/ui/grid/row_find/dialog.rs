@@ -237,9 +237,8 @@ pub(super) fn present(view: &gtk::ColumnView, target: Rc<FindTarget>) {
         .content_width(560)
         .content_height(500)
         .build();
-    let can_replace = target.edit.is_some()
-        && !target.pk_indices.is_empty()
-        && target.editable.iter().any(|editable| *editable);
+    let can_replace =
+        target.edit.is_some() && !target.pk_indices.is_empty() && target.editable.iter().any(|editable| *editable);
     let widgets = Rc::new(build_widgets(&target.names, can_replace));
     let positions: Rc<RefCell<Vec<(u32, usize)>>> = Rc::default();
     let refresh = refresh_fn(view, &widgets, &positions, &target.names);
@@ -257,12 +256,7 @@ fn refresh_fn(
     positions: &Rc<RefCell<Vec<(u32, usize)>>>,
     names: &[String],
 ) -> impl Fn() + Clone + 'static {
-    let (view, widgets, positions, names) = (
-        view.downgrade(),
-        widgets.clone(),
-        positions.clone(),
-        names.to_vec(),
-    );
+    let (view, widgets, positions, names) = (view.downgrade(), widgets.clone(), positions.clone(), names.to_vec());
     move || {
         if let Some(model) = view.upgrade().and_then(|view| view.model()) {
             *positions.borrow_mut() = show_matches(&widgets, &model, &names);
@@ -460,8 +454,7 @@ fn replace_status(report: &super::replace::ReplaceReport) -> String {
     if report.edits.is_empty() && report.skipped == 0 {
         crate::tr!("No replacements")
     } else if report.skipped == 0 {
-        crate::tr!("Replaced {count} matches")
-            .replace("{count}", &report.replacements.to_string())
+        crate::tr!("Replaced {count} matches").replace("{count}", &report.replacements.to_string())
     } else {
         crate::tr!("Replaced {count} matches · skipped {skipped} cells")
             .replace("{count}", &report.replacements.to_string())
@@ -486,12 +479,13 @@ fn row_key_values(
             }
             false
         });
-    } else if let Some(row) = model.item(position).and_then(|item| item.downcast::<RowObject>().ok()) {
+    } else {
+        let row = model
+            .item(position)
+            .and_then(|item| item.downcast::<RowObject>().ok())?;
         for (slot, &column) in pk_indices.iter().enumerate() {
             values[slot] = Some(row.cell_value(column));
         }
-    } else {
-        return None;
     }
     values.into_iter().collect()
 }

@@ -458,12 +458,14 @@ impl WelcomeView {
     }
 }
 
+#[cfg(test)]
 fn visible_group_paths(nodes: &[GroupTreeNode], collapsed: &HashSet<String>) -> Vec<Option<String>> {
     let mut visible = Vec::new();
     collect_visible_group_paths(nodes, collapsed, &mut visible);
     visible
 }
 
+#[cfg(test)]
 fn collect_visible_group_paths(
     nodes: &[GroupTreeNode],
     collapsed: &HashSet<String>,
