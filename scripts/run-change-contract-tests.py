@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run focused Rust regressions selected by changed B3 value-path files."""
+"""Run focused Rust regressions selected by changed Data-lane value-path files."""
 
 import argparse
 import datetime
@@ -176,7 +176,7 @@ def execute(command, log_path, expected_test=None, timeout=900):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run mapped unit regressions for changed B3 value paths.")
+    parser = argparse.ArgumentParser(description="Run mapped unit regressions for changed Data-lane value paths.")
     parser.add_argument("--base", default=os.environ.get("BOOKIE_CHANGE_BASE", "HEAD"))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

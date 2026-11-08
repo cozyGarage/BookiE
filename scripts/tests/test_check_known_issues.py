@@ -21,23 +21,23 @@ def problems(rows):
 
 class KnownIssuesTests(unittest.TestCase):
     def test_a_well_formed_index_has_no_problems(self):
-        rows = "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | B3 |\n"
+        rows = "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | Data |\n"
         self.assertEqual(problems(rows), [])
 
     def test_project_url_is_required(self):
-        text = "## Open work index\n\n| ID | Issue | Lane |\n| --- | --- | --- |\n| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | B3 |\n"
+        text = "## Open work index\n\n| ID | Issue | Lane |\n| --- | --- | --- |\n| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | Data |\n"
         self.assertTrue(any("project URL" in item for item in checker.problems(text)))
 
     def test_issue_link_must_match_number(self):
-        self.assertEqual(len(problems("| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/2) | B3 |\n")), 1)
+        self.assertEqual(len(problems("| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/2) | Data |\n")), 1)
 
     def test_lane_must_be_known(self):
         self.assertEqual(len(problems("| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | Other |\n")), 1)
 
     def test_ids_must_be_unique(self):
         rows = (
-            "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | B3 |\n"
-            "| UI-1 | [#2](https://github.com/cozyGarage/BookiE/issues/2) | B4 |\n"
+            "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | Data |\n"
+            "| UI-1 | [#2](https://github.com/cozyGarage/BookiE/issues/2) | Policy |\n"
         )
         self.assertEqual(len(problems(rows)), 1)
 
@@ -47,7 +47,7 @@ class KnownIssuesTests(unittest.TestCase):
 
     def test_indexed_issues_exposes_the_active_issue_ids_and_numbers(self):
         rows = (
-            "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | B3 |\n"
+            "| UI-1 | [#1](https://github.com/cozyGarage/BookiE/issues/1) | Data |\n"
             "| PEER-18 | [#1069](https://github.com/cozyGarage/BookiE/issues/1069) | UX |\n"
         )
         self.assertEqual(checker.indexed_issues(PREFIX + rows), [("UI-1", 1), ("PEER-18", 1069)])

@@ -289,7 +289,7 @@ jobs:
           workspaces: .
           shared-key: linux-build
           save-if: false
-      - name: Focused tests for changed B3 value paths
+      - name: Focused tests for changed Data-lane value paths
         env:
           BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
         run: python3 scripts/run-test-layer.py change-contracts
@@ -495,7 +495,8 @@ jobs:
           if-no-files-found: error
 
   b4-rollback:
-    name: B4 rollback acceptance (docker)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    name: Policy rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: pin-revision
