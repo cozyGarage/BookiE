@@ -13,9 +13,10 @@ pub(super) fn dim_previous_results(holder: &gtk::Box) {
     }
 }
 
+#[cfg(test)]
 pub(super) fn clear_results_box(holder: &gtk::Box) {
     holder.remove_css_class(STALE_RESULTS_CLASS);
-    clear_box(holder);
+    super::outcomes::clear_box(holder);
 }
 
 impl SqlEditor {
@@ -42,7 +43,7 @@ impl SqlEditor {
         if !self.gate_run_for_pending_edits(
             result_editing::DeferredRun {
                 sql: sql.clone(),
-                anchor: anchor.clone(),
+                anchor,
                 single_statement,
             },
             &sender,

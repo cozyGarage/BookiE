@@ -65,7 +65,7 @@ pub(super) fn build_database_popover(popover: &gtk::Popover, sender: &ComponentS
         .build();
     content.append(&scroll);
     let create = gtk::Button::builder()
-        .label(&crate::tr!("New Database\u{2026}"))
+        .label(crate::tr!("New Database\u{2026}"))
         .css_classes(["flat"])
         .halign(gtk::Align::Start)
         .build();
@@ -116,15 +116,15 @@ fn choice_row(choice: &DatabaseChoice, current: &str, driver_id: &str, sender: &
     if super::catalog_ddl::droppable_database(&choice.name, current, driver_id) {
         let drop = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
-            .tooltip_text(&crate::tr!("Drop {database}\u{2026}").replace("{database}", &choice.name))
+            .tooltip_text(crate::tr!("Drop {database}\u{2026}").replace("{database}", &choice.name))
             .css_classes(["flat"])
             .build();
         let drop_sender = sender.clone();
         let drop_name = choice.name.clone();
         drop.connect_clicked(move |_| {
-            drop_sender.input(AppMsg::DropDatabasePrompt {
+            drop_sender.input(AppMsg::CatalogDdl(super::msg::CatalogDdlMsg::DropDatabasePrompt {
                 database: drop_name.clone(),
-            });
+            }));
         });
         row.append(&drop);
     }

@@ -21,6 +21,9 @@ fn rebind_column_view(view: &gtk4::ColumnView) {
     let Some(selection) = view.model() else {
         return;
     };
+    let Ok(selection) = selection.downcast::<gtk4::MultiSelection>() else {
+        return;
+    };
     let Some(model) = selection.model() else {
         return;
     };

@@ -208,16 +208,21 @@ impl SqlEditor {
             database: self.database.clone(),
             settings_store: self.result_view_settings.clone(),
         };
-        let updated = self.pinned.latest().last().is_some_and(|outcome| match &outcome.kind {
-            StatementOutcomeKind::Streamed(result) => super::stream_view::update_live_stream(
-                self.results_surface(),
-                outcome,
-                result,
-                &target,
-                &mut self.stream_eviction_cursor,
-            ),
-            _ => false,
-        });
+        let surface = self.results_surface().clone();
+        let updated = if let Some(outcome) = self.pinned.latest().last() {
+            match &outcome.kind {
+                StatementOutcomeKind::Streamed(result) => super::stream_view::update_live_stream(
+                    &surface,
+                    outcome,
+                    result,
+                    &target,
+                    &mut self.stream_eviction_cursor,
+                ),
+                _ => false,
+            }
+        } else {
+            false
+        };
         if !updated {
             self.clear_result_surface();
             let shown = self.pinned.displayed();
