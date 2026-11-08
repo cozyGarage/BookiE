@@ -25,6 +25,7 @@ pub mod editor_bookmarks;
 pub mod editor_panel;
 pub mod enum_input;
 pub mod er_diagram;
+pub mod export_pages;
 pub mod filter_settings;
 pub mod highlight_settings;
 pub mod ordered_refresh;
