@@ -48,6 +48,12 @@ Async loads must not apply a reply after a newer request has started. Shared hel
 
 Grid, editor and sidebar loads keep attaching a ticket at start and dropping stale replies in the update path.
 
+## Column widths: policy vs measure
+
+`bookie-app-services::column_widths` owns remembered widths and the numeric sizing **policy**: monospace cell counts (CJK double-width), type and empty-table defaults, and which painted strings a shell should measure. Persistence stays in the same module (`ColumnWidthStore`).
+
+Font **measurement** stays in the shell. The Linux app measures those strings with Pango in the font the grid paints. A future GPUI (or other) shell supplies its own text metrics and calls the same policy; it must not fork CJK, cap, or type-default rules into UI code.
+
 ## Async work via commands
 
 Components do not call `tokio::spawn` directly. They issue commands:
