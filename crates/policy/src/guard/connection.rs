@@ -66,6 +66,18 @@ impl Connection for PolicyGuard {
         self.governed_list_tables_in(s, c).await
     }
 
+    async fn list_tables_excluding(&self, s: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        self.governed_list_tables_excluding(s).await
+    }
+
+    async fn list_tables_excluding_controlled(
+        &self,
+        s: &[String],
+        c: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        self.governed_list_tables_excluding_controlled(s, c).await
+    }
+
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         let operation = self.metadata_operation("LIST VIEWS", Vec::new());
         self.prepare_governed_read(&operation).await?;
@@ -88,6 +100,18 @@ impl Connection for PolicyGuard {
         self.audit_controlled_read_result(&operation, start, &result, rows)
             .await?;
         result
+    }
+
+    async fn list_views_excluding(&self, s: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        self.governed_list_views_excluding(s).await
+    }
+
+    async fn list_views_excluding_controlled(
+        &self,
+        s: &[String],
+        c: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        self.governed_list_views_excluding_controlled(s, c).await
     }
 
     async fn list_objects(
@@ -126,6 +150,27 @@ impl Connection for PolicyGuard {
         self.audit_controlled_read_result(&operation, start, &result, rows)
             .await?;
         result
+    }
+
+    async fn list_objects_excluding(
+        &self,
+        kind: bookie_core::CatalogObjectKind,
+        schema: Option<&str>,
+        excluded_schemas: &[String],
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
+        self.governed_list_objects_excluding(kind, schema, excluded_schemas)
+            .await
+    }
+
+    async fn list_objects_excluding_controlled(
+        &self,
+        kind: bookie_core::CatalogObjectKind,
+        schema: Option<&str>,
+        excluded_schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
+        self.governed_list_objects_excluding_controlled(kind, schema, excluded_schemas, control)
+            .await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {

@@ -39,6 +39,7 @@ impl Transaction for FakeTx {
 struct CatalogConn {
     calls: Arc<AtomicUsize>,
     fail: bool,
+    exclusion_scopes: Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>,
 }
 
 impl CatalogConn {
@@ -67,10 +68,27 @@ impl Connection for CatalogConn {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.answer(vec![table()])
     }
+    async fn list_tables_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        self.record_exclusion("tables", schemas);
+        self.answer(vec![table()])
+    }
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.answer(vec![table()])
     }
+    async fn list_views_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        self.record_exclusion("views", schemas);
+        self.answer(vec![table()])
+    }
     async fn list_objects(&self, _: CatalogObjectKind, _: Option<&str>) -> Result<Vec<CatalogObject>, DriverError> {
+        self.answer(Vec::new())
+    }
+    async fn list_objects_excluding(
+        &self,
+        _: CatalogObjectKind,
+        _: Option<&str>,
+        schemas: &[String],
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        self.record_exclusion("objects", schemas);
         self.answer(Vec::new())
     }
     async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
@@ -141,6 +159,15 @@ impl Connection for CatalogConn {
     }
 }
 
+impl CatalogConn {
+    fn record_exclusion(&self, kind: &str, schemas: &[String]) {
+        self.exclusion_scopes
+            .lock()
+            .expect("exclusion scope lock")
+            .push((kind.to_string(), schemas.to_vec()));
+    }
+}
+
 fn catalog_guard(fail: bool) -> (PolicyGuard, Arc<AtomicUsize>, Arc<SequenceAuditSink>) {
     catalog_guard_with(fail, vec![])
 }
@@ -155,6 +182,7 @@ fn catalog_guard_with(
         Arc::new(CatalogConn {
             calls: calls.clone(),
             fail,
+            exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
         }),
         context(
             Principal::human_gui(),
@@ -166,6 +194,24 @@ fn catalog_guard_with(
         ),
     );
     (guard, calls, audit)
+}
+
+fn catalog_guard_with_scopes(exclusion_scopes: Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>) -> PolicyGuard {
+    PolicyGuard::new(
+        Arc::new(CatalogConn {
+            calls: Arc::new(AtomicUsize::new(0)),
+            fail: false,
+            exclusion_scopes,
+        }),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    )
 }
 
 async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>) -> Vec<Result<(), DriverError>> {
@@ -182,9 +228,15 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
     vec![
         read!(guard.list_databases(), |c| guard.list_databases_controlled(c)),
         read!(guard.list_tables(), |c| guard.list_tables_controlled(c)),
+        read!(guard.list_tables_excluding(&[]), |c| guard
+            .list_tables_excluding_controlled(&[], c)),
         read!(guard.list_views(), |c| guard.list_views_controlled(c)),
+        read!(guard.list_views_excluding(&[]), |c| guard
+            .list_views_excluding_controlled(&[], c)),
         read!(guard.list_objects(kind, schema), |c| guard
             .list_objects_controlled(kind, schema, c)),
+        read!(guard.list_objects_excluding(kind, schema, &[]), |c| guard
+            .list_objects_excluding_controlled(kind, schema, &[], c)),
         read!(guard.fetch_columns(schema, "t"), |c| guard
             .fetch_columns_controlled(schema, "t", c)),
         read!(guard.fetch_rows(schema, "t", 0, 10), |c| guard
@@ -200,6 +252,41 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
         guard.server_version().await.map(|_| ()),
         guard.ping().await,
     ]
+}
+
+#[tokio::test]
+async fn guarded_catalog_exclusions_reach_the_driver_with_the_requested_schema_names() {
+    let exclusion_scopes = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let guard = catalog_guard_with_scopes(exclusion_scopes.clone());
+    let hidden = ["private".to_string()];
+    let control = OperationControl::with_timeout(Duration::from_secs(30));
+    let kind = CatalogObjectKind::Routine;
+
+    guard.list_tables_excluding(&hidden).await.unwrap();
+    guard.list_tables_excluding_controlled(&hidden, &control).await.unwrap();
+    guard.list_views_excluding(&hidden).await.unwrap();
+    guard.list_views_excluding_controlled(&hidden, &control).await.unwrap();
+    guard
+        .list_objects_excluding(kind, Some("public"), &hidden)
+        .await
+        .unwrap();
+    guard
+        .list_objects_excluding_controlled(kind, Some("public"), &hidden, &control)
+        .await
+        .unwrap();
+
+    let observed = exclusion_scopes.lock().expect("exclusion scope lock").clone();
+    assert_eq!(
+        observed,
+        [
+            ("tables".to_string(), hidden.to_vec()),
+            ("tables".to_string(), hidden.to_vec()),
+            ("views".to_string(), hidden.to_vec()),
+            ("views".to_string(), hidden.to_vec()),
+            ("objects".to_string(), hidden.to_vec()),
+            ("objects".to_string(), hidden.to_vec()),
+        ]
+    );
 }
 
 #[tokio::test]
@@ -417,6 +504,7 @@ async fn beginning_a_transaction_does_not_grant_write_authority() {
             Arc::new(CatalogConn {
                 calls: calls.clone(),
                 fail: false,
+                exclusion_scopes: Arc::new(std::sync::Mutex::new(Vec::new())),
             }),
             guard_context,
         );

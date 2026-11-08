@@ -1095,6 +1095,7 @@ mod administrative;
 mod audit_receipt;
 mod bulk;
 mod connection;
+mod excluded_catalog;
 mod panic_boundary;
 mod scoped_tables;
 mod session;
