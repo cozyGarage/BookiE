@@ -675,6 +675,18 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(floor=floor):
                 self.assertIn(floor, release)
 
+    def test_postgres_release_docker_passes_host_vars_used_under_set_u(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
+        self.assertIn('--env GITHUB_WORKSPACE="$GITHUB_WORKSPACE"', release)
+        match = re.search(r"bash -euo pipefail -c '([^']*)'", release, re.S)
+        self.assertIsNotNone(match)
+        inner_vars = sorted(set(re.findall(r"\$([A-Z_][A-Z0-9_]*)", match.group(1))))
+        env_names = set(re.findall(r"--env ([A-Z_][A-Z0-9_]*)=", release))
+        for name in inner_vars:
+            with self.subTest(name=name):
+                self.assertIn(name, env_names)
+
     def test_gtk_scripts_reduce_xvfb_display_collisions(self):
         for path in [
             "scripts/test-gtk-widgets.sh",

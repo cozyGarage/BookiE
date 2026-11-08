@@ -655,6 +655,7 @@ jobs:
             --env CARGO_BUILD_JOBS=4 \
             --env PATH=/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
             --env DOCKER_CONFIG=/docker \
+            --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
             --env BOOKIE_GTK_BINARY="$BOOKIE_GTK_BINARY" \
             "$BOOKIE_BUILD_IMAGE" \
             bash -euo pipefail -c '
