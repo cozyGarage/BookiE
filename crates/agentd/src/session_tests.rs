@@ -150,10 +150,15 @@ async fn session_preserves_views_errors_and_controlled_dispatch() {
         let control = OperationControl::with_timeout(Duration::from_secs(1));
         let ordinary = session.list_views().await;
         let bounded = session.list_views_controlled(&control).await;
+        let hidden_schemas = ["public".to_string()];
+        let excluded = session.list_views_excluding(&hidden_schemas).await;
+        let excluded_bounded = session.list_views_excluding_controlled(&hidden_schemas, &control).await;
         assert!(controlled.load(Ordering::SeqCst));
         if fail {
             assert!(matches!(ordinary, Err(DriverError::Disconnected)));
             assert!(matches!(bounded, Err(DriverError::Disconnected)));
+            assert!(matches!(excluded, Err(DriverError::Disconnected)));
+            assert!(matches!(excluded_bounded, Err(DriverError::Disconnected)));
         } else {
             let expected = vec![TableInfo {
                 schema: Some("public".into()),
@@ -161,6 +166,8 @@ async fn session_preserves_views_errors_and_controlled_dispatch() {
             }];
             assert_eq!(ordinary.unwrap(), expected);
             assert_eq!(bounded.unwrap(), expected);
+            assert!(excluded.unwrap().is_empty());
+            assert!(excluded_bounded.unwrap().is_empty());
         }
         controlled.store(false, Ordering::SeqCst);
         control.cancellation_token().cancel();
@@ -187,14 +194,25 @@ async fn session_forwards_catalog_listing_errors_and_controlled_dispatch() {
         let control = OperationControl::with_timeout(Duration::from_secs(1));
         let ordinary = session.list_objects(kind, Some("public")).await;
         let bounded = session.list_objects_controlled(kind, Some("public"), &control).await;
+        let hidden_schemas = ["public".to_string()];
+        let excluded = session
+            .list_objects_excluding(kind, Some("public"), &hidden_schemas)
+            .await;
+        let excluded_bounded = session
+            .list_objects_excluding_controlled(kind, Some("public"), &hidden_schemas, &control)
+            .await;
         assert!(controlled.load(Ordering::SeqCst));
         if fail {
             assert!(matches!(ordinary, Err(DriverError::Disconnected)));
             assert!(matches!(bounded, Err(DriverError::Disconnected)));
+            assert!(matches!(excluded, Err(DriverError::Disconnected)));
+            assert!(matches!(excluded_bounded, Err(DriverError::Disconnected)));
         } else {
             let names: Vec<String> = bounded.unwrap().into_iter().map(|object| object.name).collect();
             assert_eq!(names, vec!["audit_row".to_string()]);
             assert_eq!(ordinary.unwrap()[0].schema.as_deref(), Some("public"));
+            assert!(excluded.unwrap().is_empty());
+            assert!(excluded_bounded.unwrap().is_empty());
         }
     }
 }

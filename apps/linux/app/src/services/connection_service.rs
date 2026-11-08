@@ -109,6 +109,7 @@ impl PreparedConnection {
 pub async fn open_saved(
     registry: Arc<DriverRegistry>,
     saved: SavedConnection,
+    hidden_schemas: Vec<String>,
     timeout_secs: u32,
     ssh_environment: SshEnvironment,
     cancellation: tokio_util::sync::CancellationToken,
@@ -151,12 +152,10 @@ pub async fn open_saved(
         Err(_) => None,
     };
     let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = guarded
-        .list_tables_controlled(&control)
+    let tables = crate::services::catalog::list_tables_excluding(&guarded, &hidden_schemas, &control)
         .await
         .map_err(|error| crate::services::error_text::driver_message(&error))?;
-    let views = guarded
-        .list_views_controlled(&control)
+    let views = crate::services::catalog::list_views_excluding(&guarded, &hidden_schemas, &control)
         .await
         .map_err(|error| crate::services::error_text::driver_message(&error))?;
     let metadata = ConnectionMetadata {

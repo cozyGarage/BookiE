@@ -55,6 +55,12 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
 }
 
 impl App {
+    pub(super) fn hidden_schema_names(&self) -> Vec<String> {
+        let mut schemas: Vec<_> = self.sidebar_hidden_schemas.borrow().iter().cloned().collect();
+        schemas.sort();
+        schemas
+    }
+
     pub(super) fn refresh_sidebar(&self, sender: relm4::ComponentSender<App>) {
         if let Some(origin) = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database) {
             self.on_schema_changed(origin, None, None, sender);
@@ -218,6 +224,7 @@ impl App {
             &self.preferences,
             self.catalog_dialog_cancel.borrow().clone(),
             kind,
+            self.hidden_schema_names(),
         );
     }
 
@@ -304,20 +311,26 @@ impl App {
             return;
         }
         self.sidebar_hidden_schemas.borrow_mut().insert(schema.to_string());
+        self.reset_sidebar_catalog();
         self.refresh_schema_filter(sender);
         self.persist_workspace_state();
+        self.refresh_sidebar(sender.clone());
     }
 
     pub(super) fn show_sidebar_schema(&mut self, schema: &str, sender: &relm4::ComponentSender<App>) {
         self.sidebar_hidden_schemas.borrow_mut().remove(schema);
+        self.reset_sidebar_catalog();
         self.refresh_schema_filter(sender);
         self.persist_workspace_state();
+        self.refresh_sidebar(sender.clone());
     }
 
     pub(super) fn show_all_sidebar_schemas(&mut self, sender: &relm4::ComponentSender<App>) {
         self.sidebar_hidden_schemas.borrow_mut().clear();
+        self.reset_sidebar_catalog();
         self.refresh_schema_filter(sender);
         self.persist_workspace_state();
+        self.refresh_sidebar(sender.clone());
     }
 
     pub(super) fn rebuild_schema_filter_popover(&self, sender: &relm4::ComponentSender<App>) {

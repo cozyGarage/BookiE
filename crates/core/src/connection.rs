@@ -204,11 +204,35 @@ pub trait Connection: Send + Sync {
     ) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_tables_scoped(schemas), control).await
     }
+    async fn list_tables_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        let mut tables = self.list_tables().await?;
+        tables.retain(|table| table.schema.as_ref().is_none_or(|schema| !schemas.contains(schema)));
+        Ok(tables)
+    }
+    async fn list_tables_excluding_controlled(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        run_controlled(self.list_tables_excluding(schemas), control).await
+    }
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         Ok(Vec::new())
     }
     async fn list_views_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_views(), control).await
+    }
+    async fn list_views_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        let mut views = self.list_views().await?;
+        views.retain(|view| view.schema.as_ref().is_none_or(|schema| !schemas.contains(schema)));
+        Ok(views)
+    }
+    async fn list_views_excluding_controlled(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        run_controlled(self.list_views_excluding(schemas), control).await
     }
     async fn open_session(&self) -> Result<Box<dyn crate::Session>, DriverError> {
         Err(DriverError::Unsupported("dedicated sessions".into()))
@@ -233,6 +257,30 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<CatalogObject>, DriverError> {
         run_controlled(self.list_objects(kind, schema), control).await
+    }
+    async fn list_objects_excluding(
+        &self,
+        kind: CatalogObjectKind,
+        schema: Option<&str>,
+        excluded_schemas: &[String],
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        let mut objects = self.list_objects(kind, schema).await?;
+        objects.retain(|object| {
+            object
+                .schema
+                .as_ref()
+                .is_none_or(|name| !excluded_schemas.contains(name))
+        });
+        Ok(objects)
+    }
+    async fn list_objects_excluding_controlled(
+        &self,
+        kind: CatalogObjectKind,
+        schema: Option<&str>,
+        excluded_schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        run_controlled(self.list_objects_excluding(kind, schema, excluded_schemas), control).await
     }
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError>;
     async fn fetch_columns_controlled(
@@ -485,6 +533,8 @@ mod controlled_default_tests {
     struct SlowConnection {
         dispatched: Arc<AtomicUsize>,
         listed: Vec<TableInfo>,
+        listed_views: Vec<TableInfo>,
+        listed_objects: Vec<CatalogObject>,
     }
 
     #[async_trait]
@@ -501,6 +551,20 @@ mod controlled_default_tests {
         }
 
         async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
+            if !self.listed_views.is_empty() {
+                return Ok(self.listed_views.clone());
+            }
+            self.stall().await
+        }
+
+        async fn list_objects(
+            &self,
+            _kind: CatalogObjectKind,
+            _schema: Option<&str>,
+        ) -> Result<Vec<CatalogObject>, DriverError> {
+            if !self.listed_objects.is_empty() {
+                return Ok(self.listed_objects.clone());
+            }
             self.stall().await
         }
 
@@ -585,6 +649,7 @@ mod controlled_default_tests {
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
             listed: Vec::new(),
+            ..SlowConnection::default()
         };
         let control = cancelled_control();
 
@@ -637,6 +702,7 @@ mod controlled_default_tests {
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
             listed: Vec::new(),
+            ..SlowConnection::default()
         };
         let control = cancelled_control();
 
@@ -653,6 +719,7 @@ mod controlled_default_tests {
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
             listed: Vec::new(),
+            ..SlowConnection::default()
         };
         let token = CancellationToken::new();
         let control = OperationControl::new(token.clone(), None);
@@ -688,6 +755,7 @@ mod controlled_default_tests {
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
             listed: Vec::new(),
+            ..SlowConnection::default()
         };
         let control = OperationControl::with_timeout(Duration::from_secs(5));
         let task = tokio::spawn(async move { connection.list_databases_controlled(&control).await });
@@ -718,6 +786,7 @@ mod controlled_default_tests {
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
             listed: Vec::new(),
+            ..SlowConnection::default()
         };
         let control = expired_control();
 
@@ -786,6 +855,7 @@ mod controlled_default_tests {
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
             listed: Vec::new(),
+            ..SlowConnection::default()
         };
 
         let error = connection
@@ -804,6 +874,7 @@ mod controlled_default_tests {
         let connection = SlowConnection {
             dispatched: dispatched.clone(),
             listed: Vec::new(),
+            ..SlowConnection::default()
         };
         let control = OperationControl::new(
             CancellationToken::new(),
@@ -842,6 +913,57 @@ mod controlled_default_tests {
         let control = OperationControl::new(CancellationToken::new(), None);
         let scoped = connection.list_tables_in(&["b".to_string()], &control).await.unwrap();
         assert_eq!(names(scoped), ["y", "plain"]);
+    }
+
+    #[tokio::test]
+    async fn default_catalog_exclusion_keeps_unscoped_objects_and_removes_hidden_schemas() {
+        let table = |schema: Option<&str>, name: &str| TableInfo {
+            schema: schema.map(str::to_string),
+            name: name.into(),
+        };
+        let object = |schema: Option<&str>, name: &str| CatalogObject {
+            kind: CatalogObjectKind::Routine,
+            schema: schema.map(str::to_string),
+            name: name.into(),
+            detail: None,
+        };
+        let connection = SlowConnection {
+            listed: vec![
+                table(Some("public"), "visible"),
+                table(Some("private"), "hidden"),
+                table(None, "plain"),
+            ],
+            listed_views: vec![
+                table(Some("public"), "visible_view"),
+                table(Some("private"), "hidden_view"),
+            ],
+            listed_objects: vec![
+                object(Some("public"), "visible_fn"),
+                object(Some("private"), "hidden_fn"),
+            ],
+            ..SlowConnection::default()
+        };
+        let hidden = ["private".to_string()];
+
+        let tables = connection.list_tables_excluding(&hidden).await.unwrap();
+        let views = connection.list_views_excluding(&hidden).await.unwrap();
+        let objects = connection
+            .list_objects_excluding(CatalogObjectKind::Routine, None, &hidden)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            tables.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
+            ["visible", "plain"]
+        );
+        assert_eq!(
+            views.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
+            ["visible_view"]
+        );
+        assert_eq!(
+            objects.iter().map(|item| item.name.as_str()).collect::<Vec<_>>(),
+            ["visible_fn"]
+        );
     }
 }
 

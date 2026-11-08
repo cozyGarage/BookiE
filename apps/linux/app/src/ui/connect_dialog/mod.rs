@@ -55,7 +55,9 @@ pub struct ConnectDialog {
     header_title: gtk::Label,
     form: ConnectFormState,
     preferences: crate::services::preferences::PreferencesStore,
+    workspace: crate::services::workspace_state::WorkspaceStore,
     bound_connection_id: Option<Uuid>,
+    hidden_schemas: Vec<String>,
     ssh_environment: bookie_transport::SshEnvironment,
     audit_factory: bookie_transport::TransportAuditFactory,
     guard_factory: crate::services::database_service::CandidateGuardFactory,
@@ -84,6 +86,7 @@ fn selected_path(row: &adw::EntryRow) -> Option<std::path::PathBuf> {
 }
 
 mod auth_source;
+mod bootstrap;
 mod browse;
 mod controls;
 mod entry_activation;
@@ -95,6 +98,7 @@ mod socket_endpoint;
 #[cfg(test)]
 mod error_tests;
 
+use bootstrap::{CandidateBootstrap, ConnectRequest, OpenedCandidate, open_candidate};
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
@@ -104,10 +108,12 @@ pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 pub struct ConnectDialogInit {
     pub registry: Arc<DriverRegistry>,
     pub preferences: crate::services::preferences::PreferencesStore,
+    pub workspace: crate::services::workspace_state::WorkspaceStore,
     /// Saved connection this dialog edits. When set it decides which
     /// record is written, so two connections to one endpoint stay
     /// separate instead of folding into whichever matched first.
     pub bound_connection_id: Option<Uuid>,
+    pub hidden_schemas: Vec<String>,
     pub prefill: Option<ConnectionPrefill>,
     pub ssh_environment: bookie_transport::SshEnvironment,
     pub audit_factory: bookie_transport::TransportAuditFactory,
@@ -406,7 +412,9 @@ impl Component for ConnectDialog {
             header_title,
             form: ConnectFormState::default(),
             preferences: init.preferences,
+            workspace: init.workspace,
             bound_connection_id: init.bound_connection_id,
+            hidden_schemas: init.hidden_schemas,
             ssh_environment: init.ssh_environment,
             audit_factory: init.audit_factory,
             guard_factory: init.guard_factory,
@@ -506,8 +514,10 @@ impl Component for ConnectDialog {
                 let ssh_environment = self.ssh_environment.clone();
                 let audit_factory = self.audit_factory.clone();
                 let guard_factory = self.guard_factory.clone();
+                let workspace = self.workspace.clone();
 
                 let bound_id = self.bound_connection_id;
+                let hidden_schemas = self.hidden_schemas.clone();
                 let cancel = tokio_util::sync::CancellationToken::new();
                 self.connect_cancel = Some(cancel.clone());
                 sender.command(move |out, shutdown| {
@@ -517,12 +527,14 @@ impl Component for ConnectDialog {
                                 driver: driver.clone(),
                                 driver_id,
                                 bound_id,
+                                hidden_schemas,
                                 label,
                                 opts,
                                 ssh: ssh_inputs,
                                 ssh_environment,
                                 audit_factory,
                                 guard_factory,
+                                workspace,
                                 read_only,
                                 environment,
                                 timeout_secs,
@@ -576,10 +588,12 @@ impl Component for ConnectDialog {
                 let ssh_environment = self.ssh_environment.clone();
                 let audit_factory = self.audit_factory.clone();
                 let guard_factory = self.guard_factory.clone();
+                let workspace = self.workspace.clone();
                 let name = saved_connection_name(self.name.text().as_str(), &entry.id, &opts);
                 let read_only = self.read_only.is_active();
                 let query_timeout_secs = timeout_value(self.query_timeout.value());
                 let bound_id = self.bound_connection_id;
+                let hidden_schemas = self.hidden_schemas.clone();
                 let environment = self.selected_environment();
                 let cancellation = tokio_util::sync::CancellationToken::new();
                 self.connect_cancel = Some(cancellation.clone());
@@ -602,6 +616,11 @@ impl Component for ConnectDialog {
                                     let id = existing
                                         .as_ref()
                                         .map_or_else(|| bound_id.unwrap_or_else(Uuid::new_v4), |saved| saved.id);
+                                    let hidden_schemas = existing
+                                        .as_ref()
+                                        .and_then(|saved| workspace.load_database(saved.id, &saved.database))
+                                        .map(|state| state.hidden_schemas)
+                                        .unwrap_or(hidden_schemas);
                                     let audit = audit_factory.context(
                                         bookie_policy::Principal::human_gui(),
                                         id,
@@ -636,7 +655,14 @@ impl Component for ConnectDialog {
                                                 bookie_policy::Principal::human_gui(),
                                             );
                                             let listed = match guarded {
-                                                Ok(guarded) => guarded.list_tables_controlled(&control).await,
+                                                Ok(guarded) => {
+                                                    crate::services::catalog::list_tables_excluding(
+                                                        &guarded,
+                                                        &hidden_schemas,
+                                                        &control,
+                                                    )
+                                                    .await
+                                                }
                                                 Err(error) => Err(bookie_core::DriverError::PolicyDenied(error)),
                                             };
                                             match listed {
@@ -898,88 +924,19 @@ fn toggle_error(row: &adw::EntryRow, invalid: bool) {
     }
 }
 
-struct ConnectRequest {
-    driver: Arc<dyn bookie_core::DatabaseDriver>,
-    driver_id: String,
-    bound_id: Option<Uuid>,
-    label: String,
-    opts: ConnectOptions,
-    ssh: Option<SshInputs>,
-    ssh_environment: bookie_transport::SshEnvironment,
-    audit_factory: bookie_transport::TransportAuditFactory,
-    guard_factory: crate::services::database_service::CandidateGuardFactory,
-    read_only: bool,
-    environment: Environment,
-    timeout_secs: u32,
-    query_timeout_secs: Option<u32>,
-    cancel: tokio_util::sync::CancellationToken,
-}
-
-struct OpenedCandidate {
-    conn: Arc<dyn bookie_core::Connection>,
-    tunnel: Option<bookie_transport::Tunnel>,
-    server_version: Option<String>,
-    tables: Vec<bookie_core::TableInfo>,
-    views: Vec<bookie_core::TableInfo>,
-}
-
-struct CandidateBootstrap<'a> {
-    guard_factory: &'a crate::services::database_service::CandidateGuardFactory,
-    metadata: &'a crate::services::database_service::ConnectionMetadata,
-}
-
-async fn open_candidate(
-    driver: &dyn bookie_core::DatabaseDriver,
-    opts: ConnectOptions,
-    ssh: Option<bookie_transport::SshRoute>,
-    ssh_environment: &bookie_transport::SshEnvironment,
-    timeout_secs: u32,
-    cancellation: tokio_util::sync::CancellationToken,
-    bootstrap: CandidateBootstrap<'_>,
-) -> Result<OpenedCandidate, String> {
-    let (conn, tunnel) =
-        bookie_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
-            .await
-            .map_err(connection_service::message)?;
-    let conn: Arc<dyn bookie_core::Connection> = Arc::from(conn);
-    let guarded =
-        bootstrap
-            .guard_factory
-            .guard(conn.clone(), bootstrap.metadata, bookie_policy::Principal::human_gui())?;
-    let server_version = match guarded.server_version().await {
-        Ok(version) => version,
-        Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),
-        Err(_) => None,
-    };
-    let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = guarded
-        .list_tables_controlled(&control)
-        .await
-        .map_err(|error| crate::services::error_text::driver_message(&error))?;
-    let views = guarded
-        .list_views_controlled(&control)
-        .await
-        .map_err(|error| crate::services::error_text::driver_message(&error))?;
-    Ok(OpenedCandidate {
-        conn,
-        tunnel,
-        server_version,
-        tables,
-        views,
-    })
-}
-
 async fn run_connect(request: ConnectRequest) -> Result<Option<connection_service::PreparedConnection>, String> {
     let ConnectRequest {
         driver,
         driver_id,
         bound_id,
+        hidden_schemas,
         label,
         opts,
         ssh,
         ssh_environment,
         audit_factory,
         guard_factory,
+        workspace,
         read_only,
         environment,
         timeout_secs,
@@ -999,6 +956,11 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         ssh: ssh.as_ref(),
     };
     let existing = find_existing(&identity).await;
+    let hidden_schemas = existing
+        .as_ref()
+        .and_then(|saved| workspace.load_database(saved.id, &saved.database))
+        .map(|state| state.hidden_schemas)
+        .unwrap_or(hidden_schemas);
     preserve_attached_databases(&driver_id, existing.as_ref(), &mut opts);
     let id = existing
         .as_ref()
@@ -1032,6 +994,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         CandidateBootstrap {
             guard_factory: &guard_factory,
             metadata: &candidate_metadata,
+            hidden_schemas: &hidden_schemas,
         },
     );
     let opened = match opening.await {

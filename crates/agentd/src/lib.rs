@@ -71,12 +71,36 @@ impl Connection for SessionConnection {
         self.inner.list_tables_in(schemas, control).await
     }
 
+    async fn list_tables_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        self.inner.list_tables_excluding(schemas).await
+    }
+
+    async fn list_tables_excluding_controlled(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        self.inner.list_tables_excluding_controlled(schemas, control).await
+    }
+
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.inner.list_views().await
     }
 
     async fn list_views_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         self.inner.list_views_controlled(control).await
+    }
+
+    async fn list_views_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        self.inner.list_views_excluding(schemas).await
+    }
+
+    async fn list_views_excluding_controlled(
+        &self,
+        schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<TableInfo>, DriverError> {
+        self.inner.list_views_excluding_controlled(schemas, control).await
     }
 
     async fn list_objects(
@@ -94,6 +118,27 @@ impl Connection for SessionConnection {
         control: &OperationControl,
     ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         self.inner.list_objects_controlled(kind, schema, control).await
+    }
+
+    async fn list_objects_excluding(
+        &self,
+        kind: bookie_core::CatalogObjectKind,
+        schema: Option<&str>,
+        excluded_schemas: &[String],
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
+        self.inner.list_objects_excluding(kind, schema, excluded_schemas).await
+    }
+
+    async fn list_objects_excluding_controlled(
+        &self,
+        kind: bookie_core::CatalogObjectKind,
+        schema: Option<&str>,
+        excluded_schemas: &[String],
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
+        self.inner
+            .list_objects_excluding_controlled(kind, schema, excluded_schemas, control)
+            .await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {

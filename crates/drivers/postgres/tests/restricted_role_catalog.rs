@@ -40,6 +40,12 @@ const SEED: &[&str] = &[
     "CREATE MATERIALIZED VIEW bookie_vis_visible.shown_mat AS SELECT id FROM bookie_vis_visible.shown",
     "CREATE VIEW bookie_vis_visible.denied_view AS SELECT id FROM bookie_vis_visible.denied",
     "CREATE TABLE bookie_vis_hidden.secret (id int)",
+    "CREATE VIEW bookie_vis_hidden.secret_view AS SELECT id FROM bookie_vis_hidden.secret",
+    "CREATE FUNCTION bookie_vis_hidden.secret_fn() RETURNS int LANGUAGE sql AS 'SELECT 1'",
+    "CREATE FUNCTION bookie_vis_hidden.secret_trg() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN RETURN NEW; END'",
+    "CREATE TRIGGER secret_trg BEFORE INSERT ON bookie_vis_hidden.secret FOR EACH ROW EXECUTE FUNCTION bookie_vis_hidden.secret_trg()",
+    "CREATE SEQUENCE bookie_vis_hidden.secret_seq",
+    "CREATE TYPE bookie_vis_hidden.secret_type AS ENUM ('x')",
     "CREATE TABLE bookie_vis_usage.t (id int)",
     "GRANT USAGE ON SCHEMA bookie_vis_visible TO bookie_vis_restricted",
     "GRANT SELECT ON bookie_vis_visible.shown, bookie_vis_visible.shown_view, bookie_vis_visible.shown_mat TO bookie_vis_restricted",
@@ -91,6 +97,20 @@ fn names(objects: &[bookie_core::TableInfo]) -> Vec<String> {
         .collect()
 }
 
+async fn excluded_names(
+    connection: &dyn bookie_core::Connection,
+    hidden_schemas: &[String],
+) -> Result<(Vec<String>, Vec<String>, Vec<Vec<String>>), bookie_core::DriverError> {
+    let tables = names(&connection.list_tables_excluding(hidden_schemas).await?);
+    let views = names(&connection.list_views_excluding(hidden_schemas).await?);
+    let mut objects = Vec::new();
+    for kind in CatalogObjectKind::ALL {
+        let listed = connection.list_objects_excluding(kind, None, hidden_schemas).await?;
+        objects.push(object_names(&listed));
+    }
+    Ok((tables, views, objects))
+}
+
 #[tokio::test]
 #[ignore = "requires a PostgreSQL superuser; see the module comment"]
 async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_everything() {
@@ -112,6 +132,10 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
         let tables = names(&restricted.list_tables().await.expect("restricted tables"));
         let views = names(&restricted.list_views().await.expect("restricted views"));
         let admin_tables = names(&admin.list_tables().await.expect("admin tables"));
+        let hidden_schemas = ["bookie_vis_hidden".to_string()];
+        let (excluded_tables, excluded_views, excluded_objects) = excluded_names(admin.as_ref(), &hidden_schemas)
+            .await
+            .expect("catalog listings excluding hidden schemas");
         let scoped = names(
             &restricted
                 .list_tables_scoped(&["bookie_vis_visible".to_string(), "bookie_vis_hidden".to_string()])
@@ -136,13 +160,35 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
             let listed = restricted.list_objects(kind, None).await.expect("restricted objects");
             objects.push(object_names(&listed));
         }
-        (tables, views, admin_tables, admin_views, objects, scoped, admin_scoped)
+        (
+            tables,
+            views,
+            admin_tables,
+            admin_views,
+            objects,
+            scoped,
+            admin_scoped,
+            excluded_tables,
+            excluded_views,
+            excluded_objects,
+        )
     }
     .await;
     for statement in CLEANUP {
         admin.execute(statement).await.expect(statement);
     }
-    let (tables, views, admin_tables, admin_views, objects, scoped, admin_scoped) = outcome;
+    let (
+        tables,
+        views,
+        admin_tables,
+        admin_views,
+        objects,
+        scoped,
+        admin_scoped,
+        excluded_tables,
+        excluded_views,
+        excluded_objects,
+    ) = outcome;
 
     assert_eq!(
         tables,
@@ -163,7 +209,15 @@ async fn a_restricted_role_lists_only_what_it_can_reach_and_an_admin_lists_every
             "bookie_vis_visible.shown",
         ]
     );
-    assert_eq!(admin_views.len(), 3, "{admin_views:?}");
+    assert_eq!(admin_views.len(), 4, "{admin_views:?}");
+    assert_eq!(excluded_tables.len(), 3, "{excluded_tables:?}");
+    assert_eq!(excluded_views.len(), 3, "{excluded_views:?}");
+    for objects in excluded_objects {
+        assert!(
+            objects.iter().all(|name| !name.starts_with("bookie_vis_hidden.")),
+            "hidden-schema objects remain visible: {objects:?}"
+        );
+    }
     assert_eq!(
         objects[0],
         ["bookie_vis_visible.open_fn", "bookie_vis_visible.trg"],

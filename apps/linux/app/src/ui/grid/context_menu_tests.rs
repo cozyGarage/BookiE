@@ -70,8 +70,12 @@ fn an_empty_writable_grid_menu_offers_insert_row() {
 #[test]
 fn editable_grid_menu_hides_row_mutations_when_the_table_has_no_key() {
     let menu = build_menu(true, false, true, true, false);
-    let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
-    assert_eq!(actions.n_items(), 4);
+    let actions = menu_actions(&menu, 3);
+    assert!(
+        !row_mutation_actions()
+            .iter()
+            .any(|action| actions.iter().any(|present| present.as_str() == *action))
+    );
 }
 
 #[test]
@@ -172,8 +176,31 @@ fn whole_result_filter_installs_both_cell_actions() {
 #[test]
 fn editable_grid_menu_offers_row_mutations_when_the_table_has_a_key() {
     let menu = build_menu(true, true, true, true, false);
-    let actions = menu.item_link(3, gio::MENU_LINK_SECTION).expect("actions section");
-    assert_eq!(actions.n_items(), 8);
+    let actions = menu_actions(&menu, 3);
+    assert!(
+        row_mutation_actions()
+            .iter()
+            .all(|action| actions.iter().any(|present| present.as_str() == *action))
+    );
+}
+
+fn menu_actions(menu: &gio::Menu, section_index: i32) -> Vec<String> {
+    let section = menu
+        .item_link(section_index, gio::MENU_LINK_SECTION)
+        .expect("actions section");
+    (0..section.n_items())
+        .filter_map(|index| section.item_attribute_value(index, "action", None))
+        .filter_map(|value| value.get::<String>())
+        .collect()
+}
+
+fn row_mutation_actions() -> [&'static str; 4] {
+    [
+        "cell.insert-row",
+        "cell.duplicate-row",
+        "cell.set-null",
+        "cell.delete-row",
+    ]
 }
 
 #[test]

@@ -29,16 +29,21 @@ struct Ui {
     exported: Rc<RefCell<SchemaDiagram>>,
 }
 
+pub struct DiagramRequest {
+    pub schema: Option<String>,
+    pub connection_id: Option<uuid::Uuid>,
+    pub capabilities: DriverCapabilities,
+    pub scope: CancellationToken,
+    pub hidden_schemas: Vec<String>,
+}
+
 pub fn present(
     parent: &gtk::Window,
-    schema: Option<String>,
-    connection_id: Option<uuid::Uuid>,
+    request: DiagramRequest,
     database: &Arc<DatabaseService>,
     preferences: &PreferencesStore,
-    capabilities: DriverCapabilities,
-    scope: CancellationToken,
 ) {
-    let Some(connection) = connection_id.and_then(|id| database.get(id)) else {
+    let Some(connection) = request.connection_id.and_then(|id| database.get(id)) else {
         let alert = adw::AlertDialog::new(
             Some(&tr!("No active connection")),
             Some(&tr!("Open a connection before showing its diagram.")),
@@ -47,20 +52,24 @@ pub fn present(
         alert.present(Some(parent));
         return;
     };
-    let token = scope.child_token();
-    let ui = Rc::new(build(&diagram_label(schema.as_deref()), &token));
+    let token = request.scope.child_token();
+    let ui = Rc::new(build(&diagram_label(request.schema.as_deref()), &token));
     ui.dialog.present(Some(parent));
-    let timeout = crate::services::operation_control::timeout_for(preferences, database, connection_id);
+    let timeout = crate::services::operation_control::timeout_for(preferences, database, request.connection_id);
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded_with(timeout, token.clone());
-        let listed = match schema.as_deref() {
+        let listed = match request.schema.as_deref() {
+            Some(schema) if request.hidden_schemas.iter().any(|hidden| hidden == schema) => Ok(Vec::new()),
             Some(schema) => connection.list_tables_in(&[schema.to_string()], &control).await,
-            None => connection.list_tables_controlled(&control).await,
+            None => {
+                crate::services::catalog::list_tables_excluding(connection.as_ref(), &request.hidden_schemas, &control)
+                    .await
+            }
         };
         let tables = match listed {
             Ok(tables) => tables
                 .into_iter()
-                .filter(|table| schema.is_none() || table.schema == schema)
+                .filter(|table| request.schema.is_none() || table.schema == request.schema)
                 .collect::<Vec<_>>(),
             Err(error) => return show_failure(&ui, &token, &error),
         };
@@ -76,9 +85,9 @@ pub fn present(
         };
         let outcome = read_schema(
             connection.as_ref(),
-            schema.as_deref(),
+            request.schema.as_deref(),
             &tables,
-            capabilities,
+            request.capabilities,
             &control,
             progress,
         )

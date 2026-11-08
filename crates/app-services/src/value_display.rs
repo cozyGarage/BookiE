@@ -119,7 +119,10 @@ fn bytes_paint_text(bytes: &[u8]) -> String {
 fn bytes_copy_text(bytes: &[u8]) -> String {
     match std::str::from_utf8(bytes) {
         Ok(text) if !text.contains('\0') => text.to_owned(),
-        _ => format!("\\x{}", bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>()),
+        _ => format!(
+            "\\x{}",
+            bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
+        ),
     }
 }
 
@@ -292,10 +295,7 @@ mod tests {
     fn binary_copy_keeps_every_byte_beyond_a_view_hex_cap() {
         let bytes = vec![0xABu8; 20_000];
         let value = Value::Bytes(bytes.clone());
-        assert_eq!(
-            paint_value(&value, DisplayPrefs::default()).as_str(),
-            "<20000 bytes>"
-        );
+        assert_eq!(paint_value(&value, DisplayPrefs::default()).as_str(), "<20000 bytes>");
         let copied = copy_text(&value);
         assert!(copied.as_str().starts_with("\\x"));
         assert_eq!(copied.as_str().len(), 2 + bytes.len() * 2);

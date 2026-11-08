@@ -5,4 +5,4 @@ mod dialog;
 mod draw;
 mod palette;
 
-pub use dialog::present;
+pub use dialog::{DiagramRequest, present};

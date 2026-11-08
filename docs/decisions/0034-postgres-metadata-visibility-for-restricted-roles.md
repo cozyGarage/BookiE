@@ -25,6 +25,7 @@ A, with the privilege test in SQL so the cost is one catalog query, not a reques
 
 ## Consequences
 
-- The PostgreSQL driver and catalog SQL are Data-owned: the change needs the handoff and the lane, project and index update that `AGENTS.md` requires.
-- Acceptance evidence is a real PostgreSQL fixture with a restricted role (`bookie_visible` reachable, `bookie_hidden` not) checked through every consumer, plus a release-tier many-schema run recording catalog latency, main-loop stalls and memory at a named commit. Synthetic measurements stay separate.
-- The next step is the Data handoff, then the SQL change and the restricted-role fixture test. No catalog SQL changes before that handoff.
+- The PostgreSQL driver and catalog SQL, PolicyGuard wrappers, `agentd` forwarding and GUI caller propagation are implemented on the #580 branch. The issue records the Data and Policy handoffs; the GUI remains the active lane for its remaining acceptance work.
+- A PostgreSQL 18 restricted-role fixture covers reachable and denied relations and catalog objects, including exclusion scopes. It does not establish large-catalog responsiveness.
+- Release-tier acceptance still requires a representative many-schema run recording catalog latency, GTK main-loop stalls and memory at a named commit. Synthetic measurements stay separate.
+- The standalone MCP bridge still calls ordinary catalog-listing methods and does not receive the GUI's persisted hidden-schema set. Decide whether the GUI visibility preference is meant to apply to MCP/agent enumeration, then record and implement that scope before closing #580.
