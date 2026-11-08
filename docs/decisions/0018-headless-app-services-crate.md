@@ -24,6 +24,7 @@ A headless crate allows application state and service behavior to be tested with
 - GTK-free behavior can be tested independently from widget integration.
 - GTK dependencies stay in the application composition and presentation layers.
 - The `PolicyGuard` boundary and persistence contracts remain unchanged.
+- The staged moves from `apps/linux/app/src/services/` into `bookie-app-services` for GTK-free helpers are complete ([#2501](https://github.com/cozyGarage/BookiE/issues/2501) extracts through [#2537](https://github.com/cozyGarage/BookiE/pull/2537), [#2539](https://github.com/cozyGarage/BookiE/pull/2539), [#2540](https://github.com/cozyGarage/BookiE/pull/2540), [#2541](https://github.com/cozyGarage/BookiE/pull/2541), [#2543](https://github.com/cozyGarage/BookiE/pull/2543), [#2545](https://github.com/cozyGarage/BookiE/pull/2545)). What remains under that directory is shell-owned: GTK / glib / gio / Relm4 / gettext adapters, `DatabaseService` composition, and thin re-exports of headless modules. Further whole-module extracts from that tree are not expected unless a later ADR revisits the composition root.
 
 ## Alternatives considered
 
