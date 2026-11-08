@@ -56,6 +56,7 @@ pub mod csv_import_mappings;
 pub mod named_filter_presets;
 pub mod open_request;
 pub mod operation_control;
+pub mod persistence_stores;
 pub mod preferences;
 pub mod query_parameters;
 pub mod quick_switcher;
