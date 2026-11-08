@@ -80,6 +80,7 @@ zeroize = { version = "1", features = ["alloc"] }
 hex = "0.4"
 glob = "0.3"
 libc = "0.2"
+regex = "1"
 
 [patch.crates-io]
 sqlx-mysql = { path = "vendor/sqlx-mysql" }

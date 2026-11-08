@@ -143,6 +143,16 @@ pub(super) fn number_for(base: u64, position: u32, source_index: Option<usize>, 
     })
 }
 
+fn unwatch(watches: &Watches, item: &glib::Object) {
+    if let Some(handlers) = watches.borrow_mut().remove(item) {
+        for (object, handler) in handlers {
+            if let Some(object) = object.upgrade() {
+                object.disconnect(handler);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,15 +164,5 @@ mod tests {
         assert_eq!(number_for(100, 0, Some(0), false), Some(101));
         assert_eq!(number_for(0, 3, None, false), Some(4));
         assert_eq!(number_for(100, 0, None, true), None);
-    }
-}
-
-fn unwatch(watches: &Watches, item: &glib::Object) {
-    if let Some(handlers) = watches.borrow_mut().remove(item) {
-        for (object, handler) in handlers {
-            if let Some(object) = object.upgrade() {
-                object.disconnect(handler);
-            }
-        }
     }
 }

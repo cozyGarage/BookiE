@@ -337,10 +337,22 @@ pub fn build_column_view(
         database,
     );
     if tab_ctx.result_model.is_none() {
+        let editable_flags: Vec<bool> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, column)| {
+                edit_sender.is_some() && is_cell_editable(schema_columns.get(index).unwrap_or(column))
+            })
+            .collect();
         row_find::install(
             &column_view,
             &grid_actions,
-            columns.iter().map(|column| column.name.clone()).collect(),
+            row_find::FindTarget {
+                names: columns.iter().map(|column| column.name.clone()).collect(),
+                editable: editable_flags,
+                pk_indices: tab_ctx.pk_col_indices.clone(),
+                edit: edit_sender.clone(),
+            },
         );
     }
     font_zoom::install(&column_view, &grid_actions);

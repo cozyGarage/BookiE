@@ -445,3 +445,112 @@ async fn per_connection_timeouts_and_auth_database_round_trip_and_are_absent_by_
     assert_eq!(loaded[1].query_timeout_secs, Some(900));
     assert_eq!(loaded[1].auth_source.as_deref(), Some("admin"));
 }
+
+#[test]
+fn nested_group_paths_normalize_slashes_and_segments() {
+    let entry = organization(Some(" Prod /  EU / billing "), &[], false);
+    assert_eq!(entry.group.as_deref(), Some("Prod / EU / billing"));
+    assert_eq!(parse_group_path("a/b// c "), vec!["a", "b", "c"]);
+    assert_eq!(join_group_path(&["a".into(), "b".into()]).as_deref(), Some("a / b"));
+}
+
+#[test]
+fn nest_depth_above_the_ceiling_is_refused() {
+    let segments: Vec<String> = (0..MAX_GROUP_DEPTH + 1).map(|i| format!("g{i}")).collect();
+    let path = segments.join("/");
+    assert!(ConnectionOrganization::new(Some(&path), &[], false).is_err());
+    let ok: Vec<String> = (0..MAX_GROUP_DEPTH).map(|i| format!("g{i}")).collect();
+    let entry = ConnectionOrganization::new(Some(&ok.join("/")), &[], false).unwrap();
+    assert_eq!(parse_group_path(entry.group.as_deref().unwrap()).len(), MAX_GROUP_DEPTH);
+}
+
+#[test]
+fn each_group_segment_has_its_own_label_ceiling() {
+    let long = "x".repeat(MAX_LABEL_LEN);
+    let path = format!("{long} / child");
+    let entry = ConnectionOrganization::new(Some(&path), &[], false).unwrap();
+    assert_eq!(entry.group.as_deref(), Some(path.as_str()));
+    let too_long = format!("{}y / child", long);
+    assert!(ConnectionOrganization::new(Some(&too_long), &[], false).is_err());
+}
+
+#[test]
+fn moving_a_connection_rewrites_its_nested_group() {
+    let mut index = ConnectionOrganizationIndex::default();
+    let id = Uuid::new_v4();
+    index.set(id, organization(Some("Prod / EU"), &["keep"], true)).unwrap();
+    index.set(id, organization(Some("Prod / US"), &["keep"], true)).unwrap();
+    let entry = index.get(id);
+    assert_eq!(entry.group.as_deref(), Some("Prod / US"));
+    assert_eq!(entry.tags, vec!["keep".to_string()]);
+    assert!(entry.favorite);
+}
+
+#[test]
+fn group_paths_include_parent_prefixes() {
+    let mut index = ConnectionOrganizationIndex::default();
+    index
+        .set(Uuid::new_v4(), organization(Some("Prod / EU / billing"), &[], false))
+        .unwrap();
+    index
+        .set(Uuid::new_v4(), organization(Some("Prod / US"), &[], false))
+        .unwrap();
+    assert_eq!(
+        index.group_paths(),
+        vec![
+            "Prod".to_string(),
+            "Prod / EU".to_string(),
+            "Prod / EU / billing".to_string(),
+            "Prod / US".to_string(),
+        ]
+    );
+}
+
+#[test]
+fn connection_group_tree_nests_by_path_segments() {
+    let eu = connection("eu-db", "postgres");
+    let us = connection("us-db", "postgres");
+    let top = connection("top-db", "postgres");
+    let loose = connection("loose", "postgres");
+    let mut index = ConnectionOrganizationIndex::default();
+    index.set(eu.id, organization(Some("Prod / EU"), &[], false)).unwrap();
+    index.set(us.id, organization(Some("Prod / US"), &[], false)).unwrap();
+    index.set(top.id, organization(Some("Prod"), &[], false)).unwrap();
+    let arranged = vec![eu.clone(), us.clone(), top.clone(), loose.clone()];
+    let tree = connection_group_tree(&arranged, &index);
+    assert_eq!(tree.len(), 2);
+    assert_eq!(tree[0].path.as_deref(), Some("Prod"));
+    assert_eq!(tree[0].title, "Prod");
+    assert_eq!(tree[0].connections[0].id, top.id);
+    assert_eq!(tree[0].children.len(), 2);
+    assert_eq!(tree[0].children[0].path.as_deref(), Some("Prod / EU"));
+    assert_eq!(tree[0].children[0].connections[0].id, eu.id);
+    assert_eq!(tree[0].children[1].path.as_deref(), Some("Prod / US"));
+    assert_eq!(tree[0].children[1].connections[0].id, us.id);
+    assert_eq!(tree[1].path, None);
+    assert_eq!(tree[1].connections[0].id, loose.id);
+}
+
+#[tokio::test]
+async fn a_hostile_nested_group_path_is_sanitized() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connection-organization.json");
+    let id = Uuid::new_v4();
+    let deep: Vec<String> = (0..MAX_GROUP_DEPTH + 2).map(|i| format!("g{i}")).collect();
+    let document = serde_json::json!({
+        "version": 1,
+        "connections": {
+            id.to_string(): {
+                "group": deep.join(" / "),
+                "favorite": true
+            }
+        },
+    });
+    tokio::fs::write(&path, serde_json::to_vec(&document).unwrap())
+        .await
+        .unwrap();
+    let loaded = load_from(&path).await.unwrap();
+    let entry = loaded.get(id);
+    assert!(entry.group.is_none());
+    assert!(entry.favorite);
+}

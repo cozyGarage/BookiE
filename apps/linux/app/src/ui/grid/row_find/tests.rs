@@ -1,4 +1,16 @@
-use super::*;
+use std::io::Write;
+
+use bookie_app_services::text_match::TextMatchOptions;
+use bookie_core::Value;
+use tokio_util::sync::CancellationToken;
+
+use super::dialog::preview;
+use super::json_search::{CaseInsensitivePattern, JsonSearchWriter, matches_value};
+use super::query::{FindQuery, matching_rows};
+use super::replace::plan_replacements;
+use super::super::display::value_to_display_text;
+
+const PREVIEW_CHARS: usize = 80;
 
 struct SerializationReached(std::cell::Cell<bool>);
 
@@ -27,7 +39,15 @@ fn rows() -> Vec<Vec<Value>> {
     ]
 }
 
-fn find(query: &str, limit: usize) -> Vec<(u32, usize)> {
+fn query(needle: &str) -> FindQuery {
+    FindQuery::new(needle, TextMatchOptions::default(), None)
+}
+
+fn find(needle: &str, limit: usize) -> Vec<(u32, usize)> {
+    find_with(query(needle), limit)
+}
+
+fn find_with(query: FindQuery, limit: usize) -> Vec<(u32, usize)> {
     let rows = rows();
     matching_rows(
         rows.len() as u32,
@@ -40,18 +60,60 @@ fn find(query: &str, limit: usize) -> Vec<(u32, usize)> {
                 }
             }
         },
-        query,
+        &query,
         limit,
     )
+    .unwrap()
     .into_iter()
     .map(|hit| (hit.position, hit.column))
     .collect()
+}
+
+fn first_matching_cell(cells: &[Option<Value>], needle: &CaseInsensitivePattern) -> Option<(usize, String)> {
+    cells
+        .iter()
+        .enumerate()
+        .filter_map(|(column, value)| value.as_ref().map(|value| (column, value)))
+        .find_map(|(column, value)| matches_value(value, needle).then(|| (column, value_to_display_text(value))))
 }
 
 #[test]
 fn a_match_is_case_insensitive_and_reports_the_first_matching_column() {
     assert_eq!(find("ALICE", 10), vec![(0, 1), (2, 1)]);
     assert_eq!(find("3", 10), vec![(2, 0)]);
+}
+
+#[test]
+fn match_options_and_column_scope_narrow_loaded_row_search() {
+    let cased = FindQuery::new(
+        "alice",
+        TextMatchOptions {
+            match_case: true,
+            ..TextMatchOptions::default()
+        },
+        None,
+    );
+    assert!(find_with(cased, 10).is_empty());
+    let whole = FindQuery::new(
+        "alice",
+        TextMatchOptions {
+            whole_words: true,
+            ..TextMatchOptions::default()
+        },
+        None,
+    );
+    assert_eq!(find_with(whole, 10), vec![(2, 1)]);
+    let scoped = FindQuery::new("3", TextMatchOptions::default(), Some(1));
+    assert!(find_with(scoped, 10).is_empty());
+    let regex = FindQuery::new(
+        r"bob\s+alice",
+        TextMatchOptions {
+            regex: true,
+            ..TextMatchOptions::default()
+        },
+        None,
+    );
+    assert_eq!(find_with(regex, 10), vec![(2, 1)]);
 }
 
 #[test]
@@ -111,9 +173,10 @@ fn a_missing_projected_cell_is_not_a_search_match() {
         |_, visit| {
             visit(0, &Value::Int(1));
         },
-        "not fetched",
+        &query("not fetched"),
         10,
-    );
+    )
+    .unwrap();
     assert!(found.is_empty());
 }
 
@@ -147,7 +210,7 @@ fn null_binary_and_undecodable_values_keep_their_search_labels() {
 #[test]
 fn a_long_cell_remains_searchable_beyond_its_visible_preview() {
     let text = format!("{}needle", "😀".repeat(10_001));
-    assert!(!crate::ui::grid::display::value_to_display_text(&Value::Text(text.clone())).contains("needle"));
+    assert!(!value_to_display_text(&Value::Text(text.clone())).contains("needle"));
     let result = std::sync::Arc::new(bookie_core::QueryResult {
         columns: Vec::new(),
         rows: vec![vec![Value::Int(1), Value::Text(text)]].into(),
@@ -160,9 +223,10 @@ fn a_long_cell_remains_searchable_beyond_its_visible_preview() {
         |position, visit| {
             store.visit_search_cells(position, visit);
         },
-        "needle",
+        &query("needle"),
         10,
-    );
+    )
+    .unwrap();
     assert_eq!(
         found.iter().map(|hit| (hit.position, hit.column)).collect::<Vec<_>>(),
         vec![(0, 1)]
@@ -181,6 +245,57 @@ fn a_long_cell_is_shown_as_one_short_line() {
     assert!(!shown.contains('\n'));
     assert_eq!(shown.chars().count(), PREVIEW_CHARS + 1);
     assert!(shown.ends_with('…'));
+}
+
+#[test]
+fn replace_edits_keyed_text_and_skips_read_only_or_undecodable_cells() {
+    let rows = [
+        vec![Value::Int(1), Value::Text("alpha".into()), Value::Text("keep".into())],
+        vec![
+            Value::Int(2),
+            Value::Undecodable("numeric".into()),
+            Value::Text("alpha".into()),
+        ],
+    ];
+    let editable = [false, true, false];
+    let report = plan_replacements(
+        rows.len() as u32,
+        |position, visit| {
+            for (column, value) in rows[position as usize].iter().enumerate() {
+                visit(column, value);
+            }
+        },
+        |position| Some(vec![rows[position as usize][0].clone()]),
+        &query("alpha"),
+        "beta",
+        &editable,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    assert_eq!(report.edits.len(), 1);
+    assert_eq!(report.edits[0].column, 1);
+    assert_eq!(report.edits[0].new_value, "beta");
+    assert_eq!(report.replacements, 1);
+    assert!(report.skipped >= 2);
+}
+
+#[test]
+fn replace_stops_when_cancelled() {
+    let rows = vec![vec![Value::Text("alpha".into())]; 8];
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    let report = plan_replacements(
+        rows.len() as u32,
+        |position, visit| visit(0, &rows[position as usize][0]),
+        |position| Some(vec![Value::Int(position as i64)]),
+        &query("alpha"),
+        "beta",
+        &[true],
+        &cancel,
+    )
+    .unwrap();
+    assert!(report.edits.is_empty());
+    assert_eq!(report.replacements, 0);
 }
 
 #[test]
@@ -207,9 +322,10 @@ fn large_shared_value_search_has_bounded_temporary_memory() {
             |position, visit| {
                 store.visit_search_cells(position, visit);
             },
-            "needle",
+            &query("needle"),
             1,
-        );
+        )
+        .unwrap();
         let extra = peak_memory_kib().saturating_sub(before);
         eprintln!("row-search-memory kind={kind} extra_peak_kib={extra}");
         assert_eq!(found.len(), 1);
