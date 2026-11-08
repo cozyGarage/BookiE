@@ -30,11 +30,12 @@ fn run_catalog_sql(
     let connection = origin.connection(&app.database);
     let timeout_secs =
         crate::services::operation_control::timeout_for(&app.preferences, &app.database, app.connection_id);
+    let result_sender = sender.clone();
     sender.command(move |_, shutdown| {
         shutdown
             .register(async move {
                 let Some(conn) = connection else {
-                    sender.input(AppMsg::ShowAlert {
+                    result_sender.input(AppMsg::ShowAlert {
                         title: failure_title,
                         body: crate::tr!("No active connection."),
                     });
@@ -42,8 +43,8 @@ fn run_catalog_sql(
                 };
                 let control = crate::services::operation_control::bounded(timeout_secs);
                 match conn.execute_controlled(&sql, &control).await {
-                    Ok(_) => sender.input(on_ok),
-                    Err(error) => sender.input(AppMsg::ShowAlert {
+                    Ok(_) => result_sender.input(on_ok),
+                    Err(error) => result_sender.input(AppMsg::ShowAlert {
                         title: failure_title,
                         body: format!("{error}"),
                     }),

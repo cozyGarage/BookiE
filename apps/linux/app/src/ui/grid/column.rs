@@ -430,6 +430,16 @@ struct CellBinding<'a> {
     column_index: usize,
 }
 
+struct EditableLabelBinding<'a, 'b> {
+    position: u32,
+    view: &'a CellView<'b>,
+    text: &'a str,
+    inline_editable: bool,
+    binding: CellBinding<'b>,
+    value: Option<&'b Value>,
+    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
+}
+
 fn bind_cell(
     item: &gtk4::ListItem,
     view: CellView<'_>,
@@ -452,13 +462,15 @@ fn bind_cell(
     if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
         bind_editable_label(
             &label,
-            item.position(),
-            &view,
-            text.as_ref(),
-            inline_editable,
-            binding,
-            value,
-            highlight,
+            EditableLabelBinding {
+                position: item.position(),
+                view: &view,
+                text: text.as_ref(),
+                inline_editable,
+                binding,
+                value,
+                highlight,
+            },
         );
     } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
         bind_bool_cell(
@@ -482,16 +494,16 @@ fn bind_cell(
     }
 }
 
-fn bind_editable_label(
-    label: &crate::ui::cell_editor::CellEditor,
-    position: u32,
-    view: &CellView<'_>,
-    text: &str,
-    inline_editable: bool,
-    binding: CellBinding<'_>,
-    value: Option<&Value>,
-    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
-) {
+fn bind_editable_label(label: &crate::ui::cell_editor::CellEditor, bind: EditableLabelBinding<'_, '_>) {
+    let EditableLabelBinding {
+        position,
+        view,
+        text,
+        inline_editable,
+        binding,
+        value,
+        highlight,
+    } = bind;
     IS_NULL_SLOT.set(label, view.is_null);
     label.set_inline_editable(inline_editable);
     label.set_text(text);

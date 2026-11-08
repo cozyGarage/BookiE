@@ -268,6 +268,7 @@ impl BrowseTab {
             result_model: None,
             row_visibility: None,
             sortable_result_columns: Default::default(),
+            highlight_rules: None,
             foreign_key_columns,
             has_inbound_foreign_keys: !self.inbound_foreign_keys.is_empty(),
             filters_unavailable: !self.browse_filters,
