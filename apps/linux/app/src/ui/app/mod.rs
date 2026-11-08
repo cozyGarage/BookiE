@@ -52,6 +52,7 @@ use uuid::Uuid;
 use super::browse_tab::BrowseTabInput;
 use super::connect_dialog::ConnectDialog;
 use super::connection_row::ConnectionRow;
+use super::editor::SqlEditorInput;
 use super::history_dialog::HistoryDialog;
 use super::sidebar_row::SidebarRow;
 use super::welcome_view::{WelcomeView, WelcomeViewInit, WelcomeViewOutput};
@@ -832,11 +833,28 @@ impl SimpleComponent for App {
                 self.on_browse_save_failed(tab_id, save_id, message);
             }
             AppMsg::FlashErrorRowForTab(tab_id, source) => {
-                self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source));
+                self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source.clone()));
+                self.dispatch_to_editor(tab_id, SqlEditorInput::ResultFlashError(source));
+            }
+            AppMsg::FocusActiveGrid => {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusResultGrid);
+                } else if let Some(id) = self.selected_browse_tab_id() {
+                    self.dispatch_to_tab(id, BrowseTabInput::FocusGrid);
+                }
+            }
+            AppMsg::FocusActiveEditor => {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusEditor);
+                }
             }
             AppMsg::SaveActiveBrowseTab => {
                 if let Some(id) = self.selected_editor_tab_id() {
-                    self.save_editor_file(id, false, sender);
+                    if self.change_trackers.with_tab_ref(id, |tracker| tracker.has_pending()) == Some(true) {
+                        self.dispatch_to_editor(id, SqlEditorInput::CommitResultEdits);
+                    } else {
+                        self.save_editor_file(id, false, sender);
+                    }
                 } else if let Some(id) = self.selected_browse_tab_id() {
                     self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
                 }
@@ -889,6 +907,7 @@ impl SimpleComponent for App {
             AppMsg::ExportStreamedResults(request) => self.on_export_streamed_results(request),
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
+            AppMsg::EditorResultDirtyChanged(tab_id, dirty) => self.refresh_editor_result_dirty(tab_id, dirty),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
             AppMsg::SidebarSearchChanged => self.sync_sidebar_expansion(),
             AppMsg::RefreshSidebar => self.refresh_sidebar(sender),

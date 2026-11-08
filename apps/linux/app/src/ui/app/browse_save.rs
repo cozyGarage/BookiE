@@ -3,6 +3,7 @@ use relm4::adw::prelude::*;
 use uuid::Uuid;
 
 use crate::ui::browse_tab::BrowseTabInput;
+use crate::ui::editor::SqlEditorInput;
 
 use super::App;
 
@@ -32,6 +33,7 @@ impl App {
         toast.set_timeout(4);
         self.toast_overlay.add_toast(toast);
         self.dispatch_to_tab(tab_id, BrowseTabInput::SaveCompleted(save_id));
+        self.dispatch_to_editor(tab_id, SqlEditorInput::ResultSaveCompleted(save_id));
         let drained = self.close_after_save.borrow_mut().complete(&tab_id);
         if drained {
             self.request_workspace_tab_close(tab_id);
@@ -57,7 +59,8 @@ impl App {
             &self.close_window_after_save,
             tab_id,
         );
-        self.dispatch_to_tab(tab_id, BrowseTabInput::SaveFailed(save_id, message));
+        self.dispatch_to_tab(tab_id, BrowseTabInput::SaveFailed(save_id, message.clone()));
+        self.dispatch_to_editor(tab_id, SqlEditorInput::ResultSaveFailed(save_id, message));
         self.connection_switch_save_failed();
     }
 }

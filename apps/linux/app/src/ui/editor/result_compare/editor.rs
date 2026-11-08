@@ -134,9 +134,11 @@ fn diff_identity(request: &CompareRequest) -> StatementIdentity {
 }
 
 fn diff_outcome(request: &CompareRequest, diff: Arc<QueryResult>) -> StatementOutcome {
+    let sql = format!("COMPARE {} ↔ {}", request.left.label, request.right.label);
     StatementOutcome {
         identity: diff_identity(request),
-        sql_preview: format!("COMPARE {} ↔ {}", request.left.label, request.right.label),
+        sql_preview: sql.clone(),
+        sql,
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Rows(vec![diff]),
         pinned: true,

@@ -37,6 +37,7 @@ pub(super) fn outcome(preview: &str, kind: StatementOutcomeKind) -> StatementOut
     StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: preview.into(),
+        sql: preview.to_owned(),
         elapsed_ms: 0,
         kind,
         pinned: false,

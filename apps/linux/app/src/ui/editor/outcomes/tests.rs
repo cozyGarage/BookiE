@@ -298,6 +298,7 @@ fn a_pinned_result_is_named_by_its_statement_without_a_run_number() {
     let outcome = super::StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "select * from public.users".into(),
+        sql: "select * from public.users".into(),
         elapsed_ms: 3,
         kind: StatementOutcomeKind::Rows(Vec::new()),
         pinned: true,
@@ -313,6 +314,7 @@ fn a_fresh_result_keeps_its_script_number_after_pinned_results_precede_it() {
             digest: [0; 32],
         },
         sql_preview: "select * from missing_table".into(),
+        sql: "select * from missing_table".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Error("missing table".into()),
         pinned: false,
@@ -634,6 +636,7 @@ fn streamed_result_pages(
     let outcome = super::StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT id FROM items".into(),
+        sql: "SELECT id FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
@@ -937,6 +940,7 @@ fn outcome_with(kind: StatementOutcomeKind, pinned: bool) -> super::StatementOut
     super::StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT 1".into(),
+        sql: "SELECT 1".into(),
         elapsed_ms: 0,
         kind,
         pinned,
@@ -991,6 +995,7 @@ fn skipped_empty_stream_page_does_not_shift_retained_result_identity() {
     let outcome = super::StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT id FROM items".into(),
+        sql: "SELECT id FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
         pinned: false,
