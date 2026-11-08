@@ -17,6 +17,7 @@ mod completion_relations;
 pub mod config_io;
 pub mod connection_form;
 pub mod connection_identity;
+pub mod connection_save_turn;
 pub mod database_backup;
 pub mod driver_diagnostics;
 pub mod driver_error_presentation;

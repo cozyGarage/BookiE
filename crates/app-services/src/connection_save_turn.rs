@@ -13,7 +13,6 @@ async fn run_locked<T>(turn: &tokio::sync::Mutex<()>, operation: impl std::futur
     operation.await
 }
 
-#[cfg(test)]
 pub fn is_held() -> bool {
     TURN.try_lock().is_err()
 }
@@ -27,5 +26,13 @@ mod tests {
 
         assert!(held);
         assert!(turn.try_lock().is_ok());
+    }
+
+    #[tokio::test]
+    async fn run_holds_the_global_turn_during_the_operation() {
+        let held = super::run(async { super::is_held() }).await;
+
+        assert!(held);
+        assert!(!super::is_held());
     }
 }
