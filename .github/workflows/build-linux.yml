@@ -650,7 +650,6 @@ jobs:
             --env HOME=/tmp \
             --env CARGO_HOME=/cargo \
             --env RUSTUP_HOME=/rustup \
-            --env RUSTUP_TOOLCHAIN=1.98.0 \
             --env CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target" \
             --env CARGO_BUILD_JOBS=4 \
             --env PATH=/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
