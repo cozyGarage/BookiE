@@ -87,7 +87,7 @@ Other options and why they were rejected.
 | [0038](0038-audit-sql-hash-key.md) | Key the audit journal's SQL hash | Proposed | Use a per-install key and HMAC-SHA-256 for `sql_hash`, so a leaked journal cannot be matched against candidate statements. |
 | [0039](0039-gpui-source-for-experiments.md) | GPUI source for the experimental frontends | Proposed | Pin `gpui-pre` and `gpui-kit` as an exact pair instead of crates.io `gpui 0.2.2`; the spike port passes all 77 tests. |
 | [0033](0033-frozen-result-grid-columns.md) | Frozen leading columns in the result grid | Proposed | GTK4 has no frozen columns; the options are two synced column views, a custom list-view grid, or not freezing, with a spike to decide. |
-| [0040](0040-multi-session-window-workspace.md) | Multi-session windows keep a headless workspace model | Proposed | A window may hold several PolicyGuard-backed sessions; tab↔connection maps and restore live in app-services; Relm4 stays the Linux shell. |
+| [0040](0040-multi-session-window-workspace.md) | Multi-session windows keep a headless workspace model | Accepted | A window may hold several PolicyGuard-backed sessions; tab↔connection maps and restore live in app-services; Relm4 stays the Linux shell. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

@@ -1,6 +1,6 @@
 # 0040: Multi-session windows keep a headless workspace model
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-08)
 - **Date**: 2026-11-08
 
 ## Context
