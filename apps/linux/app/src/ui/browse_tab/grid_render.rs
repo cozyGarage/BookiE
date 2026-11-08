@@ -202,6 +202,15 @@ impl BrowseTab {
         *self.ambiguous_keys.borrow_mut() = ambiguous;
     }
 
+    fn prepared_highlight_rules(
+        &self,
+    ) -> Option<std::sync::Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>> {
+        let connection_id = self.connection_id?;
+        let store = self.persistence.highlight_settings.as_ref()?;
+        let columns: Vec<&str> = self.current_columns.iter().map(|column| column.name.as_str()).collect();
+        store.prepared(connection_id, self.schema.as_deref(), &self.table, &columns)
+    }
+
     pub(super) fn render_grid_if_ready(&mut self, sender: ComponentSender<Self>) {
         let Some(result) = self.current_result.clone() else {
             return;
@@ -268,7 +277,7 @@ impl BrowseTab {
             result_model: None,
             row_visibility: None,
             sortable_result_columns: Default::default(),
-            highlight_rules: None,
+            highlight_rules: self.prepared_highlight_rules(),
             foreign_key_columns,
             has_inbound_foreign_keys: !self.inbound_foreign_keys.is_empty(),
             filters_unavailable: !self.browse_filters,
