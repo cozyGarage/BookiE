@@ -1313,6 +1313,7 @@ dependencies = [
  "bookie-core",
  "chrono",
  "getrandom 0.3.4",
+ "regex",
  "rmp-serde",
  "rust_decimal",
  "secrecy",

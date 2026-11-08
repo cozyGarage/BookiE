@@ -10,6 +10,7 @@ fn contains(needle: &str) -> ResultPredicate {
     ResultPredicate::Contains {
         scope: ColumnScope::Any,
         needle: needle.into(),
+        options: Default::default(),
     }
 }
 

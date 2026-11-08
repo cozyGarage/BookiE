@@ -8,7 +8,7 @@ use bookie_app_services::stream_result_spool::{StreamResultSpool, StreamResultSp
 use bookie_core::{ColumnInfo, QueryResult, Value};
 use tokio_util::sync::CancellationToken;
 
-use super::cursor::MatchCursor;
+use super::cursor::{MatchCursor, SearchSpec};
 use super::derived::{derived_outcome, derived_result, next_generation};
 use super::editor::{failure_message, success_message};
 use crate::ui::editor::pinned::{MAX_PINNED, PinnedResults};
@@ -49,7 +49,7 @@ fn report(count: usize, capped: bool, unsearchable: u64) -> FindReport {
 
 fn cursor_with(count: usize) -> (MatchCursor, u64) {
     let mut cursor = MatchCursor::default();
-    let generation = cursor.begin("needle");
+    let generation = cursor.begin(SearchSpec { needle: "needle".into(), ..SearchSpec::default() });
     assert!(cursor.complete(generation, report(count, false, 0)));
     (cursor, generation)
 }
@@ -82,8 +82,8 @@ fn stepping_with_no_matches_returns_nothing() {
 #[test]
 fn a_stale_search_result_is_dropped() {
     let mut cursor = MatchCursor::default();
-    let first = cursor.begin("a");
-    let second = cursor.begin("ab");
+    let first = cursor.begin(SearchSpec { needle: "a".into(), ..SearchSpec::default() });
+    let second = cursor.begin(SearchSpec { needle: "ab".into(), ..SearchSpec::default() });
     assert!(!cursor.accepts(first));
     assert!(!cursor.complete(first, report(5, false, 0)));
     assert!(cursor.complete(second, report(1, false, 0)));
@@ -93,20 +93,20 @@ fn a_stale_search_result_is_dropped() {
 #[test]
 fn results_are_reused_only_for_the_same_completed_search() {
     let mut cursor = MatchCursor::default();
-    let generation = cursor.begin("abc");
-    assert!(!cursor.has_results_for("abc"));
+    let generation = cursor.begin(SearchSpec { needle: "abc".into(), ..SearchSpec::default() });
+    assert!(!cursor.has_results_for(&SearchSpec { needle: "abc".into(), ..SearchSpec::default() }));
     cursor.complete(generation, report(1, false, 0));
-    assert!(cursor.has_results_for("abc"));
-    assert!(!cursor.has_results_for("abcd"));
+    assert!(cursor.has_results_for(&SearchSpec { needle: "abc".into(), ..SearchSpec::default() }));
+    assert!(!cursor.has_results_for(&SearchSpec { needle: "abcd".into(), ..SearchSpec::default() }));
     cursor.invalidate();
-    assert!(!cursor.has_results_for("abc"));
+    assert!(!cursor.has_results_for(&SearchSpec { needle: "abc".into(), ..SearchSpec::default() }));
     assert!(!cursor.accepts(generation));
 }
 
 #[test]
 fn status_text_reports_position_cap_and_unsearchable_cells() {
     let mut cursor = MatchCursor::default();
-    let generation = cursor.begin("x");
+    let generation = cursor.begin(SearchSpec { needle: "x".into(), ..SearchSpec::default() });
     cursor.complete(generation, report(10_000, true, 1));
     assert_eq!(
         cursor.status(),
@@ -115,7 +115,7 @@ fn status_text_reports_position_cap_and_unsearchable_cells() {
     cursor.step(true);
     cursor.step(true);
     assert_eq!(cursor.status(), "Match 2 of 10,000+ · 1 cell could not be searched");
-    let generation = cursor.begin("y");
+    let generation = cursor.begin(SearchSpec { needle: "y".into(), ..SearchSpec::default() });
     cursor.complete(generation, report(3, false, 2));
     assert_eq!(cursor.status(), "3 matches · 2 cells could not be searched");
     assert_eq!(MatchCursor::default().status(), "");
@@ -195,6 +195,7 @@ fn filtered(source: &StreamedResult, needle: &str) -> FilteredResult {
         ResultPredicate::Contains {
             scope: ColumnScope::Any,
             needle: needle.into(),
+            options: Default::default(),
         },
         &StreamResultSpoolManager::default(),
         &CancellationToken::new(),
@@ -487,25 +488,25 @@ fn a_jump_selects_retries_or_gives_up_by_what_the_view_shows() {
 #[test]
 fn a_cancelled_or_failed_search_no_longer_counts_as_running() {
     let mut cursor = MatchCursor::default();
-    let generation = cursor.begin("needle");
-    assert!(cursor.keeps_for("needle"));
+    let generation = cursor.begin(SearchSpec { needle: "needle".into(), ..SearchSpec::default() });
+    assert!(cursor.keeps_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
     cursor.end_search(generation.wrapping_add(1));
-    assert!(cursor.keeps_for("needle"));
+    assert!(cursor.keeps_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
     cursor.end_search(generation);
-    assert!(!cursor.keeps_for("needle"));
-    assert!(!cursor.has_results_for("needle"));
+    assert!(!cursor.keeps_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
+    assert!(!cursor.has_results_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
 }
 
 #[test]
 fn an_edit_signal_for_the_same_text_keeps_a_running_search() {
     let mut cursor = MatchCursor::default();
-    let generation = cursor.begin("needle");
-    assert!(cursor.keeps_for("needle"));
-    assert!(!cursor.keeps_for("other"));
+    let generation = cursor.begin(SearchSpec { needle: "needle".into(), ..SearchSpec::default() });
+    assert!(cursor.keeps_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
+    assert!(!cursor.keeps_for(&SearchSpec { needle: "other".into(), ..SearchSpec::default() }));
     assert!(cursor.complete(generation, report(2, false, 0)));
-    assert!(cursor.keeps_for("needle"));
+    assert!(cursor.keeps_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
     cursor.invalidate();
-    assert!(!cursor.keeps_for("needle"));
+    assert!(!cursor.keeps_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
 }
 
 #[test]
@@ -529,30 +530,30 @@ fn a_finished_filter_ticket_keeps_its_message_and_an_unfinished_one_does_not() {
 #[test]
 fn a_search_ended_without_results_is_idle_and_can_be_edited() {
     let mut cursor = MatchCursor::default();
-    let generation = cursor.begin("needle");
-    assert!(!cursor.has_results_for("needle"));
-    assert!(cursor.keeps_for("needle"));
+    let generation = cursor.begin(SearchSpec { needle: "needle".into(), ..SearchSpec::default() });
+    assert!(!cursor.has_results_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
+    assert!(cursor.keeps_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
     assert!(cursor.complete(generation, report(1, false, 0)));
-    assert!(cursor.has_results_for("needle"));
+    assert!(cursor.has_results_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
     cursor.end_search(generation);
-    assert!(cursor.has_results_for("needle"));
+    assert!(cursor.has_results_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
 }
 
 #[test]
 fn a_running_search_for_the_same_text_is_not_restarted() {
     let mut cursor = MatchCursor::default();
-    assert!(!cursor.is_searching_for("needle"));
-    let generation = cursor.begin("needle");
-    assert!(cursor.is_searching_for("needle"));
-    assert!(!cursor.is_searching_for("other"));
+    assert!(!cursor.is_searching_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
+    let generation = cursor.begin(SearchSpec { needle: "needle".into(), ..SearchSpec::default() });
+    assert!(cursor.is_searching_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
+    assert!(!cursor.is_searching_for(&SearchSpec { needle: "other".into(), ..SearchSpec::default() }));
     assert!(cursor.complete(generation, report(1, false, 0)));
-    assert!(!cursor.is_searching_for("needle"));
+    assert!(!cursor.is_searching_for(&SearchSpec { needle: "needle".into(), ..SearchSpec::default() }));
 }
 
 #[test]
 fn a_direction_requested_during_a_running_search_is_kept_for_the_result() {
     let mut cursor = MatchCursor::default();
-    let generation = cursor.begin("needle");
+    let generation = cursor.begin(SearchSpec { needle: "needle".into(), ..SearchSpec::default() });
     assert_eq!(cursor.take_direction(), None);
     cursor.request_direction(false);
     cursor.request_direction(true);
@@ -560,7 +561,7 @@ fn a_direction_requested_during_a_running_search_is_kept_for_the_result() {
     assert_eq!(cursor.take_direction(), Some(false));
     assert_eq!(cursor.take_direction(), None);
     cursor.request_direction(false);
-    cursor.begin("other");
+    cursor.begin(SearchSpec { needle: "other".into(), ..SearchSpec::default() });
     assert_eq!(cursor.take_direction(), None);
     assert!(!cursor.accepts(generation));
 }

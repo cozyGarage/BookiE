@@ -4,6 +4,8 @@ use bookie_core::Value;
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
 
+use crate::text_match::TextMatchOptions;
+
 use super::*;
 
 fn matches(predicate: ResultPredicate, row: &[Value]) -> bool {
@@ -17,6 +19,7 @@ fn contains(needle: &str, scope: ColumnScope) -> ResultPredicate {
     ResultPredicate::Contains {
         scope,
         needle: needle.into(),
+        options: TextMatchOptions::default(),
     }
 }
 
@@ -26,6 +29,38 @@ fn text_search_ignores_case_and_matches_any_column() {
     assert!(matches(contains("WORLD", ColumnScope::Any), &row));
     assert!(!matches(contains("WORLD", ColumnScope::Column(0)), &row));
     assert!(matches(contains("hello", ColumnScope::Column(1)), &row));
+}
+
+#[test]
+fn text_search_honours_match_case_whole_words_and_regex() {
+    let row = [Value::Text("Hello World".into()), Value::Text("concatenate".into())];
+    let cased = ResultPredicate::Contains {
+        scope: ColumnScope::Any,
+        needle: "hello".into(),
+        options: TextMatchOptions {
+            match_case: true,
+            ..TextMatchOptions::default()
+        },
+    };
+    assert!(!matches(cased, &row));
+    let whole = ResultPredicate::Contains {
+        scope: ColumnScope::Column(1),
+        needle: "cat".into(),
+        options: TextMatchOptions {
+            whole_words: true,
+            ..TextMatchOptions::default()
+        },
+    };
+    assert!(!matches(whole, &row));
+    let regex = ResultPredicate::Contains {
+        scope: ColumnScope::Any,
+        needle: r"W.rld".into(),
+        options: TextMatchOptions {
+            regex: true,
+            ..TextMatchOptions::default()
+        },
+    };
+    assert!(matches(regex, &row));
 }
 
 #[test]
