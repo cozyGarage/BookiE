@@ -215,6 +215,8 @@ pub enum AppMsg {
     SaveCompletedForTab(Uuid, Uuid, Option<String>),
     SaveFailedForTab(Uuid, Uuid, String),
     FlashErrorRowForTab(Uuid, crate::services::change_tracker::StatementSource),
+    FocusActiveGrid,
+    FocusActiveEditor,
     SaveActiveBrowseTab,
     SaveActiveBrowseTabById(Uuid),
     UndoActiveBrowseTab,
