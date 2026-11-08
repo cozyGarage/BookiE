@@ -471,10 +471,7 @@ fn sort_keys_summary(result: &QueryResult, keys: &[(usize, bool)]) -> Option<Str
             format!("{name} {arrow}")
         })
         .collect::<Vec<_>>();
-    Some(
-        crate::tr!("Sorted by {keys}")
-            .replace("{keys}", &parts.join(", ")),
-    )
+    Some(crate::tr!("Sorted by {keys}").replace("{keys}", &parts.join(", ")))
 }
 
 fn filter_summary(visible: u128, loaded: u128, truncated: bool) -> String {
