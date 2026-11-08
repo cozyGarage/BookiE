@@ -1,5 +1,4 @@
 use bookie_app_services::editor_bookmarks::BookmarkSet;
-use relm4::gtk;
 use sourceview5::prelude::*;
 
 pub(super) const CATEGORY: &str = "sql-bookmark";
@@ -71,6 +70,7 @@ fn collect_lines(buffer: &sourceview5::Buffer) -> Vec<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use relm4::gtk;
 
     #[test]
     #[ignore = "requires an isolated GTK display"]

@@ -602,8 +602,8 @@ fn local_multi_key_sort_reverses_secondary_and_clears_to_source_order() {
     );
     let state = view.0.borrow();
     assert!(state.controls.is_visible());
-    assert!(state.status.label().unwrap_or_default().contains("dept"));
-    assert!(state.status.label().unwrap_or_default().contains("name"));
+    assert!(state.status.label().contains("dept"));
+    assert!(state.status.label().contains("name"));
     drop(state);
     view.clear_sort();
     assert!(view.sort_keys().is_empty());
