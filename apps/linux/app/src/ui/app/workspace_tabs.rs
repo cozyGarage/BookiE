@@ -161,6 +161,7 @@ impl App {
         let history_for_create = self.history.clone();
         let database_for_create = self.database.clone();
         let preferences_for_create = self.preferences.clone();
+        let change_trackers_for_create = self.change_trackers.clone();
         let sender_for_create = sender.clone();
         // The workspace root is rebuilt on every connect, so the identifier
         // captured here always belongs to the connection this window owns.
@@ -177,6 +178,8 @@ impl App {
                     history: history_for_create.clone(),
                     database: database_for_create.clone(),
                     preferences: preferences_for_create.clone(),
+                    change_trackers: change_trackers_for_create.clone(),
+                    tab_id,
                 })
                 .forward(sender_for_create.input_sender(), move |out| editor_output(tab_id, out));
             let page = tab_view_for_create.append(editor.widget());
@@ -571,6 +574,8 @@ impl App {
                 history: self.history.clone(),
                 database: self.database.clone(),
                 preferences: self.preferences.clone(),
+                change_trackers: self.change_trackers.clone(),
+                tab_id,
             })
             .forward(sender.input_sender(), move |out| editor_output(tab_id, out));
         let page = tab_view.append(editor.widget());
@@ -657,6 +662,7 @@ impl App {
         match &removed {
             WorkspaceTab::Editor(slot) => {
                 let _ = slot.controller.sender().send(SqlEditorInput::Cancel);
+                self.change_trackers.close_tab(id);
             }
             WorkspaceTab::Structure(slot) => {
                 self.structure_trackers.close_tab(slot.id);
@@ -765,7 +771,11 @@ impl App {
                     self.change_trackers.close_tab(slot.id);
                     self.structure_trackers.close_tab(slot.id);
                 }
-                WorkspaceTab::Editor(_) => {}
+                WorkspaceTab::Editor(slot) => {
+                    if let Some(id) = read_workspace_tab_id(&slot.page) {
+                        self.change_trackers.close_tab(id);
+                    }
+                }
             }
         }
         if let Some(root) = self.workspace_root.take()
@@ -807,9 +817,45 @@ impl App {
         }
     }
 
+    pub(super) fn dispatch_to_editor(&self, tab_id: Uuid, msg: SqlEditorInput) {
+        if let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow().get(&tab_id) {
+            let _ = slot.controller.sender().send(msg);
+        }
+    }
+
     /// Editor tab title update on query change. Mirrors what was on
     /// editor_tabs.rs::on_editor_tab_query_changed; lives here now since
     /// editor tabs are first-class workspace tabs.
+    pub(super) fn refresh_editor_result_dirty(&self, tab_id: Uuid, dirty: bool) {
+        let rows_dirty = self
+            .change_trackers
+            .with_tab_ref(tab_id, |tracker| tracker.has_pending())
+            .unwrap_or(false)
+            || dirty;
+        let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow().get(&tab_id) else {
+            return;
+        };
+        if slot.file.is_some() {
+            Self::refresh_editor_file_title(slot);
+            return;
+        }
+        let label = if slot.query.trim().is_empty() {
+            crate::tr!("Empty query")
+        } else {
+            derive_tab_label(&slot.query)
+        };
+        let title = if rows_dirty { format!("• {label}") } else { label };
+        slot.page.set_title(&title);
+        let is_selected = self
+            .workspace_tab_view
+            .as_ref()
+            .and_then(|view| view.selected_page())
+            .map(|selected| selected == slot.page)
+            .unwrap_or(false);
+        slot.page.set_needs_attention(rows_dirty && !is_selected);
+        self.refresh_window_title();
+    }
+
     pub(super) fn on_editor_tab_query_changed(&self, id: Uuid, query: String) {
         let label = if query.trim().is_empty() {
             crate::tr!("Empty query")
@@ -840,12 +886,6 @@ impl App {
             .borrow()
             .values()
             .any(|tab| matches!(tab, WorkspaceTab::Editor(slot) if slot.running))
-    }
-
-    pub(super) fn dispatch_to_editor(&self, tab_id: Uuid, msg: SqlEditorInput) {
-        if let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow().get(&tab_id) {
-            let _ = slot.controller.sender().send(msg);
-        }
     }
 
     pub(super) fn on_replace_active_tab_query(&mut self, text: String, sender: ComponentSender<Self>) {
@@ -1001,6 +1041,18 @@ fn editor_tab_tooltip(query: &str, label: &str) -> Option<String> {
 
 fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
     match output {
+        SqlEditorOutput::DirtyChanged(dirty) => AppMsg::EditorResultDirtyChanged(tab_id, dirty),
+        SqlEditorOutput::ShowAlert { title, body } => AppMsg::ShowAlert { title, body },
+        SqlEditorOutput::ExecuteTransaction {
+            save_id,
+            statements,
+            sources,
+        } => AppMsg::ExecuteBrowseTransaction {
+            tab_id,
+            save_id,
+            statements,
+            sources,
+        },
         SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
             origin,
             schema: None,

@@ -121,6 +121,7 @@ pub struct SqlEditor {
     saved_draft_blocked: bool,
     known_lexing: session_lexing::KnownLexing,
     reading_lexing: bool,
+    result_editing: Option<result_editing::ResultEditing>,
 }
 
 pub struct SqlEditorInit {
@@ -130,6 +131,8 @@ pub struct SqlEditorInit {
     pub history: Option<HistoryStore>,
     pub database: std::sync::Arc<crate::services::database_service::DatabaseService>,
     pub preferences: crate::services::preferences::PreferencesStore,
+    pub change_trackers: crate::services::change_tracker::WorkspaceChangeTrackers,
+    pub tab_id: Uuid,
 }
 
 mod messages;
@@ -149,6 +152,7 @@ struct ExecutionContext {
 
 mod drop_request;
 use drop_request::{DropGeneration, DropRequest};
+mod result_editing;
 
 #[relm4::component(pub)]
 impl SimpleComponent for SqlEditor {
@@ -532,7 +536,27 @@ impl SimpleComponent for SqlEditor {
             saved_draft_blocked,
             known_lexing,
             reading_lexing: false,
+            result_editing: Some(result_editing::ResultEditing::build(
+                init.change_trackers.clone(),
+                init.tab_id,
+                &widgets.results_holder,
+            )),
         };
+        if let Some(editing) = model.result_editing.as_ref() {
+            editing.wire_actions(&sender);
+            let (tracker_sender, tracker_receiver) = relm4::channel::<crate::services::change_tracker::TrackerEvent>();
+            editing.change_trackers.subscribe(init.tab_id, tracker_sender);
+            let input_for_tracker = sender.input_sender().clone();
+            relm4::spawn_local(tracker_receiver.forward(input_for_tracker, move |event| match event {
+                crate::services::change_tracker::TrackerEvent::PendingCountChanged(n) => {
+                    SqlEditorInput::ResultPendingCountChanged(n)
+                }
+                crate::services::change_tracker::TrackerEvent::Cleared => SqlEditorInput::ResultPendingCountChanged(0),
+                crate::services::change_tracker::TrackerEvent::ChangedRows(keys) => {
+                    SqlEditorInput::ResultChangedRows(keys)
+                }
+            }));
+        }
         model.refresh_run_options(&sender);
         ComponentParts { model, widgets }
     }
@@ -587,7 +611,28 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::Grid(GridMsg::ExportStreamedResults(request)) => {
                 let _ = sender.output(SqlEditorOutput::ExportStreamedResults(request));
             }
-            SqlEditorInput::Grid(message) => self.on_result_grid_message(message, &sender),
+            SqlEditorInput::Grid(message) => match self.on_editable_grid_message(message, &sender) {
+                Some(message) => self.on_result_grid_message(message, &sender),
+                None => {}
+            },
+            SqlEditorInput::EditColumnsFetched { run, source, columns } => {
+                self.on_edit_columns_fetched(run, source, columns, &sender);
+            }
+            SqlEditorInput::ResultPendingCountChanged(count) => {
+                self.on_result_pending_count_changed(count, &sender);
+            }
+            SqlEditorInput::ResultChangedRows(keys) => self.on_result_changed_rows(keys),
+            SqlEditorInput::CommitResultEdits => self.handle_commit_result_edits(sender),
+            SqlEditorInput::DiscardResultEdits => self.handle_discard_result_edits(sender),
+            SqlEditorInput::PreviewResultEdits => self.handle_preview_result_edits(&sender),
+            SqlEditorInput::ConfirmDiscardAndRun => self.on_confirm_discard_and_run(sender),
+            SqlEditorInput::ResultSaveCompleted(save_id) => {
+                self.handle_result_save_completed(save_id, sender);
+            }
+            SqlEditorInput::ResultSaveFailed(save_id, message) => {
+                self.handle_result_save_failed(save_id, message, sender);
+            }
+            SqlEditorInput::ResultFlashError(source) => self.handle_result_flash_error(source),
             SqlEditorInput::SplitToggled(visible) => self.split_view.set_visible(visible),
             SqlEditorInput::SessionToggled(enabled) => self.on_session_toggle(enabled, &sender),
             SqlEditorInput::SessionOpened {
@@ -902,7 +947,7 @@ impl SqlEditor {
 
         self.set_running(true, conn.supports_server_cancellation(), &sender);
         self.status.set_label(&crate::tr!("Running…"));
-        dim_previous_results(&self.results_holder);
+        dim_previous_results(self.results_surface());
         self.streaming = None;
         self.clear_run_marks();
 
@@ -957,6 +1002,7 @@ impl SqlEditor {
                                 StreamUpdate::Started {
                                     identity,
                                     sql_preview,
+                                    sql,
                                     spool,
                                 } => {
                                     let (accepted, delivered) = tokio::sync::oneshot::channel();
@@ -965,6 +1011,7 @@ impl SqlEditor {
                                             generation,
                                             identity,
                                             sql_preview,
+                                            sql,
                                             export_query: Some(crate::ui::export_dialog::StreamExportQuery {
                                                 driver_id: export_driver_id.clone(),
                                                 suggested_name: export_suggested_name.clone(),

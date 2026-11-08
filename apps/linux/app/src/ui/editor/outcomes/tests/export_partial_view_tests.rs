@@ -36,6 +36,7 @@ fn an_incomplete_stream_does_not_offer_full_result_export() {
             digest: [7; 32],
         },
         sql_preview: "SELECT id FROM items".into(),
+        sql: "SELECT id FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
@@ -84,6 +85,7 @@ fn a_completed_stream_offers_its_saved_result_for_export() {
     let outcome = super::super::StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT id FROM items".into(),
+        sql: "SELECT id FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
