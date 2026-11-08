@@ -4,6 +4,8 @@ use bookie_core::{
     CatalogObject, CatalogObjectKind, ColumnInfo, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, TableInfo,
 };
 
+type ExclusionScopes = Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>;
+
 struct FakeTx {
     calls: Arc<AtomicUsize>,
 }
@@ -39,7 +41,7 @@ impl Transaction for FakeTx {
 struct CatalogConn {
     calls: Arc<AtomicUsize>,
     fail: bool,
-    exclusion_scopes: Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>,
+    exclusion_scopes: ExclusionScopes,
 }
 
 impl CatalogConn {
@@ -196,7 +198,7 @@ fn catalog_guard_with(
     (guard, calls, audit)
 }
 
-fn catalog_guard_with_scopes(exclusion_scopes: Arc<std::sync::Mutex<Vec<(String, Vec<String>)>>>) -> PolicyGuard {
+fn catalog_guard_with_scopes(exclusion_scopes: ExclusionScopes) -> PolicyGuard {
     PolicyGuard::new(
         Arc::new(CatalogConn {
             calls: Arc::new(AtomicUsize::new(0)),
