@@ -108,7 +108,7 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook.
+- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook. Ctrl+Shift+E exports the front tab's shown rows.
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
 - Import CSV into an existing table, or create a new table from a CSV file. Separator, header row and column mapping are detected and can be changed. The quote character, backslash escaping and file encoding (UTF-8, Windows-1252, UTF-16) can be set.
 - Import accepts Excel `.xlsx` files. The first worksheet with data is read.

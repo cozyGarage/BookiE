@@ -6,6 +6,7 @@ mod diagnostics;
 mod draft_guard;
 mod error_location;
 mod error_navigation;
+mod export_shown;
 mod fold_menu;
 mod statement_failure;
 use error_navigation::{ExecutionSource, SourceAnchor};

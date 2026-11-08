@@ -1113,6 +1113,7 @@ impl SimpleComponent for App {
             AppMsg::ExportJson => self.on_export(ExportFormat::Json),
             AppMsg::ExportAllCsv => self.on_export_all(ExportFormat::Csv),
             AppMsg::ExportAllJson => self.on_export_all(ExportFormat::Json),
+            AppMsg::ExportFrontResults => self.on_export_front_results(),
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsStatement {
                 tab_id,
