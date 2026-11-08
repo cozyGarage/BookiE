@@ -131,7 +131,7 @@ impl BrowseTab {
         prev_button.connect_clicked(move |_| sender_for_prev.input(BrowseTabInput::PrevPage));
         let sender_for_next = sender.clone();
         next_button.connect_clicked(move |_| sender_for_next.input(BrowseTabInput::NextPage));
-        let sender_for_last = sender;
+        let sender_for_last = sender.clone();
         last_button.connect_clicked(move |_| sender_for_last.input(BrowseTabInput::LastPage));
 
         // Paginator lives in a native `gtk::ActionBar` to match the

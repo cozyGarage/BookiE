@@ -3,14 +3,12 @@ use std::collections::HashSet;
 
 use bookie_core::{QueryResult, Value};
 
+#[cfg(test)]
 pub(super) fn sorted_source_indices(result: &QueryResult, column: usize, ascending: bool) -> Option<Vec<usize>> {
     sorted_source_indices_by_keys(result, &[(column, ascending)])
 }
 
-pub(super) fn sorted_source_indices_by_keys(
-    result: &QueryResult,
-    keys: &[(usize, bool)],
-) -> Option<Vec<usize>> {
+pub(super) fn sorted_source_indices_by_keys(result: &QueryResult, keys: &[(usize, bool)]) -> Option<Vec<usize>> {
     if keys.is_empty() {
         return Some((0..result.rows.len()).collect());
     }
@@ -61,12 +59,7 @@ pub(super) fn sorted_source_indices_for_subset_by_keys(
     Ok(order)
 }
 
-fn sort_subset_one_key(
-    result: &QueryResult,
-    column: usize,
-    ascending: bool,
-    source_indices: Vec<usize>,
-) -> Vec<usize> {
+fn sort_subset_one_key(result: &QueryResult, column: usize, ascending: bool, source_indices: Vec<usize>) -> Vec<usize> {
     let sorts_text = source_indices
         .iter()
         .filter_map(|source_index| result.rows.get(*source_index).and_then(|row| row.get(column)))
@@ -268,8 +261,14 @@ mod tests {
     #[test]
     fn local_sort_reverses_a_single_key() {
         let result = result(vec![Value::Int(1), Value::Int(3), Value::Int(2)]);
-        assert_eq!(sorted_source_indices_by_keys(&result, &[(0, true)]), Some(vec![0, 2, 1]));
-        assert_eq!(sorted_source_indices_by_keys(&result, &[(0, false)]), Some(vec![1, 2, 0]));
+        assert_eq!(
+            sorted_source_indices_by_keys(&result, &[(0, true)]),
+            Some(vec![0, 2, 1])
+        );
+        assert_eq!(
+            sorted_source_indices_by_keys(&result, &[(0, false)]),
+            Some(vec![1, 2, 0])
+        );
     }
 
     #[test]
@@ -320,10 +319,7 @@ mod tests {
             sorted_source_indices_by_keys(&result, &[(0, true), (1, false)]),
             Some(vec![1, 2, 0, 3])
         );
-        assert_eq!(
-            sorted_source_indices_by_keys(&result, &[]),
-            Some(vec![0, 1, 2, 3])
-        );
+        assert_eq!(sorted_source_indices_by_keys(&result, &[]), Some(vec![0, 1, 2, 3]));
         assert_eq!(
             sorted_source_indices_for_subset_by_keys(&result, &[(0, true), (1, true)], vec![0, 1, 2, 3]),
             Ok(vec![2, 1, 3, 0])

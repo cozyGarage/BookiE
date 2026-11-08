@@ -199,12 +199,14 @@ impl LocalResultView {
         true
     }
 
+    #[cfg(test)]
     pub(crate) fn clear_filter(&self) {
         self.0.borrow_mut().filter = None;
         self.persist_settings();
         self.rebuild_visible_rows();
     }
 
+    #[cfg(test)]
     pub(crate) fn clear_sort(&self) {
         let column_view = self.0.borrow().column_view.as_ref().and_then(glib::WeakRef::upgrade);
         if let Some(column_view) = column_view {
@@ -237,10 +239,12 @@ impl LocalResultView {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn sort_keys(&self) -> Vec<(usize, bool)> {
         self.0.borrow().sort.clone()
     }
 
+    #[cfg(test)]
     pub(crate) fn sort_by(&self, column: usize, ascending: bool) {
         self.sort_by_keys(&[(column, ascending)]);
     }
@@ -301,7 +305,13 @@ impl LocalResultView {
             let Some(selection) = state.selection.clone() else {
                 return;
             };
-            (state.result.clone(), store, selection, state.filter.clone(), state.sort)
+            (
+                state.result.clone(),
+                store,
+                selection,
+                state.filter.clone(),
+                state.sort.clone(),
+            )
         };
         let selected = selected_source_rows(&store, &selection);
         let order = match filter {
@@ -471,10 +481,7 @@ fn sort_keys_summary(result: &QueryResult, keys: &[(usize, bool)]) -> Option<Str
             format!("{name} {arrow}")
         })
         .collect::<Vec<_>>();
-    Some(
-        crate::tr!("Sorted by {keys}")
-            .replace("{keys}", &parts.join(", ")),
-    )
+    Some(crate::tr!("Sorted by {keys}").replace("{keys}", &parts.join(", ")))
 }
 
 fn filter_summary(visible: u128, loaded: u128, truncated: bool) -> String {

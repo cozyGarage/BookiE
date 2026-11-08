@@ -1,4 +1,6 @@
 use bookie_app_services::{completion, completion_identifiers, completion_proposals};
+mod bookmark_menu;
+mod bookmarks;
 mod bottom_panel;
 mod completion_provider;
 mod completion_requests;
@@ -7,8 +9,6 @@ mod draft_guard;
 mod error_location;
 mod error_navigation;
 mod export_shown;
-mod bookmark_menu;
-mod bookmarks;
 mod fold_menu;
 mod statement_failure;
 use error_navigation::{ExecutionSource, SourceAnchor};
@@ -409,10 +409,7 @@ impl SimpleComponent for SqlEditor {
                     return;
                 };
                 let line = iter.line();
-                if !buffer
-                    .source_marks_at_line(line, Some("sql-fold"))
-                    .is_empty()
-                {
+                if !buffer.source_marks_at_line(line, Some("sql-fold")).is_empty() {
                     folding_for_mark.borrow_mut().unfold_line(&buffer, line);
                     return;
                 }
