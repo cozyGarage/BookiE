@@ -1,6 +1,4 @@
-pub use bookie_app_services::audit_view::{
-    OperationRow, contains_operation, operations, row_needs_attention,
-};
+pub use bookie_app_services::audit_view::{OperationRow, contains_operation, operations, row_needs_attention};
 
 use bookie_policy::{AuditApprovalOutcome, AuditOperationClass, AuditTerminalStatus};
 
