@@ -195,9 +195,21 @@ impl BrowseTab {
         nav_box.append(&next_button);
         nav_box.append(&last_button);
 
+        let sort_status_label = gtk::Label::builder().visible(false).build();
+        sort_status_label.add_css_class("dim-label");
+        sort_status_label.add_css_class("caption");
+        let clear_sort_button = gtk::Button::with_label(&crate::tr!("Clear sort"));
+        clear_sort_button.add_css_class("flat");
+        clear_sort_button.set_visible(false);
+        clear_sort_button.set_tooltip_text(Some(&crate::tr!("Clear column sort")));
+        let sender_for_clear_sort = sender.clone();
+        clear_sort_button.connect_clicked(move |_| sender_for_clear_sort.input(BrowseTabInput::ClearSort));
+
         paginator_bar.pack_start(&insert_button);
         paginator_bar.pack_start(&nav_box);
         paginator_bar.pack_start(&paginator_label);
+        paginator_bar.pack_start(&sort_status_label);
+        paginator_bar.pack_start(&clear_sort_button);
         paginator_bar.pack_start(&selection_label);
         let inspector_button = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-right-symbolic")
@@ -221,6 +233,8 @@ impl BrowseTab {
             filter_button,
             filter_badge,
             paginator_label,
+            sort_status_label,
+            clear_sort_button,
             selection_label,
             selection_count_label,
             selection_details_label,
@@ -444,9 +458,56 @@ impl BrowseTab {
     pub(super) fn update_paginator_label(&self) {
         let Some(result) = self.current_result.as_ref() else {
             self.set_paginator_text("");
+            self.update_sort_status_label();
             return;
         };
         self.set_paginator_text(&paginator_summary(result, self.current_offset, self.current_total_rows));
+        self.update_sort_status_label();
+    }
+
+    pub(super) fn update_sort_status_label(&self) {
+        if self.current_sort_keys.is_empty() {
+            self.sort_status_label.set_visible(false);
+            self.sort_status_label.set_label("");
+            self.clear_sort_button.set_visible(false);
+            return;
+        }
+        let parts = self
+            .current_sort_keys
+            .iter()
+            .map(|&(column, ascending)| {
+                let name = self
+                    .current_columns
+                    .get(column)
+                    .map(|column| column.name.as_str())
+                    .unwrap_or("?");
+                let arrow = if ascending { "↑" } else { "↓" };
+                format!("{name} {arrow}")
+            })
+            .collect::<Vec<_>>();
+        let summary = crate::tr!("Sorted by {keys}").replace("{keys}", &parts.join(", "));
+        self.sort_status_label.set_label(&summary);
+        self.sort_status_label.set_visible(true);
+        self.clear_sort_button.set_visible(true);
+    }
+
+    pub(super) fn apply_local_sort_keys(&self) {
+        if self.current_sort_keys.len() < 2 {
+            return;
+        }
+        let Some(result) = self.current_result.as_ref() else {
+            return;
+        };
+        let Some(selection) = self.current_selection.as_ref() else {
+            return;
+        };
+        let Some(model) = selection.model() else {
+            return;
+        };
+        let Ok(store) = model.downcast::<crate::ui::row_store::RowStore>() else {
+            return;
+        };
+        crate::ui::grid::sort_local_result_by_keys(result, &self.current_sort_keys, &store, selection);
     }
 
     pub(super) fn replace_status_child(&self, name: &str, child: &impl IsA<gtk::Widget>) {
@@ -602,6 +663,8 @@ pub(super) struct Paginator {
     pub(super) filter_button: gtk::Button,
     pub(super) filter_badge: gtk::Label,
     pub(super) paginator_label: gtk::Label,
+    pub(super) sort_status_label: gtk::Label,
+    pub(super) clear_sort_button: gtk::Button,
     pub(super) selection_label: gtk::MenuButton,
     pub(super) selection_count_label: gtk::Label,
     pub(super) selection_details_label: gtk::Label,

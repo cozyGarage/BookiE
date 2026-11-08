@@ -8,16 +8,10 @@ use std::rc::Rc;
 use gtk4 as gtk;
 use gtk4::prelude::*;
 
-use dialog::present;
 pub(super) use dialog::FindTarget;
-pub(super) use query::{FindQuery, RowMatch, matching_rows};
-pub(super) use replace::{ReplaceEdit, ReplaceReport, plan_replacements};
+use dialog::present;
 
-pub(super) fn install(
-    view: &gtk::ColumnView,
-    actions: &gtk::gio::SimpleActionGroup,
-    target: FindTarget,
-) {
+pub(super) fn install(view: &gtk::ColumnView, actions: &gtk::gio::SimpleActionGroup, target: FindTarget) {
     let action = gtk::gio::SimpleAction::new("find-row", None);
     let weak_view = view.downgrade();
     let target = Rc::new(target);

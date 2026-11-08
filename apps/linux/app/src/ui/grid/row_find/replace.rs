@@ -50,7 +50,12 @@ pub(super) fn plan_replacements(
             if query.column.is_some_and(|wanted| wanted != column) {
                 return;
             }
-            match replace_cell(value, editable.get(column).copied().unwrap_or(false), &matcher, replacement) {
+            match replace_cell(
+                value,
+                editable.get(column).copied().unwrap_or(false),
+                &matcher,
+                replacement,
+            ) {
                 CellReplace::Skip => report.skipped = report.skipped.saturating_add(1),
                 CellReplace::None => {}
                 CellReplace::Edit { text, count } => {
@@ -78,7 +83,7 @@ fn replace_cell(value: &Value, editable: bool, matcher: &TextMatcher, replacemen
     if matches!(value, Value::Undecodable(_)) {
         return CellReplace::Skip;
     }
-    let Value::Text(original) | Value::JsonText(original) = value else {
+    let (Value::Text(original) | Value::JsonText(original)) = value else {
         if matcher.matches(&super::super::display::value_to_search_text(value)) {
             return CellReplace::Skip;
         }

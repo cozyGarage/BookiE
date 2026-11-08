@@ -31,9 +31,9 @@ pub enum BrowseTabInput {
     NextPage,
     LastPage,
     SortChanged {
-        col_idx: usize,
-        ascending: bool,
+        keys: Vec<(usize, bool)>,
     },
+    ClearSort,
     PageSizeChanged(u64),
     InsertRow,
     FocusInsertedDraft,

@@ -840,6 +840,7 @@ pub(super) fn build_result_set_widget(
             database,
         },
     );
+    local_result_view.bind_column_view(&column_view);
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     holder.append(&local_result_view.controls());
     holder.append(&crate::ui::grid::wrap_grid_scrolled(&column_view));

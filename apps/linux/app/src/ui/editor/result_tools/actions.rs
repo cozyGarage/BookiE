@@ -20,25 +20,38 @@ use crate::ui::count_format::format_thousands;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
+pub(super) struct ActionWidgets<'a> {
+    pub(super) row: &'a gtk::Box,
+    pub(super) entry: &'a gtk::SearchEntry,
+    pub(super) previous: &'a gtk::Button,
+    pub(super) next: &'a gtk::Button,
+    pub(super) filter: &'a gtk::Button,
+    pub(super) stop: &'a gtk::Button,
+    pub(super) match_case: &'a gtk::ToggleButton,
+    pub(super) whole_words: &'a gtk::ToggleButton,
+    pub(super) regex: &'a gtk::ToggleButton,
+    pub(super) columns: &'a gtk::DropDown,
+}
+
 fn with<T: IsA<gtk::glib::Object>>(weak: &WeakRef<T>, apply: impl FnOnce(&T)) {
     if let Some(widget) = weak.upgrade() {
         apply(&widget);
     }
 }
 
-pub(super) fn connect(
-    tools: &Rc<Tools>,
-    row: &gtk::Box,
-    entry: &gtk::SearchEntry,
-    previous: &gtk::Button,
-    next: &gtk::Button,
-    filter: &gtk::Button,
-    stop: &gtk::Button,
-    match_case: &gtk::ToggleButton,
-    whole_words: &gtk::ToggleButton,
-    regex: &gtk::ToggleButton,
-    columns: &gtk::DropDown,
-) {
+pub(super) fn connect(tools: &Rc<Tools>, widgets: ActionWidgets<'_>) {
+    let ActionWidgets {
+        row,
+        entry,
+        previous,
+        next,
+        filter,
+        stop,
+        match_case,
+        whole_words,
+        regex,
+        columns,
+    } = widgets;
     entry.connect_activate({
         let tools = tools.clone();
         move |_| tools.search(true)
@@ -100,7 +113,12 @@ impl Tools {
                 .is_some_and(|toggle| toggle.is_active()),
             regex: self.controls.regex.upgrade().is_some_and(|toggle| toggle.is_active()),
         };
-        let selected = self.controls.columns.upgrade().map(|columns| columns.selected()).unwrap_or(0);
+        let selected = self
+            .controls
+            .columns
+            .upgrade()
+            .map(|columns| columns.selected())
+            .unwrap_or(0);
         let column = (selected > 0).then(|| selected as usize - 1);
         SearchSpec {
             needle,
@@ -184,9 +202,7 @@ impl Tools {
             let source = self.source.clone();
             let progress = progress.clone();
             std::thread::Builder::new().name("result-find".into()).spawn(move || {
-                let scope = spec
-                    .column
-                    .map_or(ColumnScope::Any, ColumnScope::Column);
+                let scope = spec.column.map_or(ColumnScope::Any, ColumnScope::Column);
                 let predicate = ResultPredicate::Contains {
                     scope,
                     needle: spec.needle,

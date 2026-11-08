@@ -160,42 +160,62 @@ fn replace_ignore_case(text: &str, needle_lower: &str, replacement: &str) -> (St
 }
 
 fn next_ignore_case_span(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
-    let start = find_ignore_case(haystack, needle_lower)?;
-    let end = char_boundary_after(haystack, start, needle_lower.chars().count());
-    Some((start, end))
+    find_ignore_case_span(haystack, needle_lower)
 }
 
-fn char_boundary_after(text: &str, start: usize, chars: usize) -> usize {
-    text[start..]
-        .char_indices()
-        .nth(chars)
-        .map(|(offset, _)| start + offset)
-        .unwrap_or(text.len())
-}
-
-fn find_ignore_case(haystack: &str, needle_lower: &str) -> Option<usize> {
+fn find_ignore_case_span(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
+    if needle_lower.is_empty() {
+        return None;
+    }
     if needle_lower.is_ascii() {
         let needle = needle_lower.as_bytes();
-        if let Some(start) = haystack
+        let direct = haystack
             .as_bytes()
             .windows(needle.len())
             .position(|window| window.eq_ignore_ascii_case(needle))
-            && haystack.is_char_boundary(start)
-        {
-            return Some(start);
-        }
+            .filter(|start| haystack.is_char_boundary(*start))
+            .map(|start| (start, start + needle.len()));
         if haystack.is_ascii() || !haystack.contains(FOLDS_TO_ASCII) {
-            return None;
+            return direct;
         }
+        let folded = find_ignore_case_folded(haystack, needle_lower);
+        return earlier_span(direct, folded);
     }
     find_ignore_case_folded(haystack, needle_lower)
 }
 
-fn find_ignore_case_folded(haystack: &str, needle_lower: &str) -> Option<usize> {
-    let lower = haystack.to_lowercase();
-    let byte = lower.find(needle_lower)?;
-    let chars_before = lower[..byte].chars().count();
-    haystack.char_indices().nth(chars_before).map(|(index, _)| index)
+fn earlier_span(left: Option<(usize, usize)>, right: Option<(usize, usize)>) -> Option<(usize, usize)> {
+    match (left, right) {
+        (Some(left), Some(right)) if left.0 <= right.0 => Some(left),
+        (_, Some(right)) => Some(right),
+        (Some(left), None) => Some(left),
+        (None, None) => None,
+    }
+}
+
+fn find_ignore_case_folded(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
+    let (lower, spans) = lowercase_with_source_spans(haystack);
+    let start = lower.find(needle_lower)?;
+    let end = start + needle_lower.len();
+    let first = spans.iter().find(|span| span.1 > start)?;
+    let last = spans.iter().rev().find(|span| span.0 < end)?;
+    Some((first.2, last.3))
+}
+
+fn lowercase_with_source_spans(text: &str) -> (String, Vec<(usize, usize, usize, usize)>) {
+    let mut lower = String::with_capacity(text.len());
+    let mut spans = Vec::with_capacity(text.chars().count());
+    for (source_start, character) in text.char_indices() {
+        let lower_start = lower.len();
+        lower.extend(character.to_lowercase());
+        spans.push((
+            lower_start,
+            lower.len(),
+            source_start,
+            source_start + character.len_utf8(),
+        ));
+    }
+    (lower, spans)
 }
 
 fn escape_replacement(template: &str) -> String {
@@ -203,7 +223,7 @@ fn escape_replacement(template: &str) -> String {
 }
 
 pub(crate) fn contains_ignore_case(haystack: &str, needle_lower: &str) -> bool {
-    find_ignore_case(haystack, needle_lower).is_some()
+    find_ignore_case_span(haystack, needle_lower).is_some()
 }
 
 const FOLDS_TO_ASCII: [char; 2] = ['\u{0130}', '\u{212A}'];
