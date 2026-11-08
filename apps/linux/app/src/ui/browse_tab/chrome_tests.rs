@@ -228,3 +228,18 @@ fn an_edit_for_a_saved_row_does_not_land_on_a_draft_inserted_at_its_position() {
     pump(&outputs);
     assert!(!controller.model().row_position_still_holds(0, &[Value::Int(1)]));
 }
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn focus_grid_targets_the_current_browse_view() {
+    let (controller, outputs) = launch_tab(false);
+    let window = gtk::Window::builder().child(controller.widget()).build();
+    window.present();
+    load_two_rows(&controller, &outputs);
+    let view = controller.model().current_column_view.clone().unwrap();
+    controller.sender().send(BrowseTabInput::FocusGrid).unwrap();
+    pump(&outputs);
+    let focused = gtk::prelude::RootExt::focus(&window).unwrap();
+    assert!(focused == *view.upcast_ref::<gtk::Widget>() || focused.is_ancestor(&view));
+    window.destroy();
+}

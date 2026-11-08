@@ -92,6 +92,7 @@ pub enum BrowseTabInput {
     GridExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
     Undo,
     Redo,
+    FocusGrid,
     CommitSave,
     PreviewSql,
     DiscardAll,

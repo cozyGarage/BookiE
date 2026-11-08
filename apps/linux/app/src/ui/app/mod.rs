@@ -836,6 +836,18 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source.clone()));
                 self.dispatch_to_editor(tab_id, SqlEditorInput::ResultFlashError(source));
             }
+            AppMsg::FocusActiveGrid => {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusResultGrid);
+                } else if let Some(id) = self.selected_browse_tab_id() {
+                    self.dispatch_to_tab(id, BrowseTabInput::FocusGrid);
+                }
+            }
+            AppMsg::FocusActiveEditor => {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusEditor);
+                }
+            }
             AppMsg::SaveActiveBrowseTab => {
                 if let Some(id) = self.selected_editor_tab_id() {
                     if self.change_trackers.with_tab_ref(id, |tracker| tracker.has_pending()) == Some(true) {

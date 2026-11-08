@@ -235,3 +235,98 @@ fn the_editor_content_fits_the_narrowest_window_with_every_toolbar_button() {
         .unwrap_or(0);
     assert!(widest <= 480, "an editor widget needs {widest}px at minimum");
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn keyboard_shortcuts_move_focus_between_editor_and_result_grid() {
+    let fixture = EditorFixture::new();
+    let window = gtk::Window::builder()
+        .default_width(1000)
+        .default_height(700)
+        .child(fixture.controller.widget())
+        .build();
+    window.present();
+    spin_until(|| fixture.controller.model().source_view.is_mapped());
+    fixture.controller.model().run_button.emit_clicked();
+    let query = fixture.next_query();
+    let column = ColumnInfo {
+        name: "id".into(),
+        data_type: "integer".into(),
+        nullable: false,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let result = QueryResult {
+        columns: vec![column],
+        rows: vec![vec![Value::Int(1)]].into(),
+        truncated: false,
+    };
+    fixture.finish(
+        query,
+        Ok(QueryResultBatch {
+            result_sets: vec![result.clone(), result],
+            truncated: false,
+        }),
+    );
+    let dropdown = descendants(fixture.controller.widget().upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::DropDown>().ok())
+        .find(|d| d.model().is_some_and(|model| model.n_items() == 2))
+        .unwrap();
+    dropdown.set_selected(1);
+    spin_until(|| {
+        descendants(fixture.controller.widget().upcast_ref())
+            .into_iter()
+            .filter_map(|widget| widget.downcast::<adw::ViewStack>().ok())
+            .any(|stack| stack.visible_child_name().as_deref() == Some("set1"))
+    });
+    let result_set_stack = descendants(fixture.controller.widget().upcast_ref())
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<adw::ViewStack>().ok())
+        .find(|stack| stack.visible_child_name().as_deref() == Some("set1"))
+        .unwrap();
+    spin_until(|| {
+        result_set_stack.visible_child().is_some_and(|page| {
+            descendants(&page)
+                .iter()
+                .any(|widget| widget.is::<gtk::ColumnView>() && widget.is_mapped())
+        })
+    });
+    let selected_page = result_set_stack.visible_child().unwrap();
+    let visible_grid = descendants(&selected_page)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::ColumnView>().ok())
+        .find(|widget| widget.is_mapped())
+        .unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Panel(PanelAction::Toggle))
+        .unwrap();
+    spin_until(|| !visible_grid.is_mapped());
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::FocusResultGrid)
+        .unwrap();
+    spin_until(|| visible_grid.is_mapped());
+    spin_until(|| {
+        gtk::prelude::RootExt::focus(&window)
+            .is_some_and(|w| w.is::<gtk::ColumnView>() || w.ancestor(gtk::ColumnView::static_type()).is_some())
+    });
+    assert!(
+        gtk::prelude::RootExt::focus(&window)
+            .is_some_and(|w| w == *visible_grid.upcast_ref::<gtk::Widget>() || w.is_ancestor(&visible_grid))
+    );
+    fixture.controller.sender().send(SqlEditorInput::FocusEditor).unwrap();
+    spin_until(|| {
+        gtk::prelude::RootExt::focus(&window).as_ref() == Some(fixture.controller.model().source_view.upcast_ref())
+    });
+    window.destroy();
+}

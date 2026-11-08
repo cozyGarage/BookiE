@@ -53,6 +53,8 @@ pub enum SqlEditorInput {
         settings: Option<bookie_core::sql_syntax::script::LexicalSettings>,
     },
     Cancel,
+    FocusResultGrid,
+    FocusEditor,
     TogglePin,
     NavigateError(error_navigation::ErrorTarget),
     Panel(bottom_panel::PanelAction),
