@@ -1,3 +1,4 @@
+pub mod highlight_match;
 pub mod result_compare;
 pub mod result_filter;
 pub mod result_find;

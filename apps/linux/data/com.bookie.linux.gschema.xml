@@ -18,6 +18,7 @@
     <key name="editor-font-family" type="s"><default>''</default></key>
     <key name="editor-vim-mode" type="b"><default>false</default></key>
     <key name="null-display" type="s"><default>'standard'</default></key>
+    <key name="date-format" type="s"><default>'iso'</default></key>
     <key name="open-tables-in-preview-tab" type="b"><default>true</default></key>
   </schema>
   <schema id="com.bookie.linux.Devel" path="/com/bookie/linux/Devel/">
@@ -38,6 +39,7 @@
     <key name="editor-font-family" type="s"><default>''</default></key>
     <key name="editor-vim-mode" type="b"><default>false</default></key>
     <key name="null-display" type="s"><default>'standard'</default></key>
+    <key name="date-format" type="s"><default>'iso'</default></key>
     <key name="open-tables-in-preview-tab" type="b"><default>true</default></key>
   </schema>
 </schemalist>

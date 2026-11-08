@@ -3,6 +3,7 @@ mod backup;
 mod browse;
 mod browse_save;
 mod bundle;
+mod catalog_ddl;
 mod connection;
 mod database_switcher;
 mod editor_files;
@@ -545,6 +546,7 @@ impl SimpleComponent for App {
         ));
         crate::ui::theme::apply(preferences.load().theme);
         crate::ui::grid::set_null_display(preferences.load().null_display);
+        crate::ui::grid::set_date_format(preferences.load().date_format);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
             change_trackers,
@@ -937,6 +939,7 @@ impl SimpleComponent for App {
             AppMsg::DropTableSucceeded { origin, schema, table } => {
                 self.on_drop_table_succeeded(origin, schema, table, sender)
             }
+            AppMsg::CatalogDdl(message) => self.dispatch_catalog_ddl(message, sender),
             AppMsg::ExecuteStructureTransaction { tab_id, statements } => {
                 self.on_execute_structure_transaction(tab_id, statements, sender)
             }

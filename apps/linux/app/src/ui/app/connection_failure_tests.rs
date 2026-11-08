@@ -45,6 +45,7 @@ fn forced_connection_failure_dismissal_keeps_the_window_usable() {
             persistence: persistence_stores::PersistenceStores {
                 column_widths: None,
                 filter_settings: None,
+                highlight_settings: None,
                 csv_import_mappings: None,
                 named_filter_presets: None,
             },

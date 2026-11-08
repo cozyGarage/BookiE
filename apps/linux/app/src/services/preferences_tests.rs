@@ -409,6 +409,15 @@ fn the_null_display_survives_a_gsettings_round_trip_and_defaults_to_standard() {
 }
 
 #[test]
+fn the_date_format_survives_a_gsettings_round_trip_and_defaults_to_iso() {
+    let (before, after) = after_a_round_trip("/com/bookie/linux/date-format/", |prefs| {
+        prefs.date_format = DateFormatPref::EuLong;
+    });
+    assert_eq!(before.date_format, DateFormatPref::Iso);
+    assert_eq!(after.date_format, DateFormatPref::EuLong);
+}
+
+#[test]
 fn color_scheme_rows_keys_and_styles_agree() {
     for (position, scheme) in ColorSchemePref::ALL.into_iter().enumerate() {
         assert_eq!(scheme.index() as usize, position);

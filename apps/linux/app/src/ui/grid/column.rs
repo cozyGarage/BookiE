@@ -189,6 +189,7 @@ pub(super) fn build_column(
                 popover.popdown();
             }
             clear_pending_classes(label.upcast_ref());
+            super::highlight_paint::clear_highlight(label.upcast_ref());
             label.reset_property(gtk4::AccessibleProperty::Description);
             label.set_strikethrough(false);
             POSITION_SLOT.take(&label);
@@ -198,12 +199,14 @@ pub(super) fn build_column(
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             checkbox.set_sensitive(false);
             clear_pending_classes(checkbox.upcast_ref());
+            super::highlight_paint::clear_highlight(checkbox.upcast_ref());
             checkbox.reset_property(gtk4::AccessibleProperty::Description);
             checkbox.set_opacity(1.0);
             POSITION_SLOT.take(&checkbox);
             ROW_KEY_SLOT.take(&checkbox);
         } else if let Ok(label) = child.downcast::<gtk4::Label>() {
             clear_pending_classes(label.upcast_ref());
+            super::highlight_paint::clear_highlight(label.upcast_ref());
             label.reset_property(gtk4::AccessibleProperty::Description);
             set_label_strikethrough(&label, false);
             POSITION_SLOT.take(&label);
@@ -312,6 +315,7 @@ fn bind_row_cell(
             (None, Some(value)) => cell_view_with_column_editability(value, column, column_is_editable),
             (None, None) => return,
         };
+        let highlight_rules = context.highlight_rules.as_deref().unwrap_or(&[]);
         bind_cell(
             item,
             view,
@@ -321,7 +325,10 @@ fn bind_row_cell(
                 pk_values: identity.map_or_else(|| Arc::<[Value]>::from([]), |identity| identity.pk_values.clone()),
                 pending_classes,
                 column,
+                column_index: index,
             },
+            row,
+            highlight_rules,
         );
         if let Some(child) = item.child() {
             mark_ambiguous_key(&child, ambiguous);
@@ -420,12 +427,27 @@ struct CellBinding<'a> {
     pk_values: std::sync::Arc<[Value]>,
     pending_classes: Vec<&'static str>,
     column: &'a ColumnInfo,
+    column_index: usize,
 }
 
-fn bind_cell(item: &gtk4::ListItem, view: CellView<'_>, value: Option<&Value>, binding: CellBinding<'_>) {
+fn bind_cell(
+    item: &gtk4::ListItem,
+    view: CellView<'_>,
+    value: Option<&Value>,
+    binding: CellBinding<'_>,
+    row: &crate::ui::row_object::RowObject,
+    highlight_rules: &[bookie_app_services::highlight_match::PreparedHighlightRule],
+) {
     let is_null = view.is_null;
     let inline_editable = binding.editable && view.inline_editable;
     let text = view.text_for_bind(binding.editable);
+    let highlight = super::highlight_paint::paint_for_bound_cell(
+        highlight_rules,
+        binding.column_index,
+        text.as_ref(),
+        is_null,
+        row,
+    );
     let Some(child) = item.child() else { return };
     if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
         bind_editable_label(
@@ -436,11 +458,27 @@ fn bind_cell(item: &gtk4::ListItem, view: CellView<'_>, value: Option<&Value>, b
             inline_editable,
             binding,
             value,
+            highlight,
         );
     } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
-        bind_bool_cell(&checkbox, item.position(), view.checked, inline_editable, binding);
+        bind_bool_cell(
+            &checkbox,
+            item.position(),
+            view.checked,
+            inline_editable,
+            binding,
+            highlight,
+        );
     } else if let Ok(label) = child.downcast::<gtk4::Label>() {
-        bind_readonly_label(&label, item.position(), text.as_ref(), is_null, view.truncated, binding);
+        bind_readonly_label(
+            &label,
+            item.position(),
+            text.as_ref(),
+            is_null,
+            view.truncated,
+            binding,
+            highlight,
+        );
     }
 }
 
@@ -452,6 +490,7 @@ fn bind_editable_label(
     inline_editable: bool,
     binding: CellBinding<'_>,
     value: Option<&Value>,
+    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     IS_NULL_SLOT.set(label, view.is_null);
     label.set_inline_editable(inline_editable);
@@ -464,6 +503,7 @@ fn bind_editable_label(
         view.is_null && (binding.editable || view.auto_filled),
     );
     apply_cell_state(label.upcast_ref(), &binding.pending_classes);
+    super::highlight_paint::apply_highlight(label.upcast_ref(), highlight);
     label.set_strikethrough(binding.pending_classes.contains(&"tp-row-pending-delete"));
     POSITION_SLOT.set(label, position);
     ROW_KEY_SLOT.set(label, binding.pk_values);
@@ -486,6 +526,7 @@ fn bind_bool_cell(
     checked: Option<bool>,
     inline_editable: bool,
     binding: CellBinding<'_>,
+    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     checkbox.set_sensitive(inline_editable);
     SUPPRESS_SLOT.set(checkbox, true);
@@ -493,6 +534,7 @@ fn bind_bool_cell(
     checkbox.set_active(checked.unwrap_or(false));
     SUPPRESS_SLOT.set(checkbox, false);
     apply_cell_state(checkbox.upcast_ref(), &binding.pending_classes);
+    super::highlight_paint::apply_highlight(checkbox.upcast_ref(), highlight);
     checkbox.set_opacity(if binding.pending_classes.contains(&"tp-row-pending-delete") {
         0.5
     } else {
@@ -509,11 +551,13 @@ fn bind_readonly_label(
     is_null: bool,
     truncated: bool,
     binding: CellBinding<'_>,
+    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     label.set_text(text);
     apply_cell_tooltip(label.upcast_ref(), text, is_null, truncated);
     set_class(label.upcast_ref(), "dim-label", is_null);
     apply_cell_state(label.upcast_ref(), &binding.pending_classes);
+    super::highlight_paint::apply_highlight(label.upcast_ref(), highlight);
     set_label_strikethrough(label, binding.pending_classes.contains(&"tp-row-pending-delete"));
     POSITION_SLOT.set(label, position);
     super::editing::sync_readonly_cell_focus(label);
