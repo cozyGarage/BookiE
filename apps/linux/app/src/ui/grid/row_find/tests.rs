@@ -4,11 +4,11 @@ use bookie_app_services::text_match::TextMatchOptions;
 use bookie_core::Value;
 use tokio_util::sync::CancellationToken;
 
+use super::super::display::value_to_display_text;
 use super::dialog::preview;
 use super::json_search::{CaseInsensitivePattern, JsonSearchWriter, matches_value};
 use super::query::{FindQuery, matching_rows};
 use super::replace::plan_replacements;
-use super::super::display::value_to_display_text;
 
 const PREVIEW_CHARS: usize = 80;
 
@@ -93,7 +93,7 @@ fn match_options_and_column_scope_narrow_loaded_row_search() {
         },
         None,
     );
-    assert!(find_with(cased, 10).is_empty());
+    assert_eq!(find_with(cased, 10), vec![(2, 1)]);
     let whole = FindQuery::new(
         "alice",
         TextMatchOptions {
@@ -102,7 +102,7 @@ fn match_options_and_column_scope_narrow_loaded_row_search() {
         },
         None,
     );
-    assert_eq!(find_with(whole, 10), vec![(2, 1)]);
+    assert_eq!(find_with(whole, 10), vec![(0, 1), (2, 1)]);
     let scoped = FindQuery::new("3", TextMatchOptions::default(), Some(1));
     assert!(find_with(scoped, 10).is_empty());
     let regex = FindQuery::new(

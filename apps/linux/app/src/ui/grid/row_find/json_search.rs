@@ -153,4 +153,3 @@ fn prefix_lengths(pattern: &[char]) -> Vec<usize> {
     }
     prefix
 }
-

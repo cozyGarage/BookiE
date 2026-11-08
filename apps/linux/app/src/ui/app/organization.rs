@@ -267,9 +267,7 @@ fn existing_group_path_row(group_row: &adw::EntryRow, paths: &[String]) -> Optio
     if paths.is_empty() {
         return None;
     }
-    let labels: Vec<&str> = std::iter::once("")
-        .chain(paths.iter().map(String::as_str))
-        .collect();
+    let labels: Vec<&str> = std::iter::once("").chain(paths.iter().map(String::as_str)).collect();
     let model = gtk::StringList::new(&labels);
     let dropdown = gtk::DropDown::builder().model(&model).build();
     if let Some(current) = paths.iter().position(|path| path == group_row.text().as_str()) {

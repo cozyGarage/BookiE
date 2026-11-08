@@ -216,16 +216,18 @@ pub(in crate::ui::editor) fn append(target: ToolsTarget<'_>) {
     });
     super::actions::connect(
         &tools,
-        &widgets.find,
-        &widgets.entry,
-        &widgets.previous,
-        &widgets.next,
-        &widgets.filter,
-        &widgets.stop,
-        &widgets.match_case,
-        &widgets.whole_words,
-        &widgets.regex,
-        &widgets.columns,
+        super::actions::ActionWidgets {
+            row: &widgets.find,
+            entry: &widgets.entry,
+            previous: &widgets.previous,
+            next: &widgets.next,
+            filter: &widgets.filter,
+            stop: &widgets.stop,
+            match_case: &widgets.match_case,
+            whole_words: &widgets.whole_words,
+            regex: &widgets.regex,
+            columns: &widgets.columns,
+        },
     );
     header.append(&widgets.find);
     header.append(&widgets.actions);

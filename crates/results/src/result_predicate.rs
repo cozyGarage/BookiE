@@ -19,8 +19,14 @@ pub enum ResultPredicate {
         needle: String,
         options: TextMatchOptions,
     },
-    Equals { column: usize, value: Value },
-    NotEquals { column: usize, value: Value },
+    Equals {
+        column: usize,
+        value: Value,
+    },
+    NotEquals {
+        column: usize,
+        value: Value,
+    },
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -47,10 +53,7 @@ pub struct PreparedPredicate {
 
 #[derive(Clone, Debug)]
 enum PreparedKind {
-    Contains {
-        scope: ColumnScope,
-        matcher: TextMatcher,
-    },
+    Contains { scope: ColumnScope, matcher: TextMatcher },
     Equals { column: usize, value: Value },
     NotEquals { column: usize, value: Value },
 }
@@ -58,11 +61,7 @@ enum PreparedKind {
 impl ResultPredicate {
     pub fn prepare(self, column_count: usize) -> Result<PreparedPredicate, PredicateError> {
         let kind = match self {
-            Self::Contains {
-                scope,
-                needle,
-                options,
-            } => prepare_contains(scope, needle, options, column_count)?,
+            Self::Contains { scope, needle, options } => prepare_contains(scope, needle, options, column_count)?,
             Self::Equals { column, value } => PreparedKind::Equals {
                 column: checked_column(column, column_count)?,
                 value: comparable_value(value)?,
