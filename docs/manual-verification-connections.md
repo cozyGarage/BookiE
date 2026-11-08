@@ -21,8 +21,8 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Connection list
 
-- [ ] Connections are grouped, with one section per group and an ungrouped section.
-- [ ] A group that appears twice in the ordering still renders one section.
+- [ ] Connections are grouped. Nested paths such as `Prod / EU` show as a hierarchy; each folder can collapse and expand. Ungrouped connections stay in their own section.
+- [ ] A nested path that appears twice still renders one folder at each level.
 - [ ] The colour swatch shows on a tagged row and the picker sets it.
 - [ ] After connecting to a tagged connection, the workspace tab strip shows its colour. Changing or clearing the tag updates the strip, and disconnecting clears it.
 - [ ] With Orca, open Group and tags, navigate to Colour, open the named button, choose a palette colour, and confirm the selected colour is announced and saved. Sidebar table search and the saved-filter name field announce their purpose.

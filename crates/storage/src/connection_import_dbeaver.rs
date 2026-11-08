@@ -4,14 +4,13 @@ use serde::Deserialize;
 use serde::de::IgnoredAny;
 
 use crate::connection_import_peer::{PeerImport, PeerPort, field, port, refused, skipped_label};
+use crate::connection_organization::{MAX_GROUP_DEPTH, join_group_path};
 use crate::connection_url::{draft_connection, validate_host};
 use crate::connections::SavedConnection;
 use crate::error::StorageError;
 
 pub const MAX_DBEAVER_BYTES: usize = 4 * 1024 * 1024;
 const MAX_DBEAVER_CONNECTIONS: usize = 1_000;
-
-const MAX_FOLDER_DEPTH: usize = 8;
 
 #[derive(Deserialize)]
 struct Sources {
@@ -129,7 +128,7 @@ fn group_name(folders: &Folders, folder: &str) -> Option<String> {
     let mut top = *segments.first()?;
     let mut seen = vec![top];
     let mut ancestors: Vec<&str> = Vec::new();
-    while ancestors.len() + segments.len() < MAX_FOLDER_DEPTH {
+    while ancestors.len() + segments.len() < MAX_GROUP_DEPTH {
         let parent = parent_of(folders, top);
         if parent.is_empty() || seen.contains(&parent) {
             break;
@@ -140,8 +139,9 @@ fn group_name(folders: &Folders, folder: &str) -> Option<String> {
     }
     ancestors.reverse();
     ancestors.extend(segments);
-    let start = ancestors.len().saturating_sub(MAX_FOLDER_DEPTH);
-    Some(ancestors[start..].join(" / "))
+    let start = ancestors.len().saturating_sub(MAX_GROUP_DEPTH);
+    let levels: Vec<String> = ancestors[start..].iter().map(|segment| (*segment).to_owned()).collect();
+    join_group_path(&levels)
 }
 
 fn draft_from(peer: &PeerConnection) -> Option<SavedConnection> {

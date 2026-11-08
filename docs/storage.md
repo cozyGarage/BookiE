@@ -45,7 +45,7 @@ graph TD
 | Hidden columns, column order | JSON | `$XDG_CONFIG_HOME/bookie/hidden_columns.json`, `$XDG_CONFIG_HOME/bookie/column_order.json` |
 | Named filter presets | JSON | `$XDG_CONFIG_HOME/bookie/named_filter_presets.json` |
 | CSV import column mappings | JSON | `$XDG_CONFIG_HOME/bookie/csv_import_mappings.json` |
-| Connection organization (groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/bookie/connection-organization.json` |
+| Connection organization (nested groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/bookie/connection-organization.json` |
 | Query favorites | Versioned JSON | `$XDG_CONFIG_HOME/bookie/favorites.json` |
 | Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/bookie/history.db` |
 | Policy | TOML | `$XDG_CONFIG_HOME/bookie/policy.toml` |

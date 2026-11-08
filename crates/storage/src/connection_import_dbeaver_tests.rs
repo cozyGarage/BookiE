@@ -146,7 +146,7 @@ fn a_nested_folder_becomes_one_flattened_group() {
 fn a_cyclic_folder_chain_is_bounded() {
     let import = parse_dbeaver_data_sources(FOLDERS).unwrap();
     let group = group_of(&import, "Cyclic").unwrap();
-    assert!(group.split(" / ").count() <= MAX_FOLDER_DEPTH, "{group}");
+    assert!(group.split(" / ").count() <= MAX_GROUP_DEPTH, "{group}");
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn a_folder_path_deeper_than_the_limit_keeps_the_innermost_levels() {
     let path = (1..=12).map(|level| format!("s{level}")).collect::<Vec<_>>().join("/");
     let group = group_for("{}", &path).unwrap();
     let levels: Vec<&str> = group.split(" / ").collect();
-    assert_eq!(levels.len(), MAX_FOLDER_DEPTH, "{group}");
+    assert_eq!(levels.len(), MAX_GROUP_DEPTH, "{group}");
     assert_eq!((levels[0], levels[levels.len() - 1]), ("s5", "s12"));
 }
 

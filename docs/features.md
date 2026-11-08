@@ -31,7 +31,8 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - The sidebar Catalog group lists functions, procedures and triggers (and the other catalog kinds the engine supports). Click a kind to load its objects under it, up to 200 shown; schemas hidden in the sidebar filter stay hidden. Click an object, or "Show all in Catalog…", to open the Catalog dialog on that kind.
 - A connection can be filled from a URL such as `postgres://user@host:5432/db`.
 - Connections can be exported and imported. An export encrypted with a passphrase includes stored credentials. A plaintext export contains none.
-- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app (Redis Desktop Manager) `connections.json` and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver folders become a connection group when present.
+- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app (Redis Desktop Manager) `connections.json` and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver and DataGrip folders become nested connection groups when present.
+- Saved connections can live in nested groups (for example `Prod / EU`). The welcome list shows the hierarchy and can collapse or expand each folder. Organisation stays in the local sidecar beside `connections.json`; connection files never gain secrets.
 
 ## Browse and edit tables
 
