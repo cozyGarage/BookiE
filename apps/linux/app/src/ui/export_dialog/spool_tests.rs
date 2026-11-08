@@ -41,7 +41,7 @@ fn fixture() -> (
         });
         runtime.block_on(spool.append_page(index as u64, result)).unwrap();
     }
-    let run = Arc::new(move |future: crate::services::export_pages::PageFuture| runtime.block_on(future));
+    let run = Arc::new(move |future: bookie_app_services::export_pages::PageFuture| runtime.block_on(future));
     (spool, columns, run)
 }
 

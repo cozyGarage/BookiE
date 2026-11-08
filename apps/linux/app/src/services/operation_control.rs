@@ -1,7 +1,7 @@
 use crate::services::preferences::PreferencesStore;
 
 pub use bookie_app_services::operation_control::{
-    MAX_QUERY_TIMEOUT_SECS, bounded, bounded_with, deadline_for, longer_timeout_secs,
+    MAX_QUERY_TIMEOUT_SECS, bounded, bounded_with, longer_timeout_secs,
 };
 
 pub fn configured_timeout_secs(preferences: &PreferencesStore) -> u32 {

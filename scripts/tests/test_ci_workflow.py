@@ -506,9 +506,7 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED:
             for state in ["failure", "skipped", "cancelled", "missing"]:
                 results = success | {name: {"result": state}}
-                deferred = (name in checker.MERGE_ONLY or name in checker.PULL_REQUEST_ONLY) and state == "skipped"
-                expected = [] if deferred else [name]
-                self.assertEqual(checker.assess(results, "push")[0], expected, (name, state))
+                self.assertEqual(checker.assess(results, "push")[0], [name], (name, state))
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED | {checker.SCHEDULED})
 
     def test_only_pull_request_runs_are_cancelled_when_a_newer_run_starts(self):
@@ -516,35 +514,36 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
         self.assertNotIn("event_name == 'push' }}", workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0])
 
-    def test_push_and_pull_request_may_defer_only_the_merge_tier_jobs(self):
+    def test_push_and_pull_request_require_every_regression_job(self):
+        self.assertEqual(checker.MERGE_ONLY, set())
+        self.assertEqual(checker.PULL_REQUEST_ONLY, set())
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         for name in checker.REQUIRED:
             results = success | {name: {"result": "skipped"}}
-            pr_expected = [] if name in checker.MERGE_ONLY else [name]
-            push_expected = [] if name in checker.MERGE_ONLY or name in checker.PULL_REQUEST_ONLY else [name]
-            self.assertEqual(checker.assess(results, "pull_request")[0], pr_expected, name)
-            self.assertEqual(checker.assess(results, "push")[0], push_expected, name)
-        for name in checker.MERGE_ONLY:
-            results = success | {name: {"result": "skipped"}}
-            self.assertEqual(checker.assess(results, "schedule")[0], [name], name)
+            self.assertEqual(checker.assess(results, "pull_request")[0], [name], name)
+            self.assertEqual(checker.assess(results, "push")[0], [name], name)
         results = success | {"driver-tls": {"result": "skipped"}}
         self.assertEqual(checker.assess(results, "pull_request")[0], ["driver-tls"])
-        self.assertEqual(checker.assess(results, "push")[0], [])
+        self.assertEqual(checker.assess(results, "push")[0], ["driver-tls"])
 
-    def test_the_workflow_runs_merge_tier_jobs_only_on_schedule_or_dispatch(self):
+    def test_only_current_stable_clippy_is_schedule_or_dispatch_only(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        guarded = set(
-            re.findall(
-                r"^  ([a-z0-9-]+):\n    if: github.event_name == 'schedule' \|\| github.event_name == 'workflow_dispatch'\n",
-                workflow,
-                re.M,
+        guarded = set()
+        for match in re.finditer(r"^  ([a-z0-9-]+):\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S):
+            header = match.group(2).split("\n    steps:\n", 1)[0]
+            if re.search(
+                r"(?m)^    if: github.event_name == 'schedule' \|\| github.event_name == 'workflow_dispatch'\s*$",
+                header,
+            ):
+                guarded.add(match.group(1))
+        self.assertEqual(guarded, {checker.SCHEDULED})
+        for name in ["gtk-safety", "integration", "b4-rollback", "driver-tls", "postgres-release"]:
+            section = re.search(rf"^  {name}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+            self.assertNotRegex(
+                section.split("\n    steps:\n", 1)[0],
+                r"(?m)^    if: ",
+                name,
             )
-        )
-        self.assertEqual(guarded, checker.MERGE_ONLY)
-        self.assertIn(
-            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
-            workflow.split("  current-stable-clippy:\n", 1)[1].split("  integration:\n", 1)[0],
-        )
 
     def test_github_docker_hub_jobs_authenticate_when_secrets_exist(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -601,12 +600,15 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         focused = workflow.split("  b4-rollback:\n", 1)[1].split("  driver-tls:\n", 1)[0]
         for required in [
-            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
             "prefix-key: linux-integration",
             "run-test-layer.py b4-rollback",
             "regression-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}",
         ]:
             self.assertIn(required, focused)
+        self.assertNotIn(
+            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+            focused.split("\n    steps:\n", 1)[0],
+        )
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         self.assertIn("needs: [pin-revision, b4-rollback]", integration)
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
