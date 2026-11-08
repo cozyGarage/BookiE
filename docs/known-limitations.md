@@ -41,7 +41,7 @@ This page describes user-visible behavior and limits in the current source. Curr
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles. The activity dialog is a plain result grid; it does not provide a typed activity console.
 - Server messages such as NOTICE and PRINT are not displayed. Query timing shows elapsed time only.
 - A foreign-key value picker and estimated row counts are unavailable. Go to Referenced Row, enum/set pickers and tab-separated row paste are available.
-- PostgreSQL schemas can be hidden from the sidebar per connection ([#580](https://github.com/cozyGarage/BookiE/issues/580)). This display filter does not reduce catalog query work.
+- PostgreSQL schema hiding is a per-connection GUI visibility preference ([#580](https://github.com/cozyGarage/BookiE/issues/580)). GUI catalog queries exclude hidden schemas before returning table, view and object lists, but the PostgreSQL catalog scan has no measured large-catalog latency or GTK-stall bound yet. The standalone MCP bridge does not receive the GUI's hidden-schema set; database-role privileges still govern the objects it can list.
 - Database snapshots and one-click rollback are unavailable ([ADR 0015](decisions/0015-database-snapshots.md)). PostgreSQL logical backup and restore use the installed `pg_dump` and `pg_restore` tools; see the [user guide](user-guide.md#back-up-and-restore-postgresql). They are not point-in-time snapshots.
 
 ## Platforms and packaging
