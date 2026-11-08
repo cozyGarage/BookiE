@@ -40,6 +40,7 @@ unicode-width.workspace = true
 
 [dev-dependencies]
 secrecy.workspace = true
+tracing-subscriber.workspace = true
 async-trait.workspace = true
 bookie-driver-postgres = { path = "../drivers/postgres" }
 bookie-driver-mysql = { path = "../drivers/mysql" }
