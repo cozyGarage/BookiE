@@ -875,6 +875,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::bookmark_shortcut_from_the_secondary_pane_scrolls_that_pane_to_the_target"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::dispatch_tests::bookmark_shortcut_from_the_primary_pane_scrolls_that_pane_to_the_target"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::bookmarks::tests::toggle_jump_and_clear_move_source_marks_with_the_cursor"
     ],
     [

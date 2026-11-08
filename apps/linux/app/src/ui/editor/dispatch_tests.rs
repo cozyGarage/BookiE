@@ -17,7 +17,7 @@ use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use super::{SqlEditor, SqlEditorInit, SqlEditorInput};
+use super::{SqlEditor, SqlEditorInit, SqlEditorInput, bookmarks};
 use crate::services::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
 
 struct PendingQuery {
@@ -298,6 +298,66 @@ fn parameter_response() -> SqlEditorInput {
         },
         values: [("value".into(), Value::Int(2))].into(),
     }
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn bookmark_shortcut_from_the_secondary_pane_scrolls_that_pane_to_the_target() {
+    assert_bookmark_shortcut_scrolls_originating_pane(true);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn bookmark_shortcut_from_the_primary_pane_scrolls_that_pane_to_the_target() {
+    assert_bookmark_shortcut_scrolls_originating_pane(false);
+}
+
+fn assert_bookmark_shortcut_scrolls_originating_pane(secondary_pane: bool) {
+    let fixture = EditorFixture::new();
+    let (buffer, target_view) = {
+        let model = fixture.controller.model();
+        let buffer = model.source_view.buffer().downcast::<sourceview5::Buffer>().unwrap();
+        model.split_view.set_visible(true);
+        let target_view = if secondary_pane {
+            model.split_view.secondary_view().clone()
+        } else {
+            model.source_view.clone()
+        };
+        (buffer, target_view)
+    };
+    let query = (0..200)
+        .map(|line| format!("SELECT {line};"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    buffer.set_text(&query);
+    buffer.create_source_mark(None, bookmarks::CATEGORY, &buffer.iter_at_line(180).unwrap());
+    buffer.place_cursor(&buffer.start_iter());
+
+    let window = gtk::Window::builder()
+        .default_width(900)
+        .default_height(400)
+        .child(fixture.controller.widget())
+        .build();
+    window.present();
+    spin_until(|| target_view.is_mapped() && target_view.height() > 0);
+    assert!(target_view.grab_focus());
+    spin_until(|| target_view.has_focus());
+    let target_scroll = target_view.vadjustment().unwrap();
+    target_scroll.set_value(0.0);
+    let initial_scroll = target_scroll.value();
+
+    fixture.shortcut("<Primary><Shift>Down", secondary_pane);
+
+    spin_until(|| buffer.iter_at_mark(&buffer.get_insert()).line() == 180);
+    spin_until(|| target_scroll.value() > initial_scroll);
+
+    buffer.place_cursor(&buffer.iter_at_line(199).unwrap());
+    target_scroll.set_value(initial_scroll);
+    fixture.shortcut("<Primary><Shift>Up", secondary_pane);
+
+    spin_until(|| buffer.iter_at_mark(&buffer.get_insert()).line() == 180);
+    spin_until(|| target_scroll.value() > initial_scroll);
+    window.close();
 }
 
 #[test]

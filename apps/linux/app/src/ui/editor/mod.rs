@@ -60,6 +60,12 @@ use streaming::ActiveStream;
 use crate::services::database_service::ConnectionMetadata;
 use crate::ui::grid::GridMsg;
 
+#[derive(Clone, Copy, Debug)]
+pub(super) enum EditorPane {
+    Primary,
+    Secondary,
+}
+
 pub use completion::{SchemaIndex, SchemaRequest};
 pub(crate) use completion_identifiers::catalog_reference;
 pub use schema::derive_tab_label;
@@ -473,8 +479,8 @@ impl SimpleComponent for SqlEditor {
             sender.clone(),
             refresh_completion,
         );
-        split_view::install_shortcuts(&widgets.source_view, &sender);
-        split_view::install_shortcuts(split_view.secondary_view(), &sender);
+        split_view::install_shortcuts(&widgets.source_view, &sender, EditorPane::Primary);
+        split_view::install_shortcuts(split_view.secondary_view(), &sender, EditorPane::Secondary);
         split_view::install_drop_target(&widgets.source_view, &sender, &drop_generation);
         split_view::install_drop_target(split_view.secondary_view(), &sender, &drop_generation);
 
@@ -786,9 +792,13 @@ impl SimpleComponent for SqlEditor {
                 }
             }
 
-            SqlEditorInput::JumpBookmark { forward } => {
+            SqlEditorInput::JumpBookmark { forward, pane } => {
                 if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
-                    bookmarks::jump(&self.source_view, &buffer, forward);
+                    let view = match pane {
+                        EditorPane::Primary => &self.source_view,
+                        EditorPane::Secondary => self.split_view.secondary_view(),
+                    };
+                    bookmarks::jump(view, &buffer, forward);
                 }
             }
 

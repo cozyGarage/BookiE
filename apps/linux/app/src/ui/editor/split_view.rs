@@ -2,7 +2,7 @@ use relm4::gtk::prelude::*;
 use relm4::{ComponentSender, gtk};
 use sourceview5::prelude::*;
 
-use super::{DropGeneration, SqlEditor, SqlEditorInput};
+use super::{DropGeneration, EditorPane, SqlEditor, SqlEditorInput};
 
 pub(crate) struct SplitEditorView {
     paned: gtk::Paned,
@@ -80,7 +80,7 @@ impl SplitEditorView {
     }
 }
 
-pub(crate) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSender<SqlEditor>) {
+pub(super) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSender<SqlEditor>, pane: EditorPane) {
     let shortcuts: [EditorShortcut; 8] = [
         ("<Primary>Return", || SqlEditorInput::Run),
         ("Escape", || SqlEditorInput::Cancel),
@@ -122,7 +122,7 @@ pub(crate) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSend
             gtk::Shortcut::builder()
                 .trigger(&crate::ui::shortcut::parse(trigger))
                 .action(&gtk::CallbackAction::new(move |_, _| {
-                    sender.input(SqlEditorInput::JumpBookmark { forward });
+                    sender.input(SqlEditorInput::JumpBookmark { forward, pane });
                     gtk::glib::Propagation::Stop
                 }))
                 .build(),
