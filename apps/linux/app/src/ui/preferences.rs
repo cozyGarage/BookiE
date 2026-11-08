@@ -165,8 +165,27 @@ pub fn present(
         }
     });
 
+    let invisibles_row = adw::SwitchRow::builder()
+        .title(crate::tr!("Mark spaces, tabs and line breaks"))
+        .subtitle(crate::tr!(
+            "Show whitespace marks in the full-value editor. Copy and save keep the exact text."
+        ))
+        .active(current.show_invisible_characters)
+        .build();
+    invisibles_row.connect_active_notify({
+        let preferences = preferences.clone();
+        move |row| {
+            let show = row.is_active();
+            crate::ui::grid::full_value_editor::set_show_invisible_characters(show);
+            if let Err(error) = preferences.update(|prefs| prefs.show_invisible_characters = show) {
+                tracing::warn!(%error, "preferences: show invisible characters rejected");
+            }
+        }
+    });
+
     browse_group.add(&null_row);
     browse_group.add(&date_row);
+    browse_group.add(&invisibles_row);
     browse_group.add(&page_size_row);
     browse_group.add(&confirm_row);
     browse_group.add(&preview_tab_row);

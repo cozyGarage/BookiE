@@ -1,5 +1,6 @@
 use super::*;
 use futures::FutureExt;
+use sourceview5::prelude::*;
 
 #[test]
 fn text_payload_preserves_empty_and_multiline_values_exactly() {
@@ -275,6 +276,57 @@ fn invalid_json_stages_nothing_and_valid_apply_keeps_json_typed() {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn the_value_editor_marks_whitespace_only_when_preferences_ask() {
+    gtk::init().unwrap();
+    adw::init().unwrap();
+    let parent = adw::Window::new();
+    parent.present();
+    let (sender, _receiver) = relm4::channel::<super::super::GridMsg>();
+    set_show_invisible_characters(true);
+    let dialog = present(
+        &parent,
+        "notes",
+        "a b\tc\n",
+        EditContext {
+            row_position: 0,
+            col_index: 0,
+            row_key: vec![Value::Int(1)],
+            nullable: true,
+            kind: FullValueKind::Text,
+            sender,
+        },
+    );
+    let view = source_view(dialog.child().unwrap().upcast_ref());
+    let drawer = view.space_drawer();
+    let types = sourceview5::SpaceTypeFlags::SPACE
+        | sourceview5::SpaceTypeFlags::TAB
+        | sourceview5::SpaceTypeFlags::NEWLINE
+        | sourceview5::SpaceTypeFlags::NBSP;
+    assert!(drawer.enables_matrix());
+    for location in [
+        sourceview5::SpaceLocationFlags::LEADING,
+        sourceview5::SpaceLocationFlags::INSIDE_TEXT,
+        sourceview5::SpaceLocationFlags::TRAILING,
+    ] {
+        assert_eq!(drawer.types_for_locations(location), types);
+    }
+    let before = view
+        .buffer()
+        .text(&view.buffer().start_iter(), &view.buffer().end_iter(), true);
+    set_show_invisible_characters(false);
+    assert!(!drawer.enables_matrix());
+    let after = view
+        .buffer()
+        .text(&view.buffer().start_iter(), &view.buffer().end_iter(), true);
+    assert_eq!(before.as_str(), "a b\tc\n");
+    assert_eq!(after.as_str(), "a b\tc\n");
+    set_show_invisible_characters(true);
+    assert!(drawer.enables_matrix());
+    parent.close();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn set_null_stages_null_and_cancel_stages_nothing() {
     gtk::init().unwrap();
     adw::init().unwrap();
@@ -334,6 +386,13 @@ fn text_view(root: &gtk::Widget) -> gtk::TextView {
     descendants(root)
         .into_iter()
         .find_map(|widget| widget.downcast::<gtk::TextView>().ok())
+        .unwrap()
+}
+
+fn source_view(root: &gtk::Widget) -> sourceview5::View {
+    descendants(root)
+        .into_iter()
+        .find_map(|widget| widget.downcast::<sourceview5::View>().ok())
         .unwrap()
 }
 

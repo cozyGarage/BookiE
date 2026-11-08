@@ -23,6 +23,8 @@ pub struct Preferences {
     pub null_display: NullDisplayPref,
     #[serde(default)]
     pub date_format: DateFormatPref,
+    #[serde(default = "default_show_invisible_characters")]
+    pub show_invisible_characters: bool,
     #[serde(default = "default_open_tables_in_preview_tab")]
     pub open_tables_in_preview_tab: bool,
 }
@@ -210,6 +212,10 @@ fn default_open_tables_in_preview_tab() -> bool {
     true
 }
 
+fn default_show_invisible_characters() -> bool {
+    true
+}
+
 impl Default for Preferences {
     fn default() -> Self {
         Self {
@@ -225,6 +231,7 @@ impl Default for Preferences {
             editor_vim_mode: false,
             null_display: NullDisplayPref::default(),
             date_format: DateFormatPref::default(),
+            show_invisible_characters: default_show_invisible_characters(),
             open_tables_in_preview_tab: default_open_tables_in_preview_tab(),
         }
     }
@@ -283,5 +290,13 @@ mod tests {
             serde_json::from_str(r#"{"default_page_size":50,"confirm_destructive":true,"editor_font_size":12}"#)
                 .unwrap();
         assert_eq!(parsed.color_scheme, ColorSchemePref::System);
+    }
+
+    #[test]
+    fn an_old_preferences_file_marks_spaces_tabs_and_line_breaks_by_default() {
+        let parsed: Preferences =
+            serde_json::from_str(r#"{"default_page_size":1000,"confirm_destructive":true,"editor_font_size":12}"#)
+                .unwrap();
+        assert!(parsed.show_invisible_characters);
     }
 }
