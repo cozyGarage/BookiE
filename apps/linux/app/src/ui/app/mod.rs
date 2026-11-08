@@ -547,6 +547,7 @@ impl SimpleComponent for App {
         crate::ui::theme::apply(preferences.load().theme);
         crate::ui::grid::set_null_display(preferences.load().null_display);
         crate::ui::grid::set_date_format(preferences.load().date_format);
+        crate::ui::grid::full_value_editor::set_show_invisible_characters(preferences.load().show_invisible_characters);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
             change_trackers,
@@ -1113,6 +1114,7 @@ impl SimpleComponent for App {
             AppMsg::ExportJson => self.on_export(ExportFormat::Json),
             AppMsg::ExportAllCsv => self.on_export_all(ExportFormat::Csv),
             AppMsg::ExportAllJson => self.on_export_all(ExportFormat::Json),
+            AppMsg::ExportFrontResults => self.on_export_front_results(),
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsStatement {
                 tab_id,

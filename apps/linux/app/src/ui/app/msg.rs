@@ -196,6 +196,7 @@ pub enum AppMsg {
     ExportJson,
     ExportAllCsv,
     ExportAllJson,
+    ExportFrontResults,
     ExportResults {
         scope: crate::ui::export_dialog::ExportScope,
         result: std::sync::Arc<QueryResult>,
