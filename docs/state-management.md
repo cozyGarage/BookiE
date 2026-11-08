@@ -4,6 +4,8 @@ The `bookie-app` crate (`apps/linux/app`) uses [Relm4](https://relm4.org) on top
 
 GTK-free service modules live in `bookie-app-services` under [ADR 0018](decisions/0018-headless-app-services-crate.md). The app re-exports those modules from `services` so callers keep their paths. What remains under `apps/linux/app/src/services/` is shell-owned: GTK / glib / gio / Relm4 / gettext adapters, `DatabaseService` composition, and thin re-exports.
 
+Multi-session window membership, tab↔connection maps, front-session selection, close/save aggregation and the open-sessions restore shape live in `bookie-app-services::window_sessions` ([ADR 0040](decisions/0040-multi-session-window-workspace.md)). Live connections in that model are `PolicyGuard` handles only. Relm4 owns tab chrome and dialogs; it must not keep a second source of truth for which tab belongs to which connection. GTK multi-connection chrome is [#2499](https://github.com/cozyGarage/BookiE/issues/2499).
+
 Change and structure tracker registries live in `app-services`. Each GTK window owns its change and structure tracker registries and shares them with its tabs, grid and close handlers.
 
 Scoped filter presets and import mappings, preference data, quick-switcher ranking and reconnect classification/backoff also live in app-services. GSettings access, style application, translated labels, registered actions and connection-monitor runtime wiring stay in the app.
