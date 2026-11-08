@@ -350,6 +350,13 @@ fn assert_bookmark_shortcut_scrolls_originating_pane(secondary_pane: bool) {
 
     spin_until(|| buffer.iter_at_mark(&buffer.get_insert()).line() == 180);
     spin_until(|| target_scroll.value() > initial_scroll);
+
+    buffer.place_cursor(&buffer.iter_at_line(199).unwrap());
+    target_scroll.set_value(initial_scroll);
+    fixture.shortcut("<Primary><Shift>Up", secondary_pane);
+
+    spin_until(|| buffer.iter_at_mark(&buffer.get_insert()).line() == 180);
+    spin_until(|| target_scroll.value() > initial_scroll);
     window.close();
 }
 
