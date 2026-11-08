@@ -464,13 +464,7 @@ impl SqlEditor {
         );
         let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
         holder.append(&local_result_view.controls());
-        holder.append(
-            &gtk::ScrolledWindow::builder()
-                .child(&column_view)
-                .hexpand(true)
-                .vexpand(true)
-                .build(),
-        );
+        holder.append(&crate::ui::grid::wrap_grid_scrolled(&column_view));
         (column_view, selection, holder)
     }
 

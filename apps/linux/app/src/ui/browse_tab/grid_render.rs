@@ -274,6 +274,7 @@ impl BrowseTab {
             filters_unavailable: !self.browse_filters,
             choices: self.choice_labels.clone(),
             ambiguous_keys: self.ambiguous_keys.clone(),
+            row_number_base: self.current_offset,
         };
         let (column_view, selection) = build_column_view(
             &result,
@@ -339,11 +340,7 @@ impl BrowseTab {
         // while the tracker still holds them, leading to confused state.
         self.reprepend_drafts();
 
-        let scrolled = gtk::ScrolledWindow::builder()
-            .child(&column_view)
-            .hexpand(true)
-            .vexpand(true)
-            .build();
+        let scrolled = crate::ui::grid::wrap_grid_scrolled(&column_view);
         self.grid_holder.append(&scrolled);
         self.refresh_grid_chrome();
         self.restore_focused_row();

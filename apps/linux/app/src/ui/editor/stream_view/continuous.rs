@@ -119,13 +119,7 @@ fn start_view(
         });
         container.append(&status);
         container.append(&retry);
-        container.append(
-            &gtk::ScrolledWindow::builder()
-                .child(&view)
-                .hexpand(true)
-                .vexpand(true)
-                .build(),
-        );
+        container.append(&crate::ui::grid::wrap_grid_scrolled(&view));
     });
 }
 

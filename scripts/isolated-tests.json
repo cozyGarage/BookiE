@@ -1555,6 +1555,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::row_number_tests::browse_offset_shifts_the_leading_row_numbers"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::row_number_tests::result_grids_number_rows_from_one_and_keep_the_gutter_after_horizontal_scroll"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::value_viewer::tests::the_viewer_dialog_shows_a_preview_and_copies_the_full_value"
     ],
     [
