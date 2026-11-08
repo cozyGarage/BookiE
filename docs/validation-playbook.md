@@ -201,6 +201,20 @@ Disposition: confirmed framework-specific false positives from the web CSS analy
 
 CI is split into fast feedback and slower integration or acceptance checks. Read [AGENTS.md](../AGENTS.md) for current requirements. A pull request is ready only when its required checks pass at the current head SHA. Skipped, cancelled, timed-out or unavailable checks are not passes. Scheduled runs and local results can add evidence, but do not replace a required check on the reviewed commit.
 
+### Build Linux
+
+[`build-linux.yml`](../.github/workflows/build-linux.yml) pins the tested revision, then runs the required regression jobs on every pull request and every push to `linux` or `main` (docs-only path filters still skip the whole workflow). `scripts/check-ci-jobs.py` accepts a skipped required job only for `current-stable-clippy` on push and pull_request.
+
+| Job | Runs on |
+|---|---|
+| `pin-revision`, `ensure-ci-gtk-image`, `preflight`, `fast` | pull_request, push, schedule, workflow_dispatch |
+| `gtk-safety`, `b4-rollback`, `integration`, `driver-tls`, `postgres-release` | pull_request, push, schedule, workflow_dispatch |
+| `reusable-test-builds` | push, schedule, workflow_dispatch (not pull_request) |
+| `current-stable-clippy` | schedule, workflow_dispatch |
+| `regression-gate` | always; requires every `REQUIRED` job to succeed |
+
+Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/test_ci_workflow.py` in the same change.
+
 ### Pull request hygiene checks
 
 These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.

@@ -1,6 +1,6 @@
 pub use bookie_app_services::{
     approval_wait, column_widths, config_io, connection_form, connection_save_turn, filter_settings,
-    highlight_settings, ordered_refresh, read_scopes, recent_tabs, request_generation, single_flight, state_file,
+    ordered_refresh, read_scopes, recent_tabs, request_generation, single_flight, state_file,
 };
 pub mod approval_router;
 pub mod audit_view;
