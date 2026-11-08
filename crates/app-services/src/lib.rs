@@ -28,6 +28,7 @@ pub mod preparation;
 pub mod read_scopes;
 pub mod recent_tabs;
 pub mod request_generation;
+pub mod request_ticket;
 pub mod schema_compare;
 pub mod single_flight;
 pub mod snippets;

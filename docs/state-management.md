@@ -33,6 +33,21 @@ Naming:
 - Output: `<Thing>Output`, an enum. Only the messages a parent should react to.
 - Command output: `<Thing>Cmd`, an enum. Async work finishes by sending one of these back.
 
+## Late results and request tickets
+
+Async loads must not apply a reply after a newer request has started. Shared helpers live in `bookie-app-services::request_ticket` (and the modules it re-exports). Relm4 commands and any future non-GTK task bridge should ask these helpers whether a reply is still current; do not add a second sequencer API in the shell.
+
+| Helper | Use when |
+|---|---|
+| `Generation` / `is_current` | Exact match: only the latest ticket for one load path may apply. |
+| `LatestApplied` | Ordered apply: a newer ticket may land first; older tickets must not overwrite it. |
+| `RevisionedGeneration` | Exact match plus a revision stamp that invalidates pending work when the editor content changes. |
+| `replace_in_flight` / `replace_scoped_in_flight` | Cancel the previous in-flight token when starting a replacement load. |
+| `SingleFlight` | Refuse a second overlapping operation until the first finishes. |
+| `after_mutation` | Run a refresh only after its mutation, without letting a later mutation overtake an earlier refresh. |
+
+Grid, editor and sidebar loads keep attaching a ticket at start and dropping stale replies in the update path.
+
 ## Async work via commands
 
 Components do not call `tokio::spawn` directly. They issue commands:
