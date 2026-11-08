@@ -21,12 +21,19 @@ mod highlight_paint;
 mod lifetime_tests;
 pub(crate) mod local_filter;
 mod local_sort;
+mod pinned_numbers;
 mod presentation;
 mod row_find;
+mod row_number_column;
+#[cfg(test)]
+mod row_number_tests;
 mod types;
 mod value_viewer;
 pub(crate) use column_order::displayed_column_order;
 pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_null};
+
+use std::cell::Cell;
+use std::rc::Rc;
 
 use gtk4::prelude::*;
 
@@ -43,6 +50,7 @@ pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
 pub use display_refresh::refresh_date_displays_under;
+pub use pinned_numbers::wrap_in_scrolled as wrap_grid_scrolled;
 pub(crate) use value_viewer::present as present_value_viewer;
 
 pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
@@ -144,6 +152,7 @@ pub struct TabGridContext {
     pub filters_unavailable: bool,
     pub choices: ChoiceMap,
     pub ambiguous_keys: AmbiguousKeys,
+    pub row_number_base: u64,
 }
 
 pub type AmbiguousKeys =
@@ -244,6 +253,10 @@ pub fn build_column_view(
         .show_row_separators(true)
         .show_column_separators(true)
         .build();
+    column_view.add_css_class("data-table");
+    let row_number_base = Rc::new(Cell::new(tab_ctx.row_number_base));
+    let numbers = row_number_column::build(row_number_base.clone());
+    column_view.append_column(&numbers);
 
     if let Some(sender) = menu_sender.as_ref() {
         let driver_id = connection_id
@@ -332,6 +345,15 @@ pub fn build_column_view(
     }
     font_zoom::install(&column_view, &grid_actions);
     column_view.insert_action_group("grid", Some(&grid_actions));
+    row_number_column::fit(&column_view, tab_ctx.row_number_base);
+    {
+        let weak = column_view.downgrade();
+        column_view.columns().connect_items_changed(move |_, _, _, _| {
+            if let Some(view) = weak.upgrade() {
+                row_number_column::keep_first(&view);
+            }
+        });
+    }
 
     if let Some((col_idx, ascending)) = sort
         && let Some(col) = view_columns.get(col_idx)

@@ -90,16 +90,20 @@ fn verify_fixed_width(saved: bool, persistent: bool) {
     let window = gtk4::Window::builder()
         .default_width(500)
         .default_height(300)
-        .child(&gtk4::ScrolledWindow::builder().child(&view).build())
+        .child(&crate::ui::grid::wrap_grid_scrolled(&view))
         .build();
     window.present();
     settle();
-    let first = view
-        .columns()
-        .item(0)
-        .unwrap()
-        .downcast::<gtk4::ColumnViewColumn>()
-        .unwrap();
+    let first = (0..view.columns().n_items())
+        .find_map(|position| {
+            let column = view
+                .columns()
+                .item(position)?
+                .downcast::<gtk4::ColumnViewColumn>()
+                .ok()?;
+            (column.id().as_deref() == Some("0")).then_some(column)
+        })
+        .expect("the first data column");
     if !saved {
         first.set_fixed_width(140);
         settle();
