@@ -5,7 +5,7 @@ use std::io::{self, Write};
 
 use bookie_core::Value;
 
-use super::display::{readonly_null_sentinel, value_to_full_edit_text};
+use super::display::{readonly_null_sentinel, value_to_copy_text, value_to_full_edit_text};
 
 const MAX_VIEW_BYTES: usize = 1 << 20;
 const MAX_WORD_WRAP_BYTES: usize = 4 * 1024;
@@ -165,7 +165,7 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
         let text = null_copy_text
             .as_deref()
             .map(str::to_owned)
-            .unwrap_or_else(|| value_to_full_edit_text(&value));
+            .unwrap_or_else(|| value_to_copy_text(&value));
         button.clipboard().set_text(&text);
     });
     let header = adw::HeaderBar::new();

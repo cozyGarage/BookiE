@@ -79,7 +79,7 @@
       ]
     },
     "change-contracts": {
-      "purpose": "Run focused, required regressions for changed B3 value-path Rust files",
+      "purpose": "Run focused, required regressions for changed Data-lane value-path Rust files",
       "prerequisites": "Python 3; Rust 1.98; mapped crates' native development libraries",
       "hosted_gate": "Build Linux / fast",
       "steps": [
@@ -127,7 +127,7 @@
     "b4-rollback": {
       "purpose": "Focused MySQL failed-batch rollback and PostgreSQL rollback-failure acceptance",
       "prerequisites": "Rust 1.98; Docker; native TLS build dependencies",
-      "hosted_gate": "Build Linux / B4 rollback acceptance",
+      "hosted_gate": "Build Linux / Policy rollback acceptance",
       "steps": [
         {
           "argv": [

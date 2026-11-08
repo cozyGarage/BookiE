@@ -977,7 +977,7 @@ fn copy_value_text(widget: &gtk::Widget, row: Option<&crate::ui::row_object::Row
         if let Some(text) = row
             .and_then(|row| row.cell_value_in_row(col))
             .as_ref()
-            .map(super::display::value_to_full_edit_text)
+            .map(super::display::value_to_copy_text)
         {
             return text;
         }
