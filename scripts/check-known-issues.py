@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 PROJECT_URL = "https://github.com/users/cozyGarage/projects/3"
-LANES = {"B3", "B4", "UX", "Maintainer"}
+LANES = {"Data", "Policy", "UX", "Maintainer"}
 ID = re.compile(r"^[A-Z0-9]+-\d+[a-z]?$")
 ISSUE = re.compile(
     r"^\[#(\d+)\]\(https://github\.com/cozyGarage/BookiE/issues/\1\)$"

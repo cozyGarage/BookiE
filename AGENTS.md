@@ -14,7 +14,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 ## Where to start
 
 1. [docs/README.md](docs/README.md): the documentation map and where each fact belongs.
-2. [BookiE Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (B3, B4, UX, Maintainer).
+2. [BookiE Project #3](https://github.com/users/cozyGarage/projects/3): open work, status and lane. The [ledger index](docs/known-issues.md) maps ledger IDs to issues. Filter the project by **Lane** (Data, Policy, UX, Maintainer).
 3. The ADR that governs your change ([index](docs/decisions/README.md)). Every type or value change follows [ADR 0007](docs/decisions/0007-type-and-value-preservation.md).
 
 Accepted ADRs constrain architecture. Project #3 owns selected work order; each issue owns its acceptance. Private verification records support review but do not override current decisions.
@@ -29,15 +29,15 @@ Lanes keep parallel agents from editing the same files. Pick open work from [Pro
 
 | Lane | Owns |
 | --- | --- |
-| B3 | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display |
-| B4 | Transport, guard, audit, SSH and rollback: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage |
+| Data | Types, values, drivers and result paths: `crates/core` value and result types, decoders under `crates/drivers/`, grid value display |
+| Policy | Transport, guard, audit, SSH and rollback: `crates/policy`, `crates/transport`, `crates/ssh`, audit storage |
 | UX | App layer (`apps/linux/`), packaging, repository automation, the ledger index, and shared documentation |
 | Cursor | Documentation and tests only. UX reviews test pull requests; the maintainer reviews documentation pull requests |
 | Maintainer | Decisions and anything needing a person or a real desktop |
 
 - To work in another lane's files, first record the handoff on the GitHub issue (and update the project **Lane** / `lane:*` label plus the [ledger index](docs/known-issues.md) Lane column) in the same commit as the first change.
 - When a lane finishes a row, close or move the issue on the project and remove its line from the ledger index.
-- Each agent works in its own git worktree (a sibling directory named for the lane, for example `bookie-b3`), never in another agent's checkout. Branch from the latest `linux` on [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Name branches `<lane>/<topic>` or `<type>/<topic>`.
+- Each agent works in its own git worktree (a sibling directory named for the lane, for example `bookie-data`), never in another agent's checkout. Branch from the latest `linux` on [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Name branches `<lane>/<topic>` or `<type>/<topic>` (lane prefixes include `data/` and `policy/`).
 
 ## Workflow
 
@@ -148,7 +148,7 @@ Rules for pull requests that add tests (any agent, including Cursor):
 - A test pull request does not change product rules. When a rule looks wrong, tell the lane owner and leave the rule alone.
 - A new test fails on the code before the fix, or its commit says it pins existing behaviour.
 - Merge the latest BookiE `linux` branch into the branch and run `scripts/preflight.sh` before opening the pull request.
-- Do not edit ledger rows, sprint text or files that another lane owns (for example `policy/src/rules.rs`, owned by B4 in the lane table); those edits are what conflict.
+- Do not edit ledger rows, sprint text or files that another lane owns (for example `policy/src/rules.rs`, owned by Policy in the lane table); those edits are what conflict.
 - Check the open pull requests for the same files first. When two change the same map or sentinel (for example `change-test-map.json`), say which one lands first and rebase the other.
 - Say in the pull request which validation layers apply; maintainers confirm the exact-head acceptance results.
 

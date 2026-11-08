@@ -25,6 +25,6 @@ A, with the privilege test in SQL so the cost is one catalog query, not a reques
 
 ## Consequences
 
-- The PostgreSQL driver and catalog SQL are B3-owned: the change needs the handoff and the lane, project and index update that `AGENTS.md` requires.
+- The PostgreSQL driver and catalog SQL are Data-owned: the change needs the handoff and the lane, project and index update that `AGENTS.md` requires.
 - Acceptance evidence is a real PostgreSQL fixture with a restricted role (`bookie_visible` reachable, `bookie_hidden` not) checked through every consumer, plus a release-tier many-schema run recording catalog latency, main-loop stalls and memory at a named commit. Synthetic measurements stay separate.
-- The next step is the B3 handoff, then the SQL change and the restricted-role fixture test. No catalog SQL changes before that handoff.
+- The next step is the Data handoff, then the SQL change and the restricted-role fixture test. No catalog SQL changes before that handoff.
