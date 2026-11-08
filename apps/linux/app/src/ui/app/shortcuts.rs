@@ -46,6 +46,21 @@ pub(super) fn install_window_actions(
     sender: ComponentSender<App>,
 ) -> gio::SimpleAction {
     let group = gio::SimpleActionGroup::new();
+    add_window_input_actions(&group, window, sender.clone());
+    group.add_action(&show_audit_operation_action(sender.clone()));
+    let disconnect_action = install_disconnect_action(&group, &sender);
+    crate::ui::leak_probe::install(&group);
+    window.insert_action_group("win", Some(&group));
+    disconnect_action.set_enabled(false);
+    tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
+    disconnect_action
+}
+
+fn add_window_input_actions(
+    group: &gio::SimpleActionGroup,
+    window: &adw::ApplicationWindow,
+    sender: ComponentSender<App>,
+) {
     macro_rules! input_action {
         ($name:expr, $msg:expr) => {{
             let s = sender.clone();
@@ -97,14 +112,8 @@ pub(super) fn install_window_actions(
     group.add_action_entries([
         input_action!("focus-grid", AppMsg::FocusActiveGrid),
         input_action!("focus-editor", AppMsg::FocusActiveEditor),
+        input_action!("export-results", AppMsg::ExportFrontResults),
     ]);
-    group.add_action(&show_audit_operation_action(sender.clone()));
-    let disconnect_action = install_disconnect_action(&group, &sender);
-    crate::ui::leak_probe::install(&group);
-    window.insert_action_group("win", Some(&group));
-    disconnect_action.set_enabled(false);
-    tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
-    disconnect_action
 }
 
 fn install_disconnect_action(group: &gio::SimpleActionGroup, sender: &ComponentSender<App>) -> gio::SimpleAction {
@@ -154,6 +163,7 @@ pub(super) const WINDOW_SHORTCUTS: &[(&str, &str)] = &[
     ("<Primary>y", "win.redo-change"),
     ("<Primary><Shift>z", "win.redo-change"),
     ("<Primary><Shift>t", "win.reopen-closed-tab"),
+    ("<Primary><Shift>e", "win.export-results"),
 ];
 
 pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
@@ -214,6 +224,7 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary><Shift>l", crate::tr!("Reveal the open table in the sidebar")),
             ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
             ("<Primary><Shift>b", crate::tr!("Manage saved queries")),
+            ("<Primary><Shift>e", crate::tr!("Export Results")),
             ("<Primary>question", crate::tr!("Show keyboard shortcuts")),
             ("<Primary>q", crate::tr!("Quit")),
         ],
