@@ -42,6 +42,7 @@ pub mod state_file;
 pub mod stream_page_validation;
 pub mod structure_metadata;
 pub mod structure_tracker;
+pub mod window_sessions;
 pub mod window_state;
 pub mod workspace;
 
