@@ -91,12 +91,15 @@ mod tests {
                 ..Default::default()
             };
             let connection = driver.connect(options).await.unwrap();
-            connection.execute("CREATE TABLE visible(id INTEGER)").await.unwrap();
+            let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
             connection
-                .execute("CREATE TABLE hidden.visible(id INTEGER)")
+                .execute_controlled("CREATE TABLE visible(id INTEGER)", &control)
                 .await
                 .unwrap();
-            let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+            connection
+                .execute_controlled("CREATE TABLE hidden.visible(id INTEGER)", &control)
+                .await
+                .unwrap();
             let tables = list_tables_excluding(connection.as_ref(), &["hidden".to_string()], &control)
                 .await
                 .unwrap();
