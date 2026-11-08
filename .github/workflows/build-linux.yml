@@ -495,7 +495,6 @@ jobs:
           if-no-files-found: error
 
   b4-rollback:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     name: Policy rollback acceptance (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
