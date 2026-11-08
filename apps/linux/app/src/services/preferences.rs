@@ -9,7 +9,7 @@ use relm4::adw;
 use super::config_io::{atomic_write_bytes, atomic_write_json, xdg_config_path};
 use super::state_file::StateFile;
 
-pub use bookie_app_services::preferences::{ColorSchemePref, NullDisplayPref, Preferences, ThemePref};
+pub use bookie_app_services::preferences::{ColorSchemePref, DateFormatPref, NullDisplayPref, Preferences, ThemePref};
 
 pub fn color_scheme_style(scheme: ColorSchemePref) -> adw::ColorScheme {
     match scheme {
@@ -187,6 +187,7 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         editor_font_family: settings.string("editor-font-family").to_string(),
         editor_vim_mode: settings.boolean("editor-vim-mode"),
         null_display: NullDisplayPref::from_key(settings.string("null-display").as_str()),
+        date_format: DateFormatPref::from_key(settings.string("date-format").as_str()),
         open_tables_in_preview_tab: settings.boolean("open-tables-in-preview-tab"),
     }
 }
@@ -205,6 +206,7 @@ fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), S
         settings.set_string("editor-font-family", &prefs.editor_font_family),
         settings.set_boolean("editor-vim-mode", prefs.editor_vim_mode),
         settings.set_string("null-display", prefs.null_display.key()),
+        settings.set_string("date-format", prefs.date_format.key()),
         settings.set_boolean("open-tables-in-preview-tab", prefs.open_tables_in_preview_tab),
     ];
     if let Some(error) = writes.into_iter().find_map(Result::err) {

@@ -544,6 +544,7 @@ impl SimpleComponent for App {
         ));
         crate::ui::theme::apply(preferences.load().theme);
         crate::ui::grid::set_null_display(preferences.load().null_display);
+        crate::ui::grid::set_date_format(preferences.load().date_format);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
             change_trackers,

@@ -53,3 +53,4 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod reconnect;
 pub mod sql_text;
+pub mod value_display;
