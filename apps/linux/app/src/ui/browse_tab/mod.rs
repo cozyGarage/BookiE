@@ -230,8 +230,8 @@ pub use messages::{BrowseTabInput, BrowseTabOutput};
 pub use requests::{BrowseCellValueRequest, BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
 use requests::{CellValueRequestTracker, PageRequestTracker, RowCountRequestTracker};
 use selection::*;
-pub(crate) use value_parse::mysql_enum_set_labels;
 use value_parse::*;
+pub(crate) use value_parse::{mysql_enum_set_labels, parse_grid_cell_input};
 
 impl BrowseTab {
     fn reset_keyset_navigation(&mut self) {

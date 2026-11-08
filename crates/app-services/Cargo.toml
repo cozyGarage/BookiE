@@ -35,6 +35,7 @@ rust_decimal.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 uuid.workspace = true
+sqlparser.workspace = true
 
 [dev-dependencies]
 secrecy.workspace = true

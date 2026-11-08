@@ -39,6 +39,18 @@ impl SqlEditor {
         if !self.can_start_run() {
             return;
         }
+        if !self.gate_run_for_pending_edits(
+            result_editing::DeferredRun {
+                sql: sql.clone(),
+                anchor: anchor.clone(),
+                single_statement,
+            },
+            &sender,
+        ) {
+            return;
+        }
+        self.starts_quiet_run();
+        self.forget_result_edits();
         self.dismiss_completion_popups();
         if single_statement {
             let planned = PlannedStatements {
@@ -164,12 +176,16 @@ impl SqlEditor {
         error_navigation::locate(generation, &context, &mut outcomes);
         let totals = outcomes::RunTotals::of(&outcomes);
         self.mark_statements(&context, terminal.replace_ui, &outcomes);
-        self.record_history(
-            context,
-            totals.elapsed_ms as i64,
-            totals.history_rows(),
-            totals.history_outcome(),
-        );
+        if self.ends_quiet_run() {
+            let _ = context;
+        } else {
+            self.record_history(
+                context,
+                totals.elapsed_ms as i64,
+                totals.history_rows(),
+                totals.history_outcome(),
+            );
+        }
         if !terminal.replace_ui {
             return;
         }
@@ -177,9 +193,9 @@ impl SqlEditor {
         self.status.set_label(&totals.summary());
         let shown = self.pinned.show(outcomes);
         self.refresh_pin_button();
-        clear_results_box(&self.results_holder);
+        self.clear_result_surface();
         render_outcomes(
-            &self.results_holder,
+            self.results_surface(),
             &shown,
             &self.grid_sender,
             self.connection_id,
@@ -187,6 +203,7 @@ impl SqlEditor {
             self.result_view_settings.clone(),
             Some(sender),
         );
+        self.decide_result_edits(&shown, sender);
     }
 
     pub(super) fn record_history(

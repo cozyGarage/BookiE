@@ -4,6 +4,7 @@ use super::*;
 pub struct StatementOutcome {
     pub identity: StatementIdentity,
     pub sql_preview: String,
+    pub sql: String,
     pub elapsed_ms: u128,
     pub kind: StatementOutcomeKind,
     pub pinned: bool,
@@ -127,6 +128,20 @@ pub enum SqlEditorInput {
     },
     PrepareForTeardown(tokio::sync::oneshot::Sender<Result<(), String>>),
     SessionTeardownFinished(Result<(), String>),
+    EditColumnsFetched {
+        run: u64,
+        source: bookie_app_services::result_editability::SourceTable,
+        columns: Result<Vec<bookie_core::ColumnInfo>, ()>,
+    },
+    ResultPendingCountChanged(usize),
+    ResultChangedRows(Vec<crate::services::change_tracker::RowKey>),
+    CommitResultEdits,
+    DiscardResultEdits,
+    PreviewResultEdits,
+    ConfirmDiscardAndRun,
+    ResultSaveCompleted(Uuid),
+    ResultSaveFailed(Uuid, String),
+    ResultFlashError(crate::services::change_tracker::StatementSource),
 }
 
 #[derive(Debug)]
@@ -137,6 +152,16 @@ pub enum SqlEditorOutput {
     CopyToClipboard(String),
     ShowRowAsJson(String),
     ShowToast(String),
+    ShowAlert {
+        title: String,
+        body: String,
+    },
+    DirtyChanged(bool),
+    ExecuteTransaction {
+        save_id: Uuid,
+        statements: Vec<(String, Vec<bookie_core::Value>)>,
+        sources: Vec<crate::services::change_tracker::StatementSource>,
+    },
     ExportResults {
         result: std::sync::Arc<QueryResult>,
         name: String,

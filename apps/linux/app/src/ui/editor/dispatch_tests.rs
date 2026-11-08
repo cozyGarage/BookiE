@@ -171,6 +171,8 @@ impl EditorFixture {
                 history: None,
                 database: database.clone(),
                 preferences: crate::services::preferences::PreferencesStore::new(),
+                change_trackers: Default::default(),
+                tab_id: uuid::Uuid::new_v4(),
             })
             .connect_receiver(move |_, output| {
                 let _ = output_sender.send(output);

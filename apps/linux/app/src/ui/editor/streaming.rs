@@ -34,6 +34,7 @@ pub(in crate::ui) struct StreamStart {
     pub(super) generation: u64,
     pub(super) identity: StatementIdentity,
     pub(super) sql_preview: String,
+    pub(super) sql: String,
     pub(super) export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
     pub(super) spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
@@ -43,6 +44,7 @@ pub(super) struct ActiveStream {
     generation: u64,
     identity: StatementIdentity,
     sql_preview: String,
+    sql: String,
     export_query: Option<crate::ui::export_dialog::StreamExportQuery>,
     spool: bookie_app_services::stream_result_spool::StreamResultSpool,
     cache: StreamPageCache,
@@ -54,6 +56,7 @@ impl ActiveStream {
         StatementOutcome {
             identity: self.identity,
             sql_preview: self.sql_preview.clone(),
+            sql: self.sql.clone(),
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Streamed(Box::new(self.cache.snapshot_with_spool(
                 terminal,
@@ -104,7 +107,7 @@ impl SqlEditor {
                 result,
             } => super::stream_view::complete_page_load(
                 super::stream_view::PageLoadContext {
-                    holder: &self.results_holder,
+                    holder: self.results_surface(),
                     generation,
                     index,
                     identity,
@@ -124,6 +127,7 @@ impl SqlEditor {
             generation,
             identity,
             sql_preview,
+            sql,
             export_query,
             spool,
             accepted,
@@ -136,13 +140,14 @@ impl SqlEditor {
             generation,
             identity,
             sql_preview,
+            sql,
             export_query,
             spool,
             cache: StreamPageCache::default(),
             error: None,
         });
         self.stream_eviction_cursor = Default::default();
-        if self.results_holder.first_child().is_none() {
+        if self.results_surface().first_child().is_none() {
             let loading = waiting_for_stream_page();
             self.show_pins_above(&loading, sender);
         }
@@ -205,7 +210,7 @@ impl SqlEditor {
         };
         let updated = self.pinned.latest().last().is_some_and(|outcome| match &outcome.kind {
             StatementOutcomeKind::Streamed(result) => super::stream_view::update_live_stream(
-                &self.results_holder,
+                self.results_surface(),
                 outcome,
                 result,
                 &target,
@@ -214,10 +219,10 @@ impl SqlEditor {
             _ => false,
         });
         if !updated {
-            clear_results_box(&self.results_holder);
+            self.clear_result_surface();
             let shown = self.pinned.displayed();
             render_outcomes(
-                &self.results_holder,
+                self.results_surface(),
                 &shown,
                 &self.grid_sender,
                 self.connection_id,
@@ -247,33 +252,58 @@ impl SqlEditor {
             .map(|duration| duration.as_millis() as i64)
             .unwrap_or(0);
         let timed_out = (context.timeout_secs, context.sql.clone());
-        let stream = take_stream_for_generation(&mut self.streaming, generation);
-        let terminal = stream
-            .as_ref()
-            .and_then(|stream| stream.error.clone())
-            .map_or(terminal, |message| StreamTerminal::Failed(message.into()));
-        let rows = stream.as_ref().map(|stream| stream.cache.total_rows() as i64);
-        let outcome = stream.map(|mut stream| {
-            let mut outcome = stream.outcome(terminal.clone());
-            outcome.elapsed_ms = elapsed.max(0) as u128;
-            outcome
-        });
-        let history_outcome = match &terminal {
+        let (terminal, rows, mut outcomes) = finish_stream_outcomes(
+            take_stream_for_generation(&mut self.streaming, generation),
+            terminal,
+            elapsed,
+        );
+        super::error_navigation::locate(generation, &context, &mut outcomes);
+        self.mark_statements(&context, run_terminal.replace_ui, &outcomes);
+        self.finish_stream_history(context, elapsed, rows, &terminal);
+        if !run_terminal.replace_ui {
+            return;
+        }
+        self.cancel_token = None;
+        self.apply_stream_status(&terminal, elapsed, timed_out);
+        let shown = self.pinned.show(outcomes);
+        self.refresh_pin_button();
+        self.clear_result_surface();
+        render_outcomes(
+            self.results_surface(),
+            &shown,
+            &self.grid_sender,
+            self.connection_id,
+            self.database.clone(),
+            self.result_view_settings.clone(),
+            Some(sender),
+        );
+        self.decide_result_edits(&shown, sender);
+        self.restore_stream_page(generation, visible_page);
+    }
+
+    fn finish_stream_history(
+        &mut self,
+        context: super::ExecutionContext,
+        elapsed: i64,
+        rows: Option<i64>,
+        terminal: &StreamTerminal,
+    ) {
+        let history_outcome = match terminal {
             StreamTerminal::Complete => Outcome::Success,
             StreamTerminal::Cancelled => Outcome::Cancelled,
             StreamTerminal::TimedOut => Outcome::Error(crate::tr!("Query timed out")),
             StreamTerminal::Failed(message) => Outcome::Error(message.to_string()),
             StreamTerminal::Loading => Outcome::Error(crate::tr!("Stream ended before completion")),
         };
-        let mut outcomes = outcome.into_iter().collect::<Vec<_>>();
-        super::error_navigation::locate(generation, &context, &mut outcomes);
-        self.mark_statements(&context, run_terminal.replace_ui, &outcomes);
-        self.record_history(context, elapsed, rows.filter(|rows| *rows > 0), history_outcome);
-        if !run_terminal.replace_ui {
+        if self.ends_quiet_run() {
+            let _ = context;
             return;
         }
-        self.cancel_token = None;
-        match &terminal {
+        self.record_history(context, elapsed, rows.filter(|rows| *rows > 0), history_outcome);
+    }
+
+    fn apply_stream_status(&mut self, terminal: &StreamTerminal, elapsed: i64, timed_out: (u32, String)) {
+        match terminal {
             StreamTerminal::Complete => self
                 .status
                 .set_label(&crate::tr!("done in {ms} ms").replace("{ms}", &elapsed.max(0).to_string())),
@@ -285,30 +315,35 @@ impl SqlEditor {
             StreamTerminal::Failed(message) => self.status.set_label(message),
             StreamTerminal::Loading => self.status.set_label(&crate::tr!("error")),
         }
-        let shown = self.pinned.show(outcomes);
-        self.refresh_pin_button();
-        clear_results_box(&self.results_holder);
-        render_outcomes(
-            &self.results_holder,
-            &shown,
-            &self.grid_sender,
-            self.connection_id,
-            self.database.clone(),
-            self.result_view_settings.clone(),
-            Some(sender),
-        );
-        self.restore_stream_page(generation, visible_page);
     }
 
     fn visible_stream_page(&self, generation: u64) -> Option<u64> {
-        super::stream_view::visible_page_index(&self.results_holder, generation)
+        super::stream_view::visible_page_index(self.results_surface(), generation)
     }
 
     fn restore_stream_page(&self, generation: u64, page_index: Option<u64>) {
         if let Some(page_index) = page_index {
-            super::stream_view::restore_page_selection(&self.results_holder, generation, page_index);
+            super::stream_view::restore_page_selection(self.results_surface(), generation, page_index);
         }
     }
+}
+
+fn finish_stream_outcomes(
+    stream: Option<ActiveStream>,
+    terminal: StreamTerminal,
+    elapsed: i64,
+) -> (StreamTerminal, Option<i64>, Vec<StatementOutcome>) {
+    let terminal = stream
+        .as_ref()
+        .and_then(|stream| stream.error.clone())
+        .map_or(terminal, |message| StreamTerminal::Failed(message.into()));
+    let rows = stream.as_ref().map(|stream| stream.cache.total_rows() as i64);
+    let outcome = stream.map(|mut stream| {
+        let mut outcome = stream.outcome(terminal.clone());
+        outcome.elapsed_ms = elapsed.max(0) as u128;
+        outcome
+    });
+    (terminal, rows, outcome.into_iter().collect())
 }
 
 fn load_stream_page(
@@ -356,6 +391,7 @@ mod tests {
             generation: 2,
             identity: StatementIdentity::default(),
             sql_preview: "SELECT 2".into(),
+            sql: "SELECT 2".into(),
             export_query: None,
             spool: bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
                 .create()
