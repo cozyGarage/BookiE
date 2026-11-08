@@ -19,7 +19,7 @@ mod run_lifecycle;
 mod session_age;
 mod session_lexing;
 use bookie_core::sql_format as format_plan;
-use run_lifecycle::{clear_results_box, dim_previous_results};
+use run_lifecycle::dim_previous_results;
 mod outcomes;
 mod pinned;
 mod result_compare;
@@ -62,9 +62,7 @@ pub(crate) use completion_identifiers::catalog_reference;
 pub use schema::derive_tab_label;
 pub use statement_cursor::grammar_for;
 
-use outcomes::{
-    ScriptRunResult, StatementRun, StreamUpdate, clear_box, render_outcomes, run_statements_with_spool_manager,
-};
+use outcomes::{ScriptRunResult, StatementRun, StreamUpdate, render_outcomes, run_statements_with_spool_manager};
 use run_generation::{RunGeneration, RunTerminal};
 use schema::{apply_editor_preferences, apply_editor_scheme};
 use sql_text::{export_name_for_query, read_sql_text, text_to_run, toggle_line_comment};
@@ -611,10 +609,11 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::Grid(GridMsg::ExportStreamedResults(request)) => {
                 let _ = sender.output(SqlEditorOutput::ExportStreamedResults(request));
             }
-            SqlEditorInput::Grid(message) => match self.on_editable_grid_message(message, &sender) {
-                Some(message) => self.on_result_grid_message(message, &sender),
-                None => {}
-            },
+            SqlEditorInput::Grid(message) => {
+                if let Some(message) = self.on_editable_grid_message(message, &sender) {
+                    self.on_result_grid_message(message, &sender);
+                }
+            }
             SqlEditorInput::EditColumnsFetched { run, source, columns } => {
                 self.on_edit_columns_fetched(run, source, columns, &sender);
             }

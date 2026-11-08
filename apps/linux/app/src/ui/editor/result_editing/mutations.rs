@@ -63,7 +63,7 @@ impl SqlEditor {
     fn result_is_editable(&self) -> bool {
         self.result_editing
             .as_ref()
-            .is_some_and(|editing| matches!(editing.state, Some(ResultEdit::Editable(_))))
+            .is_some_and(|editing| matches!(editing.state, Some(ResultEdit::Editable)))
     }
 
     fn result_list_store(&self) -> Option<crate::ui::row_store::RowStore> {
@@ -367,11 +367,15 @@ impl SqlEditor {
         self.refresh_result_row(row_position);
     }
 
-    pub(super) fn on_result_pending_count_changed(&mut self, count: usize, sender: &ComponentSender<Self>) {
+    pub(in crate::ui::editor) fn on_result_pending_count_changed(
+        &mut self,
+        count: usize,
+        sender: &ComponentSender<Self>,
+    ) {
         self.refresh_result_pending_bar(count, Some(sender));
     }
 
-    pub(super) fn on_result_changed_rows(&mut self, keys: Vec<RowKey>) {
+    pub(in crate::ui::editor) fn on_result_changed_rows(&mut self, keys: Vec<RowKey>) {
         let Some(editing) = self.result_editing.as_ref() else {
             return;
         };
@@ -410,7 +414,7 @@ impl SqlEditor {
         }
     }
 
-    pub(super) fn handle_commit_result_edits(&mut self, sender: ComponentSender<Self>) {
+    pub(in crate::ui::editor) fn handle_commit_result_edits(&mut self, sender: ComponentSender<Self>) {
         let Some(editing) = self.result_editing.as_ref() else {
             return;
         };
@@ -451,7 +455,7 @@ impl SqlEditor {
         }
     }
 
-    pub(super) fn handle_preview_result_edits(&self, sender: &ComponentSender<Self>) {
+    pub(in crate::ui::editor) fn handle_preview_result_edits(&self, sender: &ComponentSender<Self>) {
         let Some(editing) = self.result_editing.as_ref() else {
             return;
         };
@@ -488,7 +492,7 @@ impl SqlEditor {
         }
     }
 
-    pub(super) fn handle_discard_result_edits(&mut self, sender: ComponentSender<Self>) {
+    pub(in crate::ui::editor) fn handle_discard_result_edits(&mut self, sender: ComponentSender<Self>) {
         let Some(editing) = self.result_editing.as_mut() else {
             return;
         };
@@ -501,7 +505,7 @@ impl SqlEditor {
         self.reread_result_statement(sender);
     }
 
-    pub(super) fn handle_result_save_completed(&mut self, save_id: Uuid, sender: ComponentSender<Self>) {
+    pub(in crate::ui::editor) fn handle_result_save_completed(&mut self, save_id: Uuid, sender: ComponentSender<Self>) {
         let Some(editing) = self.result_editing.as_mut() else {
             return;
         };
@@ -518,7 +522,12 @@ impl SqlEditor {
         self.reread_result_statement(sender);
     }
 
-    pub(super) fn handle_result_save_failed(&mut self, save_id: Uuid, message: String, sender: ComponentSender<Self>) {
+    pub(in crate::ui::editor) fn handle_result_save_failed(
+        &mut self,
+        save_id: Uuid,
+        message: String,
+        sender: ComponentSender<Self>,
+    ) {
         let Some(editing) = self.result_editing.as_mut() else {
             return;
         };
@@ -534,7 +543,7 @@ impl SqlEditor {
         });
     }
 
-    pub(super) fn handle_result_flash_error(&mut self, source: StatementSource) {
+    pub(in crate::ui::editor) fn handle_result_flash_error(&mut self, source: StatementSource) {
         let key = match source {
             StatementSource::Insert { draft_id } => RowKey::Draft(draft_id),
             StatementSource::Update { row_key } | StatementSource::Delete { row_key } => row_key,

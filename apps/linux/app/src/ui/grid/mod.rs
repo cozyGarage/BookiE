@@ -41,9 +41,7 @@ use context_menu::install_grid_context_menus;
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
 pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
-pub use display::{
-    date_format, focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text,
-};
+pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
 pub use display_refresh::refresh_date_displays_under;
 pub(crate) use value_viewer::present as present_value_viewer;
 

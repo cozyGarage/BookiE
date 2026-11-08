@@ -832,27 +832,41 @@ impl App {
             .with_tab_ref(tab_id, |tracker| tracker.has_pending())
             .unwrap_or(false)
             || dirty;
-        let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow().get(&tab_id) else {
+        let tab = {
+            let tabs = self.workspace_tabs.borrow();
+            match tabs.get(&tab_id) {
+                Some(WorkspaceTab::Editor(slot)) => Some((
+                    slot.page.clone(),
+                    slot.file
+                        .as_ref()
+                        .map(|file| (file.title(&slot.query), file.path.display().to_string())),
+                    slot.query.clone(),
+                )),
+                _ => None,
+            }
+        };
+        let Some((page, file_details, query)) = tab else {
             return;
         };
-        if slot.file.is_some() {
-            Self::refresh_editor_file_title(slot);
+        if let Some((title, tooltip)) = file_details {
+            page.set_title(&title);
+            page.set_tooltip(&tooltip);
             return;
         }
-        let label = if slot.query.trim().is_empty() {
+        let label = if query.trim().is_empty() {
             crate::tr!("Empty query")
         } else {
-            derive_tab_label(&slot.query)
+            derive_tab_label(&query)
         };
         let title = if rows_dirty { format!("• {label}") } else { label };
-        slot.page.set_title(&title);
+        page.set_title(&title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()
             .and_then(|view| view.selected_page())
-            .map(|selected| selected == slot.page)
+            .map(|selected| selected == page)
             .unwrap_or(false);
-        slot.page.set_needs_attention(rows_dirty && !is_selected);
+        page.set_needs_attention(rows_dirty && !is_selected);
         self.refresh_window_title();
     }
 

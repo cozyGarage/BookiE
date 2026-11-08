@@ -30,10 +30,6 @@ pub fn set_date_format(format: DateFormatPref) {
     DATE_FORMAT.set(format);
 }
 
-pub fn date_format() -> DateFormatPref {
-    DATE_FORMAT.get()
-}
-
 pub fn editable_null_sentinel() -> String {
     match NULL_DISPLAY.get() {
         NullDisplayPref::Standard => crate::tr!("<NULL>"),

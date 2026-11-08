@@ -578,7 +578,7 @@ mod sidebar_label_tests {
             .unwrap();
 
         assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
-        let init = row_for(entry, &Default::default(), false, false, None);
+        let init = row_for(entry, &Default::default(), false, false, "postgres", None);
         assert_eq!(init.kind, SidebarObjectKind::Catalog);
         let group_init = init.group.unwrap();
         assert!(group_init.entry);
@@ -610,10 +610,12 @@ mod sidebar_label_tests {
             .find(|node| matches!(node.kind, NodeKind::CatalogObject { .. }))
             .unwrap();
 
-        let branch_init = row_for(branch, &Default::default(), false, false, None).group.unwrap();
+        let branch_init = row_for(branch, &Default::default(), false, false, "postgres", None)
+            .group
+            .unwrap();
         assert!(!branch_init.entry);
         assert_eq!(branch_init.count, 1);
-        let leaf_init = row_for(leaf, &Default::default(), false, false, None);
+        let leaf_init = row_for(leaf, &Default::default(), false, false, "postgres", None);
         assert_eq!(leaf_init.depth, 2);
         let leaf_group = leaf_init.group.unwrap();
         assert!(leaf_group.entry);

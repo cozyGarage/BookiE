@@ -4,7 +4,8 @@ mod mutations;
 use std::sync::Arc;
 
 use bookie_app_services::result_editability::{
-    EditTarget, ResultRefusal, SourceTable, editable_target, grammar_for_driver, owned_result_columns, source_table,
+    EditTarget, ResultLock, ResultRefusal, SourceTable, editable_target, grammar_for_driver, owned_result_columns,
+    source_table,
 };
 use bookie_core::{ColumnInfo, QueryResult, TableInfo};
 use relm4::ComponentSender;
@@ -23,7 +24,7 @@ use explanation::refusal_explanation;
 enum ResultEdit {
     Locked(ResultRefusal),
     Checking,
-    Editable(EditTarget),
+    Editable,
 }
 
 struct PendingBar {
@@ -260,19 +261,21 @@ impl SqlEditor {
         let source = match source_table(&outcome.sql, grammar) {
             Ok(source) => source,
             Err(lock) => {
-                self.lock_result_edits(ResultEdit::Locked(lock.into()));
+                self.lock_result_edits(ResultEdit::Locked(ResultLock::from(lock).into()));
                 return;
             }
         };
-        let Some(editing) = self.result_editing.as_mut() else {
-            return;
+        let run = {
+            let Some(editing) = self.result_editing.as_mut() else {
+                return;
+            };
+            editing.sql = outcome.sql.clone();
+            editing.driver_id = driver_id;
+            editing.result = Some(result);
+            editing.state = Some(ResultEdit::Checking);
+            editing.run
         };
-        editing.sql = outcome.sql.clone();
-        editing.driver_id = driver_id;
-        editing.result = Some(result);
-        editing.state = Some(ResultEdit::Checking);
         self.show_refusal(ResultRefusal::Checking);
-        let run = editing.run;
         self.fetch_edit_columns(run, source, sender);
     }
 
@@ -378,7 +381,7 @@ impl SqlEditor {
             editing.columns = owned;
             editing.table = Some(target.table.clone());
             editing.result = Some(editable.clone());
-            editing.state = Some(ResultEdit::Editable(target.clone()));
+            editing.state = Some(ResultEdit::Editable);
             editing
                 .change_trackers
                 .with_tab(editing.tab_id, |tracker| tracker.clear());
