@@ -12,7 +12,7 @@ async fn table_with(rows: u64) -> (tempfile::TempDir, Arc<dyn Connection>) {
         })
         .await
         .unwrap();
-    let control = crate::services::operation_control::bounded(30);
+    let control = operation_control::bounded(30);
     connection
         .execute_controlled("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)", &control)
         .await
@@ -107,7 +107,7 @@ fn a_filter_limits_the_exported_rows() {
     let runtime = runtime();
     let (_directory, connection) = runtime.block_on(table_with(30));
     let columns = runtime
-        .block_on(connection.fetch_columns_controlled(None, "t", &crate::services::operation_control::bounded(30)))
+        .block_on(connection.fetch_columns_controlled(None, "t", &operation_control::bounded(30)))
         .unwrap();
     let mut filtered = plan();
     filtered.filter = FilterSet {
@@ -130,7 +130,7 @@ fn a_table_larger_than_one_page_exports_to_a_complete_csv_file() {
     let total = EXPORT_PAGE_ROWS * 2 + 3;
     let (directory, connection) = runtime.block_on(table_with(total));
     let columns = runtime
-        .block_on(connection.fetch_columns_controlled(None, "t", &crate::services::operation_control::bounded(30)))
+        .block_on(connection.fetch_columns_controlled(None, "t", &operation_control::bounded(30)))
         .unwrap();
     let next = page_fetcher(connection, plan(), runner(&runtime), CancellationToken::new());
     let path = directory.path().join("all.csv");
