@@ -25,6 +25,14 @@ pub struct GroupInit {
     pub collapsed: bool,
     pub actions: bool,
     pub entry: bool,
+    pub new_schema: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SchemaCatalogActions {
+    pub create: bool,
+    pub drop: bool,
+    pub hide: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +42,7 @@ pub struct SidebarRowInit {
     pub depth: u8,
     pub group: Option<GroupInit>,
     pub column_source: Option<super::sidebar_columns::ColumnSource>,
+    pub schema_actions: SchemaCatalogActions,
 }
 
 fn chevron_icon(collapsed: bool) -> &'static str {
@@ -120,7 +129,9 @@ pub struct SidebarRow {
     chevron: gtk::Image,
     new_table_button: Option<gtk::Button>,
     csv_button: Option<gtk::Button>,
+    new_schema_button: Option<gtk::Button>,
     open_button: Option<gtk::Button>,
+    schema_actions: SchemaCatalogActions,
     /// The eagerly-parented context-menu popover. Held on the model
     /// so `shutdown` can `unparent()` it before the row's root widget
     /// is finalized — without this, GTK warns
@@ -130,7 +141,7 @@ pub struct SidebarRow {
     columns: super::sidebar_columns::SidebarColumns,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SidebarRowMsg {
     ToggleColumns(bool),
     Open,
@@ -148,6 +159,8 @@ pub enum SidebarRowMsg {
     HideSchema,
     ShowDiagram,
     CompareSchema,
+    NewSchema,
+    DropSchema,
 }
 
 #[derive(Debug)]
@@ -217,6 +230,10 @@ pub enum SidebarRowOutput {
         name: String,
     },
     HideSchema(String),
+    NewSchema,
+    DropSchema {
+        schema: String,
+    },
 }
 
 #[relm4::factory(pub)]
@@ -322,6 +339,11 @@ impl FactoryComponent for SidebarRow {
         } else {
             (None, None)
         };
+        let new_schema_button = init
+            .group
+            .as_ref()
+            .is_some_and(|group| group.new_schema)
+            .then(|| group_button("folder-new-symbolic", crate::tr!("New Schema\u{2026}").to_string()));
         let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
         let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
         chevron.set_visible(init.group.as_ref().is_some_and(|group| !group.entry));
@@ -334,7 +356,9 @@ impl FactoryComponent for SidebarRow {
             chevron,
             new_table_button,
             csv_button,
+            new_schema_button,
             open_button,
+            schema_actions: init.schema_actions,
             popover: Rc::new(RefCell::new(None)),
             columns: super::sidebar_columns::SidebarColumns::new(init.column_source),
         }
@@ -364,6 +388,9 @@ impl FactoryComponent for SidebarRow {
             widgets.row_content.append(button);
         }
         if let Some(button) = &self.csv_button {
+            widgets.row_content.append(button);
+        }
+        if let Some(button) = &self.new_schema_button {
             widgets.row_content.append(button);
         }
         if let Some(button) = &self.open_button {
@@ -539,6 +566,10 @@ impl FactoryComponent for SidebarRow {
             SidebarRowMsg::HideSchema => SidebarRowOutput::HideSchema(schema.unwrap_or_default()),
             SidebarRowMsg::ShowDiagram => SidebarRowOutput::ShowDiagram { schema },
             SidebarRowMsg::CompareSchema => SidebarRowOutput::CompareSchema { schema },
+            SidebarRowMsg::NewSchema => SidebarRowOutput::NewSchema,
+            SidebarRowMsg::DropSchema => SidebarRowOutput::DropSchema {
+                schema: schema.unwrap_or(name),
+            },
         };
         let _ = sender.output(output);
     }
@@ -580,66 +611,104 @@ impl SidebarRow {
             let from_csv = sender.clone();
             button.connect_clicked(move |_| from_csv.input(SidebarRowMsg::TableFromCsv));
         }
+        if let Some(button) = &self.new_schema_button {
+            let new_schema = sender.clone();
+            button.connect_clicked(move |_| new_schema.input(SidebarRowMsg::NewSchema));
+        }
     }
 
     fn wire_schema_menu(&mut self, root: &gtk::ListBoxRow, sender: &FactorySender<Self>) {
         let compare_enabled = std::env::var_os("BOOKIE_SCHEMA_COMPARE").is_some();
-        let menu = schema_menu(compare_enabled);
+        let menu = schema_menu(compare_enabled, self.schema_actions);
         let popover = gtk::PopoverMenu::from_model(Some(&menu));
         popover.set_parent(root);
-        let sender_for_hide = sender.clone();
-        let hide_action = gtk::gio::ActionEntry::builder("hide-schema")
-            .activate(move |_, _, _| sender_for_hide.input(SidebarRowMsg::HideSchema))
-            .build();
-        let sender_for_diagram = sender.clone();
-        let diagram_action = gtk::gio::ActionEntry::builder("show-diagram")
-            .activate(move |_, _, _| sender_for_diagram.input(SidebarRowMsg::ShowDiagram))
-            .build();
-        let sender_for_compare = sender.clone();
-        let compare_action = gtk::gio::ActionEntry::builder("compare-schema")
-            .activate(move |_, _, _| sender_for_compare.input(SidebarRowMsg::CompareSchema))
-            .build();
-        let group = gtk::gio::SimpleActionGroup::new();
-        group.add_action_entries([hide_action, diagram_action]);
-        if compare_enabled {
-            group.add_action_entries([compare_action]);
-        }
-        root.insert_action_group("sidebar-row", Some(&group));
-        let popover_for_unmap = popover.clone();
-        root.connect_unmap(move |_| popover_for_unmap.popdown());
-        *self.popover.borrow_mut() = Some(popover.clone());
-        let right_click = gtk::GestureClick::builder().button(3).build();
-        let popover_for_right = popover.clone();
-        right_click.connect_pressed(move |gesture, _, x, y| {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            popover_for_right.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popover_for_right.popup();
-        });
-        root.add_controller(right_click);
-        let popover_for_shortcut = popover;
-        let menu_shortcut = gtk::Shortcut::builder()
-            .trigger(&crate::ui::shortcut::parse("Menu"))
-            .action(&gtk::CallbackAction::new(move |_, _| {
-                popover_for_shortcut.popup();
-                glib::Propagation::Stop
-            }))
-            .build();
-        let shortcut_controller = gtk::ShortcutController::new();
-        shortcut_controller.add_shortcut(menu_shortcut);
-        root.add_controller(shortcut_controller);
+        root.insert_action_group(
+            "sidebar-row",
+            Some(&schema_action_group(sender, self.schema_actions, compare_enabled)),
+        );
+        attach_schema_popover(root, &popover);
+        *self.popover.borrow_mut() = Some(popover);
     }
 }
 
-fn schema_menu(compare_enabled: bool) -> gtk::gio::Menu {
+fn schema_action(
+    name: &str,
+    sender: &FactorySender<SidebarRow>,
+    msg: SidebarRowMsg,
+) -> gtk::gio::ActionEntry<gtk::gio::SimpleActionGroup> {
+    let sender = sender.clone();
+    gtk::gio::ActionEntry::builder(name)
+        .activate(move |_, _, _| sender.input(msg.clone()))
+        .build()
+}
+
+fn schema_action_group(
+    sender: &FactorySender<SidebarRow>,
+    actions: SchemaCatalogActions,
+    compare_enabled: bool,
+) -> gtk::gio::SimpleActionGroup {
+    let group = gtk::gio::SimpleActionGroup::new();
+    group.add_action_entries([schema_action("show-diagram", sender, SidebarRowMsg::ShowDiagram)]);
+    if actions.create {
+        group.add_action_entries([schema_action("new-schema", sender, SidebarRowMsg::NewSchema)]);
+    }
+    if actions.drop {
+        group.add_action_entries([schema_action("drop-schema", sender, SidebarRowMsg::DropSchema)]);
+    }
+    if compare_enabled {
+        group.add_action_entries([schema_action("compare-schema", sender, SidebarRowMsg::CompareSchema)]);
+    }
+    if actions.hide {
+        group.add_action_entries([schema_action("hide-schema", sender, SidebarRowMsg::HideSchema)]);
+    }
+    group
+}
+
+fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
+    let popover_for_unmap = popover.clone();
+    root.connect_unmap(move |_| popover_for_unmap.popdown());
+    let right_click = gtk::GestureClick::builder().button(3).build();
+    let popover_for_right = popover.clone();
+    right_click.connect_pressed(move |gesture, _, x, y| {
+        gesture.set_state(gtk::EventSequenceState::Claimed);
+        popover_for_right.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+        popover_for_right.popup();
+    });
+    root.add_controller(right_click);
+    let popover_for_shortcut = popover.clone();
+    let menu_shortcut = gtk::Shortcut::builder()
+        .trigger(&crate::ui::shortcut::parse("Menu"))
+        .action(&gtk::CallbackAction::new(move |_, _| {
+            popover_for_shortcut.popup();
+            glib::Propagation::Stop
+        }))
+        .build();
+    let shortcut_controller = gtk::ShortcutController::new();
+    shortcut_controller.add_shortcut(menu_shortcut);
+    root.add_controller(shortcut_controller);
+}
+
+fn schema_menu(compare_enabled: bool, actions: SchemaCatalogActions) -> gtk::gio::Menu {
     let menu = gtk::gio::Menu::new();
     menu.append(Some(&crate::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
+    if actions.create {
+        menu.append(Some(&crate::tr!("New Schema\u{2026}")), Some("sidebar-row.new-schema"));
+    }
+    if actions.drop {
+        menu.append(
+            Some(&crate::tr!("Drop Schema\u{2026}")),
+            Some("sidebar-row.drop-schema"),
+        );
+    }
     if compare_enabled {
         menu.append(
             Some(&crate::tr!("Compare with another schema…")),
             Some("sidebar-row.compare-schema"),
         );
     }
-    menu.append(Some(&crate::tr!("Hide schema")), Some("sidebar-row.hide-schema"));
+    if actions.hide {
+        menu.append(Some(&crate::tr!("Hide schema")), Some("sidebar-row.hide-schema"));
+    }
     menu
 }
 
@@ -652,8 +721,13 @@ mod tests {
     fn schema_compare_menu_requires_explicit_opt_in() {
         use gtk::gio::prelude::MenuModelExt;
 
+        let catalog = SchemaCatalogActions {
+            create: true,
+            drop: true,
+            hide: true,
+        };
         for enabled in [false, true] {
-            let menu = schema_menu(enabled);
+            let menu = schema_menu(enabled, catalog);
             let actions: Vec<_> = (0..menu.n_items())
                 .filter_map(|index| menu.item_attribute_value(index, "action", None))
                 .filter_map(|value| value.get::<String>())
@@ -661,7 +735,21 @@ mod tests {
             assert_eq!(actions.contains(&"sidebar-row.compare-schema".to_owned()), enabled);
             assert!(actions.contains(&"sidebar-row.show-diagram".to_owned()));
             assert!(actions.contains(&"sidebar-row.hide-schema".to_owned()));
+            assert!(actions.contains(&"sidebar-row.new-schema".to_owned()));
+            assert!(actions.contains(&"sidebar-row.drop-schema".to_owned()));
         }
+    }
+
+    #[test]
+    fn schema_catalog_actions_omit_unsupported_entries() {
+        use gtk::gio::prelude::MenuModelExt;
+
+        let menu = schema_menu(false, SchemaCatalogActions::default());
+        let actions: Vec<_> = (0..menu.n_items())
+            .filter_map(|index| menu.item_attribute_value(index, "action", None))
+            .filter_map(|value| value.get::<String>())
+            .collect();
+        assert_eq!(actions, vec!["sidebar-row.show-diagram".to_owned()]);
     }
 
     fn pump() {
@@ -689,7 +777,9 @@ mod tests {
                 collapsed: false,
                 actions: true,
                 entry: false,
+                new_schema: false,
             }),
+            schema_actions: SchemaCatalogActions::default(),
         });
         factory.guard().push_back(SidebarRowInit {
             info: TableInfo {
@@ -700,6 +790,7 @@ mod tests {
             depth: 1,
             group: None,
             column_source: None,
+            schema_actions: SchemaCatalogActions::default(),
         });
         pump();
         let chevron_of = |index: i32| {
@@ -741,7 +832,9 @@ mod catalog_entry_tests {
                 collapsed: false,
                 actions: false,
                 entry: true,
+                new_schema: false,
             }),
+            schema_actions: SchemaCatalogActions::default(),
         });
         let context = glib::MainContext::default();
         while context.iteration(false) {}
@@ -796,6 +889,7 @@ mod columns_affordance_tests {
             depth: 1,
             group: None,
             column_source: None,
+            schema_actions: SchemaCatalogActions::default(),
         });
         while glib::MainContext::default().iteration(false) {}
         let row = list.row_at_index(0).unwrap();
@@ -818,8 +912,10 @@ mod columns_affordance_tests {
                 collapsed: false,
                 actions: true,
                 entry: false,
+                new_schema: false,
             }),
             column_source: None,
+            schema_actions: SchemaCatalogActions::default(),
         });
         factory.guard().push_back(SidebarRowInit {
             info: TableInfo {
@@ -834,8 +930,10 @@ mod columns_affordance_tests {
                 collapsed: false,
                 actions: false,
                 entry: false,
+                new_schema: false,
             }),
             column_source: None,
+            schema_actions: SchemaCatalogActions::default(),
         });
         while glib::MainContext::default().iteration(false) {}
         assert_eq!(action_button_count(list.row_at_index(1).unwrap().upcast_ref()), 2);
@@ -863,6 +961,7 @@ mod lazy_context_menu_tests {
             depth: 1,
             group: None,
             column_source: None,
+            schema_actions: SchemaCatalogActions::default(),
         });
         while glib::MainContext::default().iteration(false) {}
         assert!(factory.get(0).is_some_and(|row| row.popover.borrow().is_none()));

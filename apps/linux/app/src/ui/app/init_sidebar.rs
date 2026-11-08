@@ -82,6 +82,10 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
             SidebarRowOutput::ShowDiagram { schema } => AppMsg::ShowErDiagram { schema },
             SidebarRowOutput::CompareSchema { schema } => AppMsg::CompareSchema { schema },
             SidebarRowOutput::HideSchema(schema) => AppMsg::HideSidebarSchema(schema),
+            SidebarRowOutput::NewSchema => AppMsg::CatalogDdl(crate::ui::app::msg::CatalogDdlMsg::NewSchemaPrompt),
+            SidebarRowOutput::DropSchema { schema } => {
+                AppMsg::CatalogDdl(crate::ui::app::msg::CatalogDdlMsg::DropSchemaPrompt { schema })
+            }
         });
 
     let sidebar_listbox = sidebar_factory.widget();

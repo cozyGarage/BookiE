@@ -4,6 +4,34 @@ use uuid::Uuid;
 
 use super::{OpenMode, SessionTeardownAction};
 
+#[derive(Debug, Clone)]
+pub enum CatalogDdlMsg {
+    NewSchemaPrompt,
+    CreateSchemaConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        name: String,
+    },
+    DropSchemaPrompt {
+        schema: String,
+    },
+    DropSchemaConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: String,
+    },
+    NewDatabasePrompt,
+    CreateDatabaseConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        name: String,
+    },
+    DropDatabasePrompt {
+        database: String,
+    },
+    DropDatabaseConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        database: String,
+    },
+}
+
 #[derive(Debug)]
 pub enum AppMsg {
     OpenConnect,
@@ -283,6 +311,7 @@ pub enum AppMsg {
         schema: Option<String>,
         table: String,
     },
+    CatalogDdl(CatalogDdlMsg),
     ExecuteStructureTransaction {
         tab_id: Uuid,
         statements: Vec<String>,

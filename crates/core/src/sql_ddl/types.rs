@@ -9,6 +9,9 @@ pub enum BuildDdlError {
     #[error("table name is empty")]
     EmptyTableName,
 
+    #[error("schema or database name is empty")]
+    EmptyCatalogName,
+
     #[error("at least one column is required")]
     NoColumns,
 
@@ -617,6 +620,15 @@ pub(crate) fn validate_table(table: &str) -> Result<(), BuildDdlError> {
         Ok(()) => Ok(()),
         Err(crate::sql_dialect::IdentError::Empty) => Err(BuildDdlError::EmptyTableName),
         Err(_) => Err(BuildDdlError::UnsafeIdentifier(table.into())),
+    }
+}
+
+pub(crate) fn validate_catalog_name(name: &str) -> Result<&str, BuildDdlError> {
+    let name = name.trim();
+    match crate::sql_dialect::validate_ident(name) {
+        Ok(()) => Ok(name),
+        Err(crate::sql_dialect::IdentError::Empty) => Err(BuildDdlError::EmptyCatalogName),
+        Err(_) => Err(BuildDdlError::UnsafeIdentifier(name.into())),
     }
 }
 
