@@ -1,4 +1,6 @@
 use bookie_app_services::{completion, completion_identifiers, completion_proposals};
+mod bookmark_menu;
+mod bookmarks;
 mod bottom_panel;
 mod completion_provider;
 mod completion_requests;
@@ -261,6 +263,7 @@ impl SimpleComponent for SqlEditor {
                         },
 
                         append = &fold_menu::build(&sender),
+                        append = &bookmark_menu::build(&sender),
                         append = &snippet_menu::build(&sender),
 
                         #[name = "session_button"]
@@ -389,6 +392,8 @@ impl SimpleComponent for SqlEditor {
             known_lexing.clone(),
         );
         run_marks::install(&widgets.source_view);
+        bookmarks::install(&widgets.source_view);
+        bookmarks::install(split_view.secondary_view());
         let folding = std::rc::Rc::new(std::cell::RefCell::new(folding::FoldController::new(
             &widgets.source_view.buffer(),
         )));
@@ -397,11 +402,18 @@ impl SimpleComponent for SqlEditor {
         for view in [&widgets.source_view, split_view.secondary_view()] {
             let folding_for_mark = folding.clone();
             view.connect_line_mark_activated(move |view, iter, button, _, _| {
-                if button == 1
-                    && let Ok(buffer) = view.buffer().downcast::<sourceview5::Buffer>()
-                {
-                    folding_for_mark.borrow_mut().unfold_line(&buffer, iter.line());
+                if button != 1 {
+                    return;
                 }
+                let Ok(buffer) = view.buffer().downcast::<sourceview5::Buffer>() else {
+                    return;
+                };
+                let line = iter.line();
+                if !buffer.source_marks_at_line(line, Some("sql-fold")).is_empty() {
+                    folding_for_mark.borrow_mut().unfold_line(&buffer, line);
+                    return;
+                }
+                bookmarks::remove_at_line(&buffer, line);
             });
         }
         let transaction_actions = toolbar_actions::TransactionActions::install(&widgets.toolbar_view, &sender);
@@ -766,6 +778,24 @@ impl SimpleComponent for SqlEditor {
                 let target_chars = sql[..target].chars().count() as i32;
                 buffer.place_cursor(&buffer.iter_at_offset(target_chars));
                 self.source_view.scroll_mark_onscreen(&buffer.get_insert());
+            }
+
+            SqlEditorInput::ToggleBookmark => {
+                if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
+                    bookmarks::toggle_at_cursor(&buffer);
+                }
+            }
+
+            SqlEditorInput::JumpBookmark { forward } => {
+                if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
+                    bookmarks::jump(&self.source_view, &buffer, forward);
+                }
+            }
+
+            SqlEditorInput::ClearBookmarks => {
+                if let Ok(buffer) = self.source_view.buffer().downcast::<sourceview5::Buffer>() {
+                    bookmarks::clear(&buffer);
+                }
             }
 
             SqlEditorInput::RunAtCursor => self.run_scope(true, sender.clone()),

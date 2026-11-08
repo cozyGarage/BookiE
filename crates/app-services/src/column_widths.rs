@@ -6,6 +6,15 @@ use uuid::Uuid;
 use super::config_io::xdg_config_path;
 use super::state_file::StateFile;
 
+#[path = "column_width_policy.rs"]
+mod policy;
+pub use policy::{
+    BOOL_CELLS, MIN_CELLS, SAMPLE_ROWS, TEXT_MAX_CELLS, TYPICAL_DIGIT_CELLS, TYPICAL_TEXT_CELLS, WidthKind,
+    default_width_cells, header_measure_text, is_plain_ascii, monospace_cells, number_width_cells,
+    sampled_measure_texts, typical_measure_texts, typical_width_cells, width_kind_for_data_type, width_kind_for_value,
+    within_cell_cap,
+};
+
 type Connections = HashMap<String, HashMap<String, HashMap<String, i32>>>;
 type HiddenColumns = HashMap<String, HashMap<String, Vec<String>>>;
 

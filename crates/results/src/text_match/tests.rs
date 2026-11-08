@@ -91,3 +91,24 @@ fn whole_word_replace_does_not_expand_dollar_templates() {
     let (text, count) = matcher("id", options).replace_all("id=1", "$0");
     assert_eq!((text.as_str(), count), ("$0=1", 1));
 }
+
+#[test]
+fn case_insensitive_replace_maps_expanding_lowercase_to_source_span() {
+    let matcher = matcher("é", TextMatchOptions::default());
+    assert_eq!(matcher.replace_all("İ École", "X"), ("İ Xcole".to_owned(), 1));
+}
+
+#[test]
+fn case_insensitive_replace_keeps_matches_after_expanding_lowercase() {
+    let matcher = matcher("é", TextMatchOptions::default());
+    assert_eq!(
+        matcher.replace_all("İ École Élite", "X"),
+        ("İ Xcole Xlite".to_owned(), 2)
+    );
+}
+
+#[test]
+fn case_insensitive_ascii_search_keeps_expanding_unicode_matches_in_source_order() {
+    let matcher = matcher("i", TextMatchOptions::default());
+    assert_eq!(matcher.replace_all("İ i", "X"), ("X X".to_owned(), 2));
+}

@@ -10,8 +10,6 @@ use gtk4::prelude::*;
 
 pub(super) use dialog::FindTarget;
 use dialog::present;
-pub(super) use query::{FindQuery, RowMatch, matching_rows};
-pub(super) use replace::{ReplaceEdit, ReplaceReport, plan_replacements};
 
 pub(super) fn install(view: &gtk::ColumnView, actions: &gtk::gio::SimpleActionGroup, target: FindTarget) {
     let action = gtk::gio::SimpleAction::new("find-row", None);

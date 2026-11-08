@@ -479,12 +479,13 @@ fn row_key_values(
             }
             false
         });
-    } else if let Some(row) = model.item(position).and_then(|item| item.downcast::<RowObject>().ok()) {
+    } else {
+        let row = model
+            .item(position)
+            .and_then(|item| item.downcast::<RowObject>().ok())?;
         for (slot, &column) in pk_indices.iter().enumerate() {
             values[slot] = Some(row.cell_value(column));
         }
-    } else {
-        return None;
     }
     values.into_iter().collect()
 }

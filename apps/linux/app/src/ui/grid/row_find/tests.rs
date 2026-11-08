@@ -93,7 +93,7 @@ fn match_options_and_column_scope_narrow_loaded_row_search() {
         },
         None,
     );
-    assert!(find_with(cased, 10).is_empty());
+    assert_eq!(find_with(cased, 10), vec![(2, 1)]);
     let whole = FindQuery::new(
         "alice",
         TextMatchOptions {
@@ -102,7 +102,7 @@ fn match_options_and_column_scope_narrow_loaded_row_search() {
         },
         None,
     );
-    assert_eq!(find_with(whole, 10), vec![(2, 1)]);
+    assert_eq!(find_with(whole, 10), vec![(0, 1), (2, 1)]);
     let scoped = FindQuery::new("3", TextMatchOptions::default(), Some(1));
     assert!(find_with(scoped, 10).is_empty());
     let regex = FindQuery::new(

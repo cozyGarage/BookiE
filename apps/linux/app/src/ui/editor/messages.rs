@@ -89,6 +89,11 @@ pub enum SqlEditorInput {
     JumpStatement {
         forward: bool,
     },
+    ToggleBookmark,
+    JumpBookmark {
+        forward: bool,
+    },
+    ClearBookmarks,
     ToggleLineComment,
     ToggleFold,
     InsertSnippet(String),
