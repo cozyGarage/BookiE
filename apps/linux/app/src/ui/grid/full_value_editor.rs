@@ -1,11 +1,57 @@
+use std::cell::{Cell, RefCell};
+
 use bookie_core::{ColumnInfo, Value};
+use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{self as gtk};
 use relm4::adw;
 use relm4::adw::prelude::*;
 use serde_json::value::RawValue;
+use sourceview5::prelude::*;
 
 const MAX_EDIT_BYTES: usize = 1024 * 1024;
+
+thread_local! {
+    static SHOW_INVISIBLE: Cell<bool> = const { Cell::new(true) };
+    static OPEN_VIEWS: RefCell<Vec<glib::WeakRef<sourceview5::View>>> = const { RefCell::new(Vec::new()) };
+}
+
+pub(crate) fn set_show_invisible_characters(show: bool) {
+    SHOW_INVISIBLE.set(show);
+    OPEN_VIEWS.with(|views| {
+        let mut views = views.borrow_mut();
+        views.retain(|weak| weak.upgrade().is_some());
+        for view in views.iter().filter_map(|weak| weak.upgrade()) {
+            apply_whitespace_marks(&view, show);
+        }
+    });
+}
+
+fn show_invisible_characters() -> bool {
+    SHOW_INVISIBLE.get()
+}
+
+fn track_value_editor(view: &sourceview5::View) {
+    OPEN_VIEWS.with(|views| {
+        let mut views = views.borrow_mut();
+        views.retain(|weak| weak.upgrade().is_some());
+        if !views.iter().any(|weak| weak.upgrade().as_ref() == Some(view)) {
+            views.push(view.downgrade());
+        }
+    });
+}
+
+fn apply_whitespace_marks(view: &sourceview5::View, show: bool) {
+    let drawer = view.space_drawer();
+    drawer.set_types_for_locations(
+        sourceview5::SpaceLocationFlags::ALL,
+        sourceview5::SpaceTypeFlags::SPACE
+            | sourceview5::SpaceTypeFlags::TAB
+            | sourceview5::SpaceTypeFlags::NEWLINE
+            | sourceview5::SpaceTypeFlags::NBSP,
+    );
+    drawer.set_enable_matrix(show);
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum FullValueKind {
@@ -208,8 +254,8 @@ pub(super) fn present(
     dialog
 }
 
-fn create_text_view(initial_text: &str) -> gtk::TextView {
-    let view = gtk::TextView::builder()
+fn create_text_view(initial_text: &str) -> sourceview5::View {
+    let view = sourceview5::View::builder()
         .monospace(true)
         .wrap_mode(gtk::WrapMode::WordChar)
         .top_margin(8)
@@ -218,6 +264,9 @@ fn create_text_view(initial_text: &str) -> gtk::TextView {
         .right_margin(12)
         .build();
     view.buffer().set_text(initial_text);
+    crate::ui::theme::style_editor(&view);
+    apply_whitespace_marks(&view, show_invisible_characters());
+    track_value_editor(&view);
     view
 }
 
@@ -249,7 +298,7 @@ fn create_actions(nullable: bool, is_json: bool) -> EditorActions {
     }
 }
 
-fn create_content(view: &gtk::TextView, actions: &gtk::Box) -> (gtk::Box, gtk::Label) {
+fn create_content(view: &sourceview5::View, actions: &gtk::Box) -> (gtk::Box, gtk::Label) {
     let scroller = gtk::ScrolledWindow::builder()
         .child(view)
         .min_content_width(520)
