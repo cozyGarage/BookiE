@@ -115,7 +115,7 @@ fn comments_are_in_column_details_without_growing_every_header() {
     info.name = "id".into();
     info.comment = Some("Customer id\nsecond line".into());
     assert_eq!(column_header_title(&info, false), "id\nINTEGER");
-    let menu = header_details(&info, false);
+    let menu = header_details(&info, false, false);
     let details = menu.item_link(0, "section").unwrap();
     let comment = details
         .item_attribute_value(3, "label", None)
@@ -124,7 +124,7 @@ fn comments_are_in_column_details_without_growing_every_header() {
         .unwrap();
     assert_eq!(comment, "Customer id\nsecond line");
     info.comment = Some("x".repeat(2000));
-    let menu = header_details(&info, false);
+    let menu = header_details(&info, false, false);
     let details = menu.item_link(0, "section").unwrap();
     let comment = details
         .item_attribute_value(3, "label", None)

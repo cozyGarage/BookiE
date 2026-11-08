@@ -1545,6 +1545,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::local_filter::tests::local_multi_key_sort_reverses_secondary_and_clears_to_source_order"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::local_sort::tests::local_text_sort_follows_the_locale_collation_not_byte_order"
     ],
     [

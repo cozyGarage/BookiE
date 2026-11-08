@@ -49,7 +49,7 @@ fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
     title
 }
 
-fn header_details(info: &ColumnInfo, foreign_key: bool) -> gtk4::gio::Menu {
+fn header_details(info: &ColumnInfo, foreign_key: bool, sort_enabled: bool) -> gtk4::gio::Menu {
     let details = gtk4::gio::Menu::new();
     for text in [
         crate::tr!("Column: {name}").replace("{name}", &info.name),
@@ -74,6 +74,11 @@ fn header_details(info: &ColumnInfo, foreign_key: bool) -> gtk4::gio::Menu {
     }
     let menu = gtk4::gio::Menu::new();
     menu.append_section(Some(&crate::tr!("Column details")), &details);
+    if sort_enabled {
+        let sort_actions = gtk4::gio::Menu::new();
+        sort_actions.append(Some(&crate::tr!("Clear sort")), Some("grid.clear-sort"));
+        menu.append_section(Some(&crate::tr!("Sort")), &sort_actions);
+    }
     menu
 }
 
@@ -230,6 +235,7 @@ pub(super) fn build_column(
     column.set_header_menu(Some(&header_details(
         info,
         tab_ctx.foreign_key_columns.contains(&info.name),
+        sort_enabled,
     )));
     if sort_enabled {
         let dummy = gtk4::CustomSorter::new(|_, _| gtk4::Ordering::Equal);
