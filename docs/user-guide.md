@@ -196,6 +196,8 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+D | Save query as favorite |
 | Ctrl+Shift+B | Open saved queries (favorites) |
 | Ctrl+Shift+E | Export results from the front tab |
+| Ctrl+Alt+G | Focus the active result grid (reopens a hidden Results panel) |
+| Ctrl+Alt+E | Focus the SQL editor |
 | Ctrl+P | Open Quickly |
 | Ctrl+H | Query history |
 | Ctrl+Tab | Most recently used tab |
@@ -207,7 +209,7 @@ Press Ctrl+? for the full list. The most used:
 
 ### Results panel
 
-Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Results** and **Errors** are one switcher with the active view marked: choosing **Results** while Errors is shown returns to the existing result selector, and choosing it again hides the panel. **Errors** shows a count only when the latest run failed, and lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
+Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Ctrl+Alt+G** focuses the visible result grid for the selected query or browse tab and reopens a hidden Results panel; **Ctrl+Alt+E** returns focus to the SQL editor. Neither chord runs a query. **Results** and **Errors** are one switcher with the active view marked: choosing **Results** while Errors is shown returns to the existing result selector, and choosing it again hides the panel. **Errors** shows a count only when the latest run failed, and lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
 
 Drag the divider to resize the panel. **Maximize results** hides the SQL area; **Restore editor** returns to the previous divider position and SQL focus. Hiding a maximized panel also restores the editor. Panel size is retained within the open editor, not across an application restart. Closing the query releases its panel with the rest of that editor.
 

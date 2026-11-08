@@ -67,7 +67,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
   <img alt="The SQL editor in BookiE, with query result below" src="images/sql-editor-light.png" width="100%">
 </picture>
 
-- Ctrl+E opens an editor tab. Ctrl+Enter runs the selected text, or the whole script when nothing is selected. Ctrl+Shift+Enter runs the statement at the cursor. Escape cancels a running query when the server supports it.
+- Ctrl+E opens an editor tab. Ctrl+Enter runs the selected text, or the whole script when nothing is selected. Ctrl+Shift+Enter runs the statement at the cursor. Escape cancels a running query when the server supports it. Ctrl+Alt+G focuses the active query or browse result grid (and reopens a hidden Results panel); Ctrl+Alt+E returns focus to the SQL editor.
 - Syntax highlighting, code folding and a side-by-side split of the same query.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
 - Bound parameters: Write `:name` in queries; BookiE prompts for typed values before execution without string concatenation.
