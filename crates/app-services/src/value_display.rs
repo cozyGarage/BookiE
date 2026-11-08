@@ -80,7 +80,10 @@ fn format_value(value: &Value, prefs: DisplayPrefs, role: TextRole) -> String {
         Value::Int(number) => number.to_string(),
         Value::Float(number) => number.to_string(),
         Value::Text(text) => text.clone(),
-        Value::Bytes(bytes) => bytes_text(bytes),
+        Value::Bytes(bytes) => match role {
+            TextRole::Paint => bytes_paint_text(bytes),
+            TextRole::Copy => bytes_copy_text(bytes),
+        },
         Value::Date(_) | Value::DateTime(_) | Value::TimestampTz(_) => {
             let format = match role {
                 TextRole::Paint => prefs.date_format,
@@ -106,10 +109,17 @@ fn null_paint(style: NullDisplayPref) -> String {
     }
 }
 
-fn bytes_text(bytes: &[u8]) -> String {
+fn bytes_paint_text(bytes: &[u8]) -> String {
     match std::str::from_utf8(bytes) {
         Ok(text) if !text.contains('\0') => text.to_owned(),
         _ => format!("<{} bytes>", bytes.len()),
+    }
+}
+
+fn bytes_copy_text(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(text) if !text.contains('\0') => text.to_owned(),
+        _ => format!("\\x{}", bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>()),
     }
 }
 
@@ -266,6 +276,38 @@ mod tests {
         );
         assert_eq!(painted.as_str(), "\u{2205}");
         assert_eq!(copy_text(&value).as_str(), "");
+    }
+
+    #[test]
+    fn binary_copy_keeps_invalid_utf8_and_nul_bytes_as_full_hex() {
+        let invalid = Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01]);
+        assert_eq!(paint_value(&invalid, DisplayPrefs::default()).as_str(), "<4 bytes>");
+        assert_eq!(copy_text(&invalid).as_str(), "\\xfffe0001");
+        let with_nul = Value::Bytes(b"ab\0cd".to_vec());
+        assert_eq!(paint_value(&with_nul, DisplayPrefs::default()).as_str(), "<5 bytes>");
+        assert_eq!(copy_text(&with_nul).as_str(), "\\x6162006364");
+    }
+
+    #[test]
+    fn binary_copy_keeps_every_byte_beyond_a_view_hex_cap() {
+        let bytes = vec![0xABu8; 20_000];
+        let value = Value::Bytes(bytes.clone());
+        assert_eq!(
+            paint_value(&value, DisplayPrefs::default()).as_str(),
+            "<20000 bytes>"
+        );
+        let copied = copy_text(&value);
+        assert!(copied.as_str().starts_with("\\x"));
+        assert_eq!(copied.as_str().len(), 2 + bytes.len() * 2);
+        assert!(!copied.as_str().contains("bytes>"));
+        assert_eq!(&copied.as_str()[2..], &"ab".repeat(bytes.len()));
+    }
+
+    #[test]
+    fn valid_utf8_bytes_still_copy_as_text() {
+        let value = Value::Bytes(b"plain text".to_vec());
+        assert_eq!(copy_text(&value).as_str(), "plain text");
+        assert_eq!(paint_value(&value, DisplayPrefs::default()).as_str(), "plain text");
     }
 
     #[test]
