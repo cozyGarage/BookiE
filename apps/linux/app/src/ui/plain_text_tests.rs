@@ -147,7 +147,7 @@ fn a_preferences_group_left_unescaped_loses_a_title_with_markup_characters() {
 #[ignore = "requires an isolated GTK display"]
 fn a_welcome_screen_group_named_with_markup_characters_shows_its_name() {
     adw::init().unwrap();
-    let group = crate::ui::welcome_view::section_group(Some(HOSTILE));
+    let group = crate::ui::welcome_view::section_group(Some(HOSTILE), 0);
     assert!(
         shows_literally(&group, HOSTILE),
         "{:?}",

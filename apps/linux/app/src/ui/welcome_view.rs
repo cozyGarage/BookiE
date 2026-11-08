@@ -3,10 +3,13 @@ use relm4::factory::FactoryVecDeque;
 use relm4::prelude::*;
 use relm4::{adw, gtk};
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use bookie_core::DriverRegistry;
-use bookie_storage::{ConnectionOrganizationIndex, SavedConnection, arrange_connections};
+use bookie_storage::{
+    ConnectionOrganizationIndex, GroupTreeNode, SavedConnection, arrange_connections, connection_group_tree,
+};
 use uuid::Uuid;
 
 use super::connection_row::{ConnectionRow, ConnectionRowInit, ConnectionRowOutput};
@@ -16,9 +19,7 @@ pub struct WelcomeView {
     connections: Vec<SavedConnection>,
     organization: ConnectionOrganizationIndex,
     filter: String,
-    /// One factory per rendered group. A `FactoryVecDeque` owns exactly
-    /// one list box, so a per-group section needs its own factory; the
-    /// vector is rebuilt whenever the arrangement changes.
+    collapsed_groups: HashSet<String>,
     sections: Vec<FactoryVecDeque<ConnectionRow>>,
     sections_box: gtk::Box,
     stack: gtk::Stack,
@@ -33,6 +34,7 @@ pub enum WelcomeViewInput {
     SetConnections(Vec<SavedConnection>),
     SetOrganization(ConnectionOrganizationIndex),
     FilterChanged(String),
+    ToggleGroupCollapse(String),
     OpenConnect,
     ImportUrl,
     OpenSaved(Box<SavedConnection>),
@@ -230,6 +232,7 @@ impl SimpleComponent for WelcomeView {
             connections: Vec::new(),
             organization: ConnectionOrganizationIndex::default(),
             filter: String::new(),
+            collapsed_groups: HashSet::new(),
             sections: Vec::new(),
             sections_box,
             stack: root.clone(),
@@ -253,6 +256,12 @@ impl SimpleComponent for WelcomeView {
             }
             WelcomeViewInput::FilterChanged(filter) => {
                 self.filter = filter;
+                self.rebuild_rows(&sender);
+            }
+            WelcomeViewInput::ToggleGroupCollapse(path) => {
+                if !self.collapsed_groups.remove(&path) {
+                    self.collapsed_groups.insert(path);
+                }
                 self.rebuild_rows(&sender);
             }
             WelcomeViewInput::OpenConnect => {
@@ -322,20 +331,15 @@ fn recent_connection_detail(driver: &str, environment: bookie_core::Environment)
 impl WelcomeView {
     fn rebuild_rows(&mut self, sender: &ComponentSender<Self>) {
         self.rebuild_recent(sender);
-        // Favourites first, then group, then name — the ordering lives
-        // in bookie-storage so the same arrangement is testable
-        // without a GTK main context. Recency is a deliberate casualty:
-        // an explicit favourite outranks "whatever I opened last".
         let arranged = arrange_connections(&self.connections, &self.organization, &self.filter);
-        let sections = group_sections(&arranged, &self.organization);
+        let tree = connection_group_tree(&arranged, &self.organization);
 
         self.sections.clear();
         while let Some(child) = self.sections_box.first_child() {
             self.sections_box.remove(&child);
         }
-        for (group, members) in sections {
-            self.sections
-                .push(self.build_section(group.as_deref(), &members, sender));
+        for node in &tree {
+            self.append_tree_node(node, 0, sender);
         }
 
         self.search
@@ -348,6 +352,34 @@ impl WelcomeView {
             "populated"
         };
         self.stack.set_visible_child_name(name);
+    }
+
+    fn append_tree_node(&mut self, node: &GroupTreeNode, depth: u32, sender: &ComponentSender<Self>) {
+        let collapsed = node
+            .path
+            .as_ref()
+            .is_some_and(|path| self.collapsed_groups.contains(path));
+        let title = node.path.as_ref().map(|_| node.title.as_str());
+        let section = section_group(title, depth);
+        if let Some(path) = &node.path {
+            let toggle = collapse_button(!collapsed);
+            let path = path.clone();
+            let sender = sender.clone();
+            toggle.connect_clicked(move |_| sender.input(WelcomeViewInput::ToggleGroupCollapse(path.clone())));
+            section.set_header_suffix(Some(&toggle));
+        }
+        self.sections_box.append(&section);
+        if collapsed {
+            return;
+        }
+        if !node.connections.is_empty() {
+            let factory = self.build_connection_factory(&node.connections, sender);
+            section.add(factory.widget());
+            self.sections.push(factory);
+        }
+        for child in &node.children {
+            self.append_tree_node(child, depth.saturating_add(1), sender);
+        }
     }
 
     fn rebuild_recent(&self, sender: &ComponentSender<Self>) {
@@ -396,9 +428,8 @@ impl WelcomeView {
         }
     }
 
-    fn build_section(
+    fn build_connection_factory(
         &self,
-        group: Option<&str>,
         members: &[SavedConnection],
         sender: &ComponentSender<Self>,
     ) -> FactoryVecDeque<ConnectionRow> {
@@ -423,31 +454,46 @@ impl WelcomeView {
             guard.push_back(ConnectionRowInit::new(saved.clone(), organization, &self.registry));
         }
         drop(guard);
-
-        let section = section_group(group);
-        section.add(factory.widget());
-        self.sections_box.append(&section);
         factory
     }
 }
 
-/// Bucket an already-arranged list into the groups the list renders.
-/// Bucket order and the order inside each bucket both follow
-/// `arrange_connections`, so grouping never reorders what the user
-/// already sees; it only draws a heading between runs.
-fn group_sections(
-    arranged: &[SavedConnection],
-    index: &ConnectionOrganizationIndex,
-) -> Vec<(Option<String>, Vec<SavedConnection>)> {
-    let mut sections: Vec<(Option<String>, Vec<SavedConnection>)> = Vec::new();
-    for saved in arranged {
-        let group = index.get(saved.id).group;
-        match sections.iter_mut().find(|(name, _)| *name == group) {
-            Some((_, members)) => members.push(saved.clone()),
-            None => sections.push((group, vec![saved.clone()])),
+fn visible_group_paths(nodes: &[GroupTreeNode], collapsed: &HashSet<String>) -> Vec<Option<String>> {
+    let mut visible = Vec::new();
+    collect_visible_group_paths(nodes, collapsed, &mut visible);
+    visible
+}
+
+fn collect_visible_group_paths(
+    nodes: &[GroupTreeNode],
+    collapsed: &HashSet<String>,
+    visible: &mut Vec<Option<String>>,
+) {
+    for node in nodes {
+        visible.push(node.path.clone());
+        if node.path.as_ref().is_some_and(|path| collapsed.contains(path)) {
+            continue;
         }
+        collect_visible_group_paths(&node.children, collapsed, visible);
     }
-    sections
+}
+
+fn collapse_button(expanded: bool) -> gtk::Button {
+    let icon = if expanded {
+        "pan-down-symbolic"
+    } else {
+        "pan-end-symbolic"
+    };
+    let label = if expanded {
+        crate::tr!("Collapse group")
+    } else {
+        crate::tr!("Expand group")
+    };
+    gtk::Button::builder()
+        .icon_name(icon)
+        .has_frame(false)
+        .tooltip_text(&label)
+        .build()
 }
 
 fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
@@ -489,11 +535,15 @@ fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
     page
 }
 
-pub(crate) fn section_group(group: Option<&str>) -> adw::PreferencesGroup {
+pub(crate) fn section_group(group: Option<&str>, depth: u32) -> adw::PreferencesGroup {
     let title = group.map_or_else(|| crate::tr!("Ungrouped"), str::to_owned);
-    adw::PreferencesGroup::builder()
+    let section = adw::PreferencesGroup::builder()
         .title(crate::ui::plain_text::escape_markup(&title))
-        .build()
+        .build();
+    if depth > 0 {
+        section.set_margin_start(i32::try_from(depth.saturating_mul(12)).unwrap_or(96));
+    }
+    section
 }
 
 #[cfg(test)]
@@ -544,58 +594,60 @@ mod tests {
         let first = saved("alpha");
         let second = saved("beta");
         let arranged = vec![first.clone(), second.clone()];
-
-        let sections = group_sections(&arranged, &ConnectionOrganizationIndex::default());
-
-        assert_eq!(sections.len(), 1);
-        assert_eq!(sections[0].0, None);
-        assert_eq!(sections[0].1.len(), 2);
+        let tree = connection_group_tree(&arranged, &ConnectionOrganizationIndex::default());
+        assert_eq!(tree.len(), 1);
+        assert_eq!(tree[0].path, None);
+        assert_eq!(tree[0].connections.len(), 2);
     }
 
     #[test]
-    fn each_group_becomes_its_own_section_in_arranged_order() {
-        let prod = saved("prod db");
-        let staging = saved("staging db");
+    fn nested_groups_render_as_a_tree_in_arranged_order() {
+        let eu = saved("eu db");
+        let us = saved("us db");
         let loose = saved("scratch");
         let index = index(&[
-            (prod.id, Some("Production"), false),
-            (staging.id, Some("Staging"), false),
+            (eu.id, Some("Production / EU"), false),
+            (us.id, Some("Production / US"), false),
         ]);
-        let arranged = vec![prod.clone(), staging.clone(), loose.clone()];
-
-        let sections = group_sections(&arranged, &index);
-
-        assert_eq!(
-            sections.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>(),
-            vec![Some("Production".to_owned()), Some("Staging".to_owned()), None,]
-        );
-        assert_eq!(sections[2].1[0].id, loose.id);
+        let arranged = vec![eu.clone(), us.clone(), loose.clone()];
+        let tree = connection_group_tree(&arranged, &index);
+        assert_eq!(tree.len(), 2);
+        assert_eq!(tree[0].path.as_deref(), Some("Production"));
+        assert_eq!(tree[0].children.len(), 2);
+        assert_eq!(tree[0].children[0].path.as_deref(), Some("Production / EU"));
+        assert_eq!(tree[0].children[1].path.as_deref(), Some("Production / US"));
+        assert_eq!(tree[1].path, None);
+        assert_eq!(tree[1].connections[0].id, loose.id);
     }
 
     #[test]
-    fn a_group_that_reappears_later_keeps_one_section() {
-        let first = saved("a");
-        let other = saved("b");
-        let third = saved("c");
+    fn collapsing_a_parent_hides_its_nested_children() {
+        let eu = saved("eu db");
+        let us = saved("us db");
         let index = index(&[
-            (first.id, Some("Production"), false),
-            (other.id, Some("Staging"), false),
-            (third.id, Some("Production"), false),
+            (eu.id, Some("Production / EU"), false),
+            (us.id, Some("Production / US"), false),
         ]);
-        let arranged = vec![first.clone(), other, third.clone()];
-
-        let sections = group_sections(&arranged, &index);
-
-        assert_eq!(sections.len(), 2);
-        assert_eq!(sections[0].0.as_deref(), Some("Production"));
-        assert_eq!(sections[0].1.len(), 2);
-        assert_eq!(sections[0].1[0].id, first.id);
-        assert_eq!(sections[0].1[1].id, third.id);
+        let tree = connection_group_tree(&[eu, us], &index);
+        let mut collapsed = HashSet::new();
+        collapsed.insert("Production".to_owned());
+        assert_eq!(
+            visible_group_paths(&tree, &collapsed),
+            vec![Some("Production".to_owned())]
+        );
+        assert_eq!(
+            visible_group_paths(&tree, &HashSet::new()),
+            vec![
+                Some("Production".to_owned()),
+                Some("Production / EU".to_owned()),
+                Some("Production / US".to_owned()),
+            ]
+        );
     }
 
     #[test]
     fn an_empty_arrangement_renders_no_sections() {
-        assert!(group_sections(&[], &ConnectionOrganizationIndex::default()).is_empty());
+        assert!(connection_group_tree(&[], &ConnectionOrganizationIndex::default()).is_empty());
     }
 
     #[test]

@@ -18,6 +18,16 @@ const MAX_ORGANIZATION_FILE_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_ORGANIZED_CONNECTIONS: usize = 1_000;
 pub const MAX_TAGS_PER_CONNECTION: usize = 32;
 pub const MAX_LABEL_LEN: usize = 64;
+pub const MAX_GROUP_DEPTH: usize = 8;
+pub const GROUP_PATH_SEPARATOR: &str = " / ";
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroupTreeNode {
+    pub path: Option<String>,
+    pub title: String,
+    pub connections: Vec<SavedConnection>,
+    pub children: Vec<GroupTreeNode>,
+}
 
 /// Grouping, tagging and the favourite flag for one saved connection.
 /// Kept beside `connections.json` rather than inside it so the
@@ -49,7 +59,7 @@ impl ConnectionOrganization {
     pub fn new(group: Option<&str>, tags: &[String], favorite: bool) -> Result<Self, StorageError> {
         let group = match group.map(str::trim).filter(|value| !value.is_empty()) {
             None => None,
-            Some(value) => Some(validate_label(value, "group")?),
+            Some(value) => Some(validate_group_path(value)?),
         };
         if tags.len() > MAX_TAGS_PER_CONNECTION {
             return Err(StorageError::Schema(format!(
@@ -96,8 +106,8 @@ impl ConnectionOrganization {
             .group
             .as_deref()
             .map(str::trim)
-            .filter(|value| !value.is_empty() && value.chars().count() <= MAX_LABEL_LEN)
-            .map(str::to_owned);
+            .filter(|value| !value.is_empty())
+            .and_then(|value| validate_group_path(value).ok());
         let mut tags: Vec<String> = Vec::new();
         for tag in &self.tags {
             let tag = tag.trim();
@@ -191,11 +201,27 @@ impl ConnectionOrganizationIndex {
             .retain(|id, _| connections.iter().any(|connection| &connection.id == id));
     }
 
-    /// Every group in use, sorted case-insensitively. Feeds the group
-    /// picker so the user reuses an existing group instead of creating
-    /// a near-duplicate.
     pub fn groups(&self) -> Vec<String> {
         distinct_labels(self.entries.values().filter_map(|entry| entry.group.as_deref()))
+    }
+
+    pub fn group_paths(&self) -> Vec<String> {
+        let mut paths: Vec<String> = Vec::new();
+        for entry in self.entries.values() {
+            let Some(group) = entry.group.as_deref() else {
+                continue;
+            };
+            let segments = parse_group_path(group);
+            let mut path = String::new();
+            for (index, segment) in segments.iter().enumerate() {
+                if index > 0 {
+                    path.push_str(GROUP_PATH_SEPARATOR);
+                }
+                path.push_str(segment);
+                paths.push(path.clone());
+            }
+        }
+        distinct_labels(paths.iter().map(String::as_str))
     }
 
     pub fn tags(&self) -> Vec<String> {
@@ -422,6 +448,108 @@ fn group_key(entry: &ConnectionOrganization) -> (bool, String) {
     match entry.group.as_deref() {
         Some(group) => (false, group.to_lowercase()),
         None => (true, String::new()),
+    }
+}
+
+pub fn parse_group_path(path: &str) -> Vec<String> {
+    path.split('/')
+        .map(str::trim)
+        .filter(|segment| !segment.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+pub fn join_group_path(segments: &[String]) -> Option<String> {
+    let cleaned: Vec<String> = segments
+        .iter()
+        .map(|segment| segment.trim())
+        .filter(|segment| !segment.is_empty())
+        .map(str::to_owned)
+        .collect();
+    if cleaned.is_empty() {
+        return None;
+    }
+    Some(cleaned.join(GROUP_PATH_SEPARATOR))
+}
+
+pub fn validate_group_path(path: &str) -> Result<String, StorageError> {
+    let segments = parse_group_path(path);
+    if segments.is_empty() {
+        return Err(StorageError::Schema("a group cannot be empty".into()));
+    }
+    if segments.len() > MAX_GROUP_DEPTH {
+        return Err(StorageError::Schema(format!(
+            "a group path is limited to {MAX_GROUP_DEPTH} levels"
+        )));
+    }
+    for segment in &segments {
+        validate_label(segment, "group")?;
+    }
+    join_group_path(&segments).ok_or_else(|| StorageError::Schema("a group cannot be empty".into()))
+}
+
+pub fn connection_group_tree(arranged: &[SavedConnection], index: &ConnectionOrganizationIndex) -> Vec<GroupTreeNode> {
+    let mut roots: Vec<GroupTreeNode> = Vec::new();
+    for saved in arranged {
+        insert_tree_connection(&mut roots, index.get(saved.id).group.as_deref(), saved.clone());
+    }
+    roots
+}
+
+fn insert_tree_connection(roots: &mut Vec<GroupTreeNode>, group: Option<&str>, saved: SavedConnection) {
+    let Some(group) = group else {
+        push_tree_connection(roots, None, String::new(), saved);
+        return;
+    };
+    let segments = parse_group_path(group);
+    if segments.is_empty() {
+        push_tree_connection(roots, None, String::new(), saved);
+        return;
+    }
+    insert_at_segments(roots, &segments, 0, String::new(), saved);
+}
+
+fn insert_at_segments(
+    nodes: &mut Vec<GroupTreeNode>,
+    segments: &[String],
+    index: usize,
+    parent_path: String,
+    saved: SavedConnection,
+) {
+    let segment = &segments[index];
+    let path = if parent_path.is_empty() {
+        segment.clone()
+    } else {
+        format!("{parent_path}{GROUP_PATH_SEPARATOR}{segment}")
+    };
+    let position = nodes
+        .iter()
+        .position(|node| node.path.as_deref() == Some(path.as_str()))
+        .unwrap_or_else(|| {
+            nodes.push(GroupTreeNode {
+                path: Some(path.clone()),
+                title: segment.clone(),
+                connections: Vec::new(),
+                children: Vec::new(),
+            });
+            nodes.len() - 1
+        });
+    if index + 1 == segments.len() {
+        nodes[position].connections.push(saved);
+        return;
+    }
+    insert_at_segments(&mut nodes[position].children, segments, index + 1, path, saved);
+}
+
+fn push_tree_connection(roots: &mut Vec<GroupTreeNode>, path: Option<String>, title: String, saved: SavedConnection) {
+    match roots.iter().position(|node| node.path == path) {
+        Some(position) => roots[position].connections.push(saved),
+        None => roots.push(GroupTreeNode {
+            path,
+            title,
+            connections: vec![saved],
+            children: Vec::new(),
+        }),
     }
 }
 
