@@ -1,6 +1,6 @@
 use bookie_core::Value;
 
-use crate::preferences::DateFormatPref;
+use crate::preferences::{DateFormatPref, NullDisplayPref};
 
 impl DateFormatPref {
     fn clock_pattern(self) -> Option<&'static str> {
@@ -21,6 +21,95 @@ impl DateFormatPref {
             Self::UsLong | Self::UsShort => Some("%m/%d/%Y"),
             Self::EuLong | Self::EuShort => Some("%d/%m/%Y"),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DisplayPrefs {
+    pub null_display: NullDisplayPref,
+    pub date_format: DateFormatPref,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaintedText(String);
+
+impl PaintedText {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CopyText(String);
+
+impl CopyText {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+pub fn paint_value(value: &Value, prefs: DisplayPrefs) -> PaintedText {
+    PaintedText(format_value(value, prefs, TextRole::Paint))
+}
+
+pub fn copy_text(value: &Value) -> CopyText {
+    CopyText(format_value(value, DisplayPrefs::default(), TextRole::Copy))
+}
+
+#[derive(Clone, Copy)]
+enum TextRole {
+    Paint,
+    Copy,
+}
+
+fn format_value(value: &Value, prefs: DisplayPrefs, role: TextRole) -> String {
+    match value {
+        Value::Null => match role {
+            TextRole::Paint => null_paint(prefs.null_display),
+            TextRole::Copy => String::new(),
+        },
+        Value::Bool(flag) => flag.to_string(),
+        Value::Int(number) => number.to_string(),
+        Value::Float(number) => number.to_string(),
+        Value::Text(text) => text.clone(),
+        Value::Bytes(bytes) => bytes_text(bytes),
+        Value::Date(_) | Value::DateTime(_) | Value::TimestampTz(_) => {
+            let format = match role {
+                TextRole::Paint => prefs.date_format,
+                TextRole::Copy => DateFormatPref::Iso,
+            };
+            format_temporal_for_display(value, format).unwrap_or_default()
+        }
+        Value::Time(time) => time.format("%H:%M:%S").to_string(),
+        Value::Decimal(number) => number.to_string(),
+        Value::Uuid(id) => id.to_string(),
+        Value::Json(json) => json.to_string(),
+        Value::JsonText(text) => text.clone(),
+        Value::Undecodable(_) if value.is_missing_field() => "(missing)".to_owned(),
+        Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
+    }
+}
+
+fn null_paint(style: NullDisplayPref) -> String {
+    match style {
+        NullDisplayPref::Standard => "NULL".to_owned(),
+        NullDisplayPref::Symbol => "\u{2205}".to_owned(),
+        NullDisplayPref::Parenthesized => "(null)".to_owned(),
+    }
+}
+
+fn bytes_text(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(text) if !text.contains('\0') => text.to_owned(),
+        _ => format!("<{} bytes>", bytes.len()),
     }
 }
 
@@ -134,5 +223,68 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn paint_value_uses_a_non_default_date_form() {
+        let day = NaiveDate::from_ymd_opt(2024, 12, 31).unwrap();
+        let stamp = Value::DateTime(day.and_hms_opt(23, 59, 58).unwrap());
+        let painted = paint_value(
+            &stamp,
+            DisplayPrefs {
+                date_format: DateFormatPref::UsShort,
+                ..DisplayPrefs::default()
+            },
+        );
+        assert_eq!(painted.as_str(), "12/31/2024");
+    }
+
+    #[test]
+    fn copy_text_ignores_display_date_form() {
+        let day = NaiveDate::from_ymd_opt(2024, 12, 31).unwrap();
+        let stamp = Value::DateTime(day.and_hms_opt(23, 59, 58).unwrap());
+        let prefs = DisplayPrefs {
+            date_format: DateFormatPref::UsShort,
+            ..DisplayPrefs::default()
+        };
+        let painted = paint_value(&stamp, prefs);
+        let copied = copy_text(&stamp);
+        assert_eq!(painted.as_str(), "12/31/2024");
+        assert_eq!(copied.as_str(), "2024-12-31 23:59:58");
+        assert_ne!(painted.as_str(), copied.as_str());
+    }
+
+    #[test]
+    fn null_paint_follows_pref_while_copy_stays_empty() {
+        let value = Value::Null;
+        let painted = paint_value(
+            &value,
+            DisplayPrefs {
+                null_display: NullDisplayPref::Symbol,
+                ..DisplayPrefs::default()
+            },
+        );
+        assert_eq!(painted.as_str(), "\u{2205}");
+        assert_eq!(copy_text(&value).as_str(), "");
+    }
+
+    #[test]
+    fn paint_does_not_mutate_the_source_value() {
+        let stamp = Value::DateTime(
+            NaiveDate::from_ymd_opt(2024, 12, 31)
+                .unwrap()
+                .and_hms_opt(23, 59, 58)
+                .unwrap(),
+        );
+        let before = stamp.clone();
+        let _ = paint_value(
+            &stamp,
+            DisplayPrefs {
+                date_format: DateFormatPref::EuShort,
+                ..DisplayPrefs::default()
+            },
+        );
+        let _ = copy_text(&stamp);
+        assert_eq!(stamp, before);
     }
 }
