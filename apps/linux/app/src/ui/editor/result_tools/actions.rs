@@ -100,7 +100,12 @@ impl Tools {
                 .is_some_and(|toggle| toggle.is_active()),
             regex: self.controls.regex.upgrade().is_some_and(|toggle| toggle.is_active()),
         };
-        let selected = self.controls.columns.upgrade().map(|columns| columns.selected()).unwrap_or(0);
+        let selected = self
+            .controls
+            .columns
+            .upgrade()
+            .map(|columns| columns.selected())
+            .unwrap_or(0);
         let column = (selected > 0).then(|| selected as usize - 1);
         SearchSpec {
             needle,
@@ -184,9 +189,7 @@ impl Tools {
             let source = self.source.clone();
             let progress = progress.clone();
             std::thread::Builder::new().name("result-find".into()).spawn(move || {
-                let scope = spec
-                    .column
-                    .map_or(ColumnScope::Any, ColumnScope::Column);
+                let scope = spec.column.map_or(ColumnScope::Any, ColumnScope::Column);
                 let predicate = ResultPredicate::Contains {
                     scope,
                     needle: spec.needle,

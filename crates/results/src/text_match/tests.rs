@@ -47,10 +47,22 @@ fn regex_matches_and_rejects_invalid_patterns() {
 
 #[test]
 fn empty_terms_compile_to_no_matcher() {
-    assert!(TextMatcher::compile("   ", TextMatchOptions::default()).unwrap().is_none());
-    assert!(TextMatcher::compile("", TextMatchOptions { regex: true, ..Default::default() })
+    assert!(
+        TextMatcher::compile("   ", TextMatchOptions::default())
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        TextMatcher::compile(
+            "",
+            TextMatchOptions {
+                regex: true,
+                ..Default::default()
+            }
+        )
         .unwrap()
-        .is_none());
+        .is_none()
+    );
 }
 
 #[test]

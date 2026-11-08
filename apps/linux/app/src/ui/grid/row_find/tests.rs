@@ -4,11 +4,11 @@ use bookie_app_services::text_match::TextMatchOptions;
 use bookie_core::Value;
 use tokio_util::sync::CancellationToken;
 
+use super::super::display::value_to_display_text;
 use super::dialog::preview;
 use super::json_search::{CaseInsensitivePattern, JsonSearchWriter, matches_value};
 use super::query::{FindQuery, matching_rows};
 use super::replace::plan_replacements;
-use super::super::display::value_to_display_text;
 
 const PREVIEW_CHARS: usize = 80;
 
