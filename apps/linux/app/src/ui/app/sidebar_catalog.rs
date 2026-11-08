@@ -19,6 +19,7 @@ impl App {
             return;
         };
         let token = self.sidebar_catalog_cancel.borrow().child_token();
+        let hidden_schemas = self.hidden_schema_names();
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let reply = sender.clone();
@@ -26,10 +27,15 @@ impl App {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
-                    let result = conn
-                        .list_objects_controlled(kind, None, &control)
-                        .await
-                        .map_err(|error| crate::services::error_text::driver_message(&error));
+                    let result = crate::services::catalog::list_objects_excluding(
+                        conn.as_ref(),
+                        kind,
+                        None,
+                        &hidden_schemas,
+                        &control,
+                    )
+                    .await
+                    .map_err(|error| crate::services::error_text::driver_message(&error));
                     reply.input(AppMsg::SidebarCatalogLoaded { origin, kind, result });
                 })
                 .drop_on_shutdown()

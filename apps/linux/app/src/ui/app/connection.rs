@@ -66,11 +66,18 @@ impl App {
             return;
         }
         self.switch.transition = ConnectionTransition::Connecting;
+        let hidden_schemas = prefill
+            .as_ref()
+            .and_then(|prefill| self.workspace.load_database(prefill.saved.id, &prefill.saved.database))
+            .map(|state| state.hidden_schemas)
+            .unwrap_or_default();
         let dialog = ConnectDialog::builder()
             .launch(ConnectDialogInit {
                 registry: self.registry.clone(),
                 preferences: self.preferences.clone(),
+                workspace: self.workspace.clone(),
                 bound_connection_id: prefill.as_ref().map(|prefill| prefill.saved.id),
+                hidden_schemas,
                 prefill,
                 ssh_environment: self.database.ssh_environment(),
                 audit_factory: self.database.transport_audit_factory(),
@@ -383,6 +390,11 @@ impl App {
             .database
             .ssh_environment_for_connection(&saved, bookie_policy::Principal::human_gui());
         let guard_factory = self.database.candidate_guard_factory();
+        let hidden_schemas = self
+            .workspace
+            .load_database(saved.id, &saved.database)
+            .map(|state| state.hidden_schemas)
+            .unwrap_or_default();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -391,6 +403,7 @@ impl App {
                     match connection_service::open_saved(
                         registry,
                         saved,
+                        hidden_schemas,
                         timeout_secs,
                         ssh_environment,
                         cancel.clone(),

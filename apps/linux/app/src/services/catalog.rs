@@ -1,10 +1,42 @@
 use super::database_service::{ConnectionIdentity, DatabaseService};
-use bookie_core::{Connection, TableInfo};
+use bookie_core::{CatalogObject, CatalogObjectKind, Connection, DriverError, OperationControl, TableInfo};
 use bookie_policy::{PolicyGuard, Principal};
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub type Catalog = (Vec<TableInfo>, Vec<TableInfo>);
+
+pub(crate) async fn list_tables_excluding(
+    connection: &dyn Connection,
+    hidden_schemas: &[String],
+    control: &OperationControl,
+) -> Result<Vec<TableInfo>, DriverError> {
+    connection
+        .list_tables_excluding_controlled(hidden_schemas, control)
+        .await
+}
+
+pub(crate) async fn list_views_excluding(
+    connection: &dyn Connection,
+    hidden_schemas: &[String],
+    control: &OperationControl,
+) -> Result<Vec<TableInfo>, DriverError> {
+    connection
+        .list_views_excluding_controlled(hidden_schemas, control)
+        .await
+}
+
+pub(crate) async fn list_objects_excluding(
+    connection: &dyn Connection,
+    kind: CatalogObjectKind,
+    schema: Option<&str>,
+    hidden_schemas: &[String],
+    control: &OperationControl,
+) -> Result<Vec<CatalogObject>, DriverError> {
+    connection
+        .list_objects_excluding_controlled(kind, schema, hidden_schemas, control)
+        .await
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CatalogOrigin {
@@ -42,6 +74,40 @@ impl CatalogOrigin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hidden_schema_scope_is_applied_before_catalog_results_reach_consumers() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            use bookie_core::{AttachedDatabase, ConnectOptions, DatabaseDriver, OperationControl};
+
+            let driver = drivers_sqlite::SqliteDriver;
+            let attached = tempfile::NamedTempFile::new().unwrap();
+            let options = ConnectOptions {
+                attached_databases: vec![AttachedDatabase::new("hidden", attached.path().to_string_lossy())],
+                ..Default::default()
+            };
+            let connection = driver.connect(options).await.unwrap();
+            connection.execute("CREATE TABLE visible(id INTEGER)").await.unwrap();
+            connection
+                .execute("CREATE TABLE hidden.visible(id INTEGER)")
+                .await
+                .unwrap();
+            let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+            let tables = list_tables_excluding(connection.as_ref(), &["hidden".to_string()], &control)
+                .await
+                .unwrap();
+            assert!(
+                tables
+                    .iter()
+                    .any(|table| table.name == "visible" && table.schema.is_none())
+            );
+            assert!(tables.iter().all(|table| table.schema.as_deref() != Some("hidden")));
+        });
+    }
 
     fn session() -> (Arc<dyn Connection>, ConnectionIdentity) {
         use bookie_core::DatabaseDriver;

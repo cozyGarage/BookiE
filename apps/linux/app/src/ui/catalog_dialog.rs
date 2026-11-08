@@ -17,6 +17,7 @@ struct CatalogSource {
     database: std::sync::Arc<DatabaseService>,
     preferences: PreferencesStore,
     connection_scope: CancellationToken,
+    hidden_schemas: Vec<String>,
     in_flight: Rc<RefCell<CancellationToken>>,
 }
 
@@ -27,6 +28,7 @@ pub fn present(
     preferences: &PreferencesStore,
     connection_scope: CancellationToken,
     initial_kind: Option<CatalogObjectKind>,
+    hidden_schemas: Vec<String>,
 ) {
     let Some(connection) = connection_id.filter(|id| database.metadata(*id).is_some()) else {
         let alert = adw::AlertDialog::new(
@@ -42,6 +44,7 @@ pub fn present(
         database: database.clone(),
         preferences: preferences.clone(),
         connection_scope: connection_scope.clone(),
+        hidden_schemas,
         in_flight: Rc::new(RefCell::new(connection_scope.child_token())),
     });
     let dialog = adw::Dialog::builder().title(tr!("Catalog")).build();
@@ -162,10 +165,18 @@ fn load(
     status.set_text(&tr!("Loading…"));
     let timeout_secs =
         crate::services::operation_control::timeout_for(&source.preferences, &source.database, Some(source.connection));
+    let hidden_schemas = source.hidden_schemas.clone();
     let (list, status) = (list.clone(), status.clone());
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
-        let outcome = conn.list_objects_controlled(kind, schema.as_deref(), &control).await;
+        let outcome = crate::services::catalog::list_objects_excluding(
+            conn.as_ref(),
+            kind,
+            schema.as_deref(),
+            &hidden_schemas,
+            &control,
+        )
+        .await;
         if token.is_cancelled() {
             return;
         }

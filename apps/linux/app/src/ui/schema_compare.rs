@@ -18,6 +18,7 @@ pub struct CompareRequest {
     pub driver_id: String,
     pub capabilities: DriverCapabilities,
     pub scope: CancellationToken,
+    pub hidden_schemas: Vec<String>,
 }
 
 pub fn present(
@@ -37,8 +38,25 @@ pub fn present(
     let timeout = crate::services::operation_control::timeout_for(preferences, database, request.connection_id);
     let parent = parent.clone();
     glib::spawn_future_local(async move {
+        if request
+            .schema
+            .as_ref()
+            .is_some_and(|schema| request.hidden_schemas.iter().any(|hidden| hidden == schema))
+        {
+            return notify(
+                &parent,
+                &tr!("Hidden schema"),
+                &tr!("Show the schema before comparing it."),
+            );
+        }
         let control = crate::services::operation_control::bounded_with(timeout, request.scope.child_token());
-        let tables = match connection.list_tables_controlled(&control).await {
+        let tables = match crate::services::catalog::list_tables_excluding(
+            connection.as_ref(),
+            &request.hidden_schemas,
+            &control,
+        )
+        .await
+        {
             Ok(tables) => tables,
             Err(error) => return failed(&parent, &error),
         };
