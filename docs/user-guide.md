@@ -67,6 +67,7 @@ In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+A
 - **Open editor**: Press `Ctrl+E` or `Ctrl+T` to open a SQL tab.
 - **Split editor**: Click **Split** in the toolbar to edit side-by-side with shared carets and independent scroll.
 - **Code folding**: Press `Ctrl+Shift+[` inside any block to fold it; `Ctrl+Shift+]` or the gutter markers unfold blocks.
+- **Line bookmarks**: Press `Ctrl+F2` to bookmark or clear the current line. Press `Ctrl+Shift+Down` or `Ctrl+Shift+Up` to jump between bookmarks in this editor. The bookmark toolbar menu can clear every bookmark in the buffer.
 - **Autocompletion**: Context-aware suggestions for keywords, schemas, tables, and columns.
 - **Bound parameters**: Write `:name` in your query; BookiE prompts for typed values before execution without string concatenation.
 
@@ -202,6 +203,8 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+/ | Toggle a line comment |
 | Ctrl+Shift+[ | Fold the SQL block at the cursor |
 | Ctrl+Shift+] | Unfold all SQL blocks |
+| Ctrl+F2 | Toggle a bookmark on the current line |
+| Ctrl+Shift+Down / Up | Jump to the next or previous bookmark |
 | F5 | Refresh the table |
 | Ctrl+W | Close the tab |
 

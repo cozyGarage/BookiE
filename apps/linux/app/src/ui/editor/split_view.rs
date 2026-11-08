@@ -81,7 +81,7 @@ impl SplitEditorView {
 }
 
 pub(crate) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSender<SqlEditor>) {
-    let shortcuts: [EditorShortcut; 7] = [
+    let shortcuts: [EditorShortcut; 8] = [
         ("<Primary>Return", || SqlEditorInput::Run),
         ("Escape", || SqlEditorInput::Cancel),
         ("<Primary><Shift>f", || SqlEditorInput::Format),
@@ -89,6 +89,7 @@ pub(crate) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSend
         ("<Primary>slash", || SqlEditorInput::ToggleLineComment),
         ("<Primary><Shift>bracketleft", || SqlEditorInput::ToggleFold),
         ("<Primary><Shift>bracketright", || SqlEditorInput::UnfoldAll),
+        ("<Primary>F2", || SqlEditorInput::ToggleBookmark),
     ];
     let controller = gtk::ShortcutController::new();
     for (trigger, input) in shortcuts {
@@ -110,6 +111,18 @@ pub(crate) fn install_shortcuts(view: &sourceview5::View, sender: &ComponentSend
                 .trigger(&crate::ui::shortcut::parse(trigger))
                 .action(&gtk::CallbackAction::new(move |_, _| {
                     sender.input(SqlEditorInput::JumpStatement { forward });
+                    gtk::glib::Propagation::Stop
+                }))
+                .build(),
+        );
+    }
+    for (trigger, forward) in [("<Primary><Shift>Down", true), ("<Primary><Shift>Up", false)] {
+        let sender = sender.clone();
+        controller.add_shortcut(
+            gtk::Shortcut::builder()
+                .trigger(&crate::ui::shortcut::parse(trigger))
+                .action(&gtk::CallbackAction::new(move |_, _| {
+                    sender.input(SqlEditorInput::JumpBookmark { forward });
                     gtk::glib::Propagation::Stop
                 }))
                 .build(),

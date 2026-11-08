@@ -19,6 +19,7 @@ pub mod connection_form;
 pub mod connection_identity;
 pub mod database_backup;
 pub mod driver_error_presentation;
+pub mod editor_bookmarks;
 pub mod editor_panel;
 pub mod enum_input;
 pub mod er_diagram;
