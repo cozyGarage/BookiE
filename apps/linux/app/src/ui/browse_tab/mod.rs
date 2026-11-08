@@ -1077,6 +1077,11 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::SelectAllRows => self.handle_select_all_rows(),
             BrowseTabInput::GoToFirstRow => self.handle_go_to_first_row(),
             BrowseTabInput::GoToLastRow => self.handle_go_to_last_row(),
+            BrowseTabInput::FocusGrid => {
+                if let Some(view) = self.current_column_view.as_ref() {
+                    view.grab_focus();
+                }
+            }
             BrowseTabInput::CommitSave => self.handle_commit_save(sender),
             BrowseTabInput::PreviewSql => self.handle_preview_sql(&sender),
             BrowseTabInput::DiscardAll => self.handle_discard_all(sender),

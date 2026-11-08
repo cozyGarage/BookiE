@@ -94,17 +94,25 @@ pub(super) fn install_window_actions(
         input_action!("back-up-database", AppMsg::BackUpDatabase),
         input_action!("restore-database", AppMsg::RestoreDatabase),
     ]);
-    let show_audit_for = show_audit_operation_action(sender.clone());
-    group.add_action(&show_audit_for);
-    let disconnect_action = gio::SimpleAction::new("disconnect", None);
-    let disconnect_sender = sender.clone();
-    disconnect_action.connect_activate(move |_, _| disconnect_sender.input(AppMsg::Disconnect));
-    group.add_action(&disconnect_action);
+    group.add_action_entries([
+        input_action!("focus-grid", AppMsg::FocusActiveGrid),
+        input_action!("focus-editor", AppMsg::FocusActiveEditor),
+    ]);
+    group.add_action(&show_audit_operation_action(sender.clone()));
+    let disconnect_action = install_disconnect_action(&group, &sender);
     crate::ui::leak_probe::install(&group);
     window.insert_action_group("win", Some(&group));
     disconnect_action.set_enabled(false);
     tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
     disconnect_action
+}
+
+fn install_disconnect_action(group: &gio::SimpleActionGroup, sender: &ComponentSender<App>) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("disconnect", None);
+    let sender = sender.clone();
+    action.connect_activate(move |_, _| sender.input(AppMsg::Disconnect));
+    group.add_action(&action);
+    action
 }
 
 fn show_audit_operation_action(sender: ComponentSender<App>) -> gio::SimpleAction {
@@ -138,6 +146,8 @@ pub(super) const WINDOW_SHORTCUTS: &[(&str, &str)] = &[
     ("<Primary><Shift>l", "win.reveal-in-sidebar"),
     ("<Primary>d", "win.save-favorite"),
     ("<Primary><Shift>b", "win.show-saved-queries"),
+    ("<Primary><Alt>g", "win.focus-grid"),
+    ("<Primary><Alt>e", "win.focus-editor"),
     ("<Primary>s", "win.save-changes"),
     ("<Primary><Shift>s", "win.save-file-as"),
     ("<Primary>z", "win.undo-change"),
@@ -249,6 +259,8 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &dialog,
         &crate::tr!("SQL editor"),
         &[
+            ("<Primary><Alt>g", crate::tr!("Focus result grid")),
+            ("<Primary><Alt>e", crate::tr!("Focus SQL editor")),
             ("<Primary>Return", crate::tr!("Run query")),
             ("<Primary><Shift>Return", crate::tr!("Run statement at cursor")),
             ("<Primary><Shift>s", crate::tr!("Save the SQL file as")),

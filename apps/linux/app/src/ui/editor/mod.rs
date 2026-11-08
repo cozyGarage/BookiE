@@ -741,6 +741,8 @@ impl SimpleComponent for SqlEditor {
                 }
             }
 
+            SqlEditorInput::FocusResultGrid => self.panel.focus_result_grid(),
+            SqlEditorInput::FocusEditor => self.panel.focus_editor(),
             SqlEditorInput::TogglePin => self.toggle_pin(&sender),
             SqlEditorInput::Panel(action) => self.panel.apply(action),
             SqlEditorInput::NavigateError(target) => self.navigate_error(target),

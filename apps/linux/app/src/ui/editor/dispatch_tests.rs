@@ -262,6 +262,7 @@ impl Drop for EditorFixture {
     }
 }
 
+#[track_caller]
 fn spin_until(mut condition: impl FnMut() -> bool) {
     let deadline = Instant::now() + Duration::from_secs(5);
     let context = gtk::glib::MainContext::default();
