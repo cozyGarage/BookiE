@@ -875,6 +875,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::bookmarks::tests::toggle_jump_and_clear_move_source_marks_with_the_cursor"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::folding::tests::folding_hides_lines_without_changing_query_text_and_can_be_cleared"
     ],
     [

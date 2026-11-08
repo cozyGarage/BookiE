@@ -63,6 +63,13 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Fold two blocks, then use Unfold all and Ctrl+Shift+]. Both show the complete query.
 - [ ] Edit the query while a block is folded. The editor reveals the full query and clears stale fold markers.
 
+## SQL line bookmarks
+
+- [ ] Place the cursor on several lines and press Ctrl+F2 (or use the bookmark toolbar menu). Each bookmarked line shows a gutter marker in light and dark themes, including the split pane.
+- [ ] Press Ctrl+Shift+Down and Ctrl+Shift+Up to move between bookmarks without wrapping past the first or last mark.
+- [ ] Click a bookmark-only gutter marker to clear that line. Click a fold marker still unfolds the block.
+- [ ] Choose Clear bookmarks from the menu: every bookmark in that buffer is gone. Editing the SQL leaves bookmarks in place (they track the buffer).
+
 ## Pinned results and gutter marks
 
 - [ ] Run `SELECT 1 AS first;`, then run `SELECT pg_sleep(3), 2 AS second;`: while it runs, the first result stays on screen, dimmed, with Running… and the spinner in the toolbar; when it finishes the dimming is gone and the second result is shown. Repeat with a query that fails, with Cancel, and with a statement that times out: each replaces the dimmed result. A streamed PostgreSQL SELECT keeps the previous result until its first page arrives.
