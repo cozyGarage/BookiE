@@ -93,6 +93,7 @@ pub struct BrowseTab {
     current_offset: u64,
     page_size: u64,
     current_sort: Option<(usize, bool)>,
+    current_sort_keys: Vec<(usize, bool)>,
     /// Server-side WHERE filter applied to every fetch. Persisted per
     /// `(connection_id, schema, table)` via `services::filter_settings`.
     /// Empty FilterSet means no WHERE clause; updates restart pagination
@@ -153,6 +154,8 @@ pub struct BrowseTab {
     /// when a sort happens). Cleared by `restore_focused_row`.
     pending_focus_restore: std::cell::RefCell<Option<crate::services::change_tracker::RowKey>>,
     paginator_label: gtk::Label,
+    sort_status_label: gtk::Label,
+    clear_sort_button: gtk::Button,
     /// Live count of selected rows. Hidden when 0 or 1 rows are
     /// selected; shows "{n} selected" once the user shift-clicks
     /// or Ctrl+clicks to build a multi-row selection. Updated via
@@ -655,6 +658,7 @@ impl SimpleComponent for BrowseTab {
             current_offset: init.initial_offset,
             page_size: init.page_size,
             current_sort: init.initial_sort,
+            current_sort_keys: init.initial_sort.into_iter().collect(),
             current_filter: initial_filter,
             current_columns: Vec::new(),
             foreign_keys: Vec::new(),
@@ -684,6 +688,8 @@ impl SimpleComponent for BrowseTab {
             save_in_flight: std::cell::Cell::new(None),
             pending_focus_restore: std::cell::RefCell::new(None),
             paginator_label: paginator.paginator_label,
+            sort_status_label: paginator.sort_status_label,
+            clear_sort_button: paginator.clear_sort_button.clone(),
             selection_label: paginator.selection_label,
             selection_count_label: paginator.selection_count_label,
             selection_details_label: paginator.selection_details_label,
@@ -976,22 +982,40 @@ impl SimpleComponent for BrowseTab {
                     let _ = sender.output(BrowseTabOutput::StateChanged);
                 }
             }
-            BrowseTabInput::SortChanged { col_idx, ascending } => {
-                // Idempotent: GtkColumnViewSorter fires both
-                // `primary-sort-column` and `primary-sort-order`
-                // notifies for one logical click on a different
-                // column (column changes; order resets). Each
-                // notify dispatches the same post-state pair, so
-                // we short-circuit when the pair already matches.
-                let next = (col_idx, ascending);
-                if self.current_sort == Some(next) {
+            BrowseTabInput::SortChanged { keys } => {
+                let next_primary = keys.first().copied();
+                let primary_changed = self.current_sort != next_primary;
+                let keys_changed = self.current_sort_keys != keys;
+                if !primary_changed && !keys_changed {
                     return;
                 }
-                self.current_sort = Some(next);
+                self.current_sort_keys = keys;
+                self.current_sort = next_primary;
+                if primary_changed {
+                    self.current_offset = 0;
+                    self.reset_keyset_navigation();
+                    self.capture_focus_for_restore();
+                    self.emit_fetch_page(&sender);
+                    let _ = sender.output(BrowseTabOutput::StateChanged);
+                } else {
+                    self.apply_local_sort_keys();
+                    self.update_sort_status_label();
+                }
+            }
+            BrowseTabInput::ClearSort => {
+                if self.current_sort.is_none() && self.current_sort_keys.is_empty() {
+                    return;
+                }
+                self.current_sort = None;
+                self.current_sort_keys.clear();
+                if let Some(view) = self.current_column_view.as_ref() {
+                    view.sort_by_column(None::<&gtk::ColumnViewColumn>, gtk::SortType::Ascending);
+                }
                 self.current_offset = 0;
                 self.reset_keyset_navigation();
                 self.capture_focus_for_restore();
                 self.emit_fetch_page(&sender);
+                self.update_sort_status_label();
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
             BrowseTabInput::PageSizeChanged(size) => {

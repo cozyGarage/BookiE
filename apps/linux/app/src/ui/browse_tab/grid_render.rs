@@ -342,6 +342,8 @@ impl BrowseTab {
 
         let scrolled = crate::ui::grid::wrap_grid_scrolled(&column_view);
         self.grid_holder.append(&scrolled);
+        self.apply_local_sort_keys();
+        self.update_sort_status_label();
         self.refresh_grid_chrome();
         self.restore_focused_row();
         let _ = sender.output(BrowseTabOutput::StateChanged);

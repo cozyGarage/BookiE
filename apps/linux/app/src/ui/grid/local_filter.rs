@@ -29,7 +29,7 @@ pub(crate) struct LocalCellFilter {
 #[derive(Clone, Default)]
 pub(crate) struct LocalResultSettings {
     pub(crate) filter: Option<LocalCellFilter>,
-    pub(crate) sort: Option<(usize, bool)>,
+    pub(crate) sort: Vec<(usize, bool)>,
     pub(crate) changed_cells: Option<Arc<bookie_app_services::result_compare::ChangedCells>>,
     selection: Option<(std::sync::Weak<QueryResult>, Arc<HashSet<usize>>)>,
 }
@@ -70,13 +70,14 @@ struct LocalResultViewState {
     store: Option<RowStore>,
     selection: Option<gtk4::MultiSelection>,
     filter: Option<LocalCellFilter>,
-    sort: Option<(usize, bool)>,
+    sort: Vec<(usize, bool)>,
     controls: gtk4::Box,
     status: gtk4::Label,
     clear_button: gtk4::Button,
     settings_store: LocalResultSettingsStore,
     settings_key: ResultViewKey,
     selection_syncing: Rc<Cell<bool>>,
+    column_view: Option<glib::WeakRef<gtk4::ColumnView>>,
 }
 
 impl LocalResultView {
@@ -94,7 +95,7 @@ impl LocalResultView {
             .margin_bottom(4)
             .build();
         let status = gtk4::Label::builder().hexpand(true).halign(gtk4::Align::Start).build();
-        let clear = gtk4::Button::with_label(&crate::tr!("Clear filter"));
+        let clear = gtk4::Button::with_label(&crate::tr!("Clear"));
         controls.append(&status);
         controls.append(&clear);
         let settings = settings_store.get(settings_key);
@@ -110,14 +111,19 @@ impl LocalResultView {
             settings_store,
             settings_key,
             selection_syncing: Rc::new(Cell::new(false)),
+            column_view: None,
         })));
         let weak_view = Rc::downgrade(&view.0);
         clear.connect_clicked(move |_| {
             if let Some(view) = weak_view.upgrade() {
-                Self(view).clear_filter();
+                Self(view).clear_filter_and_sort();
             }
         });
         view
+    }
+
+    pub(crate) fn bind_column_view(&self, column_view: &gtk4::ColumnView) {
+        self.0.borrow_mut().column_view = Some(column_view.downgrade());
     }
 
     pub(crate) fn statement_identity(&self) -> crate::ui::editor::StatementIdentity {
@@ -154,7 +160,7 @@ impl LocalResultView {
         }
         let has_saved_view_order = {
             let state = self.0.borrow();
-            state.filter.is_some() || state.sort.is_some()
+            state.filter.is_some() || !state.sort.is_empty()
         };
         if has_saved_view_order {
             self.rebuild_visible_rows();
@@ -199,7 +205,48 @@ impl LocalResultView {
         self.rebuild_visible_rows();
     }
 
+    pub(crate) fn clear_sort(&self) {
+        let column_view = self.0.borrow().column_view.as_ref().and_then(glib::WeakRef::upgrade);
+        if let Some(column_view) = column_view {
+            column_view.sort_by_column(None::<&gtk4::ColumnViewColumn>, gtk4::SortType::Ascending);
+        }
+        if !self.0.borrow().sort.is_empty() {
+            self.0.borrow_mut().sort.clear();
+            self.persist_settings();
+            self.rebuild_visible_rows();
+        }
+    }
+
+    pub(crate) fn clear_filter_and_sort(&self) {
+        let had_filter = self.0.borrow().filter.is_some();
+        if had_filter {
+            self.0.borrow_mut().filter = None;
+            self.persist_settings();
+        }
+        let column_view = self.0.borrow().column_view.as_ref().and_then(glib::WeakRef::upgrade);
+        if let Some(column_view) = column_view {
+            column_view.sort_by_column(None::<&gtk4::ColumnViewColumn>, gtk4::SortType::Ascending);
+        }
+        let needs_rebuild = !self.0.borrow().sort.is_empty() || had_filter;
+        if !self.0.borrow().sort.is_empty() {
+            self.0.borrow_mut().sort.clear();
+            self.persist_settings();
+        }
+        if needs_rebuild {
+            self.rebuild_visible_rows();
+        }
+    }
+
+    pub(crate) fn sort_keys(&self) -> Vec<(usize, bool)> {
+        self.0.borrow().sort.clone()
+    }
+
     pub(crate) fn sort_by(&self, column: usize, ascending: bool) {
+        self.sort_by_keys(&[(column, ascending)]);
+    }
+
+    pub(crate) fn sort_by_keys(&self, keys: &[(usize, bool)]) {
+        let keys = keys.to_vec();
         let (result, attached, filter) = {
             let state = self.0.borrow();
             (
@@ -208,24 +255,29 @@ impl LocalResultView {
                 state.filter.clone(),
             )
         };
-        let sorted_order = if !attached {
-            if !local_sort::is_sortable_column(&result, column) {
+        let sorted_order = if keys.is_empty() {
+            None
+        } else if !attached {
+            if keys
+                .iter()
+                .any(|&(column, _)| !local_sort::is_sortable_column(&result, column))
+            {
                 return;
             }
             None
         } else if let Some(filter) = filter.as_ref() {
             let matches = matching_source_indices(&result, filter.column, &filter.value, filter.exclude);
-            let Ok(order) = local_sort::sorted_source_indices_for_subset(&result, column, ascending, matches) else {
+            let Ok(order) = local_sort::sorted_source_indices_for_subset_by_keys(&result, &keys, matches) else {
                 return;
             };
             Some(order)
         } else {
-            let Some(order) = local_sort::sorted_source_indices(&result, column, ascending) else {
+            let Some(order) = local_sort::sorted_source_indices_by_keys(&result, &keys) else {
                 return;
             };
             Some(order)
         };
-        self.0.borrow_mut().sort = Some((column, ascending));
+        self.0.borrow_mut().sort = keys;
         self.persist_settings();
         self.rebuild_visible_rows_with_sorted_order(sorted_order);
     }
@@ -234,7 +286,7 @@ impl LocalResultView {
         let state = self.0.borrow();
         state.settings_store.update(state.settings_key, |settings| {
             settings.filter = state.filter.clone();
-            settings.sort = state.sort;
+            settings.sort.clone_from(&state.sort);
         });
     }
 
@@ -258,21 +310,23 @@ impl LocalResultView {
                     order
                 } else {
                     let matches = matching_source_indices(&result, filter.column, &filter.value, filter.exclude);
-                    match sort {
-                        Some((sort_column, ascending)) => {
-                            local_sort::sorted_source_indices_for_subset(&result, sort_column, ascending, matches)
-                                .unwrap_or_else(|unsorted| unsorted)
-                        }
-                        None => matches,
+                    if sort.is_empty() {
+                        matches
+                    } else {
+                        local_sort::sorted_source_indices_for_subset_by_keys(&result, &sort, matches)
+                            .unwrap_or_else(|unsorted| unsorted)
                     }
                 }
             }
-            None => match sort {
-                Some((column, ascending)) => sorted_order
-                    .or_else(|| local_sort::sorted_source_indices(&result, column, ascending))
-                    .unwrap_or_else(|| (0..result.rows.len()).collect()),
-                None => (0..result.rows.len()).collect(),
-            },
+            None => {
+                if sort.is_empty() {
+                    (0..result.rows.len()).collect()
+                } else {
+                    sorted_order
+                        .or_else(|| local_sort::sorted_source_indices_by_keys(&result, &sort))
+                        .unwrap_or_else(|| (0..result.rows.len()).collect())
+                }
+            }
         };
         let syncing = self.0.borrow().selection_syncing.clone();
         syncing.set(true);
@@ -349,30 +403,78 @@ fn selected_source_rows(store: &RowStore, selection: &gtk4::MultiSelection) -> s
 }
 
 fn update_status(state: &LocalResultViewState) {
-    if state.filter.is_none() {
+    let sorted = !state.sort.is_empty();
+    let filtered = state.filter.is_some();
+    let truncated = state.result.truncated;
+    if !filtered && !sorted && !truncated {
         state.clear_button.set_visible(false);
-        state.controls.set_visible(state.result.truncated);
-        if state.result.truncated {
-            state.status.add_css_class("warning");
-            state
-                .status
-                .set_text(&truncation_notice(state.sort.is_some(), state.result.rows.len()));
-        }
+        state.controls.set_visible(false);
         return;
     }
-    state.clear_button.set_visible(true);
+    state.clear_button.set_visible(filtered || sorted);
+    state.clear_button.set_label(&clear_button_label(filtered, sorted));
+    let sort_summary = sort_keys_summary(&state.result, &state.sort);
+    if !filtered {
+        if truncated {
+            state.status.add_css_class("warning");
+            let mut text = truncation_notice(sorted, state.result.rows.len());
+            if let Some(summary) = sort_summary {
+                text = format!("{summary} · {text}");
+            }
+            state.status.set_text(&text);
+        } else if let Some(summary) = sort_summary {
+            state.status.remove_css_class("warning");
+            state.status.set_text(&summary);
+        }
+        state.controls.set_visible(true);
+        return;
+    }
     let visible = state.store.as_ref().map_or(0, |store| store.n_items());
-    state.status.set_text(&filter_summary(
+    let mut summary = filter_summary(
         u128::from(visible),
         state.result.rows.len() as u128,
         state.result.truncated,
-    ));
-    if state.result.truncated {
+    );
+    if let Some(sort_summary) = sort_summary {
+        summary = format!("{sort_summary} · {summary}");
+    }
+    state.status.set_text(&summary);
+    if truncated {
         state.status.add_css_class("warning");
     } else {
         state.status.remove_css_class("warning");
     }
     state.controls.set_visible(true);
+}
+
+fn clear_button_label(filtered: bool, sorted: bool) -> String {
+    match (filtered, sorted) {
+        (true, false) => crate::tr!("Clear filter"),
+        (false, true) => crate::tr!("Clear sort"),
+        _ => crate::tr!("Clear"),
+    }
+}
+
+fn sort_keys_summary(result: &QueryResult, keys: &[(usize, bool)]) -> Option<String> {
+    if keys.is_empty() {
+        return None;
+    }
+    let parts = keys
+        .iter()
+        .map(|&(column, ascending)| {
+            let name = result
+                .columns
+                .get(column)
+                .map(|column| column.name.as_str())
+                .unwrap_or("?");
+            let arrow = if ascending { "↑" } else { "↓" };
+            format!("{name} {arrow}")
+        })
+        .collect::<Vec<_>>();
+    Some(
+        crate::tr!("Sorted by {keys}")
+            .replace("{keys}", &parts.join(", ")),
+    )
 }
 
 fn filter_summary(visible: u128, loaded: u128, truncated: bool) -> String {

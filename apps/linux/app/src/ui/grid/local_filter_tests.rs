@@ -120,13 +120,13 @@ fn local_result_settings_survive_rerender_and_are_pruned_when_no_longer_visible(
         result_set_index: 1,
         ..key
     };
-    settings.update(key, |current| current.sort = Some((2, false)));
-    settings.update(second_set, |current| current.sort = Some((0, true)));
+    settings.update(key, |current| current.sort = vec![(2, false)]);
+    settings.update(second_set, |current| current.sort = vec![(0, true)]);
 
-    assert_eq!(settings.get(key).sort, Some((2, false)));
+    assert_eq!(settings.get(key).sort, vec![(2, false)]);
     settings.retain(&std::collections::HashSet::from([second_set]));
-    assert_eq!(settings.get(key).sort, None);
-    assert_eq!(settings.get(second_set).sort, Some((0, true)));
+    assert_eq!(settings.get(key).sort, Vec::<(usize, bool)>::new());
+    assert_eq!(settings.get(second_set).sort, vec![(0, true)]);
 }
 
 #[test]
@@ -210,7 +210,7 @@ fn attaching_a_sorted_result_restores_selection_by_source_row() {
     };
     let selected = std::collections::HashSet::from([0, 2]);
     settings.update(key, |current| {
-        current.sort = Some((0, false));
+        current.sort = vec![(0, false)];
         current.selection = Some((Arc::downgrade(&result), Arc::new(selected)));
     });
 
@@ -245,7 +245,7 @@ fn attaching_a_sorted_result_restores_all_source_rows_as_selected() {
         result_set_index: 0,
     };
     settings.update(key, |current| {
-        current.sort = Some((0, false));
+        current.sort = vec![(0, false)];
         current.selection = Some((Arc::downgrade(&result), Arc::new((0..result.rows.len()).collect())));
     });
 
@@ -385,7 +385,8 @@ fn local_filter_and_sort_keep_selection_attached_to_the_source_row() {
         state.controls.is_visible(),
         "the sort of a truncated result keeps its notice"
     );
-    assert!(!state.clear_button.is_visible());
+    assert!(state.clear_button.is_visible());
+    assert_eq!(state.clear_button.label().as_deref(), Some("Clear sort"));
 }
 
 #[test]
@@ -508,7 +509,8 @@ fn sorting_a_truncated_result_without_a_filter_warns_that_only_loaded_rows_were_
     let state = view.0.borrow();
     assert!(state.controls.is_visible());
     assert!(state.status.has_css_class("warning"));
-    assert!(!state.clear_button.is_visible());
+    assert!(state.clear_button.is_visible());
+    assert_eq!(state.clear_button.label().as_deref(), Some("Clear sort"));
     drop(state);
 
     let complete = Arc::new(result(vec![Value::Int(3), Value::Int(1)]));
@@ -517,5 +519,98 @@ fn sorting_a_truncated_result_without_a_filter_warns_that_only_loaded_rows_were_
     let complete_view = LocalResultView::new(complete, LocalResultSettingsStore::default(), key);
     complete_view.attach(complete_store, complete_selection);
     complete_view.sort_by(0, true);
+    assert!(complete_view.0.borrow().controls.is_visible());
+    complete_view.clear_sort();
     assert!(!complete_view.0.borrow().controls.is_visible());
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn local_multi_key_sort_reverses_secondary_and_clears_to_source_order() {
+    gtk4::init().unwrap();
+    let result = Arc::new(QueryResult {
+        columns: vec![
+            ColumnInfo {
+                name: "dept".into(),
+                data_type: "".into(),
+                nullable: true,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            },
+            ColumnInfo {
+                name: "name".into(),
+                data_type: "".into(),
+                nullable: true,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            },
+        ],
+        rows: vec![
+            vec![Value::Text("b".into()), Value::Text("z".into())],
+            vec![Value::Text("a".into()), Value::Text("y".into())],
+            vec![Value::Text("a".into()), Value::Text("x".into())],
+            vec![Value::Text("b".into()), Value::Text("w".into())],
+        ]
+        .into(),
+        truncated: false,
+    });
+    let store = crate::ui::row_store::RowStore::from_shared(result.clone());
+    let selection = gtk4::MultiSelection::new(Some(store.clone()));
+    let key = ResultViewKey {
+        statement_identity: crate::ui::editor::StatementIdentity {
+            statement_index: 0,
+            digest: [12; 32],
+        },
+        result_set_index: 0,
+    };
+    let view = LocalResultView::new(result, LocalResultSettingsStore::default(), key);
+    view.attach(store.clone(), selection);
+
+    view.sort_by_keys(&[(0, true)]);
+    assert_eq!(
+        (0..store.n_items())
+            .map(|position| store.source_index_at(position))
+            .collect::<Vec<_>>(),
+        vec![Some(1), Some(2), Some(0), Some(3)]
+    );
+    view.sort_by_keys(&[(0, false)]);
+    assert_eq!(
+        (0..store.n_items())
+            .map(|position| store.source_index_at(position))
+            .collect::<Vec<_>>(),
+        vec![Some(0), Some(3), Some(1), Some(2)]
+    );
+    view.sort_by_keys(&[(0, true), (1, true)]);
+    assert_eq!(view.sort_keys(), vec![(0, true), (1, true)]);
+    assert_eq!(
+        (0..store.n_items())
+            .map(|position| store.source_index_at(position))
+            .collect::<Vec<_>>(),
+        vec![Some(2), Some(1), Some(3), Some(0)]
+    );
+    let state = view.0.borrow();
+    assert!(state.controls.is_visible());
+    assert!(state.status.label().unwrap_or_default().contains("dept"));
+    assert!(state.status.label().unwrap_or_default().contains("name"));
+    drop(state);
+    view.clear_sort();
+    assert!(view.sort_keys().is_empty());
+    assert_eq!(
+        (0..store.n_items())
+            .map(|position| store.source_index_at(position))
+            .collect::<Vec<_>>(),
+        vec![Some(0), Some(1), Some(2), Some(3)]
+    );
 }
