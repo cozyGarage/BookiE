@@ -3,6 +3,7 @@ mod backup;
 mod browse;
 mod browse_save;
 mod bundle;
+mod catalog_ddl;
 mod connection;
 mod database_switcher;
 mod editor_files;
@@ -937,6 +938,7 @@ impl SimpleComponent for App {
             AppMsg::DropTableSucceeded { origin, schema, table } => {
                 self.on_drop_table_succeeded(origin, schema, table, sender)
             }
+            AppMsg::CatalogDdl(message) => self.dispatch_catalog_ddl(message, sender),
             AppMsg::ExecuteStructureTransaction { tab_id, statements } => {
                 self.on_execute_structure_transaction(tab_id, statements, sender)
             }

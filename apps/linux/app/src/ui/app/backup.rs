@@ -79,7 +79,7 @@ impl App {
         None
     }
 
-    fn active_database_name(&self) -> String {
+    pub(super) fn active_database_name(&self) -> String {
         self.connection_id
             .and_then(|id| self.saved_connections.iter().find(|saved| saved.id == id))
             .map_or_else(|| "database".to_owned(), |saved| saved.database.clone())
