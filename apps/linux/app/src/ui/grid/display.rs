@@ -368,6 +368,10 @@ pub(crate) fn value_to_full_edit_text(value: &Value) -> String {
     }
 }
 
+pub(crate) fn value_to_copy_text(value: &Value) -> String {
+    bookie_app_services::value_display::copy_text(value).into_string()
+}
+
 pub(super) fn value_is_inline_editable(value: &Value) -> bool {
     match value {
         Value::Bytes(_) | Value::Undecodable(_) => false,
