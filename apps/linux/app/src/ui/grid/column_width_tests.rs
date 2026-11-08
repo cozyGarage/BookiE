@@ -84,6 +84,7 @@ fn verify_fixed_width(saved: bool, persistent: bool) {
             connection_id: persistent.then_some(id),
             tab_ctx: TabGridContext::default(),
             column_widths: persistent.then_some(store.clone()),
+            highlight_settings: None,
             database: Arc::new(DatabaseService::new()),
         },
     );

@@ -211,6 +211,22 @@ impl BrowseTab {
         store.prepared(connection_id, self.schema.as_deref(), &self.table, &columns)
     }
 
+    fn highlight_persist(&self) -> Option<crate::ui::grid::HighlightPersist> {
+        let connection_id = self.connection_id?;
+        let store = self.persistence.highlight_settings.clone()?;
+        Some(crate::ui::grid::HighlightPersist {
+            connection_id,
+            schema: self.schema.clone(),
+            table: self.table.clone(),
+            store,
+        })
+    }
+
+    pub(super) fn reload_highlight_rules(&mut self, sender: ComponentSender<Self>) {
+        self.current_column_view = None;
+        self.render_grid_if_ready(sender);
+    }
+
     pub(super) fn render_grid_if_ready(&mut self, sender: ComponentSender<Self>) {
         let Some(result) = self.current_result.clone() else {
             return;
@@ -299,6 +315,7 @@ impl BrowseTab {
                 connection_id: self.connection_id,
                 tab_ctx,
                 column_widths: self.persistence.column_widths.clone(),
+                highlight_settings: self.highlight_persist(),
                 database: self.database.clone(),
             },
         );

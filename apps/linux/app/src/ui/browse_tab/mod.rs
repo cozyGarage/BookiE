@@ -910,6 +910,7 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::ShowToast(message) => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
             }
+            BrowseTabInput::HighlightRulesChanged => self.reload_highlight_rules(sender),
             BrowseTabInput::GoToReference { column, row } => self.go_to_reference(&column, &row, &sender),
             BrowseTabInput::ShowReferencingRows { row } => self.show_referencing_rows(&row, &sender),
             BrowseTabInput::ToggleFilterStrip => {
