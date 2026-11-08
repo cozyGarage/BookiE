@@ -6,7 +6,8 @@ use relm4::gtk::glib;
 use relm4::{adw, gtk};
 
 use crate::services::audit_view::{
-    OperationRow, approval_label, contains_operation, matches, operations, row_needs_attention, status_label,
+    OperationRow, approval_label, class_label, contains_operation, matches, operations, row_needs_attention,
+    status_label,
 };
 use crate::services::database_service::DatabaseService;
 use crate::tr;
@@ -127,7 +128,7 @@ fn show_operations(list: &gtk::ListBox, stack: &gtk::Stack, search: &gtk::Search
 }
 
 fn operation_row(row: &OperationRow) -> adw::ExpanderRow {
-    let mut subtitle = vec![status_label(row.status), row.class.clone(), row.principal.clone()];
+    let mut subtitle = vec![status_label(row.status), class_label(row.class), row.principal.clone()];
     if let Some(rows) = row.rows {
         subtitle.push(tr!("rows: {n}").replace("{n}", &rows.to_string()));
     }
