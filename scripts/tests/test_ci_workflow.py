@@ -687,6 +687,17 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(name, env_names)
 
+    def test_postgres_release_container_uses_workspace_toolchain(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
+        toolchain = re.search(r"toolchain: ([^\s]+)", release)
+        workspace_toolchain = re.search(r"^channel = \"([^\"]+)\"$", (ROOT / "rust-toolchain.toml").read_text(), re.M)
+
+        self.assertIsNotNone(toolchain)
+        self.assertIsNotNone(workspace_toolchain)
+        self.assertEqual(toolchain.group(1), workspace_toolchain.group(1))
+        self.assertNotRegex(release, r"--env RUSTUP_TOOLCHAIN=")
+
     def test_gtk_scripts_reduce_xvfb_display_collisions(self):
         for path in [
             "scripts/test-gtk-widgets.sh",
