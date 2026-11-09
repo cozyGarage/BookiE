@@ -40,6 +40,32 @@ fn a_missing_service_name_is_refused() {
 }
 
 #[test]
+fn the_connect_deadline_is_applied_to_the_oracle_transport() {
+    let mut options = options();
+    options.connect_timeout_secs = Some(3);
+    assert_eq!(
+        connect_config(&options)
+            .expect("valid Oracle options")
+            .transport_connect_timeout(),
+        Some(std::time::Duration::from_secs(3))
+    );
+}
+
+#[test]
+fn a_missing_or_zero_connect_deadline_uses_the_shared_transport_default() {
+    for connect_timeout_secs in [None, Some(0)] {
+        let mut options = options();
+        options.connect_timeout_secs = connect_timeout_secs;
+        assert_eq!(
+            connect_config(&options)
+                .expect("valid Oracle options")
+                .transport_connect_timeout(),
+            Some(std::time::Duration::from_secs(30))
+        );
+    }
+}
+
+#[test]
 fn the_driver_declares_itself_experimental_on_the_oracle_port() {
     let capabilities = OracleDriver.capabilities();
     assert_eq!(capabilities.maturity, DriverMaturity::Experimental);
