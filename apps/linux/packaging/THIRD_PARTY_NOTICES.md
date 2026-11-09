@@ -9258,11 +9258,18 @@ Packages:
 - `adler2 2.0.1`
 - `allocator-api2 0.2.21`
 - `async-channel 2.5.0`
+- `async-executor 1.14.1`
+- `async-fs 2.2.0`
+- `async-io 2.6.0`
 - `async-lock 3.4.2`
 - `async-native-tls 0.6.0`
+- `async-process 2.5.0`
 - `async-recursion 1.2.0`
+- `async-signal 0.2.14`
+- `async-task 4.7.1`
 - `async-trait 0.1.92`
 - `atomic-waker 1.1.2`
+- `blocking 1.7.0`
 - `clickhouse 0.15.3`
 - `concurrent-queue 2.5.0`
 - `curve25519-dalek-derive 0.1.1`
@@ -9289,6 +9296,8 @@ Packages:
 - `ordered-stream 0.2.0`
 - `parking 2.2.1`
 - `pin-project-lite 0.2.17`
+- `piper 0.2.5`
+- `polling 3.11.0`
 - `portable-atomic 1.15.0`
 - `proc-macro-crate 3.5.0`
 - `proc-macro2 1.0.107`
