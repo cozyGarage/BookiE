@@ -774,6 +774,8 @@ dependencies = [
  "gpui-pre-platform",
  "rust_decimal",
  "serde_json",
+ "tokio",
+ "tokio-util",
  "unicode-segmentation",
  "uuid",
 ]
