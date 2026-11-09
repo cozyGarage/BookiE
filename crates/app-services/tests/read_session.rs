@@ -36,6 +36,7 @@ fn saved(path: &std::path::Path, id: Uuid) -> SavedConnection {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 
@@ -88,6 +89,28 @@ async fn a_session_lists_tables_and_reads_typed_pages() {
     assert_eq!(first.rows.len(), 2);
     assert_eq!(last.rows.len(), 1);
     assert_eq!(last.rows.iter().next().map(|row| row[1].clone()), Some(Value::Null));
+}
+
+#[tokio::test]
+async fn page_sizes_are_bounded_before_a_read() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let table = session.tables.iter().find(|table| table.name == "items").unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let maximum = bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS as u64;
+
+    assert_eq!(
+        session.read_page(table, 0, maximum, &control).await.unwrap().rows.len(),
+        3
+    );
+    for limit in [0, maximum + 1, u64::MAX] {
+        assert!(matches!(
+            session.read_page(table, 0, limit, &control).await,
+            Err(DriverFailurePresentation::Unsupported(_))
+        ));
+    }
 }
 
 #[tokio::test]

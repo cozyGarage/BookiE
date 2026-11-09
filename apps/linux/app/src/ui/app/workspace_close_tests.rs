@@ -151,6 +151,7 @@ fn force_dismissing_connection_deletion_does_not_abort() {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     };
     runtime
         .block_on(bookie_storage::save_connections(std::slice::from_ref(&saved)))

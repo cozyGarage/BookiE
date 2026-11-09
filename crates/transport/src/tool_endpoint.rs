@@ -13,6 +13,7 @@ pub async fn open_tool_endpoint(
     cancellation: CancellationToken,
 ) -> Result<(ConnectOptions, Option<Tunnel>), TransportError> {
     crate::validate_client_tls_auth(driver, &opts)?;
+    crate::validate_strict_encryption(driver, &opts)?;
     crate::validate_local_socket(&opts, driver, ssh.is_some())?;
     opts.forwarded_socket_dir = None;
     let Some(route) = ssh else {
