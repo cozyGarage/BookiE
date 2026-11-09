@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bookie_core::{
@@ -77,14 +78,23 @@ fn connect_config(opts: &ConnectOptions) -> Result<Config, DriverError> {
     Config::default()
         .set_credentials(&opts.username, opts.password.expose_secret())
         .set_connect_string(&connect_string)
+        .map(|config| config.set_transport_connect_timeout(Some(connect_timeout(opts))))
         .map_err(map_error)
+}
+
+fn connect_timeout(opts: &ConnectOptions) -> Duration {
+    opts.connect_timeout_secs
+        .filter(|seconds| *seconds > 0)
+        .map_or(Duration::from_secs(30), |seconds| {
+            Duration::from_secs(u64::from(seconds))
+        })
 }
 
 async fn probe_listener(opts: &ConnectOptions) -> Result<(), DriverError> {
     let Transport::Tcp { host, port } = opts.transport() else {
         return Ok(());
     };
-    let wait = std::time::Duration::from_secs(u64::from(opts.connect_timeout_secs.unwrap_or(10)));
+    let wait = connect_timeout(opts);
     match tokio::time::timeout(wait, tokio::net::TcpStream::connect((host, port))).await {
         Err(_) => Err(DriverError::TimedOut),
         Ok(Ok(_)) => Ok(()),
