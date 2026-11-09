@@ -23,6 +23,13 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_runs_gpui_model_and_interaction_tests(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("timeout-minutes:", job)
+        self.assertIn("cargo test --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked", job)
+        self.assertNotIn("--lib", job)
+
     def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", workflow, re.M | re.S).group(1)
@@ -121,7 +128,7 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("mongodb, duckdb]", driver)
+        self.assertIn("mongodb, oracle, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
         self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
@@ -151,7 +158,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = (
-            "distro-floor", "driver", "e2e", "consumers", "gtk",
+            "driver", "e2e", "consumers", "gtk",
             "pg-release", "pg-dump", "socket-ssh", "gtk-server", "driver-tls",
             "keyring", "supply-chain",
         )
@@ -160,9 +167,7 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 expected = {"guards", "clippy"}
-                if name == "distro-floor":
-                    expected.add("floor-build")
-                elif name != "supply-chain":
+                if name != "supply-chain":
                     expected.add("test-build")
                 if name in {"e2e", "gtk", "gtk-server"}:
                     expected.add("gtk-build")
@@ -194,7 +199,7 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
         for name in (
-            "guards", "unit", "sandbox", "widgets", "distro-floor", "distro-floor-scenarios", "driver", "e2e",
+            "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver", "e2e",
             "consumers", "gtk", "pg-release", "pg-dump", "socket-ssh", "gtk-server",
             "driver-tls", "keyring",
         ):
@@ -243,14 +248,17 @@ class CiWorkflowTests(unittest.TestCase):
             harness.index("scripts/update-third-party-notices.py --check"),
         )
 
-    def test_forgejo_workflows_do_not_block_other_runs(self):
+    def test_forgejo_ci_and_nightly_share_a_per_ref_concurrency_group(self):
+        groups = []
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
             self.assertIsNotNone(match, name)
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
-            self.assertNotIn("group", settings, name)
+            self.assertEqual(settings["group"].strip(), "bookie-ci-${{ github.ref }}", name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
+            groups.append(settings["group"].strip())
+        self.assertEqual(groups[0], groups[1])
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('printf \'%s/%s\' "$remote" "$target" | sha256sum', gate)
 
@@ -616,7 +624,7 @@ class CiWorkflowTests(unittest.TestCase):
             focused.split("\n    steps:\n", 1)[0],
         )
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("needs: [pin-revision, b4-rollback]", integration)
+        self.assertIn("needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]", integration)
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
         commands = [step["argv"] for step in layers["steps"]]
         self.assertEqual(len(commands), 2)
@@ -919,16 +927,18 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertLess(job.index("ensure-node.sh"), job.index("uses:"), workflow.name)
                 self.assertIn('>> "$GITHUB_PATH"', job)
 
-    def test_forgejo_distro_floor_reuses_one_package_across_bases(self):
+    def test_forgejo_distro_floor_keeps_runtime_coverage_without_deb_release_lifecycle(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertNotIn("\n  distro-floor-build:\n", workflow)
-        floor = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        self.assertNotIn("\n  distro-floor:\n", workflow)
+        self.assertNotIn("tablepro_0.1.5-1_amd64.deb", workflow)
+        scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
+        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("runs-on: build-host", producer)
         self.assertIn("scripts/build-deb.sh", producer)
-        self.assertNotIn("scripts/distro-floor-package.sh", floor)
-        self.assertIn("DISTRO_FLOOR_PACKAGE=", floor)
-        self.assertIn("PREBUILT_DEB=", floor)
+        self.assertNotIn("scripts/test-deb-package.sh", workflow)
+        self.assertIn("needs: [floor-build]", scenarios)
+        self.assertIn("ci-gtk-artifact.py create --package", producer)
+        self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
         self.assertIn("BASE=debian:testing", builder)
         self.assertIn("scripts/build-deb.sh", builder)
@@ -940,9 +950,8 @@ class CiWorkflowTests(unittest.TestCase):
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('docker build -t "$tag"', floor_script)
         self.assertIn("apt-get update\n", floor_script)
-        self.assertIn('apt-get install -y "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
+        self.assertIn('cd /package\n      apt-get install -y "./$DISTRO_FLOOR_DEB_NAME"', floor_script)
         self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
-        self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
         gtk_safety_script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
         self.assertIn('timeout 1500s "$system_python" -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
@@ -966,14 +975,10 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_distro_scenarios_share_the_package_and_partition_all_six_shards(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        producer = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        self.assertNotIn("scripts/test-distro-floor.sh", producer)
-        self.assertIn("scripts/test-deb-package.sh", producer)
-        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("ci-gtk-artifact.py create --package", builder)
-        self.assertIn("ci-gtk-artifact.py verify --package", producer)
-        self.assertIn("needs: [distro-floor]", scenarios)
+        self.assertIn("needs: [floor-build]", scenarios)
         self.assertIn("max-parallel: 2", scenarios)
         self.assertIn("shard_group: [1, 2]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
@@ -983,7 +988,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('scripts/ci-mcp-port.py "$((10 + shard))"', scenarios)
         self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
         self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)
-        for job in (producer, scenarios):
+        for job in (builder, scenarios):
             self.assertIn("name: floor-package-${{ github.run_id }}-${{ github.sha }}", job)
 
     def test_packaged_distro_smoke_does_not_mount_a_stale_build_target(self):

@@ -405,9 +405,6 @@ class CiCacheTests(unittest.TestCase):
                         self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', step, filename)
                     else:
                         self.assertIn('runs-on: build-host', block, name)
-                elif name == 'distro-floor':
-                    self.assertIn('defaults:\n      run:\n        shell: bash', block)
-                    self.assertNotIn('bookie-ci-cache', step)
                 else:
                     self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}', step, filename)
                 if 'shell:' in step:

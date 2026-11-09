@@ -91,6 +91,10 @@ fn every_registered_driver_profile_matches_its_declared_static_behavior() {
         );
         assert_matches_declaration!(capabilities.supports_client_tls_auth, driver.supports_client_tls_auth());
         assert_matches_declaration!(
+            capabilities.supports_strict_encryption,
+            driver.supports_strict_encryption()
+        );
+        assert_matches_declaration!(
             capabilities.supports_explicit_auto_increment_values,
             driver.supports_explicit_auto_increment_values()
         );

@@ -3,6 +3,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 revision=${BOOKIE_SOURCE_COMMIT:-$(git rev-parse HEAD)}
+if [[ "$revision" != "$(git rev-parse HEAD)" ]]; then
+  echo 'requested bundle revision differs from the checkout' >&2
+  exit 1
+fi
 output=${1:?Usage: build-test-bundles.sh OUTPUT_DIRECTORY}
 requested_group=${2:-default}
 case "$requested_group" in

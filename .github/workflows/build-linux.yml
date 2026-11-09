@@ -190,7 +190,6 @@ jobs:
 
   reusable-test-builds:
     name: Reusable test builds
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image]
     timeout-minutes: 60
@@ -452,7 +451,7 @@ jobs:
     name: Driver integration tests (docker)
     timeout-minutes: 55
     runs-on: ubuntu-24.04
-    needs: [pin-revision, b4-rollback]
+    needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]
     defaults:
       run:
         working-directory: .
@@ -466,34 +465,51 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
-      - name: Install system dependencies
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-default
+          path: ${{ runner.temp }}/bookie-bundle
+      - name: Verify the test bundle
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            pkg-config \
-            libssl-dev \
-            libkrb5-dev \
-            clang \
-            dbus-daemon \
-            gnome-keyring \
-            libsecret-tools \
-            libglib2.0-bin
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        with:
-          toolchain: 1.98
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-        with:
-          workspaces: .
-          prefix-key: linux-integration
-          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
-      - name: Verify docker is available
-        run: docker version
+          test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
+          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-bundle" "$BOOKIE_SOURCE_COMMIT"
+          find "$RUNNER_TEMP/bookie-bundle/tests" "$RUNNER_TEMP/bookie-bundle/bin" -type f -exec chmod u+x {} +
       - name: Driver, socket and SSH integration
-        run: python3 scripts/run-test-layer.py drivers
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+        run: |
+          task_tmp="$(mktemp -d /tmp/bookie-ci.XXXXXX)"
+          trap 'rm -rf -- "$task_tmp"' EXIT
+          docker run --rm --entrypoint cat "$BOOKIE_BUILD_IMAGE" /etc/passwd > "$RUNNER_TEMP/bookie-integration-passwd"
+          printf 'bookie-ci:x:%s:%s:CI:%s:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" "$task_tmp" >> "$RUNNER_TEMP/bookie-integration-passwd"
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            --volume "$RUNNER_TEMP/bookie-integration-passwd:/etc/passwd:ro" \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
+            --volume "$task_tmp:$task_tmp" \
+            --volume "$HOME/.docker:/docker:ro" \
+            --workdir "$GITHUB_WORKSPACE" \
+            --env HOME="$task_tmp" --env TMPDIR="$task_tmp" \
+            --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
+            --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
+            --env BOOKIE_TEST_BUNDLE="$RUNNER_TEMP/bookie-bundle" \
+            --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
+            "$BOOKIE_BUILD_IMAGE" python3 scripts/run-test-layer.py drivers
 
       - name: Upload validation evidence
         if: always()
@@ -704,6 +720,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - pin-revision
+      - reusable-test-builds
       - preflight
       - fast
       - gtk-safety

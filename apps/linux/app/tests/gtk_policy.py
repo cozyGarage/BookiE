@@ -23,7 +23,7 @@ def scenarios(ui):
         restart(repair)
         ui.invoke_named_action_within(ui.CONNECTION_NAME, "Open connection")
         ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=ui.pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql("INSERT INTO safety_items(id) VALUES (81)")
         ui.wait_for_database_count(database, 1)

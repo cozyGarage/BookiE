@@ -27,6 +27,9 @@ if [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]]; then
   if [[ "${TMPDIR:-}" == "/var/cache/ci/tmp/bookie-guards-$GITHUB_RUN_ID" ]]; then
     rm -rf -- "$TMPDIR" || status=$?
   fi
+  if [[ "${TMPDIR:-}" == "$workspace/.tmp-pg-dump-$GITHUB_RUN_ID-${GITHUB_RUN_ATTEMPT:-1}" ]]; then
+    rm -rf -- "$TMPDIR" || status=$?
+  fi
 fi
 
 for entry in src gtk-artifact test-bundles floor-artifact floor-package floor-package-path; do

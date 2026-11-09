@@ -35,6 +35,7 @@ fn saved(fixture: &Fixture, mode: TlsMode, root_cert: Option<PathBuf>) -> SavedC
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 
