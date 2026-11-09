@@ -306,6 +306,29 @@ impl GridView {
         self.activate_run(self.runs.len() - 1);
     }
 
+    fn close_tab(&mut self, index: usize) {
+        let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
+        self.tabs.close(index);
+        self.sync_grid_owner();
+        if !closing_query {
+            return;
+        }
+        if self.grid_is_query {
+            self.generation += 1;
+            self.edits = std::mem::take(&mut self.table_edits);
+            self.source = self.table_source.clone();
+            self.grid_is_query = false;
+            self.editing = None;
+            self.compare = None;
+            self.cursor = MatchCursor::default();
+            self.set_mode(Mode::All);
+        }
+        self.runs.clear();
+        self.run_edits.clear();
+        self.active_run = 0;
+        self.next_run_number = 1;
+    }
+
     fn sync_grid_owner(&mut self) {
         let query = match self.tabs.current() {
             Tab::Query => true,
