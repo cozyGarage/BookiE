@@ -3841,7 +3841,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `libsqlite3-sys 0.37.0`
+- `libsqlite3-sys 0.39.1`
 
 ```text
 Copyright (c) 2014 The rusqlite developers

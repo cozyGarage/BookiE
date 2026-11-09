@@ -41,6 +41,8 @@
 
 apps/linux/po/*.po linguist-generated=true
 vendor/** linguist-vendored
+vendor/sqlx-sqlite/** whitespace=-blank-at-eol
+vendor/patches/*.patch whitespace=-blank-at-eol
 .github/workflows/*.lock.yml linguist-generated=true merge=ours
 CHANGELOG.md merge=union
 crates/drivers/*/tests/support/connection_paths.rs merge=union
