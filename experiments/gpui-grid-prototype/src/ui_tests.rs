@@ -705,6 +705,55 @@ fn the_command_palette_navigates_between_results(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_match_in_filtered_rows_uses_its_filtered_position_for_paging(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let kept: Vec<u32> = (0..6_000).map(|row| row * 20).collect();
+            view.set_mode(crate::Mode::Filtered {
+                kept,
+                label: "filtered".into(),
+            });
+            view.cursor.set(vec![20_000]);
+            view.step_match(true);
+            assert_eq!(view.pager.page, 0);
+            assert_eq!(view.selection.map(|selection| selection.focus), Some(1_000));
+            view.cursor.set(vec![110_000]);
+            view.step_match(true);
+            assert_eq!(view.pager.page, 1);
+            assert_eq!(view.selection.map(|selection| selection.focus), Some(5_500));
+            view.cursor.set(vec![1]);
+            view.step_match(true);
+            assert_eq!(view.pager.page, 1);
+            assert_eq!(view.status, "Match is outside the filtered rows");
+        });
+    });
+}
+
+#[gpui::test]
+fn searching_after_filter_selects_the_matching_filtered_row(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let kept: Vec<u32> = (0..6_000).map(|row| row * 20).collect();
+            view.set_mode(crate::Mode::Filtered {
+                kept,
+                label: "filtered".into(),
+            });
+            window.focus(&view.find.read(cx).focus_handle_for_tests(), cx);
+        });
+    });
+    cx.simulate_input("Sample 20000");
+    cx.simulate_keystrokes("enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.pager.page, 0);
+        assert_eq!(view.selection.map(|selection| selection.focus), Some(1_000));
+    });
+}
+
+#[gpui::test]
 fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");

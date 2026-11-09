@@ -473,12 +473,15 @@ impl GridView {
 
     fn step_match(&mut self, forward: bool) {
         if let Some(row) = self.cursor.step(forward) {
-            let at = self.dataset_index_of(row);
-            self.selection = at.map(|index| Selection::after_click(None, index, false));
+            let Some(at) = self.dataset_index_of(row) else {
+                self.status = "Match is outside the filtered rows".into();
+                return;
+            };
+            self.selection = Some(Selection::after_click(None, at, false));
             if !self.continuous {
-                self.pager.contains_row(row);
+                self.pager.contains_row(at);
             }
-            let local = row.saturating_sub(self.base()) as usize;
+            let local = at.saturating_sub(self.base()) as usize;
             self.scroll.scroll_to_item_strict(local, ScrollStrategy::Center);
         }
         self.status = self.cursor.status(self.find_capped);
