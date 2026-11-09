@@ -40,6 +40,7 @@ pub async fn list_saved_connections() -> Result<Vec<ConnectionSummary>, String> 
 pub struct ReadSession {
     database: Arc<DatabaseService>,
     id: Uuid,
+    generation: Uuid,
     pub driver_id: String,
     pub tables: Vec<TableInfo>,
 }
@@ -73,12 +74,13 @@ impl ReadSession {
         let id = prepared.id();
         let mut tables = prepared.tables.clone();
         tables.extend(prepared.views.iter().cloned());
-        let activated = prepared
-            .activate(&database)
+        let (activated, generation) = prepared
+            .activate_with_generation(&database)
             .ok_or_else(|| OpenFailure::Other("the connection is already open in another window".into()))?;
         Ok(Self {
             database,
             id,
+            generation,
             driver_id: activated.driver_id,
             tables,
         })
@@ -93,7 +95,7 @@ impl ReadSession {
     ) -> Result<QueryResult, DriverFailurePresentation> {
         let guard = self
             .database
-            .guard(self.id, Principal::human_gui())
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)?;
         guard
             .fetch_rows_controlled(table.schema.as_deref(), &table.name, offset, limit, control)
@@ -104,6 +106,6 @@ impl ReadSession {
 
 impl Drop for ReadSession {
     fn drop(&mut self) {
-        self.database.close(self.id);
+        self.database.close_generation(self.id, self.generation);
     }
 }
