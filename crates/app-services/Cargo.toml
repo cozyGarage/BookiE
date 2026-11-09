@@ -25,6 +25,7 @@ bookie-dump = { path = "../dump" }
 bookie-policy = { path = "../policy" }
 bookie-transport = { path = "../transport" }
 bookie-storage = { path = "../storage" }
+bookie-ssh = { path = "../ssh" }
 chrono.workspace = true
 thiserror.workspace = true
 serde.workspace = true
@@ -46,10 +47,13 @@ bookie-driver-postgres = { path = "../drivers/postgres" }
 bookie-driver-mysql = { path = "../drivers/mysql" }
 bookie-driver-mssql = { path = "../drivers/mssql" }
 bookie-driver-sqlite = { path = "../drivers/sqlite" }
-bookie-ssh = { path = "../ssh" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres", "mysql", "mssql_server"] }
 tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
+
+[features]
+# Constructors for frontends' tests: an isolated service with a temporary audit journal.
+test-support = []
 
 [lints]
 workspace = true

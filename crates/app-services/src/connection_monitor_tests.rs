@@ -130,7 +130,14 @@ async fn a_credential_failure_ends_the_retry_loop_and_reports_the_reason() {
     );
     let health = inner.lock().expect("entry lock").health.clone();
     assert!(
-        matches!(health, ConnectionHealth::Failed { ref reason } if reason.contains("password")),
+        matches!(
+            health,
+            ConnectionHealth::Failed {
+                reason: crate::open_failure::OpenFailure::Driver(
+                    crate::driver_error_presentation::DriverFailurePresentation::AuthFailed
+                )
+            }
+        ),
         "{health:?}"
     );
 }

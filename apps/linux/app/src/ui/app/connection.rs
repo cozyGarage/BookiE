@@ -413,7 +413,10 @@ impl App {
                     {
                         Ok(prepared) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
                         Err(_) if cancel.is_cancelled() => sender_clone.input(AppMsg::ConnectionCancelled),
-                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(e, Box::new(attempted))),
+                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(
+                            crate::services::error_text::open_failure_message(&e),
+                            Box::new(attempted),
+                        )),
                     }
                 })
                 .drop_on_shutdown()
@@ -769,7 +772,7 @@ impl App {
             Some(ConnectionHealth::Failed { reason }) => {
                 self.reconnect_banner.set_title(
                     &crate::tr!("Connection lost and cannot be restored: {reason}. Reopen the connection to retry.")
-                        .replace("{reason}", &reason),
+                        .replace("{reason}", &crate::services::error_text::open_failure_message(&reason)),
                 );
                 self.reconnect_banner.set_revealed(true);
             }

@@ -4,7 +4,6 @@
 # Lower a count when you split a function. Do not raise one.
 # Empty means every function under crates/ is within the limit.
 apps/linux/app/src/lib.rs 1
-apps/linux/app/src/services/connection_service.rs 1
 apps/linux/app/src/services/gtk_approval.rs 1
 apps/linux/app/src/ui/activity_dialog.rs 1
 apps/linux/app/src/ui/app/browse.rs 1
@@ -25,8 +24,8 @@ apps/linux/app/src/ui/connect_dialog/mod.rs 3
 apps/linux/app/src/ui/editor/diagnostics.rs 1
 apps/linux/app/src/ui/editor/mod.rs 3
 apps/linux/app/src/ui/explain_dialog.rs 1
-apps/linux/app/src/ui/export_dialog/file.rs 1
 apps/linux/app/src/ui/export_dialog.rs 1
+apps/linux/app/src/ui/export_dialog/file.rs 1
 apps/linux/app/src/ui/filter_strip.rs 2
 apps/linux/app/src/ui/grid/column.rs 1
 apps/linux/app/src/ui/grid/column_jump.rs 1
@@ -44,9 +43,10 @@ apps/linux/app/src/ui/structure_tab/columns.rs 2
 apps/linux/app/src/ui/structure_tab/mod.rs 2
 apps/linux/app/src/ui/structure_tab_dialogs.rs 1
 apps/linux/app/src/ui/welcome_view.rs 1
+crates/app-services/src/connection_service.rs 1
 crates/core/src/activity.rs 1
-crates/core/src/import/plan.rs 1
 crates/core/src/filter.rs 1
+crates/core/src/import/plan.rs 1
 crates/core/src/pagination.rs 1
 crates/core/src/sql_ddl/diff.rs 2
 crates/core/src/sql_ddl/types.rs 1
@@ -58,8 +58,8 @@ crates/drivers/sqlite/src/lib.rs 1
 crates/mcp/src/tools.rs 1
 crates/policy/src/classify.rs 1
 crates/policy/src/guard.rs 2
-tests/release/examples/browse_benchmark.rs 1
 crates/ssh/src/lib.rs 1
 crates/storage/src/audit_journal.rs 0
 crates/storage/src/connection_url.rs 1
 crates/storage/src/query_history.rs 1
+tests/release/examples/browse_benchmark.rs 1
