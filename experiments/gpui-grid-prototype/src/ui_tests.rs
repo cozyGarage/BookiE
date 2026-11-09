@@ -631,6 +631,19 @@ fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn the_command_palette_navigates_between_results(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-enter ctrl-shift-p");
+    cx.simulate_input("previous result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert_eq!(view.active_run, 0));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("next result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert_eq!(view.active_run, 1));
+}
+
+#[gpui::test]
 fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {

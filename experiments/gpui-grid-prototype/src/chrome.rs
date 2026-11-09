@@ -521,6 +521,7 @@ impl GridView {
                 .id(("run", index))
                 .flex()
                 .items_center()
+                .flex_none()
                 .h(px(28.0))
                 .px_2()
                 .rounded(px(theme.radius))
@@ -589,7 +590,16 @@ impl GridView {
             .border_color(rgb(theme.border))
             .child(icon("pin", theme.muted_foreground))
             .child(div().w(px(1.0)).h(px(16.0)).bg(rgb(theme.border)))
-            .child(div().flex().flex_1().gap_1().overflow_hidden().children(run_tabs))
+            .child(
+                div()
+                    .id("result-runs")
+                    .flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_1()
+                    .overflow_x_scroll()
+                    .children(run_tabs),
+            )
             .child(switch("view-table", "Table Data", !self.summary_view, false, cx))
             .child(switch("view-summary", "Summary", self.summary_view, true, cx))
             .child(

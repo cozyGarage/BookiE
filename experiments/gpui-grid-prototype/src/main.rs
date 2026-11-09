@@ -702,6 +702,16 @@ impl GridView {
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
+                "previous-run",
+                "Previous result",
+                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
+            ),
+            action(
+                "next-run",
+                "Next result",
+                matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
+            ),
+            action(
                 "close-run",
                 "Close current result",
                 matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
@@ -799,6 +809,8 @@ impl GridView {
                 window.focus(&self.focus, cx);
             }
             "run" => self.run_query(),
+            "previous-run" => self.activate_run(self.active_run - 1),
+            "next-run" => self.activate_run(self.active_run + 1),
             "close-run" => self.close_run(self.active_run),
             "results" => self.result_open = !self.result_open,
             "table" => {
