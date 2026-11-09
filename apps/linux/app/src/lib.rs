@@ -212,17 +212,7 @@ fn initialize_ui() -> RelmApp<<ui::App as relm4::Component>::Input> {
 }
 
 fn build_registry() -> DriverRegistry {
-    let mut r = DriverRegistry::new();
-    r.register(Arc::new(drivers_clickhouse::ClickhouseDriver));
-    r.register(Arc::new(drivers_duckdb::DuckdbDriver));
-    r.register(Arc::new(drivers_mongodb::MongodbDriver));
-    r.register(Arc::new(drivers_mssql::MssqlDriver));
-    r.register(Arc::new(drivers_mysql::MysqlDriver));
-    r.register(Arc::new(drivers_oracle::OracleDriver));
-    r.register(Arc::new(drivers_postgres::PgDriver));
-    r.register(Arc::new(drivers_redis::RedisDriver));
-    r.register(Arc::new(drivers_sqlite::SqliteDriver));
-    r
+    drivers_registry::default_registry()
 }
 
 fn enable_system_openssh(database: Arc<services::database_service::DatabaseService>) {
