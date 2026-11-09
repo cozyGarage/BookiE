@@ -39,7 +39,7 @@ PROFILE="${BOOKIE_NEXTEST_PROFILE:-default}"
 if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
   mkdir -p "${CARGO_TARGET_DIR:?Cargo target directory required}"
   export TMPDIR="$CARGO_TARGET_DIR"
-  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE" "${GITHUB_SHA:?source revision required}"
+  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE" "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}"
   packages=""
   for crate in "${CRATES[@]}"; do
     packages+="${packages:+ | }package(=$crate)"

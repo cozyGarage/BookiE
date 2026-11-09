@@ -20,6 +20,8 @@ def verify(bundle, revision):
     index = json.loads((bundle / 'index.json').read_text())
     if index.get('schema_version') != 1 or index.get('source_commit') != revision:
         raise ValueError('test bundle identity mismatch')
+    if index.get('architecture') != platform.machine():
+        raise ValueError('test bundle architecture mismatch')
     if not index.get('tests') or not index.get('files'):
         raise ValueError('empty test bundle')
     for name, expected in index['files'].items():
@@ -31,6 +33,10 @@ def verify(bundle, revision):
     for entry in index['tests']:
         if entry['path'] not in index['files']:
             raise ValueError('unverified test executable')
+    if any(path not in index['files'] for path in index.get('binaries', {}).values()):
+        raise ValueError('unverified helper executable')
+    if (bundle / 'nextest.tar.zst').exists() and 'nextest.tar.zst' not in index['files']:
+        raise ValueError('unverified nextest archive')
     return index
 
 

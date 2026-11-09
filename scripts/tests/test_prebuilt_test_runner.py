@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import tempfile
@@ -17,13 +18,14 @@ SPEC.loader.exec_module(runner)
 class PrebuiltTestRunnerTests(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.dict(os.environ, {"GITHUB_SHA": "a" * 40}))
+        self.enterContext(patch.object(runner.subprocess, 'check_output', return_value='a' * 40))
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.binary = self.root / "test-program"
         self.binary.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n")
         self.binary.chmod(0o755)
-        self.index = {"schema_version": 1, "source_commit": "a" * 40, "tests": [
+        self.index = {"schema_version": 1, "source_commit": "a" * 40, "architecture": platform.machine(), "tests": [
             {"package": "sample", "kind": "test", "name": "integration", "path": "test-program"}
         ], "build_group": "default", "files": {"test-program": {"sha256": hashlib.sha256(self.binary.read_bytes()).hexdigest(), "size": self.binary.stat().st_size}}, "binaries": {}, "package_directories": {"sample": "crates/sample"}}
         (self.root / "index.json").write_text(json.dumps(self.index))
@@ -36,6 +38,34 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.splitlines(), ["rollback", "--include-ignored", "--test-threads=1"])
 
+    def test_invocation_requires_at_least_one_executed_test(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        command = [str(self.binary)]
+        empty = subprocess.CompletedProcess(command, 0, 'test result: ok. 0 passed; 0 failed;\n')
+        passed = subprocess.CompletedProcess(command, 0, 'test result: ok. 1 passed; 0 failed;\n')
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command, command]), \
+             patch.object(runner.subprocess, 'run', side_effect=[empty, passed]), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
+            self.assertEqual(runner.main(), 0)
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.object(runner.subprocess, 'run', return_value=empty), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}), \
+             self.assertRaisesRegex(ValueError, 'no prebuilt tests executed'):
+            runner.main()
+
+    def test_failed_process_and_missing_summary_fail_the_invocation(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        command = [str(self.binary)]
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
+            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 101, '')):
+                self.assertEqual(runner.main(), 101)
+            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, '')), \
+                 self.assertRaisesRegex(ValueError, 'execution evidence missing'):
+                runner.main()
+
     def test_missing_target_fails_instead_of_building_or_running_zero_tests(self):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ["-p", "sample", "--test", "missing"])
@@ -43,6 +73,29 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
     def test_another_source_revision_is_rejected(self):
         with patch.dict(os.environ, {"GITHUB_SHA": "b" * 40}, clear=True), self.assertRaises(ValueError):
             runner.commands(self.root, ["-p", "sample", "--test", "integration"])
+
+    def test_another_architecture_is_rejected(self):
+        self.index['architecture'] = 'different-architecture'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        with self.assertRaisesRegex(ValueError, 'architecture mismatch'):
+            runner.commands(self.root, ['-p', 'sample', '--test', 'integration'])
+
+    def test_explicit_source_revision_takes_precedence_for_manual_runs(self):
+        with patch.dict(os.environ, {"GITHUB_SHA": "b" * 40, "BOOKIE_SOURCE_COMMIT": "a" * 40}, clear=True):
+            self.assertEqual(len(runner.commands(self.root, ["-p", "sample", "--test", "integration"])), 1)
+
+    def test_bundle_preparation_rejects_a_different_checkout(self):
+        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default'],
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('differs from the checkout', result.stderr)
+
+    def test_bundle_builder_rejects_a_different_checkout(self):
+        result = subprocess.run(['bash', str(ROOT / 'scripts/build-test-bundles.sh'), str(self.root / 'out')],
+                                env={**os.environ, 'BOOKIE_SOURCE_COMMIT': '0' * 40}, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('differs from the checkout', result.stderr)
+        self.assertFalse((self.root / 'out').exists())
 
     def test_executable_cannot_escape_the_verified_bundle(self):
         self.index["tests"][0]["path"] = "../outside"
@@ -55,9 +108,25 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ['-p', 'sample', '--test', 'integration'])
 
+    def test_unverified_helper_is_rejected_before_execution(self):
+        self.index['binaries']['helper'] = 'unverified'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        with self.assertRaisesRegex(ValueError, 'unverified helper executable'):
+            runner.load_index(self.root)
+
+    def test_unverified_nextest_archive_is_rejected(self):
+        (self.root / 'nextest.tar.zst').write_bytes(b'unverified')
+        with self.assertRaisesRegex(ValueError, 'unverified nextest archive'):
+            runner.load_index(self.root)
+
     def test_missing_package_cannot_be_silently_skipped(self):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ['-p', 'sample', '-p', 'missing', '--tests'])
+
+    def test_missing_target_in_one_package_cannot_be_silently_skipped(self):
+        self.index['package_directories']['other'] = 'crates/other'
+        with self.assertRaises(ValueError):
+            runner.commands(self.root, ['-p', 'sample', '-p', 'other', '--test', 'integration'], self.index)
 
     def test_wildcard_selects_integration_targets(self):
         command = runner.commands(self.root, ['-p', 'sample', '--test', '*'])[0]

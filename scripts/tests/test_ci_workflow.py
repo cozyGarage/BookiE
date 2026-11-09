@@ -121,7 +121,7 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("mongodb, duckdb]", driver)
+        self.assertIn("mongodb, oracle, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
         self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
@@ -243,14 +243,17 @@ class CiWorkflowTests(unittest.TestCase):
             harness.index("scripts/update-third-party-notices.py --check"),
         )
 
-    def test_forgejo_workflows_do_not_block_other_runs(self):
+    def test_forgejo_ci_and_nightly_share_a_per_ref_concurrency_group(self):
+        groups = []
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
             self.assertIsNotNone(match, name)
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
-            self.assertNotIn("group", settings, name)
+            self.assertEqual(settings["group"].strip(), "bookie-ci-${{ github.ref }}", name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
+            groups.append(settings["group"].strip())
+        self.assertEqual(groups[0], groups[1])
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('printf \'%s/%s\' "$remote" "$target" | sha256sum', gate)
 
@@ -616,7 +619,7 @@ class CiWorkflowTests(unittest.TestCase):
             focused.split("\n    steps:\n", 1)[0],
         )
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("needs: [pin-revision, b4-rollback]", integration)
+        self.assertIn("needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]", integration)
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
         commands = [step["argv"] for step in layers["steps"]]
         self.assertEqual(len(commands), 2)

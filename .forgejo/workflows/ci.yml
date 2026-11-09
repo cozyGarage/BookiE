@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
+  group: bookie-ci-${{ github.ref }}
   cancel-in-progress: false
 
 defaults:
@@ -642,7 +643,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, duckdb]
+        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, duckdb]
         include:
           - driver: duckdb
             tests: --test integration --test read_only --test missing_file

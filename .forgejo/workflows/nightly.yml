@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 
 concurrency:
+  group: bookie-ci-${{ github.ref }}
   cancel-in-progress: false
 
 defaults:
