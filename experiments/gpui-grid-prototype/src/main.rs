@@ -300,7 +300,16 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let rows = (selection.first()..=selection.last()).map(|index| self.source.row(self.source_row(index)));
+        let rows = (selection.first()..=selection.last()).map(|index| {
+            let source = self.source_row(index);
+            let mut row = self.source.row(source);
+            for (column, cell) in row.iter_mut().enumerate() {
+                if let Some(edited) = self.edits.get(&(source, column)) {
+                    *cell = edited.clone();
+                }
+            }
+            row
+        });
         let text = copy_tsv(rows, with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -317,6 +326,29 @@ impl GridView {
         self.runs.push(run);
         self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
+    }
+
+    fn close_tab(&mut self, index: usize) {
+        let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
+        self.tabs.close(index);
+        self.sync_grid_owner();
+        if !closing_query {
+            return;
+        }
+        if self.grid_is_query {
+            self.generation += 1;
+            self.edits = std::mem::take(&mut self.table_edits);
+            self.source = self.table_source.clone();
+            self.grid_is_query = false;
+            self.editing = None;
+            self.compare = None;
+            self.cursor = MatchCursor::default();
+            self.set_mode(Mode::All);
+        }
+        self.runs.clear();
+        self.run_edits.clear();
+        self.active_run = 0;
+        self.next_run_number = 1;
     }
 
     fn sync_grid_owner(&mut self) {
@@ -551,6 +583,7 @@ impl GridView {
             move || source.compare(keyed),
             |this, diff| {
                 this.status.clear();
+                this.selection = None;
                 this.compare = Some(diff);
                 this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
             },
