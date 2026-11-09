@@ -568,7 +568,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
         self.assertIn("tag: ${{ steps.publish.outputs.tag }}", ensure)
         self.assertIn("./.github/actions/dockerhub-login", ensure)
-        for job in ["gtk-safety", "current-stable-clippy"]:
+        gtk_safety = re.search(r"^  gtk-safety:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+        self.assertIn(
+            "image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}",
+            gtk_safety,
+        )
+        self.assertIn("secrets.GITHUB_TOKEN", gtk_safety)
+        for job in ["current-stable-clippy"]:
             section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
             self.assertIn("image: debian:testing", section, job)
             self.assertIn("secrets.DOCKERHUB_USERNAME", section, job)
@@ -663,6 +669,19 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn('cargo build --locked -p bookie-app --bin bookie-app', supplied_binary_branch)
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())
         self.assertEqual(layers["layers"]["postgres-release"]["steps"][0]["timeout_seconds"], 2700)
+
+    def test_gtk_safety_reuses_the_binary_built_by_fast_checks(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
+        gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
+        self.assertIn("cargo build --locked -p bookie-app --bin bookie-app", fast)
+        self.assertIn("install -Dm755 target/debug/bookie-app target/gtk-safety/bookie", fast)
+        self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", fast)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, fast]", gtk_safety)
+        self.assertIn("image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", gtk_safety)
+        self.assertIn("actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131", gtk_safety)
+        self.assertIn("chmod 0755 target/gtk-safety/bookie", gtk_safety)
+        self.assertIn("BOOKIE_GTK_BINARY: target/gtk-safety/bookie", gtk_safety)
 
     def test_postgres_release_runs_on_the_supported_gtk_floor_with_host_docker(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
