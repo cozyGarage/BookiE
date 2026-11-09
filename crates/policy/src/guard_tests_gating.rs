@@ -88,6 +88,29 @@ async fn dangerous_effects_ask_for_approval_without_running_a_blast_radius_query
 }
 
 #[tokio::test]
+async fn oracle_stored_function_is_denied_before_driver_dispatch_without_approval() {
+    let queries = Arc::new(AtomicUsize::new(0));
+    let mut guard_context = context(
+        Principal::human_gui(),
+        Environment::Local,
+        PolicyConfig::default(),
+        Arc::new(DenyApprovalSink),
+        Arc::new(SequenceAuditSink::new(vec![])),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "oracle".into();
+    let guard = PolicyGuard::new(query_counting_connection(queries.clone()), guard_context);
+
+    let error = guard
+        .query("SELECT bookie_it.delayed_write() FROM dual")
+        .await
+        .expect_err("stored function must need approval");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(queries.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
 async fn write_approval_overrides_the_human_unparseable_allow_rule() {
     let approvals = Arc::new(AtomicUsize::new(0));
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
