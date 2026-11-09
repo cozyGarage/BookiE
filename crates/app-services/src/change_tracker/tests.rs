@@ -1,5 +1,15 @@
 use super::*;
 use bookie_core::ColumnInfo;
+use std::{cell::RefCell, rc::Rc};
+
+#[derive(Clone, Debug)]
+struct EventLog(Rc<RefCell<Vec<TrackerEvent>>>);
+
+impl TrackerEventSink for EventLog {
+    fn emit(&self, event: TrackerEvent) {
+        self.0.borrow_mut().push(event);
+    }
+}
 
 fn pk_col(name: &str) -> ColumnInfo {
     ColumnInfo {
@@ -45,6 +55,25 @@ fn cell_edit_creates_modified_state() {
     assert_eq!(t.cell_state(&key, 1), CellState::Modified);
     assert_eq!(t.row_state(&key), RowState::Modified);
     assert_eq!(t.pending_count(), 1);
+}
+
+#[test]
+fn bulk_cell_edits_coalesce_changed_rows_and_pending_count_events() {
+    let mut tracker = TabChangeTracker::new();
+    let events = Rc::new(RefCell::new(Vec::new()));
+    tracker.subscribe(EventLog(events.clone()));
+    let first = rk(&[Value::Int(1)]);
+    let second = rk(&[Value::Int(2)]);
+    tracker.track_cell_edits(vec![
+        (first.clone(), 1, Value::Text("a".into()), Value::Text("b".into())),
+        (first.clone(), 2, Value::Text("c".into()), Value::Text("d".into())),
+        (second.clone(), 1, Value::Text("e".into()), Value::Text("f".into())),
+    ]);
+    assert_eq!(tracker.pending_count(), 3);
+    let events = events.borrow();
+    assert!(matches!(&events[0], TrackerEvent::ChangedRows(rows) if rows == &[first, second]));
+    assert!(matches!(&events[1], TrackerEvent::PendingCountChanged(3)));
+    assert_eq!(events.len(), 2);
 }
 
 #[test]

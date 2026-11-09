@@ -375,13 +375,9 @@ fn run_replace(
     widgets: &FindWidgets,
     target: &FindTarget,
     only: Option<(u32, usize)>,
-) -> Result<super::replace::ReplaceReport, bookie_app_services::text_match::TextMatchError> {
+) -> Result<super::replace::ReplaceReport, super::replace::ReplaceError> {
     let Some(model) = view.model() else {
-        return Ok(super::replace::ReplaceReport {
-            edits: Vec::new(),
-            replacements: 0,
-            skipped: 0,
-        });
+        return Ok(super::replace::ReplaceReport::default());
     };
     let query = {
         let mut query = current_query(widgets);
@@ -426,12 +422,25 @@ fn run_replace(
 fn finish_replace(
     widgets: &FindWidgets,
     target: &FindTarget,
-    report: Result<super::replace::ReplaceReport, bookie_app_services::text_match::TextMatchError>,
+    report: Result<super::replace::ReplaceReport, super::replace::ReplaceError>,
     refresh: &impl Fn(),
 ) {
-    let Ok(report) = report else {
-        widgets.status.set_text(&crate::tr!("Invalid regular expression"));
-        return;
+    let report = match report {
+        Ok(report) => report,
+        Err(super::replace::ReplaceError::Cancelled) => {
+            widgets.status.set_text(&crate::tr!("Replacement cancelled"));
+            return;
+        }
+        Err(super::replace::ReplaceError::Budget) => {
+            widgets.status.set_text(&crate::tr!(
+                "Replacement is too large; narrow the selection or use a shorter replacement"
+            ));
+            return;
+        }
+        Err(super::replace::ReplaceError::Match(_)) => {
+            widgets.status.set_text(&crate::tr!("Invalid regular expression"));
+            return;
+        }
     };
     let Some(sender) = &target.edit else {
         return;

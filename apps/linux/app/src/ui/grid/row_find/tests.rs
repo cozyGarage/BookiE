@@ -292,10 +292,60 @@ fn replace_stops_when_cancelled() {
         "beta",
         &[true],
         &cancel,
-    )
-    .unwrap();
-    assert!(report.edits.is_empty());
-    assert_eq!(report.replacements, 0);
+    );
+    assert!(matches!(report, Err(super::replace::ReplaceError::Cancelled)));
+}
+
+#[test]
+fn cancellation_during_replacement_does_not_return_a_partial_plan() {
+    let cancel = CancellationToken::new();
+    let result = plan_replacements(
+        2,
+        |position, visit| {
+            if position == 1 {
+                cancel.cancel();
+            }
+            visit(0, &Value::Text("alpha".into()));
+        },
+        |position| Some(vec![Value::Int(i64::from(position))]),
+        &query("alpha"),
+        "beta",
+        &[true],
+        &cancel,
+    );
+    assert!(result.is_err(), "cancelled planning must not stage a partial result");
+}
+
+#[test]
+fn replacement_refuses_a_cell_that_expands_beyond_its_budget() {
+    let text = Value::Text("a".repeat(1024));
+    let replacement = "b".repeat(2048);
+    let result = plan_replacements(
+        1,
+        |_, visit| visit(0, &text),
+        |_| Some(vec![Value::Int(1)]),
+        &query("a"),
+        &replacement,
+        &[true],
+        &CancellationToken::new(),
+    );
+    assert!(result.is_err(), "oversized output must not become an edit plan");
+}
+
+#[test]
+fn replacement_refuses_aggregate_output_without_returning_partial_edits() {
+    let text = Value::Text("a".into());
+    let replacement = "b".repeat(1024 * 1024);
+    let result = plan_replacements(
+        17,
+        |_, visit| visit(0, &text),
+        |position| Some(vec![Value::Int(i64::from(position))]),
+        &query("a"),
+        &replacement,
+        &[true],
+        &CancellationToken::new(),
+    );
+    assert!(matches!(result, Err(super::replace::ReplaceError::Budget)));
 }
 
 #[test]
