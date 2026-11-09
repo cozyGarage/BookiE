@@ -19,6 +19,18 @@ fn snapshot_is_send_and_rejects_input_before_retaining_it() {
 }
 
 #[test]
+fn an_oversized_cell_discards_earlier_cells_from_the_same_snapshot_row() {
+    let mut snapshot = ReplaceSnapshot::default();
+    let first = Value::Text("small".into());
+    let oversized = Value::Text("x".repeat(16 * 1024 * 1024));
+    assert!(matches!(
+        snapshot.push(0, &[Value::Int(1)], &[(0, &first), (1, &oversized)]),
+        Err(ReplaceError::Budget)
+    ));
+    assert!(snapshot.rows().is_empty());
+}
+
+#[test]
 fn snapshot_plan_keeps_original_values_for_stale_cell_validation() {
     let mut snapshot = ReplaceSnapshot::default();
     let original = Value::Text("old value".into());
