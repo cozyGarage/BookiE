@@ -51,6 +51,34 @@ fn editing_a_cell_does_not_write_its_value_to_process_output() {
 }
 
 #[gpui::test]
+fn opening_a_query_reveals_its_tab_in_an_overflowing_workspace(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            for index in 0..15 {
+                view.tabs.open_table(&format!("table_{index}"));
+            }
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &bookie_gpui_grid_prototype::shell::Tab::Query);
+        assert!(view.tab_scroll.offset().x < gpui::px(0.0));
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("open home");
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &bookie_gpui_grid_prototype::shell::Tab::Home);
+        assert_eq!(view.tab_scroll.offset().x, gpui::px(0.0));
+    });
+}
+
+#[gpui::test]
 fn an_invalid_edit_is_refused_and_keeps_the_editor_open(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(2, 3, window, cx)));

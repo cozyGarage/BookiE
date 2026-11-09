@@ -246,13 +246,14 @@ impl GridView {
             .count()
     }
 
-    pub fn tab_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    pub fn tab_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let active = self.tabs.active;
         let tabs = self.tabs.items.iter().enumerate().map(|(index, tab)| {
             let selected = index == active;
             let mut item = div()
                 .id(("tab", index))
                 .flex()
+                .flex_none()
                 .items_center()
                 .gap_2()
                 .h_full()
@@ -307,10 +308,15 @@ impl GridView {
             }))
         });
         div()
+            .id("workspace-tabs")
             .flex()
             .items_center()
             .flex_none()
+            .w_full()
+            .min_w_0()
             .h(px(TAB_HEIGHT))
+            .overflow_x_scroll()
+            .track_scroll(&self.tab_scroll)
             .bg(rgb(theme.chrome))
             .border_b_1()
             .border_color(rgb(theme.border))

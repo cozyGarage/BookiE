@@ -122,6 +122,24 @@ fn multi_key_restore_keeps_window_groups_and_drops_unknown_or_duplicate_keys() {
 }
 
 #[test]
+fn large_restore_keeps_first_occurrences_in_window_order() {
+    let keys = (1..=10_000).map(Uuid::from_u128).collect::<Vec<_>>();
+    let record = OpenSessionsRecord::from_windows([keys.clone(), keys.clone()]);
+    assert_eq!(record.windows.len(), 1);
+    assert_eq!(record.windows[0], keys);
+}
+
+#[test]
+fn restoring_available_keys_preserves_key_order_and_duplicate_behavior() {
+    let first = Uuid::from_u128(1);
+    let second = Uuid::from_u128(2);
+    assert_eq!(
+        restore_window_keys(&[first, second, first], &[second, first]),
+        vec![first, second, first]
+    );
+}
+
+#[test]
 fn an_unsupported_open_sessions_version_is_refused_without_restoring_keys() {
     let id = Uuid::new_v4();
     let bytes = serde_json::to_vec(&serde_json::json!({
