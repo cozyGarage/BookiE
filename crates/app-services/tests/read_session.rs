@@ -129,6 +129,30 @@ async fn dropping_a_session_removes_its_connection() {
 }
 
 #[tokio::test]
+async fn an_old_session_cannot_read_or_close_a_replacement() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let id = Uuid::new_v4();
+    let database = Arc::new(DatabaseService::new_isolated());
+    let old = session(&path, id, database.clone()).await;
+    let table = old.tables.iter().find(|table| table.name == "items").unwrap().clone();
+    database.close(id);
+    let replacement = session(&path, id, database.clone()).await;
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    assert!(matches!(
+        old.read_page(&table, 0, 2, &control).await,
+        Err(DriverFailurePresentation::Disconnected)
+    ));
+    drop(old);
+    assert_eq!(
+        replacement.read_page(&table, 0, 2, &control).await.unwrap().rows.len(),
+        2
+    );
+}
+
+#[tokio::test]
 async fn a_missing_table_is_a_typed_query_failure() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");

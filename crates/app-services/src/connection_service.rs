@@ -83,26 +83,30 @@ impl PreparedConnection {
     /// switch (tearing down a previous connection, clearing tabs) so a
     /// refusal here never needs to be rolled back.
     pub fn activate(self, database: &DatabaseService) -> Option<ActivatedConnection> {
+        self.activate_with_generation(database).map(|(activated, _)| activated)
+    }
+
+    pub(crate) fn activate_with_generation(self, database: &DatabaseService) -> Option<(ActivatedConnection, Uuid)> {
         let id = self.id;
         let database_name = self.params.opts.database.clone();
-        let activated = database.activate_shared(
+        let generation = database.activate_shared(
             id,
             self.metadata,
             self.connection,
             self.tunnel,
             self.read_only,
             self.params,
-        );
-        if !activated {
-            return None;
-        }
-        Some(ActivatedConnection {
-            id,
-            tables: self.tables,
-            views: self.views,
-            driver_id: self.driver_id,
-            database: database_name,
-        })
+        )?;
+        Some((
+            ActivatedConnection {
+                id,
+                tables: self.tables,
+                views: self.views,
+                driver_id: self.driver_id,
+                database: database_name,
+            },
+            generation,
+        ))
     }
 }
 
