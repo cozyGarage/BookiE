@@ -79,14 +79,14 @@ run_integration() {
   trap 'cleanup_testcontainers; exit 143' TERM
   trap 'cleanup_testcontainers; exit 130' INT
   echo "==> SQL and document/key-value driver integration"
-  cargo test --locked --test integration \
+  bash scripts/run-rust-tests.sh --locked --test integration \
     -p bookie-driver-postgres -p bookie-driver-mysql -p bookie-driver-mssql \
     -p bookie-driver-clickhouse -p bookie-driver-redis -p bookie-driver-mongodb -p bookie-driver-oracle \
     -- --include-ignored --test-threads=1
-  cargo test --locked -p bookie-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
-  cargo test --locked -p bookie-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
-  cargo test --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1
-  cargo test --locked -p bookie-policy --test session_mssql -- --include-ignored --test-threads=1
+  bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+  bash scripts/run-rust-tests.sh --locked -p bookie-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
+  bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1
+  bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_mssql -- --include-ignored --test-threads=1
   echo "==> PostgreSQL Unix-socket integration"
   ./scripts/test-postgres-socket.sh
   bash ./scripts/test-ssh.sh
