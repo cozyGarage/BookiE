@@ -17,6 +17,10 @@ class IsolatedRunnerTests(unittest.TestCase):
     def test_prebuilt_test_runs_in_its_package_directory(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            subprocess.run(['git', '-C', str(root), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                            'commit', '--allow-empty', '-qm', 'fixture'], check=True)
+            revision = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
             scripts = root / 'scripts'
             scripts.mkdir()
             for name in ('run-isolated-tests.py', 'run-prebuilt-tests.py', 'ci-test-bundle.py', 'rust_test_evidence.py'):
@@ -29,13 +33,13 @@ class IsolatedRunnerTests(unittest.TestCase):
             binary = bundle / 'test-program'
             binary.write_text('#!/bin/sh\ntest "$PWD" = "$EXPECTED_CWD" || exit 1\nprintf "test example ... ok\\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\\n"\n')
             binary.chmod(0o755)
-            index = {'schema_version': 1, 'source_commit': 'a' * 40, 'architecture': platform.machine(),
+            index = {'schema_version': 1, 'source_commit': revision, 'architecture': platform.machine(),
                      'tests': [{'package': 'sample', 'kind': 'test', 'name': 'integration', 'path': 'test-program'}],
                      'files': {'test-program': {'sha256': hashlib.sha256(binary.read_bytes()).hexdigest(), 'size': binary.stat().st_size}},
                      'binaries': {}, 'package_directories': {'sample': 'crates/sample'}}
             (bundle / 'index.json').write_text(json.dumps(index))
             result = subprocess.run(['/usr/bin/python3', str(scripts / 'run-isolated-tests.py'), 'gtk'],
-                                    env=os.environ | {'BOOKIE_TEST_BUNDLE': str(bundle), 'BOOKIE_SOURCE_COMMIT': 'a' * 40,
+                                    env=os.environ | {'BOOKIE_TEST_BUNDLE': str(bundle), 'BOOKIE_SOURCE_COMMIT': revision,
                                                       'EXPECTED_CWD': str(package)}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

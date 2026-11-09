@@ -18,6 +18,7 @@ SPEC.loader.exec_module(runner)
 class PrebuiltTestRunnerTests(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.dict(os.environ, {"GITHUB_SHA": "a" * 40}))
+        self.enterContext(patch.object(runner.subprocess, 'check_output', return_value='a' * 40))
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)

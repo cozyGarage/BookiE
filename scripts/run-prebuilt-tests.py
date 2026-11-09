@@ -16,7 +16,10 @@ def load_index(bundle):
     verifier = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(verifier)
     revision = os.environ.get('BOOKIE_SOURCE_COMMIT') or os.environ.get('GITHUB_SHA')
-    return verifier.verify(bundle, revision or json.loads((bundle / 'index.json').read_text())['source_commit'])
+    checkout = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    if revision and revision != checkout:
+        raise ValueError('test bundle source revision differs from the checkout')
+    return verifier.verify(bundle, checkout)
 
 
 def commands(bundle, arguments, index=None):
