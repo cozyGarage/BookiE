@@ -727,6 +727,12 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIsNotNone(workspace_toolchain)
         self.assertEqual(toolchain.group(1), workspace_toolchain.group(1))
         self.assertNotRegex(release, r"--env RUSTUP_TOOLCHAIN=")
+        self.assertIn('toolchain_bin="$(dirname "$(rustup which cargo --toolchain 1.98)")"', release)
+        self.assertIn('toolchain_relative="${toolchain_bin#"$HOME/.rustup"}"', release)
+        self.assertIn('--env PATH="/rustup${toolchain_relative}:/cargo/bin:', release)
+        self.assertIn('echo "Rust toolchain is outside the mounted Rustup home"', release)
+        self.assertIn("cargo --version", release)
+        self.assertIn("rustc --version", release)
 
     def test_gtk_scripts_reduce_xvfb_display_collisions(self):
         for path in [
