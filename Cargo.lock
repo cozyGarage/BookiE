@@ -972,6 +972,7 @@ name = "bookie-app-services"
 version = "0.2.5"
 dependencies = [
  "async-trait",
+ "bookie-app-services",
  "bookie-core",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
