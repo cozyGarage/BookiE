@@ -181,6 +181,13 @@ impl SqlEditor {
         let Some(editing) = self.result_editing.as_ref() else {
             return;
         };
+        let Some(column) = editing.columns.get(col_index) else {
+            return;
+        };
+        if !super::can_stage_result_value(column, &new) {
+            self.refresh_result_row(row_position);
+            return;
+        }
         let tab_id = editing.tab_id;
         if let Some(row_obj) = self.result_row_object(row_position)
             && let Some(draft_id) = row_obj.draft_id()
@@ -424,7 +431,7 @@ impl SqlEditor {
         let Some(table) = editing.table.clone() else {
             return;
         };
-        let columns = editing.columns.clone();
+        let columns = editing.mutation_columns.clone();
         let driver_id = editing.driver_id.clone();
         let tab_id = editing.tab_id;
         let result = editing.change_trackers.with_tab_ref(tab_id, |tracker| {
@@ -467,7 +474,7 @@ impl SqlEditor {
                 &editing.driver_id,
                 table.schema.as_deref(),
                 &table.name,
-                &editing.columns,
+                &editing.mutation_columns,
             )
         });
         match result {

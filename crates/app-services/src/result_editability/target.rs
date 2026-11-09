@@ -1,4 +1,4 @@
-use bookie_core::{ColumnInfo, TableInfo};
+use bookie_core::{ColumnInfo, TableInfo, Value};
 
 use super::source_table::{SourceRefusal, SourceTable, source_columns_for_result};
 
@@ -96,6 +96,8 @@ pub fn owned_result_columns(result_columns: &[ColumnInfo], target: &EditTarget) 
     let mut columns = result_columns.to_vec();
     for (column, position) in columns.iter_mut().zip(&target.positions) {
         let Some(position) = position else {
+            column.is_generated = true;
+            column.primary_key = false;
             continue;
         };
         let Some(known) = target.catalog.get(*position) else {
@@ -113,4 +115,21 @@ pub fn owned_result_columns(result_columns: &[ColumnInfo], target: &EditTarget) 
         }
     }
     columns
+}
+
+pub fn mutation_columns(result_columns: &[ColumnInfo], target: &EditTarget) -> Vec<ColumnInfo> {
+    let mut columns = owned_result_columns(result_columns, target);
+    for (column, position) in columns.iter_mut().zip(&target.positions) {
+        if let Some(source) = position.and_then(|position| target.catalog.get(position)) {
+            *column = source.clone();
+        }
+    }
+    columns
+}
+
+pub fn can_stage_result_value(column: &ColumnInfo, value: &Value) -> bool {
+    !column.is_generated
+        && !column.primary_key
+        && !column.is_auto_increment
+        && (!matches!(value, Value::Null) || column.nullable)
 }
