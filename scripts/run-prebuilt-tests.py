@@ -4,6 +4,7 @@ import fnmatch
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -15,8 +16,11 @@ def load_index(bundle):
     spec = importlib.util.spec_from_file_location('ci_test_bundle', Path(__file__).resolve().with_name('ci-test-bundle.py'))
     verifier = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(verifier)
-    revision = os.environ.get('GITHUB_SHA')
-    return verifier.verify(bundle, revision or json.loads((bundle / 'index.json').read_text())['source_commit'])
+    revision = os.environ.get('BOOKIE_SOURCE_COMMIT') or os.environ.get('GITHUB_SHA')
+    checkout = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+    if revision and revision != checkout:
+        raise ValueError('test bundle source revision differs from the checkout')
+    return verifier.verify(bundle, checkout)
 
 
 def commands(bundle, arguments, index=None):
@@ -24,7 +28,7 @@ def commands(bundle, arguments, index=None):
     index = index or load_index(bundle)
     if index.get('schema_version') != 1:
         raise ValueError('unsupported test bundle schema')
-    revision = os.environ.get('GITHUB_SHA')
+    revision = os.environ.get('BOOKIE_SOURCE_COMMIT') or os.environ.get('GITHUB_SHA')
     if revision and index.get('source_commit') != revision:
         raise ValueError('test bundle source revision differs from the checkout')
     parser = argparse.ArgumentParser(allow_abbrev=False)
@@ -59,7 +63,9 @@ def commands(bundle, arguments, index=None):
                      or (entry['kind'] == 'bin' and selection.bins))]
     if not selected:
         raise ValueError('no prebuilt test target matches the selection')
-    missing = [pattern for pattern in selection.test if not any(entry['kind'] == 'test' and fnmatch.fnmatchcase(entry['name'], pattern) for entry in selected)]
+    missing = [(package, pattern) for package in packages for pattern in selection.test
+               if not any(entry['package'] == package and entry['kind'] == 'test'
+                          and fnmatch.fnmatchcase(entry['name'], pattern) for entry in selected)]
     if missing:
         raise ValueError('a requested prebuilt test target is missing')
     result = []
@@ -85,14 +91,22 @@ def main():
     bundle = Path(os.environ['BOOKIE_TEST_BUNDLE'])
     index = load_index(bundle)
     execution_environment = environment(bundle, index)
+    passed = 0
     for command in commands(bundle, sys.argv[1:], index):
         entry = next(entry for entry in index['tests'] if (bundle / entry['path']).resolve() == Path(command[0]))
         directory = (ROOT / index['package_directories'][entry['package']]).resolve()
         if not directory.is_relative_to(ROOT.resolve()):
             raise ValueError('package directory is outside the source checkout')
-        result = subprocess.run(command, cwd=directory, env=execution_environment)
+        result = subprocess.run(command, cwd=directory, env=execution_environment, text=True, stdout=subprocess.PIPE)
+        print(result.stdout, end='', flush=True)
         if result.returncode:
             return result.returncode
+        summaries = re.findall(r'^test result: ok\. (\d+) passed; 0 failed;', result.stdout, re.MULTILINE)
+        if len(summaries) != 1:
+            raise ValueError('prebuilt test execution evidence missing')
+        passed += int(summaries[0])
+    if not passed:
+        raise ValueError('no prebuilt tests executed')
     return 0
 
 
