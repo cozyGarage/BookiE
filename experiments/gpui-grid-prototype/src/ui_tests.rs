@@ -599,6 +599,29 @@ fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut Tes
 }
 
 #[gpui::test]
+fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("query".into()));
+        })
+    });
+}
+
+#[gpui::test]
 fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t ctrl-shift-p");
