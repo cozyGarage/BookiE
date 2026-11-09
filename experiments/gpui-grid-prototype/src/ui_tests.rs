@@ -78,6 +78,21 @@ fn the_find_field_takes_typed_text_and_enter_runs_the_search(cx: &mut TestAppCon
 }
 
 #[gpui::test]
+fn changing_find_text_discards_a_pending_search_result(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
+            view.run_find(true, cx);
+            view.find.update(cx, |input, cx| input.set_content("new search", cx));
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.cursor.matches.is_empty()));
+}
+
+#[gpui::test]
 fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("down down right");
@@ -507,6 +522,24 @@ fn selecting_an_earlier_run_restores_its_result_and_clears_the_view_state(cx: &m
 }
 
 #[gpui::test]
+fn selecting_the_active_result_keeps_its_filter_and_selection(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: vec![2, 4],
+                label: "filtered".into(),
+            });
+            view.click_row(1, false);
+            view.select_run(view.active_run);
+            assert_eq!(view.dataset_count(), 2);
+            assert_eq!(view.selection.map(|selection| selection.focus), Some(1));
+        });
+    });
+}
+
+#[gpui::test]
 fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");
@@ -690,6 +723,30 @@ fn searching_after_filter_selects_the_matching_filtered_row(cx: &mut TestAppCont
         assert_eq!(view.pager.page, 0);
         assert_eq!(view.selection.map(|selection| selection.focus), Some(1_000));
     });
+}
+
+#[gpui::test]
+fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            for _ in 0..12 {
+                view.run_query();
+            }
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.run_scroll.offset().x < gpui::px(0.0)));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.activate_run(0);
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.run_scroll.offset().x, gpui::px(0.0)));
 }
 
 #[gpui::test]

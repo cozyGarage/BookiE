@@ -554,7 +554,7 @@ impl GridView {
                     .hover(move |style| style.bg(rgb(theme.accent)))
             };
             tab.on_click(cx.listener(move |this, _, _, cx| {
-                this.activate_run(index);
+                this.select_run(index);
                 cx.notify();
             }))
         });
@@ -598,6 +598,7 @@ impl GridView {
                     .min_w_0()
                     .gap_1()
                     .overflow_x_scroll()
+                    .track_scroll(&self.run_scroll)
                     .children(run_tabs),
             )
             .child(switch("view-table", "Table Data", !self.summary_view, false, cx))
