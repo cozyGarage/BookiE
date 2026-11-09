@@ -377,11 +377,7 @@ fn run_replace(
     only: Option<(u32, usize)>,
 ) -> Result<super::replace::ReplaceReport, super::replace::ReplaceError> {
     let Some(model) = view.model() else {
-        return Ok(super::replace::ReplaceReport {
-            edits: Vec::new(),
-            replacements: 0,
-            skipped: 0,
-        });
+        return Ok(super::replace::ReplaceReport::default());
     };
     let query = {
         let mut query = current_query(widgets);

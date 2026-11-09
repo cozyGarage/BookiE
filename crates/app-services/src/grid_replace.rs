@@ -2,8 +2,17 @@ use crate::text_match::{TextMatchError, TextMatcher};
 use bookie_core::Value;
 use tokio_util::sync::CancellationToken;
 
+mod snapshot;
 #[cfg(test)]
 mod tests;
+pub use snapshot::{ReplaceSnapshot, SnapshotRow};
+
+pub const MAX_REPLACE_INPUT_BYTES: usize = 16 * 1024;
+pub const MAX_REPLACE_CELL_OUTPUT_BYTES: usize = 1024 * 1024;
+pub const MAX_REPLACE_PLAN_BYTES: usize = 16 * 1024 * 1024;
+pub const MAX_REPLACE_SNAPSHOT_BYTES: usize = 16 * 1024 * 1024;
+pub const MAX_REPLACE_EDITS: usize = 10_000;
+pub const MAX_REPLACE_SNAPSHOT_ROWS: usize = bookie_core::MAX_QUERY_ROWS;
 
 pub struct ReplaceRequest<'a> {
     pub query: &'a ReplaceQuery,
@@ -30,6 +39,7 @@ pub enum ReplaceError {
 pub struct ReplaceEdit {
     pub position: u32,
     pub column: usize,
+    pub original: Value,
     pub new_value: String,
     pub row_key: Vec<Value>,
 }
@@ -39,6 +49,7 @@ pub struct ReplaceReport {
     pub edits: Vec<ReplaceEdit>,
     pub replacements: usize,
     pub skipped: usize,
+    retained_bytes: usize,
 }
 
 pub fn plan_replacements(
@@ -54,11 +65,11 @@ pub fn plan_replacements(
         replacement,
         editable,
     } = request;
+    validate_input(query, replacement)?;
     check_cancelled(cancel)?;
     let Some(matcher) = TextMatcher::compile(&query.needle, query.options)? else {
         return Ok(ReplaceReport::default());
     };
-    let mut output_bytes = 0usize;
     let mut over_budget = false;
     let mut report = ReplaceReport::default();
     for position in 0..count {
@@ -83,12 +94,12 @@ pub fn plan_replacements(
                 &search_text,
                 cancel,
             ) {
-                CellReplace::Budget => over_budget = true,
+                CellReplace::Budget | CellReplace::Cancelled => over_budget = true,
                 CellReplace::Skip => report.skipped = report.skipped.saturating_add(1),
                 CellReplace::None => {}
                 CellReplace::Edit { text, count } => {
                     if report
-                        .push_edit(position, column, text, count, &row_key, &mut output_bytes)
+                        .push_edit(position, column, value, text, count, &row_key)
                         .is_err()
                     {
                         over_budget = true;
@@ -105,8 +116,54 @@ pub fn plan_replacements(
     Ok(report)
 }
 
+pub fn plan_snapshot_replacements(
+    snapshot: &ReplaceSnapshot,
+    request: ReplaceRequest<'_>,
+    cancel: &CancellationToken,
+    search_text: impl Fn(&Value) -> String,
+) -> Result<ReplaceReport, ReplaceError> {
+    validate_input(request.query, request.replacement)?;
+    check_cancelled(cancel)?;
+    let Some(matcher) = TextMatcher::compile(&request.query.needle, request.query.options)? else {
+        return Ok(ReplaceReport::default());
+    };
+    let mut report = ReplaceReport::default();
+    for row in snapshot.rows() {
+        check_cancelled(cancel)?;
+        if row.key.is_empty() || crate::change_tracker::pk_values_are_unreadable(&row.key) {
+            report.skipped = report.skipped.saturating_add(1);
+            continue;
+        }
+        for (column, value) in &row.cells {
+            check_cancelled(cancel)?;
+            if request.query.column.is_some_and(|wanted| wanted != *column) {
+                continue;
+            }
+            match replace_cell(
+                value,
+                request.editable.get(*column).copied().unwrap_or(false),
+                &matcher,
+                request.replacement,
+                &search_text,
+                cancel,
+            ) {
+                CellReplace::Cancelled => return Err(ReplaceError::Cancelled),
+                CellReplace::Budget => return Err(ReplaceError::Budget),
+                CellReplace::Skip => report.skipped = report.skipped.saturating_add(1),
+                CellReplace::None => {}
+                CellReplace::Edit { text, count } => {
+                    report.push_edit(row.position, *column, value, text, count, &row.key)?
+                }
+            }
+        }
+    }
+    check_cancelled(cancel)?;
+    Ok(report)
+}
+
 enum CellReplace {
     Budget,
+    Cancelled,
     Skip,
     None,
     Edit { text: String, count: usize },
@@ -136,13 +193,16 @@ fn replace_cell(
             CellReplace::None
         };
     }
-    if !matcher.matches(original) {
-        return CellReplace::None;
-    }
     let Ok((text, count)) =
-        matcher.replace_all_bounded_controlled(original, replacement, 1024 * 1024, || cancel.is_cancelled())
+        matcher.replace_all_bounded_controlled(original, replacement, MAX_REPLACE_CELL_OUTPUT_BYTES, || {
+            cancel.is_cancelled()
+        })
     else {
-        return CellReplace::Budget;
+        return if cancel.is_cancelled() {
+            CellReplace::Cancelled
+        } else {
+            CellReplace::Budget
+        };
     };
     if count == 0 {
         CellReplace::None
@@ -156,27 +216,38 @@ impl ReplaceReport {
         &mut self,
         position: u32,
         column: usize,
+        original: &Value,
         text: String,
         count: usize,
         row_key: &[Value],
-        output_bytes: &mut usize,
     ) -> Result<(), ReplaceError> {
         let retained = retained_key_bytes(row_key)
+            .saturating_add(retained_key_bytes(std::slice::from_ref(original)))
             .saturating_add(text.len())
             .saturating_add(std::mem::size_of::<ReplaceEdit>());
-        if retained > (16 * 1024 * 1024usize).saturating_sub(*output_bytes) || self.edits.len() >= 10_000 {
+        if retained > MAX_REPLACE_PLAN_BYTES.saturating_sub(self.retained_bytes)
+            || self.edits.len() >= MAX_REPLACE_EDITS
+        {
             return Err(ReplaceError::Budget);
         }
-        *output_bytes += retained;
+        self.retained_bytes += retained;
         self.replacements = self.replacements.saturating_add(count);
         self.edits.push(ReplaceEdit {
             position,
             column,
+            original: original.clone(),
             new_value: text,
             row_key: row_key.to_vec(),
         });
         Ok(())
     }
+}
+
+fn validate_input(query: &ReplaceQuery, replacement: &str) -> Result<(), ReplaceError> {
+    if query.needle.len() > MAX_REPLACE_INPUT_BYTES || replacement.len() > MAX_REPLACE_INPUT_BYTES {
+        return Err(ReplaceError::Budget);
+    }
+    Ok(())
 }
 
 fn retained_key_bytes(key: &[Value]) -> usize {
