@@ -163,14 +163,12 @@ impl App {
         let preferences_for_create = self.preferences.clone();
         let change_trackers_for_create = self.change_trackers.clone();
         let sender_for_create = sender.clone();
-        // The workspace root is rebuilt on every connect, so the identifier
-        // captured here always belongs to the connection this window owns.
-        let connection_id_for_create = self.connection_id;
+        let front_connection_id_for_create = self.overview_front_connection_id.clone();
         tab_overview.connect_create_tab(move |_| {
             let tab_id = Uuid::new_v4();
             let editor = SqlEditor::builder()
                 .launch(SqlEditorInit {
-                    connection_id: connection_id_for_create,
+                    connection_id: super::multi_session::overview_new_tab_connection(&front_connection_id_for_create),
                     schema_index: std::rc::Rc::new(std::cell::RefCell::new(
                         schema_index_for_create.borrow().editor_snapshot(),
                     )),

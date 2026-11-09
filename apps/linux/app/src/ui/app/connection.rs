@@ -108,6 +108,7 @@ impl App {
         self.dialog = None;
         self.connected = true;
         self.connection_id = Some(id);
+        self.overview_front_connection_id.set(Some(id));
         self.workspace_save_token = Some(self.workspace.connection_save_token(id));
         self.connected_database = Some(connected_database.clone());
         crate::services::window_registry::register(id, self.window.clone().upcast());
@@ -698,6 +699,7 @@ impl App {
             self.connected_database = None;
             self.workspace_save_token = None;
             if let Some(previous) = self.connection_id.take() {
+                self.overview_front_connection_id.set(None);
                 self.multi.sessions.disconnect(previous);
                 self.multi.guards.remove(previous);
                 self.multi.catalogs.remove(&previous);
