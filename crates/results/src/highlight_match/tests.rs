@@ -2,7 +2,7 @@ use bookie_core::FilterValue;
 
 use super::{
     DisplayCell, HighlightError, HighlightOp, HighlightPaint, HighlightRule, HighlightRuleSet, HighlightTarget,
-    paint_for_cell, prepare_rules,
+    MAX_LIKE_PATTERN_BYTES, paint_for_cell, prepare_rules,
 };
 
 fn rule(
@@ -113,6 +113,103 @@ fn between_compares_numbers_without_rounding_display_text() {
     assert!(paint_for_cell(&rules, 0, cell("1.50"), |_| None::<(String, bool)>).is_some());
     assert!(paint_for_cell(&rules, 0, cell("2.000"), |_| None::<(String, bool)>).is_some());
     assert!(paint_for_cell(&rules, 0, cell("2.1"), |_| None::<(String, bool)>).is_none());
+}
+
+#[test]
+fn like_no_match_with_many_wildcard_segments_finishes() {
+    let pattern = format!("{}b", "%a".repeat(24));
+    let text = format!("{}c", "a".repeat(128));
+    let rules = prepared(
+        &[rule(
+            "value",
+            HighlightOp::Like,
+            Some(FilterValue::Single(pattern)),
+            "red",
+            HighlightTarget::Cell,
+        )],
+        &["value"],
+    );
+
+    assert_eq!(paint_for_cell(&rules, 0, cell(&text), |_| None::<(String, bool)>), None);
+}
+
+#[test]
+fn like_wildcards_match_unicode_characters_and_newlines() {
+    let rules = prepared(
+        &[rule(
+            "value",
+            HighlightOp::Like,
+            Some(FilterValue::Single("ab_%z".into())),
+            "red",
+            HighlightTarget::Cell,
+        )],
+        &["value"],
+    );
+
+    assert!(paint_for_cell(&rules, 0, cell("abé\nz"), |_| None::<(String, bool)>).is_some());
+    assert!(paint_for_cell(&rules, 0, cell("abz"), |_| None::<(String, bool)>).is_none());
+}
+
+#[test]
+fn like_treats_regex_metacharacters_as_literal_text() {
+    let rules = prepared(
+        &[rule(
+            "value",
+            HighlightOp::Like,
+            Some(FilterValue::Single("a.+%".into())),
+            "red",
+            HighlightTarget::Cell,
+        )],
+        &["value"],
+    );
+
+    assert!(paint_for_cell(&rules, 0, cell("a.+tail"), |_| None::<(String, bool)>).is_some());
+    assert!(paint_for_cell(&rules, 0, cell("abbbtail"), |_| None::<(String, bool)>).is_none());
+}
+
+#[test]
+fn ilike_preserves_unicode_lowercase_expansion_and_not_like_negates_matches() {
+    let ilike = prepared(
+        &[rule(
+            "value",
+            HighlightOp::Ilike,
+            Some(FilterValue::Single("İ%".into())),
+            "blue",
+            HighlightTarget::Cell,
+        )],
+        &["value"],
+    );
+    let not_like = prepared(
+        &[rule(
+            "value",
+            HighlightOp::NotLike,
+            Some(FilterValue::Single("alpha%".into())),
+            "green",
+            HighlightTarget::Cell,
+        )],
+        &["value"],
+    );
+
+    assert!(paint_for_cell(&ilike, 0, cell("İREADY"), |_| None::<(String, bool)>).is_some());
+    assert!(paint_for_cell(&not_like, 0, cell("beta"), |_| None::<(String, bool)>).is_some());
+    assert!(paint_for_cell(&not_like, 0, cell("alpha"), |_| None::<(String, bool)>).is_none());
+}
+
+#[test]
+fn like_pattern_over_the_byte_limit_is_rejected() {
+    let pattern = "é".repeat(MAX_LIKE_PATTERN_BYTES / 2 + 1);
+    let result = prepare_rules(
+        &[rule(
+            "value",
+            HighlightOp::Like,
+            Some(FilterValue::Single(pattern)),
+            "red",
+            HighlightTarget::Cell,
+        )],
+        &["value"],
+    );
+
+    assert_eq!(result, Err(HighlightError::PatternTooLong));
 }
 
 #[test]

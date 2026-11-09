@@ -1,11 +1,13 @@
 use std::cmp::Ordering;
 
 use bookie_core::FilterValue;
+use regex::{Regex, RegexBuilder};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub const HIGHLIGHT_COLORS: &[&str] = &["blue", "teal", "green", "yellow", "orange", "red", "purple", "brown"];
+const MAX_LIKE_PATTERN_BYTES: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -60,14 +62,27 @@ impl HighlightRuleSet {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PreparedHighlightRule {
     column: usize,
     op: HighlightOp,
     value: Option<FilterValue>,
+    like_pattern: Option<Regex>,
     color: &'static str,
     target: HighlightTarget,
 }
+
+impl PartialEq for PreparedHighlightRule {
+    fn eq(&self, other: &Self) -> bool {
+        self.column == other.column
+            && self.op == other.op
+            && self.value == other.value
+            && self.color == other.color
+            && self.target == other.target
+    }
+}
+
+impl Eq for PreparedHighlightRule {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DisplayCell<'a> {
@@ -87,6 +102,8 @@ pub enum HighlightError {
     UnknownColor,
     #[error("the highlight rule value shape does not match the operator")]
     InvalidValue,
+    #[error("the highlight LIKE pattern exceeds the supported size")]
+    PatternTooLong,
 }
 
 pub fn highlight_color(name: &str) -> Option<&'static str> {
@@ -102,10 +119,12 @@ pub fn prepare_rules(rules: &[HighlightRule], columns: &[&str]) -> Result<Vec<Pr
         };
         let color = highlight_color(&rule.color).ok_or(HighlightError::UnknownColor)?;
         validate_value(rule.op, rule.value.as_ref())?;
+        let like_pattern = compile_like_pattern(rule.op, rule.value.as_ref())?;
         prepared.push(PreparedHighlightRule {
             column,
             op: rule.op,
             value: rule.value.clone(),
+            like_pattern,
             color,
             target: rule.target,
         });
@@ -123,7 +142,7 @@ pub fn paint_for_cell(
         if rule.target != HighlightTarget::Cell || rule.column != column {
             continue;
         }
-        if display_matches(rule.op, cell, rule.value.as_ref()) {
+        if display_matches(rule, cell) {
             return Some(HighlightPaint {
                 color: rule.color,
                 target: HighlightTarget::Cell,
@@ -135,7 +154,7 @@ pub fn paint_for_cell(
             continue;
         }
         if rule.column == column {
-            if display_matches(rule.op, cell, rule.value.as_ref()) {
+            if display_matches(rule, cell) {
                 return Some(HighlightPaint {
                     color: rule.color,
                     target: HighlightTarget::Row,
@@ -147,12 +166,11 @@ pub fn paint_for_cell(
             continue;
         };
         if display_matches(
-            rule.op,
+            rule,
             DisplayCell {
                 text: text.as_str(),
                 is_null,
             },
-            rule.value.as_ref(),
         ) {
             return Some(HighlightPaint {
                 color: rule.color,
@@ -175,29 +193,89 @@ fn validate_value(op: HighlightOp, value: Option<&FilterValue>) -> Result<(), Hi
     ok.then_some(()).ok_or(HighlightError::InvalidValue)
 }
 
-fn display_matches(op: HighlightOp, cell: DisplayCell<'_>, value: Option<&FilterValue>) -> bool {
-    match op {
+fn compile_like_pattern(op: HighlightOp, value: Option<&FilterValue>) -> Result<Option<Regex>, HighlightError> {
+    if !matches!(op, HighlightOp::Like | HighlightOp::NotLike | HighlightOp::Ilike) {
+        return Ok(None);
+    }
+    let Some(pattern) = single(value) else {
+        return Err(HighlightError::InvalidValue);
+    };
+    if pattern.len() > MAX_LIKE_PATTERN_BYTES {
+        return Err(HighlightError::PatternTooLong);
+    }
+    let pattern = if op == HighlightOp::Ilike {
+        pattern.to_lowercase()
+    } else {
+        pattern.to_string()
+    };
+    let mut expression = String::with_capacity(pattern.len().saturating_mul(6).saturating_add(8));
+    expression.push_str(r"\A");
+    let mut literal_start = 0;
+    for (index, character) in pattern.char_indices() {
+        let wildcard = match character {
+            '%' => Some("(?s:.*)"),
+            '_' => Some("(?s:.)"),
+            _ => None,
+        };
+        if let Some(wildcard) = wildcard {
+            expression.push_str(&regex::escape(&pattern[literal_start..index]));
+            expression.push_str(wildcard);
+            literal_start = index + character.len_utf8();
+        }
+    }
+    expression.push_str(&regex::escape(&pattern[literal_start..]));
+    expression.push_str(r"\z");
+    RegexBuilder::new(&expression)
+        .size_limit(1 << 20)
+        .build()
+        .map(Some)
+        .map_err(|_| HighlightError::InvalidValue)
+}
+
+fn display_matches(rule: &PreparedHighlightRule, cell: DisplayCell<'_>) -> bool {
+    match rule.op {
         HighlightOp::IsNull => cell.is_null,
         HighlightOp::IsNotNull => !cell.is_null,
         HighlightOp::IsEmpty => !cell.is_null && cell.text.is_empty(),
         HighlightOp::IsNotEmpty => !cell.is_null && !cell.text.is_empty(),
-        HighlightOp::Eq => single(value).is_some_and(|needle| cell.text == needle),
-        HighlightOp::NotEq => single(value).is_some_and(|needle| cell.text != needle),
-        HighlightOp::Contains => single(value).is_some_and(|needle| contains_ignore_case(cell.text, needle)),
-        HighlightOp::StartsWith => single(value).is_some_and(|needle| starts_ignore_case(cell.text, needle)),
-        HighlightOp::EndsWith => single(value).is_some_and(|needle| ends_ignore_case(cell.text, needle)),
-        HighlightOp::Like => single(value).is_some_and(|pattern| like_match(cell.text, pattern, false)),
-        HighlightOp::NotLike => single(value).is_some_and(|pattern| !like_match(cell.text, pattern, false)),
-        HighlightOp::Ilike => single(value).is_some_and(|pattern| like_match(cell.text, pattern, true)),
-        HighlightOp::In => list(value).is_some_and(|items| items.iter().any(|item| item == cell.text)),
-        HighlightOp::NotIn => list(value).is_some_and(|items| items.iter().all(|item| item != cell.text)),
-        HighlightOp::Between => pair(value).is_some_and(|(lo, hi)| {
+        HighlightOp::Eq => single(rule.value.as_ref()).is_some_and(|needle| cell.text == needle),
+        HighlightOp::NotEq => single(rule.value.as_ref()).is_some_and(|needle| cell.text != needle),
+        HighlightOp::Contains => {
+            single(rule.value.as_ref()).is_some_and(|needle| contains_ignore_case(cell.text, needle))
+        }
+        HighlightOp::StartsWith => {
+            single(rule.value.as_ref()).is_some_and(|needle| starts_ignore_case(cell.text, needle))
+        }
+        HighlightOp::EndsWith => single(rule.value.as_ref()).is_some_and(|needle| ends_ignore_case(cell.text, needle)),
+        HighlightOp::Like => rule
+            .like_pattern
+            .as_ref()
+            .is_some_and(|pattern| pattern.is_match(cell.text)),
+        HighlightOp::NotLike => rule
+            .like_pattern
+            .as_ref()
+            .is_some_and(|pattern| !pattern.is_match(cell.text)),
+        HighlightOp::Ilike => rule
+            .like_pattern
+            .as_ref()
+            .is_some_and(|pattern| pattern.is_match(&cell.text.to_lowercase())),
+        HighlightOp::In => list(rule.value.as_ref()).is_some_and(|items| items.iter().any(|item| item == cell.text)),
+        HighlightOp::NotIn => list(rule.value.as_ref()).is_some_and(|items| items.iter().all(|item| item != cell.text)),
+        HighlightOp::Between => pair(rule.value.as_ref()).is_some_and(|(lo, hi)| {
             ordered(cell.text, lo) != Ordering::Less && ordered(cell.text, hi) != Ordering::Greater
         }),
-        HighlightOp::Lt => single(value).is_some_and(|needle| ordered(cell.text, needle) == Ordering::Less),
-        HighlightOp::LtEq => single(value).is_some_and(|needle| ordered(cell.text, needle) != Ordering::Greater),
-        HighlightOp::Gt => single(value).is_some_and(|needle| ordered(cell.text, needle) == Ordering::Greater),
-        HighlightOp::GtEq => single(value).is_some_and(|needle| ordered(cell.text, needle) != Ordering::Less),
+        HighlightOp::Lt => {
+            single(rule.value.as_ref()).is_some_and(|needle| ordered(cell.text, needle) == Ordering::Less)
+        }
+        HighlightOp::LtEq => {
+            single(rule.value.as_ref()).is_some_and(|needle| ordered(cell.text, needle) != Ordering::Greater)
+        }
+        HighlightOp::Gt => {
+            single(rule.value.as_ref()).is_some_and(|needle| ordered(cell.text, needle) == Ordering::Greater)
+        }
+        HighlightOp::GtEq => {
+            single(rule.value.as_ref()).is_some_and(|needle| ordered(cell.text, needle) != Ordering::Less)
+        }
     }
 }
 
@@ -252,49 +330,6 @@ fn ends_ignore_case(haystack: &str, needle: &str) -> bool {
         && haystack
             .get(haystack.len() - needle.len()..)
             .is_some_and(|suffix| suffix.eq_ignore_ascii_case(needle) || suffix.to_lowercase() == needle.to_lowercase())
-}
-
-fn like_match(haystack: &str, pattern: &str, case_insensitive: bool) -> bool {
-    if case_insensitive {
-        like_backtrack(&haystack.to_lowercase(), &pattern.to_lowercase())
-    } else {
-        like_backtrack(haystack, pattern)
-    }
-}
-
-fn like_backtrack(haystack: &str, pattern: &str) -> bool {
-    if pattern.is_empty() {
-        return haystack.is_empty();
-    }
-    let mut chars = pattern.chars();
-    let Some(first) = chars.next() else {
-        return haystack.is_empty();
-    };
-    let rest = chars.as_str();
-    match first {
-        '%' => {
-            if like_backtrack(haystack, rest) {
-                return true;
-            }
-            let mut rest_hay = haystack.chars();
-            while rest_hay.next().is_some() {
-                if like_backtrack(rest_hay.as_str(), rest) {
-                    return true;
-                }
-            }
-            false
-        }
-        '_' => {
-            let mut rest_hay = haystack.chars();
-            rest_hay.next().is_some_and(|_| like_backtrack(rest_hay.as_str(), rest))
-        }
-        expected => {
-            let mut rest_hay = haystack.chars();
-            rest_hay
-                .next()
-                .is_some_and(|got| got == expected && like_backtrack(rest_hay.as_str(), rest))
-        }
-    }
 }
 
 #[cfg(test)]
