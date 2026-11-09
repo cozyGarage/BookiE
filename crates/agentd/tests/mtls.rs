@@ -40,6 +40,7 @@ fn saved_connection(fixture: &Fixture, id: Uuid, cert: Option<&str>, key: Option
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 

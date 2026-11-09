@@ -61,6 +61,7 @@ pub struct DriverCapabilities {
     pub supports_local_socket_file: bool,
     pub supports_local_socket_directory: bool,
     pub supports_client_tls_auth: bool,
+    pub supports_strict_encryption: bool,
     pub supports_explicit_auto_increment_values: bool,
     pub supports_browse_filters: bool,
 }
@@ -98,6 +99,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_local_socket_file: self.supports_local_socket_file(),
             supports_local_socket_directory: self.supports_local_socket_directory(),
             supports_client_tls_auth: self.supports_client_tls_auth(),
+            supports_strict_encryption: self.supports_strict_encryption(),
             supports_explicit_auto_increment_values: self.supports_explicit_auto_increment_values(),
             supports_browse_filters: self.supports_browse_filters(),
         }
@@ -204,6 +206,10 @@ pub trait DatabaseDriver: Send + Sync {
     /// certificate and private key. Transport refuses configured identities
     /// for drivers that do not explicitly opt in.
     fn supports_client_tls_auth(&self) -> bool {
+        false
+    }
+
+    fn supports_strict_encryption(&self) -> bool {
         false
     }
 

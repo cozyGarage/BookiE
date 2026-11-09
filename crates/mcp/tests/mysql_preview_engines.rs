@@ -92,6 +92,7 @@ async fn fixture() -> Fixture {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     };
     let directory = tempfile::tempdir().unwrap();
     let tokens = Arc::new(TokenStore::open(directory.path().join("tokens.json")).unwrap());

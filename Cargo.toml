@@ -52,7 +52,7 @@ clickhouse = { version = "0.15", default-features = false, features = ["rustls-t
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "chrono", "rust_decimal", "uuid", "json"] }
 sqlx-core = { version = "0.9", default-features = false }
 # Tiberius 0.13 supports SQL Server's full DECIMAL scale of 38.
-tiberius = { version = "0.13", default-features = false, features = ["tds73", "native-tls", "chrono", "rust_decimal"] }
+tiberius = { version = "0.13", default-features = false, features = ["tds73", "tds80", "native-tls", "chrono", "rust_decimal"] }
 csv = "1"
 calamine = { version = "0.38", default-features = false, features = ["dates"] }
 encoding_rs = "0.8"

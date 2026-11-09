@@ -81,6 +81,7 @@ fn forced_connection_failure_dismissal_keeps_the_window_usable() {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     };
     controller.emit(AppMsg::OpenSaved(saved.clone()));
     spin_until(|| controller.widget().visible_dialog().is_some());
