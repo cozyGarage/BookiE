@@ -48,6 +48,7 @@ pub(super) fn install_window_actions(
     let group = gio::SimpleActionGroup::new();
     add_window_input_actions(&group, window, sender.clone());
     group.add_action(&show_audit_operation_action(sender.clone()));
+    group.add_action(&focus_working_session_action(sender.clone()));
     let disconnect_action = install_disconnect_action(&group, &sender);
     crate::ui::leak_probe::install(&group);
     window.insert_action_group("win", Some(&group));
@@ -121,6 +122,20 @@ fn install_disconnect_action(group: &gio::SimpleActionGroup, sender: &ComponentS
     let sender = sender.clone();
     action.connect_activate(move |_, _| sender.input(AppMsg::Disconnect));
     group.add_action(&action);
+    action
+}
+
+fn focus_working_session_action(sender: ComponentSender<App>) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("focus-working-session", Some(&String::static_variant_type()));
+    action.connect_activate(move |_, parameter| {
+        let Some(connection_id) = parameter
+            .and_then(|parameter| parameter.str())
+            .and_then(|value| uuid::Uuid::parse_str(value).ok())
+        else {
+            return;
+        };
+        sender.input(AppMsg::FocusWorkingSession(connection_id));
+    });
     action
 }
 

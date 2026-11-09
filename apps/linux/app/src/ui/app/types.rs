@@ -160,6 +160,13 @@ pub(super) enum ConnectionTransition {
     WaitingForSaves,
 }
 
+pub(super) struct ConnectionSwitch {
+    pub(super) transition: ConnectionTransition,
+    pub(super) prepared: Option<crate::services::connection_service::PreparedConnection>,
+    pub(super) saves_pending: std::collections::HashMap<Uuid, u32>,
+    pub(super) cancel_audit_was_disabled: Option<bool>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SwitchDecision {
     Stay,

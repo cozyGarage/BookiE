@@ -69,6 +69,7 @@ pub enum AppMsg {
     ReloadConnections,
     ConnectionsLoaded(Vec<SavedConnection>),
     OpenSaved(SavedConnection),
+    FocusWorkingSession(Uuid),
     LoadDatabases,
     DatabasesLoaded {
         origin: crate::services::catalog::CatalogOrigin,
