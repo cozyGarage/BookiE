@@ -670,6 +670,10 @@ class CiWorkflowTests(unittest.TestCase):
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())
         self.assertEqual(layers["layers"]["postgres-release"]["steps"][0]["timeout_seconds"], 2700)
 
+    def test_postgres_release_gtk_smoke_can_find_the_askpass_helper(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('PATH="$BOOKIE_TARGET_DIR/debug:$PATH" \\\n      bash scripts/test-gtk-safety.sh', script)
+
     def test_gtk_safety_reuses_the_binary_built_by_fast_checks(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
