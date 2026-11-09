@@ -236,7 +236,6 @@ fn build_shell() -> (
         .wrap(true)
         .build();
     let status = gtk::Label::builder().halign(gtk::Align::Start).wrap(true).build();
-    status.add_css_class("error");
     status.set_visible(false);
     let body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
@@ -323,10 +322,19 @@ fn wire_apply(
     applied: Option<relm4::Sender<GridMsg>>,
 ) {
     let dialog = dialog.downgrade();
+    if validate_highlight_pattern_lengths(&HighlightRuleSet::default(), &original).is_err() {
+        status.set_text(&crate::tr!(
+            "An existing LIKE pattern exceeds 4 KiB (4,096 bytes) and is not applied. Edit or remove it."
+        ));
+        status.add_css_class("warning");
+        status.set_visible(true);
+    }
     apply.connect_clicked(move |_| {
         let set = normalize_highlight_rules(&state.borrow().rules);
         if validate_highlight_pattern_lengths(&original, &set).is_err() {
             status.set_text(&crate::tr!("New LIKE patterns must be 4 KiB (4,096 bytes) or less."));
+            status.remove_css_class("warning");
+            status.add_css_class("error");
             status.set_visible(true);
             return;
         }
@@ -634,4 +642,92 @@ fn remove_button(index: usize, state: Rc<RefCell<HighlightRuleSet>>, rebuild: Re
         }
     });
     button
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bookie_app_services::highlight_match::MAX_LIKE_PATTERN_BYTES;
+
+    fn long_like_rule() -> HighlightRule {
+        let mut rule = default_highlight_rule("status");
+        rule.op = HighlightOp::Like;
+        rule.value = Some(FilterValue::Single("x".repeat(MAX_LIKE_PATTERN_BYTES + 1)));
+        rule
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn a_new_over_limit_pattern_is_refused_without_saving_or_closing() {
+        gtk::init().expect("GTK display");
+        let dir = tempfile::tempdir().expect("settings directory");
+        let store = HighlightSettingsStore::load_in(dir.path());
+        let connection_id = uuid::Uuid::new_v4();
+        let (dialog, _, _, _, apply, status) = build_shell();
+        let window = gtk::Window::new();
+        window.present();
+        dialog.present(Some(&window));
+        wire_apply(
+            apply.clone(),
+            &dialog,
+            Rc::new(RefCell::new(HighlightRuleSet {
+                rules: vec![long_like_rule()],
+            })),
+            HighlightRuleSet::default(),
+            status.clone(),
+            HighlightPersist {
+                connection_id,
+                schema: None,
+                table: "orders".into(),
+                store: store.clone(),
+            },
+            None,
+        );
+        apply.emit_clicked();
+        assert!(dialog.is_visible());
+        assert!(status.is_visible());
+        assert!(store.load(connection_id, None, "orders").is_empty());
+        dialog.close();
+        window.destroy();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn an_unchanged_legacy_pattern_is_warned_and_survives_unrelated_changes() {
+        gtk::init().expect("GTK display");
+        let dir = tempfile::tempdir().expect("settings directory");
+        let store = HighlightSettingsStore::load_in(dir.path());
+        let connection_id = uuid::Uuid::new_v4();
+        let original = HighlightRuleSet {
+            rules: vec![long_like_rule()],
+        };
+        let mut candidate = original.clone();
+        candidate.rules.push(default_highlight_rule("kind"));
+        let (dialog, _, _, _, apply, status) = build_shell();
+        let window = gtk::Window::new();
+        window.present();
+        dialog.present(Some(&window));
+        wire_apply(
+            apply.clone(),
+            &dialog,
+            Rc::new(RefCell::new(candidate.clone())),
+            original.clone(),
+            status.clone(),
+            HighlightPersist {
+                connection_id,
+                schema: None,
+                table: "orders".into(),
+                store: store.clone(),
+            },
+            None,
+        );
+        assert!(status.is_visible());
+        apply.emit_clicked();
+        while gtk::glib::MainContext::default().iteration(false) {}
+        assert_eq!(
+            store.load(connection_id, None, "orders"),
+            normalize_highlight_rules(&candidate.rules)
+        );
+        window.destroy();
+    }
 }

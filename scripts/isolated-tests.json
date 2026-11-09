@@ -1600,6 +1600,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::highlight_rules::tests::a_new_over_limit_pattern_is_refused_without_saving_or_closing"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::highlight_rules::tests::an_unchanged_legacy_pattern_is_warned_and_survives_unrelated_changes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::value_viewer::tests::the_viewer_dialog_shows_a_preview_and_copies_the_full_value"
     ],
     [
