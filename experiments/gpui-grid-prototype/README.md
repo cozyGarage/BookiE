@@ -74,6 +74,8 @@ cargo deny --manifest-path experiments/gpui-grid-prototype/Cargo.toml --config d
 cargo run --release --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked
 ```
 
+Forgejo runs the model and simulated interaction tests without a display. Native rendering and system clipboard behavior require a desktop session.
+
 The window needs a Wayland or X11 session with a Vulkan driver that can present.
 
 ## Scroll and memory measurement
