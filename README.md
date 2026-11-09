@@ -39,7 +39,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 | | |
 |---|---|
 | Platform | Linux, with a native GTK4 and libadwaita interface. |
-| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB, MongoDB and Redis are experimental and built in. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
+| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB, MongoDB, Redis and a read-only Oracle Database driver are experimental and built in. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Every shipped feature is free, with no account, license key, subscription, paid tier or remote entitlement check. |
 | Credentials | Kept in the desktop keyring (Secret Service). |
 | Safety | Database operations pass local policy checks. Audit-intent failures block writes by default; explicit Local/Dev policy can allow a human write without an audit record. |

@@ -36,6 +36,7 @@ CRATES=(
   bookie-driver-clickhouse
   bookie-driver-redis
   bookie-driver-mongodb
+  bookie-driver-oracle
   bookie-release-tests
   bookie-driver-tls-tests
 )
