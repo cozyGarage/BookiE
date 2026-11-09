@@ -495,6 +495,8 @@ jobs:
             --volume "$HOME/.docker:/docker:ro" \
             --workdir "$GITHUB_WORKSPACE" \
             --env HOME="$GITHUB_WORKSPACE/ci-tmp" --env TMPDIR="$GITHUB_WORKSPACE/ci-tmp" \
+            --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
             --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
             --env BOOKIE_TEST_BUNDLE="$GITHUB_WORKSPACE/reusable-builds/default" \
             --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
