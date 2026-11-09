@@ -15,6 +15,21 @@ fn bounded_replacement_observes_cancellation_between_matches() {
 }
 
 #[test]
+fn bounded_replacement_observes_cancellation_while_lowercasing_unicode() {
+    let checks = std::cell::Cell::new(0);
+    let result = matcher("x", TextMatchOptions::default()).replace_all_bounded_controlled(
+        &format!("İ{}", "x".repeat(100)),
+        "y",
+        1024,
+        || {
+            checks.set(checks.get() + 1);
+            checks.get() >= 4
+        },
+    );
+    assert_eq!(result, Err(ReplacementLimit::Cancelled));
+}
+
+#[test]
 fn bounded_replacement_refuses_literal_expansion_before_returning_output() {
     let matcher = matcher("a", TextMatchOptions::default());
     assert!(matcher.replace_all_bounded("aaaa", "xxxx", 15).is_err());
@@ -187,4 +202,25 @@ fn case_insensitive_replace_keeps_matches_after_expanding_lowercase() {
 fn case_insensitive_ascii_search_keeps_expanding_unicode_matches_in_source_order() {
     let matcher = matcher("i", TextMatchOptions::default());
     assert_eq!(matcher.replace_all("İ i", "X"), ("X X".to_owned(), 2));
+}
+
+#[test]
+fn case_insensitive_replacement_maps_shorter_lowercase_to_source_span() {
+    let matcher = matcher("k", TextMatchOptions::default());
+    assert_eq!(matcher.replace_all("K k", "X"), ("X X".to_owned(), 2));
+}
+
+#[test]
+fn case_insensitive_replacement_preserves_many_ascii_and_unicode_matches() {
+    let repeated = "x".repeat(15_000);
+    let matcher = matcher("x", TextMatchOptions::default());
+
+    for text in [repeated.clone(), format!("İ{repeated}")] {
+        let expected = text.replacen('x', "y", 15_000);
+        assert_eq!(matcher.replace_all(&text, "y"), (expected.clone(), 15_000));
+        assert_eq!(
+            matcher.replace_all_bounded(&text, "y", expected.len()).unwrap(),
+            (expected, 15_000)
+        );
+    }
 }

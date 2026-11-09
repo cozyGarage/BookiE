@@ -14,6 +14,16 @@ impl SqlEditor {
         message: GridMsg,
         sender: &ComponentSender<Self>,
     ) -> Option<GridMsg> {
+        if let GridMsg::ReplaceBatch {
+            report,
+            generation,
+            cancel,
+            reply,
+        } = message
+        {
+            self.handle_result_replace_batch(report, generation, cancel, reply);
+            return None;
+        }
         if !self.result_is_editable() {
             return Some(message);
         }
@@ -58,6 +68,123 @@ impl SqlEditor {
             }
             other => Some(other),
         }
+    }
+
+    fn handle_result_replace_batch(
+        &mut self,
+        report: bookie_app_services::grid_replace::ReplaceReport,
+        generation: u64,
+        cancel: tokio_util::sync::CancellationToken,
+        reply: tokio::sync::oneshot::Sender<
+            Result<
+                bookie_app_services::grid_replace::ReplaceAcknowledgement,
+                bookie_app_services::grid_replace::ReplaceApplyError,
+            >,
+        >,
+    ) {
+        use bookie_app_services::grid_replace::{ReplaceAcknowledgement, ReplaceApplyError};
+        if cancel.is_cancelled() {
+            let _ = reply.send(Err(ReplaceApplyError::Cancelled));
+            return;
+        }
+        if !self.result_is_editable() {
+            let _ = reply.send(Err(ReplaceApplyError::NotEditable));
+            return;
+        }
+        if self
+            .result_editing
+            .as_ref()
+            .is_none_or(|editing| editing.save_in_flight.is_some())
+        {
+            let _ = reply.send(Err(ReplaceApplyError::Saving));
+            return;
+        }
+        if self
+            .result_list_store()
+            .is_none_or(|store| store.generation() != generation)
+        {
+            let _ = reply.send(Err(ReplaceApplyError::Stale));
+            return;
+        }
+        let prepared = match self.prepare_result_replace(&report) {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                let _ = reply.send(Err(error));
+                return;
+            }
+        };
+        let edits = prepared
+            .edits
+            .into_iter()
+            .map(|edit| RowKey::from_pk_values(&edit.row_key).map(|key| (key, edit.column, edit.original, edit.value)))
+            .collect::<Option<Vec<_>>>();
+        let Some(edits) = edits else {
+            let _ = reply.send(Err(ReplaceApplyError::Stale));
+            return;
+        };
+        let Some(editing) = self.result_editing.as_ref() else {
+            let _ = reply.send(Err(ReplaceApplyError::NotEditable));
+            return;
+        };
+        if cancel.is_cancelled() {
+            let _ = reply.send(Err(ReplaceApplyError::Cancelled));
+            return;
+        }
+        let tracker = editing
+            .change_trackers
+            .with_tab(editing.tab_id, |tracker| tracker.track_cell_edits(edits));
+        if tracker.is_none() {
+            let _ = reply.send(Err(ReplaceApplyError::Stale));
+            return;
+        }
+        let _ = reply.send(Ok(ReplaceAcknowledgement {
+            replacements: prepared.replacements,
+            skipped: prepared.skipped,
+        }));
+    }
+
+    fn prepare_result_replace(
+        &self,
+        report: &bookie_app_services::grid_replace::ReplaceReport,
+    ) -> Result<
+        bookie_app_services::grid_replace::PreparedReplaceBatch,
+        bookie_app_services::grid_replace::ReplaceApplyError,
+    > {
+        use bookie_app_services::grid_replace::{ReplaceApplyError, prepare_replace_plan};
+        let Some(editing) = self.result_editing.as_ref() else {
+            return Err(ReplaceApplyError::NotEditable);
+        };
+        let pk_indices = self.result_pk_indices();
+        prepare_replace_plan(
+            report,
+            |position, edits| {
+                let row = self.result_row_object(position)?;
+                let key = pk_indices
+                    .iter()
+                    .map(|index| row.cell_value_in_row(*index))
+                    .collect::<Option<Vec<_>>>()?;
+                let cells = edits
+                    .iter()
+                    .map(|edit| row.cell_value_in_row(edit.column))
+                    .collect::<Option<Vec<_>>>()?;
+                Some((key, cells))
+            },
+            |column_index, original, new_value| {
+                let Some(column) = editing.columns.get(column_index) else {
+                    return Err(ReplaceApplyError::NotEditable);
+                };
+                if !crate::ui::grid::cell_allows_inline_edit(column, original) {
+                    return Err(ReplaceApplyError::NotEditable);
+                }
+                crate::ui::browse_tab::parse_grid_cell_input(
+                    new_value,
+                    Some(column),
+                    &editing.driver_id,
+                    Some(original),
+                )
+                .map_err(|_| ReplaceApplyError::InvalidValue)
+            },
+        )
     }
 
     fn result_is_editable(&self) -> bool {
