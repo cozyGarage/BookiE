@@ -435,6 +435,12 @@ fn finish_replace(
             widgets.status.set_text(&crate::tr!("Replacement cancelled"));
             return;
         }
+        Err(super::replace::ReplaceError::Budget) => {
+            widgets.status.set_text(&crate::tr!(
+                "Replacement is too large; narrow the selection or use a shorter replacement"
+            ));
+            return;
+        }
         Err(super::replace::ReplaceError::Match(_)) => {
             widgets.status.set_text(&crate::tr!("Invalid regular expression"));
             return;

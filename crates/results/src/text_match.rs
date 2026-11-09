@@ -1,4 +1,7 @@
 use regex::{Captures, Regex, RegexBuilder};
+
+mod bounded;
+pub use bounded::ReplacementLimit;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

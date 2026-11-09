@@ -317,6 +317,38 @@ fn cancellation_during_replacement_does_not_return_a_partial_plan() {
 }
 
 #[test]
+fn replacement_refuses_a_cell_that_expands_beyond_its_budget() {
+    let text = Value::Text("a".repeat(1024));
+    let replacement = "b".repeat(2048);
+    let result = plan_replacements(
+        1,
+        |_, visit| visit(0, &text),
+        |_| Some(vec![Value::Int(1)]),
+        &query("a"),
+        &replacement,
+        &[true],
+        &CancellationToken::new(),
+    );
+    assert!(result.is_err(), "oversized output must not become an edit plan");
+}
+
+#[test]
+fn replacement_refuses_aggregate_output_without_returning_partial_edits() {
+    let text = Value::Text("a".into());
+    let replacement = "b".repeat(1024 * 1024);
+    let result = plan_replacements(
+        17,
+        |_, visit| visit(0, &text),
+        |position| Some(vec![Value::Int(i64::from(position))]),
+        &query("a"),
+        &replacement,
+        &[true],
+        &CancellationToken::new(),
+    );
+    assert!(matches!(result, Err(super::replace::ReplaceError::Budget)));
+}
+
+#[test]
 fn large_shared_value_search_has_bounded_temporary_memory() {
     const KIND_ENV: &str = "BOOKIE_LARGE_ROW_SEARCH_KIND";
     if let Ok(kind) = std::env::var(KIND_ENV) {

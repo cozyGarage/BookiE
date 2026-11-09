@@ -10,6 +10,8 @@ pub(super) enum ReplaceError {
     Match(#[from] TextMatchError),
     #[error("replacement was cancelled")]
     Cancelled,
+    #[error("replacement output exceeds its budget")]
+    Budget,
 }
 
 pub(super) struct ReplaceEdit {
@@ -44,6 +46,8 @@ pub(super) fn plan_replacements(
             skipped: 0,
         });
     };
+    let mut output_bytes = 0usize;
+    let mut over_budget = false;
     let mut report = ReplaceReport {
         edits: Vec::new(),
         replacements: 0,
@@ -58,6 +62,9 @@ pub(super) fn plan_replacements(
             continue;
         };
         visit_row(position, &mut |column, value| {
+            if over_budget || cancel.is_cancelled() {
+                return;
+            }
             if query.column.is_some_and(|wanted| wanted != column) {
                 return;
             }
@@ -67,19 +74,22 @@ pub(super) fn plan_replacements(
                 &matcher,
                 replacement,
             ) {
+                CellReplace::Budget => over_budget = true,
                 CellReplace::Skip => report.skipped = report.skipped.saturating_add(1),
                 CellReplace::None => {}
                 CellReplace::Edit { text, count } => {
-                    report.replacements = report.replacements.saturating_add(count);
-                    report.edits.push(ReplaceEdit {
-                        position,
-                        column,
-                        new_value: text,
-                        row_key: row_key.clone(),
-                    });
+                    if report
+                        .push_edit(position, column, text, count, &row_key, &mut output_bytes)
+                        .is_err()
+                    {
+                        over_budget = true;
+                    }
                 }
             }
         });
+        if over_budget {
+            return Err(ReplaceError::Budget);
+        }
     }
     if cancel.is_cancelled() {
         return Err(ReplaceError::Cancelled);
@@ -88,6 +98,7 @@ pub(super) fn plan_replacements(
 }
 
 enum CellReplace {
+    Budget,
     Skip,
     None,
     Edit { text: String, count: usize },
@@ -110,10 +121,40 @@ fn replace_cell(value: &Value, editable: bool, matcher: &TextMatcher, replacemen
             CellReplace::None
         };
     }
-    let (text, count) = matcher.replace_all(original, replacement);
+    if !matcher.matches(original) {
+        return CellReplace::None;
+    }
+    let Ok((text, count)) = matcher.replace_all_bounded(original, replacement, 1024 * 1024) else {
+        return CellReplace::Budget;
+    };
     if count == 0 {
         CellReplace::None
     } else {
         CellReplace::Edit { text, count }
+    }
+}
+
+impl ReplaceReport {
+    fn push_edit(
+        &mut self,
+        position: u32,
+        column: usize,
+        text: String,
+        count: usize,
+        row_key: &[Value],
+        output_bytes: &mut usize,
+    ) -> Result<(), ReplaceError> {
+        if text.len() > (16 * 1024 * 1024usize).saturating_sub(*output_bytes) || self.edits.len() >= 10_000 {
+            return Err(ReplaceError::Budget);
+        }
+        *output_bytes += text.len();
+        self.replacements = self.replacements.saturating_add(count);
+        self.edits.push(ReplaceEdit {
+            position,
+            column,
+            new_value: text,
+            row_key: row_key.to_vec(),
+        });
+        Ok(())
     }
 }

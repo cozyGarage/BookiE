@@ -5,6 +5,72 @@ fn matcher(term: &str, options: TextMatchOptions) -> TextMatcher {
 }
 
 #[test]
+fn bounded_replacement_refuses_literal_expansion_before_returning_output() {
+    let matcher = matcher("a", TextMatchOptions::default());
+    assert!(matcher.replace_all_bounded("aaaa", "xxxx", 15).is_err());
+    assert_eq!(
+        matcher.replace_all_bounded("aaaa", "xxxx", 16).unwrap(),
+        ("x".repeat(16), 4)
+    );
+}
+
+#[test]
+fn bounded_replacement_counts_capture_expansion_in_utf8_bytes() {
+    let matcher = matcher(
+        "(?P<word>é)",
+        TextMatchOptions {
+            regex: true,
+            ..Default::default()
+        },
+    );
+    assert!(matcher.replace_all_bounded("é", "${word}$0", 3).is_err());
+    assert_eq!(
+        matcher.replace_all_bounded("é", "${word}$0", 4).unwrap(),
+        ("éé".into(), 1)
+    );
+}
+
+#[test]
+fn bounded_replacement_preserves_existing_template_and_unicode_semantics() {
+    let cases = [
+        ("(?P<word>é)|(a)", "é a", "${word}:$0:$2:$$:$missing:${missing}:$"),
+        ("(a)", "aba", "$1x-${1}x-${1-$999999999999999999999999999999"),
+        ("a*", "baac", "[$0]"),
+        ("(?P<x>a)", "a", "${x}é${}$$$x"),
+    ];
+    for (pattern, text, template) in cases {
+        let matcher = matcher(
+            pattern,
+            TextMatchOptions {
+                regex: true,
+                ..Default::default()
+            },
+        );
+        let expected = matcher.replace_all(text, template);
+        assert_eq!(
+            matcher.replace_all_bounded(text, template, expected.0.len()).unwrap(),
+            expected
+        );
+        if !expected.0.is_empty() {
+            assert!(
+                matcher
+                    .replace_all_bounded(text, template, expected.0.len() - 1)
+                    .is_err()
+            );
+        }
+    }
+    for text in ["İ École Élite", "İ i", "K k", "é É"] {
+        for needle in ["i", "é", "k"] {
+            let matcher = matcher(needle, TextMatchOptions::default());
+            assert_eq!(
+                matcher.replace_all_bounded(text, "$0", 1024).unwrap(),
+                matcher.replace_all(text, "$0")
+            );
+        }
+    }
+}
+
+#[test]
 fn literal_search_is_case_insensitive_by_default() {
     let options = TextMatchOptions::default();
     assert!(matcher("World", options).matches("Hello World"));
