@@ -355,6 +355,12 @@ impl GridView {
         self.show_run(index, run);
     }
 
+    fn select_run(&mut self, index: usize) {
+        if index != self.active_run {
+            self.activate_run(index);
+        }
+    }
+
     fn show_run(&mut self, index: usize, run: Run) {
         self.run_scroll.scroll_to_item(index);
         self.edits = std::mem::take(&mut self.run_edits[index]);

@@ -522,6 +522,24 @@ fn selecting_an_earlier_run_restores_its_result_and_clears_the_view_state(cx: &m
 }
 
 #[gpui::test]
+fn selecting_the_active_result_keeps_its_filter_and_selection(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: vec![2, 4],
+                label: "filtered".into(),
+            });
+            view.click_row(1, false);
+            view.select_run(view.active_run);
+            assert_eq!(view.dataset_count(), 2);
+            assert_eq!(view.selection.map(|selection| selection.focus), Some(1));
+        });
+    });
+}
+
+#[gpui::test]
 fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");
