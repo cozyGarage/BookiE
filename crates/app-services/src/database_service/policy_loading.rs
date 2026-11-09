@@ -2,7 +2,7 @@ use std::path::Path;
 
 use bookie_policy::{PolicyConfig, load_from_path};
 
-use crate::services::config_io::xdg_config_path;
+use crate::config_io::xdg_config_path;
 
 pub(super) fn load_policy() -> Result<PolicyConfig, String> {
     let path = xdg_config_path("policy.toml").ok_or("neither XDG_CONFIG_HOME nor HOME is set")?;

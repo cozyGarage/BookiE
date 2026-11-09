@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 pub type Catalog = (Vec<TableInfo>, Vec<TableInfo>);
 
-pub(crate) async fn list_tables_excluding(
+pub async fn list_tables_excluding(
     connection: &dyn Connection,
     hidden_schemas: &[String],
     control: &OperationControl,
@@ -16,7 +16,7 @@ pub(crate) async fn list_tables_excluding(
         .await
 }
 
-pub(crate) async fn list_views_excluding(
+pub async fn list_views_excluding(
     connection: &dyn Connection,
     hidden_schemas: &[String],
     control: &OperationControl,
@@ -26,7 +26,7 @@ pub(crate) async fn list_views_excluding(
         .await
 }
 
-pub(crate) async fn list_objects_excluding(
+pub async fn list_objects_excluding(
     connection: &dyn Connection,
     kind: CatalogObjectKind,
     schema: Option<&str>,
@@ -44,7 +44,7 @@ pub struct CatalogOrigin {
     pub identity: ConnectionIdentity,
 }
 
-pub use bookie_app_services::catalog_changes::CatalogChanges;
+pub use crate::catalog_changes::CatalogChanges;
 
 impl CatalogOrigin {
     pub fn capture(id: Option<Uuid>, database: &DatabaseService) -> Option<Self> {
@@ -57,7 +57,7 @@ impl CatalogOrigin {
     pub fn owns_window(&self, id: Option<Uuid>, database: &DatabaseService) -> bool {
         self.matches(id, database.identity(self.id).as_ref())
     }
-    pub(crate) fn matches(&self, id: Option<Uuid>, identity: Option<&ConnectionIdentity>) -> bool {
+    pub fn matches(&self, id: Option<Uuid>, identity: Option<&ConnectionIdentity>) -> bool {
         id == Some(self.id) && identity == Some(&self.identity)
     }
     pub fn connection(&self, database: &DatabaseService) -> Option<Arc<dyn Connection>> {
@@ -65,7 +65,7 @@ impl CatalogOrigin {
         (identity == self.identity).then_some(connection)
     }
 
-    pub(crate) fn guard(&self, database: &DatabaseService) -> Option<Arc<PolicyGuard>> {
+    pub fn guard(&self, database: &DatabaseService) -> Option<Arc<PolicyGuard>> {
         let (guard, identity) = database.guard_with_identity(self.id, Principal::human_gui())?;
         (identity == self.identity).then_some(guard)
     }

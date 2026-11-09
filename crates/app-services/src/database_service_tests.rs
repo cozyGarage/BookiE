@@ -9,7 +9,7 @@ mod policy_failure_tests;
 #[test]
 fn policy_file_is_read_from_the_build_profile_config_directory() {
     let path = xdg_config_path("policy.toml").unwrap();
-    let expected = std::path::Path::new(crate::config::storage_dir_name()).join("policy.toml");
+    let expected = std::path::Path::new(bookie_storage::storage_dir_name()).join("policy.toml");
     assert!(path.ends_with(expected));
 }
 

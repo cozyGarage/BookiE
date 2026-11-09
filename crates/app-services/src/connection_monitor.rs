@@ -14,7 +14,7 @@ use bookie_policy::AuditState;
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const TUNNEL_POLL_INTERVAL: Duration = Duration::from_secs(1);
-use bookie_app_services::reconnect::{BACKOFF_INITIAL, next_delay};
+use crate::reconnect::{BACKOFF_INITIAL, next_delay};
 
 pub(super) async fn run(
     inner: Arc<Mutex<EntryInner>>,
@@ -124,13 +124,8 @@ async fn reconnect_loop(
 
         match try_reconnect(params, cancel).await {
             Err(failure) if failure.permanent => {
-                tracing::warn!(error = %failure.message, attempt, "reconnect cannot succeed; giving up");
-                set_health(
-                    inner,
-                    ConnectionHealth::Failed {
-                        reason: failure.message,
-                    },
-                );
+                tracing::warn!(error = ?failure.error, attempt, "reconnect cannot succeed; giving up");
+                set_health(inner, ConnectionHealth::Failed { reason: failure.error });
                 return Err(());
             }
             Ok((conn, tunnel)) => {
@@ -140,7 +135,7 @@ async fn reconnect_loop(
                 return Ok(());
             }
             Err(failure) => {
-                tracing::warn!(error = %failure.message, attempt, delay_secs = delay.as_secs(), "reconnect failed; backing off");
+                tracing::warn!(error = ?failure.error, attempt, delay_secs = delay.as_secs(), "reconnect failed; backing off");
                 attempt += 1;
                 set_health(inner, ConnectionHealth::Reconnecting { attempt });
                 delay = next_delay(delay);

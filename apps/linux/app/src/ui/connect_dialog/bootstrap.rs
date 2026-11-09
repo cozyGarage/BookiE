@@ -45,12 +45,12 @@ pub(super) async fn open_candidate(
     let (conn, tunnel) =
         bookie_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
             .await
-            .map_err(connection_service::message)?;
+            .map_err(crate::services::error_text::transport_message)?;
     let conn: Arc<dyn bookie_core::Connection> = Arc::from(conn);
-    let guarded =
-        bootstrap
-            .guard_factory
-            .guard(conn.clone(), bootstrap.metadata, bookie_policy::Principal::human_gui())?;
+    let guarded = bootstrap
+        .guard_factory
+        .guard(conn.clone(), bootstrap.metadata, bookie_policy::Principal::human_gui())
+        .map_err(|failure| crate::services::error_text::open_failure_message(&failure))?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
         Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),

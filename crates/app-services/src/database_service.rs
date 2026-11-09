@@ -13,13 +13,14 @@ use bookie_policy::{
 use bookie_storage::AuditJournal;
 use bookie_transport::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel};
 
-use super::config_io::xdg_config_path;
 use super::connection_monitor;
+use super::open_failure::OpenFailure;
+use crate::config_io::xdg_config_path;
 
 mod policy_loading;
 use policy_loading::{load_policy, load_policy_file};
 
-pub use bookie_app_services::connection_identity::ConnectionIdentity;
+pub use crate::connection_identity::ConnectionIdentity;
 
 pub(super) struct EntryInner {
     pub(super) connection: Arc<dyn Connection>,
@@ -43,7 +44,7 @@ pub struct ConnectionMetadata {
 pub enum ConnectionHealth {
     Healthy,
     Reconnecting { attempt: u32 },
-    Failed { reason: String },
+    Failed { reason: OpenFailure },
 }
 
 pub struct ReconnectParams {
@@ -71,10 +72,8 @@ impl CandidateGuardFactory {
         connection: Arc<dyn Connection>,
         metadata: &ConnectionMetadata,
         principal: Principal,
-    ) -> Result<PolicyGuard, String> {
-        let policy = self.policy.clone().ok_or_else(|| {
-            crate::tr!("Policy unavailable. Fix policy.toml and reopen Preferences or restart BookiE.")
-        })?;
+    ) -> Result<PolicyGuard, OpenFailure> {
+        let policy = self.policy.clone().ok_or(OpenFailure::PolicyUnavailable)?;
         Ok(PolicyGuard::new(
             connection,
             GuardContext {
@@ -144,7 +143,7 @@ impl AuditRuntime {
         Self::from_journal(AuditJournal::open_default())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     fn open_path(path: std::path::PathBuf) -> Self {
         Self::from_journal(AuditJournal::open_validated(path))
     }
@@ -205,9 +204,15 @@ pub struct DatabaseService {
     unresolved_connection_ids: Arc<HashSet<Uuid>>,
     approval: Mutex<Arc<dyn bookie_policy::ApprovalSink>>,
     ssh_environment: Mutex<SshEnvironment>,
-    stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager,
-    #[cfg(test)]
+    stream_result_spools: crate::stream_result_spool::StreamResultSpoolManager,
+    #[cfg(any(test, feature = "test-support"))]
     _audit_temp_dir: Option<tempfile::TempDir>,
+}
+
+impl Default for DatabaseService {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DatabaseService {
@@ -223,23 +228,29 @@ impl DatabaseService {
         let audit = AuditRuntime::open_default();
         Self::with_audit(
             audit,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             None,
         )
     }
 
-    #[cfg(test)]
-    pub(crate) fn new_isolated() -> Self {
-        let audit_temp_dir = tempfile::tempdir().expect("temporary audit directory");
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn new_isolated() -> Self {
+        let audit_temp_dir = tempfile::tempdir().unwrap_or_else(|error| {
+            tracing::error!(%error, "cannot create the isolated audit directory");
+            std::process::abort()
+        });
         let audit = AuditRuntime::open_path(audit_temp_dir.path().join("audit.jsonl"));
         Self::with_audit(audit, Some(audit_temp_dir))
     }
 
-    fn with_audit(audit: AuditRuntime, #[cfg(test)] audit_temp_dir: Option<tempfile::TempDir>) -> Self {
+    fn with_audit(
+        audit: AuditRuntime,
+        #[cfg(any(test, feature = "test-support"))] audit_temp_dir: Option<tempfile::TempDir>,
+    ) -> Self {
         Self::with_loaded_policy(
             audit,
             load_policy(),
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             audit_temp_dir,
         )
     }
@@ -247,7 +258,7 @@ impl DatabaseService {
     fn with_loaded_policy(
         audit: AuditRuntime,
         loaded: Result<PolicyConfig, String>,
-        #[cfg(test)] audit_temp_dir: Option<tempfile::TempDir>,
+        #[cfg(any(test, feature = "test-support"))] audit_temp_dir: Option<tempfile::TempDir>,
     ) -> Self {
         let policy = match loaded {
             Ok(policy) => Some(Arc::new(policy)),
@@ -269,15 +280,14 @@ impl DatabaseService {
             unresolved_connection_ids: audit.unresolved_connection_ids,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
             ssh_environment: Mutex::new(SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse)),
-            stream_result_spools: bookie_app_services::stream_result_spool::StreamResultSpoolManager::from_environment(
-            ),
-            #[cfg(test)]
+            stream_result_spools: crate::stream_result_spool::StreamResultSpoolManager::from_environment(),
+            #[cfg(any(test, feature = "test-support"))]
             _audit_temp_dir: audit_temp_dir,
         }
     }
 
-    #[cfg(test)]
-    pub(crate) fn audit_journal_path_for_test(&self) -> std::path::PathBuf {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn audit_journal_path_for_test(&self) -> std::path::PathBuf {
         self._audit_temp_dir
             .as_ref()
             .map(|dir| dir.path().join("audit.jsonl"))
@@ -288,7 +298,7 @@ impl DatabaseService {
         self.audit_available
     }
 
-    pub fn stream_result_spool_manager(&self) -> bookie_app_services::stream_result_spool::StreamResultSpoolManager {
+    pub fn stream_result_spool_manager(&self) -> crate::stream_result_spool::StreamResultSpoolManager {
         self.stream_result_spools.clone()
     }
 
@@ -465,7 +475,7 @@ impl DatabaseService {
     /// Returns `false` without registering anything when `id` is already
     /// active. `connection` and `tunnel` are dropped in that case -- this
     /// consumes them either way, so refusal alone is enough to close them.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
     pub fn activate(
         &self,

@@ -1,13 +1,13 @@
-pub use bookie_app_services::reconnect::{is_permanent_failure, was_cancelled};
+pub use crate::reconnect::{is_permanent_failure, was_cancelled};
 use std::sync::Arc;
 
 use bookie_core::{ConnectOptions, Connection, DriverRegistry};
 use bookie_storage::SavedConnection;
-use bookie_transport::TransportError;
 use bookie_transport::{SshEnvironment, SshRoute, Tunnel};
 use uuid::Uuid;
 
 use super::database_service::{CandidateGuardFactory, ConnectionMetadata, DatabaseService, ReconnectParams};
+use super::open_failure::OpenFailure;
 
 /// A connection that has authenticated and completed its initial metadata
 /// query, but has not replaced the active application connection yet.
@@ -53,7 +53,7 @@ impl PreparedConnection {
         self.id
     }
 
-    pub(crate) fn new(
+    pub fn new(
         tables: Vec<bookie_core::TableInfo>,
         views: Vec<bookie_core::TableInfo>,
         driver_id: String,
@@ -114,16 +114,20 @@ pub async fn open_saved(
     ssh_environment: SshEnvironment,
     cancellation: tokio_util::sync::CancellationToken,
     guard_factory: CandidateGuardFactory,
-) -> Result<PreparedConnection, String> {
+) -> Result<PreparedConnection, OpenFailure> {
     let driver = registry
         .get(&saved.driver_id)
-        .ok_or_else(|| format!("driver {} not registered", saved.driver_id))?;
+        .ok_or_else(|| OpenFailure::Other(format!("driver {} not registered", saved.driver_id)))?;
     let id = saved.id;
     let environment = saved.environment;
     let read_only = saved.read_only;
 
-    let ssh_hops = bookie_transport::saved_ssh_route(&saved).await.map_err(message)?;
-    let mut opts = bookie_transport::connect_options_for(&saved).await.map_err(message)?;
+    let ssh_hops = bookie_transport::saved_ssh_route(&saved)
+        .await
+        .map_err(OpenFailure::from)?;
+    let mut opts = bookie_transport::connect_options_for(&saved)
+        .await
+        .map_err(OpenFailure::from)?;
     opts.application_name = Some("BookiE".into());
 
     let (conn, tunnel) = bookie_transport::establish_with_cancellation(
@@ -134,7 +138,7 @@ pub async fn open_saved(
         cancellation,
     )
     .await
-    .map_err(message)?;
+    .map_err(OpenFailure::from)?;
     let connection: Arc<dyn Connection> = Arc::from(conn);
     let metadata = ConnectionMetadata {
         id,
@@ -148,16 +152,16 @@ pub async fn open_saved(
     let guarded = guard_factory.guard(connection.clone(), &metadata, bookie_policy::Principal::human_gui())?;
     let server_version = match guarded.server_version().await {
         Ok(version) => version,
-        Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(error @ bookie_core::DriverError::PolicyDenied(_)) => return Err(OpenFailure::from_driver(&error)),
         Err(_) => None,
     };
-    let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = crate::services::catalog::list_tables_excluding(&guarded, &hidden_schemas, &control)
+    let control = crate::operation_control::bounded(timeout_secs);
+    let tables = crate::catalog::list_tables_excluding(&guarded, &hidden_schemas, &control)
         .await
-        .map_err(|error| crate::services::error_text::driver_message(&error))?;
-    let views = crate::services::catalog::list_views_excluding(&guarded, &hidden_schemas, &control)
+        .map_err(|error| OpenFailure::from_driver(&error))?;
+    let views = crate::catalog::list_views_excluding(&guarded, &hidden_schemas, &control)
         .await
-        .map_err(|error| crate::services::error_text::driver_message(&error))?;
+        .map_err(|error| OpenFailure::from_driver(&error))?;
     let metadata = ConnectionMetadata {
         server_version,
         ..metadata
@@ -180,7 +184,7 @@ pub async fn open_saved(
 }
 
 pub struct EstablishFailure {
-    pub message: String,
+    pub error: OpenFailure,
     pub permanent: bool,
 }
 
@@ -195,18 +199,6 @@ pub async fn establish_classified_with_cancellation(
         .await
         .map_err(|error| EstablishFailure {
             permanent: is_permanent_failure(&error),
-            message: message(error),
+            error: OpenFailure::from(error),
         })
-}
-
-pub(crate) fn message(error: TransportError) -> String {
-    match error {
-        TransportError::Driver(error) => crate::services::error_text::driver_message(&error),
-        TransportError::Keyring(failure) => crate::services::error_text::keyring_message(&failure),
-        TransportError::IntegratedAuthUnsupported(driver_name) => {
-            crate::tr!("The {driver} driver does not support Windows (Kerberos) authentication.")
-                .replace("{driver}", &driver_name)
-        }
-        other => other.to_string(),
-    }
 }

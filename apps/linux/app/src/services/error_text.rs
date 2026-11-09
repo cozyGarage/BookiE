@@ -119,6 +119,26 @@ fn save_failure_message(failure: &SaveFailure) -> String {
     }
 }
 
+pub fn open_failure_message(failure: &bookie_app_services::open_failure::OpenFailure) -> String {
+    use bookie_app_services::open_failure::OpenFailure;
+    match failure {
+        OpenFailure::Driver(presentation) => driver_presentation_message(presentation),
+        OpenFailure::Keyring(failure) => keyring_message(failure),
+        OpenFailure::IntegratedAuthUnsupported(driver_name) => {
+            crate::tr!("The {driver} driver does not support Windows (Kerberos) authentication.")
+                .replace("{driver}", driver_name)
+        }
+        OpenFailure::PolicyUnavailable => {
+            crate::tr!("Policy unavailable. Fix policy.toml and reopen Preferences or restart BookiE.")
+        }
+        OpenFailure::Other(detail) => detail.clone(),
+    }
+}
+
+pub fn transport_message(error: bookie_transport::TransportError) -> String {
+    open_failure_message(&bookie_app_services::open_failure::OpenFailure::from(error))
+}
+
 pub fn keyring_message(failure: &bookie_storage::KeyringFailure) -> String {
     use bookie_storage::KeyringFailure;
     match failure {

@@ -663,14 +663,16 @@ impl Component for ConnectDialog {
                                                     )
                                                     .await
                                                 }
-                                                Err(error) => Err(bookie_core::DriverError::PolicyDenied(error)),
+                                                Err(error) => Err(bookie_core::DriverError::PolicyDenied(
+                                                    crate::services::error_text::open_failure_message(&error),
+                                                )),
                                             };
                                             match listed {
                                                 Ok(tables) => Ok(tables.len()),
                                                 Err(error) => Err(crate::services::error_text::driver_message(&error)),
                                             }
                                         }
-                                        Err(error) => Err(connection_service::message(error)),
+                                        Err(error) => Err(crate::services::error_text::transport_message(error)),
                                     }
                                 }
                             };
