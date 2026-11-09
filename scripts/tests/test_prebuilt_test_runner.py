@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import tempfile
@@ -23,7 +24,7 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         self.binary = self.root / "test-program"
         self.binary.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n")
         self.binary.chmod(0o755)
-        self.index = {"schema_version": 1, "source_commit": "a" * 40, "tests": [
+        self.index = {"schema_version": 1, "source_commit": "a" * 40, "architecture": platform.machine(), "tests": [
             {"package": "sample", "kind": "test", "name": "integration", "path": "test-program"}
         ], "build_group": "default", "files": {"test-program": {"sha256": hashlib.sha256(self.binary.read_bytes()).hexdigest(), "size": self.binary.stat().st_size}}, "binaries": {}, "package_directories": {"sample": "crates/sample"}}
         (self.root / "index.json").write_text(json.dumps(self.index))
@@ -43,6 +44,12 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
     def test_another_source_revision_is_rejected(self):
         with patch.dict(os.environ, {"GITHUB_SHA": "b" * 40}, clear=True), self.assertRaises(ValueError):
             runner.commands(self.root, ["-p", "sample", "--test", "integration"])
+
+    def test_another_architecture_is_rejected(self):
+        self.index['architecture'] = 'different-architecture'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        with self.assertRaisesRegex(ValueError, 'architecture mismatch'):
+            runner.commands(self.root, ['-p', 'sample', '--test', 'integration'])
 
     def test_explicit_source_revision_takes_precedence_for_manual_runs(self):
         with patch.dict(os.environ, {"GITHUB_SHA": "b" * 40, "BOOKIE_SOURCE_COMMIT": "a" * 40}, clear=True):

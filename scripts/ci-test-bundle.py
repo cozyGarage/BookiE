@@ -20,6 +20,8 @@ def verify(bundle, revision):
     index = json.loads((bundle / 'index.json').read_text())
     if index.get('schema_version') != 1 or index.get('source_commit') != revision:
         raise ValueError('test bundle identity mismatch')
+    if index.get('architecture') != platform.machine():
+        raise ValueError('test bundle architecture mismatch')
     if not index.get('tests') or not index.get('files'):
         raise ValueError('empty test bundle')
     for name, expected in index['files'].items():
