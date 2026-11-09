@@ -94,6 +94,10 @@ impl DatabaseDriver for MssqlDriver {
         cfg!(feature = "kerberos")
     }
 
+    fn supports_strict_encryption(&self) -> bool {
+        true
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let client = open_for(&opts).await?;
         Ok(Box::new(MssqlConnection::new(client, opts)))
@@ -117,17 +121,11 @@ fn build_target(opts: &ConnectOptions) -> Result<MssqlTarget, DriverError> {
     config.database(&opts.database);
     config.authentication(auth_method(opts)?);
     use bookie_core::TlsMode;
+    let encryption = encryption_level(&opts.tls)?;
+    config.encryption(encryption);
     match opts.tls.mode {
-        TlsMode::Disabled => {
-            config.encryption(EncryptionLevel::Off);
-            config.trust_cert();
-        }
-        TlsMode::Prefer | TlsMode::Require => {
-            config.encryption(EncryptionLevel::Required);
-            config.trust_cert();
-        }
+        TlsMode::Disabled | TlsMode::Prefer | TlsMode::Require => config.trust_cert(),
         TlsMode::VerifyCa | TlsMode::VerifyFull => {
-            config.encryption(EncryptionLevel::Required);
             if let Some(root_cert) = &opts.tls.root_cert {
                 config.trust_cert_ca(root_cert.display().to_string());
             }
@@ -140,6 +138,18 @@ fn build_target(opts: &ConnectOptions) -> Result<MssqlTarget, DriverError> {
         dial_port: opts.port,
         plaintext_fallback: opts.tls.mode == TlsMode::Prefer,
     })
+}
+
+fn encryption_level(tls: &bookie_core::TlsConfig) -> Result<EncryptionLevel, DriverError> {
+    use bookie_core::TlsMode;
+    match (tls.mode, tls.strict_encryption) {
+        (TlsMode::Disabled | TlsMode::Prefer, true) => Err(DriverError::Tls(
+            "strict encryption cannot be combined with the Disabled or Prefer TLS mode".into(),
+        )),
+        (_, true) => Ok(EncryptionLevel::Strict),
+        (TlsMode::Disabled, false) => Ok(EncryptionLevel::Off),
+        (_, false) => Ok(EncryptionLevel::Required),
+    }
 }
 
 fn auth_method(opts: &ConnectOptions) -> Result<AuthMethod, DriverError> {

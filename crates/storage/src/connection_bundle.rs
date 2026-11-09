@@ -51,6 +51,7 @@ pub const BUNDLE_INCLUDED_FIELDS: &[&str] = &[
     "tls_root_cert",
     "tls_client_cert",
     "tls_client_key",
+    "tls_strict_encryption",
     "read_only",
     "auth_mode",
     "environment",
@@ -124,6 +125,8 @@ pub struct BundleConnection {
     pub tls_client_cert: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_client_key: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tls_strict_encryption: bool,
     pub read_only: bool,
     pub auth_mode: AuthMode,
     pub environment: Environment,
@@ -151,6 +154,7 @@ impl BundleConnection {
             tls_root_cert: saved.tls_root_cert.clone(),
             tls_client_cert: saved.tls_client_cert.clone(),
             tls_client_key: saved.tls_client_key.clone(),
+            tls_strict_encryption: saved.tls_strict_encryption,
             read_only: saved.read_only,
             auth_mode: saved.auth_mode,
             environment: saved.environment,
@@ -176,6 +180,7 @@ impl BundleConnection {
             tls_root_cert: self.tls_root_cert.clone(),
             tls_client_cert: self.tls_client_cert.clone(),
             tls_client_key: self.tls_client_key.clone(),
+            tls_strict_encryption: self.tls_strict_encryption,
             read_only: self.read_only,
             auth_mode: self.auth_mode,
             environment: self.environment,

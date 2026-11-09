@@ -215,6 +215,28 @@ async fn a_driver_without_client_tls_auth_refuses_configured_identity() {
 }
 
 #[tokio::test]
+async fn a_driver_without_strict_encryption_refuses_the_setting() {
+    let error = refusal(
+        &FakeDriver::plain(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::VerifyFull,
+                strict_encryption: true,
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        None,
+        "a driver without strict encryption must not silently ignore the setting",
+    )
+    .await;
+    assert!(
+        error.to_string().contains("does not support strict encryption"),
+        "{error}"
+    );
+}
+
+#[tokio::test]
 async fn a_local_socket_is_refused_by_a_driver_that_cannot_do_it() {
     let error = refusal(
         &FakeDriver::plain(),

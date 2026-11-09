@@ -34,6 +34,7 @@ fn saved(name: &str) -> SavedConnection {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 
@@ -118,6 +119,7 @@ fn the_exported_record_carries_exactly_the_included_fields() {
                 | "tls_root_cert"
                 | "tls_client_cert"
                 | "tls_client_key"
+                | "tls_strict_encryption"
                 | "ssh"
                 | "auth_source"
                 | "attached_databases"

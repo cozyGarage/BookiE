@@ -88,6 +88,21 @@ fn seconds_row(seconds: Option<u32>) -> f64 {
 }
 
 impl ConnectDialog {
+    fn prefill_tls(&self, saved: &SavedConnection) {
+        self.tls_mode.set_selected(saved.effective_tls_mode().index());
+        if let Some(root_cert) = &saved.tls_root_cert {
+            self.tls_root_cert.set_text(&root_cert.to_string_lossy());
+        }
+        if let Some(client_cert) = &saved.tls_client_cert {
+            self.tls_client_cert.set_text(&client_cert.to_string_lossy());
+        }
+        if let Some(client_key) = &saved.tls_client_key {
+            self.tls_client_key.set_text(&client_key.to_string_lossy());
+        }
+        self.tls_strict.set_active(saved.tls_strict_encryption);
+        self.apply_tls_visibility();
+    }
+
     pub(super) fn apply_prefill(&mut self, prefill: &ConnectionPrefill, root: &adw::Dialog) {
         let saved = &prefill.saved;
         if let Some(row) = driver_row(&self.drivers, &saved.driver_id) {
@@ -111,17 +126,7 @@ impl ConnectDialog {
         self.auth_combo.set_selected(auth_row(saved.auth_mode));
         self.form.selected = saved.auth_mode;
         self.apply_form_state();
-        self.tls_mode.set_selected(saved.effective_tls_mode().index());
-        if let Some(root_cert) = &saved.tls_root_cert {
-            self.tls_root_cert.set_text(&root_cert.to_string_lossy());
-        }
-        if let Some(client_cert) = &saved.tls_client_cert {
-            self.tls_client_cert.set_text(&client_cert.to_string_lossy());
-        }
-        if let Some(client_key) = &saved.tls_client_key {
-            self.tls_client_key.set_text(&client_key.to_string_lossy());
-        }
-        self.apply_tls_visibility();
+        self.prefill_tls(saved);
         self.read_only.set_active(saved.read_only);
         self.environment.set_selected(environment_row(saved.environment));
         self.connect_timeout.set_value(seconds_row(saved.connect_timeout_secs));
@@ -192,6 +197,7 @@ mod tests {
             connect_timeout_secs: None,
             query_timeout_secs: None,
             attached_databases: Vec::new(),
+            tls_strict_encryption: false,
         }
     }
 
