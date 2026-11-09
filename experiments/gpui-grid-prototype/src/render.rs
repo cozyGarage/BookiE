@@ -158,10 +158,10 @@ impl Render for GridView {
             .font_weight(gpui::FontWeight::SEMIBOLD)
             .text_color(rgb(theme.muted_foreground))
             .child(fixed_cell(GUTTER_WIDTH, "#".into()))
-            .child(cell_div(CELL_WIDTHS[0], "value".into()))
-            .child(cell_div(CELL_WIDTHS[1], "label".into()))
-            .child(cell_div(CELL_WIDTHS[2], "state".into()))
-            .child(cell_div(CELL_WIDTHS[3], "typed".into()));
+            .child(header_cell(self.cell_cursor, 0, CELL_WIDTHS[0], "value", theme))
+            .child(header_cell(self.cell_cursor, 1, CELL_WIDTHS[1], "label", theme))
+            .child(header_cell(self.cell_cursor, 2, CELL_WIDTHS[2], "state", theme))
+            .child(header_cell(self.cell_cursor, 3, CELL_WIDTHS[3], "typed", theme));
         let list = uniform_list(
             "rows",
             self.visible_count(),
@@ -239,6 +239,14 @@ impl Render for GridView {
     }
 }
 
+fn header_cell(cursor: Option<Cursor>, column: usize, width: f32, text: &str, theme: Theme) -> Div {
+    let cell = cell_div(width, text.to_string());
+    match super::grid_edit::cursor_column_background(cursor, column, theme) {
+        Some(background) => cell.bg(rgb(background)),
+        None => cell,
+    }
+}
+
 impl GridView {
     fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
         let theme = Theme::current(cx);
@@ -297,7 +305,8 @@ impl GridView {
         let selected = self
             .selection
             .is_some_and(|selection| selection.contains(dataset_index));
-        row_div(position % 2 == 1, selected, theme)
+        let highlighted = selected || super::grid_edit::cursor_row(self.cell_cursor, position);
+        row_div(position % 2 == 1, highlighted, theme)
             .id(position)
             .on_mouse_down(
                 MouseButton::Left,
