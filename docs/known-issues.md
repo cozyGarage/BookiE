@@ -85,5 +85,6 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PERF-18 | [#2604](https://github.com/cozyGarage/BookiE/issues/2604) | UX |
 | AUD-14 | [#2578](https://github.com/cozyGarage/BookiE/issues/2578) | Data |
 | CI-1 | [#2597](https://github.com/cozyGarage/BookiE/issues/2597) | UX |
+| CI-2 | [#2617](https://github.com/cozyGarage/BookiE/issues/2617) | UX |
 
 When you finish a row, close or move the GitHub issue on the project. Remove its index line in the same docs change. When you move work between lanes, change the project **Lane** field (and `lane:*` label) and update the Lane column here in the same commit.

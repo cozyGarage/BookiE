@@ -51,7 +51,7 @@ The fast Build Linux job runs `change-contracts` before the GTK app unit layer. 
 
 ```bash
 python3 scripts/run-change-contract-tests.py
-python3 scripts/run-change-contract-tests.py --base origin/linux
+python3 scripts/run-change-contract-tests.py --base origin/main
 ```
 
 Use the remote that tracks [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE) for `--base` (often `origin` after cloning BookiE).
@@ -203,7 +203,7 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 ### Build Linux
 
-[`build-linux.yml`](../.github/workflows/build-linux.yml) pins the tested revision, then runs the required regression jobs on every pull request and every push to `linux` or `main` (docs-only path filters still skip the whole workflow). `scripts/check-ci-jobs.py` accepts a skipped required job only for `current-stable-clippy` on push and pull_request.
+[`build-linux.yml`](../.github/workflows/build-linux.yml) pins the tested revision, then runs the required regression jobs on every pull request and every push to `main` (docs-only path filters still skip the whole workflow). `scripts/check-ci-jobs.py` accepts a skipped required job only for `current-stable-clippy` on push and pull_request.
 
 | Job | Runs on |
 |---|---|
