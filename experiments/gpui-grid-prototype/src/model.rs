@@ -253,7 +253,7 @@ pub fn find_rows(total: u64, query: &str, cap: usize) -> Result<FindResult, &'st
             return Ok(FindResult {
                 matches,
                 capped: true,
-                scanned: index,
+                scanned: index + 1,
             });
         }
         matches.push(index);
