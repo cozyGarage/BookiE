@@ -1,3 +1,5 @@
+use tokio_util::sync::CancellationToken;
+
 pub const ALLOWED_ROWS: [u64; 3] = [150_000, 500_000, 1_000_000];
 pub const DEFAULT_ROWS: u64 = 1_000_000;
 pub const MAX_FIND_MATCHES: usize = 10_000;
@@ -245,7 +247,10 @@ fn right_state(index: u64) -> &'static str {
     }
 }
 
-pub fn build_diff(total: u64, keyed: bool) -> Diff {
+pub fn build_diff(total: u64, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
+    if cancel.is_cancelled() {
+        return Err("comparison cancelled");
+    }
     let mut summary = DiffSummary {
         keyed,
         ..DiffSummary::default()
@@ -253,6 +258,9 @@ pub fn build_diff(total: u64, keyed: bool) -> Diff {
     let mut rows: Vec<DiffRow> = Vec::new();
     let mut capped = false;
     for index in 0..total {
+        if index.is_multiple_of(1_024) && cancel.is_cancelled() {
+            return Err("comparison cancelled");
+        }
         let mut produced: Vec<(&'static str, Vec<Cell>)> = Vec::new();
         let original = label_of(index);
         let edited = format!("{original} (edited)");
@@ -282,7 +290,7 @@ pub fn build_diff(total: u64, keyed: bool) -> Diff {
             }
         }
     }
-    Diff { summary, rows, capped }
+    Ok(Diff { summary, rows, capped })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -14,7 +14,7 @@ The window (`src/main.rs`) has:
 - A filter row (Ctrl+F): a WHERE expression such as `label contains 7`, Apply and Clear all.
 - A compare bar with Whole row and Key: value.
 - A fourth `typed` column that cycles through every value kind (float, bytes, date, time, datetime, timestamp with time zone, decimal, UUID, JSON, raw JSON text, undecodable, NULL), searchable with Find and the filter row.
-- A virtualized grid over `uniform_list` with 36 px rows. Find, filter and compare run on the background executor and drop stale results by generation.
+- A virtualized grid over `uniform_list` with 36 px rows. Find, filter and compare run on the background executor; replaced work is cancelled and stale replies are discarded by generation.
 
 Find, the filter row and the cell editor use `src/text_input.rs`, a single-line input ported from GPUI's own `examples/input.rs` (Apache-2.0, comments removed). It has a caret, mouse and Shift selection, Ctrl+A/C/X/V, Home/End, grapheme-aware deletion and the IME hooks (`EntityInputHandler`). It is single line only: no SQL editor, no multi-line text, no undo and no completion.
 
