@@ -471,34 +471,35 @@ jobs:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-default
-          path: reusable-builds/default
+          path: ${{ runner.temp }}/bookie-bundle
       - name: Verify the test bundle
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
-          python3 scripts/ci-test-bundle.py verify reusable-builds/default "$BOOKIE_SOURCE_COMMIT"
-          find reusable-builds/default/tests reusable-builds/default/bin -type f -exec chmod u+x {} +
+          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-bundle" "$BOOKIE_SOURCE_COMMIT"
+          find "$RUNNER_TEMP/bookie-bundle/tests" "$RUNNER_TEMP/bookie-bundle/bin" -type f -exec chmod u+x {} +
       - name: Driver, socket and SSH integration
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/ci-tmp"
+          mkdir -p "$RUNNER_TEMP/bookie-ci-tmp"
           docker run --rm --entrypoint cat "$BOOKIE_BUILD_IMAGE" /etc/passwd > "$RUNNER_TEMP/bookie-integration-passwd"
-          printf 'bookie-ci:x:%s:%s:CI:%s:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" "$GITHUB_WORKSPACE/ci-tmp" >> "$RUNNER_TEMP/bookie-integration-passwd"
+          printf 'bookie-ci:x:%s:%s:CI:%s:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" "$RUNNER_TEMP/bookie-ci-tmp" >> "$RUNNER_TEMP/bookie-integration-passwd"
           docker run --rm --network host \
             --user "$(id -u):$(id -g)" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
             --volume "$RUNNER_TEMP/bookie-integration-passwd:/etc/passwd:ro" \
             --volume /var/run/docker.sock:/var/run/docker.sock \
             --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
             --volume "$HOME/.docker:/docker:ro" \
             --workdir "$GITHUB_WORKSPACE" \
-            --env HOME="$GITHUB_WORKSPACE/ci-tmp" --env TMPDIR="$GITHUB_WORKSPACE/ci-tmp" \
+            --env HOME="$RUNNER_TEMP/bookie-ci-tmp" --env TMPDIR="$RUNNER_TEMP/bookie-ci-tmp" \
             --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory \
             --env GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
             --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
-            --env BOOKIE_TEST_BUNDLE="$GITHUB_WORKSPACE/reusable-builds/default" \
+            --env BOOKIE_TEST_BUNDLE="$RUNNER_TEMP/bookie-bundle" \
             --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
             "$BOOKIE_BUILD_IMAGE" python3 scripts/run-test-layer.py drivers
 
