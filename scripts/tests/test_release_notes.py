@@ -20,6 +20,11 @@ class ReleaseNotesTests(unittest.TestCase):
         self.assertEqual(release_notes.parse_notes("fix\n\nRelease-Note: Fixed: Export keeps NULLs")[0], [("Fixed", "Export keeps NULLs")])
         self.assertEqual(release_notes.parse_notes("ci\n\nRelease-Note: none"), ([], []))
 
+    def test_parse_accepts_a_note_after_escaped_line_breaks(self):
+        message = r"feat(experiment): update the grid\n\nValidation passed.\n\nRelease-Note: none"
+
+        self.assertEqual(release_notes.parse_notes(message), ([], []))
+
     def test_parse_rejects_missing_unknown_empty_and_mixed(self):
         for message in ("no trailer", "Release-Note: Fix: x", "Release-Note: Fixed:", "Release-Note: none\nRelease-Note: Added: x"):
             self.assertTrue(release_notes.parse_notes(message)[1], message)
