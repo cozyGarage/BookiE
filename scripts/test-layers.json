@@ -103,7 +103,7 @@
             "bash",
             "scripts/test-sandbox.sh"
           ],
-          "timeout_seconds": 2700,
+          "timeout_seconds": 1200,
           "evidence": "rust-tests"
         }
       ]
@@ -119,7 +119,7 @@
             "scripts/ci-local.sh",
             "integration"
           ],
-          "timeout_seconds": 2700,
+          "timeout_seconds": 1200,
           "evidence": "rust-tests"
         }
       ]
@@ -226,7 +226,7 @@
             "bash",
             "scripts/test-postgres-release.sh"
           ],
-          "timeout_seconds": 1200,
+          "timeout_seconds": 2700,
           "evidence": "rust-tests"
         }
       ]

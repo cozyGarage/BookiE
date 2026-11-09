@@ -95,6 +95,12 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
     elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
       echo "a source-matched prebuilt test bundle is required" >&2
       exit 1
+    elif [[ -n "${BOOKIE_GTK_BINARY:-}" ]]; then
+      if [[ ! -x "$BOOKIE_GTK_BINARY" ]]; then
+        echo "the supplied GTK test binary is not executable: $BOOKIE_GTK_BINARY" >&2
+        exit 1
+      fi
+      cargo build --locked -p bookie-ssh --bin bookie-askpass
     else
       cargo build --locked -p bookie-ssh --bin bookie-askpass
       cargo build --locked -p bookie-app --bin bookie-app
