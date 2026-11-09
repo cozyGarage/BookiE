@@ -9,6 +9,7 @@ pub mod selection;
 pub mod shell;
 pub mod source;
 pub mod theme;
+pub mod type_colors;
 
 #[cfg(test)]
 mod core_bridge_tests;
