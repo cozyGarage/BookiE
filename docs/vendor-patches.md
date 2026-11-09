@@ -8,10 +8,11 @@ BookiE maintains patched dependency snapshots under `vendor/`, applied through t
 |---|---|
 | PostgreSQL driver | Bound SCRAM work; preserve quoted text `NULL` in arrays; recognize multirange metadata for explicit refusal; resolve nested type metadata within a bound; support selected server-formatted text results; support protocol cancellation; expose session parameters used by SQL lexing. |
 | MySQL driver | Preserve `ENUM` and `SET` text under binary collation; report `SET` column names; reject malformed or oversized packets with protocol errors; refuse the in-band RSA password exchange without TLS or a local socket (an SSH-forwarded socket counts as local, so that connection is protected only as far as the SSH server). |
+| SQLite driver | Permit the fixed `libsqlite3-sys` 0.39.x release selected by the lockfile. BookiE enables SQLx's `sqlite-unbundled` feature and links to the operating system SQLite library. |
 | MongoDB driver | Bound SCRAM work and verify the server nonce; preserve TLS hostname verification when connecting through a tunnel. |
 | Redis driver | Preserve TLS hostname verification when connecting through a tunnel. |
 
-Patch contents and base crate versions are listed in [`vendor/README.md`](../vendor/README.md). Value behavior follows [ADR 0007](decisions/0007-type-and-value-preservation.md); TLS identity and cancellation follow the local transport and driver contracts.
+Patch contents and base crate versions are listed in [`vendor/README.md`](../vendor/README.md). The SQLx SQLite patch carries the dependency-range update from [SQLx pull request 4502](https://github.com/transact-rs/sqlx/pull/4502) while waiting for a release containing it. Value behavior follows [ADR 0007](decisions/0007-type-and-value-preservation.md); TLS identity and cancellation follow the local transport and driver contracts.
 
 ## Updating a patch
 

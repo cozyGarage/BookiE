@@ -2,7 +2,7 @@ name: Build Linux
 
 on:
   push:
-    branches: [main, linux]
+    branches: [main]
     paths:
       - "**"
       - "!docs/**"
@@ -10,7 +10,7 @@ on:
       - ".github/workflows/build-linux.yml"
       - ".github/actions/dockerhub-login/**"
   pull_request:
-    branches: [main, linux]
+    branches: [main]
     paths:
       - "**"
       - "!docs/**"
@@ -33,7 +33,7 @@ permissions:
   packages: read
 
 # A newer pull request push supersedes its in-flight run. Pull requests and
-# linux/main pushes run the full required regression jobs. Current-stable
+# Default-branch pushes run the full required regression jobs. Current-stable
 # Clippy stays schedule or dispatch only. Scheduled and dispatched runs keep
 # their own concurrency group so a manual full Build Linux is never cancelled
 # by ordinary branch traffic.
@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
+          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'main') || github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Pin the tested revision once
@@ -176,7 +176,7 @@ jobs:
         with:
           workspaces: .
           shared-key: linux-build
-          save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/linux' || github.ref == 'refs/heads/main')) }}
+          save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
       - name: Preflight
         run: python3 scripts/run-test-layer.py quick
 

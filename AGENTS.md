@@ -4,7 +4,9 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 
 ## Project
 
-**BookiE** is a Linux-only native database client. The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `linux` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`).
+**BookiE** is a Linux-only native database client. The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `main` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`).
+
+The Forgejo mirror may retain a separate `linux` branch until that service is migrated. Specify the remote and branch explicitly for mirror operations; GitHub PRs and canonical development use `main`.
 
 - The rename is complete ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)): Cargo packages, binaries, crates, environment variables, application ID, paths and keyring schema are `bookie-*` / `BOOKIE_*` / `com.bookie.linux`. Legacy `tablepro` names appear only for upstream attribution and for reading old state. Do not reintroduce `tablepro` identifiers.
 - The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. Isolated synthetic frontend experiments follow [ADR 0028](docs/decisions/0028-isolated-frontend-experiments.md).
@@ -37,7 +39,7 @@ Lanes keep parallel agents from editing the same files. Pick open work from [Pro
 
 - To work in another lane's files, first record the handoff on the GitHub issue (and update the project **Lane** / `lane:*` label plus the [ledger index](docs/known-issues.md) Lane column) in the same commit as the first change.
 - When a lane finishes a row, close or move the issue on the project and remove its line from the ledger index.
-- Each agent works in its own git worktree (a sibling directory named for the lane, for example `bookie-data`), never in another agent's checkout. Branch from the latest `linux` on [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Name branches `<lane>/<topic>` or `<type>/<topic>` (lane prefixes include `data/` and `policy/`).
+- Each agent works in its own git worktree (a sibling directory named for the lane, for example `bookie-data`), never in another agent's checkout. Branch from the latest `main` on [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Name branches `<lane>/<topic>` or `<type>/<topic>` (lane prefixes include `data/` and `policy/`).
 
 ## Workflow
 
@@ -45,14 +47,14 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 
 1. Write the failing test first, then the fix, in one commit.
 2. Run the checks in [Validation](#validation) locally. Run each script directly; piping `bash scripts/preflight.sh` through `tail` reports `tail`'s status, not the script's.
-3. Merge the latest BookiE `linux` branch from GitHub `cozyGarage/BookiE` into the branch (do not rebase a shared branch). Resolve generated files such as `Cargo.lock` by regenerating them.
+3. Merge the latest BookiE `main` branch from GitHub `cozyGarage/BookiE` into the branch (do not rebase a shared branch). Resolve generated files such as `Cargo.lock` by regenerating them.
 4. **Required checks.** Every pull request must pass the required checks for its exact source revision. Missing, skipped, cancelled or failed checks are not passes; maintainers confirm acceptance before merging.
-5. **Pull requests and merge.** Open pull requests against `linux`. Merge only after required checks and lane review pass for the reviewed source.
+5. **Pull requests and merge.** Open pull requests against `main`. Merge only after required checks and lane review pass for the reviewed source.
 6. **Documentation-only changes.** Run `python3 scripts/check-doc-links.py`, `check-known-issues.py` and `inventory-ignored-tests.py --check`. Changes to code, workflows or packages require the applicable full validation.
 
 7. **Isolated test inputs.** Keep mutable fixtures, display sessions and build inputs isolated between test runs. Check isolation before attributing overlapping-run failures to product code.
 8. **Required check status.** Check results must apply to the exact proposed revision. Skipped checks do not pass. CodeQL and SonarCloud are reference scans, not gates.
-9. **Protected branch.** Merge only through the protected `linux` branch. Do not force-push or delete it. Resolve a non-fast-forward rejection by including the latest base before retrying.
+9. **Protected branch.** Merge only through the protected `main` branch. Do not force-push or delete it. Resolve a non-fast-forward rejection by including the latest base before retrying.
 
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
 11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or edits to another lane's ledger/sprint/policy files.
@@ -147,7 +149,7 @@ Rules for pull requests that add tests (any agent, including Cursor):
 - Assert observable behaviour, such as an outcome, a stored value or an error kind, and not rule names, message text or internal identifiers that the code owner may rename.
 - A test pull request does not change product rules. When a rule looks wrong, tell the lane owner and leave the rule alone.
 - A new test fails on the code before the fix, or its commit says it pins existing behaviour.
-- Merge the latest BookiE `linux` branch into the branch and run `scripts/preflight.sh` before opening the pull request.
+- Merge the latest BookiE `main` branch into the branch and run `scripts/preflight.sh` before opening the pull request.
 - Do not edit ledger rows, sprint text or files that another lane owns (for example `policy/src/rules.rs`, owned by Policy in the lane table); those edits are what conflict.
 - Check the open pull requests for the same files first. When two change the same map or sentinel (for example `change-test-map.json`), say which one lands first and rebase the other.
 - Say in the pull request which validation layers apply; maintainers confirm the exact-head acceptance results.

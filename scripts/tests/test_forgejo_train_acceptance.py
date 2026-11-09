@@ -70,7 +70,7 @@ class DispatchedCheckTests(unittest.TestCase):
     def setUp(self):
         self.head = 'a' * 40
         self.pr = {'number': 7, 'headRefOid': self.head, 'state': 'OPEN', 'isDraft': False,
-                   'baseRefName': 'linux', 'reviewDecision': '', 'mergeable': 'MERGEABLE'}
+                   'baseRefName': 'main', 'reviewDecision': '', 'mergeable': 'MERGEABLE'}
         self.checks = [{'name': name, 'state': 'SUCCESS', 'workflow': ''}
                        for name in TRAIN.REQUIRED_CHECKS - {'harness', 'workflow-lint'}]
         self.runs = [{'id': index, 'name': name, 'head_sha': self.head, 'status': 'completed',
@@ -147,7 +147,7 @@ class TrainIntegrationTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name)
-        self.git('init', '--quiet', '--initial-branch=linux')
+        self.git('init', '--quiet', '--initial-branch=main')
         self.git('config', 'user.name', 'Train Test')
         self.git('config', 'user.email', 'train@example.invalid')
         self.base = self.commit('base')
@@ -183,8 +183,8 @@ class TrainIntegrationTests(unittest.TestCase):
             with self.subTest(members=members), self.assertRaises(ValueError):
                 TRAIN.check_integration(self.base, self.head, members)
 
-    def test_a_new_linux_tip_requires_a_new_train_base(self):
-        self.git('checkout', '--quiet', 'linux')
+    def test_a_new_main_tip_requires_a_new_train_base(self):
+        self.git('checkout', '--quiet', 'main')
         new_base = self.commit('later')
         self.git('checkout', '--quiet', 'train')
         self.git('merge', '--quiet', '--no-ff', '-m', 'late base', new_base)
@@ -216,7 +216,7 @@ class TrainIntegrationTests(unittest.TestCase):
         self.git('commit', '--quiet', '-m', 'record manifest')
         head = self.git('rev-parse', 'HEAD')
         states = {
-            number: {'number': number, 'headRefOid': sha, 'baseRefName': 'linux', 'state': 'OPEN',
+            number: {'number': number, 'headRefOid': sha, 'baseRefName': 'main', 'state': 'OPEN',
                      'isDraft': False, 'reviewDecision': '', 'mergeable': 'MERGEABLE',
                      'body': 'Release-Note: none'}
             for number, sha in [(9, head), (7, self.a), (8, self.b)]
@@ -228,7 +228,7 @@ class TrainIntegrationTests(unittest.TestCase):
                 patch.object(TRAIN, 'pull_request', side_effect=lambda n: dict(states[n])), \
                 patch.object(TRAIN, 'fetch_head'), patch.object(TRAIN, 'github_checks', return_value=checks), \
                 patch.object(TRAIN, 'forgejo_run', return_value=gate), \
-                patch.object(TRAIN, 'linux_head', return_value=self.base):
+                patch.object(TRAIN, 'main_head', return_value=self.base):
             TRAIN.main()
             dirty = self.repo / 'untracked'
             dirty.write_text('pending work')
@@ -243,7 +243,7 @@ class TrainIntegrationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 TRAIN.main()
             states[7]['headRefOid'] = self.a
-            with patch.object(TRAIN, 'linux_head', return_value=self.a), self.assertRaises(ValueError):
+            with patch.object(TRAIN, 'main_head', return_value=self.a), self.assertRaises(ValueError):
                 TRAIN.main()
             with patch('sys.argv', ['check-forgejo-train.py', '9', '--phase', 'gate']):
                 TRAIN.main()

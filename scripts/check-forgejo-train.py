@@ -116,7 +116,7 @@ def fetch_head(remote, pr):
 
 def check_open(pr, *, is_aggregate):
     require(pr['state'] == 'OPEN' and not pr['isDraft'], f"PR #{pr['number']} is not an open ready PR")
-    require(pr['baseRefName'] == 'linux', 'constituent and aggregate PRs must target linux')
+    require(pr['baseRefName'] == 'main', 'constituent and aggregate PRs must target main')
     require(pr['reviewDecision'] != 'CHANGES_REQUESTED', f"PR #{pr['number']} has requested changes")
     require(pr['mergeable'] == 'MERGEABLE', f"PR #{pr['number']} is not confirmed mergeable")
     required_checks = REQUIRED_CHECKS if is_aggregate else MEMBER_REQUIRED_CHECKS
@@ -126,7 +126,7 @@ def check_open(pr, *, is_aggregate):
 def check_integration(base, head, members):
     commits = command('git', 'rev-list', '--first-parent', '--reverse', f'{base}..{head}').splitlines()
     require(commits and command('git', 'rev-parse', f'{commits[0]}^1') == base,
-            'train must start at the pinned linux base')
+            'train must start at the pinned main base')
     integrated = []
     for commit in commits:
         parents = command('git', 'show', '-s', '--format=%P', commit).split()
@@ -136,8 +136,8 @@ def check_integration(base, head, members):
     require(integrated == [m['sha'] for m in members], 'train merge order or constituent heads differ from manifest')
 
 
-def linux_head():
-    return command('gh', 'api', f'repos/{REPOSITORY}/git/ref/heads/linux', '--jq', '.object.sha')
+def main_head():
+    return command('gh', 'api', f'repos/{REPOSITORY}/git/ref/heads/main', '--jq', '.object.sha')
 
 
 def check_merged_tree(merged, head):
@@ -178,12 +178,12 @@ def main():
         check_gate(forgejo_run(args.run), args.run, head)
     if args.phase == 'merged':
         require(aggregate['state'] == 'MERGED', 'aggregate PR has not merged')
-        command('git', 'fetch', '--quiet', args.remote, 'linux')
+        command('git', 'fetch', '--quiet', args.remote, 'main')
         merged = aggregate['mergeCommit']['oid']
         check_merged_tree(merged, head)
         print(f'train #{args.pr}: merged tree matches gated head {head}')
         return
-    require(linux_head() == manifest['base'], 'linux moved; rebuild and gate a new train')
+    require(main_head() == manifest['base'], 'main moved; rebuild and gate a new train')
     check_open(aggregate, is_aggregate=True)
     member_bodies = {}
     for member in members:
@@ -197,8 +197,8 @@ def main():
         require(current['headRefOid'] == member['sha'] and current['state'] == 'OPEN'
                 and current['reviewDecision'] != 'CHANGES_REQUESTED' and not current['isDraft'],
                 f"constituent #{member['number']} changed during verification")
-    require(pull_request(args.pr)['headRefOid'] == head and linux_head() == manifest['base'],
-            'aggregate head or linux moved during verification')
+    require(pull_request(args.pr)['headRefOid'] == head and main_head() == manifest['base'],
+            'aggregate head or main moved during verification')
     print(f'train #{args.pr}: ready for {args.phase} at {head}')
 
 

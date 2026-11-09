@@ -474,7 +474,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("shared-key: linux-build", preflight)
         self.assertIn("shared-key: linux-build", fast)
         self.assertIn(
-            "save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/linux' || github.ref == 'refs/heads/main')) }}",
+            "save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}",
             preflight,
         )
         self.assertIn("persist-credentials: false", preflight)
@@ -837,7 +837,7 @@ class CiWorkflowTests(unittest.TestCase):
         triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
         events = set(re.findall(r"^  ([a-z_]+):", triggers, re.M))
         self.assertEqual(events, {"push", "schedule", "workflow_dispatch"})
-        self.assertIn("branches: [linux]", triggers.split("  push:", 1)[1])
+        self.assertIn("branches: [main]", triggers.split("  push:", 1)[1])
 
     def test_analysis_skips_docs_and_reuse_cache(self):
         cancel_push_or_pr = (
