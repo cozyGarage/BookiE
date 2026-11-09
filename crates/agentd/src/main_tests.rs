@@ -201,8 +201,7 @@ fn token_connections_require_at_least_one_saved_connection() {
 
 #[test]
 fn every_registered_driver_is_listed_in_the_feature_table_with_its_declared_maturity() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/features.md");
-    let table = std::fs::read_to_string(path).expect("read docs/features.md");
+    let table = include_str!("../../../docs/features.md");
     let rows: Vec<Vec<&str>> = table
         .lines()
         .filter(|line| line.starts_with("| "))

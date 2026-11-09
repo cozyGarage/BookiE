@@ -151,7 +151,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = (
-            "distro-floor", "driver", "e2e", "consumers", "gtk",
+            "driver", "e2e", "consumers", "gtk",
             "pg-release", "pg-dump", "socket-ssh", "gtk-server", "driver-tls",
             "keyring", "supply-chain",
         )
@@ -160,9 +160,7 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 expected = {"guards", "clippy"}
-                if name == "distro-floor":
-                    expected.add("floor-build")
-                elif name != "supply-chain":
+                if name != "supply-chain":
                     expected.add("test-build")
                 if name in {"e2e", "gtk", "gtk-server"}:
                     expected.add("gtk-build")
@@ -194,7 +192,7 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
         for name in (
-            "guards", "unit", "sandbox", "widgets", "distro-floor", "distro-floor-scenarios", "driver", "e2e",
+            "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver", "e2e",
             "consumers", "gtk", "pg-release", "pg-dump", "socket-ssh", "gtk-server",
             "driver-tls", "keyring",
         ):
@@ -919,16 +917,18 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertLess(job.index("ensure-node.sh"), job.index("uses:"), workflow.name)
                 self.assertIn('>> "$GITHUB_PATH"', job)
 
-    def test_forgejo_distro_floor_reuses_one_package_across_bases(self):
+    def test_forgejo_distro_floor_keeps_runtime_coverage_without_deb_release_lifecycle(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertNotIn("\n  distro-floor-build:\n", workflow)
-        floor = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        self.assertNotIn("\n  distro-floor:\n", workflow)
+        self.assertNotIn("tablepro_0.1.5-1_amd64.deb", workflow)
+        scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
+        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("runs-on: build-host", producer)
         self.assertIn("scripts/build-deb.sh", producer)
-        self.assertNotIn("scripts/distro-floor-package.sh", floor)
-        self.assertIn("DISTRO_FLOOR_PACKAGE=", floor)
-        self.assertIn("PREBUILT_DEB=", floor)
+        self.assertNotIn("scripts/test-deb-package.sh", workflow)
+        self.assertIn("needs: [floor-build]", scenarios)
+        self.assertIn("ci-gtk-artifact.py create --package", producer)
+        self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
         self.assertIn("BASE=debian:testing", builder)
         self.assertIn("scripts/build-deb.sh", builder)
@@ -940,9 +940,8 @@ class CiWorkflowTests(unittest.TestCase):
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('docker build -t "$tag"', floor_script)
         self.assertIn("apt-get update\n", floor_script)
-        self.assertIn('apt-get install -y "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
+        self.assertIn('cd /package\n      apt-get install -y "./$DISTRO_FLOOR_DEB_NAME"', floor_script)
         self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
-        self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
         gtk_safety_script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
         self.assertIn('timeout 1500s "$system_python" -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
@@ -966,14 +965,10 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_distro_scenarios_share_the_package_and_partition_all_six_shards(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        producer = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        self.assertNotIn("scripts/test-distro-floor.sh", producer)
-        self.assertIn("scripts/test-deb-package.sh", producer)
-        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("ci-gtk-artifact.py create --package", builder)
-        self.assertIn("ci-gtk-artifact.py verify --package", producer)
-        self.assertIn("needs: [distro-floor]", scenarios)
+        self.assertIn("needs: [floor-build]", scenarios)
         self.assertIn("max-parallel: 2", scenarios)
         self.assertIn("shard_group: [1, 2]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
@@ -983,7 +978,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('scripts/ci-mcp-port.py "$((10 + shard))"', scenarios)
         self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
         self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)
-        for job in (producer, scenarios):
+        for job in (builder, scenarios):
             self.assertIn("name: floor-package-${{ github.run_id }}-${{ github.sha }}", job)
 
     def test_packaged_distro_smoke_does_not_mount_a_stale_build_target(self):

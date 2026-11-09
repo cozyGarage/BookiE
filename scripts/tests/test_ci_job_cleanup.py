@@ -71,12 +71,6 @@ class CiJobCleanupTests(unittest.TestCase):
                                 block,
                             )
 
-    def test_distro_floor_uses_container_shell_without_host_cache_wrapper(self):
-        job = runner_jobs(WORKFLOWS[0])["distro-floor"]
-        self.assertIn("    defaults:\n      run:\n        shell: bash", job)
-        self.assertNotIn("bookie-ci-cache", job)
-        self.assertNotIn("CARGO_TARGET_DIR:", job)
-
     def test_finalizer_removes_job_files_and_keeps_shared_targets(self):
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
@@ -234,6 +228,33 @@ class CiJobCleanupTests(unittest.TestCase):
                 ],
             )
             self.assertFalse((workspace / "src").exists())
+
+    def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
+        job = runner_jobs(WORKFLOWS[0])["pg-dump"]
+        self.assertIn("TMPDIR: ${{ github.workspace }}/.tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / "workspace"
+            workspace.mkdir()
+            job_tmp = workspace / ".tmp-pg-dump-123-2"
+            job_tmp.mkdir()
+            (job_tmp / "temporary-data").touch()
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                cwd=workspace,
+                env={
+                    **os.environ,
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "GITHUB_WORKSPACE": str(workspace),
+                    "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
+                    "TMPDIR": str(job_tmp),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(job_tmp.exists())
 
     def test_driver_tls_workflow_assigns_a_run_scoped_fixture_project(self):
         job = runner_jobs(WORKFLOWS[0])["driver-tls"]

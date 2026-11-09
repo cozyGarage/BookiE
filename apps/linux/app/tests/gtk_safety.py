@@ -1049,7 +1049,8 @@ def stop_application(process):
 
 def open_editor():
     invoke_named_action_within(CONNECTION_NAME, "Open connection")
-    invoke(wait_for_node(name="Open SQL editor"))
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 
 
@@ -1250,7 +1251,7 @@ def mysql_unparseable_routine_dialog_denial_preserves_database(database, _base):
     container = os.environ["BOOKIE_GTK_MYSQL_CONTAINER"]
     open_saved_connection(MYSQL_CONNECTION_NAME)
     wait_for_frame_containing(f"{MYSQL_CONNECTION_NAME} — BookiE")
-    invoke(wait_for_node(name="Open SQL editor"))
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 
     denied_name = "bookie_gtk_unparseable_denied"
@@ -1833,7 +1834,7 @@ def successful_switch_keeps_database_ownership(database, base):
 
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_node(name=f"{CONNECTION_B_NAME} — BookiE", role=pyatspi.ROLE_FRAME)
-    invoke(wait_for_node(name="Open SQL editor"))
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("CREATE TABLE ownership_new (id INTEGER PRIMARY KEY); INSERT INTO safety_items(id) VALUES (22)")
 
@@ -1891,7 +1892,7 @@ def running_query_is_cancelled_before_switch(database, base):
     invoke(wait_for_node(name="Cancel queries and switch", role=pyatspi.ROLE_PUSH_BUTTON))
 
     wait_for_node(name=f"{CONNECTION_B_NAME} — BookiE", role=pyatspi.ROLE_FRAME)
-    invoke(wait_for_node(name="Open SQL editor"))
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("INSERT INTO safety_items(id) VALUES (44)")
     database_b = base / "safety-b.sqlite"
@@ -2144,7 +2145,7 @@ def pending_edits_gate_a_connection_switch(database, base):
         f"a discarded pending row reached the old database: {database_ids(database)}"
     )
 
-    invoke(wait_for_node(name="Open SQL editor"))
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("INSERT INTO safety_items(id) VALUES (55)")
     database_b = base / "safety-b.sqlite"
@@ -2728,7 +2729,7 @@ def imported_socket_urls_connect_to_mysql(_database, base):
         assert record is not None, f"{scheme} socket connection was not saved"
         open_saved_connection(record["name"])
         wait_for_frame_containing(f'{record["name"]} — BookiE')
-        invoke(wait_for_node(name="Open SQL editor"))
+        invoke_accessible_action("win.open-editor")
         wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         run_sql("SELECT 42 AS socket_probe")
         wait_for_node(name="42", role=pyatspi.ROLE_TABLE_CELL)

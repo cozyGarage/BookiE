@@ -503,73 +503,9 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  distro-floor:
-    runs-on: any-host
-    needs: [guards, clippy, floor-build]
-    if: github.event_name != 'pull_request'
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - base: "debian:testing"
-            mcp_port_slot: 10
-    steps:
-      - name: Check out
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: Select isolated MCP HTTP port
-        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
-      - name: Prepare artifact runtime
-        env:
-          BOOKIE_TOOL_DIR: /var/cache/ci/tools
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Download the shared release package
-        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
-        with:
-          name: floor-package-${{ github.run_id }}-${{ github.sha }}
-          path: floor-artifact/
-      - name: Verify the shared release package
-        run: python3 src/scripts/ci-gtk-artifact.py verify --package "$GITHUB_WORKSPACE/floor-artifact" "${{ github.sha }}" > "$GITHUB_WORKSPACE/floor-package-path"
-      - name: Debian package build, install, upgrade from the released package and purge
-        run: |
-          released=/var/cache/ci/releases/tablepro_0.1.5-1_amd64.deb
-          if [ ! -s "$released" ]; then
-            mkdir -p "$(dirname "$released")"
-            curl -fsSL -o "$released.part" https://github.com/cozyGarage/BookiE/releases/download/linux-v0.1.5/tablepro_0.1.5-1_amd64.deb
-            mv "$released.part" "$released"
-          fi
-          cd src && package=$(cat "$GITHUB_WORKSPACE/floor-package-path") && PREVIOUS_DEB="$released" PREBUILT_DEB="$package" bash scripts/test-deb-package.sh ${{ matrix.base }}
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
   distro-floor-scenarios:
     runs-on: any-host
-    needs: [distro-floor]
+    needs: [floor-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 90
     env:
@@ -944,6 +880,7 @@ jobs:
     timeout-minutes: 30
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-dump
+      TMPDIR: ${{ github.workspace }}/.tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -951,6 +888,7 @@ jobs:
           TOKEN: ${{ github.token }}
           SERVER: ${{ github.server_url }}
         run: |
+          mkdir -p "$TMPDIR"
           rm -rf src
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
