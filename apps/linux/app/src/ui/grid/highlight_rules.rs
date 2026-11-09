@@ -5,7 +5,7 @@ use bookie_app_services::highlight_match::{
     HIGHLIGHT_COLORS, HighlightOp, HighlightRule, HighlightRuleSet, HighlightTarget,
 };
 use bookie_app_services::highlight_settings::{
-    HighlightSettingsStore, default_highlight_rule, normalize_highlight_rules,
+    HighlightSettingsStore, default_highlight_rule, normalize_highlight_rules, validate_highlight_pattern_lengths,
 };
 use bookie_core::FilterValue;
 use gtk4::{self as gtk, gio};
@@ -185,8 +185,9 @@ fn present(
     let initial = persist
         .store
         .load(persist.connection_id, persist.schema.as_deref(), &persist.table);
+    let original = initial.clone();
     let state = Rc::new(RefCell::new(initial));
-    let (dialog, rules_list, add, cancel, apply) = build_shell();
+    let (dialog, rules_list, add, cancel, apply, status) = build_shell();
     let suppress = Rc::new(Cell::new(false));
     let rebuild = install_rebuild(state.clone(), columns.clone(), rules_list, suppress);
     if let Some(run) = rebuild.borrow().as_ref() {
@@ -194,11 +195,18 @@ fn present(
     }
     wire_add(add, state.clone(), columns, rebuild.clone());
     wire_cancel(cancel, &dialog);
-    wire_apply(apply, &dialog, state, persist, applied);
+    wire_apply(apply, &dialog, state, original, status, persist, applied);
     crate::ui::leak_probe::present_tracked("highlight_rules", &dialog, view);
 }
 
-fn build_shell() -> (adw::Dialog, gtk::ListBox, gtk::Button, gtk::Button, gtk::Button) {
+fn build_shell() -> (
+    adw::Dialog,
+    gtk::ListBox,
+    gtk::Button,
+    gtk::Button,
+    gtk::Button,
+    gtk::Label,
+) {
     let dialog = adw::Dialog::builder()
         .title(crate::tr!("Highlight Rules"))
         .content_width(640)
@@ -222,6 +230,14 @@ fn build_shell() -> (adw::Dialog, gtk::ListBox, gtk::Button, gtk::Button, gtk::B
         .halign(gtk::Align::Start)
         .build();
     add.add_css_class("flat");
+    let description = gtk::Label::builder()
+        .label(crate::tr!("LIKE patterns are limited to 4 KiB (4,096 bytes)."))
+        .halign(gtk::Align::Start)
+        .wrap(true)
+        .build();
+    let status = gtk::Label::builder().halign(gtk::Align::Start).wrap(true).build();
+    status.add_css_class("error");
+    status.set_visible(false);
     let body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(12)
@@ -230,6 +246,8 @@ fn build_shell() -> (adw::Dialog, gtk::ListBox, gtk::Button, gtk::Button, gtk::B
         .margin_start(12)
         .margin_end(12)
         .build();
+    body.append(&description);
+    body.append(&status);
     body.append(&rules_list);
     body.append(&add);
     let scroller = gtk::ScrolledWindow::builder()
@@ -242,7 +260,7 @@ fn build_shell() -> (adw::Dialog, gtk::ListBox, gtk::Button, gtk::Button, gtk::B
     toolbar.set_content(Some(&scroller));
     dialog.set_child(Some(&toolbar));
     dialog.set_default_widget(Some(&apply));
-    (dialog, rules_list, add, cancel, apply)
+    (dialog, rules_list, add, cancel, apply, status)
 }
 
 fn install_rebuild(
@@ -299,12 +317,19 @@ fn wire_apply(
     apply: gtk::Button,
     dialog: &adw::Dialog,
     state: Rc<RefCell<HighlightRuleSet>>,
+    original: HighlightRuleSet,
+    status: gtk::Label,
     persist: HighlightPersist,
     applied: Option<relm4::Sender<GridMsg>>,
 ) {
     let dialog = dialog.downgrade();
     apply.connect_clicked(move |_| {
         let set = normalize_highlight_rules(&state.borrow().rules);
+        if validate_highlight_pattern_lengths(&original, &set).is_err() {
+            status.set_text(&crate::tr!("New LIKE patterns must be 4 KiB (4,096 bytes) or less."));
+            status.set_visible(true);
+            return;
+        }
         if let Err(error) = persist
             .store
             .save(persist.connection_id, persist.schema.as_deref(), &persist.table, set)

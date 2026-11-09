@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub const HIGHLIGHT_COLORS: &[&str] = &["blue", "teal", "green", "yellow", "orange", "red", "purple", "brown"];
-const MAX_LIKE_PATTERN_BYTES: usize = 4096;
+pub const MAX_LIKE_PATTERN_BYTES: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

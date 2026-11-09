@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use bookie_core::FilterValue;
 use bookie_results::highlight_match::{
-    HighlightOp, HighlightRule, HighlightRuleSet, HighlightTarget, PreparedHighlightRule, highlight_color,
-    prepare_rules,
+    HighlightError, HighlightOp, HighlightRule, HighlightRuleSet, HighlightTarget, MAX_LIKE_PATTERN_BYTES,
+    PreparedHighlightRule, highlight_color, prepare_rules,
 };
 use uuid::Uuid;
 
@@ -49,6 +49,44 @@ pub fn default_highlight_rule(column: &str) -> HighlightRule {
 pub fn normalize_highlight_rules(rules: &[HighlightRule]) -> HighlightRuleSet {
     HighlightRuleSet {
         rules: rules.iter().cloned().filter_map(normalize_highlight_rule).collect(),
+    }
+}
+
+pub fn validate_highlight_pattern_lengths(
+    original: &HighlightRuleSet,
+    candidate: &HighlightRuleSet,
+) -> Result<(), HighlightError> {
+    let mut preserved = original
+        .rules
+        .iter()
+        .filter_map(like_pattern)
+        .filter(|(op, pattern)| is_like(*op) && pattern.len() > MAX_LIKE_PATTERN_BYTES)
+        .collect::<Vec<_>>();
+    for rule in &candidate.rules {
+        let Some((op, pattern)) =
+            like_pattern(rule).filter(|(op, pattern)| is_like(*op) && pattern.len() > MAX_LIKE_PATTERN_BYTES)
+        else {
+            continue;
+        };
+        let Some(index) = preserved
+            .iter()
+            .position(|(old_op, old_pattern)| *old_op == op && *old_pattern == pattern)
+        else {
+            return Err(HighlightError::PatternTooLong);
+        };
+        preserved.swap_remove(index);
+    }
+    Ok(())
+}
+
+fn is_like(op: HighlightOp) -> bool {
+    matches!(op, HighlightOp::Like | HighlightOp::NotLike | HighlightOp::Ilike)
+}
+
+fn like_pattern(rule: &HighlightRule) -> Option<(HighlightOp, &str)> {
+    match rule.value.as_ref()? {
+        FilterValue::Single(pattern) => Some((rule.op, pattern)),
+        _ => None,
     }
 }
 
@@ -216,6 +254,77 @@ mod tests {
                 },
             ],
         }
+    }
+
+    fn long_like_rule(pattern: String) -> HighlightRule {
+        HighlightRule {
+            column: "status".into(),
+            op: HighlightOp::Like,
+            value: Some(FilterValue::Single(pattern)),
+            color: "red".into(),
+            target: HighlightTarget::Cell,
+        }
+    }
+
+    #[test]
+    fn pattern_limit_uses_utf8_bytes_and_allows_exact_limit() {
+        let original = HighlightRuleSet::default();
+        assert!(
+            validate_highlight_pattern_lengths(
+                &original,
+                &HighlightRuleSet {
+                    rules: vec![long_like_rule("é".repeat(MAX_LIKE_PATTERN_BYTES / 2))],
+                }
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_highlight_pattern_lengths(
+                &original,
+                &HighlightRuleSet {
+                    rules: vec![long_like_rule("é".repeat(MAX_LIKE_PATTERN_BYTES / 2 + 1))],
+                }
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn applying_unrelated_changes_preserves_legacy_over_limit_rules() {
+        let legacy = HighlightRuleSet {
+            rules: vec![long_like_rule("x".repeat(MAX_LIKE_PATTERN_BYTES + 1))],
+        };
+        let candidate = HighlightRuleSet {
+            rules: vec![legacy.rules[0].clone(), default_highlight_rule("kind")],
+        };
+        assert!(validate_highlight_pattern_lengths(&legacy, &candidate).is_ok());
+        assert!(validate_highlight_pattern_lengths(&legacy, &HighlightRuleSet::default()).is_ok());
+    }
+
+    #[test]
+    fn changed_or_duplicated_legacy_over_limit_rules_are_rejected() {
+        let long = "x".repeat(MAX_LIKE_PATTERN_BYTES + 1);
+        let legacy = HighlightRuleSet {
+            rules: vec![long_like_rule(long.clone())],
+        };
+        assert!(
+            validate_highlight_pattern_lengths(
+                &legacy,
+                &HighlightRuleSet {
+                    rules: vec![long_like_rule(format!("{long}x"))],
+                }
+            )
+            .is_err()
+        );
+        assert!(
+            validate_highlight_pattern_lengths(
+                &legacy,
+                &HighlightRuleSet {
+                    rules: vec![long_like_rule(long.clone()), long_like_rule(long)],
+                }
+            )
+            .is_err()
+        );
     }
 
     #[test]
