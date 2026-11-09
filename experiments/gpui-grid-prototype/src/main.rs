@@ -19,8 +19,8 @@ use bookie_gpui_grid_prototype::source::{Source, Synthetic};
 use bookie_gpui_grid_prototype::theme::{Style, Theme};
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
-    MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size, uniform_list,
+    MouseDownEvent, ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
 };
 use text_input::{InputEvent, TextInput};
 use ui_theme::ThemeExt;
@@ -59,6 +59,7 @@ struct GridView {
     runs: Vec<Run>,
     run_edits: Vec<grid_edit::Edits>,
     active_run: usize,
+    run_scroll: ScrollHandle,
     next_run_number: usize,
     summary_view: bool,
     result_ratio: f32,
@@ -201,6 +202,7 @@ impl GridView {
             runs: vec![Run { number: 1, rows: total }],
             run_edits: vec![grid_edit::Edits::new()],
             active_run: 0,
+            run_scroll: ScrollHandle::new(),
             next_run_number: 2,
             summary_view: false,
             result_ratio: DEFAULT_RESULT_RATIO,
@@ -350,6 +352,7 @@ impl GridView {
     }
 
     fn show_run(&mut self, index: usize, run: Run) {
+        self.run_scroll.scroll_to_item(index);
         self.edits = std::mem::take(&mut self.run_edits[index]);
         self.editing = None;
         self.active_run = index;

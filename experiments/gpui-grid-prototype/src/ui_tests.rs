@@ -693,6 +693,30 @@ fn searching_after_filter_selects_the_matching_filtered_row(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            for _ in 0..12 {
+                view.run_query();
+            }
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.run_scroll.offset().x < gpui::px(0.0)));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.activate_run(0);
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.run_scroll.offset().x, gpui::px(0.0)));
+}
+
+#[gpui::test]
 fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
