@@ -675,6 +675,96 @@ fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            view.run_query();
+            let index = view.tabs.active;
+            view.close_tab(index);
+            assert!(view.runs.is_empty());
+            assert!(view.run_edits.is_empty());
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert_eq!(view.dataset_count(), 0);
+            view.run_query();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            let query = view.tabs.active;
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            view.close_tab(query);
+            assert!(view.runs.is_empty());
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            let query = view.tabs.active;
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            view.close_tab(query);
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            assert!(view.runs.is_empty());
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(cx, || (), |view, ()| view.status = "stale".into());
+            let query = view.tabs.active;
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            view.close_tab(query);
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale"));
+}
+
+#[gpui::test]
 fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t ctrl-shift-p");
