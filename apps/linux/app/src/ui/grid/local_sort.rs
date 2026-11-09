@@ -3,26 +3,25 @@ use std::collections::HashSet;
 
 use bookie_core::{QueryResult, Value};
 
+#[cfg(test)]
 pub(super) fn sorted_source_indices(result: &QueryResult, column: usize, ascending: bool) -> Option<Vec<usize>> {
-    let values = sortable_values(result, column)?;
-    let text_keys = values
-        .iter()
-        .map(|value| match value {
-            Value::Text(text) => Some(glib::CollationKey::from(text)),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    let mut indices = (0..result.rows.len()).collect::<Vec<_>>();
-    indices.sort_by(|left, right| match (&text_keys[*left], &text_keys[*right]) {
-        (Some(left_key), Some(right_key)) => {
-            let order = left_key
-                .cmp(right_key)
-                .then_with(|| compare_values(values[*left], values[*right], true));
-            if ascending { order } else { order.reverse() }
+    sorted_source_indices_by_keys(result, &[(column, ascending)])
+}
+
+pub(super) fn sorted_source_indices_by_keys(result: &QueryResult, keys: &[(usize, bool)]) -> Option<Vec<usize>> {
+    if keys.is_empty() {
+        return Some((0..result.rows.len()).collect());
+    }
+    for &(column, _) in keys {
+        if !is_sortable_column(result, column) {
+            return None;
         }
-        _ => compare_values(values[*left], values[*right], ascending),
-    });
-    Some(indices)
+    }
+    let mut order = (0..result.rows.len()).collect::<Vec<_>>();
+    for &(column, ascending) in keys.iter().rev() {
+        order = sorted_source_indices_for_subset(result, column, ascending, order).ok()?;
+    }
+    Some(order)
 }
 
 pub(super) fn sorted_source_indices_for_subset(
@@ -31,26 +30,47 @@ pub(super) fn sorted_source_indices_for_subset(
     ascending: bool,
     source_indices: Vec<usize>,
 ) -> Result<Vec<usize>, Vec<usize>> {
-    if !is_sortable_column(result, column) {
-        return Err(source_indices);
+    sorted_source_indices_for_subset_by_keys(result, &[(column, ascending)], source_indices)
+}
+
+pub(super) fn sorted_source_indices_for_subset_by_keys(
+    result: &QueryResult,
+    keys: &[(usize, bool)],
+    source_indices: Vec<usize>,
+) -> Result<Vec<usize>, Vec<usize>> {
+    if keys.is_empty() {
+        return Ok(source_indices);
     }
-    if source_indices
-        .iter()
-        .any(|source_index| result.rows.get(*source_index).and_then(|row| row.get(column)).is_none())
-    {
-        return Err(source_indices);
+    for &(column, _) in keys {
+        if !is_sortable_column(result, column) {
+            return Err(source_indices);
+        }
+        if source_indices
+            .iter()
+            .any(|source_index| result.rows.get(*source_index).and_then(|row| row.get(column)).is_none())
+        {
+            return Err(source_indices);
+        }
     }
+    let mut order = source_indices;
+    for &(column, ascending) in keys.iter().rev() {
+        order = sort_subset_one_key(result, column, ascending, order);
+    }
+    Ok(order)
+}
+
+fn sort_subset_one_key(result: &QueryResult, column: usize, ascending: bool, source_indices: Vec<usize>) -> Vec<usize> {
     let sorts_text = source_indices
         .iter()
         .filter_map(|source_index| result.rows.get(*source_index).and_then(|row| row.get(column)))
         .find(|value| !matches!(value, Value::Null))
         .is_some_and(|value| matches!(value, Value::Text(_)));
     if sorts_text {
-        return Ok(sorted_text_subset(result, column, source_indices, ascending));
+        return sorted_text_subset(result, column, source_indices, ascending);
     }
     let mut source_indices = source_indices;
     source_indices.sort_by(|left, right| compare_source_values(result, column, left, right, ascending));
-    Ok(source_indices)
+    source_indices
 }
 
 pub(super) fn is_sortable_column(result: &QueryResult, column: usize) -> bool {
@@ -107,22 +127,6 @@ impl Sortability {
         }
         self.kind = Some(kind);
     }
-}
-
-fn sortable_values(result: &QueryResult, column: usize) -> Option<Vec<&Value>> {
-    let values = result
-        .rows
-        .iter()
-        .map(|row| row.get(column))
-        .collect::<Option<Vec<_>>>()?;
-    let kind = values.iter().find_map(|value| comparable_kind(value));
-    values
-        .iter()
-        .all(|value| {
-            (matches!(value, Value::Null) || comparable_kind(value).is_some())
-                && comparable_kind(value).is_none_or(|candidate| Some(candidate) == kind)
-        })
-        .then_some(values)
 }
 
 fn sorted_text_subset(result: &QueryResult, column: usize, source_indices: Vec<usize>, ascending: bool) -> Vec<usize> {
@@ -221,7 +225,10 @@ mod tests {
     use chrono::NaiveDate;
     use rust_decimal::Decimal;
 
-    use super::{sorted_source_indices, sorted_source_indices_for_subset};
+    use super::{
+        sorted_source_indices, sorted_source_indices_by_keys, sorted_source_indices_for_subset,
+        sorted_source_indices_for_subset_by_keys,
+    };
 
     fn result(values: Vec<Value>) -> QueryResult {
         QueryResult {
@@ -249,6 +256,74 @@ mod tests {
 
         assert_eq!(sorted_source_indices(&result, 0, true), Some(vec![1, 2, 0]));
         assert_eq!(sorted_source_indices(&result, 0, false), Some(vec![0, 1, 2]));
+    }
+
+    #[test]
+    fn local_sort_reverses_a_single_key() {
+        let result = result(vec![Value::Int(1), Value::Int(3), Value::Int(2)]);
+        assert_eq!(
+            sorted_source_indices_by_keys(&result, &[(0, true)]),
+            Some(vec![0, 2, 1])
+        );
+        assert_eq!(
+            sorted_source_indices_by_keys(&result, &[(0, false)]),
+            Some(vec![1, 2, 0])
+        );
+    }
+
+    #[test]
+    fn local_sort_applies_secondary_keys_and_clear_restores_source_order() {
+        let result = QueryResult {
+            columns: vec![
+                ColumnInfo {
+                    name: "dept".into(),
+                    data_type: "".into(),
+                    nullable: true,
+                    primary_key: false,
+                    is_auto_increment: false,
+                    default_value: None,
+                    is_generated: false,
+                    comment: None,
+                    collation: None,
+                    enum_type: None,
+                    domain_type: None,
+                },
+                ColumnInfo {
+                    name: "name".into(),
+                    data_type: "".into(),
+                    nullable: true,
+                    primary_key: false,
+                    is_auto_increment: false,
+                    default_value: None,
+                    is_generated: false,
+                    comment: None,
+                    collation: None,
+                    enum_type: None,
+                    domain_type: None,
+                },
+            ],
+            rows: vec![
+                vec![Value::Text("b".into()), Value::Text("z".into())],
+                vec![Value::Text("a".into()), Value::Text("y".into())],
+                vec![Value::Text("a".into()), Value::Text("x".into())],
+                vec![Value::Text("b".into()), Value::Text("w".into())],
+            ]
+            .into(),
+            truncated: false,
+        };
+        assert_eq!(
+            sorted_source_indices_by_keys(&result, &[(0, true), (1, true)]),
+            Some(vec![2, 1, 3, 0])
+        );
+        assert_eq!(
+            sorted_source_indices_by_keys(&result, &[(0, true), (1, false)]),
+            Some(vec![1, 2, 0, 3])
+        );
+        assert_eq!(sorted_source_indices_by_keys(&result, &[]), Some(vec![0, 1, 2, 3]));
+        assert_eq!(
+            sorted_source_indices_for_subset_by_keys(&result, &[(0, true), (1, true)], vec![0, 1, 2, 3]),
+            Ok(vec![2, 1, 3, 0])
+        );
     }
 
     #[test]
@@ -357,10 +432,10 @@ mod tests {
     #[ignore = "requires isolated GTK display"]
     fn local_text_sort_follows_the_locale_collation_not_byte_order() {
         let set = unsafe { libc::setlocale(libc::LC_ALL, c"en_US.UTF-8".as_ptr()) };
-        if set.is_null() {
-            eprintln!("en_US.UTF-8 is not installed; skipping");
-            return;
-        }
+        assert!(
+            !set.is_null(),
+            "generate en_US.UTF-8 before running the isolated locale-sort test"
+        );
         let result = result(vec![
             Value::Text("Zebra".into()),
             Value::Text("éclair".into()),

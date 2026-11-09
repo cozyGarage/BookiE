@@ -14,3 +14,9 @@ BookiE and the TablePro Linux client are both AGPL-3.0, so a reviewed file may b
 | `apps/linux/app/src/ui/diagram/card_text.rs`, `draw.rs`, `palette.rs` | `card_text.rs`, `draw.rs`, `palette.rs` | Comments removed; the palette takes a light or dark theme; GTK tests registered as isolated tests. |
 
 The model, the bounded metadata read, the canvas, the dialog and the accessible descriptions are BookiE's own. The export and movable-card nodes are not adopted.
+
+## Adoption procedure
+
+1. Read the candidate file and diff it against the BookiE counterpart before copying. Adopt only what BookiE lacks.
+2. Port it to BookiE's types, remove comments and add a test that fails without it.
+3. Add a row to the table above with the source commit and the changes.

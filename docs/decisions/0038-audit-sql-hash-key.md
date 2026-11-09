@@ -19,5 +19,5 @@ C. Store a random 32-byte key in the Secret Service next to the other secrets, w
 
 ## Consequences
 
-- Policy and storage are B4-owned: the change needs the lane handoff.
+- The policy crate and audit storage belong to the Policy lane: the change needs the lane handoff.
 - Acceptance: a test that no record stores `SHA-256(statement)`, a test that two identical statements share a hash under one key and differ under another, and a test that a journal holding old unkeyed records still verifies.

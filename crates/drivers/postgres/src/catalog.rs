@@ -9,6 +9,8 @@ pub(crate) const SUPPORTED_KINDS: &[CatalogObjectKind] = &CatalogObjectKind::ALL
 const USER_SCHEMA: &str = "n.nspname NOT IN ('pg_catalog', 'information_schema') \
      AND n.nspname NOT LIKE 'pg\\_toast%' AND n.nspname NOT LIKE 'pg\\_temp\\_%' \
      AND ($1::text IS NULL OR n.nspname = $1) \
+     AND NOT EXISTS (SELECT 1 FROM pg_catalog.unnest($3::text[]) AS hidden_schema(schema_name) \
+                     WHERE hidden_schema.schema_name = n.nspname) \
      AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')";
 
 const TABLE_REACHABLE: &str = "pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')";
@@ -87,7 +89,9 @@ fn grants_sql() -> String {
 const EXTENSIONS_SQL: &str = "SELECT n.nspname, e.extname, e.extversion
      FROM pg_catalog.pg_extension e
      JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
-     ORDER BY 2 LIMIT $1";
+     WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.unnest($1::text[]) AS hidden_schema(schema_name) \
+                       WHERE hidden_schema.schema_name = n.nspname)
+     ORDER BY 2 LIMIT $2";
 
 const ROLES_SQL: &str = "SELECT NULL::text, r.rolname,
          NULLIF(concat_ws(', ',
@@ -116,11 +120,25 @@ pub(crate) async fn list_objects(
     kind: CatalogObjectKind,
     schema: Option<&str>,
 ) -> Result<Vec<CatalogObject>, DriverError> {
+    list_objects_excluding(pool, kind, schema, &[]).await
+}
+
+pub(crate) async fn list_objects_excluding(
+    pool: &Pool<Postgres>,
+    kind: CatalogObjectKind,
+    schema: Option<&str>,
+    excluded_schemas: &[String],
+) -> Result<Vec<CatalogObject>, DriverError> {
     let limit = i64::try_from(CATALOG_OBJECT_LIMIT).unwrap_or(i64::MAX);
     let query = sqlx::query(sqlx::AssertSqlSafe(sql_for(kind)));
-    let query = match kind.is_schema_scoped() {
-        true => query.bind(schema).bind(limit),
-        false => query.bind(limit),
+    let query = match kind {
+        CatalogObjectKind::Routine
+        | CatalogObjectKind::Trigger
+        | CatalogObjectKind::Sequence
+        | CatalogObjectKind::Type
+        | CatalogObjectKind::Grant => query.bind(schema).bind(limit).bind(excluded_schemas),
+        CatalogObjectKind::Extension => query.bind(excluded_schemas).bind(limit),
+        CatalogObjectKind::Role => query.bind(limit),
     };
     let rows = query.fetch_all(pool).await.map_err(map_sqlx_error)?;
     rows.iter().map(|row| object_from_row(kind, row)).collect()

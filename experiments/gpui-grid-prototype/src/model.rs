@@ -1,3 +1,5 @@
+use tokio_util::sync::CancellationToken;
+
 pub const ALLOWED_ROWS: [u64; 3] = [150_000, 500_000, 1_000_000];
 pub const DEFAULT_ROWS: u64 = 1_000_000;
 pub const MAX_FIND_MATCHES: usize = 10_000;
@@ -208,61 +210,11 @@ pub fn parse_predicate(input: &str) -> Result<Predicate, &'static str> {
     })
 }
 
-pub fn matches_predicate(index: u64, predicate: &Predicate) -> bool {
-    let needle = predicate.text.to_lowercase();
-    let text = column_text(index, predicate.column).map(|text| text.to_lowercase());
-    match predicate.op {
-        Op::Contains => text.is_some_and(|text| text.contains(&needle)),
-        Op::Equals => text.is_some_and(|text| text == needle),
-        Op::NotEquals => text.is_none_or(|text| text != needle),
-    }
-}
-
-pub fn filter_rows(total: u64, predicate: &Predicate) -> Vec<u32> {
-    (0..total)
-        .filter(|index| matches_predicate(*index, predicate))
-        .map(|index| index as u32)
-        .collect()
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct FindResult {
     pub matches: Vec<u64>,
     pub capped: bool,
     pub scanned: u64,
-}
-
-pub fn find_rows(total: u64, query: &str, cap: usize) -> Result<FindResult, &'static str> {
-    if cap == 0 || cap > MAX_FIND_MATCHES {
-        return Err("match cap exceeds the prototype limit");
-    }
-    if query.is_empty() || query.len() > 256 {
-        return Err("invalid search text");
-    }
-    let needle = query.to_lowercase();
-    let mut matches = Vec::new();
-    for index in 0..total {
-        let hit = Column::ALL
-            .iter()
-            .filter_map(|column| column_text(index, *column))
-            .any(|text| text.to_lowercase().contains(&needle));
-        if !hit {
-            continue;
-        }
-        if matches.len() == cap {
-            return Ok(FindResult {
-                matches,
-                capped: true,
-                scanned: index,
-            });
-        }
-        matches.push(index);
-    }
-    Ok(FindResult {
-        matches,
-        capped: false,
-        scanned: total,
-    })
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -295,7 +247,10 @@ fn right_state(index: u64) -> &'static str {
     }
 }
 
-pub fn build_diff(total: u64, keyed: bool) -> Diff {
+pub fn build_diff(total: u64, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
+    if cancel.is_cancelled() {
+        return Err("comparison cancelled");
+    }
     let mut summary = DiffSummary {
         keyed,
         ..DiffSummary::default()
@@ -303,6 +258,9 @@ pub fn build_diff(total: u64, keyed: bool) -> Diff {
     let mut rows: Vec<DiffRow> = Vec::new();
     let mut capped = false;
     for index in 0..total {
+        if index.is_multiple_of(1_024) && cancel.is_cancelled() {
+            return Err("comparison cancelled");
+        }
         let mut produced: Vec<(&'static str, Vec<Cell>)> = Vec::new();
         let original = label_of(index);
         let edited = format!("{original} (edited)");
@@ -332,7 +290,7 @@ pub fn build_diff(total: u64, keyed: bool) -> Diff {
             }
         }
     }
-    Diff { summary, rows, capped }
+    Ok(Diff { summary, rows, capped })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -367,6 +325,9 @@ impl Pager {
     }
 
     pub fn range(&self) -> (u64, u64) {
+        if self.total == 0 {
+            return (0, 0);
+        }
         let start = self.page * PAGE_ROWS;
         (start + 1, (start + PAGE_ROWS).min(self.total))
     }

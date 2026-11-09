@@ -2,7 +2,7 @@ name: CI debian-testing GTK image
 
 on:
   push:
-    branches: [linux, main]
+    branches: [main]
     paths:
       - "ci/debian-testing-gtk/**"
       - ".github/workflows/ci-debian-testing-gtk.yml"

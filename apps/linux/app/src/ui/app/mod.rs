@@ -3,6 +3,7 @@ mod backup;
 mod browse;
 mod browse_save;
 mod bundle;
+mod catalog_ddl;
 mod connection;
 mod database_switcher;
 mod editor_files;
@@ -15,6 +16,7 @@ mod init_sidebar;
 mod init_window;
 mod init_workspace;
 mod msg;
+mod multi_session;
 mod open_request;
 mod organization;
 mod ran_statements;
@@ -52,6 +54,7 @@ use uuid::Uuid;
 use super::browse_tab::BrowseTabInput;
 use super::connect_dialog::ConnectDialog;
 use super::connection_row::ConnectionRow;
+use super::editor::SqlEditorInput;
 use super::history_dialog::HistoryDialog;
 use super::sidebar_row::SidebarRow;
 use super::welcome_view::{WelcomeView, WelcomeViewInit, WelcomeViewOutput};
@@ -59,7 +62,7 @@ use crate::services::database_service::ConnectionHealth;
 
 pub use msg::AppMsg;
 use render::qualified_label;
-use types::{CLOSED_TABS_CAPACITY, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
+use types::{CLOSED_TABS_CAPACITY, ConnectionSwitch, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
 
 #[derive(Clone, Copy, Debug)]
@@ -82,18 +85,6 @@ pub struct AppInit {
 }
 
 use bookie_app_services::workspace::{CloseAfterSave, WorkspaceTabs};
-
-struct ConnectionSwitch {
-    /// Serialized connection-switch state. The candidate is fully validated
-    /// before it can replace the active connection.
-    transition: ConnectionTransition,
-    prepared: Option<crate::services::connection_service::PreparedConnection>,
-    saves_pending: std::collections::HashMap<Uuid, u32>,
-    /// Audit safety state captured before cancelling running work for a
-    /// connection switch. If cancellation makes a previously safe state
-    /// ambiguous, the candidate is discarded and the old workspace remains.
-    cancel_audit_was_disabled: Option<bool>,
-}
 
 pub struct App {
     change_trackers: crate::services::change_tracker::WorkspaceChangeTrackers,
@@ -168,6 +159,7 @@ pub struct App {
     recent_walk: std::cell::RefCell<Option<crate::services::recent_tabs::RecentWalk<adw::TabPage>>>,
     /// Idempotency flag for `ensure_workspace_root`.
     workspace_root_added: std::cell::Cell<bool>,
+    overview_front_connection_id: std::rc::Rc<std::cell::Cell<Option<Uuid>>>,
     /// Per-tab state. Each entry is either a Browse or Editor tab.
     /// HashMap for O(1) tab_id lookup; display order is read from
     /// `tab_view.pages()` since HashMap is unordered.
@@ -201,12 +193,8 @@ pub struct App {
     /// An encrypted bundle waiting on its passphrase.
     pending_bundle: Option<bookie_storage::EncryptedBundle>,
     connected: bool,
-    /// The connection this window owns. Activation is process-wide and
-    /// additive, so a window must resolve its own connection rather than
-    /// whichever one was focused most recently.
     connection_id: Option<Uuid>,
-    /// The running CSV import's progress window, held while its batches
-    /// run and dropped when it reaches its terminal state.
+    multi: multi_session::MultiSessionState,
     csv_import_progress: Option<crate::ui::import_dialog::ImportProgress>,
     backup_progress: Option<crate::ui::progress_dialog::CancellableDialog>,
     switch: ConnectionSwitch,
@@ -544,6 +532,8 @@ impl SimpleComponent for App {
         ));
         crate::ui::theme::apply(preferences.load().theme);
         crate::ui::grid::set_null_display(preferences.load().null_display);
+        crate::ui::grid::set_date_format(preferences.load().date_format);
+        crate::ui::grid::full_value_editor::set_show_invisible_characters(preferences.load().show_invisible_characters);
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
             change_trackers,
@@ -612,6 +602,7 @@ impl SimpleComponent for App {
             recent_pages: std::cell::RefCell::default(),
             recent_walk: std::cell::RefCell::default(),
             workspace_root_added: std::cell::Cell::new(false),
+            overview_front_connection_id: std::rc::Rc::new(std::cell::Cell::new(None)),
             workspace_tabs: std::rc::Rc::new(std::cell::RefCell::new(Default::default())),
             dialog: None,
             favorites: Vec::new(),
@@ -630,6 +621,7 @@ impl SimpleComponent for App {
             pending_bundle: None,
             connected: false,
             connection_id: None,
+            multi: multi_session::MultiSessionState::default(),
             csv_import_progress: None,
             backup_progress: None,
             switch: ConnectionSwitch {
@@ -813,7 +805,8 @@ impl SimpleComponent for App {
             }
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
-            AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(),
+            AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(sender),
+            AppMsg::FocusWorkingSession(id) => self.focus_working_session(id, sender),
             AppMsg::SwitchToRecentTab => self.on_switch_to_recent_tab(),
             AppMsg::EndRecentTabWalk => self.on_end_recent_tab_walk(),
             AppMsg::WorkspaceSchemaWordsChanged => self.refresh_schema_index(),
@@ -832,11 +825,28 @@ impl SimpleComponent for App {
                 self.on_browse_save_failed(tab_id, save_id, message);
             }
             AppMsg::FlashErrorRowForTab(tab_id, source) => {
-                self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source));
+                self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source.clone()));
+                self.dispatch_to_editor(tab_id, SqlEditorInput::ResultFlashError(source));
+            }
+            AppMsg::FocusActiveGrid => {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusResultGrid);
+                } else if let Some(id) = self.selected_browse_tab_id() {
+                    self.dispatch_to_tab(id, BrowseTabInput::FocusGrid);
+                }
+            }
+            AppMsg::FocusActiveEditor => {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::FocusEditor);
+                }
             }
             AppMsg::SaveActiveBrowseTab => {
                 if let Some(id) = self.selected_editor_tab_id() {
-                    self.save_editor_file(id, false, sender);
+                    if self.change_trackers.with_tab_ref(id, |tracker| tracker.has_pending()) == Some(true) {
+                        self.dispatch_to_editor(id, SqlEditorInput::CommitResultEdits);
+                    } else {
+                        self.save_editor_file(id, false, sender);
+                    }
                 } else if let Some(id) = self.selected_browse_tab_id() {
                     self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
                 }
@@ -889,6 +899,7 @@ impl SimpleComponent for App {
             AppMsg::ExportStreamedResults(request) => self.on_export_streamed_results(request),
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
+            AppMsg::EditorResultDirtyChanged(tab_id, dirty) => self.refresh_editor_result_dirty(tab_id, dirty),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
             AppMsg::SidebarSearchChanged => self.sync_sidebar_expansion(),
             AppMsg::RefreshSidebar => self.refresh_sidebar(sender),
@@ -918,6 +929,7 @@ impl SimpleComponent for App {
             AppMsg::DropTableSucceeded { origin, schema, table } => {
                 self.on_drop_table_succeeded(origin, schema, table, sender)
             }
+            AppMsg::CatalogDdl(message) => self.dispatch_catalog_ddl(message, sender),
             AppMsg::ExecuteStructureTransaction { tab_id, statements } => {
                 self.on_execute_structure_transaction(tab_id, statements, sender)
             }
@@ -1091,6 +1103,7 @@ impl SimpleComponent for App {
             AppMsg::ExportJson => self.on_export(ExportFormat::Json),
             AppMsg::ExportAllCsv => self.on_export_all(ExportFormat::Csv),
             AppMsg::ExportAllJson => self.on_export_all(ExportFormat::Json),
+            AppMsg::ExportFrontResults => self.on_export_front_results(),
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsStatement {
                 tab_id,
@@ -1162,10 +1175,8 @@ impl SimpleComponent for App {
     /// context, until this runs (H12).
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
         self.schema_index.borrow_mut().invalidate_columns();
-        if let Some(id) = self.connection_id.take() {
-            self.database.close(id);
-            crate::services::window_registry::unregister(id);
-        }
+        self.connection_id = None;
+        self.clear_multi_session_state();
         if let Some(source) = self.poll_health_source.take() {
             source.remove();
         }

@@ -2,13 +2,8 @@
 apps/linux/app/src/config.rs 5
 apps/linux/app/src/lib.rs 9
 apps/linux/app/src/logging.rs 3
-apps/linux/app/src/services/connection_monitor_tests.rs 2
-apps/linux/app/src/services/connection_service.rs 15
-apps/linux/app/src/services/database_service.rs 33
-apps/linux/app/src/services/database_service_tests.rs 6
 apps/linux/app/src/services/gtk_approval.rs 13
 apps/linux/app/src/services/mcp_service.rs 3
-apps/linux/app/src/services/operation_control.rs 8
 apps/linux/app/src/services/preferences.rs 3
 apps/linux/app/src/services/single_instance.rs 24
 apps/linux/app/src/services/window_registry.rs 3
@@ -70,6 +65,10 @@ crates/agentd/src/audit_isolation_tests.rs 1
 crates/agentd/src/lib.rs 4
 crates/agentd/src/main.rs 16
 crates/agentd/src/main_tests.rs 5
+crates/app-services/src/connection_monitor_tests.rs 2
+crates/app-services/src/connection_service.rs 15
+crates/app-services/src/database_service.rs 33
+crates/app-services/src/database_service_tests.rs 6
 crates/app-services/src/filter_settings.rs 12
 crates/app-services/src/state_file.rs 2
 crates/app-services/src/structure_tracker.rs 22

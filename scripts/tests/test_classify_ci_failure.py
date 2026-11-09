@@ -161,7 +161,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
         self.assertIn("No such image: postgres", output.getvalue())
 
     def test_cli_lists_runs_from_a_list_shaped_api_response(self):
-        runs = [{"id": 12, "status": "success", "event": "push", "prettyref": "refs/heads/linux", "title": "check"}]
+        runs = [{"id": 12, "status": "success", "event": "push", "prettyref": "refs/heads/main", "title": "check"}]
         output = io.StringIO()
         with (
             mock.patch.object(classifier.sys, "argv", ["classify", "--list", "4"]),
@@ -172,7 +172,7 @@ class ClassifyCiFailureTests(unittest.TestCase):
         ):
             classifier.main()
         self.assertIn("12", output.getvalue())
-        self.assertIn("refs/heads/linux", output.getvalue())
+        self.assertIn("refs/heads/main", output.getvalue())
 
     def test_cli_lists_jobs_and_classifies_failed_run_with_tail(self):
         jobs_output = io.StringIO()

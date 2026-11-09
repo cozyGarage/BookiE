@@ -1,6 +1,6 @@
 pub(super) const REMOVED_ALGORITHMS: [(&str, &str); 5] = [
     ("HostKeyAlgorithms", "-ssh-rsa,ssh-rsa-cert-v01@openssh.com"),
-    ("PubkeyAcceptedAlgorithms", "-ssh-rsa,ssh-rsa-cert-v01@openssh.com"),
+    ("PubkeyAcceptedKeyTypes", "-ssh-rsa,ssh-rsa-cert-v01@openssh.com"),
     (
         "Ciphers",
         "-3des-cbc,blowfish-cbc,cast128-cbc,arcfour,arcfour128,arcfour256",

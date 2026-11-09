@@ -510,24 +510,75 @@ impl App {
     }
 
     pub(super) fn on_export(&self, format: ExportFormat) {
-        let Some((schema, table)) = self.selected_browse_slot_table() else {
+        let Some(request) = self.browse_export_request() else {
+            return;
+        };
+        crate::ui::export_dialog::present_with_format(
+            &self.window,
+            &self.toast_overlay,
+            request,
+            matches!(format, ExportFormat::Json),
+            &self.preferences,
+        );
+    }
+
+    pub(super) fn on_export_front_results(&self) {
+        let Some(id) = self.selected_workspace_tab_id() else {
             self.show_toast(&crate::tr!("Nothing to export"));
             return;
+        };
+        let export = {
+            let tabs = self.workspace_tabs.borrow();
+            match tabs.get(&id) {
+                Some(super::WorkspaceTab::Table(_)) => FrontExport::Browse,
+                Some(super::WorkspaceTab::Editor(slot)) => match slot.controller.model().export_shown_result() {
+                    Some((result, name)) => FrontExport::Editor { result, name },
+                    None => FrontExport::Empty,
+                },
+                Some(super::WorkspaceTab::Structure(_)) | None => FrontExport::Empty,
+            }
+        };
+        match export {
+            FrontExport::Browse => {
+                let Some(request) = self.browse_export_request() else {
+                    return;
+                };
+                crate::ui::export_dialog::present(&self.window, &self.toast_overlay, request, &self.preferences);
+            }
+            FrontExport::Editor { result, name } => crate::ui::export_dialog::present(
+                &self.window,
+                &self.toast_overlay,
+                crate::ui::export_dialog::ExportRequest {
+                    scope: crate::ui::export_dialog::ExportScope::QueryResult,
+                    paged: None,
+                    result,
+                    suggested_name: name,
+                    driver_id: self.driver_id().to_string(),
+                },
+                &self.preferences,
+            ),
+            FrontExport::Empty => self.show_toast(&crate::tr!("Nothing to export")),
+        }
+    }
+
+    fn browse_export_request(&self) -> Option<crate::ui::export_dialog::ExportRequest> {
+        let Some((schema, table)) = self.selected_browse_slot_table() else {
+            self.show_toast(&crate::tr!("Nothing to export"));
+            return None;
         };
         let Some(active_id) = self.selected_browse_tab_id() else {
             self.show_toast(&crate::tr!("Nothing to export"));
-            return;
+            return None;
         };
-
         let (result, has_unfetched_columns, filtered) = {
             let tabs = self.workspace_tabs.borrow();
             let Some(model) = tabs
                 .get(&active_id)
-                .and_then(|t| t.browse_controller())
-                .map(|c| c.model())
+                .and_then(|tab| tab.browse_controller())
+                .map(|controller| controller.model())
             else {
                 self.show_toast(&crate::tr!("Nothing to export"));
-                return;
+                return None;
             };
             (
                 model.snapshot(),
@@ -542,25 +593,19 @@ impl App {
                 crate::tr!("Nothing to export")
             };
             self.show_toast(&message);
-            return;
+            return None;
         };
         let table_label = match &schema {
             Some(schema) => format!("{schema}.{table}"),
             None => table,
         };
-        crate::ui::export_dialog::present_with_format(
-            &self.window,
-            &self.toast_overlay,
-            crate::ui::export_dialog::ExportRequest {
-                scope: crate::ui::export_dialog::ExportScope::TablePage { filtered },
-                paged: None,
-                result: std::sync::Arc::new(result),
-                suggested_name: table_label,
-                driver_id: self.driver_id().to_string(),
-            },
-            matches!(format, ExportFormat::Json),
-            &self.preferences,
-        );
+        Some(crate::ui::export_dialog::ExportRequest {
+            scope: crate::ui::export_dialog::ExportScope::TablePage { filtered },
+            paged: None,
+            result: std::sync::Arc::new(result),
+            suggested_name: table_label,
+            driver_id: self.driver_id().to_string(),
+        })
     }
 
     pub(super) fn on_export_streamed_results(&self, request: crate::ui::export_dialog::StreamExportRequest) {
@@ -723,6 +768,15 @@ impl App {
         });
         dialog.present(Some(&self.window));
     }
+}
+
+enum FrontExport {
+    Browse,
+    Editor {
+        result: std::sync::Arc<QueryResult>,
+        name: String,
+    },
+    Empty,
 }
 
 fn connect_refresh_response(dialog: &adw::AlertDialog, on_discard: impl Fn() + 'static) {

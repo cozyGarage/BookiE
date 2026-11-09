@@ -37,6 +37,7 @@ These are the dependencies used by the current drivers:
 | Redis | `redis`, including the workspace's vendored patch |
 | MongoDB | `mongodb`, including the workspace's vendored patch |
 | DuckDB | `duckdb`, built in |
+| Oracle Database | `oracledb` (Oracle's pure-Rust thin driver, pre-release, pinned exactly), no Oracle client needed |
 
 Review engine/library proposals against [driver maturity](adding-drivers.md#order-the-engines-were-added), dependency policy and license requirements. Keep driver registration static unless a new architecture decision explicitly changes that contract.
 
@@ -104,6 +105,7 @@ Current defaults are `Stable`, `RawValue`, non-file-based, non-transactional DDL
 | MongoDB | `Experimental`, database listing |
 | MySQL | `enum_input_style = DeclaredMemberList`, database listing, index and foreign-key metadata, client TLS auth, local socket and socket-file support, explicit auto-increment values, inline comments on new and existing columns |
 | PostgreSQL | transactional DDL, database listing, index and foreign-key metadata, view metadata and catalog kinds, client TLS auth, local socket and socket-directory support, explicit auto-increment values, separate comments on new and existing columns |
+| Oracle Database | `Experimental`, read-only |
 | Redis | `Experimental` |
 | SQL Server | database listing, transactional DDL, index and foreign-key metadata, integrated authentication, separate comments on new and existing columns |
 | SQLite | file-based, transactional DDL, index and foreign-key metadata, explicit auto-increment values |
@@ -153,6 +155,7 @@ Every registered driver reports a `DriverMaturity` (`Stable` or `Experimental`).
 | Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | one bound key for the Value read | no | See [known limitations](known-limitations.md#editing-and-connections) for topology support; driver TLS fixture; Verify CA behaves as Verify Full |
 | MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop; keyed grid edits use bound values | no | no | TLS fixture coverage; Verify CA behaves as Verify Full; integration coverage includes browse, find, aggregate, stale-edit and stale-delete checks |
 | DuckDB | Experimental | yes | yes | SQL | yes | yes | no | built in; CSV/TSV/JSON/Parquet files; bundled JSON/Parquet; dedicated CI job |
+| Oracle Database | Experimental | yes | schemas and tables | SELECT and WITH only | refused | no | no | Read-only; plain TCP only (TLS refused, not downgraded); no server-side cancel, a call timeout retires the connection; TIMESTAMP WITH TIME ZONE and NUMBER wider than 28 digits show as undecodable; driver library is a pre-release; integration tests use the `gvenzl/oracle-free` image and run only in the local integration tier |
 
 ### Maturity rules
 

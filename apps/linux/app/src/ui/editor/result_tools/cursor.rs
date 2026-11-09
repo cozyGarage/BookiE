@@ -1,4 +1,5 @@
 use bookie_app_services::result_find::{FindMatch, FindReport};
+use bookie_app_services::text_match::TextMatchOptions;
 
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 enum SearchState {
@@ -8,6 +9,13 @@ enum SearchState {
     Complete,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub(super) struct SearchSpec {
+    pub needle: String,
+    pub options: TextMatchOptions,
+    pub column: Option<usize>,
+}
+
 #[derive(Default)]
 pub(super) struct MatchCursor {
     generation: u64,
@@ -15,13 +23,13 @@ pub(super) struct MatchCursor {
     capped: bool,
     unsearchable: u64,
     current: Option<usize>,
-    needle: String,
+    spec: SearchSpec,
     state: SearchState,
     requested_forward: Option<bool>,
 }
 
 impl MatchCursor {
-    pub(super) fn begin(&mut self, needle: &str) -> u64 {
+    pub(super) fn begin(&mut self, spec: SearchSpec) -> u64 {
         self.generation = self.generation.wrapping_add(1);
         self.matches.clear();
         self.capped = false;
@@ -29,7 +37,7 @@ impl MatchCursor {
         self.current = None;
         self.state = SearchState::Searching;
         self.requested_forward = None;
-        self.needle = needle.to_owned();
+        self.spec = spec;
         self.generation
     }
 
@@ -61,8 +69,8 @@ impl MatchCursor {
         true
     }
 
-    pub(super) fn has_results_for(&self, needle: &str) -> bool {
-        self.state == SearchState::Complete && self.needle == needle
+    pub(super) fn has_results_for(&self, spec: &SearchSpec) -> bool {
+        self.state == SearchState::Complete && &self.spec == spec
     }
 
     pub(super) fn request_direction(&mut self, forward: bool) {
@@ -73,12 +81,12 @@ impl MatchCursor {
         self.requested_forward.take()
     }
 
-    pub(super) fn is_searching_for(&self, needle: &str) -> bool {
-        self.state == SearchState::Searching && self.needle == needle
+    pub(super) fn is_searching_for(&self, spec: &SearchSpec) -> bool {
+        self.state == SearchState::Searching && &self.spec == spec
     }
 
-    pub(super) fn keeps_for(&self, needle: &str) -> bool {
-        self.state != SearchState::Idle && self.needle == needle
+    pub(super) fn keeps_for(&self, spec: &SearchSpec) -> bool {
+        self.state != SearchState::Idle && &self.spec == spec
     }
 
     pub(super) fn step(&mut self, forward: bool) -> Option<FindMatch> {

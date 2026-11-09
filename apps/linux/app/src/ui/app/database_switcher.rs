@@ -57,12 +57,24 @@ pub(super) fn build_database_popover(popover: &gtk::Popover, sender: &ComponentS
         .build();
     let content = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
+        .spacing(6)
         .margin_top(6)
         .margin_bottom(6)
         .margin_start(6)
         .margin_end(6)
         .build();
     content.append(&scroll);
+    let create = gtk::Button::builder()
+        .label(crate::tr!("New Database\u{2026}"))
+        .css_classes(["flat"])
+        .halign(gtk::Align::Start)
+        .build();
+    create.set_widget_name("new-database");
+    let create_sender = sender.clone();
+    create.connect_clicked(move |_| {
+        create_sender.input(AppMsg::CatalogDdl(super::msg::CatalogDdlMsg::NewDatabasePrompt))
+    });
+    content.append(&create);
     popover.set_child(Some(&content));
     let opened = sender.clone();
     popover.connect_visible_notify(move |popover| {
@@ -79,7 +91,8 @@ fn clear(list: &gtk::ListBox) {
     }
 }
 
-fn choice_button(choice: &DatabaseChoice, sender: &ComponentSender<App>) -> gtk::Button {
+fn choice_row(choice: &DatabaseChoice, current: &str, driver_id: &str, sender: &ComponentSender<App>) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
     let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     let label = gtk::Label::builder()
         .label(&choice.name)
@@ -90,12 +103,32 @@ fn choice_button(choice: &DatabaseChoice, sender: &ComponentSender<App>) -> gtk:
     if choice.current {
         content.append(&gtk::Image::from_icon_name("object-select-symbolic"));
     }
-    let button = gtk::Button::builder().child(&content).css_classes(["flat"]).build();
+    let button = gtk::Button::builder()
+        .child(&content)
+        .css_classes(["flat"])
+        .hexpand(true)
+        .build();
     button.update_property(&[gtk::accessible::Property::Label(&choice.name)]);
     let picked = sender.clone();
     let name = choice.name.clone();
     button.connect_clicked(move |_| picked.input(AppMsg::SwitchDatabase(name.clone())));
-    button
+    row.append(&button);
+    if super::catalog_ddl::droppable_database(&choice.name, current, driver_id) {
+        let drop = gtk::Button::builder()
+            .icon_name("user-trash-symbolic")
+            .tooltip_text(crate::tr!("Drop {database}\u{2026}").replace("{database}", &choice.name))
+            .css_classes(["flat"])
+            .build();
+        let drop_sender = sender.clone();
+        let drop_name = choice.name.clone();
+        drop.connect_clicked(move |_| {
+            drop_sender.input(AppMsg::CatalogDdl(super::msg::CatalogDdlMsg::DropDatabasePrompt {
+                database: drop_name.clone(),
+            }));
+        });
+        row.append(&drop);
+    }
+    row
 }
 
 fn message_row(title: &str, subtitle: &str) -> adw::ActionRow {
@@ -104,6 +137,22 @@ fn message_row(title: &str, subtitle: &str) -> adw::ActionRow {
         .title(title)
         .subtitle(subtitle)
         .build()
+}
+
+fn find_named_button(widget: &gtk::Widget, name: &str) -> Option<gtk::Button> {
+    if let Some(button) = widget.downcast_ref::<gtk::Button>()
+        && button.widget_name() == name
+    {
+        return Some(button.clone());
+    }
+    let mut child = widget.first_child();
+    while let Some(current) = child {
+        if let Some(button) = find_named_button(&current, name) {
+            return Some(button);
+        }
+        child = current.next_sibling();
+    }
+    None
 }
 
 impl App {
@@ -162,8 +211,18 @@ impl App {
             .find(|saved| saved.id == connection_id)
             .map(|saved| saved.database.clone())
             .unwrap_or_default();
+        let driver_id = self.driver_id();
+        if let Some(create) = self
+            .databases_button
+            .popover()
+            .and_then(|popover| popover.child())
+            .and_then(|child| find_named_button(&child, "new-database"))
+        {
+            create.set_visible(bookie_core::sql_ddl::supports_create_database(driver_id));
+        }
         for choice in database_choices(&names, &current) {
-            self.databases_list.append(&choice_button(&choice, &sender));
+            self.databases_list
+                .append(&choice_row(&choice, &current, driver_id, &sender));
         }
     }
 
@@ -195,6 +254,14 @@ impl App {
                 .get(driver_id)
                 .is_some_and(|driver| driver.capabilities().supports_database_listing),
         );
+        if let Some(create) = self
+            .databases_button
+            .popover()
+            .and_then(|popover| popover.child())
+            .and_then(|child| find_named_button(&child, "new-database"))
+        {
+            create.set_visible(bookie_core::sql_ddl::supports_create_database(driver_id));
+        }
         self.persist_switched_database(id, sender);
     }
 

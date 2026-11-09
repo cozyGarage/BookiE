@@ -322,7 +322,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_postgres_text_array_grid_edit_preserves_escaped_values_and_siblings",
                 "value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling",
                 "value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling",
-                "value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values",
+                "value_contract_clickhouse_enum8_and_enum16_preserve_labels_and_refuse_ambiguous_edits",
                 "value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution",
                 "value_contract_mongodb_int32_grid_edit_preserves_integer_width",
                 "value_contract_mongodb_date_grid_edit_preserves_millisecond_instant",
@@ -336,7 +336,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor",
                 "mysql_value_query_refetches_the_exact_blob_for_a_composite_key",
                 "mssql_value_query_refetches_the_exact_blob_for_a_composite_key",
-                "clickhouse_value_query_refetches_the_exact_text_for_a_composite_key",
+                "clickhouse_value_query_refuses_duplicate_sort_keys",
                 "mongodb_guarded_refetch_preserves_long_text_and_binary_values",
                 "redis_guarded_refetch_preserves_binary_key_and_value",
                 "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
@@ -474,7 +474,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("shared-key: linux-build", preflight)
         self.assertIn("shared-key: linux-build", fast)
         self.assertIn(
-            "save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && (github.ref == 'refs/heads/linux' || github.ref == 'refs/heads/main')) }}",
+            "save-if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}",
             preflight,
         )
         self.assertIn("persist-credentials: false", preflight)
@@ -506,9 +506,7 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED:
             for state in ["failure", "skipped", "cancelled", "missing"]:
                 results = success | {name: {"result": state}}
-                deferred = (name in checker.MERGE_ONLY or name in checker.PULL_REQUEST_ONLY) and state == "skipped"
-                expected = [] if deferred else [name]
-                self.assertEqual(checker.assess(results, "push")[0], expected, (name, state))
+                self.assertEqual(checker.assess(results, "push")[0], [name], (name, state))
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED | {checker.SCHEDULED})
 
     def test_only_pull_request_runs_are_cancelled_when_a_newer_run_starts(self):
@@ -516,35 +514,36 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
         self.assertNotIn("event_name == 'push' }}", workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0])
 
-    def test_push_and_pull_request_may_defer_only_the_merge_tier_jobs(self):
+    def test_push_and_pull_request_require_every_regression_job(self):
+        self.assertEqual(checker.MERGE_ONLY, set())
+        self.assertEqual(checker.PULL_REQUEST_ONLY, set())
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         for name in checker.REQUIRED:
             results = success | {name: {"result": "skipped"}}
-            pr_expected = [] if name in checker.MERGE_ONLY else [name]
-            push_expected = [] if name in checker.MERGE_ONLY or name in checker.PULL_REQUEST_ONLY else [name]
-            self.assertEqual(checker.assess(results, "pull_request")[0], pr_expected, name)
-            self.assertEqual(checker.assess(results, "push")[0], push_expected, name)
-        for name in checker.MERGE_ONLY:
-            results = success | {name: {"result": "skipped"}}
-            self.assertEqual(checker.assess(results, "schedule")[0], [name], name)
+            self.assertEqual(checker.assess(results, "pull_request")[0], [name], name)
+            self.assertEqual(checker.assess(results, "push")[0], [name], name)
         results = success | {"driver-tls": {"result": "skipped"}}
         self.assertEqual(checker.assess(results, "pull_request")[0], ["driver-tls"])
-        self.assertEqual(checker.assess(results, "push")[0], [])
+        self.assertEqual(checker.assess(results, "push")[0], ["driver-tls"])
 
-    def test_the_workflow_runs_merge_tier_jobs_only_on_schedule_or_dispatch(self):
+    def test_only_current_stable_clippy_is_schedule_or_dispatch_only(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        guarded = set(
-            re.findall(
-                r"^  ([a-z0-9-]+):\n    if: github.event_name == 'schedule' \|\| github.event_name == 'workflow_dispatch'\n",
-                workflow,
-                re.M,
+        guarded = set()
+        for match in re.finditer(r"^  ([a-z0-9-]+):\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S):
+            header = match.group(2).split("\n    steps:\n", 1)[0]
+            if re.search(
+                r"(?m)^    if: github.event_name == 'schedule' \|\| github.event_name == 'workflow_dispatch'\s*$",
+                header,
+            ):
+                guarded.add(match.group(1))
+        self.assertEqual(guarded, {checker.SCHEDULED})
+        for name in ["gtk-safety", "integration", "b4-rollback", "driver-tls", "postgres-release"]:
+            section = re.search(rf"^  {name}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+            self.assertNotRegex(
+                section.split("\n    steps:\n", 1)[0],
+                r"(?m)^    if: ",
+                name,
             )
-        )
-        self.assertEqual(guarded, checker.MERGE_ONLY)
-        self.assertIn(
-            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
-            workflow.split("  current-stable-clippy:\n", 1)[1].split("  integration:\n", 1)[0],
-        )
 
     def test_github_docker_hub_jobs_authenticate_when_secrets_exist(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -569,7 +568,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ghcr.io/cozygarage/bookie/ci-debian-testing-gtk", ensure)
         self.assertIn("tag: ${{ steps.publish.outputs.tag }}", ensure)
         self.assertIn("./.github/actions/dockerhub-login", ensure)
-        for job in ["gtk-safety", "current-stable-clippy"]:
+        gtk_safety = re.search(r"^  gtk-safety:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
+        self.assertIn(
+            "image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}",
+            gtk_safety,
+        )
+        self.assertIn("secrets.GITHUB_TOKEN", gtk_safety)
+        for job in ["current-stable-clippy"]:
             section = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z0-9-]+:|\Z)", workflow, re.M | re.S).group(1)
             self.assertIn("image: debian:testing", section, job)
             self.assertIn("secrets.DOCKERHUB_USERNAME", section, job)
@@ -601,12 +606,15 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         focused = workflow.split("  b4-rollback:\n", 1)[1].split("  driver-tls:\n", 1)[0]
         for required in [
-            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
             "prefix-key: linux-integration",
             "run-test-layer.py b4-rollback",
             "regression-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}",
         ]:
             self.assertIn(required, focused)
+        self.assertNotIn(
+            "if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+            focused.split("\n    steps:\n", 1)[0],
+        )
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         self.assertIn("needs: [pin-revision, b4-rollback]", integration)
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
@@ -646,10 +654,48 @@ class CiWorkflowTests(unittest.TestCase):
     def test_postgres_release_gtk_uses_the_staged_release_binary(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
-        self.assertIn("timeout-minutes: 45", release)
+        self.assertIn("timeout-minutes: 60", release)
         self.assertIn("cargo build --locked --release -p bookie-app", release)
         self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', release)
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", release)
+
+    def test_postgres_release_reuses_staged_app_without_debug_rebuild(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('elif [[ -n "${BOOKIE_GTK_BINARY:-}" ]]', script)
+        self.assertIn('[[ ! -x "$BOOKIE_GTK_BINARY" ]]', script)
+        self.assertIn('cargo build --locked -p bookie-app --bin bookie-app', script)
+        self.assertIn('cargo build --locked -p bookie-ssh --bin bookie-askpass', script)
+        supplied_binary_branch = script.split('elif [[ -n "${BOOKIE_GTK_BINARY:-}" ]]', 1)[1].split("    else", 1)[0]
+        self.assertNotIn('cargo build --locked -p bookie-app --bin bookie-app', supplied_binary_branch)
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())
+        self.assertEqual(layers["layers"]["postgres-release"]["steps"][0]["timeout_seconds"], 2700)
+
+    def test_postgres_release_gtk_smoke_can_find_the_askpass_helper(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('PATH="$BOOKIE_TARGET_DIR/debug:$PATH" \\\n      bash scripts/test-gtk-safety.sh', script)
+
+    def test_gtk_safety_reuses_the_binary_built_by_fast_checks(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
+        gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
+        self.assertIn("cargo build --locked -p bookie-app --bin bookie-app", fast)
+        self.assertIn("install -Dm755 target/debug/bookie-app target/gtk-safety/bookie", fast)
+        self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", fast)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, fast]", gtk_safety)
+        self.assertIn("image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", gtk_safety)
+        self.assertIn("actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131", gtk_safety)
+        self.assertIn("chmod 0755 target/gtk-safety/bookie", gtk_safety)
+        self.assertIn("BOOKIE_GTK_BINARY: target/gtk-safety/bookie", gtk_safety)
+
+    def test_gtk_safety_installs_pinned_rust_before_keyring_tests(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
+        toolchain_action = "uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772"
+        keyring_step = "name: Secret Service round-trip"
+
+        self.assertIn(toolchain_action, gtk_safety)
+        self.assertIn("toolchain: 1.98", gtk_safety)
+        self.assertLess(gtk_safety.index(toolchain_action), gtk_safety.index(keyring_step))
 
     def test_postgres_release_runs_on_the_supported_gtk_floor_with_host_docker(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -672,6 +718,35 @@ class CiWorkflowTests(unittest.TestCase):
         ]:
             with self.subTest(floor=floor):
                 self.assertIn(floor, release)
+
+    def test_postgres_release_docker_passes_host_vars_used_under_set_u(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
+        self.assertIn('--env GITHUB_WORKSPACE="$GITHUB_WORKSPACE"', release)
+        match = re.search(r"bash -euo pipefail -c '([^']*)'", release, re.S)
+        self.assertIsNotNone(match)
+        inner_vars = sorted(set(re.findall(r"\$([A-Z_][A-Z0-9_]*)", match.group(1))))
+        env_names = set(re.findall(r"--env ([A-Z_][A-Z0-9_]*)=", release))
+        for name in inner_vars:
+            with self.subTest(name=name):
+                self.assertIn(name, env_names)
+
+    def test_postgres_release_container_uses_workspace_toolchain(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
+        toolchain = re.search(r"toolchain: ([^\s]+)", release)
+        workspace_toolchain = re.search(r"^channel = \"([^\"]+)\"$", (ROOT / "rust-toolchain.toml").read_text(), re.M)
+
+        self.assertIsNotNone(toolchain)
+        self.assertIsNotNone(workspace_toolchain)
+        self.assertEqual(toolchain.group(1), workspace_toolchain.group(1))
+        self.assertNotRegex(release, r"--env RUSTUP_TOOLCHAIN=")
+        self.assertIn('toolchain_bin="$(dirname "$(rustup which cargo --toolchain 1.98)")"', release)
+        self.assertIn('toolchain_relative="${toolchain_bin#"$HOME/.rustup"}"', release)
+        self.assertIn('--env PATH="/rustup${toolchain_relative}:/cargo/bin:', release)
+        self.assertIn('echo "Rust toolchain is outside the mounted Rustup home"', release)
+        self.assertIn("cargo --version", release)
+        self.assertIn("rustc --version", release)
 
     def test_gtk_scripts_reduce_xvfb_display_collisions(self):
         for path in [
@@ -762,7 +837,7 @@ class CiWorkflowTests(unittest.TestCase):
         triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
         events = set(re.findall(r"^  ([a-z_]+):", triggers, re.M))
         self.assertEqual(events, {"push", "schedule", "workflow_dispatch"})
-        self.assertIn("branches: [linux]", triggers.split("  push:", 1)[1])
+        self.assertIn("branches: [main]", triggers.split("  push:", 1)[1])
 
     def test_analysis_skips_docs_and_reuse_cache(self):
         cancel_push_or_pr = (

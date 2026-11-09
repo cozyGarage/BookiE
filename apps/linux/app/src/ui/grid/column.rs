@@ -49,7 +49,7 @@ fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
     title
 }
 
-fn header_details(info: &ColumnInfo, foreign_key: bool) -> gtk4::gio::Menu {
+fn header_details(info: &ColumnInfo, foreign_key: bool, sort_enabled: bool) -> gtk4::gio::Menu {
     let details = gtk4::gio::Menu::new();
     for text in [
         crate::tr!("Column: {name}").replace("{name}", &info.name),
@@ -74,6 +74,11 @@ fn header_details(info: &ColumnInfo, foreign_key: bool) -> gtk4::gio::Menu {
     }
     let menu = gtk4::gio::Menu::new();
     menu.append_section(Some(&crate::tr!("Column details")), &details);
+    if sort_enabled {
+        let sort_actions = gtk4::gio::Menu::new();
+        sort_actions.append(Some(&crate::tr!("Clear sort")), Some("grid.clear-sort"));
+        menu.append_section(Some(&crate::tr!("Sort")), &sort_actions);
+    }
     menu
 }
 
@@ -86,6 +91,7 @@ pub(super) struct ColumnSpec {
     pub(super) sort_enabled: bool,
     pub(super) default_min_width: Option<i32>,
     pub(super) column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    pub(super) display_columns: Arc<[ColumnInfo]>,
 }
 
 pub(super) fn build_column(
@@ -102,6 +108,7 @@ pub(super) fn build_column(
         sort_enabled,
         default_min_width,
         column_widths,
+        display_columns,
     } = spec;
     let factory = gtk4::SignalListItemFactory::new();
     let edit_sender = if editable { sender.clone() } else { None };
@@ -140,6 +147,7 @@ pub(super) fn build_column(
     let column_info = info.clone();
     let column_is_editable = is_cell_editable(info);
     let tab_ctx_for_bind = tab_ctx.clone();
+    let display_columns_for_bind = display_columns.clone();
     let row_positions = Rc::new(std::cell::RefCell::new(std::collections::HashMap::new()));
     let positions_for_bind = row_positions.clone();
     factory.connect_bind(move |_, item| {
@@ -160,6 +168,7 @@ pub(super) fn build_column(
             item,
             &row,
             &tab_ctx_for_bind,
+            &display_columns_for_bind,
             BoundColumn {
                 index: idx,
                 editable: editable_for_bind,
@@ -189,6 +198,7 @@ pub(super) fn build_column(
                 popover.popdown();
             }
             clear_pending_classes(label.upcast_ref());
+            super::highlight_paint::clear_highlight(label.upcast_ref());
             label.reset_property(gtk4::AccessibleProperty::Description);
             label.set_strikethrough(false);
             POSITION_SLOT.take(&label);
@@ -198,12 +208,14 @@ pub(super) fn build_column(
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             checkbox.set_sensitive(false);
             clear_pending_classes(checkbox.upcast_ref());
+            super::highlight_paint::clear_highlight(checkbox.upcast_ref());
             checkbox.reset_property(gtk4::AccessibleProperty::Description);
             checkbox.set_opacity(1.0);
             POSITION_SLOT.take(&checkbox);
             ROW_KEY_SLOT.take(&checkbox);
         } else if let Ok(label) = child.downcast::<gtk4::Label>() {
             clear_pending_classes(label.upcast_ref());
+            super::highlight_paint::clear_highlight(label.upcast_ref());
             label.reset_property(gtk4::AccessibleProperty::Description);
             set_label_strikethrough(&label, false);
             POSITION_SLOT.take(&label);
@@ -227,6 +239,7 @@ pub(super) fn build_column(
     column.set_header_menu(Some(&header_details(
         info,
         tab_ctx.foreign_key_columns.contains(&info.name),
+        sort_enabled,
     )));
     if sort_enabled {
         let dummy = gtk4::CustomSorter::new(|_, _| gtk4::Ordering::Equal);
@@ -274,6 +287,7 @@ fn bind_row_cell(
     item: &gtk4::ListItem,
     row: &crate::ui::row_object::RowObject,
     context: &TabGridContext,
+    display_columns: &[ColumnInfo],
     bound: BoundColumn<'_>,
 ) {
     let BoundColumn {
@@ -312,6 +326,7 @@ fn bind_row_cell(
             (None, Some(value)) => cell_view_with_column_editability(value, column, column_is_editable),
             (None, None) => return,
         };
+        let highlight_rules = context.highlight_rules.as_ref();
         bind_cell(
             item,
             view,
@@ -321,7 +336,11 @@ fn bind_row_cell(
                 pk_values: identity.map_or_else(|| Arc::<[Value]>::from([]), |identity| identity.pk_values.clone()),
                 pending_classes,
                 column,
+                column_index: index,
             },
+            row,
+            highlight_rules,
+            display_columns,
         );
         if let Some(child) = item.child() {
             mark_ambiguous_key(&child, ambiguous);
@@ -420,39 +439,87 @@ struct CellBinding<'a> {
     pk_values: std::sync::Arc<[Value]>,
     pending_classes: Vec<&'static str>,
     column: &'a ColumnInfo,
+    column_index: usize,
 }
 
-fn bind_cell(item: &gtk4::ListItem, view: CellView<'_>, value: Option<&Value>, binding: CellBinding<'_>) {
+struct EditableLabelBinding<'a, 'b> {
+    position: u32,
+    view: &'a CellView<'b>,
+    text: &'a str,
+    inline_editable: bool,
+    binding: CellBinding<'b>,
+    value: Option<&'b Value>,
+    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
+}
+
+fn bind_cell(
+    item: &gtk4::ListItem,
+    view: CellView<'_>,
+    value: Option<&Value>,
+    binding: CellBinding<'_>,
+    row: &crate::ui::row_object::RowObject,
+    highlight_rules: Option<&Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>>,
+    display_columns: &[ColumnInfo],
+) {
     let is_null = view.is_null;
     let inline_editable = binding.editable && view.inline_editable;
     let text = view.text_for_bind(binding.editable);
+    let highlight = highlight_rules.and_then(|rules| {
+        super::highlight_paint::paint_for_bound_cell(
+            rules,
+            binding.column_index,
+            text.as_ref(),
+            is_null,
+            row,
+            display_columns,
+        )
+    });
     let Some(child) = item.child() else { return };
     if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
         bind_editable_label(
             &label,
-            item.position(),
-            &view,
-            text.as_ref(),
-            inline_editable,
-            binding,
-            value,
+            EditableLabelBinding {
+                position: item.position(),
+                view: &view,
+                text: text.as_ref(),
+                inline_editable,
+                binding,
+                value,
+                highlight,
+            },
         );
     } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
-        bind_bool_cell(&checkbox, item.position(), view.checked, inline_editable, binding);
+        bind_bool_cell(
+            &checkbox,
+            item.position(),
+            view.checked,
+            inline_editable,
+            binding,
+            highlight,
+        );
     } else if let Ok(label) = child.downcast::<gtk4::Label>() {
-        bind_readonly_label(&label, item.position(), text.as_ref(), is_null, view.truncated, binding);
+        bind_readonly_label(
+            &label,
+            item.position(),
+            text.as_ref(),
+            is_null,
+            view.truncated,
+            binding,
+            highlight,
+        );
     }
 }
 
-fn bind_editable_label(
-    label: &crate::ui::cell_editor::CellEditor,
-    position: u32,
-    view: &CellView<'_>,
-    text: &str,
-    inline_editable: bool,
-    binding: CellBinding<'_>,
-    value: Option<&Value>,
-) {
+fn bind_editable_label(label: &crate::ui::cell_editor::CellEditor, bind: EditableLabelBinding<'_, '_>) {
+    let EditableLabelBinding {
+        position,
+        view,
+        text,
+        inline_editable,
+        binding,
+        value,
+        highlight,
+    } = bind;
     IS_NULL_SLOT.set(label, view.is_null);
     label.set_inline_editable(inline_editable);
     label.set_text(text);
@@ -464,6 +531,7 @@ fn bind_editable_label(
         view.is_null && (binding.editable || view.auto_filled),
     );
     apply_cell_state(label.upcast_ref(), &binding.pending_classes);
+    super::highlight_paint::apply_highlight(label.upcast_ref(), highlight);
     label.set_strikethrough(binding.pending_classes.contains(&"tp-row-pending-delete"));
     POSITION_SLOT.set(label, position);
     ROW_KEY_SLOT.set(label, binding.pk_values);
@@ -486,6 +554,7 @@ fn bind_bool_cell(
     checked: Option<bool>,
     inline_editable: bool,
     binding: CellBinding<'_>,
+    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     checkbox.set_sensitive(inline_editable);
     SUPPRESS_SLOT.set(checkbox, true);
@@ -493,6 +562,7 @@ fn bind_bool_cell(
     checkbox.set_active(checked.unwrap_or(false));
     SUPPRESS_SLOT.set(checkbox, false);
     apply_cell_state(checkbox.upcast_ref(), &binding.pending_classes);
+    super::highlight_paint::apply_highlight(checkbox.upcast_ref(), highlight);
     checkbox.set_opacity(if binding.pending_classes.contains(&"tp-row-pending-delete") {
         0.5
     } else {
@@ -509,11 +579,13 @@ fn bind_readonly_label(
     is_null: bool,
     truncated: bool,
     binding: CellBinding<'_>,
+    highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     label.set_text(text);
     apply_cell_tooltip(label.upcast_ref(), text, is_null, truncated);
     set_class(label.upcast_ref(), "dim-label", is_null);
     apply_cell_state(label.upcast_ref(), &binding.pending_classes);
+    super::highlight_paint::apply_highlight(label.upcast_ref(), highlight);
     set_label_strikethrough(label, binding.pending_classes.contains(&"tp-row-pending-delete"));
     POSITION_SLOT.set(label, position);
     super::editing::sync_readonly_cell_focus(label);

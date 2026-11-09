@@ -2,7 +2,7 @@
 
 This isolated experiment compares a welcome layout and a virtualized result grid with the GTK application. It uses synthetic values only and cannot connect to a database. It is not a supported frontend, a package, or an alternative execution path. The shipped application continues to use GTK. The experiment does not establish accessibility, input-method, security, cross-platform or performance parity.
 
-The Rust commands use bounded requests and the shared `bookie-core` value type for a small synthetic fixture. Their JSON envelope carries every `bookie_core::Value` variant as a kind and an exact text: integers and decimals as decimal strings, bytes as `\x` hex, dates and times as ISO text, raw JSON text with its original spacing, and an undecodable cell as `<undecodable TYPE>`. The text rules mirror the export text of `bookie-core`, so a value reads the same here as in an export. This is still not a complete value bridge: nothing is parsed back, edited or compared by type, and no policy or database operations cross it.
+The Rust commands use bounded requests and the shared `bookie-core` value type for a small synthetic fixture. Display batches cap each cell at 512 Unicode characters or 16 binary bytes, with a `previewed` flag. Explicit editing retrieves the original cell through a checked row/column request; a reply from an older view is discarded. Copy still reads original values in Rust. The exact-value envelope carries every `bookie_core::Value` variant as a kind and canonical text: integers and decimals as decimal strings, bytes as `\x` hex, dates and times as ISO text, raw JSON text with its original spacing, and an undecodable cell as `<undecodable TYPE>`. The text rules mirror the export text of `bookie-core`, so a value reads the same here as in an export. This remains an experimental value bridge: edits use the core parser, but no policy or database operations cross it.
 
 ## Scope
 
@@ -19,15 +19,19 @@ The result screen mirrors the GTK streamed-result header so both layouts can be 
 - A command palette (`frontend/palette.mjs`), opened with Ctrl+Shift+P as in Zed and VS Code: type letters of a command, Up and Down choose, Enter runs, Escape closes. It lists page navigation, Find, Filter, Clear filter, Compare, the paged and continuous modes, Copy, Clear selection and Edit the active cell, and hides what does not apply right now (for example Clear filter with no filter). It is a `<dialog>` with a combobox and listbox, so focus is trapped while it is open and returns to the grid on close.
 - Row counts of 150,000, 500,000 or 1,000,000 through `?rows=` or `BOOKIE_PROTOTYPE_ROWS`.
 
-Double-click a label, state or typed cell to edit it in place. Enter applies, Escape cancels and Ctrl+Backspace sets NULL. The text is parsed by `bookie_core::import::parse_cell` for the cell's own kind, so an invalid date, UUID, number, boolean, JSON or hex value is refused with a reason that never repeats the text. Edits live in the web view only: nothing is written anywhere, paging or filtering keeps them, and Copy still uses the original values (the status line says so). The undecodable cell is read-only.
+Double-click a label, state or typed cell to edit it in place. Enter applies, Escape cancels and Ctrl+Backspace sets NULL. The text is parsed by `bookie_core::import::parse_cell` for the cell's own kind, so an invalid date, UUID, number, boolean, JSON or hex value is refused with a reason that never repeats the text. Edits live in the web view only: nothing is written anywhere, paging or filtering keeps them, and Copy still uses the original values (the status line says so). Undecodable and multiline cells are read-only in this single-line editor. Full values fetched from a preview are checked again before creating an input, so line breaks cannot be silently removed by HTML input normalization.
 
 `BOOKIE_PROTOTYPE_SELFTEST=1` opens the result, selects rows 2 to 4, runs the copy path and prints a `PROTOTYPE_REPORT` line with the copy outcome, then drives the editor through the DOM (an invalid date is refused, a valid one is applied and marked) and prints a second line. The self-test has no user gesture, so WebKit refuses both clipboard routes (`navigator.clipboard.writeText` and the `execCommand("copy")` fallback) and the report says so; a real Ctrl+C with a gesture has not been verified in this environment.
+
+The self-test forces preview metadata on a small synthetic cell and verifies that editing retrieves the full value. This checks the IPC edit path, not native performance with oversized values.
 
 The self-test also drives the cursor and the palette through the DOM: three keys put the cursor on row 3 of the Label column, Space selects the row, and Ctrl+Shift+P with `last page` moves to page 200 of 200 and closes the dialog.
 
 Export is inert. Nothing is read from or written to disk.
 
 ## Run and test
+
+Visible cells render at most 512 Unicode characters, with visible markers for line breaks, tabs and NULs. Binary cells render at most 16 bytes in hexadecimal and their exact byte count. Editing and copying still use the full original values. The [shared large-cell inputs](../fixtures/README.md) exercise the same synthetic cases as the GPUI formatter tests. Display-batch payloads are bounded before IPC as well as before DOM insertion. Explicit full-value requests and copy operations still carry complete values. JSON objects are currently serialized in full in Rust before their display prefix is taken; this does not bound serialization CPU or all transient allocations.
 
 From the repository root:
 
@@ -37,6 +41,15 @@ cargo test --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml
 cargo deny --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --config deny.toml check advisories licenses
 cargo run --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --locked
 ```
+
+For the headless selection, edit and keyboard-navigation smoke check, build the debug binary and run:
+
+```bash
+cargo build --manifest-path experiments/tauri-grid-prototype/src-tauri/Cargo.toml --locked
+node experiments/tauri-grid-prototype/selftest.mjs /path/to/debug/bookie-tauri-grid-prototype
+```
+
+The launcher requires `dbus-run-session` and `xvfb-run`. It forces the GTK X11 backend inside its isolated display, checks the reported selection, committed edit and keyboard cursor, then terminates its own process group. It fails after 30 seconds or if any outcome is missing. An inherited Wayland session can otherwise bypass Xvfb and leave animation-frame rendering inactive. The check does not establish clipboard access without a user gesture, native Wayland behavior or accessibility acceptance.
 
 Select **Open sample result**. `BOOKIE_PROTOTYPE_ROWS`, `BOOKIE_PROTOTYPE_WIDTH` and `BOOKIE_PROTOTYPE_HEIGHT` choose the synthetic size and window size for a run. Only a small window of rows is requested at a time; the prototype caps requests, matches and the scroll surface.
 

@@ -31,9 +31,9 @@ pub enum BrowseTabInput {
     NextPage,
     LastPage,
     SortChanged {
-        col_idx: usize,
-        ascending: bool,
+        keys: Vec<(usize, bool)>,
     },
+    ClearSort,
     PageSizeChanged(u64),
     InsertRow,
     FocusInsertedDraft,
@@ -45,12 +45,24 @@ pub enum BrowseTabInput {
         value: Option<Value>,
         row_key: Vec<Value>,
     },
+    GridReplaceBatch {
+        report: bookie_app_services::grid_replace::ReplaceReport,
+        generation: u64,
+        cancel: tokio_util::sync::CancellationToken,
+        reply: tokio::sync::oneshot::Sender<
+            Result<
+                bookie_app_services::grid_replace::ReplaceAcknowledgement,
+                bookie_app_services::grid_replace::ReplaceApplyError,
+            >,
+        >,
+    },
     FilterByValue {
         column: String,
         value: bookie_core::Value,
         exclude: bool,
     },
     ShowToast(String),
+    HighlightRulesChanged,
     GoToReference {
         column: String,
         row: Vec<(String, Value)>,
@@ -92,6 +104,7 @@ pub enum BrowseTabInput {
     GridExportStreamedResults(crate::ui::export_dialog::StreamExportRequest),
     Undo,
     Redo,
+    FocusGrid,
     CommitSave,
     PreviewSql,
     DiscardAll,

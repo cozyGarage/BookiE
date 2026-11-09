@@ -17,6 +17,8 @@ use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use tokio_util::sync::CancellationToken;
 
+#[path = "catalog_exclusion_scale.rs"]
+mod catalog_exclusion_scale;
 #[path = "support/session_time_zone.rs"]
 mod session_time_zone;
 #[path = "support/shared_container.rs"]

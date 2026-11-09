@@ -4,6 +4,34 @@ use uuid::Uuid;
 
 use super::{OpenMode, SessionTeardownAction};
 
+#[derive(Debug, Clone)]
+pub enum CatalogDdlMsg {
+    NewSchemaPrompt,
+    CreateSchemaConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        name: String,
+    },
+    DropSchemaPrompt {
+        schema: String,
+    },
+    DropSchemaConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: String,
+    },
+    NewDatabasePrompt,
+    CreateDatabaseConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        name: String,
+    },
+    DropDatabasePrompt {
+        database: String,
+    },
+    DropDatabaseConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
+        database: String,
+    },
+}
+
 #[derive(Debug)]
 pub enum AppMsg {
     OpenConnect,
@@ -41,6 +69,7 @@ pub enum AppMsg {
     ReloadConnections,
     ConnectionsLoaded(Vec<SavedConnection>),
     OpenSaved(SavedConnection),
+    FocusWorkingSession(Uuid),
     LoadDatabases,
     DatabasesLoaded {
         origin: crate::services::catalog::CatalogOrigin,
@@ -168,6 +197,7 @@ pub enum AppMsg {
     ExportJson,
     ExportAllCsv,
     ExportAllJson,
+    ExportFrontResults,
     ExportResults {
         scope: crate::ui::export_dialog::ExportScope,
         result: std::sync::Arc<QueryResult>,
@@ -215,6 +245,8 @@ pub enum AppMsg {
     SaveCompletedForTab(Uuid, Uuid, Option<String>),
     SaveFailedForTab(Uuid, Uuid, String),
     FlashErrorRowForTab(Uuid, crate::services::change_tracker::StatementSource),
+    FocusActiveGrid,
+    FocusActiveEditor,
     SaveActiveBrowseTab,
     SaveActiveBrowseTabById(Uuid),
     UndoActiveBrowseTab,
@@ -225,6 +257,7 @@ pub enum AppMsg {
     },
     ShowToast(String),
     BrowseTabDirtyChanged(Uuid, bool),
+    EditorResultDirtyChanged(Uuid, bool),
     ToggleSidebarGroup(String),
     SidebarSearchChanged,
     RefreshSidebar,
@@ -280,6 +313,7 @@ pub enum AppMsg {
         schema: Option<String>,
         table: String,
     },
+    CatalogDdl(CatalogDdlMsg),
     ExecuteStructureTransaction {
         tab_id: Uuid,
         statements: Vec<String>,

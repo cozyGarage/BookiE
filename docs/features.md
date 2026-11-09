@@ -1,6 +1,6 @@
-# BookiE features on `linux`
+# BookiE features
 
-This page describes current behavior on the `linux` branch. Published artifact versions and package requirements are listed in [platforms](platforms.md). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
+This page describes current BookiE behavior. Published artifact versions and package requirements are listed in [platforms](platforms.md). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
 
 ## Databases
 
@@ -14,6 +14,7 @@ This page describes current behavior on the `linux` branch. Published artifact v
 | MongoDB | Experimental | Collections, find and aggregate. An optional authentication database can be set. |
 | Redis | Experimental | One host and port. Sentinel and Cluster are not supported. |
 | DuckDB | Experimental | Built in. |
+| Oracle Database | Experimental | Read-only browsing and SELECT queries over plain TCP. TLS, writes and server-side cancel are not available. |
 
 Drivers are linked at build time. There is no plugin system ([ADR 0001](decisions/0001-no-plugin-system.md)).
 
@@ -31,7 +32,8 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - The sidebar Catalog group lists functions, procedures and triggers (and the other catalog kinds the engine supports). Click a kind to load its objects under it, up to 200 shown; schemas hidden in the sidebar filter stay hidden. Click an object, or "Show all in Catalog…", to open the Catalog dialog on that kind.
 - A connection can be filled from a URL such as `postgres://user@host:5432/db`.
 - Connections can be exported and imported. An export encrypted with a passphrase includes stored credentials. A plaintext export contains none.
-- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app (Redis Desktop Manager) `connections.json` and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver folders become a connection group when present.
+- Connection drafts can be imported from DBeaver `data-sources.json`, DataGrip `dataSources.xml`, Navicat `.ncx`, RESP.app (Redis Desktop Manager) `connections.json` and Another Redis Desktop Manager exports. Host, user and engine are filled; passwords are never read from those files. Save each draft to store credentials in Secret Service. DBeaver and DataGrip folders become nested connection groups when present.
+- Saved connections can live in nested groups (for example `Prod / EU`). The welcome list shows the hierarchy and can collapse or expand each folder. Organisation stays in the local sidecar beside `connections.json`; connection files never gain secrets.
 
 ## Browse and edit tables
 
@@ -46,7 +48,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
 - NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL. Sparse document fields that an object lacks show as (missing) and remain distinct from NULL.
 - The header shows each column's type. Primary key columns have a key mark, foreign key columns a link mark, and a column comment appears under the name.
-- Filter with the filter bar, and save filters by name per table. Sort by clicking a header.
+- Filter with the filter bar, and save filters by name per table. Sort by clicking a header; click further headers to add local secondary sort keys on the loaded page, and clear sort from the header menu or pager.
 - Foreign key navigation is bidirectional: **Go to Referenced Row** opens the parent table, and **Show Referencing Rows** navigates to matching child records in referencing tables with pre-populated filters.
 - Copy selections in multiple formats: CSV, CSV with headers, Markdown, Text Table (aligned ASCII borders with right-aligned numeric cells), JSON Lines, and Values List (SQL multi-row tuples with dialect-specific syntax).
 - Hide and reorder columns, and reset dragged column widths. The choice is remembered per table.
@@ -66,13 +68,13 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
   <img alt="The SQL editor in BookiE, with query result below" src="images/sql-editor-light.png" width="100%">
 </picture>
 
-- Ctrl+E opens an editor tab. Ctrl+Enter runs the selected text, or the whole script when nothing is selected. Ctrl+Shift+Enter runs the statement at the cursor. Escape cancels a running query when the server supports it.
-- Syntax highlighting, code folding and a side-by-side split of the same query.
+- Ctrl+E opens an editor tab. Ctrl+Enter runs the selected text, or the whole script when nothing is selected. Ctrl+Shift+Enter runs the statement at the cursor. Escape cancels a running query when the server supports it. Ctrl+Alt+G focuses the active query or browse result grid (and reopens a hidden Results panel); Ctrl+Alt+E returns focus to the SQL editor.
+- Syntax highlighting, code folding, line bookmarks and a side-by-side split of the same query.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
 - Bound parameters: Write `:name` in queries; BookiE prompts for typed values before execution without string concatenation.
 - Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL. The first page stays selected while rows arrive, and the result shows whether it is receiving, complete or incomplete. The newest page and the page currently being viewed remain in memory while later pages arrive; if a stream times out or is cancelled, received pages stay selected. After successful completion, Export all rows reads the stored result without executing the query again.
-- Local sort and filter: Sorting and filtering loaded query results are local and do not re-execute SQL.
-- Whole-result Find and Filter: Once a streamed result is complete, **Find in all rows** searches every saved page in the background (up to 10,000 matches, with Cancel), steps through matches with the match buttons and loads the page that holds each one. **Show matching rows** copies the matching rows into a new encrypted result with its own paging, continuous scrolling, pinning and Export all rows. Neither runs SQL again.
+- Local sort and filter: Sorting and filtering loaded query results are local and do not re-execute SQL. Multiple column headers stack as local sort keys on the loaded rows; clear sort restores load order.
+- Whole-result Find and Filter: Once a streamed result is complete, **Find in all rows** searches every saved page in the background (up to 10,000 matches, with Cancel), with match case, whole words, regular expression and column scope. It steps through matches with the match buttons and loads the page that holds each one. **Show matching rows** copies the matching rows into a new encrypted result with its own paging, continuous scrolling, pinning and Export all rows. Neither runs SQL again. Page-local Replace for keyed editable text cells is available from **Find in Loaded Rows**.
 - Cell filter: the cell menu of a completed streamed result filters all saved rows to those equal, or not equal, to the cell's exact typed value.
 - Compare results: **Compare…** diffs two complete results from one connection. Without a key it compares whole rows and ignores order; with chosen key columns it also shows changed rows as Before and After and highlights the cells that changed. NULL, empty text and empty bytes stay different, and a comparison records an entry in the audit journal.
 - Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
@@ -108,7 +110,7 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook.
+- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook. Ctrl+Shift+E exports the front tab's shown rows.
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
 - Import CSV into an existing table, or create a new table from a CSV file. Separator, header row and column mapping are detected and can be changed. The quote character, backslash escaping and file encoding (UTF-8, Windows-1252, UTF-16) can be set.
 - Import accepts Excel `.xlsx` files. The first worksheet with data is read.

@@ -46,6 +46,22 @@ pub(super) fn install_window_actions(
     sender: ComponentSender<App>,
 ) -> gio::SimpleAction {
     let group = gio::SimpleActionGroup::new();
+    add_window_input_actions(&group, window, sender.clone());
+    group.add_action(&show_audit_operation_action(sender.clone()));
+    group.add_action(&focus_working_session_action(sender.clone()));
+    let disconnect_action = install_disconnect_action(&group, &sender);
+    crate::ui::leak_probe::install(&group);
+    window.insert_action_group("win", Some(&group));
+    disconnect_action.set_enabled(false);
+    tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
+    disconnect_action
+}
+
+fn add_window_input_actions(
+    group: &gio::SimpleActionGroup,
+    window: &adw::ApplicationWindow,
+    sender: ComponentSender<App>,
+) {
     macro_rules! input_action {
         ($name:expr, $msg:expr) => {{
             let s = sender.clone();
@@ -94,17 +110,33 @@ pub(super) fn install_window_actions(
         input_action!("back-up-database", AppMsg::BackUpDatabase),
         input_action!("restore-database", AppMsg::RestoreDatabase),
     ]);
-    let show_audit_for = show_audit_operation_action(sender.clone());
-    group.add_action(&show_audit_for);
-    let disconnect_action = gio::SimpleAction::new("disconnect", None);
-    let disconnect_sender = sender.clone();
-    disconnect_action.connect_activate(move |_, _| disconnect_sender.input(AppMsg::Disconnect));
-    group.add_action(&disconnect_action);
-    crate::ui::leak_probe::install(&group);
-    window.insert_action_group("win", Some(&group));
-    disconnect_action.set_enabled(false);
-    tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
-    disconnect_action
+    group.add_action_entries([
+        input_action!("focus-grid", AppMsg::FocusActiveGrid),
+        input_action!("focus-editor", AppMsg::FocusActiveEditor),
+        input_action!("export-results", AppMsg::ExportFrontResults),
+    ]);
+}
+
+fn install_disconnect_action(group: &gio::SimpleActionGroup, sender: &ComponentSender<App>) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("disconnect", None);
+    let sender = sender.clone();
+    action.connect_activate(move |_, _| sender.input(AppMsg::Disconnect));
+    group.add_action(&action);
+    action
+}
+
+fn focus_working_session_action(sender: ComponentSender<App>) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("focus-working-session", Some(&String::static_variant_type()));
+    action.connect_activate(move |_, parameter| {
+        let Some(connection_id) = parameter
+            .and_then(|parameter| parameter.str())
+            .and_then(|value| uuid::Uuid::parse_str(value).ok())
+        else {
+            return;
+        };
+        sender.input(AppMsg::FocusWorkingSession(connection_id));
+    });
+    action
 }
 
 fn show_audit_operation_action(sender: ComponentSender<App>) -> gio::SimpleAction {
@@ -138,12 +170,15 @@ pub(super) const WINDOW_SHORTCUTS: &[(&str, &str)] = &[
     ("<Primary><Shift>l", "win.reveal-in-sidebar"),
     ("<Primary>d", "win.save-favorite"),
     ("<Primary><Shift>b", "win.show-saved-queries"),
+    ("<Primary><Alt>g", "win.focus-grid"),
+    ("<Primary><Alt>e", "win.focus-editor"),
     ("<Primary>s", "win.save-changes"),
     ("<Primary><Shift>s", "win.save-file-as"),
     ("<Primary>z", "win.undo-change"),
     ("<Primary>y", "win.redo-change"),
     ("<Primary><Shift>z", "win.redo-change"),
     ("<Primary><Shift>t", "win.reopen-closed-tab"),
+    ("<Primary><Shift>e", "win.export-results"),
 ];
 
 pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
@@ -204,6 +239,7 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary><Shift>l", crate::tr!("Reveal the open table in the sidebar")),
             ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
             ("<Primary><Shift>b", crate::tr!("Manage saved queries")),
+            ("<Primary><Shift>e", crate::tr!("Export Results")),
             ("<Primary>question", crate::tr!("Show keyboard shortcuts")),
             ("<Primary>q", crate::tr!("Quit")),
         ],
@@ -249,12 +285,17 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &dialog,
         &crate::tr!("SQL editor"),
         &[
+            ("<Primary><Alt>g", crate::tr!("Focus result grid")),
+            ("<Primary><Alt>e", crate::tr!("Focus SQL editor")),
             ("<Primary>Return", crate::tr!("Run query")),
             ("<Primary><Shift>Return", crate::tr!("Run statement at cursor")),
             ("<Primary><Shift>s", crate::tr!("Save the SQL file as")),
             ("<Primary>slash", crate::tr!("Toggle line comment")),
             ("<Primary><Shift>bracketleft", crate::tr!("Fold SQL block at cursor")),
             ("<Primary><Shift>bracketright", crate::tr!("Unfold all SQL blocks")),
+            ("<Primary>F2", crate::tr!("Toggle bookmark on the current line")),
+            ("<Primary><Shift>Down", crate::tr!("Jump to the next bookmark")),
+            ("<Primary><Shift>Up", crate::tr!("Jump to the previous bookmark")),
             ("<Primary>t", crate::tr!("New editor tab")),
             ("<Primary>w", crate::tr!("Close current tab or window")),
             ("<Primary>Tab", crate::tr!("Switch to the most recently used tab")),
@@ -338,7 +379,10 @@ mod window_shortcut_tests {
         "<Primary>slash",
         "<Primary>Return",
         "<Primary><Shift>Return",
+        "<Primary>F2",
         "<Primary><Shift>f",
+        "<Primary><Shift>Up",
+        "<Primary><Shift>Down",
         "<Primary><Shift>bracketleft",
         "<Primary><Shift>bracketright",
     ];

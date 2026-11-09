@@ -40,7 +40,7 @@ Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables
 
 - **Edit cells**: Double-click or press F2/Enter. Changes remain pending (marked with a dot on the tab) until saved with `Ctrl+S`. Preview the exact SQL changes before saving. Undo and redo with `Ctrl+Z` / `Ctrl+Y`.
 - **Insert and delete**: Press `Ctrl+N` to insert a row, `Delete` to remove selected rows, and `Ctrl+Shift+N` to set a cell to NULL.
-- **Filter and sort**: Press `Ctrl+F` to open the structured filter bar. The WHERE field, **Saved filters** menu, **Clear all**, and **Apply** share one row, with the rule editor available under disclosure. Save named filter presets per table. Right-click any cell to **Filter by This Value**. Click column headers to sort.
+- **Filter and sort**: Press `Ctrl+F` to open the structured filter bar. The WHERE field, **Saved filters** menu, **Clear all**, and **Apply** share one row, with the rule editor available under disclosure. Save named filter presets per table. Right-click any cell to **Filter by This Value**. Click a column header to sort; click the same header again to reverse that key. Click another header to add a secondary local sort key on the loaded rows (the previous key becomes a tie-breaker). The active keys appear in order above the grid or on the browse pager; **Clear sort** (header menu or pager) removes them. Query-result sort stays local and does not re-run SQL.
 - **Foreign key jumps**: Right-click a foreign key cell and choose **Go to Referenced Row** to open the target table filtered to that specific record.
 - **Referencing rows**: Right-click a saved row in a table with detected incoming foreign keys and choose **Show Referencing Rows** to open matching child records with pre-populated filters. The action is unavailable for new draft rows; referenced values must be present and non-NULL.
 - **Copy as formats**: Right-click a row selection and choose **Copy as** to copy complete selected rows as **CSV**, **CSV (with headers)**, **Markdown**, **Text Table** (aligned ASCII borders with right-aligned numeric cells), **JSON Lines** (newline-delimited JSON objects), or **Values List** (multi-row SQL tuples with engine-specific escaping).
@@ -60,13 +60,14 @@ Right-click a schema, or a table, in the sidebar and choose **Show ER Diagram**.
   <img alt="BookiE SQL editor with query results in the light theme" src="images/sql-editor-light.png" width="100%">
 </picture>
 
-In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+Alt+F** opens **Find in Loaded Rows**. **Ctrl+Home** and **Ctrl+End** navigate to the first and last loaded rows.
+In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+Alt+F** opens **Find in Loaded Rows**. The dialog supports match case, whole words, regular expressions and a column scope. On keyed editable grids it also offers Replace and Replace all for text cells; read-only and undecodable cells are skipped and counted. **Ctrl+Home** and **Ctrl+End** navigate to the first and last loaded rows.
 
 ### Editor controls
 
 - **Open editor**: Press `Ctrl+E` or `Ctrl+T` to open a SQL tab.
 - **Split editor**: Click **Split** in the toolbar to edit side-by-side with shared carets and independent scroll.
 - **Code folding**: Press `Ctrl+Shift+[` inside any block to fold it; `Ctrl+Shift+]` or the gutter markers unfold blocks.
+- **Line bookmarks**: Press `Ctrl+F2` to bookmark or clear the current line. Press `Ctrl+Shift+Down` or `Ctrl+Shift+Up` to jump between bookmarks in this editor. The bookmark toolbar menu can clear every bookmark in the buffer.
 - **Autocompletion**: Context-aware suggestions for keywords, schemas, tables, and columns.
 - **Bound parameters**: Write `:name` in your query; BookiE prompts for typed values before execution without string concatenation.
 
@@ -85,7 +86,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **Encrypted disk spool**: Evicted pages write to a local encrypted spool (up to 4,096 pages, 1 GiB quota), keeping earlier pages navigable via **Previous page** without re-running the query.
 - **Export all rows** is available once the query completes and reads the saved result without running the SQL again. For an incomplete result, export the available page instead.
 - After a streamed query completes, **Continuous scrolling** switches from the page controls to a single scrollable grid. Pages load from temporary storage as rows come into view. The grid can retain two visible pages over its 64 MiB estimated row budget; if the visible range needs more memory, it offers the page view. If a page cannot be loaded, use **Retry loading pages** or return to the page view. Find in Loaded Rows is available in the page view.
-- A completed streamed result also has **Find in all rows** in its header. Type text and press Enter to search every saved page in the background; use the match buttons to step through up to 10,000 matches; a jump selects the matching row even when the page is sorted locally. **Show matching rows** opens the matches as a new result that you can page through, pin and export. **Cancel** stops a running search. Cells that cannot be read are skipped and counted, and NULL never matches text.
+- A completed streamed result also has **Find in all rows** in its header. Type text and press Enter to search every saved page in the background; use match case, whole words, regular expression and column scope as needed; use the match buttons to step through up to 10,000 matches; a jump selects the matching row even when the page is sorted locally. **Show matching rows** opens the matches as a new result that you can page through, pin and export. **Cancel** stops a running search. Cells that cannot be read are skipped and counted, and NULL never matches text. Replace stays on the loaded page through **Find in Loaded Rows**, not through the spool.
 - In a completed streamed result, right-click a cell and choose **Show All Rows Equal to This Value** or **Show All Rows Not Equal to This Value** to filter every saved page by that exact value, with the same new result as **Show matching rows**. The match is exact and typed: a NULL cell matches only NULL, empty text only empty text, and "not equal" keeps NULL rows. Values that cannot be read are refused. The older **Filter by This Value** still filters only the loaded page.
 - **Compare…** in the editor toolbar compares two complete results from this connection. Pick the left and right result, optionally tick the key columns, and choose **Compare**. Without a key, whole rows are compared and row order is ignored. With a key, a changed row appears as a **Before** and **After** pair, and the cells whose value changed are highlighted (and described as Changed to screen readers) in both rows. The key must be unique and have no NULL values. Values hidden by policy masking compare as the text shown. The comparison reads saved results only, shows at most 100,000 differing rows or 64 MiB of them, whichever comes first (counts stay exact), and writes an entry to the audit journal. A comparison that cannot run, such as one with a duplicate or NULL key, keeps the dialog open with the reason so you can pick another key. **Compare…** is reachable with Tab and Enter. Results whose columns share a name, as in a join that returns two `id` columns, cannot be compared yet.
 - Other statement shapes and database engines load capped results.
@@ -104,7 +105,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- **Export**: Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). Full-table unindexed snapshot exports remain unavailable until a consistent snapshot path is supported.
+- **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab's shown rows. Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). Full-table unindexed snapshot exports remain unavailable until a consistent snapshot path is supported.
 - **Import**: Right-click any table and choose **Import CSV…**, or import from a schema header to create a new table. Excel `.xlsx` files read the first populated sheet. Delimiters, headers, encodings (UTF-8, Windows-1252, UTF-16), and column mappings are detected automatically and can be remembered per table.
 
 ## Safety
@@ -195,18 +196,23 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+Shift+L | Reveal the open table in the sidebar |
 | Ctrl+D | Save query as favorite |
 | Ctrl+Shift+B | Open saved queries (favorites) |
+| Ctrl+Shift+E | Export results from the front tab |
+| Ctrl+Alt+G | Focus the active result grid (reopens a hidden Results panel) |
+| Ctrl+Alt+E | Focus the SQL editor |
 | Ctrl+P | Open Quickly |
 | Ctrl+H | Query history |
 | Ctrl+Tab | Most recently used tab |
 | Ctrl+/ | Toggle a line comment |
 | Ctrl+Shift+[ | Fold the SQL block at the cursor |
 | Ctrl+Shift+] | Unfold all SQL blocks |
+| Ctrl+F2 | Toggle a bookmark on the current line |
+| Ctrl+Shift+Down / Up | Jump to the next or previous bookmark |
 | F5 | Refresh the table |
 | Ctrl+W | Close the tab |
 
 ### Results panel
 
-Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Results** and **Errors** are one switcher with the active view marked: choosing **Results** while Errors is shown returns to the existing result selector, and choosing it again hides the panel. **Errors** shows a count only when the latest run failed, and lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
+Each SQL editor keeps its own bottom panel. **Results** or **Ctrl+J** hides or shows it from the SQL editor or result grid. Hiding preserves the loaded rows, selection and current result set; it does not run SQL. **Ctrl+Alt+G** focuses the visible result grid for the selected query or browse tab and reopens a hidden Results panel; **Ctrl+Alt+E** returns focus to the SQL editor. Neither chord runs a query. **Results** and **Errors** are one switcher with the active view marked: choosing **Results** while Errors is shown returns to the existing result selector, and choosing it again hides the panel. **Errors** shows a count only when the latest run failed, and lists failures from the latest completed run, including streamed failures and timeouts; informational server messages are not implemented by this panel.
 
 Drag the divider to resize the panel. **Maximize results** hides the SQL area; **Restore editor** returns to the previous divider position and SQL focus. Hiding a maximized panel also restores the editor. Panel size is retained within the open editor, not across an application restart. Closing the query releases its panel with the rest of that editor.
 

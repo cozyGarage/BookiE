@@ -1,16 +1,14 @@
 pub use bookie_app_services::{
-    approval_wait, column_widths, config_io, connection_form, filter_settings, ordered_refresh, read_scopes,
-    recent_tabs, request_generation, single_flight, state_file,
+    approval_wait, catalog, column_widths, config_io, connection_form, connection_save_turn, connection_service,
+    database_service, ordered_refresh, read_scopes, recent_tabs, request_generation, single_flight, state_file,
 };
+
+#[cfg(test)]
+pub use bookie_app_services::filter_settings;
 pub mod approval_router;
 pub mod audit_view;
-pub mod catalog;
 pub mod change_tracker;
-pub mod connection_monitor;
-pub mod connection_save_turn;
-pub mod connection_service;
 pub mod csv_import_mappings;
-pub mod database_service;
 pub(crate) mod driver_diagnostics;
 pub(crate) mod error_text;
 pub mod export_pages;

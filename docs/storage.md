@@ -39,13 +39,14 @@ graph TD
 | Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/bookie/connections.json` |
 | Preferences | GSettings with JSON rollback mirror | `com.bookie.linux` and `$XDG_CONFIG_HOME/bookie/preferences.json` |
 | Window state | GSettings geometry with JSON rollback mirror | `com.bookie.linux` and `$XDG_CONFIG_HOME/bookie/window.json` |
+| Open sessions (multi-window restore keys) | JSON | `$XDG_CONFIG_HOME/bookie/open-sessions.json` |
 | Workspace tabs | JSON | `$XDG_CONFIG_HOME/bookie/workspace_state.json` |
 | Column widths | JSON | `$XDG_CONFIG_HOME/bookie/column_widths.json` |
 | Table filters | JSON | `$XDG_CONFIG_HOME/bookie/filter_settings.json` |
 | Hidden columns, column order | JSON | `$XDG_CONFIG_HOME/bookie/hidden_columns.json`, `$XDG_CONFIG_HOME/bookie/column_order.json` |
 | Named filter presets | JSON | `$XDG_CONFIG_HOME/bookie/named_filter_presets.json` |
 | CSV import column mappings | JSON | `$XDG_CONFIG_HOME/bookie/csv_import_mappings.json` |
-| Connection organization (groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/bookie/connection-organization.json` |
+| Connection organization (nested groups, tags, favorite flag) | JSON, beside `connections.json` | `$XDG_CONFIG_HOME/bookie/connection-organization.json` |
 | Query favorites | Versioned JSON | `$XDG_CONFIG_HOME/bookie/favorites.json` |
 | Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/bookie/history.db` |
 | Policy | TOML | `$XDG_CONFIG_HOME/bookie/policy.toml` |
@@ -73,6 +74,8 @@ Connection records contain host, port, database, username, TLS mode, read-only s
 Application services own preferences, window state, workspace state, column widths, and table filters. They read from the XDG config directory. Failure behavior varies by store; unreadable persisted state must not be assumed to reset safely to defaults. Preferences and window geometry use GSettings when its schema is installed; the development build has a separate `com.bookie.linux.Devel` schema. The last connection id remains in `window.json`. On first use, legacy `preferences.json` and `window.json` are copied to private `*.before-gsettings.json` files before migration. Every later save also writes the JSON files, so an older package can read current values after rollback. Preferences validate migration writes by reading them back, refuse future migration versions, and block edits when a legacy source is malformed. A failed JSON mirror write rolls back the preferences update. Cargo compiles the same schema used by packages for source-tree runs. If the schema is unavailable, the JSON files remain the source of both settings. To restore the original pre-migration values, copy `preferences.before-gsettings.json` over `preferences.json` after closing BookiE, then restart the newer package; it imports the restored JSON values. For window state, use the matching `window.before-gsettings.json` backup and reset `window-migrated`.
 
 Window state stores size, maximize flag, and the last connection id. Closing a window keeps that id so the next launch can reopen the same connection. An explicit disconnect or deleting that saved connection clears it. Geometry writes do not drop the last connection id.
+
+ADR 0040 defines an open-session record with saved connection keys grouped by window, and `bookie-app-services::window_sessions` provides its headless model and parser. Runtime persistence and multi-session startup restoration are not wired yet: the app still saves one `last_connection_id` in `window.json` and restores only that connection. This remains open in [#2499](https://github.com/cozyGarage/BookiE/issues/2499). Per-connection workspace tab records remain keyed by saved connection id below; ADR 0040 does not rewrite that format.
 
 Workspace state is keyed by connection UUID and limited before it is written. Unknown tab variants deserialize as `Unknown` and are dropped during restore. This lets an older build ignore a newer tab kind without rejecting the whole workspace file. Editor bodies are separate private draft files. Individual file replacements are atomic, but a workspace save is not atomic across all draft files and metadata: a later failure can leave an earlier draft updated ([#1821](https://github.com/cozyGarage/BookiE/issues/1821)). Prefetch currently loads all saved connections, so one unreadable draft can prevent restoring an unrelated requested workspace ([#1822](https://github.com/cozyGarage/BookiE/issues/1822)).
 

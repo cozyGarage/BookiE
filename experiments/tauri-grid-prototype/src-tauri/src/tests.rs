@@ -1,5 +1,36 @@
 use super::*;
 
+#[test]
+fn display_payloads_are_bounded_while_the_original_cell_keeps_exact_text_and_bytes() {
+    for value in [
+        Value::Text("💾".repeat(1_000_000)),
+        Value::Text("\0".repeat(1_000_000)),
+        Value::JsonText(format!("{{ \"payload\":  \"{}\" }}", "x".repeat(1_000_000))),
+        Value::Bytes(vec![0xab; 1_000_000]),
+        Value::Json(Box::new(serde_json::json!({"payload": "x".repeat(1_000_000)}))),
+    ] {
+        let display = display_cell(value.clone()).unwrap();
+        assert!(serde_json::to_vec(&display).unwrap().len() < 4096);
+        assert!(display.value.as_ref().unwrap().capacity() <= 8192);
+        assert!(display.previewed);
+        assert!(display.value.as_ref().unwrap().contains('…'));
+        let original = cell(value).unwrap();
+        assert!(!original.previewed);
+        assert!(original.value.unwrap().len() > 4096);
+    }
+}
+
+#[test]
+fn exact_cell_requests_validate_coordinates_and_return_the_original_synthetic_value() {
+    let exact = full_cell(9, 3, Some(150_000)).unwrap();
+    assert_eq!(exact.kind, "json_text");
+    assert_eq!(exact.value.as_deref(), Some("{\"raw\":  1,   \"keep\" : 2}"));
+    assert!(!exact.previewed);
+    assert!(full_cell(150_000, 0, Some(150_000)).is_err());
+    assert!(full_cell(0, 4, None).is_err());
+    assert!(full_cell(0, 0, Some(42)).is_err());
+}
+
 fn predicate(column: &str, op: &str, text: &str) -> Predicate {
     Predicate {
         column: column.into(),

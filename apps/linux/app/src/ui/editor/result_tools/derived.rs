@@ -87,9 +87,11 @@ pub(in crate::ui::editor) fn derived_outcome(
     needle: &str,
 ) -> StatementOutcome {
     let generation = next_generation();
+    let label = preview(needle);
     StatementOutcome {
         identity: identity(source_identity, needle, generation),
-        sql_preview: preview(needle),
+        sql_preview: label.clone(),
+        sql: label,
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(derived_result(source, filtered, generation))),
         pinned: true,

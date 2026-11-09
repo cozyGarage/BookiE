@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::Range;
 
 use crate::ui_theme::ThemeExt;
@@ -8,6 +9,13 @@ use gpui::{
     UnderlineStyle, Window, actions, div, fill, hsla, point, prelude::*, px, relative, rgb, rgba, size,
 };
 use unicode_segmentation::*;
+
+fn single_line_text(text: &str) -> Cow<'_, str> {
+    if text.contains('\n') {
+        return Cow::Owned(text.replace('\n', " "));
+    }
+    Cow::Borrowed(text)
+}
 
 actions!(
     text_input,
@@ -94,8 +102,8 @@ impl TextInput {
     }
 
     pub fn set_content(&mut self, text: &str, cx: &mut Context<Self>) {
-        self.content = text.to_string().into();
-        self.selected_range = text.len()..text.len();
+        self.content = single_line_text(text).into_owned().into();
+        self.selected_range = self.content.len()..self.content.len();
         self.selection_reversed = false;
         self.marked_range = None;
         cx.emit(InputEvent::Changed);
@@ -183,7 +191,7 @@ impl TextInput {
 
     fn paste(&mut self, _: &Paste, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
-            self.replace_text_in_range(None, &text.replace("\n", " "), window, cx);
+            self.replace_text_in_range(None, &text, window, cx);
         }
     }
 
@@ -340,13 +348,15 @@ impl EntityInputHandler for TextInput {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let new_text = single_line_text(new_text);
         let range = range_utf16
             .as_ref()
             .map(|range_utf16| self.range_from_utf16(range_utf16))
             .or(self.marked_range.clone())
             .unwrap_or(self.selected_range.clone());
 
-        self.content = (self.content[0..range.start].to_owned() + new_text + &self.content[range.end..]).into();
+        self.content =
+            (self.content[0..range.start].to_owned() + new_text.as_ref() + &self.content[range.end..]).into();
         self.selected_range = range.start + new_text.len()..range.start + new_text.len();
         self.marked_range.take();
         cx.emit(InputEvent::Changed);
@@ -361,13 +371,15 @@ impl EntityInputHandler for TextInput {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let new_text = single_line_text(new_text);
         let range = range_utf16
             .as_ref()
             .map(|range_utf16| self.range_from_utf16(range_utf16))
             .or(self.marked_range.clone())
             .unwrap_or(self.selected_range.clone());
 
-        self.content = (self.content[0..range.start].to_owned() + new_text + &self.content[range.end..]).into();
+        self.content =
+            (self.content[0..range.start].to_owned() + new_text.as_ref() + &self.content[range.end..]).into();
         if !new_text.is_empty() {
             self.marked_range = Some(range.start..range.start + new_text.len());
         } else {
@@ -375,8 +387,10 @@ impl EntityInputHandler for TextInput {
         }
         self.selected_range = new_selected_range_utf16
             .as_ref()
-            .map(|range_utf16| self.range_from_utf16(range_utf16))
-            .map(|new_range| new_range.start + range.start..new_range.end + range.end)
+            .map(|selection| {
+                let start = self.offset_to_utf16(range.start);
+                self.range_from_utf16(&(start + selection.start..start + selection.end))
+            })
             .unwrap_or_else(|| range.start + new_text.len()..range.start + new_text.len());
 
         cx.emit(InputEvent::Changed);

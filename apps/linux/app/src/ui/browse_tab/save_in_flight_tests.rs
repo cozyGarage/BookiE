@@ -6,6 +6,8 @@ use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
 use uuid::Uuid;
 
+mod replace_batch_tests;
+
 pub(super) fn column(name: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
         name: name.into(),
@@ -67,6 +69,7 @@ pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<Br
             persistence: crate::services::persistence_stores::PersistenceStores {
                 column_widths: None,
                 filter_settings: None,
+                highlight_settings: None,
                 csv_import_mappings: None,
                 named_filter_presets: None,
             },

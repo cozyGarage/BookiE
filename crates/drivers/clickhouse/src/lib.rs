@@ -235,7 +235,6 @@ impl Connection for ClickhouseConnection {
                 "SELECT
                     name,
                     type,
-                    is_in_primary_key,
                     default_kind,
                     default_expression,
                     comment
@@ -585,7 +584,6 @@ struct CatalogColumnRow {
     name: String,
     #[serde(rename = "type")]
     data_type: String,
-    is_in_primary_key: u8,
     default_kind: String,
     default_expression: String,
     comment: String,
@@ -605,11 +603,7 @@ fn catalog_row_to_column_info(r: CatalogColumnRow) -> ColumnInfo {
         nullable: type_is_nullable(&r.data_type),
         name: r.name,
         data_type: r.data_type,
-        // A MergeTree sorting key is the closest thing to a row
-        // identifier ClickHouse has, but it is not unique. The edit
-        // path needs *some* key to build a WHERE from; see
-        // `fetch_indexes` for why it is not advertised as unique.
-        primary_key: r.is_in_primary_key != 0,
+        primary_key: false,
         is_auto_increment: false,
         default_value,
         is_generated,

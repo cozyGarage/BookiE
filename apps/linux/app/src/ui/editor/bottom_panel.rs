@@ -79,12 +79,12 @@ impl BottomPanel {
         let controller = gtk::ShortcutController::new();
         controller.set_scope(gtk::ShortcutScope::Local);
         controller.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let sender = sender.clone();
+        let toggle_sender = sender.clone();
         controller.add_shortcut(
             gtk::Shortcut::builder()
                 .trigger(&crate::ui::shortcut::parse("<Primary>j"))
                 .action(&gtk::CallbackAction::new(move |_, _| {
-                    sender.input(SqlEditorInput::Panel(PanelAction::Toggle));
+                    toggle_sender.input(SqlEditorInput::Panel(PanelAction::Toggle));
                     gtk::glib::Propagation::Stop
                 }))
                 .build(),
@@ -137,6 +137,28 @@ impl BottomPanel {
         } else if !self.stack.child_focus(gtk::DirectionType::TabForward) {
             self.stack.grab_focus();
         }
+    }
+
+    pub(super) fn focus_result_grid(&self) {
+        let mut state = self.state.get();
+        state.show(true);
+        self.state.set(state);
+        self.stack.set_visible_child_name("results");
+        self.layout();
+        if focus_mapped_grid(self.stack.upcast_ref()) {
+            return;
+        }
+        let stack = self.stack.downgrade();
+        gtk::glib::idle_add_local_once(move || {
+            if let Some(stack) = stack.upgrade() {
+                focus_mapped_grid(stack.upcast_ref());
+            }
+        });
+    }
+
+    pub(super) fn focus_editor(&self) {
+        self.reveal_editor();
+        self.restore_focus();
     }
 
     pub(super) fn reveal_editor(&self) {
@@ -311,4 +333,21 @@ fn outcome_error(outcome: &StatementOutcome) -> Option<super::StatementFailure> 
         },
         _ => None,
     }
+}
+
+fn focus_mapped_grid(widget: &gtk::Widget) -> bool {
+    if !widget.is_mapped() {
+        return false;
+    }
+    if widget.is::<gtk::ColumnView>() {
+        return widget.grab_focus();
+    }
+    let mut child = widget.first_child();
+    while let Some(current) = child {
+        if focus_mapped_grid(&current) {
+            return true;
+        }
+        child = current.next_sibling();
+    }
+    false
 }

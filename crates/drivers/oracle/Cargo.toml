@@ -1,0 +1,28 @@
+[package]
+name = "bookie-driver-oracle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "drivers_oracle"
+path = "src/lib.rs"
+
+[dependencies]
+bookie-core = { path = "../../core" }
+async-trait.workspace = true
+chrono.workspace = true
+oracledb = "=26.0.0-beta.5"
+rust_decimal.workspace = true
+secrecy.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["net", "time"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
+testcontainers.workspace = true
+
+[lints]
+workspace = true

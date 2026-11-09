@@ -662,6 +662,7 @@ fn build_menu(
     actions.append(Some(&crate::tr!("Columns…")), Some("grid.columns"));
     actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
     actions.append(Some(&crate::tr!("Find in Loaded Rows…")), Some("grid.find-row"));
+    actions.append(Some(&crate::tr!("Highlight Rules…")), Some("grid.highlight-rules"));
     if row_operations {
         actions.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
         actions.append(Some(&crate::tr!("Duplicate row")), Some("cell.duplicate-row"));
@@ -976,7 +977,7 @@ fn copy_value_text(widget: &gtk::Widget, row: Option<&crate::ui::row_object::Row
         if let Some(text) = row
             .and_then(|row| row.cell_value_in_row(col))
             .as_ref()
-            .map(super::display::value_to_full_edit_text)
+            .map(super::display::value_to_copy_text)
         {
             return text;
         }

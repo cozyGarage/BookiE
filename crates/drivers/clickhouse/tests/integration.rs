@@ -25,8 +25,7 @@ mod non_utf8;
 #[path = "support/temporal.rs"]
 mod temporal;
 
-use bookie_core::sql_dialect::{build_full_row_update, build_single_cell_update};
-use bookie_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, OperationControl, Value};
 use clickhouse::{connect, start_clickhouse};
 use drivers_clickhouse::ClickhouseDriver;
 use testcontainers::{ContainerAsync, GenericImage};
@@ -194,7 +193,7 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
+async fn wide_integer_mutations_bind_exact_values_for_explicit_predicates() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
     conn.execute(
@@ -226,33 +225,15 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
         .await
         .unwrap();
     let id_index = columns.iter().position(|column| column.name == "id").unwrap();
-    let signed_index = columns
-        .iter()
-        .position(|column| column.name == "signed_amount")
-        .unwrap();
-    let unsigned_index = columns
-        .iter()
-        .position(|column| column.name == "unsigned_amount")
-        .unwrap();
-    assert!(columns[id_index].primary_key);
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "wide_grid_edits",
-        &columns,
-        &[
-            (
-                signed_index,
-                Value::Text("-170141183460469231731687303715884105727".into()),
-            ),
-            (
-                unsigned_index,
-                Value::Text("340282366920938463463374607431768211454".into()),
-            ),
+    assert!(!columns[id_index].primary_key);
+    let update = (
+        "ALTER TABLE `wide_grid_edits` UPDATE `signed_amount` = ?, `unsigned_amount` = ? WHERE `id` = ?".to_string(),
+        vec![
+            Value::Text("-170141183460469231731687303715884105727".into()),
+            Value::Text("340282366920938463463374607431768211454".into()),
+            result.rows[0][id_index].clone(),
         ],
-        &[result.rows[0][id_index].clone()],
-    )
-    .unwrap();
+    );
     conn.execute_in_transaction(&[update]).await.unwrap();
 
     let after = conn
@@ -267,21 +248,14 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
             Value::Text("0".into()),
         ]
     );
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "wide_grid_edits",
-        &columns,
-        &[
-            (
-                signed_index,
-                Value::Text("170141183460469231731687303715884105726".into()),
-            ),
-            (unsigned_index, Value::Text("1".into())),
+    let update = (
+        "ALTER TABLE `wide_grid_edits` UPDATE `signed_amount` = ?, `unsigned_amount` = ? WHERE `id` = ?".to_string(),
+        vec![
+            Value::Text("170141183460469231731687303715884105726".into()),
+            Value::Text("1".into()),
+            after.rows[1][id_index].clone(),
         ],
-        &[after.rows[1][id_index].clone()],
-    )
-    .unwrap();
+    );
     conn.execute_in_transaction(&[update]).await.unwrap();
 
     let final_rows = conn
@@ -327,7 +301,7 @@ async fn copied_in_clause_keeps_backslash_payload_as_data() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn connect_list_tables_and_pk_detection() {
+async fn connect_list_tables_and_primary_sorting_index_detection() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
@@ -351,7 +325,7 @@ async fn connect_list_tables_and_pk_detection() {
     let cols = conn.fetch_columns(None, "pk_demo").await.unwrap();
     assert_eq!(cols.len(), 3);
     let id_col = cols.iter().find(|c| c.name == "id").unwrap();
-    assert!(id_col.primary_key, "ORDER BY key must be detected as primary_key");
+    assert!(!id_col.primary_key, "a sparse sorting key is not a unique row identity");
     assert!(!id_col.nullable);
     let note_col = cols.iter().find(|c| c.name == "note").unwrap();
     assert!(!note_col.primary_key);
@@ -391,13 +365,9 @@ async fn views_appear_in_the_table_list() {
     );
 }
 
-/// The inline-edit Save path renders its UPDATE through
-/// `sql_dialect`, which has to emit `ALTER TABLE … UPDATE` for
-/// ClickHouse. A plain `UPDATE` is a syntax error before 25.7, so this
-/// covers the dialect and the driver's bind path together.
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn inline_edit_update_applies() {
+async fn inline_edit_is_refused_without_unique_row_identity() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
@@ -410,26 +380,26 @@ async fn inline_edit_update_applies() {
 
     let columns = conn.fetch_columns(None, "edits").await.unwrap();
     let original = vec![Value::Int(1), Value::Text("before".into())];
-    let (sql, params) = build_single_cell_update(
-        "clickhouse",
-        "edits",
-        &columns,
-        &original,
-        1,
-        Value::Text("after".into()),
-    )
-    .unwrap();
-    assert!(sql.starts_with("ALTER TABLE"), "unexpected dialect: {sql}");
-    conn.execute_in_transaction(&[(sql, params)]).await.unwrap();
+    assert!(matches!(
+        bookie_core::sql_dialect::build_single_cell_update(
+            "clickhouse",
+            "edits",
+            &columns,
+            &original,
+            1,
+            Value::Text("after".into()),
+        ),
+        Err(bookie_core::sql_dialect::BuildSqlError::NoPrimaryKey)
+    ));
 
     let result = conn.query("SELECT name FROM edits ORDER BY id").await.unwrap();
-    assert_eq!(result.rows[0][0], Value::Text("after".into()));
+    assert_eq!(result.rows[0][0], Value::Text("before".into()));
     assert_eq!(result.rows[1][0], Value::Text("other".into()));
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn full_row_update_applies() {
+async fn full_row_update_is_refused_without_unique_row_identity() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
@@ -438,15 +408,17 @@ async fn full_row_update_applies() {
         .unwrap();
     conn.execute("INSERT INTO rows_edit VALUES (1, 'x', 10)").await.unwrap();
 
-    let columns: Vec<ColumnInfo> = conn.fetch_columns(None, "rows_edit").await.unwrap();
+    let columns = conn.fetch_columns(None, "rows_edit").await.unwrap();
     let original = vec![Value::Int(1), Value::Text("x".into()), Value::Int(10)];
     let new_values = vec![Value::Int(1), Value::Text("y".into()), Value::Int(20)];
-    let (sql, params) = build_full_row_update("clickhouse", "rows_edit", &columns, &original, &new_values).unwrap();
-    conn.execute_in_transaction(&[(sql, params)]).await.unwrap();
+    assert!(matches!(
+        bookie_core::sql_dialect::build_full_row_update("clickhouse", "rows_edit", &columns, &original, &new_values),
+        Err(bookie_core::sql_dialect::BuildSqlError::NoPrimaryKey)
+    ));
 
     let result = conn.query("SELECT a, b FROM rows_edit WHERE id = 1").await.unwrap();
-    assert_eq!(result.rows[0][0], Value::Text("y".into()));
-    assert_eq!(result.rows[0][1], Value::Int(20));
+    assert_eq!(result.rows[0][0], Value::Text("x".into()));
+    assert_eq!(result.rows[0][1], Value::Int(10));
 }
 
 /// A row whose text contains an apostrophe and a `?` would corrupt the

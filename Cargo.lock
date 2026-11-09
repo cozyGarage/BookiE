@@ -682,20 +682,19 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.72.1"
+version = "0.73.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
+checksum = "787ef8ef523575546b106a58213d6e6b06198a05c2f757258c68a74273670cfa"
 dependencies = [
  "bitflags 2.13.2",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "regex",
  "rustc-hash",
- "shlex 1.3.0",
- "syn 2.0.119",
+ "shlex 2.0.1",
+ "syn 3.0.9",
 ]
 
 [[package]]
@@ -897,8 +896,10 @@ dependencies = [
  "bookie-driver-mongodb",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
+ "bookie-driver-oracle",
  "bookie-driver-postgres",
  "bookie-driver-redis",
+ "bookie-driver-registry",
  "bookie-driver-sqlite",
  "bookie-mcp",
  "bookie-policy",
@@ -929,8 +930,10 @@ dependencies = [
  "bookie-driver-mongodb",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
+ "bookie-driver-oracle",
  "bookie-driver-postgres",
  "bookie-driver-redis",
+ "bookie-driver-registry",
  "bookie-driver-sqlite",
  "bookie-mcp",
  "bookie-policy",
@@ -971,6 +974,7 @@ name = "bookie-app-services"
 version = "0.2.5"
 dependencies = [
  "async-trait",
+ "bookie-app-services",
  "bookie-core",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
@@ -987,6 +991,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sqlparser",
  "tempfile",
  "testcontainers",
  "testcontainers-modules",
@@ -994,6 +999,8 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
+ "unicode-width",
  "uuid",
 ]
 
@@ -1132,6 +1139,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bookie-driver-oracle"
+version = "0.2.5"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "chrono",
+ "oracledb",
+ "rust_decimal",
+ "secrecy",
+ "serde_json",
+ "testcontainers",
+ "tokio",
+]
+
+[[package]]
 name = "bookie-driver-postgres"
 version = "0.2.5"
 dependencies = [
@@ -1169,6 +1191,22 @@ dependencies = [
  "testcontainers",
  "testcontainers-modules",
  "tokio",
+]
+
+[[package]]
+name = "bookie-driver-registry"
+version = "0.2.5"
+dependencies = [
+ "bookie-core",
+ "bookie-driver-clickhouse",
+ "bookie-driver-duckdb",
+ "bookie-driver-mongodb",
+ "bookie-driver-mssql",
+ "bookie-driver-mysql",
+ "bookie-driver-oracle",
+ "bookie-driver-postgres",
+ "bookie-driver-redis",
+ "bookie-driver-sqlite",
 ]
 
 [[package]]
@@ -1312,6 +1350,7 @@ dependencies = [
  "bookie-core",
  "chrono",
  "getrandom 0.3.4",
+ "regex",
  "rmp-serde",
  "rust_decimal",
  "secrecy",
@@ -4057,11 +4096,11 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.37.0"
+version = "0.39.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f111c8c41e7c61a49cd34e44c7619462967221a6443b0ec299e0ac30cfb9b1"
+checksum = "14a5f01b87b92705d07b433c06f96cbc764637d81a0bffb5734ce17cf0f9a2b3"
 dependencies = [
- "bindgen 0.72.1",
+ "bindgen 0.73.2",
  "pkg-config",
  "vcpkg",
 ]
@@ -4681,6 +4720,27 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "oracledb"
+version = "26.0.0-beta.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27b98c7346f2bb5169ec4b2d4f066fb616529ac766b395440c5019fe88d1ef45"
+dependencies = [
+ "aes 0.9.3",
+ "base16ct",
+ "base64ct",
+ "cbc 0.2.1",
+ "chrono",
+ "pbkdf2 0.13.0",
+ "pkcs8",
+ "rand 0.10.3",
+ "rustls",
+ "sha2 0.11.1",
+ "uuid",
+ "webpki-roots",
+ "whoami",
 ]
 
 [[package]]
@@ -5487,9 +5547,9 @@ dependencies = [
 
 [[package]]
 name = "rmcp"
-version = "3.8.0"
+version = "3.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8be15815186873ea063bf005011d16c356804973489e40c39116ae3a2878d1f"
+checksum = "d24a7e92f4bcaa36b97fa93c4fa7ca8f3e669eced949345b3462dba333c7f909"
 dependencies = [
  "chrono",
  "futures",
@@ -5500,6 +5560,7 @@ dependencies = [
  "schemars 1.2.3",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -6476,8 +6537,6 @@ dependencies = [
 [[package]]
 name = "sqlx-sqlite"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "488e99c397a62007e4229aec669a179816339afc6d2620ca6fa420dbee2e982c"
 dependencies = [
  "atoi 2.0.0",
  "chrono",

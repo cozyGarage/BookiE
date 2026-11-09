@@ -10,7 +10,6 @@ use bookie_app_services::stream_result_spool::{StreamResultSpool, StreamResultSp
 use bookie_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings};
 use bookie_core::{DriverError, OperationControl, QueryResult};
 use bookie_policy::AuditReceipt;
-use sha2::{Digest, Sha256};
 use std::future::Future;
 use stream_result_view::build_streamed_result_widget;
 
@@ -92,6 +91,7 @@ pub(crate) enum StreamUpdate {
     Started {
         identity: StatementIdentity,
         sql_preview: String,
+        sql: String,
         spool: StreamResultSpool,
     },
     Page {
@@ -161,76 +161,9 @@ where
     crate::services::approval_wait::track(run_tracked_statements(run, stream_spool_manager, stream_update)).await
 }
 
-async fn run_tracked_statements<S, F, Fut>(
-    run: StatementRun<'_, S>,
-    stream_spool_manager: StreamResultSpoolManager,
-    mut stream_update: F,
-) -> ScriptRunResult
-where
-    S: Fn(&str),
-    F: FnMut(StreamUpdate) -> Fut,
-    Fut: Future<Output = bool>,
-{
-    let StatementRun {
-        target,
-        statements,
-        driver_id,
-        parameter_values,
-        control,
-        error_policy,
-        settings_check,
-        succeeded,
-    } = run;
-    let (single_statement, stops_on_error, last_index) = run_options(statements.len(), error_policy);
-    let (mut out, mut skip) = (Vec::with_capacity(statements.len()), None);
-    for (statement_index, sql) in statements.into_iter().enumerate() {
-        let identity = statement_identity(statement_index, &sql);
-        let preview = sql_preview(&sql);
-        if let Some(reason) = skip.replace(None) {
-            out.push(skipped_outcome(identity, preview, reason));
-            continue;
-        }
-        let (started, waited_before) = (std::time::Instant::now(), crate::services::approval_wait::waited());
-        let bound = match bind_statement_for_run(&sql, driver_id, parameter_values, identity, preview.clone()) {
-            Ok(bound) => bound,
-            Err(reason) => {
-                out.push(*reason);
-                skip = stops_on_error.then_some(None);
-                continue;
-            }
-        };
-        let attempt = StreamAttempt {
-            target: &target,
-            single_statement,
-            driver_id,
-            bound_sql: &bound.sql,
-            bound_params: &bound.values,
-            identity,
-            preview: preview.clone(),
-            sql: &sql,
-            started,
-            control,
-            spool_manager: stream_spool_manager.clone(),
-        };
-        let kind = match run_statement(attempt, &mut stream_update, &succeeded).await {
-            Ok(kind) => kind,
-            Err(Halt::Finished(result)) => return result,
-            Err(Halt::Failed(outcome)) => {
-                out.push(*outcome);
-                return ScriptRunResult::Completed(out);
-            }
-        };
-        skip = (stops_on_error && matches!(kind, StatementOutcomeKind::Error(_))).then_some(None);
-        out.push(statement_outcome(identity, preview, started, waited_before, kind));
-        if skip.is_none() && statement_index < last_index {
-            match lexical_settings_change(&target, settings_check, control).await {
-                Ok(change) => skip = change.map(Some),
-                Err(result) => return result,
-            }
-        }
-    }
-    ScriptRunResult::Completed(out)
-}
+#[path = "outcomes/run_loop.rs"]
+mod run_loop;
+use run_loop::run_tracked_statements;
 
 fn run_options(statement_count: usize, error_policy: BatchErrorPolicy) -> (bool, bool, usize) {
     (
@@ -240,14 +173,17 @@ fn run_options(statement_count: usize, error_policy: BatchErrorPolicy) -> (bool,
     )
 }
 
-fn skipped_outcome(identity: StatementIdentity, preview: String, reason: Option<String>) -> StatementOutcome {
-    match reason {
-        Some(reason) => StatementOutcome {
-            kind: StatementOutcomeKind::Error(reason.into()),
-            ..not_run_outcome(identity, preview)
-        },
-        None => not_run_outcome(identity, preview),
+fn skipped_outcome(
+    identity: StatementIdentity,
+    preview: String,
+    sql: String,
+    reason: Option<String>,
+) -> StatementOutcome {
+    let mut outcome = not_run_outcome(identity, preview, sql);
+    if let Some(reason) = reason {
+        outcome.kind = StatementOutcomeKind::Error(reason.into());
     }
+    outcome
 }
 
 enum Halt {
@@ -304,10 +240,11 @@ async fn lexical_settings_change(
     }
 }
 
-fn not_run_outcome(identity: StatementIdentity, preview: String) -> StatementOutcome {
+fn not_run_outcome(identity: StatementIdentity, preview: String, sql: String) -> StatementOutcome {
     StatementOutcome {
         identity,
         sql_preview: preview,
+        sql,
         elapsed_ms: 0,
         kind: StatementOutcomeKind::NotRun,
         pinned: false,
@@ -317,6 +254,7 @@ fn not_run_outcome(identity: StatementIdentity, preview: String) -> StatementOut
 fn statement_outcome(
     identity: StatementIdentity,
     preview: String,
+    sql: String,
     started: std::time::Instant,
     waited_before: std::time::Duration,
     kind: StatementOutcomeKind,
@@ -324,6 +262,7 @@ fn statement_outcome(
     StatementOutcome {
         identity,
         sql_preview: preview,
+        sql,
         elapsed_ms: elapsed_without_approval_wait(started, waited_before),
         kind,
         pinned: false,
@@ -343,11 +282,13 @@ fn bind_statement_for_run(
     parameter_values: &std::collections::HashMap<String, bookie_core::Value>,
     identity: StatementIdentity,
     preview: String,
+    full_sql: String,
 ) -> Result<crate::services::query_parameters::BoundStatement, Box<StatementOutcome>> {
     crate::services::query_parameters::bind_statement(sql, driver_id, parameter_values).map_err(|error| {
         Box::new(StatementOutcome {
             identity,
             sql_preview: preview,
+            sql: full_sql,
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Error(crate::ui::parameters_dialog::error_message(error).into()),
             pinned: false,
@@ -409,6 +350,7 @@ where
         Box::new(StatementOutcome {
             identity: attempt.identity,
             sql_preview: attempt.preview.clone(),
+            sql: attempt.sql.to_owned(),
             elapsed_ms: attempt.started.elapsed().as_millis(),
             kind: StatementOutcomeKind::Error(crate::tr!("Temporary result storage is unavailable.").into()),
             pinned: false,
@@ -443,6 +385,7 @@ where
         Err(error) => Err(Box::new(StatementOutcome {
             identity: attempt.identity,
             sql_preview: attempt.preview,
+            sql: attempt.sql.to_owned(),
             elapsed_ms: attempt.started.elapsed().as_millis(),
             kind: StatementOutcomeKind::Error(
                 failure_message(&error, attempt.sql, attempt.bound_sql).with_audit_receipts(audit_receipts),
@@ -494,6 +437,7 @@ where
     let started = stream_update(StreamUpdate::Started {
         identity,
         sql_preview: preview,
+        sql: sql.to_owned(),
         spool: spool.clone(),
     })
     .await;
@@ -594,16 +538,9 @@ async fn finish_stream_cursor(cursor: super::session_mode::StatementCursor, clos
     }
 }
 
-fn statement_identity(statement_index: usize, sql: &str) -> StatementIdentity {
-    let mut digest = Sha256::new();
-    digest.update((statement_index as u64).to_be_bytes());
-    digest.update((sql.len() as u64).to_be_bytes());
-    digest.update(sql.as_bytes());
-    StatementIdentity {
-        statement_index,
-        digest: digest.finalize().into(),
-    }
-}
+#[path = "outcomes/preview.rs"]
+mod preview;
+pub(super) use preview::{sql_preview, statement_identity};
 
 fn failure_message(error: &DriverError, written: &str, sent: &str) -> super::StatementFailure {
     super::StatementFailure::located(error, written, sent)
@@ -614,16 +551,6 @@ fn merge_audit_receipts(target: &mut Vec<AuditReceipt>, incoming: Vec<AuditRecei
         if !target.contains(&receipt) {
             target.push(receipt);
         }
-    }
-}
-
-fn sql_preview(sql: &str) -> String {
-    let single_line: String = sql.split_whitespace().collect::<Vec<_>>().join(" ");
-    if single_line.chars().count() > 60 {
-        let prefix: String = single_line.chars().take(60).collect();
-        format!("{prefix}…")
-    } else {
-        single_line
     }
 }
 
@@ -910,18 +837,14 @@ pub(super) fn build_result_set_widget(
                 ..Default::default()
             },
             column_widths: None,
+            highlight_settings: None,
             database,
         },
     );
+    local_result_view.bind_column_view(&column_view);
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     holder.append(&local_result_view.controls());
-    holder.append(
-        &gtk::ScrolledWindow::builder()
-            .child(&column_view)
-            .hexpand(true)
-            .vexpand(true)
-            .build(),
-    );
+    holder.append(&crate::ui::grid::wrap_grid_scrolled(&column_view));
     holder.upcast()
 }
 
@@ -1175,17 +1098,14 @@ fn result_view_keys(outcomes: &[StatementOutcome]) -> std::collections::HashSet<
 #[path = "outcomes/lexing_tests.rs"]
 mod lexing_tests;
 #[cfg(test)]
-#[path = "outcomes/tests.rs"]
-mod tests;
-
-#[cfg(test)]
-#[path = "outcomes/stream_page_label_tests.rs"]
-mod stream_page_label_tests;
-
+#[path = "outcomes/lifetime_tests.rs"]
+mod lifetime_tests;
 #[cfg(test)]
 #[path = "outcomes/result_tab_icon_tests.rs"]
 mod result_tab_icon_tests;
-
 #[cfg(test)]
-#[path = "outcomes/lifetime_tests.rs"]
-mod lifetime_tests;
+#[path = "outcomes/stream_page_label_tests.rs"]
+mod stream_page_label_tests;
+#[cfg(test)]
+#[path = "outcomes/tests.rs"]
+mod tests;

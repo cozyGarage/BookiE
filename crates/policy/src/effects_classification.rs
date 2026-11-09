@@ -4,6 +4,7 @@ use sqlparser::tokenizer::{Token, Tokenizer};
 use crate::admin_functions::{is_administrative_function_exact_name, is_administrative_function_prefix};
 use crate::classify::{StatementClass, StatementDetails};
 use crate::effects::Effects;
+use crate::oracle_functions::is_known_pure_function;
 use sqlparser::ast::{CopySource, CopyTarget, Set, Statement};
 
 pub(crate) fn merge_script_class(current: StatementClass, next: StatementClass) -> StatementClass {
@@ -183,7 +184,8 @@ pub(crate) fn sql_effects_from_tokens(sql: &str, dialect: &dyn Dialect, driver_i
         }
         let known_function = is_administrative_function_exact_name(name)
             || (is_administrative_function_prefix(name) && function_prefix_is_system_scoped(&tokens, index));
-        if known_function || is_engine_administrative_function_name(driver_id, name) {
+        let oracle_function = driver_id == "oracle" && oracle_function_requires_guard(&tokens, index, name);
+        if known_function || is_engine_administrative_function_name(driver_id, name) || oracle_function {
             effects = effects.union(Effects::ADMIN);
             legacy_administrative_call = true;
         }
@@ -201,6 +203,15 @@ pub(crate) fn sql_effects_from_tokens(sql: &str, dialect: &dyn Dialect, driver_i
         }
     }
     (effects, legacy_administrative_call)
+}
+
+fn oracle_function_requires_guard(tokens: &[Token], index: usize, name: &str) -> bool {
+    let qualified = tokens[..index]
+        .iter()
+        .rev()
+        .find(|token| !matches!(token, Token::Whitespace(_)))
+        .is_some_and(|token| matches!(token, Token::Period));
+    qualified || !is_known_pure_function(name)
 }
 
 fn function_prefix_is_system_scoped(tokens: &[Token], index: usize) -> bool {

@@ -9,6 +9,7 @@ RUN apt-get update \
         curl \
         git \
         nodejs \
+        locales \
         pkg-config \
         libgtk-4-dev \
         libadwaita-1-dev \
@@ -29,4 +30,5 @@ RUN apt-get update \
         xauth \
         at-spi2-core \
         python3-pyatspi \
+    && localedef -i en_US -f UTF-8 en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*

@@ -19,6 +19,8 @@ MAX_NOTE = 300
 def note_values(message):
     """The text after each `Release-Note:` marker. A note continues over the following lines of its paragraph,
     so a body wrapped at 72 columns keeps its whole sentence."""
+    if not TRAILER.search(message):
+        message = re.sub(r"\\n(?=Release-Note:)", "\n", message)
     values, current = [], None
     for line in message.splitlines():
         match = TRAILER.match(line)

@@ -115,7 +115,7 @@ fn comments_are_in_column_details_without_growing_every_header() {
     info.name = "id".into();
     info.comment = Some("Customer id\nsecond line".into());
     assert_eq!(column_header_title(&info, false), "id\nINTEGER");
-    let menu = header_details(&info, false);
+    let menu = header_details(&info, false, false);
     let details = menu.item_link(0, "section").unwrap();
     let comment = details
         .item_attribute_value(3, "label", None)
@@ -124,7 +124,7 @@ fn comments_are_in_column_details_without_growing_every_header() {
         .unwrap();
     assert_eq!(comment, "Customer id\nsecond line");
     info.comment = Some("x".repeat(2000));
-    let menu = header_details(&info, false);
+    let menu = header_details(&info, false, false);
     let details = menu.item_link(0, "section").unwrap();
     let comment = details
         .item_attribute_value(3, "label", None)
@@ -300,6 +300,7 @@ fn boolean_affinity_mismatch_cannot_emit_an_edit() {
             connection_id: None,
             tab_ctx: TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         },
     );
@@ -383,6 +384,7 @@ fn mysql_bit_one_grid_shows_numeric_values_and_emits_boolean_edits() {
             connection_id: None,
             tab_ctx: TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         },
     );
@@ -449,6 +451,7 @@ fn bind_does_not_open_binary_bytes_in_a_text_column_for_editing() {
             connection_id: None,
             tab_ctx: TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         },
     );
@@ -579,6 +582,7 @@ fn mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits() {
             connection_id: None,
             tab_ctx: TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         },
     );
@@ -633,6 +637,7 @@ fn entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value() {
             connection_id: None,
             tab_ctx: TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         },
     );
@@ -680,6 +685,7 @@ fn editing_literal_null_sentinel_text_keeps_it_distinct_from_sql_null() {
             connection_id: None,
             tab_ctx: TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         },
     );

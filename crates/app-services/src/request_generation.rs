@@ -43,6 +43,72 @@ impl LatestApplied {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct Generation {
+    current: std::cell::Cell<u64>,
+}
+
+impl Generation {
+    pub fn begin(&self) -> u64 {
+        let ticket = self.current.get().wrapping_add(1);
+        self.current.set(ticket);
+        ticket
+    }
+
+    pub fn current(&self) -> u64 {
+        self.current.get()
+    }
+
+    pub fn accepts(&self, ticket: u64) -> bool {
+        is_current(ticket, self.current.get())
+    }
+
+    pub fn invalidate(&self) {
+        let _ = self.begin();
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RevisionedTicket {
+    generation: u64,
+    revision: u64,
+}
+
+impl RevisionedTicket {
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct RevisionedGeneration {
+    generation: std::cell::Cell<u64>,
+    revision: std::cell::Cell<u64>,
+}
+
+impl RevisionedGeneration {
+    pub fn revision(&self) -> u64 {
+        self.revision.get()
+    }
+
+    pub fn changed(&self) {
+        self.revision.set(self.revision.get().wrapping_add(1));
+    }
+
+    pub fn begin(&self) -> RevisionedTicket {
+        let generation = self.generation.get().wrapping_add(1);
+        self.generation.set(generation);
+        RevisionedTicket {
+            generation,
+            revision: self.revision.get(),
+        }
+    }
+
+    pub fn accepts(&self, ticket: RevisionedTicket) -> bool {
+        self.generation.get() == ticket.generation && self.revision.get() == ticket.revision
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,5 +192,39 @@ mod tests {
         let ticket = order.begin();
         assert!(order.accept(ticket));
         assert!(order.accept(ticket));
+    }
+
+    #[test]
+    fn an_exact_generation_rejects_every_older_ticket() {
+        let gate = Generation::default();
+        let first = gate.begin();
+        let second = gate.begin();
+        assert!(!gate.accepts(first));
+        assert!(gate.accepts(second));
+        assert_eq!(gate.current(), second);
+    }
+
+    #[test]
+    fn invalidating_an_exact_generation_drops_the_pending_ticket() {
+        let gate = Generation::default();
+        let pending = gate.begin();
+        gate.invalidate();
+        assert!(!gate.accepts(pending));
+        let next = gate.begin();
+        assert!(gate.accepts(next));
+    }
+
+    #[test]
+    fn a_revision_bump_rejects_an_otherwise_current_ticket() {
+        let gate = RevisionedGeneration::default();
+        let first = gate.begin();
+        let second = gate.begin();
+        assert!(!gate.accepts(first));
+        assert!(gate.accepts(second));
+        gate.changed();
+        assert!(!gate.accepts(second));
+        let resumed = gate.begin();
+        assert!(gate.accepts(resumed));
+        assert_eq!(gate.revision(), resumed.revision());
     }
 }

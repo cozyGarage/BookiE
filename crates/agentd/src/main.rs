@@ -12,14 +12,6 @@ use bookie_mcp::{McpBridge, TokenPermissions, TokenStore, serve_stdio};
 use bookie_policy::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AuditState, DenyApprovalSink, load_from_path};
 use bookie_storage::{AuditJournal, SavedConnection, load_connections};
 use clap::{Parser, ValueEnum};
-use drivers_clickhouse::ClickhouseDriver;
-use drivers_duckdb::DuckdbDriver;
-use drivers_mongodb::MongodbDriver;
-use drivers_mssql::MssqlDriver;
-use drivers_mysql::MysqlDriver;
-use drivers_postgres::PgDriver;
-use drivers_redis::RedisDriver;
-use drivers_sqlite::SqliteDriver;
 use uuid::Uuid;
 
 mod tty_answer;
@@ -241,16 +233,7 @@ fn emit_token(plain: &str) -> std::io::Result<()> {
 }
 
 fn build_registry() -> DriverRegistry {
-    let mut r = DriverRegistry::new();
-    r.register(Arc::new(ClickhouseDriver));
-    r.register(Arc::new(DuckdbDriver));
-    r.register(Arc::new(MongodbDriver));
-    r.register(Arc::new(MssqlDriver));
-    r.register(Arc::new(MysqlDriver));
-    r.register(Arc::new(PgDriver));
-    r.register(Arc::new(RedisDriver));
-    r.register(Arc::new(SqliteDriver));
-    r
+    drivers_registry::default_registry()
 }
 
 async fn daemon_provider(

@@ -6,10 +6,12 @@ use bookie_app_services::request_generation::replace_in_flight;
 use bookie_app_services::result_find::{FindError, FindReport, find_matches};
 use bookie_app_services::result_predicate::{ColumnScope, ResultPredicate};
 use bookie_app_services::result_scan::{ScanError, ScanProgress};
+use bookie_app_services::text_match::TextMatchOptions;
 use relm4::gtk;
 use relm4::gtk::glib::WeakRef;
 use relm4::gtk::prelude::*;
 
+use super::cursor::SearchSpec;
 use super::editor::FilterRequest;
 use super::jump::{JumpTarget, go_to};
 use super::ticket::FilterTicket;
@@ -18,21 +20,38 @@ use crate::ui::count_format::format_thousands;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
+pub(super) struct ActionWidgets<'a> {
+    pub(super) row: &'a gtk::Box,
+    pub(super) entry: &'a gtk::SearchEntry,
+    pub(super) previous: &'a gtk::Button,
+    pub(super) next: &'a gtk::Button,
+    pub(super) filter: &'a gtk::Button,
+    pub(super) stop: &'a gtk::Button,
+    pub(super) match_case: &'a gtk::ToggleButton,
+    pub(super) whole_words: &'a gtk::ToggleButton,
+    pub(super) regex: &'a gtk::ToggleButton,
+    pub(super) columns: &'a gtk::DropDown,
+}
+
 fn with<T: IsA<gtk::glib::Object>>(weak: &WeakRef<T>, apply: impl FnOnce(&T)) {
     if let Some(widget) = weak.upgrade() {
         apply(&widget);
     }
 }
 
-pub(super) fn connect(
-    tools: &Rc<Tools>,
-    row: &gtk::Box,
-    entry: &gtk::SearchEntry,
-    previous: &gtk::Button,
-    next: &gtk::Button,
-    filter: &gtk::Button,
-    stop: &gtk::Button,
-) {
+pub(super) fn connect(tools: &Rc<Tools>, widgets: ActionWidgets<'_>) {
+    let ActionWidgets {
+        row,
+        entry,
+        previous,
+        next,
+        filter,
+        stop,
+        match_case,
+        whole_words,
+        regex,
+        columns,
+    } = widgets;
     entry.connect_activate({
         let tools = tools.clone();
         move |_| tools.search(true)
@@ -57,6 +76,16 @@ pub(super) fn connect(
         let tools = tools.clone();
         move |_| tools.stop()
     });
+    for toggle in [match_case, whole_words, regex] {
+        toggle.connect_toggled({
+            let tools = tools.clone();
+            move |_| tools.entry_changed()
+        });
+    }
+    columns.connect_selected_notify({
+        let tools = tools.clone();
+        move |_| tools.entry_changed()
+    });
     row.connect_destroy({
         let tools = tools.clone();
         move |_| tools.cancel_search()
@@ -64,12 +93,38 @@ pub(super) fn connect(
 }
 
 impl Tools {
-    fn needle(&self) -> String {
-        self.controls
+    fn search_spec(&self) -> SearchSpec {
+        let needle = self
+            .controls
             .entry
             .upgrade()
             .map(|entry| entry.text().to_string())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        let options = TextMatchOptions {
+            match_case: self
+                .controls
+                .match_case
+                .upgrade()
+                .is_some_and(|toggle| toggle.is_active()),
+            whole_words: self
+                .controls
+                .whole_words
+                .upgrade()
+                .is_some_and(|toggle| toggle.is_active()),
+            regex: self.controls.regex.upgrade().is_some_and(|toggle| toggle.is_active()),
+        };
+        let selected = self
+            .controls
+            .columns
+            .upgrade()
+            .map(|columns| columns.selected())
+            .unwrap_or(0);
+        let column = (selected > 0).then(|| selected as usize - 1);
+        SearchSpec {
+            needle,
+            options,
+            column,
+        }
     }
 
     pub(super) fn set_status(&self, text: &str) {
@@ -105,8 +160,8 @@ impl Tools {
     }
 
     fn entry_changed(&self) {
-        let needle = self.needle();
-        if self.cursor.borrow().keeps_for(&needle) {
+        let spec = self.search_spec();
+        if self.cursor.borrow().keeps_for(&spec) {
             return;
         }
         self.cancel.borrow().cancel();
@@ -122,34 +177,36 @@ impl Tools {
         if self.filter_running() {
             return;
         }
-        let needle = self.needle();
-        if needle.is_empty() {
+        let spec = self.search_spec();
+        if spec.needle.is_empty() {
             self.set_status("");
             return;
         }
-        if self.cursor.borrow().has_results_for(&needle) {
+        if self.cursor.borrow().has_results_for(&spec) {
             self.step(forward);
             return;
         }
-        if self.cursor.borrow().is_searching_for(&needle) {
+        if self.cursor.borrow().is_searching_for(&spec) {
             self.cursor.borrow_mut().request_direction(forward);
             return;
         }
-        self.start_search(needle, forward);
+        self.start_search(spec, forward);
     }
 
-    fn start_search(self: &Rc<Self>, needle: String, forward: bool) {
+    fn start_search(self: &Rc<Self>, spec: SearchSpec, forward: bool) {
         let cancel = replace_in_flight(&self.cancel);
-        let generation = self.cursor.borrow_mut().begin(&needle);
+        let generation = self.cursor.borrow_mut().begin(spec.clone());
         let progress = ScanProgress::default();
         let (send, receive) = async_channel::bounded(1);
         let worker = {
             let source = self.source.clone();
             let progress = progress.clone();
             std::thread::Builder::new().name("result-find".into()).spawn(move || {
+                let scope = spec.column.map_or(ColumnScope::Any, ColumnScope::Column);
                 let predicate = ResultPredicate::Contains {
-                    scope: ColumnScope::Any,
-                    needle,
+                    scope,
+                    needle: spec.needle,
+                    options: spec.options,
                 };
                 let _ = send.send_blocking(find_matches(&source, predicate, &cancel, &progress));
             })
@@ -204,6 +261,10 @@ impl Tools {
                 self.cursor.borrow_mut().end_search(generation);
                 self.set_status(&crate::tr!("Search cancelled"));
             }
+            Err(FindError::Predicate(_)) => {
+                self.cursor.borrow_mut().end_search(generation);
+                self.set_status(&crate::tr!("Invalid regular expression"));
+            }
             Err(_) => {
                 self.cursor.borrow_mut().end_search(generation);
                 self.set_status(&crate::tr!("The search could not finish"));
@@ -251,24 +312,26 @@ impl Tools {
         if self.filter_running() {
             return;
         }
-        let needle = self.needle();
-        if needle.is_empty() {
+        let spec = self.search_spec();
+        if spec.needle.is_empty() {
             self.set_status(&crate::tr!("Enter text to filter by"));
             return;
         }
         let ticket = Arc::new(FilterTicket::default());
         super::ticket::register(self.identity, &ticket);
         self.adopt_filter(ticket.clone());
+        let scope = spec.column.map_or(ColumnScope::Any, ColumnScope::Column);
         let sent = self
             .sender
             .send(super::super::SqlEditorInput::FilterResults(Box::new(FilterRequest {
                 source: self.result.clone(),
                 identity: self.identity,
                 predicate: ResultPredicate::Contains {
-                    scope: ColumnScope::Any,
-                    needle: needle.clone(),
+                    scope,
+                    needle: spec.needle.clone(),
+                    options: spec.options,
                 },
-                label: needle,
+                label: spec.needle,
                 ticket: ticket.clone(),
             })));
         if sent.is_err() {

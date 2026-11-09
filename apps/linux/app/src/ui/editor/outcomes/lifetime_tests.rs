@@ -70,6 +70,7 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
     let make_outcome = |streamed| StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT id FROM items".into(),
+        sql: "SELECT id FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed)),
         pinned: false,

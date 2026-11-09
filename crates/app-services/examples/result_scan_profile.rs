@@ -228,6 +228,7 @@ async fn profile_find_and_filter(
         let predicate = ResultPredicate::Contains {
             scope: ColumnScope::Any,
             needle: "zzz-not-present".into(),
+            options: Default::default(),
         };
         Ok(find_matches(
             &source,
@@ -247,6 +248,7 @@ async fn profile_find_and_filter(
         let predicate = ResultPredicate::Contains {
             scope: ColumnScope::Column(1),
             needle: "item-7".into(),
+            options: Default::default(),
         };
         Ok(filter_into_spool(
             &source,

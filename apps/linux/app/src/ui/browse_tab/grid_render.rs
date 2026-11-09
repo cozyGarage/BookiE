@@ -202,6 +202,31 @@ impl BrowseTab {
         *self.ambiguous_keys.borrow_mut() = ambiguous;
     }
 
+    fn prepared_highlight_rules(
+        &self,
+    ) -> Option<std::sync::Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>> {
+        let connection_id = self.connection_id?;
+        let store = self.persistence.highlight_settings.as_ref()?;
+        let columns: Vec<&str> = self.current_columns.iter().map(|column| column.name.as_str()).collect();
+        store.prepared(connection_id, self.schema.as_deref(), &self.table, &columns)
+    }
+
+    fn highlight_persist(&self) -> Option<crate::ui::grid::HighlightPersist> {
+        let connection_id = self.connection_id?;
+        let store = self.persistence.highlight_settings.clone()?;
+        Some(crate::ui::grid::HighlightPersist {
+            connection_id,
+            schema: self.schema.clone(),
+            table: self.table.clone(),
+            store,
+        })
+    }
+
+    pub(super) fn reload_highlight_rules(&mut self, sender: ComponentSender<Self>) {
+        self.current_column_view = None;
+        self.render_grid_if_ready(sender);
+    }
+
     pub(super) fn render_grid_if_ready(&mut self, sender: ComponentSender<Self>) {
         let Some(result) = self.current_result.clone() else {
             return;
@@ -268,11 +293,13 @@ impl BrowseTab {
             result_model: None,
             row_visibility: None,
             sortable_result_columns: Default::default(),
+            highlight_rules: self.prepared_highlight_rules(),
             foreign_key_columns,
             has_inbound_foreign_keys: !self.inbound_foreign_keys.is_empty(),
             filters_unavailable: !self.browse_filters,
             choices: self.choice_labels.clone(),
             ambiguous_keys: self.ambiguous_keys.clone(),
+            row_number_base: self.current_offset,
         };
         let (column_view, selection) = build_column_view(
             &result,
@@ -288,6 +315,7 @@ impl BrowseTab {
                 connection_id: self.connection_id,
                 tab_ctx,
                 column_widths: self.persistence.column_widths.clone(),
+                highlight_settings: self.highlight_persist(),
                 database: self.database.clone(),
             },
         );
@@ -338,12 +366,10 @@ impl BrowseTab {
         // while the tracker still holds them, leading to confused state.
         self.reprepend_drafts();
 
-        let scrolled = gtk::ScrolledWindow::builder()
-            .child(&column_view)
-            .hexpand(true)
-            .vexpand(true)
-            .build();
+        let scrolled = crate::ui::grid::wrap_grid_scrolled(&column_view);
         self.grid_holder.append(&scrolled);
+        self.apply_local_sort_keys();
+        self.update_sort_status_label();
         self.refresh_grid_chrome();
         self.restore_focused_row();
         let _ = sender.output(BrowseTabOutput::StateChanged);

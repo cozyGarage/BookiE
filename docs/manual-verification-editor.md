@@ -24,6 +24,11 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Saving a structure change or edited rows appears in history, and the history dialog can filter those out.
 - [ ] `BOOKIE_LOG_FORMAT=json ./target/debug/bookie` writes lines that parse as JSON; unset keeps the human format.
 
+## SQL result editing
+
+- [ ] Create a disposable table with primary key `id` and distinct text columns `a` and `b`. Run `SELECT id AS row_id, b AS a FROM t`, edit the displayed `a`, preview and save. The preview targets source column `b` using key `id`; an independent database query confirms that `a` and the key stayed unchanged. Repeat after sorting the result.
+- [ ] Include a repeated source column and a computed expression in an editable SQL result. Both extra projections remain read-only, including Set NULL and the full-value editor; ordinary source columns remain editable. Discard and refresh restore the query result.
+
 ## Editor sessions (PostgreSQL, MySQL, SQL Server and SQLite files)
 
 - [ ] Turn on Session in an editor tab: `SET search_path` and a `CREATE TEMP TABLE` from one run are still in effect on the next run.
@@ -63,6 +68,13 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Fold two blocks, then use Unfold all and Ctrl+Shift+]. Both show the complete query.
 - [ ] Edit the query while a block is folded. The editor reveals the full query and clears stale fold markers.
 
+## SQL line bookmarks
+
+- [ ] Place the cursor on several lines and press Ctrl+F2 (or use the bookmark toolbar menu). Each bookmarked line shows a gutter marker in light and dark themes, including the split pane.
+- [ ] Press Ctrl+Shift+Down and Ctrl+Shift+Up in either split pane to move between bookmarks without wrapping past the first or last mark; the pane that receives the shortcut scrolls the target line into view.
+- [ ] Click a bookmark-only gutter marker to clear that line. Click a fold marker still unfolds the block.
+- [ ] Choose Clear bookmarks from the menu: every bookmark in that buffer is gone. Editing the SQL leaves bookmarks in place (they track the buffer).
+
 ## Pinned results and gutter marks
 
 - [ ] Run `SELECT 1 AS first;`, then run `SELECT pg_sleep(3), 2 AS second;`: while it runs, the first result stays on screen, dimmed, with Running… and the spinner in the toolbar; when it finishes the dimming is gone and the second result is shown. Repeat with a query that fails, with Cancel, and with a statement that times out: each replaces the dimmed result. A streamed PostgreSQL SELECT keeps the previous result until its first page arrives.
@@ -87,6 +99,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 
 ## Editor bottom panel
 
+- [ ] With a query result visible, hide the Results panel, then press Ctrl+Alt+G to reopen it and focus the active result grid. Press Ctrl+Alt+E to return focus to the SQL editor. Repeat with multiple result sets selected and with a browse-table tab active; confirm the shortcuts follow the selected tab and never execute a query.
 - [ ] On the target desktop, run a query with a unique visible value, hide/show Results by button and Ctrl+J from SQL and the result grid, and confirm the same result and selection remain.
 - [ ] Resize the divider, maximize/restore, and hide while maximized. Confirm the normal divider size and the previously focused SQL split are restored.
 - [ ] Check 1,200 px with normal SQL text and 802 px with a 20-point SQL font in light/dark themes. Every panel control remains reachable.

@@ -55,10 +55,28 @@ index ad10e14..2bc5422 100755
      stream.write_packet(&[public_key_request_id][..])?;
      stream.flush().await?;
 diff --git a/src/connection/establish.rs b/src/connection/establish.rs
-index f61654d..2abed80 100755
+index f61654d..84dd43e 100755
 --- a/src/connection/establish.rs
 +++ b/src/connection/establish.rs
-@@ -171,6 +171,7 @@ impl WithSocket for DoHandshake<'_> {
+@@ -8,6 +8,7 @@ use crate::net::{Socket, WithSocket};
+ use crate::protocol::connect::{
+     AuthSwitchRequest, AuthSwitchResponse, Handshake, HandshakeResponse,
+ };
++use crate::protocol::auth::AuthPlugin;
+ use crate::protocol::Capabilities;
+ use crate::{MySqlConnectOptions, MySqlConnection, MySqlSslMode};
+ 
+@@ -63,6 +64,9 @@ impl<'a> DoHandshake<'a> {
+         let handshake: Handshake = stream.recv_packet().await?.decode()?;
+ 
+         let mut plugin = handshake.auth_plugin;
++        if matches!(plugin, Some(AuthPlugin::MySqlClearPassword)) && !options.enable_cleartext_plugin {
++            return Err(err_protocol!("mysql_cleartext_plugin disabled"));
++        }
+         let nonce = handshake.auth_plugin_data;
+ 
+         // FIXME: server version parse is a bit ugly
+@@ -171,6 +175,7 @@ impl WithSocket for DoHandshake<'_> {
      type Output = Result<MySqlStream, Error>;
  
      async fn with_socket<S: Socket>(self, socket: S) -> Self::Output {

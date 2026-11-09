@@ -24,7 +24,7 @@ use shell::{
 use update::{parse_browse_page_select, parse_keyed_delete, parse_keyed_update, parse_keyed_value_select};
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
+    ColumnInfo, ConnectOptions, Connection, DataModel, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, QueryRows,
     TableInfo, Value,
 };
@@ -55,6 +55,10 @@ impl DatabaseDriver for MongodbDriver {
 
     fn maturity(&self) -> DriverMaturity {
         DriverMaturity::Experimental
+    }
+
+    fn data_model(&self) -> DataModel {
+        DataModel::Document
     }
 
     fn default_port(&self) -> u16 {

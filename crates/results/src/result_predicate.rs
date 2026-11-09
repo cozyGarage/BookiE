@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use bookie_core::Value;
 use thiserror::Error;
 
+use crate::text_match::{TextMatchError, TextMatchOptions, TextMatcher};
 use crate::value_exact::exact_equal;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,9 +14,19 @@ pub enum ColumnScope {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ResultPredicate {
-    Contains { scope: ColumnScope, needle: String },
-    Equals { column: usize, value: Value },
-    NotEquals { column: usize, value: Value },
+    Contains {
+        scope: ColumnScope,
+        needle: String,
+        options: TextMatchOptions,
+    },
+    Equals {
+        column: usize,
+        value: Value,
+    },
+    NotEquals {
+        column: usize,
+        value: Value,
+    },
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -26,6 +37,8 @@ pub enum PredicateError {
     UnknownColumn,
     #[error("the value cannot be compared exactly")]
     UncomparableValue,
+    #[error("the regular expression is invalid")]
+    InvalidPattern,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -33,14 +46,14 @@ pub struct CellTally {
     pub unsearchable_cells: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct PreparedPredicate {
     kind: PreparedKind,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 enum PreparedKind {
-    Contains { scope: ColumnScope, needle: String },
+    Contains { scope: ColumnScope, matcher: TextMatcher },
     Equals { column: usize, value: Value },
     NotEquals { column: usize, value: Value },
 }
@@ -48,7 +61,7 @@ enum PreparedKind {
 impl ResultPredicate {
     pub fn prepare(self, column_count: usize) -> Result<PreparedPredicate, PredicateError> {
         let kind = match self {
-            Self::Contains { scope, needle } => prepare_contains(scope, needle, column_count)?,
+            Self::Contains { scope, needle, options } => prepare_contains(scope, needle, options, column_count)?,
             Self::Equals { column, value } => PreparedKind::Equals {
                 column: checked_column(column, column_count)?,
                 value: comparable_value(value)?,
@@ -62,17 +75,17 @@ impl ResultPredicate {
     }
 }
 
-fn prepare_contains(scope: ColumnScope, needle: String, column_count: usize) -> Result<PreparedKind, PredicateError> {
-    if needle.is_empty() {
-        return Err(PredicateError::EmptyNeedle);
-    }
+fn prepare_contains(
+    scope: ColumnScope,
+    needle: String,
+    options: TextMatchOptions,
+    column_count: usize,
+) -> Result<PreparedKind, PredicateError> {
     if let ColumnScope::Column(column) = scope {
         checked_column(column, column_count)?;
     }
-    Ok(PreparedKind::Contains {
-        scope,
-        needle: needle.to_lowercase(),
-    })
+    let matcher = TextMatcher::compile(&needle, options)?.ok_or(PredicateError::EmptyNeedle)?;
+    Ok(PreparedKind::Contains { scope, matcher })
 }
 
 fn checked_column(column: usize, column_count: usize) -> Result<usize, PredicateError> {
@@ -88,10 +101,19 @@ fn comparable_value(value: Value) -> Result<Value, PredicateError> {
     Ok(value)
 }
 
+impl From<TextMatchError> for PredicateError {
+    fn from(error: TextMatchError) -> Self {
+        match error {
+            TextMatchError::EmptyNeedle => Self::EmptyNeedle,
+            TextMatchError::InvalidPattern => Self::InvalidPattern,
+        }
+    }
+}
+
 impl PreparedPredicate {
     pub fn matches(&self, row: &[Value], tally: &mut CellTally) -> bool {
         match &self.kind {
-            PreparedKind::Contains { scope, needle } => contains_in_row(row, scope, needle, tally),
+            PreparedKind::Contains { scope, matcher } => contains_in_row(row, scope, matcher, tally),
             PreparedKind::Equals { column, value } => match row.get(*column) {
                 Some(cell) if is_unreadable(cell) => {
                     tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
@@ -116,19 +138,17 @@ fn is_unreadable(cell: &Value) -> bool {
     matches!(cell, Value::Undecodable(_)) && !cell.is_missing_field()
 }
 
-fn contains_in_row(row: &[Value], scope: &ColumnScope, needle: &str, tally: &mut CellTally) -> bool {
+fn contains_in_row(row: &[Value], scope: &ColumnScope, matcher: &TextMatcher, tally: &mut CellTally) -> bool {
     match scope {
-        ColumnScope::Any => row.iter().any(|cell| cell_contains(cell, needle, tally)),
-        ColumnScope::Column(column) => row.get(*column).is_some_and(|cell| cell_contains(cell, needle, tally)),
+        ColumnScope::Any => row.iter().any(|cell| cell_contains(cell, matcher, tally)),
+        ColumnScope::Column(column) => row.get(*column).is_some_and(|cell| cell_contains(cell, matcher, tally)),
     }
 }
 
-fn cell_contains(cell: &Value, needle: &str, tally: &mut CellTally) -> bool {
+fn cell_contains(cell: &Value, matcher: &TextMatcher, tally: &mut CellTally) -> bool {
     match search_text(cell) {
-        SearchText::Text(text) => contains_ignore_case(&text, needle),
-        SearchText::TextOrHex(text, bytes) => {
-            contains_ignore_case(text, needle) || contains_ignore_case(&hex_text(bytes), needle)
-        }
+        SearchText::Text(text) => matcher.matches(&text),
+        SearchText::TextOrHex(text, bytes) => matcher.matches(text) || matcher.matches(&hex_text(bytes)),
         SearchText::Never => false,
         SearchText::Unsearchable => {
             tally.unsearchable_cells = tally.unsearchable_cells.saturating_add(1);
@@ -176,23 +196,6 @@ fn hex_text(bytes: &[u8]) -> String {
     }
     text
 }
-
-fn contains_ignore_case(haystack: &str, needle_lower: &str) -> bool {
-    if !needle_lower.is_ascii() {
-        return haystack.to_lowercase().contains(needle_lower);
-    }
-    let needle = needle_lower.as_bytes();
-    if haystack
-        .as_bytes()
-        .windows(needle.len())
-        .any(|window| window.eq_ignore_ascii_case(needle))
-    {
-        return true;
-    }
-    !haystack.is_ascii() && haystack.contains(FOLDS_TO_ASCII) && haystack.to_lowercase().contains(needle_lower)
-}
-
-const FOLDS_TO_ASCII: [char; 2] = ['\u{0130}', '\u{212A}'];
 
 #[cfg(test)]
 mod tests;

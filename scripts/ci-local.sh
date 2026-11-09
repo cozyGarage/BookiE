@@ -81,7 +81,7 @@ run_integration() {
   echo "==> SQL and document/key-value driver integration"
   cargo test --locked --test integration \
     -p bookie-driver-postgres -p bookie-driver-mysql -p bookie-driver-mssql \
-    -p bookie-driver-clickhouse -p bookie-driver-redis -p bookie-driver-mongodb \
+    -p bookie-driver-clickhouse -p bookie-driver-redis -p bookie-driver-mongodb -p bookie-driver-oracle \
     -- --include-ignored --test-threads=1
   cargo test --locked -p bookie-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
   cargo test --locked -p bookie-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1

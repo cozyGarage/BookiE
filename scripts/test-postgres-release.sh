@@ -95,6 +95,12 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
     elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
       echo "a source-matched prebuilt test bundle is required" >&2
       exit 1
+    elif [[ -n "${BOOKIE_GTK_BINARY:-}" ]]; then
+      if [[ ! -x "$BOOKIE_GTK_BINARY" ]]; then
+        echo "the supplied GTK test binary is not executable: $BOOKIE_GTK_BINARY" >&2
+        exit 1
+      fi
+      cargo build --locked -p bookie-ssh --bin bookie-askpass
     else
       cargo build --locked -p bookie-ssh --bin bookie-askpass
       cargo build --locked -p bookie-app --bin bookie-app
@@ -126,5 +132,6 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_KEY="$BOOKIE_FIXTURE_MATERIALS/client_ed25519_key" \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_CA="$BOOKIE_FIXTURE_MATERIALS/ca.crt" \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_PASSWORD=bookie \
+      PATH="$BOOKIE_TARGET_DIR/debug:$PATH" \
       bash scripts/test-gtk-safety.sh
   '

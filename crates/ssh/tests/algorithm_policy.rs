@@ -51,7 +51,11 @@ async fn start_peer(config: Config) -> u16 {
 }
 
 async fn open_against(preferred: Preferred) -> SshError {
-    let port = start_peer(peer_config(preferred)).await;
+    open_config(peer_config(preferred)).await
+}
+
+async fn open_config(peer: Config) -> SshError {
+    let port = start_peer(peer).await;
     let config = SshConfig {
         host: "127.0.0.1".into(),
         port,
@@ -118,4 +122,27 @@ async fn a_peer_offering_only_a_sha1_mac_is_refused_by_name() {
     );
     assert_eq!(class, AlgorithmClass::Mac);
     assert!(offered.contains("hmac-sha1"), "{offered}");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_peer_offering_only_a_sha1_rsa_host_key_is_refused_by_name() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("host_rsa");
+    let status = std::process::Command::new("ssh-keygen")
+        .args(["-q", "-t", "rsa", "-b", "2048", "-N", "", "-f"])
+        .arg(&path)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let peer = Config {
+        keys: vec![PrivateKey::read_openssh_file(path).unwrap()],
+        preferred: Preferred {
+            key: Cow::Owned(vec![russh::keys::Algorithm::Rsa { hash: None }]),
+            ..Preferred::DEFAULT
+        },
+        ..Config::default()
+    };
+    let (class, offered) = refused(open_config(peer).await);
+    assert_eq!(class, AlgorithmClass::HostKey);
+    assert!(offered.contains("ssh-rsa"), "{offered}");
 }

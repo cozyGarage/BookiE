@@ -34,6 +34,50 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
     });
 }
 
+#[test]
+fn editing_a_cell_does_not_write_its_value_to_process_output() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "ui_tests::a_valid_edit_is_applied_to_the_typed_cell_and_marked",
+            "--nocapture",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("2026-02-03"));
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("2026-02-03"));
+}
+
+#[gpui::test]
+fn opening_a_query_reveals_its_tab_in_an_overflowing_workspace(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            for index in 0..15 {
+                view.tabs.open_table(&format!("table_{index}"));
+            }
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &bookie_gpui_grid_prototype::shell::Tab::Query);
+        assert!(view.tab_scroll.offset().x < gpui::px(0.0));
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("open home");
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &bookie_gpui_grid_prototype::shell::Tab::Home);
+        assert_eq!(view.tab_scroll.offset().x, gpui::px(0.0));
+    });
+}
+
 #[gpui::test]
 fn an_invalid_edit_is_refused_and_keeps_the_editor_open(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
@@ -74,6 +118,49 @@ fn the_find_field_takes_typed_text_and_enter_runs_the_search(cx: &mut TestAppCon
     view.read_with(cx, |view, cx| {
         assert_eq!(view.find.read(cx).content(), "sample 149999");
         assert_eq!(view.cursor.matches, vec![149_999]);
+    });
+}
+
+#[gpui::test]
+fn changing_find_text_discards_a_pending_search_result(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
+            view.run_find(true, cx);
+        });
+    });
+    let cancel = view.read_with(cx, |view, _| view.operation_cancel.clone());
+    view.update(cx, |view, cx| {
+        view.find.update(cx, |input, cx| input.set_content("new search", cx))
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(cancel.is_cancelled());
+    view.read_with(cx, |view, _| assert!(view.cursor.matches.is_empty()));
+}
+
+#[gpui::test]
+fn changing_filter_text_discards_a_pending_filter(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.filter
+                .update(cx, |input, cx| input.set_content("label contains 7", cx));
+            view.apply_filter(cx);
+        });
+    });
+    let cancel = view.read_with(cx, |view, _| view.operation_cancel.clone());
+    view.update(cx, |view, cx| {
+        view.filter
+            .update(cx, |input, cx| input.set_content("label contains 8", cx))
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(cancel.is_cancelled());
+    view.read_with(cx, |view, _| {
+        assert!(matches!(view.mode, crate::Mode::All));
+        assert_ne!(view.status, "Filtering…");
     });
 }
 
@@ -291,6 +378,179 @@ fn the_palette_switches_the_theme_style_and_light_dark_keeps_it(cx: &mut TestApp
 
 struct Tiny;
 
+struct CountingSource(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+
+impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
+    fn total(&self) -> u64 {
+        3
+    }
+
+    fn row(&self, index: u64) -> Vec<Cell> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        bookie_gpui_grid_prototype::source::ResultSource::row(&Tiny, index)
+    }
+
+    fn find(
+        &self,
+        query: &str,
+        cap: usize,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::find(&Tiny, query, cap, cancel)
+    }
+
+    fn filter(
+        &self,
+        predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Vec<u32>, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::filter(&Tiny, predicate, cancel)
+    }
+
+    fn compare(
+        &self,
+        keyed: bool,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::compare(&Tiny, keyed, cancel)
+    }
+}
+
+#[gpui::test]
+fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &mut TestAppContext) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let requests = std::sync::Arc::new(AtomicUsize::new(0));
+    let source = std::sync::Arc::new(CountingSource(requests.clone()));
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.run_until_parked();
+    let full = "💾".repeat(10_000);
+    view.update(cx, |view, cx| {
+        view.edits.insert((1, 1), Cell::Text(full.clone()));
+        requests.store(0, Ordering::Relaxed);
+        let _ = view.row_at_position(1, cx);
+        assert_eq!(requests.load(Ordering::Relaxed), 1);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
+    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), full));
+}
+
+#[gpui::test]
+fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let value = "full\tvalue\nwith unicode 💾";
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: vec![10, 20],
+                label: "filtered".into(),
+            });
+            view.edits.insert((20, 1), Cell::Text(value.into()));
+            view.click_row(1, false);
+            view.copy_selection(false, cx);
+        });
+    });
+    let actual = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    let mut row = bookie_gpui_grid_prototype::model::row_at(20);
+    row[1] = Cell::Text(value.into());
+    let expected = bookie_gpui_grid_prototype::selection::copy_tsv([row], false);
+    assert_eq!(actual.as_deref(), Some(expected.as_str()));
+}
+
+#[gpui::test]
+fn comparing_results_clears_selection_from_the_previous_grid(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.click_row(4, false);
+            view.compare(false, cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.compare.is_some());
+        assert!(view.selection.is_none());
+    });
+}
+
+#[gpui::test]
+fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let text = format!("{}\0tail", "💾".repeat(8_192));
+    let bytes = vec![0xab; 1_000_000];
+    let json = format!("{{\"raw\":  \"{}\"}}", "x".repeat(1_000_000));
+    view.update(cx, |view, cx| {
+        view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+        view.edits.insert((0, 1), Cell::Text(text.clone()));
+        view.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
+        view.edits.insert((1, 3), Cell::JsonText(json.clone()));
+        cx.notify();
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_at(0, 3), Cell::Bytes(bytes));
+        assert_eq!(view.cell_at(1, 3), Cell::JsonText(json));
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), text));
+}
+
+#[gpui::test]
+fn opening_a_multiline_value_preserves_it_and_reports_the_single_line_editor_limit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let value = Cell::Text("first\nsecond".into());
+    view.update(cx, |view, _| {
+        view.edits.insert((0, 1), value.clone());
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.editing.is_none());
+        assert_eq!(view.edits.get(&(0, 1)), Some(&value));
+        assert!(!view.status.is_empty());
+    });
+}
+
+#[gpui::test]
+fn composed_text_selects_inside_its_replacement_after_a_unicode_prefix(cx: &mut TestAppContext) {
+    use gpui::EntityInputHandler;
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        let input = view.read(cx).find.clone();
+        input.update(cx, |input, cx| {
+            input.set_content("α OLD tail", cx);
+            input.replace_and_mark_text_in_range(Some(2..5), "💾é", Some(2..3), window, cx);
+            assert_eq!(input.content(), "α 💾é tail");
+            assert_eq!(input.selected_text_range(false, window, cx).unwrap().range, 4..5);
+            input.replace_text_in_range(None, "X", window, cx);
+            assert_eq!(input.content(), "α X tail");
+        });
+    });
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn platform_input_flattens_newlines_like_single_line_paste(cx: &mut TestAppContext) {
+    use gpui::EntityInputHandler;
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        let focus = view.read(cx).find.read(cx).focus_handle_for_tests();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_input("first\nsecond");
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| assert_eq!(view.find.read(cx).content(), "first second"));
+    cx.update(|window, cx| {
+        let input = view.read(cx).find.clone();
+        input.update(cx, |input, cx| {
+            input.replace_and_mark_text_in_range(Some(0..12), "a\n💾", Some(0..4), window, cx);
+            assert_eq!(input.content(), "a 💾");
+            assert_eq!(input.selected_text_range(false, window, cx).unwrap().range, 0..4);
+        });
+    });
+    cx.run_until_parked();
+}
+
 impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
     fn total(&self) -> u64 {
         3
@@ -305,7 +565,12 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         ]
     }
 
-    fn find(&self, query: &str, _cap: usize) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+    fn find(
+        &self,
+        query: &str,
+        _cap: usize,
+        _cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
         Ok(bookie_gpui_grid_prototype::model::FindResult {
             matches: if query == "tiny 2" { vec![2] } else { Vec::new() },
             capped: false,
@@ -313,12 +578,20 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         })
     }
 
-    fn filter(&self, _predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Vec<u32> {
-        vec![1]
+    fn filter(
+        &self,
+        _predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        _cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Vec<u32>, &'static str> {
+        Ok(vec![1])
     }
 
-    fn compare(&self, keyed: bool) -> bookie_gpui_grid_prototype::model::Diff {
-        bookie_gpui_grid_prototype::model::build_diff(3, keyed)
+    fn compare(
+        &self,
+        keyed: bool,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
+        bookie_gpui_grid_prototype::model::build_diff(3, keyed, cancel)
     }
 }
 
@@ -383,6 +656,357 @@ fn selecting_an_earlier_run_restores_its_result_and_clears_the_view_state(cx: &m
         assert!(view.selection.is_none() && view.edits.is_empty());
         assert!(view.status.contains("Run 1"));
     });
+}
+
+#[gpui::test]
+fn selecting_the_active_result_keeps_its_filter_and_selection(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: vec![2, 4],
+                label: "filtered".into(),
+            });
+            view.click_row(1, false);
+            view.select_run(view.active_run);
+            assert_eq!(view.dataset_count(), 2);
+            assert_eq!(view.selection.map(|selection| selection.focus), Some(1));
+        });
+    });
+}
+
+#[gpui::test]
+fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.activate_run(0);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
+            view.activate_run(1);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.close_run(0);
+            assert_eq!(view.runs.len(), 1);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
+            view.close_run(0);
+            assert!(view.runs.is_empty());
+            assert!(view.edits.is_empty());
+            assert_eq!(view.dataset_count(), 0);
+            view.run_query();
+            assert_eq!(view.runs[0].number, 3);
+            assert!(view.edits.is_empty());
+        });
+    });
+}
+
+#[gpui::test]
+fn closing_the_final_run_renders_an_empty_result_pane(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.close_run(0);
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.runs.is_empty());
+        assert_eq!(view.status, "No results");
+    });
+}
+
+#[gpui::test]
+fn closing_the_last_query_result_keeps_the_synthetic_table_available(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.close_run(0);
+            assert_eq!(view.dataset_count(), 0);
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            assert_eq!(view.dataset_count(), 150_000);
+        });
+    });
+}
+
+#[gpui::test]
+fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.close_run(0);
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            view.edits.insert((1, 1), Cell::Text("table edit".into()));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.run_query();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table edit".into()));
+        });
+    });
+}
+
+#[gpui::test]
+fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("query".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            view.run_query();
+            let index = view.tabs.active;
+            view.close_tab(index);
+            assert!(view.runs.is_empty());
+            assert!(view.run_edits.is_empty());
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert_eq!(view.dataset_count(), 0);
+            view.run_query();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            let query = view.tabs.active;
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            view.close_tab(query);
+            assert!(view.runs.is_empty());
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            let query = view.tabs.active;
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            view.close_tab(query);
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            assert!(view.runs.is_empty());
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(cx, |_| (), |view, ()| view.status = "stale".into());
+            let cancel = view.operation_cancel.clone();
+            let query = view.tabs.active;
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            assert!(cancel.is_cancelled());
+            view.close_tab(query);
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale"));
+}
+
+#[gpui::test]
+fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-shift-p");
+    cx.simulate_input("close current result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert!(view.runs.is_empty()));
+}
+
+#[gpui::test]
+fn the_command_palette_navigates_between_results(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-enter ctrl-shift-p");
+    cx.simulate_input("previous result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert_eq!(view.active_run, 0));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("next result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert_eq!(view.active_run, 1));
+}
+
+#[gpui::test]
+fn a_match_in_filtered_rows_uses_its_filtered_position_for_paging(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let kept: Vec<u32> = (0..6_000).map(|row| row * 20).collect();
+            view.set_mode(crate::Mode::Filtered {
+                kept,
+                label: "filtered".into(),
+            });
+            view.cursor.set(vec![20_000]);
+            view.step_match(true);
+            assert_eq!(view.pager.page, 0);
+            assert_eq!(view.selection.map(|selection| selection.focus), Some(1_000));
+            view.cursor.set(vec![110_000]);
+            view.step_match(true);
+            assert_eq!(view.pager.page, 1);
+            assert_eq!(view.selection.map(|selection| selection.focus), Some(5_500));
+            view.cursor.set(vec![1]);
+            view.step_match(true);
+            assert_eq!(view.pager.page, 1);
+            assert_eq!(view.status, "Match is outside the filtered rows");
+        });
+    });
+}
+
+#[gpui::test]
+fn searching_after_filter_selects_the_matching_filtered_row(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let kept: Vec<u32> = (0..6_000).map(|row| row * 20).collect();
+            view.set_mode(crate::Mode::Filtered {
+                kept,
+                label: "filtered".into(),
+            });
+            window.focus(&view.find.read(cx).focus_handle_for_tests(), cx);
+        });
+    });
+    cx.simulate_input("Sample 20000");
+    cx.simulate_keystrokes("enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.pager.page, 0);
+        assert_eq!(view.selection.map(|selection| selection.focus), Some(1_000));
+    });
+}
+
+#[gpui::test]
+fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            for _ in 0..12 {
+                view.run_query();
+            }
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.run_scroll.offset().x < gpui::px(0.0)));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.activate_run(0);
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.run_scroll.offset().x, gpui::px(0.0)));
+}
+
+#[gpui::test]
+fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
+            view.close_run(1);
+            assert_eq!(view.active_run, 0);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale result"));
+}
+
+#[gpui::test]
+fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
+            view.run_query();
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale result"));
 }
 
 #[gpui::test]

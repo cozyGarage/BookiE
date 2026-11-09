@@ -53,6 +53,34 @@ fn grid_cell_view_borrows_short_utf8_bytes_without_changing_display() {
 }
 
 #[test]
+fn grid_cell_view_bounds_byte_classification_and_keeps_the_full_value_available() {
+    let text = "large text bytes".repeat(GRID_CELL_DISPLAY_MAX_CHARS / 4 + 1);
+    let value = Value::Bytes(text.as_bytes().to_vec());
+    let view = cell_view(&value, &metadata("text"));
+
+    assert_eq!(view.display_text, format!("<{} bytes>", text.len()));
+    assert!(view.truncated);
+    assert!(!view.inline_editable);
+    assert_eq!(value_to_full_edit_text(&value), text);
+}
+
+#[test]
+fn grid_byte_summaries_do_not_depend_on_invalid_bytes_or_nuls_after_the_display_budget() {
+    for tail in [0, 0xff, b'x'] {
+        let mut bytes = vec![b'a'; GRID_CELL_DISPLAY_MAX_BYTES + 1];
+        bytes[GRID_CELL_DISPLAY_MAX_BYTES] = tail;
+        let value = Value::Bytes(bytes.clone());
+        let view = cell_view(&value, &metadata("blob"));
+        assert_eq!(view.display_text, format!("<{} bytes>", bytes.len()));
+        assert_eq!(value, Value::Bytes(bytes));
+        assert!(!view.inline_editable);
+    }
+    let value = Value::Bytes(vec![b'a'; GRID_CELL_DISPLAY_MAX_BYTES]);
+    let view = cell_view(&value, &metadata("text"));
+    assert!(view.display_text.starts_with(&"a".repeat(GRID_CELL_DISPLAY_MAX_CHARS)));
+}
+
+#[test]
 fn grid_cell_view_bounds_long_text_and_keeps_full_value_formatting_available() {
     let value = Value::Text("a".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 10));
     let view = cell_view(&value, &metadata("text"));
@@ -279,6 +307,7 @@ fn cell_view_maps_only_boolean_and_bit_one_values_to_checkbox_states() {
 
 #[test]
 fn display_text_temporal_variants() {
+    set_date_format(DateFormatPref::Iso);
     let date = chrono::NaiveDate::from_ymd_opt(2026, 4, 26).unwrap();
     assert_eq!(value_to_display_text(&Value::Date(date)), "2026-04-26");
 
@@ -298,6 +327,23 @@ fn display_text_temporal_variants() {
         value_to_display_text(&Value::TimestampTz(tz)),
         "2026-04-26 14:30:00+00:00"
     );
+}
+
+#[test]
+fn dates_follow_the_chosen_format_and_copy_keeps_database_text() {
+    let day = chrono::NaiveDate::from_ymd_opt(2024, 12, 31).unwrap();
+    let at = day.and_hms_opt(23, 59, 58).unwrap();
+    let date = Value::Date(day);
+    let stamp = Value::DateTime(at);
+    set_date_format(DateFormatPref::EuShort);
+    assert_eq!(value_to_display_text(&date), "31/12/2024");
+    assert_eq!(value_to_display_text(&stamp), "31/12/2024");
+    assert_eq!(value_to_full_edit_text(&date), "2024-12-31");
+    assert_eq!(value_to_full_edit_text(&stamp), "2024-12-31 23:59:58");
+    set_date_format(DateFormatPref::UsLong);
+    assert_eq!(value_to_display_text(&stamp), "12/31/2024 11:59:58 PM");
+    assert_eq!(value_to_full_edit_text(&stamp), "2024-12-31 23:59:58");
+    set_date_format(DateFormatPref::Iso);
 }
 
 #[test]

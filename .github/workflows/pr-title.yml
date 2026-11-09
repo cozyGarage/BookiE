@@ -2,7 +2,7 @@ name: PR title
 
 on:
   pull_request:
-    branches: [linux]
+    branches: [main]
     types: [opened, edited, reopened, synchronize, ready_for_review]
 
 permissions:

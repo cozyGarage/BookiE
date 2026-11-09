@@ -8,7 +8,7 @@
     [
       "bookie-app",
       "--lib",
-      "services::browse_query::tests::clickhouse_value_query_refetches_the_exact_text_for_a_composite_key"
+      "services::browse_query::tests::clickhouse_value_query_refuses_duplicate_sort_keys"
     ],
     [
       "bookie-app",
@@ -63,7 +63,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::browse_tab::value_parse::clickhouse_enum_contract::value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values"
+      "ui::browse_tab::value_parse::clickhouse_enum_contract::value_contract_clickhouse_enum8_and_enum16_preserve_labels_and_refuse_ambiguous_edits"
     ],
     [
       "bookie-app",
@@ -335,6 +335,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::chrome_tests::focus_grid_targets_the_current_browse_view"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::a_page_reload_retires_a_pending_cell_value_request"
     ],
     [
@@ -435,6 +440,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::bulk_cancel_tests::bulk_delete_cancel_preserves_selection_and_confirm_removes_drafts_once"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_edit"
     ],
     [
@@ -486,6 +496,16 @@
       "bookie-app",
       "--lib",
       "ui::browse_tab::save_in_flight_tests::stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::replace_batch_tests::stale_later_cell_rejects_the_full_replace_batch"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::replace_batch_tests::valid_replace_batch_acknowledges_all_staged_cells_once"
     ],
     [
       "bookie-app",
@@ -790,6 +810,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::panel_tests::keyboard_shortcuts_move_focus_between_editor_and_result_grid"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::panel_tests::maximizing_and_hiding_restore_the_split_editor_and_divider"
     ],
     [
@@ -856,6 +881,21 @@
       "bookie-app",
       "--lib",
       "ui::editor::find_bar::tests::find_selects_matches_and_replace_all_rewrites_every_occurrence"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::dispatch_tests::bookmark_shortcut_from_the_secondary_pane_scrolls_that_pane_to_the_target"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::dispatch_tests::bookmark_shortcut_from_the_primary_pane_scrolls_that_pane_to_the_target"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::bookmarks::tests::toggle_jump_and_clear_move_source_marks_with_the_cursor"
     ],
     [
       "bookie-app",
@@ -1435,6 +1475,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::full_value_editor::tests::the_value_editor_marks_whitespace_only_when_preferences_ask"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::lifetime_tests::a_dropped_result_grid_releases_its_page"
     ],
     [
@@ -1525,6 +1570,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::local_filter::tests::local_multi_key_sort_reverses_secondary_and_clears_to_source_order"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::local_sort::tests::local_text_sort_follows_the_locale_collation_not_byte_order"
     ],
     [
@@ -1536,6 +1586,26 @@
       "bookie-app",
       "--lib",
       "ui::grid::local_sort_tests::sorting_a_fully_selected_result_restores_the_selection_in_one_signal"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::row_number_tests::browse_offset_shifts_the_leading_row_numbers"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::row_number_tests::result_grids_number_rows_from_one_and_keep_the_gutter_after_horizontal_scroll"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::highlight_rules::tests::a_new_over_limit_pattern_is_refused_without_saving_or_closing"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::highlight_rules::tests::an_unchanged_legacy_pattern_is_warned_and_survives_unrelated_changes"
     ],
     [
       "bookie-app",

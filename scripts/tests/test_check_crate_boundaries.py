@@ -1,4 +1,5 @@
 import importlib.util
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -143,6 +144,28 @@ class PreflightListTests(unittest.TestCase):
     def test_the_application_and_the_optional_duckdb_driver_are_exempt(self):
         metadata = graph(["bookie-core", "bookie-policy", "bookie-app", "bookie-driver-duckdb"], [], [])
         self.assertEqual(checker.unlisted_in_preflight(metadata, self.SCRIPT), [])
+
+
+class ExperimentBoundaryTests(unittest.TestCase):
+    def manifest(self, dependencies):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        crate = Path(directory.name) / "demo"
+        crate.mkdir()
+        (crate / "Cargo.toml").write_text(f"[package]\nname = \"demo\"\n\n[dependencies]\n{dependencies}\n")
+        return directory.name
+
+    def test_core_results_and_services_are_allowed(self):
+        root = self.manifest('bookie-core = { path = "../../crates/core" }\nbookie-results = { path = "x" }')
+        self.assertEqual(checker.experiment_problems(root), [])
+
+    def test_a_driver_is_refused(self):
+        root = self.manifest('bookie-driver-sqlite = { path = "../../crates/drivers/sqlite" }')
+        self.assertEqual(len(checker.experiment_problems(root)), 1)
+
+    def test_a_renamed_dependency_is_refused(self):
+        root = self.manifest('db = { package = "bookie-storage", path = "x" }')
+        self.assertEqual(len(checker.experiment_problems(root)), 1)
 
 
 if __name__ == "__main__":

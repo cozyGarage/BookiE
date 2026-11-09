@@ -131,7 +131,7 @@ impl BrowseTab {
         prev_button.connect_clicked(move |_| sender_for_prev.input(BrowseTabInput::PrevPage));
         let sender_for_next = sender.clone();
         next_button.connect_clicked(move |_| sender_for_next.input(BrowseTabInput::NextPage));
-        let sender_for_last = sender;
+        let sender_for_last = sender.clone();
         last_button.connect_clicked(move |_| sender_for_last.input(BrowseTabInput::LastPage));
 
         // Paginator lives in a native `gtk::ActionBar` to match the
@@ -195,9 +195,21 @@ impl BrowseTab {
         nav_box.append(&next_button);
         nav_box.append(&last_button);
 
+        let sort_status_label = gtk::Label::builder().visible(false).build();
+        sort_status_label.add_css_class("dim-label");
+        sort_status_label.add_css_class("caption");
+        let clear_sort_button = gtk::Button::with_label(&crate::tr!("Clear sort"));
+        clear_sort_button.add_css_class("flat");
+        clear_sort_button.set_visible(false);
+        clear_sort_button.set_tooltip_text(Some(&crate::tr!("Clear column sort")));
+        let sender_for_clear_sort = sender.clone();
+        clear_sort_button.connect_clicked(move |_| sender_for_clear_sort.input(BrowseTabInput::ClearSort));
+
         paginator_bar.pack_start(&insert_button);
         paginator_bar.pack_start(&nav_box);
         paginator_bar.pack_start(&paginator_label);
+        paginator_bar.pack_start(&sort_status_label);
+        paginator_bar.pack_start(&clear_sort_button);
         paginator_bar.pack_start(&selection_label);
         let inspector_button = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-right-symbolic")
@@ -221,6 +233,8 @@ impl BrowseTab {
             filter_button,
             filter_badge,
             paginator_label,
+            sort_status_label,
+            clear_sort_button,
             selection_label,
             selection_count_label,
             selection_details_label,
@@ -444,9 +458,42 @@ impl BrowseTab {
     pub(super) fn update_paginator_label(&self) {
         let Some(result) = self.current_result.as_ref() else {
             self.set_paginator_text("");
+            self.update_sort_status_label();
             return;
         };
         self.set_paginator_text(&paginator_summary(result, self.current_offset, self.current_total_rows));
+        self.update_sort_status_label();
+    }
+
+    pub(super) fn update_sort_status_label(&self) {
+        let Some(summary) = sort_status_summary(&self.current_sort_keys, &self.current_columns) else {
+            self.sort_status_label.set_visible(false);
+            self.sort_status_label.set_label("");
+            self.clear_sort_button.set_visible(false);
+            return;
+        };
+        self.sort_status_label.set_label(&summary);
+        self.sort_status_label.set_visible(true);
+        self.clear_sort_button.set_visible(true);
+    }
+
+    pub(super) fn apply_local_sort_keys(&self) {
+        if self.current_sort_keys.len() < 2 {
+            return;
+        }
+        let Some(result) = self.current_result.as_ref() else {
+            return;
+        };
+        let Some(selection) = self.current_selection.as_ref() else {
+            return;
+        };
+        let Some(model) = selection.model() else {
+            return;
+        };
+        let Ok(store) = model.downcast::<crate::ui::row_store::RowStore>() else {
+            return;
+        };
+        crate::ui::grid::sort_local_result_by_keys(result, &self.current_sort_keys, &store, selection);
     }
 
     pub(super) fn replace_status_child(&self, name: &str, child: &impl IsA<gtk::Widget>) {
@@ -484,6 +531,27 @@ impl BrowseTab {
             .build();
         self.replace_status_child("error", &page);
     }
+}
+
+fn sort_status_summary(keys: &[(usize, bool)], columns: &[ColumnInfo]) -> Option<String> {
+    if keys.is_empty() {
+        return None;
+    }
+    let parts = keys
+        .iter()
+        .map(|&(column, ascending)| {
+            let name = columns.get(column).map(|column| column.name.as_str()).unwrap_or("?");
+            let arrow = if ascending { "↑" } else { "↓" };
+            format!("{name} {arrow}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let template = if keys.len() > 1 {
+        crate::tr!("Secondary sort applies only to the loaded page: {keys}")
+    } else {
+        crate::tr!("Sorted by {keys}")
+    };
+    Some(template.replace("{keys}", &parts))
 }
 
 fn retry_button(sender: &ComponentSender<BrowseTab>) -> gtk::Button {
@@ -602,6 +670,8 @@ pub(super) struct Paginator {
     pub(super) filter_button: gtk::Button,
     pub(super) filter_badge: gtk::Label,
     pub(super) paginator_label: gtk::Label,
+    pub(super) sort_status_label: gtk::Label,
+    pub(super) clear_sort_button: gtk::Button,
     pub(super) selection_label: gtk::MenuButton,
     pub(super) selection_count_label: gtk::Label,
     pub(super) selection_details_label: gtk::Label,
@@ -630,7 +700,9 @@ pub(super) fn bind_inspector(
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary};
+    use super::{
+        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary, sort_status_summary,
+    };
     use bookie_core::{ColumnInfo, QueryResult, Value};
 
     #[test]
@@ -670,6 +742,27 @@ mod tests {
             enum_type: None,
             domain_type: None,
         }
+    }
+
+    #[test]
+    fn secondary_sort_status_says_it_only_applies_to_the_loaded_page() {
+        let columns = vec![column("id", true), column("name", false)];
+
+        assert_eq!(
+            sort_status_summary(&[(0, true), (1, false)], &columns).as_deref(),
+            Some("Secondary sort applies only to the loaded page: id ↑, name ↓")
+        );
+    }
+
+    #[test]
+    fn single_key_sort_status_keeps_its_server_sort_wording() {
+        let columns = vec![column("id", true)];
+
+        assert_eq!(
+            sort_status_summary(&[(0, true)], &columns).as_deref(),
+            Some("Sorted by id ↑")
+        );
+        assert_eq!(sort_status_summary(&[], &columns), None);
     }
 
     #[test]

@@ -7,20 +7,27 @@ use std::sync::OnceLock;
 use gtk4::glib;
 use gtk4::prelude::*;
 
+use bookie_app_services::value_display::format_temporal_for_display;
 use bookie_core::{ColumnInfo, Value};
 
-use crate::services::preferences::NullDisplayPref;
+use crate::services::preferences::{DateFormatPref, NullDisplayPref};
 
 const DISPLAY_TEXT_MAX_CHARS: usize = 10_000;
 const DISPLAY_TEXT_BYTES_THRESHOLD: usize = DISPLAY_TEXT_MAX_CHARS * 4;
 const GRID_CELL_DISPLAY_MAX_CHARS: usize = 512;
+const GRID_CELL_DISPLAY_MAX_BYTES: usize = GRID_CELL_DISPLAY_MAX_CHARS * 4;
 
 thread_local! {
     static NULL_DISPLAY: Cell<NullDisplayPref> = const { Cell::new(NullDisplayPref::Standard) };
+    static DATE_FORMAT: Cell<DateFormatPref> = const { Cell::new(DateFormatPref::Iso) };
 }
 
 pub fn set_null_display(style: NullDisplayPref) {
     NULL_DISPLAY.set(style);
+}
+
+pub fn set_date_format(format: DateFormatPref) {
+    DATE_FORMAT.set(format);
 }
 
 pub fn editable_null_sentinel() -> String {
@@ -116,6 +123,9 @@ pub(super) fn cell_view_with_column_editability<'a>(
 fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
     match value {
         Value::Text(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, true, None),
+        Value::Bytes(bytes) if bytes.len() > GRID_CELL_DISPLAY_MAX_BYTES => {
+            (Cow::Owned(format!("<{} bytes>", bytes.len())), true)
+        }
         Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
             Ok(text) if !text.contains('\0') => {
                 text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None)
@@ -128,6 +138,11 @@ fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
         Value::JsonText(text) => text_to_display_text_cow(text, GRID_CELL_DISPLAY_MAX_CHARS, false, None),
         _ => bounded_owned_text(value_to_display_text(value), GRID_CELL_DISPLAY_MAX_CHARS),
     }
+}
+
+pub(super) fn highlight_display_text(value: &Value, column: &ColumnInfo) -> (String, bool) {
+    let view = cell_view_with_column_editability(value, column, false);
+    (view.text_for_bind(false).into_owned(), view.is_null)
 }
 
 fn bounded_owned_text(mut text: String, max_chars: usize) -> (Cow<'static, str>, bool) {
@@ -172,7 +187,13 @@ pub fn value_to_display_text(value: &Value) -> String {
     match value {
         Value::Text(text) => text_to_display_text(text),
         Value::Json(json) => json_to_display_text(json),
-        other => value_to_text(other, truncate_for_display),
+        other => {
+            if let Some(text) = format_temporal_for_display(other, DATE_FORMAT.get()) {
+                text
+            } else {
+                value_to_text(other, truncate_for_display)
+            }
+        }
     }
 }
 
@@ -305,7 +326,7 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
     preview_display_text(preview, usize::MAX)
 }
 
-fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
+pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
     let total = match preview.byte_count {
         crate::ui::row_object::PreviewByteCount::Exact(bytes) => {
             crate::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
@@ -350,6 +371,10 @@ pub(crate) fn value_to_full_edit_text(value: &Value) -> String {
         Value::Null => String::new(),
         other => value_to_text(other, ToString::to_string),
     }
+}
+
+pub(crate) fn value_to_copy_text(value: &Value) -> String {
+    bookie_app_services::value_display::copy_text(value).into_string()
 }
 
 pub(super) fn value_is_inline_editable(value: &Value) -> bool {

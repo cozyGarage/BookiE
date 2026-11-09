@@ -59,7 +59,6 @@ fn parse_enum_input(text: &str, col: Option<&ColumnInfo>, style: EnumInputStyle)
     })
 }
 
-#[cfg(test)]
 fn registered_enum_input_style(driver_id: &str) -> EnumInputStyle {
     use std::sync::OnceLock;
 
@@ -266,8 +265,7 @@ pub(super) fn parse_input_for_grid_cell(
     )
 }
 
-#[cfg(test)]
-pub(super) fn parse_grid_cell_input(
+pub(in crate::ui) fn parse_grid_cell_input(
     text: &str,
     col: Option<&ColumnInfo>,
     driver_id: &str,

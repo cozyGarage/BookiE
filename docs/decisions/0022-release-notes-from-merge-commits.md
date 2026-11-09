@@ -26,7 +26,7 @@ Release-Note: none
 
 ## Rationale
 
-The squash commit is the unit that reaches `linux` and the common merge record. It cannot conflict, adds no per-PR file, and keeps the note next to the change it describes. A required line, even `none`, replaces the unenforced habit of remembering to edit the changelog.
+The squash commit is the unit that reaches `main` and the common merge record. It cannot conflict, adds no per-PR file, and keeps the note next to the change it describes. A required line, even `none`, replaces the unenforced habit of remembering to edit the changelog.
 
 ## Consequences
 

@@ -38,8 +38,10 @@ pub use connection_import_navicat::{MAX_NAVICAT_BYTES, parse_navicat_connections
 pub use connection_import_peer::PeerImport;
 pub use connection_import_resp::{MAX_RESP_BYTES, looks_like_resp_export, parse_resp_connections};
 pub use connection_organization::{
-    ConnectionOrganization, ConnectionOrganizationIndex, MAX_LABEL_LEN, MAX_ORGANIZED_CONNECTIONS,
-    MAX_TAGS_PER_CONNECTION, arrange_connections, connection_matches_filter, load_organization, save_organization,
+    ConnectionOrganization, ConnectionOrganizationIndex, GROUP_PATH_SEPARATOR, GroupTreeNode, MAX_GROUP_DEPTH,
+    MAX_LABEL_LEN, MAX_ORGANIZED_CONNECTIONS, MAX_TAGS_PER_CONNECTION, arrange_connections, connection_group_tree,
+    connection_matches_filter, join_group_path, load_organization, parse_group_path, save_organization,
+    validate_group_path,
 };
 pub use connection_url::{ParsedConnectionUrl, parse_connection_url};
 pub use connections::{

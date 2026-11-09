@@ -12,7 +12,7 @@ on:
           must be pinned; the default only exists for the daily run and
           moves with the branch.
         required: false
-        default: linux
+        default: main
 
 permissions:
   contents: read
@@ -45,10 +45,10 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           persist-credentials: false
-          ref: ${{ inputs.ref || 'linux' }}
+          ref: ${{ inputs.ref || 'main' }}
       - name: Record the commit under test
         env:
-          REQUESTED_REF: ${{ inputs.ref || 'linux' }}
+          REQUESTED_REF: ${{ inputs.ref || 'main' }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           resolved="$(git rev-parse HEAD)"

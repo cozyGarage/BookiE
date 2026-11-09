@@ -12,6 +12,7 @@
 //! caller (the StructureChangeTracker). Each builder produces one
 //! statement at a time; the caller composes them.
 
+mod catalog;
 mod column;
 mod diff;
 mod index_fk;
@@ -20,6 +21,8 @@ mod types;
 
 #[cfg(test)]
 mod alter_type_using_tests;
+#[cfg(test)]
+mod catalog_tests;
 #[cfg(test)]
 mod clause_tests;
 #[cfg(test)]
@@ -37,6 +40,10 @@ mod tests;
 #[cfg(test)]
 mod truncate_tests;
 
+pub use catalog::{
+    build_create_database, build_create_schema, build_drop_database, build_drop_schema, protects_database,
+    protects_schema, supports_create_database, supports_create_schema, supports_drop_database, supports_drop_schema,
+};
 pub use column::{build_add_column, build_alter_column, build_drop_column, build_rename_column, build_reorder_column};
 pub use diff::{TableState, diff_to_ops, materialize_ops};
 pub use index_fk::{

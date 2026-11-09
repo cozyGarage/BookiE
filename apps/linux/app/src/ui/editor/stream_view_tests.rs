@@ -87,6 +87,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
     let outcome = StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT id FROM items".into(),
+        sql: "SELECT id FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(result.clone())),
         pinned: false,
@@ -365,6 +366,7 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
     let outcome = StatementOutcome {
         identity: StatementIdentity::default(),
         sql_preview: "SELECT id FROM items".into(),
+        sql: "SELECT id FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(result.clone())),
         pinned: false,

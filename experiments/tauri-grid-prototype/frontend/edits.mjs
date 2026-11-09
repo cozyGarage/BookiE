@@ -1,5 +1,18 @@
 export const EDITABLE_COLUMNS = new Set([1, 2, 3]);
 
+export async function loadEditCell(cell, load, isCurrent) {
+  let exact;
+  try {
+    exact = cell.previewed ? await load() : cell;
+  } catch (error) {
+    if (!isCurrent()) return null;
+    throw error;
+  }
+  if (!isCurrent()) return null;
+  if (exact.previewed) throw new Error('The full cell value is unavailable');
+  return exact;
+}
+
 export function createEdits() {
   const cells = new Map();
   return {
@@ -19,7 +32,7 @@ export function createEdits() {
 }
 
 export function isEditable(column, cell) {
-  return EDITABLE_COLUMNS.has(column) && cell.kind !== 'undecodable';
+  return EDITABLE_COLUMNS.has(column) && cell.kind !== 'undecodable' && !/[\r\n]/u.test(cell.value ?? '');
 }
 
 export function editStatus(count) {

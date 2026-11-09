@@ -2,7 +2,9 @@
 
 The `bookie-app` crate (`apps/linux/app`) uses [Relm4](https://relm4.org) on top of gtk4-rs. The choice is recorded in [decisions/0003-relm4-architecture.md](decisions/0003-relm4-architecture.md). This file describes the patterns used inside the codebase. Read the official Relm4 book first; this document only covers the conventions specific to BookiE.
 
-GTK-free service modules are moving incrementally into `bookie-app-services` under [ADR 0018](decisions/0018-headless-app-services-crate.md). The app re-exports those modules from `services` so callers keep their paths; services that own GTK or application wiring stay in the app.
+GTK-free service modules live in `bookie-app-services` under [ADR 0018](decisions/0018-headless-app-services-crate.md). The app re-exports those modules from `services` so callers keep their paths. What remains under `apps/linux/app/src/services/` is shell-owned: GTK / glib / gio / Relm4 / gettext adapters, `DatabaseService` composition, and thin re-exports.
+
+Multi-session window membership, tab↔connection maps, front-session selection, close/save aggregation and the open-sessions record shape live in `bookie-app-services::window_sessions` ([ADR 0040](decisions/0040-multi-session-window-workspace.md)). The record model is not yet connected to runtime persistence or multi-session startup restoration; the app currently restores one `last_connection_id` from `window.json`. Live connections in the model are `PolicyGuard` handles only. Relm4 owns tab chrome and dialogs; it must not keep a second source of truth for which tab belongs to which connection. Remaining implementation and acceptance are tracked in [#2499](https://github.com/cozyGarage/BookiE/issues/2499).
 
 Change and structure tracker registries live in `app-services`. Each GTK window owns its change and structure tracker registries and shares them with its tabs, grid and close handlers.
 
@@ -32,6 +34,27 @@ Naming:
 - Input: `<Thing>Input`, an enum. Every UI interaction is a message.
 - Output: `<Thing>Output`, an enum. Only the messages a parent should react to.
 - Command output: `<Thing>Cmd`, an enum. Async work finishes by sending one of these back.
+
+## Late results and request tickets
+
+Async loads must not apply a reply after a newer request has started. Shared helpers live in `bookie-app-services::request_ticket` (and the modules it re-exports). Relm4 commands and any future non-GTK task bridge should ask these helpers whether a reply is still current; do not add a second sequencer API in the shell.
+
+| Helper | Use when |
+|---|---|
+| `Generation` / `is_current` | Exact match: only the latest ticket for one load path may apply. |
+| `LatestApplied` | Ordered apply: a newer ticket may land first; older tickets must not overwrite it. |
+| `RevisionedGeneration` | Exact match plus a revision stamp that invalidates pending work when the editor content changes. |
+| `replace_in_flight` / `replace_scoped_in_flight` | Cancel the previous in-flight token when starting a replacement load. |
+| `SingleFlight` | Refuse a second overlapping operation until the first finishes. |
+| `after_mutation` | Run a refresh only after its mutation, without letting a later mutation overtake an earlier refresh. |
+
+Grid, editor and sidebar loads keep attaching a ticket at start and dropping stale replies in the update path.
+
+## Column widths: policy vs measure
+
+`bookie-app-services::column_widths` owns remembered widths and the numeric sizing **policy**: monospace cell counts (CJK double-width), type and empty-table defaults, and which painted strings a shell should measure. Persistence stays in the same module (`ColumnWidthStore`).
+
+Font **measurement** stays in the shell. The Linux app measures those strings with Pango in the font the grid paints. A future GPUI (or other) shell supplies its own text metrics and calls the same policy; it must not fork CJK, cap, or type-default rules into UI code.
 
 ## Async work via commands
 

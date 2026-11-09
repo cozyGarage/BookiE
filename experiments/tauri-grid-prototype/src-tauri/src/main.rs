@@ -16,6 +16,7 @@ const MAX_COPY_ROWS: u64 = 5_000;
 struct Cell {
     kind: &'static str,
     value: Option<String>,
+    previewed: bool,
 }
 
 #[derive(Serialize)]
@@ -96,7 +97,31 @@ fn cell(value: Value) -> Result<Cell, &'static str> {
         Value::JsonText(value) => ("json_text", Some(value)),
         Value::Undecodable(type_name) => ("undecodable", Some(format!("<undecodable {type_name}>"))),
     };
-    Ok(Cell { kind, value })
+    Ok(Cell {
+        kind,
+        value,
+        previewed: false,
+    })
+}
+
+fn display_cell(value: Value) -> Result<Cell, &'static str> {
+    if let Value::Bytes(bytes) = &value
+        && bytes.len() > 16
+    {
+        return Ok(Cell {
+            kind: "bytes",
+            value: Some(format!("\\x{}… ({} bytes total)", hex(&bytes[..16]), bytes.len())),
+            previewed: true,
+        });
+    }
+    let mut display = cell(value)?;
+    if let Some(text) = &mut display.value
+        && let Some((end, _)) = text.char_indices().nth(512)
+    {
+        *text = format!("{}…", &text[..end]);
+        display.previewed = true;
+    }
+    Ok(display)
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -165,7 +190,19 @@ fn values_of(index: u64, label: &str) -> Vec<Value> {
 }
 
 fn cells_of(index: u64, label: &str) -> Result<Vec<Cell>, &'static str> {
-    values_of(index, label).into_iter().map(cell).collect()
+    values_of(index, label).into_iter().map(display_cell).collect()
+}
+
+#[tauri::command]
+fn full_cell(row: u64, column: usize, total: Option<u64>) -> Result<Cell, &'static str> {
+    if row >= checked_total(total)? || column >= 4 {
+        return Err("cell is outside the synthetic result");
+    }
+    let value = values_of(row, &label_of(row))
+        .into_iter()
+        .nth(column)
+        .ok_or("cell is unavailable")?;
+    cell(value)
 }
 
 fn copy_columns() -> Vec<bookie_core::ColumnInfo> {
@@ -447,6 +484,7 @@ fn edit_cell(kind: String, text: String, as_null: bool) -> Result<Cell, String> 
         return Ok(Cell {
             kind: "null",
             value: None,
+            previewed: false,
         });
     }
     let column_kind = editable_kind(&kind).ok_or("this cell cannot be edited")?;
@@ -478,6 +516,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             scroll_done,
             report,
             sample_rows,
+            full_cell,
             copy_rows,
             edit_cell,
             find_rows,

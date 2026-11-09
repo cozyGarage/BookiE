@@ -7,10 +7,27 @@ use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, prelude
 
 use crate::text_input::InputEvent;
 use crate::ui_theme::ThemeExt;
-use crate::{CELL_WIDTHS, GridView, cell_div};
+use crate::{CELL_WIDTHS, GridView, display_cell};
 use bookie_gpui_grid_prototype::theme::Theme;
 
 pub type Edits = HashMap<(u64, usize), Cell>;
+
+pub(super) fn cursor_row(cursor: Option<Cursor>, row: usize) -> bool {
+    cursor.is_some_and(|cursor| cursor.row == row)
+}
+
+pub(super) fn cursor_column_background(cursor: Option<Cursor>, column: usize, theme: Theme) -> Option<u32> {
+    cursor.filter(|cursor| cursor.column == column).map(|_| theme.chrome)
+}
+
+fn cursor_cell_background(cursor: Option<Cursor>, row: usize, column: usize, theme: Theme) -> Option<u32> {
+    let cursor = cursor?;
+    if cursor_row(Some(cursor), row) && cursor.column == column {
+        Some(theme.background)
+    } else {
+        cursor_column_background(Some(cursor), column, theme)
+    }
+}
 
 pub struct Editing {
     pub row: u64,
@@ -38,19 +55,11 @@ impl GridView {
         let text = self.editor.read(cx).content().to_string();
         match parse_edit(editing.kind, &text) {
             Ok(cell) => {
-                println!(
-                    "PROTOTYPE_EDIT applied row={} column={} kind={} value={}",
-                    editing.row,
-                    editing.column,
-                    cell.kind(),
-                    cell.display()
-                );
                 self.edits.insert((editing.row, editing.column), cell);
                 self.status = format!("{} edited in this view only; nothing is saved.", self.edits.len());
                 self.stop_edit(window, cx);
             }
             Err(reason) => {
-                println!("PROTOTYPE_EDIT refused kind={} reason={reason}", editing.kind);
                 self.status = format!("Not applied: {reason}");
                 cx.notify();
             }
@@ -69,6 +78,11 @@ impl GridView {
         } else {
             cell.display()
         };
+        if text.contains('\n') {
+            self.status = "Multiline values cannot be edited in this single-line prototype".into();
+            cx.notify();
+            return;
+        }
         self.editing = Some(Editing {
             row,
             column,
@@ -86,7 +100,7 @@ impl GridView {
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
     }
 
-    pub fn data_cell(&self, source: u64, column: usize, position: usize, cx: &mut Context<Self>) -> Div {
+    pub fn data_cell(&self, source: u64, column: usize, position: usize, cell: &Cell, cx: &mut Context<Self>) -> Div {
         let width = CELL_WIDTHS[column];
         if self
             .editing
@@ -96,16 +110,19 @@ impl GridView {
             return crate::flex_cell(width).px_0().child(self.editor.clone());
         }
         let theme = Theme::current(cx);
-        let cell = self.cell_at(source, column);
-        let mut item = cell_div(width, cell.display());
+        let cell = self.edits.get(&(source, column)).unwrap_or(cell);
+        let mut item = display_cell(width, cell);
         if matches!(cell, Cell::Null) {
             item = item.italic().text_color(rgb(theme.muted_foreground));
         }
         if self.edits.contains_key(&(source, column)) {
             item = item.border_b_2().border_color(rgb(theme.warning));
         }
+        if let Some(background) = cursor_cell_background(self.cell_cursor, position, column, theme) {
+            item = item.bg(rgb(background));
+        }
         if self.cell_cursor == Some(Cursor { row: position, column }) {
-            item = item.border_2().border_color(rgb(theme.info)).bg(rgb(theme.background));
+            item = item.border_2().border_color(rgb(theme.info));
         }
         item.on_mouse_down(
             MouseButton::Left,
@@ -117,5 +134,24 @@ impl GridView {
                 }
             }),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn active_cell_highlights_its_row_column_and_intersection() {
+        let theme = Theme::dbx_light();
+        let cursor = Some(Cursor { row: 4, column: 2 });
+
+        assert!(cursor_row(cursor, 4));
+        assert!(!cursor_row(cursor, 5));
+        assert_eq!(cursor_column_background(cursor, 2, theme), Some(theme.chrome));
+        assert_eq!(cursor_column_background(cursor, 1, theme), None);
+        assert_eq!(cursor_cell_background(cursor, 4, 2, theme), Some(theme.background));
+        assert_eq!(cursor_cell_background(cursor, 5, 2, theme), Some(theme.chrome));
+        assert_eq!(cursor_cell_background(cursor, 4, 1, theme), None);
     }
 }

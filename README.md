@@ -39,7 +39,7 @@ BookiE is a free, open-source database client for Linux, built for data analysts
 | | |
 |---|---|
 | Platform | Linux, with a native GTK4 and libadwaita interface. |
-| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB, MongoDB and Redis are experimental and built in. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
+| Databases | PostgreSQL, MySQL and MariaDB, SQLite, SQL Server and ClickHouse. DuckDB, MongoDB, Redis and a read-only Oracle Database driver are experimental and built in. See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Every shipped feature is free, with no account, license key, subscription, paid tier or remote entitlement check. |
 | Credentials | Kept in the desktop keyring (Secret Service). |
 | Safety | Database operations pass local policy checks. Audit-intent failures block writes by default; explicit Local/Dev policy can allow a human write without an audit record. |
@@ -90,7 +90,7 @@ Every database handle that the desktop app, the MCP tools and `bookie-agentd` re
 
 ## Development
 
-The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `linux` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. The Cargo workspace lives at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`) and requires Rust 1.98.
+The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `main` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. The Cargo workspace lives at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`) and requires Rust 1.98.
 
 Start with the [documentation map](docs/README.md) and [Project #3](https://github.com/users/cozyGarage/projects/3) for selected work and acceptance criteria.
 
@@ -194,7 +194,7 @@ Start at [the documentation map](docs/README.md) for audience and ownership. Com
 
 ## Contributing
 
-Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `linux` branch and require all applicable checks before merging.
+Read [`CONTRIBUTING.md`](CONTRIBUTING.md) and the rules in [`AGENTS.md`](AGENTS.md). Pull requests for current development target the `main` branch and require all applicable checks before merging.
 
 ## Changelog
 

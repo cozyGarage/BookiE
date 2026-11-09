@@ -7,8 +7,10 @@ use std::time::Duration;
 use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, TlsMode};
 use drivers_mysql::MysqlDriver;
 use secrecy::SecretString;
+use testcontainers::GenericImage;
 use testcontainers::ImageExt;
 use testcontainers::core::IntoContainerPort;
+use testcontainers::core::{ExecCommand, WaitFor};
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -169,6 +171,37 @@ async fn a_local_socket_still_takes_the_rsa_exchange() {
 }
 
 #[tokio::test]
+async fn an_initial_cleartext_plugin_handshake_never_receives_the_password() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        send(&mut socket, 0, &handshake("mysql_clear_password")).await;
+        receive(&mut socket).await
+    });
+    let mut options = options(TlsMode::Disabled);
+    options.host = "127.0.0.1".into();
+    options.port = port;
+    let result = tokio::time::timeout(Duration::from_secs(10), MysqlDriver.connect(options))
+        .await
+        .unwrap();
+    let packet = tokio::time::timeout(Duration::from_secs(2), server)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        matches!(result, Err(DriverError::PolicyDenied(_))),
+        "{:?}",
+        result.err()
+    );
+    assert!(packet.is_none_or(|(_, payload)| {
+        !payload
+            .windows(b"never-sent-0b7f".len())
+            .any(|part| part == b"never-sent-0b7f")
+    }));
+}
+
+#[tokio::test]
 #[ignore = "requires docker"]
 async fn a_real_mysql_default_login_needs_tls_over_tcp_and_succeeds_with_it() {
     let image = Mysql::default().with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test");
@@ -199,4 +232,87 @@ async fn a_real_mysql_default_login_needs_tls_over_tcp_and_succeeds_with_it() {
     );
     let allowed = MysqlDriver.connect(credentials(TlsMode::Require)).await;
     assert!(allowed.is_ok(), "{:?}", allowed.err());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_caching_sha2_login_refuses_unprotected_tcp_and_accepts_tls() {
+    let image = GenericImage::new("mariadb", "11")
+        .with_exposed_port(3306.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
+        .with_env_var("MARIADB_ALLOW_EMPTY_ROOT_PASSWORD", "1")
+        .with_cmd(["mariadbd", "--plugin-load-add=auth_mysql_sha2"]);
+    let image = match std::env::var("BOOKIE_TEST_RUN_ID") {
+        Ok(run_id) => image.with_label("com.bookie.test-run", run_id),
+        Err(_) => image,
+    };
+    let container = image
+        .with_startup_timeout(Duration::from_secs(180))
+        .start()
+        .await
+        .unwrap();
+    let mut setup = container
+        .exec(ExecCommand::new([
+            "mariadb", "-uroot", "-e",
+            "CREATE USER 'bookie_fixture'@'%' IDENTIFIED VIA caching_sha2_password USING PASSWORD('fixture-only'); GRANT SELECT ON mysql.* TO 'bookie_fixture'@'%';",
+        ]))
+        .await
+        .unwrap();
+    let stderr = setup.stderr_to_vec().await.unwrap();
+    assert_eq!(
+        setup.exit_code().await.unwrap(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&stderr)
+    );
+    let port = container.get_host_port_ipv4(3306.tcp()).await.unwrap();
+    let credentials = |mode| {
+        let mut options = options(mode);
+        options.host = "127.0.0.1".into();
+        options.port = port;
+        options.username = "bookie_fixture".into();
+        options.database = "mysql".into();
+        options.password = SecretString::new("fixture-only".to_string().into());
+        options
+    };
+    let refused = MysqlDriver.connect(credentials(TlsMode::Disabled)).await;
+    assert!(
+        matches!(refused, Err(DriverError::PolicyDenied(_))),
+        "{:?}",
+        refused.err()
+    );
+    let allowed = MysqlDriver.connect(credentials(TlsMode::Require)).await;
+    assert!(allowed.is_ok(), "{:?}", allowed.err());
+}
+
+#[tokio::test]
+async fn a_cleartext_authentication_switch_is_a_policy_refusal_without_a_password_response() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        send(&mut socket, 0, &handshake("mysql_native_password")).await;
+        let (sequence, _) = receive(&mut socket).await.unwrap();
+        send(
+            &mut socket,
+            sequence + 1,
+            b"\xfemysql_clear_password\x00abcdefghijabcdefghij\x00",
+        )
+        .await;
+        receive(&mut socket).await
+    });
+    let mut options = options(TlsMode::Disabled);
+    options.host = "127.0.0.1".into();
+    options.port = port;
+    let result = tokio::time::timeout(Duration::from_secs(10), MysqlDriver.connect(options))
+        .await
+        .unwrap();
+    assert!(matches!(result, Err(DriverError::PolicyDenied(_))));
+    assert!(
+        tokio::time::timeout(Duration::from_secs(2), server)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_none()
+    );
 }

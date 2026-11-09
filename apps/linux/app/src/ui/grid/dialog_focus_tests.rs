@@ -12,6 +12,18 @@ fn settle() {
     }
 }
 
+fn data_column(view: &gtk4::ColumnView, index: usize) -> Option<gtk4::ColumnViewColumn> {
+    let id = index.to_string();
+    (0..view.columns().n_items()).find_map(|position| {
+        let column = view
+            .columns()
+            .item(position)?
+            .downcast::<gtk4::ColumnViewColumn>()
+            .ok()?;
+        (column.id().as_deref() == Some(id.as_str())).then_some(column)
+    })
+}
+
 fn grid(count: usize) -> gtk4::ColumnView {
     let result = Arc::new(QueryResult {
         columns: vec![ColumnInfo {
@@ -44,6 +56,7 @@ fn grid(count: usize) -> gtk4::ColumnView {
             connection_id: None,
             tab_ctx: super::super::TabGridContext::default(),
             column_widths: None,
+            highlight_settings: None,
             database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
         },
     )
@@ -83,7 +96,7 @@ fn restoration_count(dialog: &libadwaita::Dialog, view: &gtk4::ColumnView) -> st
         let count = count.clone();
         move |view| {
             count.set(count.get() + 1);
-            let column = view.columns().item(0).and_downcast::<gtk4::ColumnViewColumn>();
+            let column = data_column(view, 0);
             view.scroll_to(0, column.as_ref(), gtk4::ListScrollFlags::FOCUS, None);
         }
     });
@@ -155,7 +168,7 @@ fn virtualized_rows_keep_the_focused_cells_identity_when_revealed() {
     libadwaita::init().unwrap();
     let view = grid(5000);
     let (window, _, _) = window_with_grid(&view);
-    let column = view.columns().item(0).and_downcast::<gtk4::ColumnViewColumn>().unwrap();
+    let column = data_column(&view, 0).expect("the first data column");
     for position in [4999, 0, 2499, 0] {
         view.scroll_to(position, Some(&column), gtk4::ListScrollFlags::FOCUS, None);
         focus_navigation_row(&view);

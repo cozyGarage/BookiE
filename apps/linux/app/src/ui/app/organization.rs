@@ -73,34 +73,9 @@ impl App {
 
     pub(super) fn on_organize_connection(&self, saved: SavedConnection, sender: ComponentSender<Self>) {
         let current = self.connection_organization.get(saved.id);
-        let dialog = adw::AlertDialog::new(
-            Some(&crate::tr!("Group and tags")),
-            Some(&crate::tr!("Group “{name}” and tag it so it is easy to find.").replace("{name}", &saved.name)),
-        );
-
-        let group_row = adw::EntryRow::builder().title(crate::tr!("Group")).build();
-        group_row.set_text(current.group.as_deref().unwrap_or_default());
-        let tags_row = adw::EntryRow::builder()
-            .title(crate::tr!("Tags, separated by commas"))
-            .build();
-        tags_row.set_text(&current.tags.join(", "));
-
-        let (color_row, selected_color) = color_chooser(color_choice_index(current.color.as_deref()));
-
-        let list = gtk::ListBox::builder()
-            .selection_mode(gtk::SelectionMode::None)
-            .css_classes(["boxed-list"])
-            .build();
-        list.append(&group_row);
-        list.append(&tags_row);
-        list.append(&color_row);
-        dialog.set_extra_child(Some(&list));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("save", &crate::tr!("Save"));
-        dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
-        dialog.set_default_response(Some("save"));
-        dialog.set_close_response("cancel");
-
+        let dialog = organize_dialog(&saved.name);
+        let (group_row, tags_row, selected_color) =
+            organize_dialog_fields(&dialog, &current, &self.connection_organization.group_paths());
         let id = saved.id;
         let favorite = current.favorite;
         let input_sender = sender.input_sender().clone();
@@ -127,7 +102,7 @@ impl App {
 
     pub(super) fn on_connection_organization_rejected(&self) {
         self.show_toast(&crate::tr!(
-            "A group or tag is too long. Keep each under 64 characters."
+            "A group or tag is too long, or the group path is too deep. Keep each name under 64 characters and at most 8 levels."
         ));
     }
 
@@ -241,6 +216,90 @@ impl App {
     pub(super) fn on_import_connection_url_failed(&self) {
         self.show_toast(&crate::tr!("The imported connection could not be saved."));
     }
+}
+
+fn organize_dialog(name: &str) -> adw::AlertDialog {
+    let dialog = adw::AlertDialog::new(
+        Some(&crate::tr!("Group and tags")),
+        Some(
+            &crate::tr!(
+                "Move “{name}” into a group. Use Parent / Child for nested folders; leave the group blank to ungroup."
+            )
+            .replace("{name}", name),
+        ),
+    );
+    dialog.add_response("cancel", &crate::tr!("Cancel"));
+    dialog.add_response("save", &crate::tr!("Save"));
+    dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("save"));
+    dialog.set_close_response("cancel");
+    dialog
+}
+
+fn organize_dialog_fields(
+    dialog: &adw::AlertDialog,
+    current: &ConnectionOrganization,
+    existing_paths: &[String],
+) -> (adw::EntryRow, adw::EntryRow, Rc<Cell<u32>>) {
+    let group_row = adw::EntryRow::builder().title(crate::tr!("Group path")).build();
+    group_row.set_text(current.group.as_deref().unwrap_or_default());
+    let path_row = existing_group_path_row(&group_row, existing_paths);
+    let tags_row = adw::EntryRow::builder()
+        .title(crate::tr!("Tags, separated by commas"))
+        .build();
+    tags_row.set_text(&current.tags.join(", "));
+    let (color_row, selected_color) = color_chooser(color_choice_index(current.color.as_deref()));
+    let list = gtk::ListBox::builder()
+        .selection_mode(gtk::SelectionMode::None)
+        .css_classes(["boxed-list"])
+        .build();
+    if let Some(path_row) = path_row {
+        list.append(&path_row);
+    }
+    list.append(&group_row);
+    list.append(&tags_row);
+    list.append(&color_row);
+    dialog.set_extra_child(Some(&list));
+    (group_row, tags_row, selected_color)
+}
+
+fn existing_group_path_row(group_row: &adw::EntryRow, paths: &[String]) -> Option<adw::ActionRow> {
+    if paths.is_empty() {
+        return None;
+    }
+    let labels: Vec<&str> = std::iter::once("").chain(paths.iter().map(String::as_str)).collect();
+    let model = gtk::StringList::new(&labels);
+    let dropdown = gtk::DropDown::builder().model(&model).build();
+    if let Some(current) = paths.iter().position(|path| path == group_row.text().as_str()) {
+        dropdown.set_selected(current as u32 + 1);
+    }
+    let group_row = group_row.downgrade();
+    dropdown.connect_selected_notify(move |dropdown| {
+        let Some(group_row) = group_row.upgrade() else {
+            return;
+        };
+        let selected = dropdown.selected();
+        if selected == 0 {
+            return;
+        }
+        let Some(model) = dropdown.model() else {
+            return;
+        };
+        let Some(item) = model.item(selected) else {
+            return;
+        };
+        let Some(value) = item.downcast_ref::<gtk::StringObject>() else {
+            return;
+        };
+        group_row.set_text(value.string().as_str());
+    });
+    let row = adw::ActionRow::builder()
+        .title(crate::tr!("Existing group"))
+        .subtitle(crate::tr!("Choose a folder, then edit the path to nest further"))
+        .build();
+    row.add_suffix(&dropdown);
+    row.set_activatable_widget(Some(&dropdown));
+    Some(row)
 }
 
 fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {

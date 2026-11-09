@@ -30,6 +30,10 @@ pub(super) struct Controls {
     pub(super) next: WeakRef<gtk::Button>,
     pub(super) filter: WeakRef<gtk::Button>,
     pub(super) stop: WeakRef<gtk::Button>,
+    pub(super) match_case: WeakRef<gtk::ToggleButton>,
+    pub(super) whole_words: WeakRef<gtk::ToggleButton>,
+    pub(super) regex: WeakRef<gtk::ToggleButton>,
+    pub(super) columns: WeakRef<gtk::DropDown>,
 }
 
 pub(super) struct Tools {
@@ -88,9 +92,30 @@ struct Widgets {
     next: gtk::Button,
     filter: gtk::Button,
     stop: gtk::Button,
+    match_case: gtk::ToggleButton,
+    whole_words: gtk::ToggleButton,
+    regex: gtk::ToggleButton,
+    columns: gtk::DropDown,
 }
 
-fn build_widgets() -> Widgets {
+fn flat_toggle(label: &str, tooltip: &str, name: &str) -> gtk::ToggleButton {
+    let toggle = gtk::ToggleButton::builder().label(label).tooltip_text(tooltip).build();
+    toggle.set_widget_name(name);
+    toggle.add_css_class("flat");
+    toggle
+}
+
+fn column_dropdown(names: &[String]) -> gtk::DropDown {
+    let mut labels = vec![crate::tr!("All columns")];
+    labels.extend(names.iter().cloned());
+    let model = gtk::StringList::new(&labels.iter().map(String::as_str).collect::<Vec<_>>());
+    let dropdown = gtk::DropDown::new(Some(model), gtk::Expression::NONE);
+    dropdown.set_widget_name("tp-result-find-columns");
+    dropdown.set_tooltip_text(Some(&crate::tr!("Column scope")));
+    dropdown
+}
+
+fn build_widgets(column_names: &[String]) -> Widgets {
     let find = gtk::Box::new(gtk::Orientation::Horizontal, 4);
     find.set_widget_name("tp-result-tools");
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
@@ -107,6 +132,10 @@ fn build_widgets() -> Widgets {
         &crate::tr!("Previous match"),
     );
     let next = labelled_button("go-down-symbolic", "tp-result-find-next", &crate::tr!("Next match"));
+    let match_case = flat_toggle("Aa", &crate::tr!("Match case"), "tp-result-find-match-case");
+    let whole_words = flat_toggle("W", &crate::tr!("Whole words"), "tp-result-find-whole-words");
+    let regex = flat_toggle(".*", &crate::tr!("Regular expression"), "tp-result-find-regex");
+    let columns = column_dropdown(column_names);
     let status = gtk::Label::new(None);
     status.set_widget_name("tp-result-find-status");
     status.set_xalign(0.0);
@@ -122,6 +151,10 @@ fn build_widgets() -> Widgets {
         entry.upcast_ref::<gtk::Widget>(),
         previous.upcast_ref(),
         next.upcast_ref(),
+        match_case.upcast_ref(),
+        whole_words.upcast_ref(),
+        regex.upcast_ref(),
+        columns.upcast_ref(),
         status.upcast_ref(),
     ] {
         find.append(widget);
@@ -137,6 +170,10 @@ fn build_widgets() -> Widgets {
         next,
         filter,
         stop,
+        match_case,
+        whole_words,
+        regex,
+        columns,
     }
 }
 
@@ -150,7 +187,8 @@ pub(in crate::ui::editor) fn append(target: ToolsTarget<'_>) {
         sender,
     } = target;
     let Some(spool) = result.spool.clone() else { return };
-    let widgets = build_widgets();
+    let column_names: Vec<String> = result.columns.iter().map(|column| column.name.clone()).collect();
+    let widgets = build_widgets(&column_names);
     let tools = Rc::new(Tools {
         source: ScanSource::new(spool, result.columns.clone(), result.total_rows as u64),
         result: result.clone(),
@@ -165,6 +203,10 @@ pub(in crate::ui::editor) fn append(target: ToolsTarget<'_>) {
             next: widgets.next.downgrade(),
             filter: widgets.filter.downgrade(),
             stop: widgets.stop.downgrade(),
+            match_case: widgets.match_case.downgrade(),
+            whole_words: widgets.whole_words.downgrade(),
+            regex: widgets.regex.downgrade(),
+            columns: widgets.columns.downgrade(),
         },
         cursor: RefCell::new(MatchCursor::default()),
         cancel: RefCell::new(CancellationToken::new()),
@@ -174,12 +216,18 @@ pub(in crate::ui::editor) fn append(target: ToolsTarget<'_>) {
     });
     super::actions::connect(
         &tools,
-        &widgets.find,
-        &widgets.entry,
-        &widgets.previous,
-        &widgets.next,
-        &widgets.filter,
-        &widgets.stop,
+        super::actions::ActionWidgets {
+            row: &widgets.find,
+            entry: &widgets.entry,
+            previous: &widgets.previous,
+            next: &widgets.next,
+            filter: &widgets.filter,
+            stop: &widgets.stop,
+            match_case: &widgets.match_case,
+            whole_words: &widgets.whole_words,
+            regex: &widgets.regex,
+            columns: &widgets.columns,
+        },
     );
     header.append(&widgets.find);
     header.append(&widgets.actions);

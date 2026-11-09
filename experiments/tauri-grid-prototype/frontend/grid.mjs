@@ -1,5 +1,6 @@
 const MAX_HEIGHT = 8_000_000;
 const OVERSCAN = 3;
+const CONTROL_MARKERS = { '\n': '↵', '\r': '␍', '\t': '⇥', '\0': '␀', '\u2028': '↵', '\u2029': '↵' };
 
 export function visibleWindow(scrollTop, viewportHeight, rowHeight, totalRows) {
   if (totalRows <= 0 || viewportHeight <= 0 || rowHeight <= 0) return { offset: 0, limit: 0, height: 0 };
@@ -13,7 +14,19 @@ export function visibleWindow(scrollTop, viewportHeight, rowHeight, totalRows) {
 }
 
 export function displayCell(cell) {
-  return cell.kind === 'null' ? 'NULL' : cell.value;
+  if (cell.kind === 'null') return 'NULL';
+  const value = cell.value;
+  if (cell.kind === 'bytes' && value.startsWith('\\x') && value.length > 34 && value.length % 2 === 0) {
+    return `${value.slice(0, 34)}… (${(value.length - 2) / 2} bytes total)`;
+  }
+  let shown = '';
+  let count = 0;
+  for (const character of value) {
+    if (count === 512) return `${shown}…`;
+    shown += CONTROL_MARKERS[character] ?? character;
+    count += 1;
+  }
+  return shown;
 }
 
 const KINDS = new Set([

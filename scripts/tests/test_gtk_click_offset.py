@@ -2,6 +2,7 @@ import ctypes
 import importlib.util
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -83,6 +84,32 @@ class GtkPointerWindowTests(unittest.TestCase):
         self.xtst.XTestFakeMotionEvent.assert_called_once_with(1, -1, 110, 89, 0)
         self.xtst.XTestFakeButtonEvent.assert_any_call(1, 3, 1, 0)
         self.xtst.XTestFakeButtonEvent.assert_any_call(1, 3, 0, 0)
+
+
+class GtkArtifactNameTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("gtk_ux", ROOT / "apps/linux/app/tests/gtk_ux.py")
+        self.ui = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"gtk_input": gtk_input, "keyboard_paths": Mock()}):
+            spec.loader.exec_module(self.ui)
+
+    def test_artifact_paths_do_not_include_row_values(self):
+        values = ['quoted "value"', "slash/value", "line one\nline two", "漢字" * 3000]
+        with tempfile.TemporaryDirectory() as root:
+            with patch.dict(os.environ, {"BOOKIE_GTK_ARTIFACT_DIR": root, "GDK_BACKEND": "x11"}), \
+                 patch.object(self.ui.shutil, "which", side_effect=lambda name: "/usr/bin/scrot" if name == "scrot" else None), \
+                 patch.object(self.ui.subprocess, "run") as run:
+                for value in values:
+                    self.ui.capture_grid_navigation_artifact(value)
+
+            paths = [Path(call.args[0][-1]) for call in run.call_args_list]
+            self.assertEqual(len(paths), len(values))
+            self.assertEqual(len(set(paths)), len(values))
+            for path in paths:
+                with self.subTest(path=path.name):
+                    self.assertEqual(path.parent, Path(root))
+                    self.assertRegex(path.name, r"^grid-navigation-[0-9a-f]{32}\.png$")
+                    self.assertFalse(any(value in str(path) for value in values))
 
 
 if __name__ == "__main__":

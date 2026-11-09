@@ -41,12 +41,15 @@ impl App {
     pub(super) fn on_show_er_diagram(&self, schema: Option<String>) {
         crate::ui::diagram::present(
             self.window.upcast_ref::<relm4::gtk::Window>(),
-            schema,
-            self.connection_id,
+            crate::ui::diagram::DiagramRequest {
+                schema,
+                connection_id: self.connection_id,
+                capabilities: crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
+                scope: self.catalog_dialog_cancel.borrow().clone(),
+                hidden_schemas: self.hidden_schema_names(),
+            },
             &self.database,
             &self.preferences,
-            crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
-            self.catalog_dialog_cancel.borrow().clone(),
         );
     }
 
@@ -60,6 +63,7 @@ impl App {
                 driver_id: self.driver_id().to_string(),
                 capabilities: crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id()),
                 scope: self.catalog_dialog_cancel.borrow().clone(),
+                hidden_schemas: self.hidden_schema_names(),
             },
             &self.database,
             &self.preferences,
@@ -1042,14 +1046,19 @@ impl App {
         let token = crate::services::request_generation::replace_in_flight(&self.catalog_cancel);
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let hidden_schemas = self.hidden_schema_names();
         let sender_for_cmd = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let result = async {
-                        let tables = conn.list_tables_controlled(&control).await?;
-                        let views = conn.list_views_controlled(&control).await?;
+                        let tables =
+                            crate::services::catalog::list_tables_excluding(conn.as_ref(), &hidden_schemas, &control)
+                                .await?;
+                        let views =
+                            crate::services::catalog::list_views_excluding(conn.as_ref(), &hidden_schemas, &control)
+                                .await?;
                         Ok::<_, bookie_core::DriverError>((tables, views))
                     }
                     .await

@@ -5,7 +5,7 @@ use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values() {
+async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_and_refuse_ambiguous_edits() {
     use bookie_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::core::wait::HttpWaitStrategy;
     use testcontainers::core::{IntoContainerPort, WaitFor};
@@ -51,7 +51,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
         .unwrap();
     connection
         .execute(
-            "INSERT INTO enum16_grid VALUES (1, 'low', 'low'), (2, 'NULL', 'NULL'), (3, NULL, NULL), (4, 'high', 'high'), (5, 'low', 'low'), (6, 'low', 'low')",
+            "INSERT INTO enum16_grid VALUES (1, 'low', 'low'), (1, 'NULL', 'NULL'), (2, NULL, NULL), (3, 'high', 'high'), (4, '', ''), (5, 'O''Brien', 'low')",
         )
         .await
         .unwrap();
@@ -60,7 +60,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
     let id_index = columns.iter().position(|column| column.name == "id").unwrap();
     let state_index = columns.iter().position(|column| column.name == "state").unwrap();
     let state8_index = columns.iter().position(|column| column.name == "state8").unwrap();
-    assert!(columns[id_index].primary_key, "id is the MergeTree ordering key");
+    assert!(!columns[id_index].primary_key);
     assert!(columns[state_index].nullable);
     assert!(columns[state_index].data_type.starts_with("Nullable(Enum16("));
     assert!(columns[state8_index].nullable);
@@ -68,6 +68,18 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
 
     let high = parse_input_for_grid_cell("high", Some(&columns[state_index]), "clickhouse", None).unwrap();
     assert_eq!(high, Value::Text("high".into()));
+    let null_label = parse_input_for_grid_cell("NULL", Some(&columns[state_index]), "clickhouse", None).unwrap();
+    assert_eq!(null_label, Value::Text("NULL".into()));
+    let clear = parse_input_for_grid_cell("", Some(&columns[state_index]), "clickhouse", None).unwrap();
+    assert_eq!(clear, Value::Null);
+    let empty_label = parse_input_for_grid_cell("''", Some(&columns[state_index]), "clickhouse", None).unwrap();
+    assert_eq!(empty_label, Value::Text(String::new()));
+    let apostrophe_label =
+        parse_input_for_grid_cell("'O''Brien'", Some(&columns[state_index]), "clickhouse", None).unwrap();
+    assert_eq!(apostrophe_label, Value::Text("O'Brien".into()));
+    let empty_enum8 = parse_input_for_grid_cell("''", Some(&columns[state8_index]), "clickhouse", None).unwrap();
+    assert_eq!(empty_enum8, Value::Text(String::new()));
+
     let update = bookie_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
@@ -75,141 +87,82 @@ async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_a
         &columns,
         &[(state_index, high)],
         &[Value::Int(1)],
-    )
-    .unwrap();
-    connection.execute_in_transaction(&[update]).await.unwrap();
+    );
+    assert!(update.is_err());
 
-    let clear = parse_input_for_grid_cell("", Some(&columns[state_index]), "clickhouse", None).unwrap();
-    assert_eq!(clear, Value::Null);
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "enum16_grid",
-        &columns,
-        &[(state_index, clear)],
-        &[Value::Int(2)],
-    )
-    .unwrap();
-    connection.execute_in_transaction(&[update]).await.unwrap();
+    let invalid = parse_input_for_grid_cell("not-a-label", Some(&columns[state_index]), "clickhouse", None).unwrap();
+    assert_eq!(invalid, Value::Text("not-a-label".into()));
+    assert!(
+        connection
+            .execute_params(
+                "INSERT INTO enum16_grid VALUES (?, ?, ?)",
+                &[Value::Int(6), invalid, Value::Text("low".into())],
+            )
+            .await
+            .is_err()
+    );
 
-    let empty_label = parse_input_for_grid_cell("''", Some(&columns[state_index]), "clickhouse", None).unwrap();
-    assert_eq!(empty_label, Value::Text(String::new()));
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "enum16_grid",
-        &columns,
-        &[(state_index, empty_label)],
-        &[Value::Int(5)],
-    )
-    .unwrap();
-    connection.execute_in_transaction(&[update]).await.unwrap();
-
-    let empty_enum8 = parse_input_for_grid_cell("''", Some(&columns[state8_index]), "clickhouse", None).unwrap();
-    assert_eq!(empty_enum8, Value::Text(String::new()));
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "enum16_grid",
-        &columns,
-        &[(state8_index, empty_enum8)],
-        &[Value::Int(5)],
-    )
-    .unwrap();
-    connection.execute_in_transaction(&[update]).await.unwrap();
-
-    let apostrophe_label =
-        parse_input_for_grid_cell("'O''Brien'", Some(&columns[state_index]), "clickhouse", None).unwrap();
-    assert_eq!(apostrophe_label, Value::Text("O'Brien".into()));
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "enum16_grid",
-        &columns,
-        &[(state_index, apostrophe_label)],
-        &[Value::Int(6)],
-    )
-    .unwrap();
-    connection.execute_in_transaction(&[update]).await.unwrap();
-
-    let before_refusal = connection
-        .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state), state8, CAST(assumeNotNull(state8) AS Int8), isNull(state8) FROM enum16_grid ORDER BY id")
+    let rows = connection
+        .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state), state8, CAST(assumeNotNull(state8) AS Int8), isNull(state8) FROM enum16_grid ORDER BY id, state")
         .await
         .unwrap();
     assert_eq!(
-        before_refusal.rows,
+        rows.rows,
         vec![
             vec![
                 Value::Int(1),
-                Value::Text("high".into()),
-                Value::Int(32767),
+                Value::Text("low".into()),
+                Value::Int(-32768),
                 Value::Int(0),
                 Value::Text("low".into()),
                 Value::Int(-128),
-                Value::Int(0)
+                Value::Int(0),
+            ],
+            vec![
+                Value::Int(1),
+                Value::Text("NULL".into()),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Text("NULL".into()),
+                Value::Int(0),
+                Value::Int(0),
             ],
             vec![
                 Value::Int(2),
                 Value::Null,
                 Value::Int(0),
                 Value::Int(1),
-                Value::Text("NULL".into()),
-                Value::Int(0),
-                Value::Int(0)
-            ],
-            vec![
-                Value::Int(3),
                 Value::Null,
                 Value::Int(0),
                 Value::Int(1),
-                Value::Null,
-                Value::Int(0),
-                Value::Int(1)
             ],
             vec![
-                Value::Int(4),
+                Value::Int(3),
                 Value::Text("high".into()),
                 Value::Int(32767),
                 Value::Int(0),
                 Value::Text("high".into()),
                 Value::Int(127),
-                Value::Int(0)
+                Value::Int(0),
             ],
             vec![
-                Value::Int(5),
+                Value::Int(4),
                 Value::Text(String::new()),
                 Value::Int(1),
                 Value::Int(0),
                 Value::Text(String::new()),
                 Value::Int(1),
-                Value::Int(0)
+                Value::Int(0),
             ],
             vec![
-                Value::Int(6),
+                Value::Int(5),
                 Value::Text("O'Brien".into()),
                 Value::Int(2),
                 Value::Int(0),
                 Value::Text("low".into()),
                 Value::Int(-128),
-                Value::Int(0)
+                Value::Int(0),
             ],
         ]
     );
-
-    let invalid = parse_input_for_grid_cell("not-a-label", Some(&columns[state_index]), "clickhouse", None).unwrap();
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "enum16_grid",
-        &columns,
-        &[(state_index, invalid)],
-        &[Value::Int(1)],
-    )
-    .unwrap();
-    assert!(connection.execute_in_transaction(&[update]).await.is_err());
-    let after_refusal = connection
-        .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state), state8, CAST(assumeNotNull(state8) AS Int8), isNull(state8) FROM enum16_grid ORDER BY id")
-        .await
-        .unwrap();
-    assert_eq!(after_refusal.rows, before_refusal.rows);
 }

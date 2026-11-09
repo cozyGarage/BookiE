@@ -4,12 +4,14 @@ use std::time::{Duration, Instant};
 mod assets;
 mod chrome;
 mod grid_edit;
+mod render;
 mod text_input;
 mod ui_theme;
 
 use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
 use bookie_gpui_grid_prototype::model::*;
 use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
+use bookie_gpui_grid_prototype::preview::cell_preview;
 use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
 use bookie_gpui_grid_prototype::shell::{
     DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag,
@@ -18,10 +20,11 @@ use bookie_gpui_grid_prototype::source::{Source, Synthetic};
 use bookie_gpui_grid_prototype::theme::{Style, Theme};
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
-    MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size, uniform_list,
+    MouseDownEvent, ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
 };
 use text_input::{InputEvent, TextInput};
+use tokio_util::sync::CancellationToken;
 use ui_theme::ThemeExt;
 
 const ROW_HEIGHT: f32 = 26.0;
@@ -36,6 +39,7 @@ enum Mode {
 
 struct GridView {
     source: Source,
+    table_source: Source,
     mode: Mode,
     pager: Pager,
     continuous: bool,
@@ -45,6 +49,8 @@ struct GridView {
     editor: Entity<TextInput>,
     editing: Option<grid_edit::Editing>,
     edits: grid_edit::Edits,
+    table_edits: grid_edit::Edits,
+    grid_is_query: bool,
     cell_cursor: Option<Cursor>,
     viewport_rows: usize,
     palette_input: Entity<TextInput>,
@@ -52,8 +58,12 @@ struct GridView {
     palette_index: usize,
     dark_mode: bool,
     tabs: Tabs,
+    tab_scroll: ScrollHandle,
     runs: Vec<Run>,
+    run_edits: Vec<grid_edit::Edits>,
     active_run: usize,
+    run_scroll: ScrollHandle,
+    next_run_number: usize,
     summary_view: bool,
     result_ratio: f32,
     result_open: bool,
@@ -69,6 +79,7 @@ struct GridView {
     sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
+    operation_cancel: CancellationToken,
     compare: Option<Diff>,
     status: String,
     selection: Option<Selection>,
@@ -124,7 +135,7 @@ impl Focusable for GridView {
 
 impl GridView {
     fn new(total: u64, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        Self::with_source(std::sync::Arc::new(Synthetic { total }), started, window, cx)
+        Self::with_source(std::sync::Arc::new(Synthetic::new(total)), started, window, cx)
     }
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -133,17 +144,24 @@ impl GridView {
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
+                this.invalidate_background();
                 this.cursor = MatchCursor::default();
+                this.status.clear();
                 cx.notify();
             }
             InputEvent::Submit => this.run_find(true, cx),
             InputEvent::Cancel => this.status.clear(),
         })
         .detach();
-        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| {
-            if *event == InputEvent::Submit {
-                this.apply_filter(cx);
+        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| match event {
+            InputEvent::Changed => {
+                this.invalidate_background();
+                if this.status == "Filtering…" {
+                    this.status.clear();
+                }
             }
+            InputEvent::Submit => this.apply_filter(cx),
+            InputEvent::Cancel => {}
         })
         .detach();
         let editor = cx.new(|cx| TextInput::new("", cx));
@@ -172,6 +190,7 @@ impl GridView {
         )
         .detach();
         GridView {
+            table_source: source.clone(),
             source,
             mode: Mode::All,
             pager: Pager::new(total),
@@ -182,6 +201,8 @@ impl GridView {
             editor,
             editing: None,
             edits: Default::default(),
+            table_edits: Default::default(),
+            grid_is_query: false,
             cell_cursor: None,
             viewport_rows: 10,
             palette_input,
@@ -189,8 +210,12 @@ impl GridView {
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
+            tab_scroll: ScrollHandle::new(),
             runs: vec![Run { number: 1, rows: total }],
+            run_edits: vec![grid_edit::Edits::new()],
             active_run: 0,
+            run_scroll: ScrollHandle::new(),
+            next_run_number: 2,
             summary_view: false,
             result_ratio: DEFAULT_RESULT_RATIO,
             result_open: true,
@@ -206,6 +231,7 @@ impl GridView {
             sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
+            operation_cancel: CancellationToken::new(),
             compare: None,
             status: String::new(),
             selection: None,
@@ -222,6 +248,9 @@ impl GridView {
     }
 
     fn dataset_count(&self) -> u64 {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return 0;
+        }
         match &self.mode {
             Mode::All => self.source.total(),
             Mode::Filtered { kept, .. } => kept.len() as u64,
@@ -273,7 +302,16 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let rows = (selection.first()..=selection.last()).map(|index| self.source.row(self.source_row(index)));
+        let rows = (selection.first()..=selection.last()).map(|index| {
+            let source = self.source_row(index);
+            let mut row = self.source.row(source);
+            for (column, cell) in row.iter_mut().enumerate() {
+                if let Some(edited) = self.edits.get(&(source, column)) {
+                    *cell = edited.clone();
+                }
+            }
+            row
+        });
         let text = copy_tsv(rows, with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -285,22 +323,127 @@ impl GridView {
     }
 
     fn run_query(&mut self) {
-        let run = next_run(&self.runs);
+        let run = next_run(self.next_run_number);
+        self.next_run_number += 1;
         self.runs.push(run);
+        self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
+    }
+
+    fn close_tab(&mut self, index: usize) {
+        let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
+        self.tabs.close(index);
+        self.sync_grid_owner();
+        if !closing_query {
+            return;
+        }
+        if self.grid_is_query {
+            self.invalidate_background();
+            self.edits = std::mem::take(&mut self.table_edits);
+            self.source = self.table_source.clone();
+            self.grid_is_query = false;
+            self.editing = None;
+            self.compare = None;
+            self.cursor = MatchCursor::default();
+            self.set_mode(Mode::All);
+        }
+        self.runs.clear();
+        self.run_edits.clear();
+        self.active_run = 0;
+        self.next_run_number = 1;
+    }
+
+    fn sync_grid_owner(&mut self) {
+        self.tab_scroll.scroll_to_item(self.tabs.active);
+        let query = match self.tabs.current() {
+            Tab::Query => true,
+            Tab::Table(name) if name == DATA_TABLE => false,
+            _ => {
+                self.invalidate_background();
+                return;
+            }
+        };
+        if query == self.grid_is_query {
+            return;
+        }
+        self.invalidate_background();
+        self.editing = None;
+        self.compare = None;
+        self.cursor = MatchCursor::default();
+        if query {
+            self.table_edits = std::mem::take(&mut self.edits);
+            if let Some(run) = self.runs.get(self.active_run).copied() {
+                self.show_run(self.active_run, run);
+            } else {
+                self.source = self.table_source.clone();
+                self.set_mode(Mode::All);
+            }
+        } else {
+            if let Some(edits) = self.run_edits.get_mut(self.active_run) {
+                *edits = std::mem::take(&mut self.edits);
+            }
+            self.edits = std::mem::take(&mut self.table_edits);
+            self.source = self.table_source.clone();
+            self.set_mode(Mode::All);
+        }
+        self.grid_is_query = query;
     }
 
     fn activate_run(&mut self, index: usize) {
         let Some(run) = self.runs.get(index).copied() else {
             return;
         };
+        self.invalidate_background();
+        if let Some(previous) = self.run_edits.get_mut(self.active_run) {
+            *previous = std::mem::take(&mut self.edits);
+        }
+        self.show_run(index, run);
+    }
+
+    fn select_run(&mut self, index: usize) {
+        if index != self.active_run {
+            self.activate_run(index);
+        }
+    }
+
+    fn show_run(&mut self, index: usize, run: Run) {
+        self.run_scroll.scroll_to_item(index);
+        self.edits = std::mem::take(&mut self.run_edits[index]);
+        self.editing = None;
         self.active_run = index;
-        self.source = std::sync::Arc::new(Synthetic { total: run.rows });
-        self.edits.clear();
+        self.source = std::sync::Arc::new(Synthetic::new(run.rows));
         self.compare = None;
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
+    }
+
+    fn close_run(&mut self, index: usize) {
+        if index >= self.runs.len() {
+            return;
+        }
+        self.runs.remove(index);
+        self.run_edits.remove(index);
+        if index < self.active_run {
+            self.active_run -= 1;
+            return;
+        }
+        if index != self.active_run {
+            return;
+        }
+        self.invalidate_background();
+        self.edits.clear();
+        if self.runs.is_empty() {
+            self.source = self.table_source.clone();
+            self.editing = None;
+            self.compare = None;
+            self.cursor = MatchCursor::default();
+            self.set_mode(Mode::All);
+            self.status = "No results".into();
+            return;
+        }
+        let next = index.min(self.runs.len() - 1);
+        self.show_run(next, self.runs[next]);
     }
 
     fn set_mode(&mut self, mode: Mode) {
@@ -326,13 +469,15 @@ impl GridView {
     fn begin_background<T: Send + 'static>(
         &mut self,
         cx: &mut Context<Self>,
-        work: impl FnOnce() -> T + Send + 'static,
+        work: impl FnOnce(CancellationToken) -> T + Send + 'static,
         apply: impl FnOnce(&mut Self, T) + 'static,
     ) {
-        self.generation += 1;
+        self.invalidate_background();
         let generation = self.generation;
+        let cancel = CancellationToken::new();
+        self.operation_cancel = cancel.clone();
         cx.spawn(async move |this, cx| {
-            let result = cx.background_executor().spawn(async move { work() }).await;
+            let result = cx.background_executor().spawn(async move { work(cancel) }).await;
             this.update(cx, |this, cx| {
                 if this.generation == generation {
                     apply(this, result);
@@ -345,7 +490,7 @@ impl GridView {
     }
 
     fn run_find(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if self.find_text(cx).is_empty() {
+        if self.dataset_count() == 0 || self.find_text(cx).is_empty() {
             return;
         }
         if !self.cursor.matches.is_empty() && self.cursor.status(false) != "No match" {
@@ -356,7 +501,7 @@ impl GridView {
         self.status = "Searching…".into();
         self.begin_background(
             cx,
-            move || source.find(&query, MAX_FIND_MATCHES),
+            move |cancel| source.find(&query, MAX_FIND_MATCHES, &cancel),
             move |this, found| match found {
                 Ok(found) => {
                     this.find_capped = found.capped;
@@ -370,12 +515,15 @@ impl GridView {
 
     fn step_match(&mut self, forward: bool) {
         if let Some(row) = self.cursor.step(forward) {
-            let at = self.dataset_index_of(row);
-            self.selection = at.map(|index| Selection::after_click(None, index, false));
+            let Some(at) = self.dataset_index_of(row) else {
+                self.status = "Match is outside the filtered rows".into();
+                return;
+            };
+            self.selection = Some(Selection::after_click(None, at, false));
             if !self.continuous {
-                self.pager.contains_row(row);
+                self.pager.contains_row(at);
             }
-            let local = row.saturating_sub(self.base()) as usize;
+            let local = at.saturating_sub(self.base()) as usize;
             self.scroll.scroll_to_item_strict(local, ScrollStrategy::Center);
         }
         self.status = self.cursor.status(self.find_capped);
@@ -396,6 +544,9 @@ impl GridView {
     }
 
     fn apply_filter(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return;
+        }
         let predicate = match parse_predicate(self.filter.read(cx).content()) {
             Ok(predicate) => predicate,
             Err(message) => {
@@ -408,8 +559,15 @@ impl GridView {
         self.status = "Filtering…".into();
         self.begin_background(
             cx,
-            move || source.filter(&predicate),
+            move |cancel| source.filter(&predicate, &cancel),
             move |this, kept| {
+                let kept = match kept {
+                    Ok(kept) => kept,
+                    Err(message) => {
+                        this.status = message.into();
+                        return;
+                    }
+                };
                 this.set_mode(Mode::Filtered { kept, label });
                 this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
             },
@@ -417,24 +575,36 @@ impl GridView {
     }
 
     fn clear_filter(&mut self) {
-        self.generation += 1;
+        self.invalidate_background();
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status.clear();
     }
 
     fn compare(&mut self, keyed: bool, cx: &mut Context<Self>) {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return;
+        }
         let source = self.source.clone();
         self.status = "Comparing…".into();
         self.begin_background(
             cx,
-            move || source.compare(keyed),
-            |this, diff| {
-                this.status.clear();
-                this.compare = Some(diff);
-                this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+            move |cancel| source.compare(keyed, &cancel),
+            |this, result| match result {
+                Ok(diff) => {
+                    this.status.clear();
+                    this.selection = None;
+                    this.compare = Some(diff);
+                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+                }
+                Err(message) => this.status = message.into(),
             },
         );
+    }
+
+    fn invalidate_background(&mut self) {
+        self.generation += 1;
+        self.operation_cancel.cancel();
     }
 
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -467,6 +637,7 @@ impl GridView {
                 "b" => self.sidebar_open = !self.sidebar_open,
                 "t" => {
                     self.tabs.open_query();
+                    self.sync_grid_owner();
                     window.focus(&self.focus, cx);
                 }
                 "enter" if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
@@ -610,6 +781,21 @@ impl GridView {
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
+                "previous-run",
+                "Previous result",
+                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
+            ),
+            action(
+                "next-run",
+                "Next result",
+                matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
+            ),
+            action(
+                "close-run",
+                "Close current result",
+                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
+            ),
+            action(
                 "results",
                 if self.result_open {
                     "Hide the results pane"
@@ -695,15 +881,23 @@ impl GridView {
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
-            "home" => self.tabs.open_home(),
+            "home" => {
+                self.tabs.open_home();
+                self.sync_grid_owner();
+            }
             "query" => {
                 self.tabs.open_query();
+                self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
             "run" => self.run_query(),
+            "previous-run" => self.activate_run(self.active_run - 1),
+            "next-run" => self.activate_run(self.active_run + 1),
+            "close-run" => self.close_run(self.active_run),
             "results" => self.result_open = !self.result_open,
             "table" => {
                 self.tabs.open_table(DATA_TABLE);
+                self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
             "theme-dbx" | "theme-adwaita" => {
@@ -853,6 +1047,29 @@ pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
 }
 
+fn display_cell(width: f32, cell: &Cell) -> Div {
+    let item = cell_div(width, cell_preview(cell));
+    if numeric_cell(cell) { item.justify_end() } else { item }
+}
+
+fn numeric_cell(cell: &Cell) -> bool {
+    matches!(cell, Cell::Int(_) | Cell::Float(_) | Cell::Decimal(_))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_numeric_cells_use_right_alignment() {
+        assert!(numeric_cell(&Cell::Int(7)));
+        assert!(numeric_cell(&Cell::Float(7.5)));
+        assert!(numeric_cell(&Cell::Decimal("7.50".into())));
+        assert!(!numeric_cell(&Cell::Text("7".into())));
+        assert!(!numeric_cell(&Cell::Null));
+    }
+}
+
 fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
     let background = if selected {
         theme.active_row
@@ -867,316 +1084,6 @@ fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
         .h(px(ROW_HEIGHT))
         .w_full()
         .bg(rgb(background))
-}
-
-impl Render for GridView {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        self.note_frame();
-        self.pace_frame(window);
-        let theme = Theme::current(cx);
-        self.viewport_rows = self.viewport_rows_for(window);
-        let (first, last) = self.pager.range();
-        let title = match &self.mode {
-            Mode::Filtered { label, .. } => format!("{label} · "),
-            Mode::All => String::new(),
-        };
-        let progress = format!(
-            "{title}Complete · Received {} rows · {} pages",
-            thousands(self.dataset_count()),
-            self.pager.pages()
-        );
-        let range_label = if self.dataset_count() == 0 {
-            "Rows 0".to_string()
-        } else if self.continuous {
-            format!("Rows 1-{}", thousands(self.dataset_count()))
-        } else {
-            format!("Rows {}-{}", thousands(first), thousands(last))
-        };
-        let strip = div()
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .gap_2()
-            .p_2()
-            .bg(rgb(theme.chrome))
-            .border_b_1()
-            .border_color(rgb(theme.border))
-            .child(div().child(progress))
-            .child(button("first", "First", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.first();
-                cx.notify();
-            })))
-            .child(
-                button("prev", "Previous page", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.pager.previous();
-                    cx.notify();
-                })),
-            )
-            .child(div().child(range_label))
-            .child(
-                button("next", "Next page", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.pager.next();
-                    cx.notify();
-                })),
-            )
-            .child(button("last", "Last", theme).on_click(cx.listener(|this, _, _, cx| {
-                this.pager.last();
-                cx.notify();
-            })))
-            .child(div().w(px(260.0)).child(self.find.clone()))
-            .child(
-                button("find-prev", "Previous match", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
-            )
-            .child(
-                button("find-next", "Next match", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
-            )
-            .child(
-                button("show", "Show matching rows", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.show_matching(cx);
-                    cx.notify();
-                })),
-            )
-            .child(button("compare", "Compare…", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
-            .child(button("export", "Export all rows…", theme))
-            .child(
-                button(
-                    "continuous",
-                    if self.continuous {
-                        "Continuous scrolling: on"
-                    } else {
-                        "Continuous scrolling"
-                    },
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.continuous = !this.continuous;
-                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
-                    cx.notify();
-                })),
-            )
-            .child(div().text_color(rgb(theme.muted_foreground)).child(self.status.clone()));
-        let filter_row = self.filter_visible.then(|| {
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .pb_2()
-                .child(div().child("WHERE"))
-                .child(div().w(px(420.0)).child(self.filter.clone()))
-                .child(button("apply", "Apply", theme).on_click(cx.listener(|this, _, _, cx| this.apply_filter(cx))))
-                .child(
-                    button("clear", "Clear all", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.clear_filter();
-                        cx.notify();
-                    })),
-                )
-        });
-        let compare_bar = self.compare.as_ref().map(|diff| {
-            let s = &diff.summary;
-            let summary = if s.keyed {
-                format!(
-                    "Equal {} · Removed {} · Changed {}",
-                    thousands(s.equal),
-                    thousands(s.removed),
-                    thousands(s.changed)
-                )
-            } else {
-                format!(
-                    "Equal {} · Added {} · Removed {}",
-                    thousands(s.equal),
-                    thousands(s.added),
-                    thousands(s.removed)
-                )
-            };
-            let capped = if diff.capped {
-                format!(" · first {MAX_DIFF_ROWS} differences shown")
-            } else {
-                String::new()
-            };
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .px_2()
-                .pb_2()
-                .child(div().child(format!("COMPARE {summary}{capped}")))
-                .child(
-                    button("whole", "Whole row", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
-                )
-                .child(
-                    button("keyed", "Key: value", theme).on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))),
-                )
-                .child(
-                    button("close-compare", "Close", theme).on_click(cx.listener(|this, _, _, cx| {
-                        this.compare = None;
-                        cx.notify();
-                    })),
-                )
-        });
-        let header = row_div(false, false, theme)
-            .h(px(HEADER_HEIGHT))
-            .bg(rgb(theme.muted))
-            .border_b_1()
-            .border_color(rgb(theme.border))
-            .font_weight(gpui::FontWeight::SEMIBOLD)
-            .text_color(rgb(theme.muted_foreground))
-            .child(fixed_cell(GUTTER_WIDTH, "#".into()))
-            .child(cell_div(CELL_WIDTHS[0], "value".into()))
-            .child(cell_div(CELL_WIDTHS[1], "label".into()))
-            .child(cell_div(CELL_WIDTHS[2], "state".into()))
-            .child(cell_div(CELL_WIDTHS[3], "typed".into()));
-        let list = uniform_list(
-            "rows",
-            self.visible_count(),
-            cx.processor(|this, range: Range<usize>, _window, cx| {
-                range
-                    .map(|index| this.row_at_position(index, cx))
-                    .collect::<Vec<Stateful<Div>>>()
-            }),
-        )
-        .track_scroll(&self.scroll)
-        .flex_1();
-        let palette = self.palette_open.then(|| self.palette_overlay(cx));
-        let grid = div()
-            .flex_1()
-            .flex()
-            .flex_col()
-            .min_h_0()
-            .child(strip)
-            .children(filter_row)
-            .children(compare_bar)
-            .child(header)
-            .child(list);
-        let content = match self.tabs.current().clone() {
-            Tab::Home => self.home_page(theme, cx),
-            Tab::Query => self.query_page(theme, grid, cx),
-            Tab::Table(name) if name == DATA_TABLE => grid,
-            Tab::Table(name) => self.placeholder_page(&name, theme),
-        };
-        let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
-        let toolbar = self.toolbar(theme, cx);
-        let tab_bar = self.tab_bar(theme, cx);
-        div()
-            .size_full()
-            .relative()
-            .flex()
-            .flex_col()
-            .bg(rgb(theme.background))
-            .text_color(rgb(theme.foreground))
-            .text_size(px(13.0))
-            .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
-            .track_focus(&self.focus)
-            .on_key_down(cx.listener(Self::key_down))
-            .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
-                if this.resizing_sidebar {
-                    this.sidebar_width = f32::from(event.position.x).clamp(180.0, 480.0);
-                    cx.notify();
-                }
-                if this.resizing_split {
-                    let height = f32::from(window.viewport_size().height) - 72.0 - 24.0;
-                    this.result_ratio = result_ratio_from_drag(f32::from(event.position.y), 72.0, height);
-                    cx.notify();
-                }
-            }))
-            .on_mouse_up(
-                MouseButton::Left,
-                cx.listener(|this, _: &gpui::MouseUpEvent, _, cx| {
-                    let was_resizing =
-                        std::mem::take(&mut this.resizing_sidebar) | std::mem::take(&mut this.resizing_split);
-                    if was_resizing {
-                        cx.notify();
-                    }
-                }),
-            )
-            .child(toolbar)
-            .child(
-                div()
-                    .flex_1()
-                    .flex()
-                    .min_h_0()
-                    .children(sidebar)
-                    .child(div().flex_1().flex().flex_col().min_w_0().child(tab_bar).child(content)),
-            )
-            .child(self.status_bar(theme))
-            .children(palette)
-    }
-}
-
-impl GridView {
-    fn palette_overlay(&self, cx: &mut Context<Self>) -> Div {
-        let theme = Theme::current(cx);
-        let actions = self.palette_actions();
-        let shown = palette_matches(self.palette_input.read(cx).content(), &actions);
-        let selected = self.palette_index.min(shown.len().saturating_sub(1));
-        let list = shown.iter().enumerate().map(|(position, index)| {
-            let row = div().px_2().py_1().rounded_md().child(actions[*index].label.clone());
-            if position == selected {
-                row.bg(rgb(theme.active_row))
-            } else {
-                row
-            }
-        });
-        let empty = shown.is_empty().then(|| {
-            div()
-                .px_2()
-                .text_color(rgb(theme.muted_foreground))
-                .child("No matching command")
-        });
-        div().absolute().top(px(90.0)).w_full().flex().justify_center().child(
-            div()
-                .w(px(520.0))
-                .p_2()
-                .gap_1()
-                .flex()
-                .flex_col()
-                .rounded(px(6.0))
-                .border_1()
-                .border_color(rgb(theme.border))
-                .bg(rgb(theme.background))
-                .shadow_lg()
-                .child(self.palette_input.clone())
-                .children(list)
-                .children(empty),
-        )
-    }
-
-    fn row_at_position(&self, position: usize, cx: &mut Context<Self>) -> Stateful<Div> {
-        let theme = Theme::current(cx);
-        if let Some(diff) = &self.compare {
-            let Some(row) = diff.rows.get(position) else {
-                return row_div(false, false, theme).id(position);
-            };
-            return row_div(position % 2 == 1, false, theme)
-                .id(position)
-                .child(fixed_cell(70.0, row.change.to_string()))
-                .child(cell_div(CELL_WIDTHS[0], row.cells[0].display()))
-                .child(cell_div(CELL_WIDTHS[1], row.cells[1].display()))
-                .child(cell_div(CELL_WIDTHS[2], row.cells[2].display()))
-                .child(cell_div(CELL_WIDTHS[3], row.cells[3].display()));
-        }
-        let dataset_index = self.base() + position as u64;
-        let source = self.source_row(dataset_index);
-        let selected = self
-            .selection
-            .is_some_and(|selection| selection.contains(dataset_index));
-        row_div(position % 2 == 1, selected, theme)
-            .id(position)
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
-                    this.click_row(dataset_index, event.modifiers.shift);
-                    cx.notify();
-                }),
-            )
-            .child(fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
-            .child(self.data_cell(source, 0, position, cx))
-            .child(self.data_cell(source, 1, position, cx))
-            .child(self.data_cell(source, 2, position, cx))
-            .child(self.data_cell(source, 3, position, cx))
-    }
 }
 
 fn main() {
@@ -1201,7 +1108,10 @@ fn main() {
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
                     if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
-                        view.update(cx, |view, _| view.tabs.open_query());
+                        view.update(cx, |view, _| {
+                            view.tabs.open_query();
+                            view.sync_grid_owner();
+                        });
                     }
                     if autoscroll > 0 {
                         view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));

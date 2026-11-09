@@ -22,6 +22,7 @@ mod params;
 mod pool;
 mod pool_saturation;
 mod query;
+mod relations;
 mod session;
 mod temporal;
 #[cfg(test)]
@@ -178,26 +179,11 @@ impl Connection for PgConnection {
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT n.nspname, c.relname
-             FROM pg_catalog.pg_class c
-             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-             WHERE c.relkind IN ('r', 'p')
-               AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-               AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
-               AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
-             ORDER BY n.nspname, c.relname",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| TableInfo {
-                schema: Some(r.get::<String, _>(0)),
-                name: r.get::<String, _>(1),
-            })
-            .collect())
+        self.list_tables_excluding(&[]).await
+    }
+
+    async fn list_tables_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        relations::list_relations(&self.pool, &["r", "p"], schemas).await
     }
 
     async fn list_tables_scoped(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
@@ -226,26 +212,11 @@ impl Connection for PgConnection {
     }
 
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
-        let rows = sqlx::query(
-            "SELECT n.nspname, c.relname
-             FROM pg_catalog.pg_class c
-             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-             WHERE c.relkind IN ('v', 'm')
-               AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-               AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
-               AND pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
-             ORDER BY n.nspname, c.relname",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| TableInfo {
-                schema: Some(r.get::<String, _>(0)),
-                name: r.get::<String, _>(1),
-            })
-            .collect())
+        self.list_views_excluding(&[]).await
+    }
+
+    async fn list_views_excluding(&self, schemas: &[String]) -> Result<Vec<TableInfo>, DriverError> {
+        relations::list_relations(&self.pool, &["v", "m"], schemas).await
     }
 
     async fn list_objects(
@@ -254,6 +225,15 @@ impl Connection for PgConnection {
         schema: Option<&str>,
     ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         catalog::list_objects(&self.pool, kind, schema).await
+    }
+
+    async fn list_objects_excluding(
+        &self,
+        kind: bookie_core::CatalogObjectKind,
+        schema: Option<&str>,
+        excluded_schemas: &[String],
+    ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
+        catalog::list_objects_excluding(&self.pool, kind, schema, excluded_schemas).await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {

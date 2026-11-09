@@ -774,6 +774,8 @@ dependencies = [
  "gpui-pre-platform",
  "rust_decimal",
  "serde_json",
+ "tokio",
+ "tokio-util",
  "unicode-segmentation",
  "uuid",
 ]
@@ -786,6 +788,7 @@ dependencies = [
  "bookie-core",
  "chrono",
  "getrandom 0.3.4",
+ "regex",
  "rmp-serde",
  "rust_decimal",
  "secrecy",

@@ -47,6 +47,7 @@ async fn connecting_with_a_bad_certificate_keeps_the_certificate_recovery_guidan
         CandidateBootstrap {
             guard_factory: &factory,
             metadata: &metadata,
+            hidden_schemas: &[],
         },
     )
     .await

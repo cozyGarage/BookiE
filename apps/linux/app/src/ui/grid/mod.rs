@@ -11,20 +11,31 @@ mod column_width_tests;
 mod context_menu;
 mod dialog_focus;
 mod display;
+mod display_refresh;
 mod editing;
 mod export;
 mod font_zoom;
 pub(crate) mod full_value_editor;
+mod highlight_paint;
+mod highlight_rules;
+pub(crate) use highlight_rules::HighlightPersist;
 #[cfg(test)]
 mod lifetime_tests;
 pub(crate) mod local_filter;
 mod local_sort;
+mod pinned_numbers;
 mod presentation;
 mod row_find;
+mod row_number_column;
+#[cfg(test)]
+mod row_number_tests;
 mod types;
 mod value_viewer;
 pub(crate) use column_order::displayed_column_order;
 pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_null};
+
+use std::cell::Cell;
+use std::rc::Rc;
 
 use gtk4::prelude::*;
 
@@ -39,7 +50,9 @@ use context_menu::install_grid_context_menus;
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
 pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
-pub use display::{focused_cell_identity, last_clicked_cell, set_null_display, value_to_display_text};
+pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
+pub use display_refresh::refresh_date_displays_under;
+pub use pinned_numbers::wrap_in_scrolled as wrap_grid_scrolled;
 pub(crate) use value_viewer::present as present_value_viewer;
 
 pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
@@ -48,7 +61,7 @@ pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
 
 #[derive(Debug)]
 pub enum GridMsg {
-    SortChanged(usize, bool),
+    SortChanged(Vec<(usize, bool)>),
     EditsFlushed {
         revision: u64,
         reply: tokio::sync::oneshot::Sender<Result<(), String>>,
@@ -67,6 +80,17 @@ pub enum GridMsg {
         col_index: usize,
         value: bookie_core::Value,
         row_key: Vec<bookie_core::Value>,
+    },
+    ReplaceBatch {
+        report: bookie_app_services::grid_replace::ReplaceReport,
+        generation: u64,
+        cancel: tokio_util::sync::CancellationToken,
+        reply: tokio::sync::oneshot::Sender<
+            Result<
+                bookie_app_services::grid_replace::ReplaceAcknowledgement,
+                bookie_app_services::grid_replace::ReplaceApplyError,
+            >,
+        >,
     },
     CopyToClipboard(String),
     FetchCellValue {
@@ -113,6 +137,7 @@ pub enum GridMsg {
     ShowReferencingRows {
         row: Vec<(String, bookie_core::Value)>,
     },
+    HighlightRulesChanged,
 }
 
 #[derive(Clone, Default)]
@@ -129,6 +154,7 @@ pub struct TabGridContext {
     pub local_result_view: Option<local_filter::LocalResultView>,
     pub whole_result_filter: bool,
     pub changed_cells: Option<std::sync::Arc<bookie_app_services::result_compare::ChangedCells>>,
+    pub highlight_rules: Option<std::sync::Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>>,
     pub(crate) result_model: Option<gtk4::gio::ListModel>,
     pub(crate) row_visibility: Option<std::rc::Rc<dyn Fn(u32, bool)>>,
     pub sortable_result_columns: std::collections::HashSet<usize>,
@@ -140,6 +166,7 @@ pub struct TabGridContext {
     pub filters_unavailable: bool,
     pub choices: ChoiceMap,
     pub ambiguous_keys: AmbiguousKeys,
+    pub row_number_base: u64,
 }
 
 pub type AmbiguousKeys =
@@ -160,6 +187,7 @@ pub struct GridEnv {
     pub connection_id: Option<uuid::Uuid>,
     pub tab_ctx: TabGridContext,
     pub column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    pub highlight_settings: Option<HighlightPersist>,
     pub database: std::sync::Arc<DatabaseService>,
 }
 
@@ -180,6 +208,7 @@ pub fn build_column_view(
         connection_id,
         tab_ctx,
         column_widths,
+        highlight_settings,
         database,
     } = env;
     let result: &QueryResult = shared;
@@ -228,6 +257,7 @@ pub fn build_column_view(
     } else {
         &result.columns
     };
+    let display_columns: std::sync::Arc<[ColumnInfo]> = columns.to_vec().into();
     let model = tab_ctx.result_model.clone().unwrap_or_else(|| store.clone().upcast());
     let selection = gtk4::MultiSelection::new(Some(model));
     if tab_ctx.result_model.is_none()
@@ -240,6 +270,10 @@ pub fn build_column_view(
         .show_row_separators(true)
         .show_column_separators(true)
         .build();
+    column_view.add_css_class("data-table");
+    let row_number_base = Rc::new(Cell::new(tab_ctx.row_number_base));
+    let numbers = row_number_column::build(row_number_base.clone());
+    column_view.append_column(&numbers);
 
     if let Some(sender) = menu_sender.as_ref() {
         let driver_id = connection_id
@@ -284,6 +318,7 @@ pub fn build_column_view(
                 || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
             default_min_width,
             column_widths: column_widths.clone(),
+            display_columns: display_columns.clone(),
         };
         let (col, edit_trigger) = build_column(&header, i, spec);
         col.set_id(Some(&i.to_string()));
@@ -320,14 +355,43 @@ pub fn build_column_view(
         database,
     );
     if tab_ctx.result_model.is_none() {
+        let editable_flags: Vec<bool> = columns
+            .iter()
+            .enumerate()
+            .map(|(index, column)| {
+                edit_sender.is_some() && is_cell_editable(schema_columns.get(index).unwrap_or(column))
+            })
+            .collect();
         row_find::install(
             &column_view,
             &grid_actions,
-            columns.iter().map(|column| column.name.clone()).collect(),
+            row_find::FindTarget {
+                names: columns.iter().map(|column| column.name.clone()).collect(),
+                editable: editable_flags,
+                pk_indices: tab_ctx.pk_col_indices.clone(),
+                generation: store.generation(),
+                edit: edit_sender.clone(),
+            },
         );
     }
+    highlight_rules::install(
+        &column_view,
+        &grid_actions,
+        columns.iter().map(|column| column.name.clone()).collect(),
+        highlight_settings,
+        menu_sender.clone(),
+    );
     font_zoom::install(&column_view, &grid_actions);
     column_view.insert_action_group("grid", Some(&grid_actions));
+    row_number_column::fit(&column_view, tab_ctx.row_number_base);
+    {
+        let weak = column_view.downgrade();
+        column_view.columns().connect_items_changed(move |_, _, _, _| {
+            if let Some(view) = weak.upgrade() {
+                row_number_column::keep_first(&view);
+            }
+        });
+    }
 
     if let Some((col_idx, ascending)) = sort
         && let Some(col) = view_columns.get(col_idx)
@@ -352,42 +416,58 @@ pub fn build_column_view(
         let result_for_sort = shared.clone();
         let local_result_view = tab_ctx.local_result_view.clone();
         let sender_for_sort = sort_sender.clone();
+        let column_view_for_clear = column_view.downgrade();
         let dispatch = move |sorter: &gtk4::ColumnViewSorter| {
-            let Some(active) = sorter.primary_sort_column() else {
-                return;
-            };
-            let ascending = matches!(sorter.primary_sort_order(), gtk4::SortType::Ascending);
-            let Some(index) = columns_for_sort.iter().position(|column| column == &active) else {
-                return;
-            };
+            let keys = sort_keys_from_sorter(sorter, &columns_for_sort);
             if local {
                 if let Some(view) = &local_result_view {
-                    view.sort_by(index, ascending);
+                    view.sort_by_keys(&keys);
                 } else {
-                    sort_local_result(&result_for_sort, index, ascending, &store_for_sort, &selection_for_sort);
+                    sort_local_result_by_keys(&result_for_sort, &keys, &store_for_sort, &selection_for_sort);
                 }
             } else if let Some(sender) = &sender_for_sort {
-                sender.send(GridMsg::SortChanged(index, ascending)).ok();
+                sender.send(GridMsg::SortChanged(keys)).ok();
             }
         };
-        view_sorter.connect_primary_sort_column_notify({
-            let dispatch = dispatch.clone();
-            move |sorter| dispatch(sorter)
-        });
-        view_sorter.connect_primary_sort_order_notify(move |sorter| dispatch(sorter));
+        view_sorter.connect_changed(move |sorter, _| dispatch(sorter));
+        install_clear_sort_action(&grid_actions, column_view_for_clear);
     }
 
     (column_view, selection)
 }
 
-fn sort_local_result(
+fn sort_keys_from_sorter(sorter: &gtk4::ColumnViewSorter, columns: &[gtk4::ColumnViewColumn]) -> Vec<(usize, bool)> {
+    let mut keys = Vec::new();
+    for position in 0..sorter.n_sort_columns() {
+        let (column, order) = sorter.nth_sort_column(position);
+        let Some(column) = column else {
+            continue;
+        };
+        let Some(index) = columns.iter().position(|candidate| candidate == &column) else {
+            continue;
+        };
+        keys.push((index, matches!(order, gtk4::SortType::Ascending)));
+    }
+    keys
+}
+
+fn install_clear_sort_action(actions: &gtk4::gio::SimpleActionGroup, column_view: glib::WeakRef<gtk4::ColumnView>) {
+    let clear = gtk4::gio::SimpleAction::new("clear-sort", None);
+    clear.connect_activate(move |_, _| {
+        if let Some(view) = column_view.upgrade() {
+            view.sort_by_column(None::<&gtk4::ColumnViewColumn>, gtk4::SortType::Ascending);
+        }
+    });
+    actions.add_action(&clear);
+}
+
+pub(crate) fn sort_local_result_by_keys(
     result: &std::sync::Arc<QueryResult>,
-    column: usize,
-    ascending: bool,
+    keys: &[(usize, bool)],
     store: &RowStore,
     selection: &gtk4::MultiSelection,
 ) {
-    let Some(order) = local_sort::sorted_source_indices(result, column, ascending) else {
+    let Some(order) = local_sort::sorted_source_indices_by_keys(result, keys) else {
         return;
     };
     let selected_sources = (0..selection.n_items())
@@ -503,7 +583,7 @@ mod local_sort_tests {
         selection.select_item(0, true);
         selection.select_item(2, false);
 
-        sort_local_result(&result, 0, true, &store, &selection);
+        sort_local_result_by_keys(&result, &[(0, true)], &store, &selection);
 
         let positions = selection.selection();
         assert_eq!(positions.size(), 2);
@@ -547,7 +627,7 @@ mod local_sort_tests {
         let counter = emissions.clone();
         selection.connect_selection_changed(move |_, _, _| counter.set(counter.get() + 1));
 
-        sort_local_result(&result, 0, true, &store, &selection);
+        sort_local_result_by_keys(&result, &[(0, true)], &store, &selection);
 
         assert_eq!(selection.selection().size(), 2000);
         assert!(emissions.get() <= 2, "{} selection-changed emissions", emissions.get());

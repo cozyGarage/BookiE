@@ -5,7 +5,7 @@ use relm4::gtk::prelude::*;
 use super::App;
 use super::init_sidebar::refresh_visible;
 use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes, reveal_target};
-use crate::ui::sidebar_row::{GroupInit, SidebarObjectKind, SidebarRowInit, SidebarRowMsg};
+use crate::ui::sidebar_row::{GroupInit, SchemaCatalogActions, SidebarObjectKind, SidebarRowInit, SidebarRowMsg};
 
 fn reveal_sidebar_unless_overlay(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
     reveal_with(split_view, generation, show_unless_overlay);
@@ -55,6 +55,12 @@ pub(super) fn hide_sidebar(split_view: &adw::OverlaySplitView, generation: &std:
 }
 
 impl App {
+    pub(super) fn hidden_schema_names(&self) -> Vec<String> {
+        let mut schemas: Vec<_> = self.sidebar_hidden_schemas.borrow().iter().cloned().collect();
+        schemas.sort();
+        schemas
+    }
+
     pub(super) fn refresh_sidebar(&self, sender: relm4::ComponentSender<App>) {
         if let Some(origin) = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database) {
             self.on_schema_changed(origin, None, None, sender);
@@ -80,6 +86,7 @@ impl App {
             .map_or(&[][..], |driver| driver.capabilities().catalog_object_kinds);
         crate::services::sidebar_tree::append_catalog_entries_with(&mut nodes, catalog_kinds, &self.sidebar_catalog);
         let schema_filter_enabled = self.current_driver_id.as_deref() == Some("postgres");
+        let driver_id = self.current_driver_id.as_deref().unwrap_or_default();
         let timeout =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let source =
@@ -93,6 +100,7 @@ impl App {
                 &self.sidebar_collapsed.borrow(),
                 !self.table_search.text().trim().is_empty(),
                 schema_filter_enabled,
+                driver_id,
                 source.clone(),
             ));
         }
@@ -216,6 +224,7 @@ impl App {
             &self.preferences,
             self.catalog_dialog_cancel.borrow().clone(),
             kind,
+            self.hidden_schema_names(),
         );
     }
 
@@ -302,20 +311,26 @@ impl App {
             return;
         }
         self.sidebar_hidden_schemas.borrow_mut().insert(schema.to_string());
+        self.reset_sidebar_catalog();
         self.refresh_schema_filter(sender);
         self.persist_workspace_state();
+        self.refresh_sidebar(sender.clone());
     }
 
     pub(super) fn show_sidebar_schema(&mut self, schema: &str, sender: &relm4::ComponentSender<App>) {
         self.sidebar_hidden_schemas.borrow_mut().remove(schema);
+        self.reset_sidebar_catalog();
         self.refresh_schema_filter(sender);
         self.persist_workspace_state();
+        self.refresh_sidebar(sender.clone());
     }
 
     pub(super) fn show_all_sidebar_schemas(&mut self, sender: &relm4::ComponentSender<App>) {
         self.sidebar_hidden_schemas.borrow_mut().clear();
+        self.reset_sidebar_catalog();
         self.refresh_schema_filter(sender);
         self.persist_workspace_state();
+        self.refresh_sidebar(sender.clone());
     }
 
     pub(super) fn rebuild_schema_filter_popover(&self, sender: &relm4::ComponentSender<App>) {
@@ -384,10 +399,44 @@ fn row_for(
     collapsed: &crate::services::sidebar_tree::CollapseState,
     searching: bool,
     schema_filter_enabled: bool,
+    driver_id: &str,
     column_source: Option<crate::ui::sidebar_columns::ColumnSource>,
 ) -> SidebarRowInit {
+    use crate::services::sidebar_tree::NodeKind;
+    let create_schema = bookie_core::sql_ddl::supports_create_schema(driver_id);
+    let (kind, group) = row_kind_and_group(node, collapsed, searching, create_schema);
+    let name = match &node.kind {
+        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
+        _ => node.key.clone(),
+    };
+    let schema_name = node.schema.as_deref().unwrap_or_default();
+    SidebarRowInit {
+        info: TableInfo {
+            schema: node.schema.clone(),
+            name,
+        },
+        kind,
+        depth: node.depth,
+        group,
+        column_source,
+        schema_actions: SchemaCatalogActions {
+            create: create_schema,
+            drop: bookie_core::sql_ddl::supports_drop_schema(driver_id)
+                && !schema_name.is_empty()
+                && !bookie_core::sql_ddl::protects_schema(driver_id, schema_name),
+            hide: schema_filter_enabled,
+        },
+    }
+}
+
+fn row_kind_and_group(
+    node: &crate::services::sidebar_tree::TreeNode,
+    collapsed: &crate::services::sidebar_tree::CollapseState,
+    searching: bool,
+    create_schema: bool,
+) -> (SidebarObjectKind, Option<GroupInit>) {
     use crate::services::sidebar_tree::{GroupKind, NodeKind};
-    let (kind, group) = match &node.kind {
+    match &node.kind {
         NodeKind::Table { .. } => (SidebarObjectKind::Table, None),
         NodeKind::View { .. } => (SidebarObjectKind::View, None),
         NodeKind::Catalog(_) | NodeKind::CatalogObject { .. } | NodeKind::CatalogMore(_) => (
@@ -398,6 +447,7 @@ fn row_for(
                 collapsed: false,
                 actions: false,
                 entry: true,
+                new_schema: false,
             }),
         ),
         NodeKind::CatalogLoaded(_) => (
@@ -408,36 +458,28 @@ fn row_for(
                 collapsed: !searching && collapsed.is_collapsed(&node.key),
                 actions: false,
                 entry: false,
+                new_schema: false,
             }),
         ),
-        NodeKind::Schema | NodeKind::Group(_) => (
-            if schema_filter_enabled && node.schema.is_some() && matches!(node.kind, NodeKind::Schema) {
-                SidebarObjectKind::Schema
-            } else {
-                SidebarObjectKind::Group
-            },
-            Some(GroupInit {
-                label: sidebar_group_label(node),
-                count: node.count,
-                collapsed: !searching && collapsed.is_collapsed(&node.key),
-                actions: matches!(node.kind, NodeKind::Group(GroupKind::Tables)),
-                entry: false,
-            }),
-        ),
-    };
-    let name = match &node.kind {
-        NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
-        _ => node.key.clone(),
-    };
-    SidebarRowInit {
-        info: TableInfo {
-            schema: node.schema.clone(),
-            name,
-        },
-        kind,
-        depth: node.depth,
-        group,
-        column_source,
+        NodeKind::Schema | NodeKind::Group(_) => {
+            let is_schema = matches!(node.kind, NodeKind::Schema) && node.schema.is_some();
+            let is_tables = matches!(node.kind, NodeKind::Group(GroupKind::Tables));
+            (
+                if is_schema {
+                    SidebarObjectKind::Schema
+                } else {
+                    SidebarObjectKind::Group
+                },
+                Some(GroupInit {
+                    label: sidebar_group_label(node),
+                    count: node.count,
+                    collapsed: !searching && collapsed.is_collapsed(&node.key),
+                    actions: is_tables,
+                    entry: false,
+                    new_schema: is_tables && create_schema && node.depth == 0,
+                }),
+            )
+        }
     }
 }
 
@@ -549,7 +591,7 @@ mod sidebar_label_tests {
             .unwrap();
 
         assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
-        let init = row_for(entry, &Default::default(), false, false, None);
+        let init = row_for(entry, &Default::default(), false, false, "postgres", None);
         assert_eq!(init.kind, SidebarObjectKind::Catalog);
         let group_init = init.group.unwrap();
         assert!(group_init.entry);
@@ -581,10 +623,12 @@ mod sidebar_label_tests {
             .find(|node| matches!(node.kind, NodeKind::CatalogObject { .. }))
             .unwrap();
 
-        let branch_init = row_for(branch, &Default::default(), false, false, None).group.unwrap();
+        let branch_init = row_for(branch, &Default::default(), false, false, "postgres", None)
+            .group
+            .unwrap();
         assert!(!branch_init.entry);
         assert_eq!(branch_init.count, 1);
-        let leaf_init = row_for(leaf, &Default::default(), false, false, None);
+        let leaf_init = row_for(leaf, &Default::default(), false, false, "postgres", None);
         assert_eq!(leaf_init.depth, 2);
         let leaf_group = leaf_init.group.unwrap();
         assert!(leaf_group.entry);

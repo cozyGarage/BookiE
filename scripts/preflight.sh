@@ -20,6 +20,7 @@ esac
 
 CRATES=(
   bookie-core
+  bookie-driver-registry
   bookie-policy
   bookie-storage
   bookie-transport
@@ -36,6 +37,7 @@ CRATES=(
   bookie-driver-clickhouse
   bookie-driver-redis
   bookie-driver-mongodb
+  bookie-driver-oracle
   bookie-release-tests
   bookie-driver-tls-tests
 )
@@ -59,6 +61,9 @@ echo "==> panic sites in production code"
 
 echo "==> crate boundaries"
 python3 scripts/check-crate-boundaries.py
+
+echo "==> driver id branches"
+python3 scripts/check-driver-id-branches.py
 
 echo "==> function sizes"
 python3 scripts/check-function-size.py

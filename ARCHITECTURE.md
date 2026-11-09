@@ -439,7 +439,7 @@ flowchart TD
 |---|---|
 | Threading | GTK objects stay on the GLib main context. DB and blocking work run on Tokio via Relm4 commands; results return as component messages. |
 | Command scope | Component-scoped commands for tab/component lifetime. Detached Relm4 tasks only for independent persistence/cleanup. |
-| Tabs | `AdwTabView` workspaces; Relm4 controllers keyed by tab UUID. |
+| Tabs | `AdwTabView` workspaces; Relm4 controllers keyed by tab UUID. Session membership, tab↔connection maps and open-sessions restore live in `bookie-app-services::window_sessions` ([ADR 0040](docs/decisions/0040-multi-session-window-workspace.md)); each live connection is a distinct `PolicyGuard`. |
 | Browse grid | Bounded pages in `RowStore` (`gio::ListModel`); weakly cached `RowObject`s. |
 | SQL editor results | Supported single-statement PostgreSQL `SELECT`s stream guarded cursor pages within a 64 MiB estimated-row budget; a newest page larger than the budget remains. Pins and overlapping snapshots may retain more. Other engines and query shapes use capped materialization; these estimates are not a process-memory ceiling ([ADR 0011](docs/decisions/0011-paged-query-results.md)). |
 | Identity | Sidebar refresh tokens hold a weak session reference. Tab results keep their tab UUID across connection switches. |
