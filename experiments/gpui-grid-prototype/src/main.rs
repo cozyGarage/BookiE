@@ -583,6 +583,7 @@ impl GridView {
             move || source.compare(keyed),
             |this, diff| {
                 this.status.clear();
+                this.selection = None;
                 this.compare = Some(diff);
                 this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
             },

@@ -392,6 +392,23 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
 }
 
 #[gpui::test]
+fn comparing_results_clears_selection_from_the_previous_grid(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.click_row(4, false);
+            view.compare(false, cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.compare.is_some());
+        assert!(view.selection.is_none());
+    });
+}
+
+#[gpui::test]
 fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let text = format!("{}\0tail", "💾".repeat(8_192));
