@@ -524,6 +524,144 @@ fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.close_run(0);
+            assert_eq!(view.runs.len(), 1);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
+            view.close_run(0);
+            assert!(view.runs.is_empty());
+            assert!(view.edits.is_empty());
+            assert_eq!(view.dataset_count(), 0);
+            view.run_query();
+            assert_eq!(view.runs[0].number, 3);
+            assert!(view.edits.is_empty());
+        });
+    });
+}
+
+#[gpui::test]
+fn closing_the_final_run_renders_an_empty_result_pane(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.close_run(0);
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.runs.is_empty());
+        assert_eq!(view.status, "No results");
+    });
+}
+
+#[gpui::test]
+fn closing_the_last_query_result_keeps_the_synthetic_table_available(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.close_run(0);
+            assert_eq!(view.dataset_count(), 0);
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            assert_eq!(view.dataset_count(), 150_000);
+        });
+    });
+}
+
+#[gpui::test]
+fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.close_run(0);
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            view.edits.insert((1, 1), Cell::Text("table edit".into()));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.run_query();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table edit".into()));
+        });
+    });
+}
+
+#[gpui::test]
+fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("table".into()));
+        })
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
+            view.edits.insert((1, 1), Cell::Text("query".into()));
+            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert_eq!(view.cell_at(1, 1), Cell::Text("query".into()));
+        })
+    });
+}
+
+#[gpui::test]
+fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-shift-p");
+    cx.simulate_input("close current result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert!(view.runs.is_empty()));
+}
+
+#[gpui::test]
+fn the_command_palette_navigates_between_results(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-enter ctrl-shift-p");
+    cx.simulate_input("previous result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert_eq!(view.active_run, 0));
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("next result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert_eq!(view.active_run, 1));
+}
+
+#[gpui::test]
+fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.begin_background(cx, || (), |view, ()| view.status = "stale result".into());
+            view.close_run(1);
+            assert_eq!(view.active_run, 0);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale result"));
+}
+
+#[gpui::test]
 fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {

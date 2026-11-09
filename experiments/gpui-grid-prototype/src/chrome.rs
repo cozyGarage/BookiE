@@ -173,6 +173,7 @@ impl GridView {
                     TreeRow::Database { .. } => this.database_open = !this.database_open,
                     TreeRow::Table(name) => {
                         this.tabs.open_table(name);
+                        this.sync_grid_owner();
                         if this.tabs.shows_grid() {
                             window.focus(&this.focus, cx);
                         }
@@ -289,6 +290,7 @@ impl GridView {
                             gpui::MouseButton::Left,
                             cx.listener(move |this, _: &MouseDownEvent, _, cx| {
                                 this.tabs.close(index);
+                                this.sync_grid_owner();
                                 cx.stop_propagation();
                                 cx.notify();
                             }),
@@ -298,6 +300,7 @@ impl GridView {
             }
             item.on_click(cx.listener(move |this, _, window, cx| {
                 this.tabs.active = index;
+                this.sync_grid_owner();
                 if this.tabs.shows_grid() {
                     window.focus(&this.focus, cx);
                 }
@@ -362,6 +365,7 @@ impl GridView {
                                 ghost("quick-open", format!("{CONNECTION} → {DATA_TABLE}"), theme).on_click(
                                     cx.listener(|this, _, window, cx| {
                                         this.tabs.open_table(DATA_TABLE);
+                                        this.sync_grid_owner();
                                         window.focus(&this.focus, cx);
                                         cx.notify();
                                     }),
@@ -517,12 +521,29 @@ impl GridView {
                 .id(("run", index))
                 .flex()
                 .items_center()
+                .flex_none()
                 .h(px(28.0))
                 .px_2()
                 .rounded(px(theme.radius))
                 .border_1()
                 .cursor_pointer()
-                .child(format!("{} · {} rows", run.label(), thousands(run.rows)));
+                .child(format!("{} · {} rows", run.label(), thousands(run.rows)))
+                .child(
+                    div()
+                        .id(("close-run", index))
+                        .px_1()
+                        .rounded(px(theme.radius))
+                        .hover(move |style| style.bg(rgb(theme.muted)))
+                        .on_mouse_down(
+                            gpui::MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                                this.close_run(index);
+                                cx.stop_propagation();
+                                cx.notify();
+                            }),
+                        )
+                        .child(icon("x", theme.muted_foreground)),
+                );
             let tab = if active {
                 tab.border_color(rgb(theme.border))
                     .bg(rgb(theme.background))
@@ -569,7 +590,16 @@ impl GridView {
             .border_color(rgb(theme.border))
             .child(icon("pin", theme.muted_foreground))
             .child(div().w(px(1.0)).h(px(16.0)).bg(rgb(theme.border)))
-            .child(div().flex().flex_1().gap_1().overflow_hidden().children(run_tabs))
+            .child(
+                div()
+                    .id("result-runs")
+                    .flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_1()
+                    .overflow_x_scroll()
+                    .children(run_tabs),
+            )
             .child(switch("view-table", "Table Data", !self.summary_view, false, cx))
             .child(switch("view-summary", "Summary", self.summary_view, true, cx))
             .child(
@@ -587,8 +617,7 @@ impl GridView {
                         cx.notify();
                     })),
             );
-        let run = self.runs[self.active_run];
-        let body = if self.summary_view {
+        let body = if let Some(run) = self.runs.get(self.active_run).filter(|_| self.summary_view) {
             div()
                 .flex_1()
                 .flex()
@@ -600,6 +629,8 @@ impl GridView {
                 .child(format!("Rows returned: {}", thousands(run.rows)))
                 .child(format!("Elapsed: {} ms (synthetic)", run.millis()))
                 .child("Source: synthetic generator, no database")
+        } else if self.runs.is_empty() {
+            div().flex_1().p_4().child("No results")
         } else {
             grid
         };

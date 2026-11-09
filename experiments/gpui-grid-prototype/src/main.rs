@@ -37,6 +37,7 @@ enum Mode {
 
 struct GridView {
     source: Source,
+    table_source: Source,
     mode: Mode,
     pager: Pager,
     continuous: bool,
@@ -46,6 +47,8 @@ struct GridView {
     editor: Entity<TextInput>,
     editing: Option<grid_edit::Editing>,
     edits: grid_edit::Edits,
+    table_edits: grid_edit::Edits,
+    grid_is_query: bool,
     cell_cursor: Option<Cursor>,
     viewport_rows: usize,
     palette_input: Entity<TextInput>,
@@ -56,6 +59,7 @@ struct GridView {
     runs: Vec<Run>,
     run_edits: Vec<grid_edit::Edits>,
     active_run: usize,
+    next_run_number: usize,
     summary_view: bool,
     result_ratio: f32,
     result_open: bool,
@@ -174,6 +178,7 @@ impl GridView {
         )
         .detach();
         GridView {
+            table_source: source.clone(),
             source,
             mode: Mode::All,
             pager: Pager::new(total),
@@ -184,6 +189,8 @@ impl GridView {
             editor,
             editing: None,
             edits: Default::default(),
+            table_edits: Default::default(),
+            grid_is_query: false,
             cell_cursor: None,
             viewport_rows: 10,
             palette_input,
@@ -194,6 +201,7 @@ impl GridView {
             runs: vec![Run { number: 1, rows: total }],
             run_edits: vec![grid_edit::Edits::new()],
             active_run: 0,
+            next_run_number: 2,
             summary_view: false,
             result_ratio: DEFAULT_RESULT_RATIO,
             result_open: true,
@@ -225,6 +233,9 @@ impl GridView {
     }
 
     fn dataset_count(&self) -> u64 {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return 0;
+        }
         match &self.mode {
             Mode::All => self.source.total(),
             Mode::Filtered { kept, .. } => kept.len() as u64,
@@ -288,10 +299,43 @@ impl GridView {
     }
 
     fn run_query(&mut self) {
-        let run = next_run(&self.runs);
+        let run = next_run(self.next_run_number);
+        self.next_run_number += 1;
         self.runs.push(run);
         self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
+    }
+
+    fn sync_grid_owner(&mut self) {
+        let query = match self.tabs.current() {
+            Tab::Query => true,
+            Tab::Table(name) if name == DATA_TABLE => false,
+            _ => return,
+        };
+        if query == self.grid_is_query {
+            return;
+        }
+        self.generation += 1;
+        self.editing = None;
+        self.compare = None;
+        self.cursor = MatchCursor::default();
+        if query {
+            self.table_edits = std::mem::take(&mut self.edits);
+            if let Some(run) = self.runs.get(self.active_run).copied() {
+                self.show_run(self.active_run, run);
+            } else {
+                self.source = self.table_source.clone();
+                self.set_mode(Mode::All);
+            }
+        } else {
+            if let Some(edits) = self.run_edits.get_mut(self.active_run) {
+                *edits = std::mem::take(&mut self.edits);
+            }
+            self.edits = std::mem::take(&mut self.table_edits);
+            self.source = self.table_source.clone();
+            self.set_mode(Mode::All);
+        }
+        self.grid_is_query = query;
     }
 
     fn activate_run(&mut self, index: usize) {
@@ -299,7 +343,13 @@ impl GridView {
             return;
         };
         self.generation += 1;
-        self.run_edits[self.active_run] = std::mem::take(&mut self.edits);
+        if let Some(previous) = self.run_edits.get_mut(self.active_run) {
+            *previous = std::mem::take(&mut self.edits);
+        }
+        self.show_run(index, run);
+    }
+
+    fn show_run(&mut self, index: usize, run: Run) {
         self.edits = std::mem::take(&mut self.run_edits[index]);
         self.editing = None;
         self.active_run = index;
@@ -308,6 +358,34 @@ impl GridView {
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
+    }
+
+    fn close_run(&mut self, index: usize) {
+        if index >= self.runs.len() {
+            return;
+        }
+        self.runs.remove(index);
+        self.run_edits.remove(index);
+        if index < self.active_run {
+            self.active_run -= 1;
+            return;
+        }
+        if index != self.active_run {
+            return;
+        }
+        self.generation += 1;
+        self.edits.clear();
+        if self.runs.is_empty() {
+            self.source = self.table_source.clone();
+            self.editing = None;
+            self.compare = None;
+            self.cursor = MatchCursor::default();
+            self.set_mode(Mode::All);
+            self.status = "No results".into();
+            return;
+        }
+        let next = index.min(self.runs.len() - 1);
+        self.show_run(next, self.runs[next]);
     }
 
     fn set_mode(&mut self, mode: Mode) {
@@ -352,7 +430,7 @@ impl GridView {
     }
 
     fn run_find(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if self.find_text(cx).is_empty() {
+        if self.dataset_count() == 0 || self.find_text(cx).is_empty() {
             return;
         }
         if !self.cursor.matches.is_empty() && self.cursor.status(false) != "No match" {
@@ -403,6 +481,9 @@ impl GridView {
     }
 
     fn apply_filter(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return;
+        }
         let predicate = match parse_predicate(self.filter.read(cx).content()) {
             Ok(predicate) => predicate,
             Err(message) => {
@@ -431,6 +512,9 @@ impl GridView {
     }
 
     fn compare(&mut self, keyed: bool, cx: &mut Context<Self>) {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return;
+        }
         let source = self.source.clone();
         self.status = "Comparing…".into();
         self.begin_background(
@@ -474,6 +558,7 @@ impl GridView {
                 "b" => self.sidebar_open = !self.sidebar_open,
                 "t" => {
                     self.tabs.open_query();
+                    self.sync_grid_owner();
                     window.focus(&self.focus, cx);
                 }
                 "enter" if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
@@ -617,6 +702,21 @@ impl GridView {
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
+                "previous-run",
+                "Previous result",
+                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
+            ),
+            action(
+                "next-run",
+                "Next result",
+                matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
+            ),
+            action(
+                "close-run",
+                "Close current result",
+                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
+            ),
+            action(
                 "results",
                 if self.result_open {
                     "Hide the results pane"
@@ -705,12 +805,17 @@ impl GridView {
             "home" => self.tabs.open_home(),
             "query" => {
                 self.tabs.open_query();
+                self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
             "run" => self.run_query(),
+            "previous-run" => self.activate_run(self.active_run - 1),
+            "next-run" => self.activate_run(self.active_run + 1),
+            "close-run" => self.close_run(self.active_run),
             "results" => self.result_open = !self.result_open,
             "table" => {
                 self.tabs.open_table(DATA_TABLE);
+                self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
             "theme-dbx" | "theme-adwaita" => {
@@ -878,6 +983,9 @@ fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.pager.total != self.dataset_count() {
+            self.pager = Pager::new(self.dataset_count());
+        }
         self.note_frame();
         self.pace_frame(window);
         let theme = Theme::current(cx);
@@ -1209,7 +1317,10 @@ fn main() {
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
                     if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
-                        view.update(cx, |view, _| view.tabs.open_query());
+                        view.update(cx, |view, _| {
+                            view.tabs.open_query();
+                            view.sync_grid_owner();
+                        });
                     }
                     if autoscroll > 0 {
                         view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
