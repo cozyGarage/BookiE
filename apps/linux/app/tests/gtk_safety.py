@@ -1881,7 +1881,7 @@ def failed_switch_preserves_the_old_workspace(database, _base):
 failed_switch_preserves_the_old_workspace.environment = "local"
 
 
-def running_query_is_cancelled_before_switch(database, base):
+def running_query_stays_with_its_connection_until_cancelled(database, base):
     run_sql(
         "WITH RECURSIVE counter(value) AS "
         "(VALUES(0) UNION ALL SELECT value + 1 FROM counter WHERE value < 1000000000) "
@@ -1889,9 +1889,13 @@ def running_query_is_cancelled_before_switch(database, base):
     )
     wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON)
     open_saved_connection(CONNECTION_B_NAME)
-    invoke(wait_for_node(name="Cancel queries and switch", role=pyatspi.ROLE_PUSH_BUTTON))
-
     wait_for_node(name=f"{CONNECTION_B_NAME} — BookiE", role=pyatspi.ROLE_FRAME)
+    press_x11_key("Tab", ("Control_L",))
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    invoke(wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+    press_x11_key("Tab", ("Control_L",))
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("INSERT INTO safety_items(id) VALUES (44)")
@@ -1901,7 +1905,7 @@ def running_query_is_cancelled_before_switch(database, base):
     assert database_ids(database_b) == [44]
 
 
-running_query_is_cancelled_before_switch.environment = "local"
+running_query_stays_with_its_connection_until_cancelled.environment = "local"
 
 
 def current_page_csv_export_is_pk_ordered(database, base):
@@ -2121,29 +2125,20 @@ a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.environ
 a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.needs_restart = True
 
 
-def pending_edits_gate_a_connection_switch(database, base):
+def pending_edits_survive_opening_another_connection(database, base):
     invoke_named_action_within("safety_items", "Open safety_items")
     wait_for_node(name="No rows on this page")
     invoke(wait_for_node(name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="1 unsaved change")
 
     open_saved_connection(CONNECTION_B_NAME)
-    wait_for_node(name="Save changes before switching?")
-    invoke(wait_for_node(name="Stay", role=pyatspi.ROLE_PUSH_BUTTON))
-    wait_for_node(name="Save changes before switching?", present=False)
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    press_x11_key("Tab", ("Control_L",))
     wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
-    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE", present=False)
     wait_for_node(name="1 unsaved change")
     assert_database_count_stable(database, 0)
-
-    open_saved_connection(CONNECTION_B_NAME)
-    wait_for_node(name="Save changes before switching?")
-    invoke(wait_for_node(name="Discard and switch", role=pyatspi.ROLE_PUSH_BUTTON))
+    press_x11_key("Tab", ("Control_L",))
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
-    wait_for_node(name="1 unsaved change", present=False)
-    assert database_ids(database) == [], (
-        f"a discarded pending row reached the old database: {database_ids(database)}"
-    )
 
     invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
@@ -2151,10 +2146,10 @@ def pending_edits_gate_a_connection_switch(database, base):
     database_b = base / "safety-b.sqlite"
     wait_for_database_count(database_b, 1)
     assert database_ids(database_b) == [55]
-    assert database_ids(database) == [], "the old connection stayed writable after the switch"
+    assert database_ids(database) == [], "the pending row reached the original database"
 
 
-pending_edits_gate_a_connection_switch.environment = "local"
+pending_edits_survive_opening_another_connection.environment = "local"
 
 
 def preview_sql_shows_the_pending_statement_without_saving(database, _base):
@@ -2186,7 +2181,7 @@ def preview_sql_shows_the_pending_statement_without_saving(database, _base):
 preview_sql_shows_the_pending_statement_without_saving.environment = "local"
 
 
-def a_browse_tab_reads_the_new_connection_after_a_switch(database, base):
+def browse_tabs_read_their_own_connections(database, base):
     database_b = base / "safety-b.sqlite"
     with sqlite3.connect(database) as connection:
         connection.executemany(
@@ -2206,13 +2201,13 @@ def a_browse_tab_reads_the_new_connection_after_a_switch(database, base):
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     wait_for_node_containing("Rows 1 – 7", present=False)
 
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_table_in_new_tab("safety_items")
     wait_for_node_containing("Rows 1 – 3")
     assert database_ids(database) == list(range(1, 8)), "the old database changed after the switch"
     assert database_ids(database_b) == [1, 2, 3]
 
 
-a_browse_tab_reads_the_new_connection_after_a_switch.environment = "local"
+browse_tabs_read_their_own_connections.environment = "local"
 
 
 def two_windows_hold_two_connections(database, base):
@@ -2993,13 +2988,13 @@ def main():
         successful_switch_keeps_database_ownership,
         history_panel_refreshes_after_queries_run_while_closed,
         failed_switch_preserves_the_old_workspace,
-        running_query_is_cancelled_before_switch,
+        running_query_stays_with_its_connection_until_cancelled,
         current_page_csv_export_is_pk_ordered,
         current_page_json_export_preserves_values,
         restart_restores_active_editor_and_connection,
-        pending_edits_gate_a_connection_switch,
+        pending_edits_survive_opening_another_connection,
         preview_sql_shows_the_pending_statement_without_saving,
-        a_browse_tab_reads_the_new_connection_after_a_switch,
+        browse_tabs_read_their_own_connections,
         two_windows_hold_two_connections,
         switched_connection_keeps_workspace_tabs_after_debounce,
         replacing_a_preview_tab_removes_the_old_page,
