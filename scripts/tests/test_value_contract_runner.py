@@ -63,6 +63,7 @@ class ValueRunnerTests(unittest.TestCase):
             "docker", "ps", "-aq", "--filter", "label=com.bookie.test-run=run-123"
         ])
         self.assertEqual(run.call_args_list[1].args[0], ["docker", "rm", "-f", "one", "two"])
+        self.assertEqual([call.kwargs.get("timeout") for call in run.call_args_list], [30, 30])
 
     def test_shared_container_cleanup_does_not_remove_other_runs(self):
         with patch.object(cleanup_runner.subprocess, "run") as run:
