@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 APP = "bookie-app"
@@ -74,6 +75,21 @@ def check(metadata):
     return problems
 
 
+EXPERIMENT_ALLOWED = {"bookie-core", "bookie-results", "bookie-app-services"}
+
+
+def experiment_problems(experiments):
+    problems = []
+    for manifest in sorted(Path(experiments).glob("*/Cargo.toml")):
+        data = tomllib.loads(manifest.read_text())
+        for table in ("dependencies", "dev-dependencies", "build-dependencies"):
+            for name, spec in data.get(table, {}).items():
+                package = spec.get("package", name) if isinstance(spec, dict) else name
+                if package.startswith("bookie-") and package not in EXPERIMENT_ALLOWED:
+                    problems.append(f"{manifest.parent.name} may not depend on {package} (ADR 0041)")
+    return problems
+
+
 def unlisted_in_preflight(metadata, preflight):
     names = {package["id"]: package["name"] for package in metadata["packages"]}
     workspace = {names[member] for member in metadata["workspace_members"]}
@@ -106,7 +122,8 @@ def main():
         return output.returncode
     metadata = json.loads(output.stdout)
     preflight = (Path(__file__).resolve().parent / "preflight.sh").read_text()
-    problems = check(metadata) + unlisted_in_preflight(metadata, preflight)
+    experiments = Path(__file__).resolve().parents[1] / "experiments"
+    problems = check(metadata) + unlisted_in_preflight(metadata, preflight) + experiment_problems(experiments)
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:
