@@ -507,6 +507,23 @@ fn selecting_an_earlier_run_restores_its_result_and_clears_the_view_state(cx: &m
 }
 
 #[gpui::test]
+fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.activate_run(0);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
+            view.activate_run(1);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
+        })
+    });
+}
+
+#[gpui::test]
 fn the_results_pane_can_be_hidden_and_the_summary_view_shows_the_run(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");
