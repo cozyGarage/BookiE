@@ -93,6 +93,12 @@ impl ReadSession {
         limit: u64,
         control: &OperationControl,
     ) -> Result<QueryResult, DriverFailurePresentation> {
+        if limit == 0 || limit > bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS as u64 {
+            return Err(DriverFailurePresentation::Unsupported(format!(
+                "Page size must be between 1 and {} rows.",
+                bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS
+            )));
+        }
         let guard = self
             .database
             .guard_for_generation(self.id, self.generation, Principal::human_gui())
