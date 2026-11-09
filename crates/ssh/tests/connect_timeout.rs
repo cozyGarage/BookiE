@@ -32,6 +32,7 @@ fn config(port: u16) -> SshConfig {
             path: PathBuf::from("/nonexistent/id_ed25519"),
             passphrase: None,
         },
+        local_port: None,
     }
 }
 

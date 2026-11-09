@@ -50,6 +50,7 @@ fn password_config(host: &str, port: u16, password: &str) -> SshConfig {
         auth: SshAuth::Password {
             password: SecretString::new(password.to_string().into()),
         },
+        local_port: None,
     }
 }
 
@@ -106,6 +107,7 @@ fn config(host: &str, port: u16) -> SshConfig {
         port,
         username: "deploy".into(),
         auth: SshAuth::Agent,
+        local_port: None,
     }
 }
 
@@ -315,6 +317,7 @@ async fn a_key_not_in_authorized_keys_is_rejected() {
             path: key_path,
             passphrase: None,
         },
+        local_port: None,
     };
     let result = SshTunnel::open(cfg, "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
     assert!(matches!(result, Err(SshError::Auth)), "{:?}", result.err());
@@ -345,6 +348,7 @@ async fn an_encrypted_private_key_authenticates_with_its_passphrase() {
             path: key_path,
             passphrase: Some(SecretString::new("correct horse battery staple".to_string().into())),
         },
+        local_port: None,
     };
     let tunnel = SshTunnel::open(cfg, "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
     assert!(tunnel.is_ok(), "{:?}", tunnel.err());
@@ -402,6 +406,7 @@ async fn declining_a_built_in_host_key_does_not_learn_it() {
             path: key_path,
             passphrase: None,
         },
+        local_port: None,
     };
     let prompter = Arc::new(AnswerHostKeys {
         accept: false,

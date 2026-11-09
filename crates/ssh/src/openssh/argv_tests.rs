@@ -10,6 +10,7 @@ fn config(port: Option<u16>, user: Option<&str>, auth: OpenSshAuth) -> OpenSshCo
         destination: SshDestination::new("db-bastion", port, user.map(str::to_owned)).unwrap(),
         jump_hosts: Vec::new(),
         auth,
+        local_port: None,
     }
 }
 

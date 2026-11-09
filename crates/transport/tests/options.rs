@@ -50,6 +50,7 @@ fn hop(host: &str, port: u16, username: &str, jump: Option<SavedSshConfig>) -> S
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     }
 }
 

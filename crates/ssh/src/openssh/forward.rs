@@ -14,6 +14,7 @@ pub enum ForwardRoute {
     UnixSocket,
     NamedUnixSocket(String),
     LoopbackTcp,
+    FixedLoopbackTcp(u16),
 }
 
 #[derive(Debug)]
@@ -86,6 +87,7 @@ impl OpenSshSession {
             }
             ForwardRoute::NamedUnixSocket(name) => self.named_socket(&name),
             ForwardRoute::LoopbackTcp => free_loopback_port().map(LocalEndpoint::Tcp),
+            ForwardRoute::FixedLoopbackTcp(port) => fixed_loopback_port(port).map(LocalEndpoint::Tcp),
         }
     }
 
@@ -115,6 +117,15 @@ fn free_loopback_port() -> Result<SocketAddr, OpenSshError> {
         .and_then(|listener| listener.local_addr())
         .map_err(|error| OpenSshError::LocalBind {
             detail: error.to_string(),
+        })
+}
+
+fn fixed_loopback_port(port: u16) -> Result<SocketAddr, OpenSshError> {
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    TcpListener::bind(address)
+        .map(|_| address)
+        .map_err(|error| OpenSshError::LocalBind {
+            detail: format!("bind {address}: {error}"),
         })
 }
 
