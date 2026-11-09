@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 import gtk_input
@@ -30,12 +31,12 @@ class XWindowAttributes(ctypes.Structure):
 ATSPI_WINDOW_Y_OFFSET = gtk_input.window_y_offset()
 
 
-def capture_grid_navigation_artifact(name):
+def capture_grid_navigation_artifact(_name):
     folder = os.environ.get("BOOKIE_GTK_ARTIFACT_DIR")
     scrot, imagemagick = shutil.which("scrot"), shutil.which("import")
     if folder is None or os.environ.get("GDK_BACKEND") != "x11" or not (scrot or imagemagick):
         return
-    path = Path(folder) / f"{name}.png"
+    path = Path(folder) / f"grid-navigation-{uuid.uuid4().hex}.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     command = [scrot, str(path)] if scrot else [imagemagick, "-window", "root", str(path)]
     subprocess.run(command, check=True, timeout=10)
