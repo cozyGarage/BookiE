@@ -47,6 +47,8 @@ struct GridView {
     editor: Entity<TextInput>,
     editing: Option<grid_edit::Editing>,
     edits: grid_edit::Edits,
+    table_edits: grid_edit::Edits,
+    grid_is_query: bool,
     cell_cursor: Option<Cursor>,
     viewport_rows: usize,
     palette_input: Entity<TextInput>,
@@ -187,6 +189,8 @@ impl GridView {
             editor,
             editing: None,
             edits: Default::default(),
+            table_edits: Default::default(),
+            grid_is_query: false,
             cell_cursor: None,
             viewport_rows: 10,
             palette_input,
@@ -300,6 +304,38 @@ impl GridView {
         self.runs.push(run);
         self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
+    }
+
+    fn sync_grid_owner(&mut self) {
+        let query = match self.tabs.current() {
+            Tab::Query => true,
+            Tab::Table(name) if name == DATA_TABLE => false,
+            _ => return,
+        };
+        if query == self.grid_is_query {
+            return;
+        }
+        self.generation += 1;
+        self.editing = None;
+        self.compare = None;
+        self.cursor = MatchCursor::default();
+        if query {
+            self.table_edits = std::mem::take(&mut self.edits);
+            if let Some(run) = self.runs.get(self.active_run).copied() {
+                self.show_run(self.active_run, run);
+            } else {
+                self.source = self.table_source.clone();
+                self.set_mode(Mode::All);
+            }
+        } else {
+            if let Some(edits) = self.run_edits.get_mut(self.active_run) {
+                *edits = std::mem::take(&mut self.edits);
+            }
+            self.edits = std::mem::take(&mut self.table_edits);
+            self.source = self.table_source.clone();
+            self.set_mode(Mode::All);
+        }
+        self.grid_is_query = query;
     }
 
     fn activate_run(&mut self, index: usize) {
@@ -522,6 +558,7 @@ impl GridView {
                 "b" => self.sidebar_open = !self.sidebar_open,
                 "t" => {
                     self.tabs.open_query();
+                    self.sync_grid_owner();
                     window.focus(&self.focus, cx);
                 }
                 "enter" if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
@@ -758,6 +795,7 @@ impl GridView {
             "home" => self.tabs.open_home(),
             "query" => {
                 self.tabs.open_query();
+                self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
             "run" => self.run_query(),
@@ -765,6 +803,7 @@ impl GridView {
             "results" => self.result_open = !self.result_open,
             "table" => {
                 self.tabs.open_table(DATA_TABLE);
+                self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
             "theme-dbx" | "theme-adwaita" => {
@@ -1266,7 +1305,10 @@ fn main() {
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
                     if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
-                        view.update(cx, |view, _| view.tabs.open_query());
+                        view.update(cx, |view, _| {
+                            view.tabs.open_query();
+                            view.sync_grid_owner();
+                        });
                     }
                     if autoscroll > 0 {
                         view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));

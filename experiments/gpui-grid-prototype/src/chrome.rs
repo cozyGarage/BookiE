@@ -173,6 +173,7 @@ impl GridView {
                     TreeRow::Database { .. } => this.database_open = !this.database_open,
                     TreeRow::Table(name) => {
                         this.tabs.open_table(name);
+                        this.sync_grid_owner();
                         if this.tabs.shows_grid() {
                             window.focus(&this.focus, cx);
                         }
@@ -289,6 +290,7 @@ impl GridView {
                             gpui::MouseButton::Left,
                             cx.listener(move |this, _: &MouseDownEvent, _, cx| {
                                 this.tabs.close(index);
+                                this.sync_grid_owner();
                                 cx.stop_propagation();
                                 cx.notify();
                             }),
@@ -298,6 +300,7 @@ impl GridView {
             }
             item.on_click(cx.listener(move |this, _, window, cx| {
                 this.tabs.active = index;
+                this.sync_grid_owner();
                 if this.tabs.shows_grid() {
                     window.focus(&this.focus, cx);
                 }
@@ -362,6 +365,7 @@ impl GridView {
                                 ghost("quick-open", format!("{CONNECTION} → {DATA_TABLE}"), theme).on_click(
                                     cx.listener(|this, _, window, cx| {
                                         this.tabs.open_table(DATA_TABLE);
+                                        this.sync_grid_owner();
                                         window.focus(&this.focus, cx);
                                         cx.notify();
                                     }),
