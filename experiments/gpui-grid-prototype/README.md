@@ -1,8 +1,8 @@
 # GPUI result-grid experiment
 
-This isolated experiment renders the same synthetic result grid as `experiments/tauri-grid-prototype` with GPUI (Zed's GPU UI framework, `gpui` 0.2.2 from crates.io), so the two can be compared. It uses synthetic values only and cannot connect to a database. It is **not a supported frontend**, a package, or an alternative execution path. The shipped application continues to use GTK ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)), and the experiment is governed by [ADR 0028](../../docs/decisions/0028-isolated-frontend-experiments.md).
+This isolated experiment renders the same synthetic result grid as `experiments/tauri-grid-prototype` with `gpui-pre` 0.3.11, so the two can be compared. It uses synthetic values only and cannot connect to a database. It is **not a supported frontend**, a package, or an alternative execution path. The shipped application continues to use GTK ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)), and the experiment is governed by [ADR 0028](../../docs/decisions/0028-isolated-frontend-experiments.md).
 
-It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on one BookiE crate, `bookie-core` (`src/core_bridge.rs`), for typed values: cell edits are validated by `bookie_core::import::parse_cell` and copied text is rendered by `bookie_core::export::render_tsv`, exactly as in the Tauri prototype. Nothing else from BookiE is linked.
+It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on `bookie-core` for typed values and `bookie-results` for bounded scanning and text search. Equality filters keep the prototype's case-insensitive displayed-text behavior in the experiment adapter; they do not weaken typed equality in shared result consumers.
 
 ## Scope
 

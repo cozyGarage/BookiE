@@ -75,6 +75,44 @@ fn filtering_keeps_the_exact_typed_integer_text() {
 }
 
 #[test]
+fn filtering_typed_values_matches_their_displayed_text() {
+    let source = Synthetic::new(30);
+    let cases = [
+        ("0.30000000000000004", 0),
+        (r"\xdeadbeef", 1),
+        ("2026-11-04", 2),
+        ("23:59:59.123456", 3),
+        ("2026-11-04 23:59:59.123456", 4),
+        ("2026-11-04T23:59:59.123456+00:00", 5),
+        ("12345678901234567890.12345678", 6),
+        ("67e55044-10b1-426f-9247-bb680e5fe0c8", 7),
+        ("67E55044-10B1-426F-9247-BB680E5FE0C8", 7),
+        (r#"{"a":[1,{"b":null}]}"#, 8),
+        (r#"{"raw":  1,   "keep" : 2}"#, 9),
+        ("<undecodable numeric(40,20)>", 10),
+    ];
+    for (text, expected_modulo) in cases {
+        let predicate = parse_predicate(&format!("typed = {text}")).unwrap();
+        let expected = (0..30)
+            .filter(|index| index % 12 == expected_modulo)
+            .collect::<Vec<_>>();
+        assert_eq!(source.filter(&predicate), Ok(expected), "{text}");
+    }
+
+    let not_equals = parse_predicate("typed != 2026-11-04").unwrap();
+    assert_eq!(
+        source.filter(&not_equals).unwrap(),
+        (0..30).filter(|index| ![2, 14, 26].contains(index)).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn filtering_text_values_is_case_insensitive() {
+    let predicate = parse_predicate("label = SAMPLE 1").unwrap();
+    assert_eq!(Synthetic::new(10).filter(&predicate), Ok(vec![1]));
+}
+
+#[test]
 fn predicates_are_validated() {
     assert!(parse_predicate("label contains 7").is_ok());
     assert!(parse_predicate("nope contains 7").is_err());
@@ -223,7 +261,10 @@ fn a_filter_and_find_can_target_the_typed_column() {
     assert_eq!(hits.first().copied(), Some(1));
     assert!(hits.iter().all(|row| u64::from(*row) % TYPED_KINDS == 1));
     let not_undecodable = parse_predicate("typed != <undecodable numeric(40,20)>").unwrap();
-    assert_eq!(Synthetic::new(24).filter(&not_undecodable).map(|kept| kept.len()), Ok(22));
+    assert_eq!(
+        Synthetic::new(24).filter(&not_undecodable).map(|kept| kept.len()),
+        Ok(22)
+    );
     let found = Synthetic::new(150_000).find("numeric(40,20)", 3).unwrap();
     assert!(found.matches.is_empty(), "undecodable cells are not searchable");
 }
