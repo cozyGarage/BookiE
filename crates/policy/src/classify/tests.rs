@@ -399,3 +399,33 @@ fn a_single_read_has_no_write_session_file_or_admin_effect() {
         assert!(!classify(sql, "postgres").is_single_read(), "{sql}");
     }
 }
+
+#[test]
+fn oracle_stored_functions_are_not_plain_reads() {
+    for sql in [
+        "SELECT bookie_it.delayed_write() FROM dual",
+        "SELECT delayed_write() FROM dual",
+    ] {
+        let facts = classify(sql, "oracle");
+        assert_eq!(
+            facts.class,
+            StatementClass::Administrative,
+            "SQL: {sql}, facts: {facts:?}"
+        );
+        assert!(facts.writes(), "SQL: {sql}, facts: {facts:?}");
+    }
+}
+
+#[test]
+fn common_oracle_builtins_remain_reads_but_qualified_calls_need_governance() {
+    for sql in [
+        "SELECT COUNT(*) FROM dual",
+        "SELECT LOWER('BOOKIE'), NVL(NULL, 1), TO_CHAR(SYSDATE, 'YYYY') FROM dual",
+    ] {
+        assert_eq!(classify(sql, "oracle").class, StatementClass::Select, "{sql}");
+    }
+
+    let facts = classify("SELECT SYS.STANDARD.UPPER('bookie') FROM dual", "oracle");
+    assert_eq!(facts.class, StatementClass::Administrative);
+    assert!(facts.writes());
+}

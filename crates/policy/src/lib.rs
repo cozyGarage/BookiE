@@ -7,6 +7,7 @@ mod audit;
 mod blast_radius;
 mod catalog_effect;
 mod classify;
+mod oracle_functions;
 pub use catalog_effect::{CatalogEffect, catalog_effect};
 mod config;
 mod constant_predicate;
