@@ -1099,6 +1099,7 @@ fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
 fn main() {
     let started = Instant::now();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
+    let live = live_source();
     let autoscroll: u32 = env_number("BOOKIE_PROTOTYPE_AUTOSCROLL").unwrap_or(0);
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
@@ -1114,7 +1115,10 @@ fn main() {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let view = cx.new(|cx| GridView::new(total, started, window, cx));
+                    let view = cx.new(|cx| match live.clone() {
+                        Some(source) => GridView::with_source(source, started, window, cx),
+                        None => GridView::new(total, started, window, cx),
+                    });
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
                     if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
@@ -1138,3 +1142,25 @@ fn main() {
 
 #[cfg(test)]
 mod ui_tests;
+
+const LIVE_ROW_CAP: u64 = 100_000;
+
+fn live_source() -> Option<Source> {
+    use bookie_gpui_grid_prototype::live::{LiveTable, Origin};
+    let table = std::env::var("BOOKIE_PROTOTYPE_TABLE").ok()?;
+    let origin = match (
+        std::env::var("BOOKIE_PROTOTYPE_FILE").ok(),
+        std::env::var("BOOKIE_PROTOTYPE_CONNECTION").ok(),
+    ) {
+        (Some(path), _) => Origin::File(path.into()),
+        (None, Some(connection)) => Origin::Saved(connection),
+        (None, None) => return None,
+    };
+    match LiveTable::load(&origin, &table, LIVE_ROW_CAP) {
+        Ok(live) => Some(std::sync::Arc::new(live)),
+        Err(error) => {
+            eprintln!("could not read {table}: {error}");
+            std::process::exit(2);
+        }
+    }
+}
