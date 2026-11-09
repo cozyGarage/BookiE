@@ -91,6 +91,28 @@ async fn a_session_lists_tables_and_reads_typed_pages() {
 }
 
 #[tokio::test]
+async fn page_sizes_are_bounded_before_a_read() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let table = session.tables.iter().find(|table| table.name == "items").unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let maximum = bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS as u64;
+
+    assert_eq!(
+        session.read_page(table, 0, maximum, &control).await.unwrap().rows.len(),
+        3
+    );
+    for limit in [0, maximum + 1, u64::MAX] {
+        assert!(matches!(
+            session.read_page(table, 0, limit, &control).await,
+            Err(DriverFailurePresentation::Unsupported(_))
+        ));
+    }
+}
+
+#[tokio::test]
 async fn a_cancelled_page_read_returns_cancelled() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
