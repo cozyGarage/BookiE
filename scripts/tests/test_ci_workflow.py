@@ -619,7 +619,7 @@ class CiWorkflowTests(unittest.TestCase):
             focused.split("\n    steps:\n", 1)[0],
         )
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("needs: [pin-revision, b4-rollback]", integration)
+        self.assertIn("needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]", integration)
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
         commands = [step["argv"] for step in layers["steps"]]
         self.assertEqual(len(commands), 2)

@@ -190,7 +190,6 @@ jobs:
 
   reusable-test-builds:
     name: Reusable test builds
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image]
     timeout-minutes: 60
@@ -452,7 +451,7 @@ jobs:
     name: Driver integration tests (docker)
     timeout-minutes: 55
     runs-on: ubuntu-24.04
-    needs: [pin-revision, b4-rollback]
+    needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]
     defaults:
       run:
         working-directory: .
@@ -469,31 +468,34 @@ jobs:
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
-      - name: Install system dependencies
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-default
+          path: reusable-builds/default
+      - name: Verify the test bundle
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            pkg-config \
-            libssl-dev \
-            libkrb5-dev \
-            clang \
-            dbus-daemon \
-            gnome-keyring \
-            libsecret-tools \
-            libglib2.0-bin
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        with:
-          toolchain: 1.98
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-        with:
-          workspaces: .
-          prefix-key: linux-integration
-          save-if: ${{ github.event_name != 'workflow_dispatch' || inputs.ref == '' }}
-      - name: Verify docker is available
-        run: docker version
+          test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
+          python3 scripts/ci-test-bundle.py verify reusable-builds/default "$BOOKIE_SOURCE_COMMIT"
+          chmod -R u+X reusable-builds/default/tests reusable-builds/default/bin
       - name: Driver, socket and SSH integration
-        run: python3 scripts/run-test-layer.py drivers
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/ci-tmp"
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
+            --volume "$HOME/.docker:/docker:ro" \
+            --workdir "$GITHUB_WORKSPACE" \
+            --env HOME="$GITHUB_WORKSPACE/ci-tmp" --env TMPDIR="$GITHUB_WORKSPACE/ci-tmp" \
+            --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
+            --env BOOKIE_TEST_BUNDLE="$GITHUB_WORKSPACE/reusable-builds/default" \
+            --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
+            "$BOOKIE_BUILD_IMAGE" python3 scripts/run-test-layer.py drivers
 
       - name: Upload validation evidence
         if: always()
