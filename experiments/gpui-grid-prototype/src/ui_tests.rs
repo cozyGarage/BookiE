@@ -335,6 +335,28 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
 }
 
 #[gpui::test]
+fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let value = "full\tvalue\nwith unicode 💾";
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.set_mode(crate::Mode::Filtered {
+                kept: vec![10, 20],
+                label: "filtered".into(),
+            });
+            view.edits.insert((20, 1), Cell::Text(value.into()));
+            view.click_row(1, false);
+            view.copy_selection(false, cx);
+        });
+    });
+    let actual = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    let mut row = bookie_gpui_grid_prototype::model::row_at(20);
+    row[1] = Cell::Text(value.into());
+    let expected = bookie_gpui_grid_prototype::selection::copy_tsv([row], false);
+    assert_eq!(actual.as_deref(), Some(expected.as_str()));
+}
+
+#[gpui::test]
 fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let text = format!("{}\0tail", "💾".repeat(8_192));
