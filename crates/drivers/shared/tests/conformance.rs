@@ -3,11 +3,21 @@ use std::path::Path;
 use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 use tempfile::TempDir;
 
+#[allow(async_fn_in_trait)]
 pub trait ConformanceEngine {
     type Driver: DatabaseDriver;
     fn driver() -> Self::Driver;
     const FILE_BASED: bool;
-    fn prepare(_path: &Path) {}
+    /// Make a fresh, empty database for one case; `path` is unique per case.
+    async fn prepare(_path: &Path) {}
+    /// Connection options for the database `prepare` made for `path`.
+    fn options(path: &Path, read_only: bool) -> ConnectOptions {
+        ConnectOptions {
+            database: path.to_string_lossy().into_owned(),
+            read_only,
+            ..ConnectOptions::default()
+        }
+    }
 }
 
 const SCHEMA: &str = "CREATE TABLE conf_items (id BIGINT PRIMARY KEY, label VARCHAR(20), n BIGINT)";
@@ -18,18 +28,13 @@ const SEED: [&str; 3] = [
 ];
 
 async fn open<E: ConformanceEngine>(path: &Path, read_only: bool) -> Box<dyn Connection> {
-    let options = ConnectOptions {
-        database: path.to_string_lossy().into_owned(),
-        read_only,
-        ..ConnectOptions::default()
-    };
-    E::driver().connect(options).await.expect("connect")
+    E::driver().connect(E::options(path, read_only)).await.expect("connect")
 }
 
 pub async fn seeded<E: ConformanceEngine>() -> (TempDir, std::path::PathBuf) {
     let directory = TempDir::new().expect("temp dir");
     let path = directory.path().join("conformance.db");
-    E::prepare(&path);
+    E::prepare(&path).await;
     let writer = open::<E>(&path, false).await;
     writer.execute(SCHEMA).await.expect("create table");
     for statement in SEED {
@@ -114,6 +119,16 @@ pub async fn the_catalog_names_the_table_and_describes_its_columns<E: Conformanc
     assert_eq!(names, ["id", "label", "n"]);
     assert!(columns[0].primary_key && !columns[1].primary_key);
     assert!(columns[1].nullable);
+}
+
+/// One runtime and one server for network engines, which cannot afford a container per case.
+#[allow(dead_code)] // used by network engines only
+pub async fn run_all<E: ConformanceEngine>() {
+    declared_capabilities_match_the_suite::<E>().await;
+    read_only_connections_refuse_every_write_and_keep_the_rows::<E>().await;
+    null_empty_text_and_wide_integers_round_trip_exactly::<E>().await;
+    browse_pages_cover_every_row_once_and_the_last_page_is_short::<E>().await;
+    the_catalog_names_the_table_and_describes_its_columns::<E>().await;
 }
 
 #[macro_export]
