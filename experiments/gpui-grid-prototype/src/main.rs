@@ -19,8 +19,8 @@ use bookie_gpui_grid_prototype::source::{Source, Synthetic};
 use bookie_gpui_grid_prototype::theme::{Style, Theme};
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
-    MouseDownEvent, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size, uniform_list,
+    MouseDownEvent, ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds,
+    WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
 };
 use text_input::{InputEvent, TextInput};
 use ui_theme::ThemeExt;
@@ -59,6 +59,7 @@ struct GridView {
     runs: Vec<Run>,
     run_edits: Vec<grid_edit::Edits>,
     active_run: usize,
+    run_scroll: ScrollHandle,
     next_run_number: usize,
     summary_view: bool,
     result_ratio: f32,
@@ -75,6 +76,7 @@ struct GridView {
     sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
+    find_generation: u64,
     filter_generation: u64,
     compare: Option<Diff>,
     status: String,
@@ -140,7 +142,9 @@ impl GridView {
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
+                this.find_generation += 1;
                 this.cursor = MatchCursor::default();
+                this.status.clear();
                 cx.notify();
             }
             InputEvent::Submit => this.run_find(true, cx),
@@ -207,6 +211,7 @@ impl GridView {
             runs: vec![Run { number: 1, rows: total }],
             run_edits: vec![grid_edit::Edits::new()],
             active_run: 0,
+            run_scroll: ScrollHandle::new(),
             next_run_number: 2,
             summary_view: false,
             result_ratio: DEFAULT_RESULT_RATIO,
@@ -223,6 +228,7 @@ impl GridView {
             sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
+            find_generation: 0,
             filter_generation: 0,
             compare: None,
             status: String::new(),
@@ -356,7 +362,14 @@ impl GridView {
         self.show_run(index, run);
     }
 
+    fn select_run(&mut self, index: usize) {
+        if index != self.active_run {
+            self.activate_run(index);
+        }
+    }
+
     fn show_run(&mut self, index: usize, run: Run) {
+        self.run_scroll.scroll_to_item(index);
         self.edits = std::mem::take(&mut self.run_edits[index]);
         self.editing = None;
         self.active_run = index;
@@ -445,11 +458,13 @@ impl GridView {
             return;
         }
         let (source, query) = (self.source.clone(), self.find_text(cx));
+        let find_generation = self.find_generation;
         self.status = "Searching…".into();
         self.begin_background(
             cx,
             move || source.find(&query, MAX_FIND_MATCHES),
             move |this, found| match found {
+                _ if this.find_generation != find_generation => {}
                 Ok(found) => {
                     this.find_capped = found.capped;
                     this.cursor.set(found.matches);
