@@ -59,7 +59,9 @@ def commands(bundle, arguments, index=None):
                      or (entry['kind'] == 'bin' and selection.bins))]
     if not selected:
         raise ValueError('no prebuilt test target matches the selection')
-    missing = [pattern for pattern in selection.test if not any(entry['kind'] == 'test' and fnmatch.fnmatchcase(entry['name'], pattern) for entry in selected)]
+    missing = [(package, pattern) for package in packages for pattern in selection.test
+               if not any(entry['package'] == package and entry['kind'] == 'test'
+                          and fnmatch.fnmatchcase(entry['name'], pattern) for entry in selected)]
     if missing:
         raise ValueError('a requested prebuilt test target is missing')
     result = []

@@ -59,6 +59,11 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ['-p', 'sample', '-p', 'missing', '--tests'])
 
+    def test_missing_target_in_one_package_cannot_be_silently_skipped(self):
+        self.index['package_directories']['other'] = 'crates/other'
+        with self.assertRaises(ValueError):
+            runner.commands(self.root, ['-p', 'sample', '-p', 'other', '--test', 'integration'], self.index)
+
     def test_wildcard_selects_integration_targets(self):
         command = runner.commands(self.root, ['-p', 'sample', '--test', '*'])[0]
         self.assertEqual(command, [str(self.binary.resolve())])
