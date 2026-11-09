@@ -896,6 +896,7 @@ dependencies = [
  "bookie-driver-mongodb",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
+ "bookie-driver-oracle",
  "bookie-driver-postgres",
  "bookie-driver-redis",
  "bookie-driver-sqlite",
@@ -928,6 +929,7 @@ dependencies = [
  "bookie-driver-mongodb",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
+ "bookie-driver-oracle",
  "bookie-driver-postgres",
  "bookie-driver-redis",
  "bookie-driver-sqlite",
@@ -1131,6 +1133,21 @@ dependencies = [
  "tracing",
  "uuid",
  "zip",
+]
+
+[[package]]
+name = "bookie-driver-oracle"
+version = "0.2.5"
+dependencies = [
+ "async-trait",
+ "bookie-core",
+ "chrono",
+ "oracledb",
+ "rust_decimal",
+ "secrecy",
+ "serde_json",
+ "testcontainers",
+ "tokio",
 ]
 
 [[package]]
@@ -2466,7 +2483,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2959,7 +2976,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps 9.0.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4687,6 +4704,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "oracledb"
+version = "26.0.0-beta.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27b98c7346f2bb5169ec4b2d4f066fb616529ac766b395440c5019fe88d1ef45"
+dependencies = [
+ "aes 0.9.3",
+ "base16ct",
+ "base64ct",
+ "cbc 0.2.1",
+ "chrono",
+ "pbkdf2 0.13.0",
+ "pkcs8",
+ "rand 0.10.3",
+ "rustls",
+ "sha2 0.11.1",
+ "uuid",
+ "webpki-roots",
+ "whoami",
+]
+
+[[package]]
 name = "ordered-stream"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5706,7 +5744,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6783,10 +6821,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7658,7 +7696,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

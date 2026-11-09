@@ -14,6 +14,7 @@ This page describes current BookiE behavior. Published artifact versions and pac
 | MongoDB | Experimental | Collections, find and aggregate. An optional authentication database can be set. |
 | Redis | Experimental | One host and port. Sentinel and Cluster are not supported. |
 | DuckDB | Experimental | Built in. |
+| Oracle Database | Experimental | Read-only browsing and SELECT queries over plain TCP. TLS, writes and server-side cancel are not available. |
 
 Drivers are linked at build time. There is no plugin system ([ADR 0001](decisions/0001-no-plugin-system.md)).
 

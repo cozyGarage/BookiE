@@ -198,3 +198,37 @@ fn token_connections_require_at_least_one_saved_connection() {
     assert!(validate_token_connections(&[Uuid::new_v4()], &saved).is_err());
     assert!(validate_token_connections(&[id], &saved).is_ok());
 }
+
+#[test]
+fn every_registered_driver_is_listed_in_the_feature_table_with_its_declared_maturity() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/features.md");
+    let table = std::fs::read_to_string(path).expect("read docs/features.md");
+    let rows: Vec<Vec<&str>> = table
+        .lines()
+        .filter(|line| line.starts_with("| "))
+        .map(|line| line.split('|').map(str::trim).skip(1).collect())
+        .collect();
+    let registry = build_registry();
+    assert!(registry.len() >= 9, "the registry lost a driver");
+    for driver in registry.iter() {
+        let row = rows
+            .iter()
+            .find(|cells| {
+                cells
+                    .first()
+                    .is_some_and(|name| name.starts_with(driver.display_name()))
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "{} is registered but missing from docs/features.md",
+                    driver.display_name()
+                )
+            });
+        assert_eq!(
+            row.get(1).copied(),
+            Some(driver.capabilities().maturity.label()),
+            "{} maturity differs between the driver and docs/features.md",
+            driver.display_name()
+        );
+    }
+}
