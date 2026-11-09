@@ -210,17 +210,22 @@ pub fn parse_predicate(input: &str) -> Result<Predicate, &'static str> {
 
 pub fn matches_predicate(index: u64, predicate: &Predicate) -> bool {
     let needle = predicate.text.to_lowercase();
-    let text = column_text(index, predicate.column).map(|text| text.to_lowercase());
-    match predicate.op {
-        Op::Contains => text.is_some_and(|text| text.contains(&needle)),
+    matches_column_text(column_text(index, predicate.column), predicate.op, &needle)
+}
+
+fn matches_column_text(text: Option<String>, op: Op, needle: &str) -> bool {
+    let text = text.map(|text| text.to_lowercase());
+    match op {
+        Op::Contains => text.is_some_and(|text| text.contains(needle)),
         Op::Equals => text.is_some_and(|text| text == needle),
         Op::NotEquals => text.is_none_or(|text| text != needle),
     }
 }
 
 pub fn filter_rows(total: u64, predicate: &Predicate) -> Vec<u32> {
+    let needle = predicate.text.to_lowercase();
     (0..total)
-        .filter(|index| matches_predicate(*index, predicate))
+        .filter(|index| matches_column_text(column_text(*index, predicate.column), predicate.op, &needle))
         .map(|index| index as u32)
         .collect()
 }
