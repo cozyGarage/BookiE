@@ -44,6 +44,10 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_SHA": "b" * 40}, clear=True), self.assertRaises(ValueError):
             runner.commands(self.root, ["-p", "sample", "--test", "integration"])
 
+    def test_explicit_source_revision_takes_precedence_for_manual_runs(self):
+        with patch.dict(os.environ, {"GITHUB_SHA": "b" * 40, "BOOKIE_SOURCE_COMMIT": "a" * 40}, clear=True):
+            self.assertEqual(len(runner.commands(self.root, ["-p", "sample", "--test", "integration"])), 1)
+
     def test_executable_cannot_escape_the_verified_bundle(self):
         self.index["tests"][0]["path"] = "../outside"
         (self.root / "index.json").write_text(json.dumps(self.index))

@@ -15,7 +15,7 @@ def load_index(bundle):
     spec = importlib.util.spec_from_file_location('ci_test_bundle', Path(__file__).resolve().with_name('ci-test-bundle.py'))
     verifier = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(verifier)
-    revision = os.environ.get('GITHUB_SHA')
+    revision = os.environ.get('BOOKIE_SOURCE_COMMIT') or os.environ.get('GITHUB_SHA')
     return verifier.verify(bundle, revision or json.loads((bundle / 'index.json').read_text())['source_commit'])
 
 
@@ -24,7 +24,7 @@ def commands(bundle, arguments, index=None):
     index = index or load_index(bundle)
     if index.get('schema_version') != 1:
         raise ValueError('unsupported test bundle schema')
-    revision = os.environ.get('GITHUB_SHA')
+    revision = os.environ.get('BOOKIE_SOURCE_COMMIT') or os.environ.get('GITHUB_SHA')
     if revision and index.get('source_commit') != revision:
         raise ValueError('test bundle source revision differs from the checkout')
     parser = argparse.ArgumentParser(allow_abbrev=False)

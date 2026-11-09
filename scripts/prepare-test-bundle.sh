@@ -15,4 +15,4 @@ if ! python3 "$ROOT/scripts/ci-bundle-registry.py" fetch "$destination" "$revisi
   fi
   python3 "$ROOT/scripts/ci-bundle-registry.py" github-fetch "$destination" "$revision" "$group"
 fi
-printf 'BOOKIE_TEST_BUNDLE=%s\nBOOKIE_REQUIRE_PREBUILT=1\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$destination" "$destination" >> "${GITHUB_ENV:?job environment file required}"
+printf 'BOOKIE_TEST_BUNDLE=%s\nBOOKIE_REQUIRE_PREBUILT=1\nBOOKIE_SOURCE_COMMIT=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$destination" "$revision" "$destination" >> "${GITHUB_ENV:?job environment file required}"
