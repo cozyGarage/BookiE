@@ -79,6 +79,12 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ['-p', 'sample', '--test', 'integration'])
 
+    def test_unverified_helper_is_rejected_before_execution(self):
+        self.index['binaries']['helper'] = 'unverified'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        with self.assertRaisesRegex(ValueError, 'unverified helper executable'):
+            runner.load_index(self.root)
+
     def test_missing_package_cannot_be_silently_skipped(self):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ['-p', 'sample', '-p', 'missing', '--tests'])

@@ -33,6 +33,8 @@ def verify(bundle, revision):
     for entry in index['tests']:
         if entry['path'] not in index['files']:
             raise ValueError('unverified test executable')
+    if any(path not in index['files'] for path in index.get('binaries', {}).values()):
+        raise ValueError('unverified helper executable')
     return index
 
 
