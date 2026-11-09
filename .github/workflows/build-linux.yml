@@ -720,6 +720,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - pin-revision
+      - reusable-test-builds
       - preflight
       - fast
       - gtk-safety
