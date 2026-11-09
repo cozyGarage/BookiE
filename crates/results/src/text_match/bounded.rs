@@ -1,4 +1,4 @@
-use super::{Captures, Strategy, TextMatcher, next_ignore_case_span};
+use super::{Captures, FoldedMatchIter, Strategy, TextMatcher};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ReplacementLimit {
@@ -50,14 +50,32 @@ impl TextMatcher {
                     count += 1;
                 }
             }
-            Strategy::Literal { needle, match_case } => {
-                while let Some((start, end)) = literal_span(&text[last..], needle, *match_case) {
+            Strategy::Literal {
+                needle,
+                match_case: true,
+            } => {
+                while let Some(start) = text[last..].find(needle) {
                     if cancelled() {
                         return Err(ReplacementLimit::Cancelled);
                     }
                     append(&mut out, &text[last..last + start], limit)?;
                     append(&mut out, replacement, limit)?;
-                    last += end;
+                    last += start + needle.len();
+                    count += 1;
+                }
+            }
+            Strategy::Literal {
+                needle,
+                match_case: false,
+            } => {
+                let mut matches = FoldedMatchIter::new_controlled(text, needle, &cancelled)?;
+                for (start, end) in &mut matches {
+                    if cancelled() {
+                        return Err(ReplacementLimit::Cancelled);
+                    }
+                    append(&mut out, &text[last..start], limit)?;
+                    append(&mut out, replacement, limit)?;
+                    last = end;
                     count += 1;
                 }
             }
@@ -68,16 +86,6 @@ impl TextMatcher {
         append(&mut out, &text[last..], limit)?;
         Ok((out, count))
     }
-}
-
-fn literal_span(text: &str, needle: &str, match_case: bool) -> Option<(usize, usize)> {
-    if needle.is_empty() {
-        return None;
-    }
-    if match_case {
-        return text.find(needle).map(|start| (start, start + needle.len()));
-    }
-    next_ignore_case_span(text, needle)
 }
 
 fn append(out: &mut String, fragment: &str, limit: usize) -> Result<(), ReplacementLimit> {
