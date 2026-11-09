@@ -7,7 +7,7 @@ use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, prelude
 
 use crate::text_input::InputEvent;
 use crate::ui_theme::ThemeExt;
-use crate::{CELL_WIDTHS, GridView, cell_div};
+use crate::{CELL_WIDTHS, GridView, display_cell};
 use bookie_gpui_grid_prototype::theme::Theme;
 
 pub type Edits = HashMap<(u64, usize), Cell>;
@@ -111,7 +111,7 @@ impl GridView {
         }
         let theme = Theme::current(cx);
         let cell = self.edits.get(&(source, column)).unwrap_or(cell);
-        let mut item = cell_div(width, bookie_gpui_grid_prototype::preview::cell_preview(cell));
+        let mut item = display_cell(width, cell);
         if matches!(cell, Cell::Null) {
             item = item.italic().text_color(rgb(theme.muted_foreground));
         }

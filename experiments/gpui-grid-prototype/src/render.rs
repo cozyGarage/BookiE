@@ -241,6 +241,7 @@ impl Render for GridView {
 
 fn header_cell(cursor: Option<Cursor>, column: usize, width: f32, text: &str, theme: Theme) -> Div {
     let cell = cell_div(width, text.to_string());
+    let cell = if column == 0 { cell.justify_end() } else { cell };
     match super::grid_edit::cursor_column_background(cursor, column, theme) {
         Some(background) => cell.bg(rgb(background)),
         None => cell,
@@ -294,10 +295,10 @@ impl GridView {
             return row_div(position % 2 == 1, false, theme)
                 .id(position)
                 .child(fixed_cell(70.0, row.change.to_string()))
-                .child(cell_div(CELL_WIDTHS[0], cell_preview(&row.cells[0])))
-                .child(cell_div(CELL_WIDTHS[1], cell_preview(&row.cells[1])))
-                .child(cell_div(CELL_WIDTHS[2], cell_preview(&row.cells[2])))
-                .child(cell_div(CELL_WIDTHS[3], cell_preview(&row.cells[3])));
+                .child(display_cell(CELL_WIDTHS[0], &row.cells[0]))
+                .child(display_cell(CELL_WIDTHS[1], &row.cells[1]))
+                .child(display_cell(CELL_WIDTHS[2], &row.cells[2]))
+                .child(display_cell(CELL_WIDTHS[3], &row.cells[3]));
         }
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
@@ -315,7 +316,11 @@ impl GridView {
                     cx.notify();
                 }),
             )
-            .child(fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string()).text_color(rgb(theme.muted_foreground)))
+            .child(
+                fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string())
+                    .justify_end()
+                    .text_color(rgb(theme.muted_foreground)),
+            )
             .child(self.data_cell(source, 0, position, &cells[0], cx))
             .child(self.data_cell(source, 1, position, &cells[1], cx))
             .child(self.data_cell(source, 2, position, &cells[2], cx))

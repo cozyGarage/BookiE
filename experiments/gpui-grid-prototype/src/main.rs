@@ -1047,6 +1047,29 @@ pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
 }
 
+fn display_cell(width: f32, cell: &Cell) -> Div {
+    let item = cell_div(width, cell_preview(cell));
+    if numeric_cell(cell) { item.justify_end() } else { item }
+}
+
+fn numeric_cell(cell: &Cell) -> bool {
+    matches!(cell, Cell::Int(_) | Cell::Float(_) | Cell::Decimal(_))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_numeric_cells_use_right_alignment() {
+        assert!(numeric_cell(&Cell::Int(7)));
+        assert!(numeric_cell(&Cell::Float(7.5)));
+        assert!(numeric_cell(&Cell::Decimal("7.50".into())));
+        assert!(!numeric_cell(&Cell::Text("7".into())));
+        assert!(!numeric_cell(&Cell::Null));
+    }
+}
+
 fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
     let background = if selected {
         theme.active_row
