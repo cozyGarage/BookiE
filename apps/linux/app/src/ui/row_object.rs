@@ -39,6 +39,8 @@ mod imp {
         pub cells: RefCell<Vec<Option<Value>>>,
         pub previews: RefCell<Vec<Option<CellPreview>>>,
         pub source: RefCell<Option<SharedRow>>,
+        pub highlight_row_matches:
+            RefCell<Option<(Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>, u64)>>,
         /// Local id for draft (uninserted) rows added via the
         /// inline-Insert flow. `None` for persisted rows fetched
         /// from the database. Lets `connect_bind` distinguish a
@@ -228,6 +230,7 @@ impl RowObject {
         for (index, preview) in updates {
             previews[index] = preview;
         }
+        self.imp().highlight_row_matches.borrow_mut().take();
     }
 
     pub fn preview_long_redis_string_values(&self, key_indices: &[usize]) {
@@ -278,6 +281,21 @@ impl RowObject {
         row
     }
 
+    pub(crate) fn highlight_row_matches(
+        &self,
+        rules: &Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>,
+        compute: impl FnOnce() -> u64,
+    ) -> u64 {
+        if let Some((cached_rules, matches)) = self.imp().highlight_row_matches.borrow().as_ref()
+            && Arc::ptr_eq(cached_rules, rules)
+        {
+            return *matches;
+        }
+        let matches = compute();
+        *self.imp().highlight_row_matches.borrow_mut() = Some((rules.clone(), matches));
+        matches
+    }
+
     pub fn cells_clone(&self) -> Vec<Value> {
         let len = self.imp().cells.borrow().len();
         (0..len)
@@ -301,6 +319,7 @@ impl RowObject {
         if idx < cells.len() {
             cells[idx] = Some(value);
             self.imp().previews.borrow_mut()[idx] = None;
+            self.imp().highlight_row_matches.borrow_mut().take();
             if self
                 .imp()
                 .row_identity

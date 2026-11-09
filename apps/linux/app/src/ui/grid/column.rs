@@ -326,7 +326,7 @@ fn bind_row_cell(
             (None, Some(value)) => cell_view_with_column_editability(value, column, column_is_editable),
             (None, None) => return,
         };
-        let highlight_rules = context.highlight_rules.as_deref().unwrap_or(&[]);
+        let highlight_rules = context.highlight_rules.as_ref();
         bind_cell(
             item,
             view,
@@ -458,20 +458,22 @@ fn bind_cell(
     value: Option<&Value>,
     binding: CellBinding<'_>,
     row: &crate::ui::row_object::RowObject,
-    highlight_rules: &[bookie_app_services::highlight_match::PreparedHighlightRule],
+    highlight_rules: Option<&Arc<[bookie_app_services::highlight_match::PreparedHighlightRule]>>,
     display_columns: &[ColumnInfo],
 ) {
     let is_null = view.is_null;
     let inline_editable = binding.editable && view.inline_editable;
     let text = view.text_for_bind(binding.editable);
-    let highlight = super::highlight_paint::paint_for_bound_cell(
-        highlight_rules,
-        binding.column_index,
-        text.as_ref(),
-        is_null,
-        row,
-        display_columns,
-    );
+    let highlight = highlight_rules.and_then(|rules| {
+        super::highlight_paint::paint_for_bound_cell(
+            rules,
+            binding.column_index,
+            text.as_ref(),
+            is_null,
+            row,
+            display_columns,
+        )
+    });
     let Some(child) = item.child() else { return };
     if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
         bind_editable_label(

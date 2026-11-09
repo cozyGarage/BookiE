@@ -2,7 +2,7 @@ use bookie_core::FilterValue;
 
 use super::{
     DisplayCell, HighlightError, HighlightOp, HighlightPaint, HighlightRule, HighlightRuleSet, HighlightTarget,
-    MAX_LIKE_PATTERN_BYTES, paint_for_cell, prepare_rules,
+    MAX_LIKE_PATTERN_BYTES, compute_row_rule_matches, paint_for_cell, paint_for_cell_with_row_matches, prepare_rules,
 };
 
 fn rule(
@@ -27,6 +27,84 @@ fn prepared(rules: &[HighlightRule], columns: &[&str]) -> Vec<super::PreparedHig
 
 fn cell(text: &str) -> DisplayCell<'_> {
     DisplayCell { text, is_null: false }
+}
+
+#[test]
+fn row_rule_matches_reuse_each_source_column_and_cell_value_remains_current() {
+    let rules = prepared(
+        &[
+            rule(
+                "status",
+                HighlightOp::Eq,
+                Some(FilterValue::Single("bad".into())),
+                "red",
+                HighlightTarget::Row,
+            ),
+            rule(
+                "status",
+                HighlightOp::Contains,
+                Some(FilterValue::Single("b".into())),
+                "blue",
+                HighlightTarget::Row,
+            ),
+        ],
+        &["status", "name"],
+    );
+    let mut reads = 0;
+    let matches = compute_row_rule_matches(&rules, |index| {
+        reads += 1;
+        (index == 0).then(|| (String::from("bad"), false))
+    });
+
+    assert_eq!(reads, 1);
+    assert_eq!(matches, 0b11);
+    assert_eq!(
+        paint_for_cell_with_row_matches(&rules, 1, cell("name"), matches),
+        Some(HighlightPaint {
+            color: "red",
+            target: HighlightTarget::Row
+        })
+    );
+    assert_eq!(
+        paint_for_cell_with_row_matches(&rules, 0, cell("bingo"), matches),
+        Some(HighlightPaint {
+            color: "blue",
+            target: HighlightTarget::Row
+        })
+    );
+}
+
+#[test]
+fn row_rules_after_the_inline_cache_capacity_still_match() {
+    let mut source_rules = (0..u64::BITS)
+        .map(|_| {
+            rule(
+                "name",
+                HighlightOp::Eq,
+                Some(FilterValue::Single("never".into())),
+                "blue",
+                HighlightTarget::Cell,
+            )
+        })
+        .collect::<Vec<_>>();
+    source_rules.push(rule(
+        "status",
+        HighlightOp::Eq,
+        Some(FilterValue::Single("bad".into())),
+        "red",
+        HighlightTarget::Row,
+    ));
+    let rules = prepared(&source_rules, &["status", "name"]);
+
+    assert_eq!(
+        paint_for_cell(&rules, 1, cell("name"), |index| {
+            (index == 0).then(|| (String::from("bad"), false))
+        }),
+        Some(HighlightPaint {
+            color: "red",
+            target: HighlightTarget::Row
+        })
+    );
 }
 
 fn null_cell() -> DisplayCell<'static> {

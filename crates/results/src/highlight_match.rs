@@ -138,6 +138,79 @@ pub fn paint_for_cell(
     cell: DisplayCell<'_>,
     mut row_cell: impl FnMut(usize) -> Option<(String, bool)>,
 ) -> Option<HighlightPaint> {
+    if rules.len() > u64::BITS as usize {
+        for rule in rules {
+            if rule.target == HighlightTarget::Cell && rule.column == column && display_matches(rule, cell) {
+                return Some(HighlightPaint {
+                    color: rule.color,
+                    target: HighlightTarget::Cell,
+                });
+            }
+        }
+        for rule in rules {
+            if rule.target != HighlightTarget::Row {
+                continue;
+            }
+            if rule.column == column {
+                if display_matches(rule, cell) {
+                    return Some(HighlightPaint {
+                        color: rule.color,
+                        target: HighlightTarget::Row,
+                    });
+                }
+                continue;
+            }
+            let Some((text, is_null)) = row_cell(rule.column) else {
+                continue;
+            };
+            if display_matches(rule, DisplayCell { text: &text, is_null }) {
+                return Some(HighlightPaint {
+                    color: rule.color,
+                    target: HighlightTarget::Row,
+                });
+            }
+        }
+        return None;
+    }
+    let row_matches = compute_row_rule_matches(rules, row_cell);
+    paint_for_cell_with_row_matches(rules, column, cell, row_matches)
+}
+
+pub fn compute_row_rule_matches(
+    rules: &[PreparedHighlightRule],
+    mut row_cell: impl FnMut(usize) -> Option<(String, bool)>,
+) -> u64 {
+    let mut matches = 0;
+    for (index, rule) in rules.iter().enumerate() {
+        if rule.target != HighlightTarget::Row
+            || rules[..index]
+                .iter()
+                .any(|previous| previous.target == HighlightTarget::Row && previous.column == rule.column)
+        {
+            continue;
+        }
+        let Some((text, is_null)) = row_cell(rule.column) else {
+            continue;
+        };
+        let cell = DisplayCell { text: &text, is_null };
+        for (rule_index, candidate) in rules.iter().enumerate().skip(index) {
+            if candidate.target == HighlightTarget::Row
+                && candidate.column == rule.column
+                && display_matches(candidate, cell)
+            {
+                matches |= 1_u64 << rule_index;
+            }
+        }
+    }
+    matches
+}
+
+pub fn paint_for_cell_with_row_matches(
+    rules: &[PreparedHighlightRule],
+    column: usize,
+    cell: DisplayCell<'_>,
+    row_matches: u64,
+) -> Option<HighlightPaint> {
     for rule in rules {
         if rule.target != HighlightTarget::Cell || rule.column != column {
             continue;
@@ -149,7 +222,7 @@ pub fn paint_for_cell(
             });
         }
     }
-    for rule in rules {
+    for (index, rule) in rules.iter().enumerate() {
         if rule.target != HighlightTarget::Row {
             continue;
         }
@@ -162,16 +235,7 @@ pub fn paint_for_cell(
             }
             continue;
         }
-        let Some((text, is_null)) = row_cell(rule.column) else {
-            continue;
-        };
-        if display_matches(
-            rule,
-            DisplayCell {
-                text: text.as_str(),
-                is_null,
-            },
-        ) {
+        if index < u64::BITS as usize && row_matches & (1_u64 << index) != 0 {
             return Some(HighlightPaint {
                 color: rule.color,
                 target: HighlightTarget::Row,
