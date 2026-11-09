@@ -524,6 +524,19 @@ fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(cx, || (), |view, ()| view.status = "stale result".into());
+            view.run_query();
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale result"));
+}
+
+#[gpui::test]
 fn the_results_pane_can_be_hidden_and_the_summary_view_shows_the_run(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");

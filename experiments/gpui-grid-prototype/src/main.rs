@@ -298,6 +298,7 @@ impl GridView {
         let Some(run) = self.runs.get(index).copied() else {
             return;
         };
+        self.generation += 1;
         self.run_edits[self.active_run] = std::mem::take(&mut self.edits);
         self.edits = std::mem::take(&mut self.run_edits[index]);
         self.editing = None;
