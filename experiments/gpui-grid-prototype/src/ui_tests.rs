@@ -670,6 +670,29 @@ fn a_match_in_filtered_rows_uses_its_filtered_position_for_paging(cx: &mut TestA
 }
 
 #[gpui::test]
+fn searching_after_filter_selects_the_matching_filtered_row(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let kept: Vec<u32> = (0..6_000).map(|row| row * 20).collect();
+            view.set_mode(crate::Mode::Filtered {
+                kept,
+                label: "filtered".into(),
+            });
+            window.focus(&view.find.read(cx).focus_handle_for_tests(), cx);
+        });
+    });
+    cx.simulate_input("Sample 20000");
+    cx.simulate_keystrokes("enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.pager.page, 0);
+        assert_eq!(view.selection.map(|selection| selection.focus), Some(1_000));
+    });
+}
+
+#[gpui::test]
 fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
