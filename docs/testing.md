@@ -97,6 +97,7 @@ A guardrail test pins a contract that other code relies on but that no feature t
 | The MCP HTTP body is bounded by the same limit as stdio | `an_http_body_over_the_request_limit_is_refused` | `crates/mcp/src/server.rs` |
 | Every audited read ends in exactly one terminal outcome, on success and failure, controlled or not | `every_audited_read_ends_in_exactly_one_terminal_outcome`, `no_read_under_a_cancelled_control_writes_two_outcomes` | `crates/policy/src/guard_tests_passthrough.rs` |
 | An undecodable value stays visible and distinct from NULL in every export format and in copy; SQL export refuses it | `value_contract_every_export_keeps_undecodable_distinct_from_null` | `crates/core/src/export/stream_tests.rs` |
+| Every driver that joins the shared suite refuses writes on a read-only connection and keeps its rows, and returns NULL, empty text and integers beyond 2^53 unchanged | `conformance_*` | `crates/drivers/shared/tests/conformance.rs`, run by `crates/drivers/sqlite/tests/conformance.rs` and `crates/drivers/duckdb/tests/conformance.rs` |
 
 Add a row here when you add a guardrail.
 
