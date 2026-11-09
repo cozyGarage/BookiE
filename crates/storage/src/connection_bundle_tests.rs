@@ -296,10 +296,12 @@ fn an_encrypted_v2_bundle_round_trips_credentials_for_each_ssh_hop() {
             agent: false,
             client: Default::default(),
             agent_identity: None,
+            local_port: None,
         })),
         agent: false,
         client: Default::default(),
         agent_identity: None,
+        local_port: None,
     });
     let connection_id = connection.id;
     let mut secrets = BundleSecrets::new(connection_id, None, None, None);
@@ -350,10 +352,12 @@ fn a_bundle_rejects_duplicate_ssh_hop_identities() {
             agent: false,
             client: Default::default(),
             agent_identity: None,
+            local_port: None,
         })),
         agent: false,
         client: Default::default(),
         agent_identity: None,
+        local_port: None,
     });
     let body = BundleBody {
         connections: vec![BundleConnection::from_saved(&connection)],
@@ -381,6 +385,7 @@ fn a_bundle_rejects_per_hop_secrets_for_legacy_credentials() {
         agent: false,
         client: Default::default(),
         agent_identity: None,
+        local_port: None,
     });
     let mut secrets = BundleSecrets::new(connection.id, None, None, None);
     secrets.set_ssh_hop_secrets(vec![hop_secret(
@@ -535,6 +540,7 @@ pub(super) fn ssh_chain(depth: usize) -> SavedSshConfig {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     };
     for _ in 1..depth {
         hop = SavedSshConfig {
@@ -548,6 +554,7 @@ pub(super) fn ssh_chain(depth: usize) -> SavedSshConfig {
             client: Default::default(),
             agent: false,
             agent_identity: None,
+            local_port: None,
         };
     }
     hop
@@ -960,6 +967,7 @@ async fn an_export_collects_every_credential_kind_for_a_connection() {
         agent: false,
         client: Default::default(),
         agent_identity: None,
+        local_port: None,
     });
     crate::secrets::store_password(id, "db-pw", "bundle-test")
         .await
@@ -1020,10 +1028,12 @@ async fn an_export_collects_each_versioned_ssh_hop_secret() {
             agent: false,
             client: Default::default(),
             agent_identity: None,
+            local_port: None,
         })),
         agent: false,
         client: Default::default(),
         agent_identity: None,
+        local_port: None,
     });
     crate::secrets::store_ssh_hop_password(connection_id, root_id, 2, "root-secret", "bundle-test")
         .await

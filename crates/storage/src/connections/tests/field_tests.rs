@@ -60,6 +60,7 @@ async fn the_known_field_list_covers_every_serialized_key() {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     });
     let value = serde_json::to_value(&connection).unwrap();
     let keys: Vec<&String> = value.as_object().unwrap().keys().collect();

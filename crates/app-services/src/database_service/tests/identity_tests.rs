@@ -1,6 +1,37 @@
 use super::*;
 
 #[tokio::test]
+async fn entry_generation_survives_reconnect_and_rejects_replacement() {
+    let service = DatabaseService::new();
+    let id = open_memory_connection(&service, "generation").await;
+    let generation = service.connections.lock().unwrap().get(&id).unwrap().generation;
+    let replacement = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    {
+        let entries = service.connections.lock().unwrap();
+        entries.get(&id).unwrap().inner.lock().unwrap().connection = Arc::from(replacement);
+    }
+    assert!(
+        service
+            .guard_for_generation(id, generation, Principal::human_gui())
+            .is_some()
+    );
+    service.close(id);
+    let other_id = open_memory_connection(&service, "replacement").await;
+    let other_generation = service.connections.lock().unwrap().get(&other_id).unwrap().generation;
+    assert_ne!(generation, other_generation);
+    service.close_generation(other_id, generation);
+    assert!(service.is_active(other_id));
+    service.close_generation(other_id, other_generation);
+    assert!(!service.is_active(other_id));
+}
+
+#[tokio::test]
 async fn session_identity_survives_new_guards_but_changes_on_reconnect() {
     let service = DatabaseService::new();
     let id = open_memory_connection(&service, "identity").await;

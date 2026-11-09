@@ -130,6 +130,7 @@ fn config(fixture: &Fixture, auth: OpenSshAuth) -> OpenSshConfig {
         destination: SshDestination::new(&fixture.host, Some(fixture.port), Some("deploy".to_owned())).unwrap(),
         jump_hosts: Vec::new(),
         auth,
+        local_port: None,
     }
 }
 
@@ -350,6 +351,7 @@ async fn an_effective_proxy_command_is_refused_without_running_it() -> TestResul
         destination: SshDestination::new("target", None, None)?,
         jump_hosts: Vec::new(),
         auth: OpenSshAuth::Agent,
+        local_port: None,
     };
 
     assert!(matches!(
@@ -446,6 +448,7 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
         destination: SshDestination::new("target", None, None).unwrap(),
         jump_hosts: Vec::new(),
         auth: password("s3cret"),
+        local_port: None,
     };
     let proxy_marker = temp.path().join("proxy-command-ran");
     std::fs::write(
@@ -642,6 +645,7 @@ async fn openssh_authenticates_with_an_unencrypted_private_key() {
             path: Some(key),
             passphrase: None,
         },
+        local_port: None,
     };
     let prompter = ScriptedPrompter::new(vec![PromptAnswer::Accept]);
     let session = OpenSshSession::connect(&cfg, &fixture.context, prompter, CancellationToken::new())
@@ -665,6 +669,7 @@ async fn openssh_authenticates_with_a_passphrase_protected_private_key() {
             path: Some(key),
             passphrase: Some(SecretString::from("s3cret-passphrase")),
         },
+        local_port: None,
     };
     let prompter = ScriptedPrompter::new(vec![PromptAnswer::Accept]);
     let session = OpenSshSession::connect(&cfg, &fixture.context, prompter, CancellationToken::new())
@@ -719,6 +724,7 @@ async fn openssh_authenticates_with_a_key_held_by_ssh_agent() {
         destination: SshDestination::new(&fixture.host, Some(fixture.port), Some("deploy".to_owned())).unwrap(),
         jump_hosts: Vec::new(),
         auth: OpenSshAuth::Agent,
+        local_port: None,
     };
     let prompter = ScriptedPrompter::new(vec![PromptAnswer::Accept]);
     let session = OpenSshSession::connect(&cfg, &fixture.context, prompter, CancellationToken::new())

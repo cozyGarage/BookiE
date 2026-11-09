@@ -17,6 +17,7 @@ pub(crate) fn key_hop(host: &str) -> SavedSshConfig {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     }
 }
 

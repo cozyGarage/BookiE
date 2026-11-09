@@ -100,6 +100,7 @@ impl CandidateGuardFactory {
 }
 
 struct Entry {
+    generation: Uuid,
     inner: Arc<Mutex<EntryInner>>,
     metadata: ConnectionMetadata,
     read_only: bool,
@@ -487,6 +488,7 @@ impl DatabaseService {
         params: ReconnectParams,
     ) -> bool {
         self.activate_shared(id, metadata, Arc::from(connection), tunnel, read_only, params)
+            .is_some()
     }
 
     pub(crate) fn activate_shared(
@@ -497,13 +499,13 @@ impl DatabaseService {
         tunnel: Option<Tunnel>,
         read_only: bool,
         params: ReconnectParams,
-    ) -> bool {
+    ) -> Option<Uuid> {
         let mut connections = self
             .connections
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         if connections.contains_key(&id) {
-            return false;
+            return None;
         }
         let fault = Arc::new(Notify::new());
         connection.attach_fault_notify(Arc::clone(&fault));
@@ -525,7 +527,9 @@ impl DatabaseService {
             cancel.clone(),
             fault.clone(),
         ));
+        let generation = Uuid::new_v4();
         let entry = Entry {
+            generation,
             inner,
             metadata,
             read_only,
@@ -535,7 +539,7 @@ impl DatabaseService {
             _monitor: monitor,
         };
         connections.insert(id, entry);
-        true
+        Some(generation)
     }
 
     pub fn metadata(&self, id: Uuid) -> Option<ConnectionMetadata> {
@@ -567,7 +571,7 @@ impl DatabaseService {
         id: Uuid,
         principal: Principal,
     ) -> Option<(Arc<PolicyGuard>, ConnectionIdentity)> {
-        self.build_guard_with_identity(id, principal)
+        self.build_guard_with_identity(id, principal, None)
             .map(|(guard, identity)| (Arc::new(guard), identity))
     }
 
@@ -587,12 +591,25 @@ impl DatabaseService {
         Some((guard as Arc<dyn Connection>, identity))
     }
 
-    fn build_guard_with_identity(&self, id: Uuid, principal: Principal) -> Option<(PolicyGuard, ConnectionIdentity)> {
+    pub(crate) fn guard_for_generation(&self, id: Uuid, generation: Uuid, principal: Principal) -> Option<PolicyGuard> {
+        self.build_guard_with_identity(id, principal, Some(generation))
+            .map(|(guard, _)| guard)
+    }
+
+    fn build_guard_with_identity(
+        &self,
+        id: Uuid,
+        principal: Principal,
+        generation: Option<Uuid>,
+    ) -> Option<(PolicyGuard, ConnectionIdentity)> {
         let entries = self
             .connections
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let entry = entries.get(&id)?;
+        if generation.is_some_and(|generation| generation != entry.generation) {
+            return None;
+        }
         let inner = entry.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let policy = self
             .policy
@@ -653,6 +670,18 @@ impl DatabaseService {
         let entry = entries.get(&id)?;
         let inner = entry.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         Some(inner.health.clone())
+    }
+
+    pub(crate) fn close_generation(&self, id: Uuid, generation: Uuid) {
+        let mut entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if entries.get(&id).is_some_and(|entry| entry.generation == generation)
+            && let Some(entry) = entries.remove(&id)
+        {
+            entry.cancel.cancel();
+        }
     }
 
     pub fn close(&self, id: Uuid) {

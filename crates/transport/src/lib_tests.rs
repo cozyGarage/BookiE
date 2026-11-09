@@ -72,6 +72,7 @@ fn saved_ssh_connection(client: SshClient) -> SavedConnection {
             client,
             agent: false,
             agent_identity: None,
+            local_port: None,
         }),
         last_opened_at: None,
         connect_timeout_secs: None,
@@ -655,4 +656,31 @@ async fn legacy_jump_key_passphrase_is_refused_before_keyring_access() {
         !message.contains("keyring"),
         "must refuse before keyring access: {message}"
     );
+}
+
+fn agent_hop(jump: Option<SavedSshConfig>, local_port: Option<u16>) -> SavedSshConfig {
+    SavedSshConfig {
+        hop_id: Uuid::new_v4(),
+        credential_revision: 0,
+        host: "bastion.example".into(),
+        port: 22,
+        username: "user".into(),
+        auth: SavedSshAuth::Password,
+        jump: jump.map(Box::new),
+        client: SshClient::Builtin,
+        agent: true,
+        agent_identity: None,
+        local_port,
+    }
+}
+
+#[tokio::test]
+async fn the_saved_local_port_applies_to_the_last_hop_only() {
+    let saved = agent_hop(Some(agent_hop(None, None)), Some(15432));
+
+    let hops = resolve_saved_ssh_chain(Uuid::new_v4(), &saved).await.unwrap();
+
+    assert_eq!(hops.len(), 2);
+    assert_eq!(hops[0].local_port, None);
+    assert_eq!(hops[1].local_port, Some(15432));
 }

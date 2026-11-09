@@ -154,6 +154,8 @@ pub struct SavedSshConfig {
     pub agent: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_identity: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

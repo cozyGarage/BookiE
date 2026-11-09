@@ -312,6 +312,7 @@ async fn a_material_lookup_failure_does_not_reuse_a_healthy_cached_connection() 
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     });
     let key = SessionKey::from_saved(&saved, [0; 32]);
     let queries = Arc::new(AtomicUsize::new(0));

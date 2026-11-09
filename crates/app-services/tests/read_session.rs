@@ -92,6 +92,28 @@ async fn a_session_lists_tables_and_reads_typed_pages() {
 }
 
 #[tokio::test]
+async fn page_sizes_are_bounded_before_a_read() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let table = session.tables.iter().find(|table| table.name == "items").unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let maximum = bookie_core::MAX_QUERY_CURSOR_PAGE_ROWS as u64;
+
+    assert_eq!(
+        session.read_page(table, 0, maximum, &control).await.unwrap().rows.len(),
+        3
+    );
+    for limit in [0, maximum + 1, u64::MAX] {
+        assert!(matches!(
+            session.read_page(table, 0, limit, &control).await,
+            Err(DriverFailurePresentation::Unsupported(_))
+        ));
+    }
+}
+
+#[tokio::test]
 async fn a_cancelled_page_read_returns_cancelled() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
@@ -127,6 +149,30 @@ async fn dropping_a_session_removes_its_connection() {
     drop(session);
 
     assert!(!database.is_active(id));
+}
+
+#[tokio::test]
+async fn an_old_session_cannot_read_or_close_a_replacement() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let id = Uuid::new_v4();
+    let database = Arc::new(DatabaseService::new_isolated());
+    let old = session(&path, id, database.clone()).await;
+    let table = old.tables.iter().find(|table| table.name == "items").unwrap().clone();
+    database.close(id);
+    let replacement = session(&path, id, database.clone()).await;
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    assert!(matches!(
+        old.read_page(&table, 0, 2, &control).await,
+        Err(DriverFailurePresentation::Disconnected)
+    ));
+    drop(old);
+    assert_eq!(
+        replacement.read_page(&table, 0, 2, &control).await.unwrap().rows.len(),
+        2
+    );
 }
 
 #[tokio::test]
