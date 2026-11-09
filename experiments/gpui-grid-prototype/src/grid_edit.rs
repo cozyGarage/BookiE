@@ -12,6 +12,23 @@ use bookie_gpui_grid_prototype::theme::Theme;
 
 pub type Edits = HashMap<(u64, usize), Cell>;
 
+pub(super) fn cursor_row(cursor: Option<Cursor>, row: usize) -> bool {
+    cursor.is_some_and(|cursor| cursor.row == row)
+}
+
+pub(super) fn cursor_column_background(cursor: Option<Cursor>, column: usize, theme: Theme) -> Option<u32> {
+    cursor.filter(|cursor| cursor.column == column).map(|_| theme.chrome)
+}
+
+fn cursor_cell_background(cursor: Option<Cursor>, row: usize, column: usize, theme: Theme) -> Option<u32> {
+    let cursor = cursor?;
+    if cursor_row(Some(cursor), row) && cursor.column == column {
+        Some(theme.background)
+    } else {
+        cursor_column_background(Some(cursor), column, theme)
+    }
+}
+
 pub struct Editing {
     pub row: u64,
     pub column: usize,
@@ -101,8 +118,11 @@ impl GridView {
         if self.edits.contains_key(&(source, column)) {
             item = item.border_b_2().border_color(rgb(theme.warning));
         }
+        if let Some(background) = cursor_cell_background(self.cell_cursor, position, column, theme) {
+            item = item.bg(rgb(background));
+        }
         if self.cell_cursor == Some(Cursor { row: position, column }) {
-            item = item.border_2().border_color(rgb(theme.info)).bg(rgb(theme.background));
+            item = item.border_2().border_color(rgb(theme.info));
         }
         item.on_mouse_down(
             MouseButton::Left,
@@ -114,5 +134,24 @@ impl GridView {
                 }
             }),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn active_cell_highlights_its_row_column_and_intersection() {
+        let theme = Theme::dbx_light();
+        let cursor = Some(Cursor { row: 4, column: 2 });
+
+        assert!(cursor_row(cursor, 4));
+        assert!(!cursor_row(cursor, 5));
+        assert_eq!(cursor_column_background(cursor, 2, theme), Some(theme.chrome));
+        assert_eq!(cursor_column_background(cursor, 1, theme), None);
+        assert_eq!(cursor_cell_background(cursor, 4, 2, theme), Some(theme.background));
+        assert_eq!(cursor_cell_background(cursor, 5, 2, theme), Some(theme.chrome));
+        assert_eq!(cursor_cell_background(cursor, 4, 1, theme), None);
     }
 }
