@@ -45,6 +45,62 @@ fn a_json_preview_does_not_replace_the_full_typed_cell_value() {
 }
 
 #[test]
+fn row_highlight_cache_reuses_rule_identity_and_invalidates_with_row_changes() {
+    use bookie_app_services::highlight_match::{HighlightOp, HighlightRule, HighlightTarget, prepare_rules};
+    use bookie_core::FilterValue;
+    use std::cell::Cell;
+
+    let rules = Arc::from(
+        prepare_rules(
+            &[HighlightRule {
+                column: "status".into(),
+                op: HighlightOp::Eq,
+                value: Some(FilterValue::Single("bad".into())),
+                color: "red".into(),
+                target: HighlightTarget::Row,
+            }],
+            &["status"],
+        )
+        .unwrap(),
+    );
+    let row = RowObject::new(vec![Value::Text("bad".into())]);
+    let calls = Cell::new(0);
+    let initial = row.highlight_row_matches(&rules, || {
+        calls.set(calls.get() + 1);
+        1
+    });
+    let reused = row.highlight_row_matches(&rules, || {
+        calls.set(calls.get() + 1);
+        0
+    });
+    assert_eq!(initial, 1);
+    assert_eq!(reused, 1);
+    assert_eq!(calls.get(), 1);
+
+    let replacement_rules = Arc::from(rules.to_vec());
+    row.highlight_row_matches(&replacement_rules, || {
+        calls.set(calls.get() + 1);
+        1
+    });
+    assert_eq!(calls.get(), 2);
+
+    row.set_cell(0, Value::Text("good".into()));
+    let refreshed = row.highlight_row_matches(&rules, || {
+        calls.set(calls.get() + 1);
+        0
+    });
+    assert_eq!(refreshed, 0);
+    assert_eq!(calls.get(), 3);
+
+    row.preview_values_from_result();
+    row.highlight_row_matches(&rules, || {
+        calls.set(calls.get() + 1);
+        0
+    });
+    assert_eq!(calls.get(), 4);
+}
+
+#[test]
 fn parsed_json_preview_matches_serialized_escapes_and_utf8_boundaries() {
     let json = serde_json::json!({"payload": "é😀\0\\\"".repeat(2000)});
     let serialized = json.to_string();

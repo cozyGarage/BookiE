@@ -1,5 +1,6 @@
 use bookie_app_services::highlight_match::{
-    DisplayCell, HighlightPaint, HighlightTarget, PreparedHighlightRule, paint_for_cell,
+    DisplayCell, HighlightPaint, HighlightTarget, PreparedHighlightRule, compute_row_rule_matches, paint_for_cell,
+    paint_for_cell_with_row_matches,
 };
 use bookie_core::ColumnInfo;
 use gtk4::prelude::*;
@@ -74,7 +75,7 @@ pub(super) fn clear_highlight(widget: &gtk4::Widget) {
 }
 
 pub(super) fn paint_for_bound_cell(
-    rules: &[PreparedHighlightRule],
+    rules: &std::sync::Arc<[PreparedHighlightRule]>,
     column: usize,
     shown_text: &str,
     shown_null: bool,
@@ -88,16 +89,24 @@ pub(super) fn paint_for_bound_cell(
         text: shown_text,
         is_null: shown_null,
     };
-    paint_for_cell(rules, column, cell, |idx| {
-        if let Some(preview) = row.cell_preview(idx) {
-            return Some((super::display::preview_display_text(&preview, 512), false));
-        }
-        row.with_cell_value(idx, |value| {
-            let column = columns.get(idx)?;
-            Some(super::display::highlight_display_text(value, column))
-        })
-        .flatten()
+    if rules.len() > u64::BITS as usize {
+        return paint_for_cell(rules, column, cell, |index| highlight_source_cell(row, index, columns));
+    }
+    let row_matches = row.highlight_row_matches(rules, || {
+        compute_row_rule_matches(rules, |idx| highlight_source_cell(row, idx, columns))
+    });
+    paint_for_cell_with_row_matches(rules, column, cell, row_matches)
+}
+
+fn highlight_source_cell(row: &RowObject, index: usize, columns: &[ColumnInfo]) -> Option<(String, bool)> {
+    if let Some(preview) = row.cell_preview(index) {
+        return Some((super::display::preview_display_text(&preview, 512), false));
+    }
+    row.with_cell_value(index, |value| {
+        let column = columns.get(index)?;
+        Some(super::display::highlight_display_text(value, column))
     })
+    .flatten()
 }
 
 #[cfg(test)]
@@ -162,6 +171,7 @@ mod tests {
         )
         .expect("prepare");
         let row = RowObject::new(vec![Value::Text("bad".into())]);
+        let rules = std::sync::Arc::from(rules);
         let paint = paint_for_bound_cell(&rules, 0, "bad", false, &row, &[column("status")]);
         assert_eq!(
             paint,
@@ -191,6 +201,7 @@ mod tests {
             Value::Text(format!("{}tail-marker", "a".repeat(512))),
         ]);
         let columns = [column("name"), column("detail")];
+        let rules = std::sync::Arc::from(rules);
         let paint = paint_for_bound_cell(&rules, 0, "first", false, &row, &columns);
         assert_eq!(paint, None);
     }
