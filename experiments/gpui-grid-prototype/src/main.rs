@@ -300,7 +300,16 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let rows = (selection.first()..=selection.last()).map(|index| self.source.row(self.source_row(index)));
+        let rows = (selection.first()..=selection.last()).map(|index| {
+            let source = self.source_row(index);
+            let mut row = self.source.row(source);
+            for (column, cell) in row.iter_mut().enumerate() {
+                if let Some(edited) = self.edits.get(&(source, column)) {
+                    *cell = edited.clone();
+                }
+            }
+            row
+        });
         let text = copy_tsv(rows, with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
