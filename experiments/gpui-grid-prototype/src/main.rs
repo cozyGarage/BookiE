@@ -77,6 +77,7 @@ struct GridView {
     cursor: MatchCursor,
     find_capped: bool,
     find_generation: u64,
+    filter_generation: u64,
     compare: Option<Diff>,
     status: String,
     selection: Option<Selection>,
@@ -150,10 +151,15 @@ impl GridView {
             InputEvent::Cancel => this.status.clear(),
         })
         .detach();
-        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| {
-            if *event == InputEvent::Submit {
-                this.apply_filter(cx);
+        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| match event {
+            InputEvent::Changed => {
+                this.filter_generation += 1;
+                if this.status == "Filtering…" {
+                    this.status.clear();
+                }
             }
+            InputEvent::Submit => this.apply_filter(cx),
+            InputEvent::Cancel => {}
         })
         .detach();
         let editor = cx.new(|cx| TextInput::new("", cx));
@@ -223,6 +229,7 @@ impl GridView {
             cursor: MatchCursor::default(),
             find_capped: false,
             find_generation: 0,
+            filter_generation: 0,
             compare: None,
             status: String::new(),
             selection: None,
@@ -293,7 +300,16 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let rows = (selection.first()..=selection.last()).map(|index| self.source.row(self.source_row(index)));
+        let rows = (selection.first()..=selection.last()).map(|index| {
+            let source = self.source_row(index);
+            let mut row = self.source.row(source);
+            for (column, cell) in row.iter_mut().enumerate() {
+                if let Some(edited) = self.edits.get(&(source, column)) {
+                    *cell = edited.clone();
+                }
+            }
+            row
+        });
         let text = copy_tsv(rows, with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -310,6 +326,29 @@ impl GridView {
         self.runs.push(run);
         self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
+    }
+
+    fn close_tab(&mut self, index: usize) {
+        let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
+        self.tabs.close(index);
+        self.sync_grid_owner();
+        if !closing_query {
+            return;
+        }
+        if self.grid_is_query {
+            self.generation += 1;
+            self.edits = std::mem::take(&mut self.table_edits);
+            self.source = self.table_source.clone();
+            self.grid_is_query = false;
+            self.editing = None;
+            self.compare = None;
+            self.cursor = MatchCursor::default();
+            self.set_mode(Mode::All);
+        }
+        self.runs.clear();
+        self.run_edits.clear();
+        self.active_run = 0;
+        self.next_run_number = 1;
     }
 
     fn sync_grid_owner(&mut self) {
@@ -470,12 +509,15 @@ impl GridView {
 
     fn step_match(&mut self, forward: bool) {
         if let Some(row) = self.cursor.step(forward) {
-            let at = self.dataset_index_of(row);
-            self.selection = at.map(|index| Selection::after_click(None, index, false));
+            let Some(at) = self.dataset_index_of(row) else {
+                self.status = "Match is outside the filtered rows".into();
+                return;
+            };
+            self.selection = Some(Selection::after_click(None, at, false));
             if !self.continuous {
-                self.pager.contains_row(row);
+                self.pager.contains_row(at);
             }
-            let local = row.saturating_sub(self.base()) as usize;
+            let local = at.saturating_sub(self.base()) as usize;
             self.scroll.scroll_to_item_strict(local, ScrollStrategy::Center);
         }
         self.status = self.cursor.status(self.find_capped);
@@ -508,11 +550,15 @@ impl GridView {
         };
         let source = self.source.clone();
         let label = format!("WHERE {}", self.filter.read(cx).content());
+        let filter_generation = self.filter_generation;
         self.status = "Filtering…".into();
         self.begin_background(
             cx,
             move || source.filter(&predicate),
             move |this, kept| {
+                if this.filter_generation != filter_generation {
+                    return;
+                }
                 this.set_mode(Mode::Filtered { kept, label });
                 this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
             },
@@ -537,6 +583,7 @@ impl GridView {
             move || source.compare(keyed),
             |this, diff| {
                 this.status.clear();
+                this.selection = None;
                 this.compare = Some(diff);
                 this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
             },

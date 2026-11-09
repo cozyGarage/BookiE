@@ -500,6 +500,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::replace_batch_tests::stale_later_cell_rejects_the_full_replace_batch"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::replace_batch_tests::valid_replace_batch_acknowledges_all_staged_cells_once"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::the_cell_menu_sets_a_draft_cell_to_null_in_the_draft"
     ],
     [

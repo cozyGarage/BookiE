@@ -34,22 +34,138 @@ pub enum ReplaceError {
     Cancelled,
     #[error("replacement output exceeds its budget")]
     Budget,
+    #[error("the loaded rows changed during replacement")]
+    Stale,
 }
 
+#[derive(Debug)]
 pub struct ReplaceEdit {
     pub position: u32,
     pub column: usize,
     pub original: Value,
     pub new_value: String,
+    pub matches: usize,
     pub row_key: Vec<Value>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ReplaceReport {
     pub edits: Vec<ReplaceEdit>,
     pub replacements: usize,
     pub skipped: usize,
     retained_bytes: usize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ReplaceAcknowledgement {
+    pub replacements: usize,
+    pub skipped: usize,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ReplaceApplyError {
+    Cancelled,
+    Stale,
+    NotEditable,
+    Saving,
+    InvalidValue,
+}
+
+#[derive(Debug)]
+pub struct ValidatedReplaceRow {
+    pub position: u32,
+    pub key: Vec<Value>,
+    pub cells: Vec<Value>,
+}
+
+#[derive(Debug)]
+pub struct PreparedReplaceEdit {
+    pub row_key: Vec<Value>,
+    pub column: usize,
+    pub original: Value,
+    pub value: Value,
+}
+
+#[derive(Debug)]
+pub struct PreparedReplaceBatch {
+    pub edits: Vec<PreparedReplaceEdit>,
+    pub replacements: usize,
+    pub skipped: usize,
+}
+
+pub fn validate_replace_plan(
+    report: &ReplaceReport,
+    mut current_row: impl FnMut(u32, &[ReplaceEdit]) -> Option<(Vec<Value>, Vec<Value>)>,
+) -> Result<Vec<ValidatedReplaceRow>, ReplaceError> {
+    let mut index = 0;
+    let mut previous_cell = None;
+    let mut rows = Vec::new();
+    while let Some(edit) = report.edits.get(index) {
+        let position = edit.position;
+        let start = index;
+        while let Some(edit) = report.edits.get(index).filter(|edit| edit.position == position) {
+            let cell = (edit.position, edit.column);
+            if previous_cell.is_some_and(|previous| previous >= cell) {
+                return Err(ReplaceError::Stale);
+            }
+            previous_cell = Some(cell);
+            index += 1;
+        }
+        let edits = &report.edits[start..index];
+        let (row_key, cells) = current_row(position, edits).ok_or(ReplaceError::Stale)?;
+        if cells.len() != edits.len()
+            || edits
+                .iter()
+                .zip(&cells)
+                .any(|(edit, cell)| row_key != edit.row_key || cell != &edit.original)
+        {
+            return Err(ReplaceError::Stale);
+        }
+        rows.push(ValidatedReplaceRow {
+            position,
+            key: row_key,
+            cells,
+        });
+    }
+    Ok(rows)
+}
+
+pub fn prepare_replace_plan(
+    report: &ReplaceReport,
+    current_row: impl FnMut(u32, &[ReplaceEdit]) -> Option<(Vec<Value>, Vec<Value>)>,
+    mut parse: impl FnMut(usize, &Value, &str) -> Result<Value, ReplaceApplyError>,
+) -> Result<PreparedReplaceBatch, ReplaceApplyError> {
+    let rows = validate_replace_plan(report, current_row).map_err(|_| ReplaceApplyError::Stale)?;
+    let mut edits = Vec::with_capacity(report.edits.len());
+    let mut replacements = 0usize;
+    let mut edit_index = 0;
+    for row in rows {
+        let mut row_cell_index = 0;
+        while let Some(edit) = report
+            .edits
+            .get(edit_index)
+            .filter(|edit| edit.position == row.position)
+        {
+            let original = row.cells.get(row_cell_index).ok_or(ReplaceApplyError::Stale)?;
+            let value = parse(edit.column, original, &edit.new_value)?;
+            if crate::change_tracker::KeyValue::from(&value) != crate::change_tracker::KeyValue::from(original) {
+                edits.push(PreparedReplaceEdit {
+                    row_key: row.key.clone(),
+                    column: edit.column,
+                    original: original.clone(),
+                    value,
+                });
+                replacements = replacements.saturating_add(edit.matches);
+            }
+            edit_index += 1;
+            row_cell_index += 1;
+        }
+    }
+    Ok(PreparedReplaceBatch {
+        edits,
+        replacements,
+        skipped: report.skipped,
+    })
 }
 
 pub fn plan_replacements(
@@ -237,6 +353,7 @@ impl ReplaceReport {
             column,
             original: original.clone(),
             new_value: text,
+            matches: count,
             row_key: row_key.to_vec(),
         });
         Ok(())

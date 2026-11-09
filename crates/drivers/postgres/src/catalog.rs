@@ -9,7 +9,8 @@ pub(crate) const SUPPORTED_KINDS: &[CatalogObjectKind] = &CatalogObjectKind::ALL
 const USER_SCHEMA: &str = "n.nspname NOT IN ('pg_catalog', 'information_schema') \
      AND n.nspname NOT LIKE 'pg\\_toast%' AND n.nspname NOT LIKE 'pg\\_temp\\_%' \
      AND ($1::text IS NULL OR n.nspname = $1) \
-     AND NOT (n.nspname = ANY($3)) \
+     AND NOT EXISTS (SELECT 1 FROM pg_catalog.unnest($3::text[]) AS hidden_schema(schema_name) \
+                     WHERE hidden_schema.schema_name = n.nspname) \
      AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')";
 
 const TABLE_REACHABLE: &str = "pg_catalog.has_any_column_privilege(c.oid, 'SELECT,INSERT,UPDATE,REFERENCES')";
@@ -88,7 +89,8 @@ fn grants_sql() -> String {
 const EXTENSIONS_SQL: &str = "SELECT n.nspname, e.extname, e.extversion
      FROM pg_catalog.pg_extension e
      JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
-     WHERE NOT (n.nspname = ANY($1))
+     WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.unnest($1::text[]) AS hidden_schema(schema_name) \
+                       WHERE hidden_schema.schema_name = n.nspname)
      ORDER BY 2 LIMIT $2";
 
 const ROLES_SQL: &str = "SELECT NULL::text, r.rolname,

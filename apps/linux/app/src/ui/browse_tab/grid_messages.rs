@@ -17,6 +17,17 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             value,
             row_key,
         } => cell_edited_input(row_position, col_index, String::new(), Some(value), row_key),
+        GridMsg::ReplaceBatch {
+            report,
+            generation,
+            cancel,
+            reply,
+        } => BrowseTabInput::GridReplaceBatch {
+            report,
+            generation,
+            cancel,
+            reply,
+        },
         GridMsg::CopyToClipboard(text) => BrowseTabInput::GridCopyToClipboard(text),
         GridMsg::FetchCellValue {
             col_index,
