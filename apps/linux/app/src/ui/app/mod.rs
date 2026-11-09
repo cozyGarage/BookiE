@@ -159,6 +159,7 @@ pub struct App {
     recent_walk: std::cell::RefCell<Option<crate::services::recent_tabs::RecentWalk<adw::TabPage>>>,
     /// Idempotency flag for `ensure_workspace_root`.
     workspace_root_added: std::cell::Cell<bool>,
+    overview_front_connection_id: std::rc::Rc<std::cell::Cell<Option<Uuid>>>,
     /// Per-tab state. Each entry is either a Browse or Editor tab.
     /// HashMap for O(1) tab_id lookup; display order is read from
     /// `tab_view.pages()` since HashMap is unordered.
@@ -601,6 +602,7 @@ impl SimpleComponent for App {
             recent_pages: std::cell::RefCell::default(),
             recent_walk: std::cell::RefCell::default(),
             workspace_root_added: std::cell::Cell::new(false),
+            overview_front_connection_id: std::rc::Rc::new(std::cell::Cell::new(None)),
             workspace_tabs: std::rc::Rc::new(std::cell::RefCell::new(Default::default())),
             dialog: None,
             favorites: Vec::new(),

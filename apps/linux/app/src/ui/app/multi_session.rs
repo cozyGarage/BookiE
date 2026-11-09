@@ -94,6 +94,7 @@ impl App {
             return;
         }
         self.connection_id = Some(connection_id);
+        self.overview_front_connection_id.set(Some(connection_id));
         self.workspace_save_token = Some(self.workspace.connection_save_token(connection_id));
         let metadata = self.database.metadata(connection_id);
         self.current_driver_id = metadata.as_ref().map(|metadata| metadata.driver_id.clone());
@@ -157,6 +158,7 @@ impl App {
     }
 
     pub(super) fn clear_multi_session_state(&mut self) {
+        self.overview_front_connection_id.set(None);
         for id in self.multi.sessions.restore_keys() {
             self.database.close(id);
             crate::services::window_registry::unregister(id);
@@ -202,6 +204,7 @@ impl App {
             }
             None => {
                 self.connection_id = None;
+                self.overview_front_connection_id.set(None);
                 self.connected = false;
                 self.workspace_save_token = None;
                 self.connected_database = None;
@@ -258,6 +261,10 @@ fn strip_connection_title_suffix(
     title.to_string()
 }
 
+pub(super) fn overview_new_tab_connection(front: &std::cell::Cell<Option<Uuid>>) -> Option<Uuid> {
+    front.get()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,5 +300,17 @@ mod tests {
             }
         });
         assert_eq!(title, "orders");
+    }
+
+    #[test]
+    fn overview_new_editor_resolves_the_current_front_session() {
+        let first = Uuid::new_v4();
+        let second = Uuid::new_v4();
+        let front = std::cell::Cell::new(Some(first));
+        let create_tab = || overview_new_tab_connection(&front);
+
+        assert_eq!(create_tab(), Some(first));
+        front.set(Some(second));
+        assert_eq!(create_tab(), Some(second));
     }
 }
