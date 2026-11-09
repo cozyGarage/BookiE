@@ -640,6 +640,12 @@ jobs:
           BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie
         run: |
           set -euo pipefail
+          toolchain_bin="$(dirname "$(rustup which cargo --toolchain 1.98)")"
+          toolchain_relative="${toolchain_bin#"$HOME/.rustup"}"
+          if [[ "$toolchain_relative" == "$toolchain_bin" ]]; then
+            echo "Rust toolchain is outside the mounted Rustup home" >&2
+            exit 1
+          fi
           docker run --rm --entrypoint cat "$BOOKIE_BUILD_IMAGE" /etc/passwd > "$RUNNER_TEMP/bookie-ci-passwd"
           printf 'bookie-ci:x:%s:%s:CI:/tmp:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" >> "$RUNNER_TEMP/bookie-ci-passwd"
           docker run --rm \
@@ -658,7 +664,7 @@ jobs:
             --env RUSTUP_HOME=/rustup \
             --env CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target" \
             --env CARGO_BUILD_JOBS=4 \
-            --env PATH=/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            --env PATH="/rustup${toolchain_relative}:/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
             --env DOCKER_CONFIG=/docker \
             --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
             --env BOOKIE_GTK_BINARY="$BOOKIE_GTK_BINARY" \
@@ -666,6 +672,8 @@ jobs:
             bash -euo pipefail -c '
               git config --global --add safe.directory "$GITHUB_WORKSPACE"
               echo "tree under test: $(git rev-parse HEAD)"
+              cargo --version
+              rustc --version
               pkg-config --modversion gtk4 glib-2.0 libadwaita-1 gtksourceview-5
               pkg-config --atleast-version=4.24 gtk4
               pkg-config --atleast-version=2.88 glib-2.0
