@@ -4,6 +4,14 @@ use tokio_util::sync::CancellationToken;
 
 use super::query::FindQuery;
 
+#[derive(Debug, thiserror::Error)]
+pub(super) enum ReplaceError {
+    #[error(transparent)]
+    Match(#[from] TextMatchError),
+    #[error("replacement was cancelled")]
+    Cancelled,
+}
+
 pub(super) struct ReplaceEdit {
     pub position: u32,
     pub column: usize,
@@ -25,7 +33,10 @@ pub(super) fn plan_replacements(
     replacement: &str,
     editable: &[bool],
     cancel: &CancellationToken,
-) -> Result<ReplaceReport, TextMatchError> {
+) -> Result<ReplaceReport, ReplaceError> {
+    if cancel.is_cancelled() {
+        return Err(ReplaceError::Cancelled);
+    }
     let Some(matcher) = TextMatcher::compile(&query.needle, query.options)? else {
         return Ok(ReplaceReport {
             edits: Vec::new(),
@@ -40,7 +51,7 @@ pub(super) fn plan_replacements(
     };
     for position in 0..count {
         if cancel.is_cancelled() {
-            break;
+            return Err(ReplaceError::Cancelled);
         }
         let Some(row_key) = row_key_at(position) else {
             report.skipped = report.skipped.saturating_add(1);
@@ -69,6 +80,9 @@ pub(super) fn plan_replacements(
                 }
             }
         });
+    }
+    if cancel.is_cancelled() {
+        return Err(ReplaceError::Cancelled);
     }
     Ok(report)
 }

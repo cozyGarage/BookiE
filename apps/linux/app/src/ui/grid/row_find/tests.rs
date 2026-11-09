@@ -292,10 +292,28 @@ fn replace_stops_when_cancelled() {
         "beta",
         &[true],
         &cancel,
-    )
-    .unwrap();
-    assert!(report.edits.is_empty());
-    assert_eq!(report.replacements, 0);
+    );
+    assert!(matches!(report, Err(super::replace::ReplaceError::Cancelled)));
+}
+
+#[test]
+fn cancellation_during_replacement_does_not_return_a_partial_plan() {
+    let cancel = CancellationToken::new();
+    let result = plan_replacements(
+        2,
+        |position, visit| {
+            if position == 1 {
+                cancel.cancel();
+            }
+            visit(0, &Value::Text("alpha".into()));
+        },
+        |position| Some(vec![Value::Int(i64::from(position))]),
+        &query("alpha"),
+        "beta",
+        &[true],
+        &cancel,
+    );
+    assert!(result.is_err(), "cancelled planning must not stage a partial result");
 }
 
 #[test]
