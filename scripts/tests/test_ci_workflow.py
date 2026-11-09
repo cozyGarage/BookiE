@@ -648,10 +648,21 @@ class CiWorkflowTests(unittest.TestCase):
     def test_postgres_release_gtk_uses_the_staged_release_binary(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
-        self.assertIn("timeout-minutes: 45", release)
+        self.assertIn("timeout-minutes: 60", release)
         self.assertIn("cargo build --locked --release -p bookie-app", release)
         self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', release)
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", release)
+
+    def test_postgres_release_reuses_staged_app_without_debug_rebuild(self):
+        script = (ROOT / "scripts/test-postgres-release.sh").read_text()
+        self.assertIn('elif [[ -n "${BOOKIE_GTK_BINARY:-}" ]]', script)
+        self.assertIn('[[ ! -x "$BOOKIE_GTK_BINARY" ]]', script)
+        self.assertIn('cargo build --locked -p bookie-app --bin bookie-app', script)
+        self.assertIn('cargo build --locked -p bookie-ssh --bin bookie-askpass', script)
+        supplied_binary_branch = script.split('elif [[ -n "${BOOKIE_GTK_BINARY:-}" ]]', 1)[1].split("    else", 1)[0]
+        self.assertNotIn('cargo build --locked -p bookie-app --bin bookie-app', supplied_binary_branch)
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())
+        self.assertEqual(layers["layers"]["postgres-release"]["steps"][0]["timeout_seconds"], 2700)
 
     def test_postgres_release_runs_on_the_supported_gtk_floor_with_host_docker(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
