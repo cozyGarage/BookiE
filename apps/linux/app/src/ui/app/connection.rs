@@ -109,8 +109,10 @@ impl App {
         self.connected = true;
         self.connection_id = Some(id);
         self.workspace_save_token = Some(self.workspace.connection_save_token(id));
-        self.connected_database = Some(connected_database);
+        self.connected_database = Some(connected_database.clone());
         crate::services::window_registry::register(id, self.window.clone().upcast());
+        self.register_working_session(id, tables.clone(), views.clone(), connected_database);
+        let _ = self.multi.sessions.focus_working(id);
         self.current_driver_id = Some(driver_id.clone());
         self.read_only = self.window_metadata().map(|m| m.read_only).unwrap_or(false);
         self.read_only_badge.set_visible(self.read_only);
@@ -118,9 +120,6 @@ impl App {
         self.show_sidebar_for_new_connection();
         self.disconnect_action.set_enabled(true);
         self.table_search.set_text("");
-        // Build the unified workspace tab tree (Browse + Editor share one
-        // strip). Empty state shows "Select a table" until the user opens
-        // a tab via sidebar click or Ctrl+T.
         self.ensure_workspace_root(sender.clone());
         self.show_in_content_holder(&self.workspace_outer_stack);
         self.set_completion_tables(&tables, &views);
@@ -137,11 +136,17 @@ impl App {
         self.rebuild_schema_filter_popover(&sender);
         self.refresh_schema_index();
         self.refresh_window_title();
-        // Restore tabs (browse + editor) persisted from the prior session
-        // for this connection.
         if let Some(connection_id) = self.connection_id {
             self.set_last_connection_id(Some(connection_id), sender.clone());
             self.restore_workspace_tabs(connection_id, sender.clone());
+            self.claim_orphan_tabs(connection_id);
+            if self.multi.sessions.names_tabs_with_connection()
+                && self.multi.sessions.tabs_for_connection(connection_id).is_empty()
+            {
+                self.append_editor_tab(None, sender.clone());
+                self.claim_orphan_tabs(connection_id);
+            }
+            self.refresh_multi_session_tab_titles();
             touch_last_opened(connection_id, sender);
             return;
         }
@@ -207,21 +212,16 @@ impl App {
 
     pub(super) fn finish_disconnect(&mut self, sender: ComponentSender<Self>) {
         crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
-        // Invalidate any candidate left behind by a stale dialog callback.
-        // A late preparation result is rejected unless the transition is
-        // still `Connecting`, so it cannot reconnect after this teardown.
         self.switch.prepared = None;
         self.switch.saves_pending.clear();
         self.switch.cancel_audit_was_disabled = None;
         self.switch.transition = ConnectionTransition::Idle;
-        // Persist + tear down workspace tabs before dropping the
-        // connection (persist needs the active connection_id).
+        if self.disconnect_front_keeping_others(sender.clone()) {
+            return;
+        }
         self.teardown_workspace_tabs();
         self.table_names.clear();
         self.schema_index.borrow_mut().clear();
-        // Drop reopen-stack entries — they reference tables in the
-        // connection we're about to release. Reopening one against a
-        // different connection would target a non-existent table.
         self.clear_closed_tabs_stack();
         self.connected_database = None;
         self.workspace_save_token = None;
@@ -229,9 +229,8 @@ impl App {
             if self.window_state.borrow().last_connection_id == Some(id) {
                 self.set_last_connection_id(None, sender.clone());
             }
-            self.database.close(id);
-            crate::services::window_registry::unregister(id);
         }
+        self.clear_multi_session_state();
         self.current_driver_id = None;
         self.read_only = false;
         self.read_only_badge.set_visible(false);
@@ -513,6 +512,12 @@ impl App {
         if self.switch.prepared.is_none() {
             return;
         }
+        if self.switch.prepared.as_ref().is_some_and(|prepared| {
+            super::multi_session::opens_additional_session(self.connected, self.connection_id, prepared.id())
+        }) {
+            self.activate_prepared_connection(sender);
+            return;
+        }
         match self.switch.transition {
             ConnectionTransition::WaitingForRuns if self.any_editor_running() => return,
             ConnectionTransition::WaitingForSaves if !self.switch.saves_pending.is_empty() => return,
@@ -644,7 +649,10 @@ impl App {
     }
 
     fn activate_prepared_connection(&mut self, sender: ComponentSender<Self>) {
-        if self.connected {
+        let additive = self.switch.prepared.as_ref().is_some_and(|prepared| {
+            super::multi_session::opens_additional_session(self.connected, self.connection_id, prepared.id())
+        });
+        if self.connected && !additive {
             if !self.confirm_session_teardown(
                 sender.clone(),
                 SessionTeardownAction::ConnectionSwitch,
@@ -663,47 +671,51 @@ impl App {
         let Some(prepared) = self.switch.prepared.take() else {
             return;
         };
-        // Check before touching any of this window's own state. Reconnecting
-        // to the connection this window already owns is fine (it will be
-        // closed and reopened below); opening one another window already
-        // owns is refused outright rather than stealing it, so a refusal
-        // never needs to roll back a half-finished switch.
         let target_id = prepared.id();
+        let additive = super::multi_session::opens_additional_session(self.connected, self.connection_id, target_id);
+        if self.multi.sessions.is_working(target_id) {
+            self.switch.transition = ConnectionTransition::Idle;
+            self.switch.saves_pending.clear();
+            self.switch.cancel_audit_was_disabled = None;
+            self.focus_working_session(target_id, sender);
+            return;
+        }
         if self.connection_id != Some(target_id) && self.database.is_active(target_id) {
             self.switch.transition = ConnectionTransition::Idle;
             self.switch.saves_pending.clear();
             self.switch.cancel_audit_was_disabled = None;
             self.show_toast(&crate::tr!("This connection is already open in another window."));
-            return; // `prepared` drops here, closing the connection it dialled.
+            return;
         }
         crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
-        if self.connected {
-            // Persist while the old connection id is still active. Only then
-            // dispose the old tab controllers and install the candidate.
+        if additive {
+            if let Some(previous) = self.connection_id {
+                self.claim_orphan_tabs(previous);
+            }
+        } else if self.connected {
             self.teardown_workspace_tabs();
             self.clear_closed_tabs_stack();
-        }
-        // Activation is additive, so this window releases the connection it is
-        // replacing. Closing before activation keeps reconnecting to the same
-        // saved connection correct: the identifier is reused, not cancelled.
-        self.connected_database = None;
-        self.workspace_save_token = None;
-        if let Some(previous) = self.connection_id.take() {
-            self.database.close(previous);
+            self.connected_database = None;
+            self.workspace_save_token = None;
+            if let Some(previous) = self.connection_id.take() {
+                self.multi.sessions.disconnect(previous);
+                self.multi.guards.remove(previous);
+                self.multi.catalogs.remove(&previous);
+                self.database.close(previous);
+                crate::services::window_registry::unregister(previous);
+            }
         }
         let Some(activated) = prepared.activate(&self.database) else {
-            // Only reachable if another window raced this one between the
-            // check above and here; the GTK main loop makes that
-            // effectively impossible, but stay fail-closed rather than
-            // unwrap a connection-stealing race.
             self.switch.transition = ConnectionTransition::Idle;
             self.switch.saves_pending.clear();
             self.switch.cancel_audit_was_disabled = None;
-            self.connected = false;
-            super::sidebar_state::hide_sidebar(&self.split_view, &self.sidebar_reveal);
-            self.set_sidebar_connected(false);
-            self.disconnect_action.set_enabled(false);
-            self.refresh_window_title();
+            if !additive {
+                self.connected = false;
+                super::sidebar_state::hide_sidebar(&self.split_view, &self.sidebar_reveal);
+                self.set_sidebar_connected(false);
+                self.disconnect_action.set_enabled(false);
+                self.refresh_window_title();
+            }
             self.show_toast(&crate::tr!("This connection is already open in another window."));
             return;
         };
