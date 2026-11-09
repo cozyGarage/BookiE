@@ -502,3 +502,35 @@ fn the_refusal_message_names_the_class_and_the_offer() {
     assert!(message.contains("no acceptable cipher algorithm"), "{message}");
     assert!(message.contains("The server offered: 3des-cbc"), "{message}");
 }
+
+fn block_on<F: std::future::Future>(future: F) -> F::Output {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(future)
+}
+
+#[test]
+fn an_ephemeral_bind_gets_a_nonzero_port() {
+    let (_listener, port, _) = block_on(bind_local(LocalBind::Tcp)).unwrap();
+    assert_ne!(port, 0);
+}
+
+#[test]
+fn a_fixed_bind_listens_on_the_requested_port() {
+    let free = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+    let (_listener, port, _) = block_on(bind_local(LocalBind::FixedTcp { port: free })).unwrap();
+    assert_eq!(port, free);
+}
+
+#[test]
+fn a_fixed_bind_on_a_busy_port_names_the_port_in_a_bind_error() {
+    let held = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let busy = held.local_addr().unwrap().port();
+    let Err(SshError::Bind(error)) = block_on(bind_local(LocalBind::FixedTcp { port: busy })) else {
+        panic!("expected a bind error");
+    };
+    assert_eq!(error.kind(), std::io::ErrorKind::AddrInUse);
+    assert!(error.to_string().contains(&busy.to_string()), "{error}");
+}
