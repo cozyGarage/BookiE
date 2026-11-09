@@ -27,12 +27,13 @@ impl App {
         }
     }
 
-    pub(super) fn on_workspace_tabs_changed(&self) {
+    pub(super) fn on_workspace_tabs_changed(&mut self, sender: relm4::ComponentSender<App>) {
         if self.recent_walk.borrow().is_none()
             && let Some(page) = self.workspace_tab_view.as_ref().and_then(|view| view.selected_page())
         {
             self.recent_pages.borrow_mut().touch(&page);
         }
+        self.follow_selected_tab_session(sender);
         self.persist_workspace_state();
         self.refresh_window_title();
         self.sync_sidebar_selection();

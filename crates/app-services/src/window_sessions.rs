@@ -55,6 +55,14 @@ impl WindowSessions {
         true
     }
 
+    pub fn focus_working(&mut self, connection_id: Uuid) -> bool {
+        if !self.working.contains(&connection_id) {
+            return false;
+        }
+        self.front = Some(connection_id);
+        true
+    }
+
     pub fn open_mcp(&mut self, connection_id: Uuid) -> bool {
         if self.working.contains(&connection_id) || self.mcp.contains(&connection_id) {
             return false;

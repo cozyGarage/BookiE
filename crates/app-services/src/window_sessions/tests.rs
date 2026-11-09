@@ -15,6 +15,19 @@ fn opening_a_second_working_session_keeps_both_in_order() {
 }
 
 #[test]
+fn focusing_a_working_session_moves_front_without_a_tab() {
+    let first = Uuid::new_v4();
+    let second = Uuid::new_v4();
+    let mut sessions = WindowSessions::default();
+    sessions.open_working(first);
+    sessions.open_working(second);
+    assert!(sessions.focus_working(second));
+    assert_eq!(sessions.front(), Some(second));
+    assert!(!sessions.focus_working(Uuid::new_v4()));
+    assert_eq!(sessions.front(), Some(second));
+}
+
+#[test]
 fn selecting_a_tab_moves_the_front_session_to_that_tabs_connection() {
     let first = Uuid::new_v4();
     let second = Uuid::new_v4();

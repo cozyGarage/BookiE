@@ -16,6 +16,7 @@ mod init_sidebar;
 mod init_window;
 mod init_workspace;
 mod msg;
+mod multi_session;
 mod open_request;
 mod organization;
 mod ran_statements;
@@ -61,7 +62,7 @@ use crate::services::database_service::ConnectionHealth;
 
 pub use msg::AppMsg;
 use render::qualified_label;
-use types::{CLOSED_TABS_CAPACITY, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
+use types::{CLOSED_TABS_CAPACITY, ConnectionSwitch, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
 
 #[derive(Clone, Copy, Debug)]
@@ -84,18 +85,6 @@ pub struct AppInit {
 }
 
 use bookie_app_services::workspace::{CloseAfterSave, WorkspaceTabs};
-
-struct ConnectionSwitch {
-    /// Serialized connection-switch state. The candidate is fully validated
-    /// before it can replace the active connection.
-    transition: ConnectionTransition,
-    prepared: Option<crate::services::connection_service::PreparedConnection>,
-    saves_pending: std::collections::HashMap<Uuid, u32>,
-    /// Audit safety state captured before cancelling running work for a
-    /// connection switch. If cancellation makes a previously safe state
-    /// ambiguous, the candidate is discarded and the old workspace remains.
-    cancel_audit_was_disabled: Option<bool>,
-}
 
 pub struct App {
     change_trackers: crate::services::change_tracker::WorkspaceChangeTrackers,
@@ -203,12 +192,8 @@ pub struct App {
     /// An encrypted bundle waiting on its passphrase.
     pending_bundle: Option<bookie_storage::EncryptedBundle>,
     connected: bool,
-    /// The connection this window owns. Activation is process-wide and
-    /// additive, so a window must resolve its own connection rather than
-    /// whichever one was focused most recently.
     connection_id: Option<Uuid>,
-    /// The running CSV import's progress window, held while its batches
-    /// run and dropped when it reaches its terminal state.
+    multi: multi_session::MultiSessionState,
     csv_import_progress: Option<crate::ui::import_dialog::ImportProgress>,
     backup_progress: Option<crate::ui::progress_dialog::CancellableDialog>,
     switch: ConnectionSwitch,
@@ -634,6 +619,7 @@ impl SimpleComponent for App {
             pending_bundle: None,
             connected: false,
             connection_id: None,
+            multi: multi_session::MultiSessionState::default(),
             csv_import_progress: None,
             backup_progress: None,
             switch: ConnectionSwitch {
@@ -817,7 +803,8 @@ impl SimpleComponent for App {
             }
             AppMsg::FetchBrowseColumns(tab_id) => self.fetch_browse_columns(tab_id, sender),
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
-            AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(),
+            AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(sender),
+            AppMsg::FocusWorkingSession(id) => self.focus_working_session(id, sender),
             AppMsg::SwitchToRecentTab => self.on_switch_to_recent_tab(),
             AppMsg::EndRecentTabWalk => self.on_end_recent_tab_walk(),
             AppMsg::WorkspaceSchemaWordsChanged => self.refresh_schema_index(),
@@ -1186,10 +1173,8 @@ impl SimpleComponent for App {
     /// context, until this runs (H12).
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
         self.schema_index.borrow_mut().invalidate_columns();
-        if let Some(id) = self.connection_id.take() {
-            self.database.close(id);
-            crate::services::window_registry::unregister(id);
-        }
+        self.connection_id = None;
+        self.clear_multi_session_state();
         if let Some(source) = self.poll_health_source.take() {
             source.remove();
         }
