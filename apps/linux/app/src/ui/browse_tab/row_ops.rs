@@ -398,6 +398,102 @@ impl BrowseTab {
         true
     }
 
+    pub(super) fn handle_grid_replace_batch(
+        &mut self,
+        report: bookie_app_services::grid_replace::ReplaceReport,
+        generation: u64,
+        cancel: tokio_util::sync::CancellationToken,
+        reply: tokio::sync::oneshot::Sender<
+            Result<
+                bookie_app_services::grid_replace::ReplaceAcknowledgement,
+                bookie_app_services::grid_replace::ReplaceApplyError,
+            >,
+        >,
+    ) {
+        use crate::services::change_tracker::RowKey;
+        use bookie_app_services::grid_replace::{ReplaceAcknowledgement, ReplaceApplyError};
+        if cancel.is_cancelled() {
+            let _ = reply.send(Err(ReplaceApplyError::Cancelled));
+            return;
+        }
+        if self.row_store().is_none_or(|store| store.generation() != generation) {
+            let _ = reply.send(Err(ReplaceApplyError::Stale));
+            return;
+        }
+        let prepared = match self.prepare_grid_replace(&report) {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                let _ = reply.send(Err(error));
+                return;
+            }
+        };
+        let mut edits = Vec::with_capacity(prepared.edits.len());
+        for edit in prepared.edits {
+            let Some(key) = RowKey::from_pk_values(&edit.row_key) else {
+                let _ = reply.send(Err(ReplaceApplyError::Stale));
+                return;
+            };
+            edits.push((key, edit.column, edit.original, edit.value));
+        }
+        if cancel.is_cancelled() {
+            let _ = reply.send(Err(ReplaceApplyError::Cancelled));
+            return;
+        }
+        let tracker = self
+            .change_trackers
+            .with_tab(self.tab_id, |tracker| tracker.track_cell_edits(edits));
+        if tracker.is_none() {
+            let _ = reply.send(Err(ReplaceApplyError::Stale));
+            return;
+        }
+        let _ = reply.send(Ok(ReplaceAcknowledgement {
+            replacements: prepared.replacements,
+            skipped: prepared.skipped,
+        }));
+    }
+
+    fn prepare_grid_replace(
+        &self,
+        report: &bookie_app_services::grid_replace::ReplaceReport,
+    ) -> Result<
+        bookie_app_services::grid_replace::PreparedReplaceBatch,
+        bookie_app_services::grid_replace::ReplaceApplyError,
+    > {
+        use bookie_app_services::grid_replace::{ReplaceApplyError, prepare_replace_plan};
+        let key_indices = self.pk_indices();
+        let store = self.row_store().ok_or(ReplaceApplyError::Stale)?;
+        prepare_replace_plan(
+            report,
+            |position, edits| {
+                let key = key_indices
+                    .iter()
+                    .map(|index| store.cell_at(position, *index))
+                    .collect::<Option<Vec<_>>>()?;
+                let cells = edits
+                    .iter()
+                    .map(|edit| store.cell_at(position, edit.column))
+                    .collect::<Option<Vec<_>>>()?;
+                Some((key, cells))
+            },
+            |column_index, original, new_value| {
+                let Some(column) = self.current_columns.get(column_index) else {
+                    return Err(ReplaceApplyError::NotEditable);
+                };
+                if !crate::ui::grid::cell_allows_inline_edit(column, original) {
+                    return Err(ReplaceApplyError::NotEditable);
+                }
+                parse_grid_cell_input_with_style(
+                    new_value,
+                    Some(column),
+                    &self.driver_id,
+                    self.enum_input_style,
+                    Some(original),
+                )
+                .map_err(|_| ReplaceApplyError::InvalidValue)
+            },
+        )
+    }
+
     /// Tell the user why an edit on a row the tracker cannot key was
     /// dropped. Silence here reads as a saved change that never happens.
     fn report_unreadable_row_key(&mut self, row_position: u32, sender: &ComponentSender<Self>) {
@@ -630,6 +726,7 @@ impl BrowseTab {
                 | BrowseTabInput::InsertRow
                 | BrowseTabInput::DeleteSelectedRow
                 | BrowseTabInput::GridCellEdited { .. }
+                | BrowseTabInput::GridReplaceBatch { .. }
                 | BrowseTabInput::GridSetCellNull { .. }
                 | BrowseTabInput::GridDeleteRowAt { .. }
                 | BrowseTabInput::Undo
@@ -857,6 +954,7 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
         BrowseTabInput::InsertRow
             | BrowseTabInput::DuplicateRow { .. }
             | BrowseTabInput::GridCellEdited { .. }
+            | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave
@@ -888,6 +986,7 @@ fn requires_row_key(input: &BrowseTabInput) -> bool {
         BrowseTabInput::InsertRow
             | BrowseTabInput::DuplicateRow { .. }
             | BrowseTabInput::GridCellEdited { .. }
+            | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave

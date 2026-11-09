@@ -146,24 +146,23 @@ fn replace_literal(text: &str, needle: &str, match_case: bool, replacement: &str
 }
 
 fn replace_ignore_case(text: &str, needle_lower: &str, replacement: &str) -> (String, usize) {
+    let Ok(matches) = FoldedMatchIter::new(text, needle_lower) else {
+        return (text.to_owned(), 0);
+    };
     let mut out = String::with_capacity(text.len());
     let mut count = 0usize;
-    let mut rest = text;
-    while let Some((start, end)) = next_ignore_case_span(rest, needle_lower) {
-        out.push_str(&rest[..start]);
+    let mut last = 0;
+    for (start, end) in matches {
+        out.push_str(&text[last..start]);
         out.push_str(replacement);
-        rest = &rest[end..];
+        last = end;
         count += 1;
     }
     if count == 0 {
         return (text.to_owned(), 0);
     }
-    out.push_str(rest);
+    out.push_str(&text[last..]);
     (out, count)
-}
-
-fn next_ignore_case_span(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
-    find_ignore_case_span(haystack, needle_lower)
 }
 
 fn find_ignore_case_span(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
@@ -197,28 +196,157 @@ fn earlier_span(left: Option<(usize, usize)>, right: Option<(usize, usize)>) -> 
 }
 
 fn find_ignore_case_folded(haystack: &str, needle_lower: &str) -> Option<(usize, usize)> {
-    let (lower, spans) = lowercase_with_source_spans(haystack);
-    let start = lower.find(needle_lower)?;
-    let end = start + needle_lower.len();
-    let first = spans.iter().find(|span| span.1 > start)?;
-    let last = spans.iter().rev().find(|span| span.0 < end)?;
-    Some((first.2, last.3))
+    FoldedMatchIter::new(haystack, needle_lower).ok()?.next()
 }
 
-fn lowercase_with_source_spans(text: &str) -> (String, Vec<(usize, usize, usize, usize)>) {
-    let mut lower = String::with_capacity(text.len());
-    let mut spans = Vec::with_capacity(text.chars().count());
-    for (source_start, character) in text.char_indices() {
-        let lower_start = lower.len();
-        lower.extend(character.to_lowercase());
-        spans.push((
-            lower_start,
-            lower.len(),
-            source_start,
-            source_start + character.len_utf8(),
-        ));
+struct LowercaseChange {
+    lower_start: usize,
+    lower_end: usize,
+    source_start: usize,
+    source_end: usize,
+    delta_after: isize,
+}
+
+enum FoldedSearch {
+    Ascii {
+        cursor: usize,
+    },
+    Lowercase {
+        text: String,
+        changes: Vec<LowercaseChange>,
+        cursor: usize,
+    },
+}
+
+struct FoldedMatchIter<'text, 'needle> {
+    source: &'text str,
+    needle: &'needle str,
+    search: FoldedSearch,
+    source_cursor: usize,
+}
+
+impl<'text, 'needle> FoldedMatchIter<'text, 'needle> {
+    fn new(source: &'text str, needle: &'needle str) -> Result<Self, ReplacementLimit> {
+        Self::new_controlled(source, needle, || false)
     }
-    (lower, spans)
+
+    pub(super) fn new_controlled(
+        source: &'text str,
+        needle: &'needle str,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<Self, ReplacementLimit> {
+        if cancelled() {
+            return Err(ReplacementLimit::Cancelled);
+        }
+        if needle.is_empty() {
+            return Ok(Self {
+                source,
+                needle,
+                search: FoldedSearch::Ascii { cursor: source.len() },
+                source_cursor: source.len(),
+            });
+        }
+        if needle.is_ascii() && !source.contains(FOLDS_TO_ASCII) {
+            return Ok(Self {
+                source,
+                needle,
+                search: FoldedSearch::Ascii { cursor: 0 },
+                source_cursor: 0,
+            });
+        }
+        let (text, changes) = lowercase_with_changes(source, &cancelled)?;
+        Ok(Self {
+            source,
+            needle,
+            search: FoldedSearch::Lowercase {
+                text,
+                changes,
+                cursor: 0,
+            },
+            source_cursor: 0,
+        })
+    }
+}
+
+impl Iterator for FoldedMatchIter<'_, '_> {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.search {
+            FoldedSearch::Ascii { cursor } => {
+                let bytes = self.source.as_bytes();
+                let needle = self.needle.as_bytes();
+                while needle.len() <= bytes.len().saturating_sub(*cursor) {
+                    let start = *cursor;
+                    *cursor += 1;
+                    if bytes[start..start + needle.len()].eq_ignore_ascii_case(needle) {
+                        *cursor = start + needle.len();
+                        return Some((start, *cursor));
+                    }
+                }
+                None
+            }
+            FoldedSearch::Lowercase { text, changes, cursor } => loop {
+                let rest = text.get(*cursor..)?;
+                let lower_start = *cursor + rest.find(self.needle)?;
+                let lower_end = lower_start + self.needle.len();
+                *cursor = lower_end;
+                let source_start = source_offset(lower_start, changes, false);
+                let source_end = source_offset(lower_end, changes, true);
+                if source_start < self.source_cursor {
+                    continue;
+                }
+                self.source_cursor = source_end;
+                return Some((source_start, source_end));
+            },
+        }
+    }
+}
+
+fn lowercase_with_changes(
+    source: &str,
+    cancelled: &impl Fn() -> bool,
+) -> Result<(String, Vec<LowercaseChange>), ReplacementLimit> {
+    let mut lowercase = String::with_capacity(source.len());
+    let mut changes = Vec::new();
+    let mut delta = 0isize;
+    for (source_start, character) in source.char_indices() {
+        if cancelled() {
+            return Err(ReplacementLimit::Cancelled);
+        }
+        let lower_start = lowercase.len();
+        let mut lower_characters = 0;
+        lowercase.extend(character.to_lowercase().inspect(|_| lower_characters += 1));
+        let lower_end = lowercase.len();
+        let source_end = source_start + character.len_utf8();
+        if lower_end - lower_start != source_end - source_start || lower_characters != 1 {
+            delta += (lower_end - lower_start) as isize - (source_end - source_start) as isize;
+            changes.push(LowercaseChange {
+                lower_start,
+                lower_end,
+                source_start,
+                source_end,
+                delta_after: delta,
+            });
+        }
+    }
+    Ok((lowercase, changes))
+}
+
+fn source_offset(lower_offset: usize, changes: &[LowercaseChange], end: bool) -> usize {
+    let index = changes.partition_point(|change| change.lower_end <= lower_offset);
+    if let Some(change) = changes.get(index)
+        && lower_offset > change.lower_start
+        && lower_offset < change.lower_end
+    {
+        return if end { change.source_end } else { change.source_start };
+    }
+    let delta = index.checked_sub(1).map_or(0, |previous| changes[previous].delta_after);
+    if delta >= 0 {
+        lower_offset.saturating_sub(delta as usize)
+    } else {
+        lower_offset.saturating_add(delta.unsigned_abs())
+    }
 }
 
 fn escape_replacement(template: &str) -> String {

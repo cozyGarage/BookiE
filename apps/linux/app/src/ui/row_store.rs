@@ -6,12 +6,15 @@ use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use bookie_core::{QueryResult, Value};
 
 use crate::services::change_tracker::{KeyValue, RowKey};
 
 use super::row_object::RowObject;
+
+static NEXT_ROW_STORE_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone)]
 pub(in crate::ui) struct ColumnProjection {
@@ -44,6 +47,7 @@ mod imp {
         pub(in crate::ui) preview_keys: RefCell<Vec<usize>>,
         pub(in crate::ui) preview_redis_strings: std::cell::Cell<bool>,
         pub(in crate::ui) preview_from_result: std::cell::Cell<bool>,
+        pub(in crate::ui) generation: std::cell::Cell<u64>,
     }
 
     #[glib::object_subclass]
@@ -162,6 +166,10 @@ glib::wrapper! {
 }
 
 impl RowStore {
+    pub(super) fn generation(&self) -> u64 {
+        self.imp().generation.get()
+    }
+
     pub(super) fn visit_search_cells(&self, position: u32, visit: impl FnMut(usize, &Value) -> bool) -> bool {
         let slots = self.imp().slots.borrow();
         let Some(slot) = slots.get(position as usize) else {
@@ -334,6 +342,9 @@ impl RowStore {
         *self.imp().preview_keys.borrow_mut() = preview_keys;
         self.imp().preview_redis_strings.set(false);
         self.imp().preview_from_result.set(false);
+        self.imp()
+            .generation
+            .set(NEXT_ROW_STORE_GENERATION.fetch_add(1, Ordering::Relaxed));
     }
 
     fn detach_cached_rows(&self) {
@@ -483,7 +494,7 @@ impl RowStore {
         }
     }
 
-    fn cell_at(&self, position: u32, column: usize) -> Option<Value> {
+    pub(super) fn cell_at(&self, position: u32, column: usize) -> Option<Value> {
         let source_index = match self.imp().slots.borrow().get(position as usize)? {
             Slot::Object(row) => return row.cell_value_in_row(column),
             Slot::Cached { source_index, object } => match object.upgrade() {

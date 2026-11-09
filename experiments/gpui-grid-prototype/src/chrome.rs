@@ -290,8 +290,7 @@ impl GridView {
                         .on_mouse_down(
                             gpui::MouseButton::Left,
                             cx.listener(move |this, _: &MouseDownEvent, _, cx| {
-                                this.tabs.close(index);
-                                this.sync_grid_owner();
+                                this.close_tab(index);
                                 cx.stop_propagation();
                                 cx.notify();
                             }),
