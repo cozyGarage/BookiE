@@ -47,6 +47,7 @@ fn config(auth: OpenSshAuth) -> OpenSshConfig {
         destination: SshDestination::new("bastion", Some(2222), Some("deploy".to_owned())).unwrap(),
         jump_hosts: SshDestination::parse_jump_list("ops@jump1").unwrap(),
         auth,
+        local_port: None,
     }
 }
 

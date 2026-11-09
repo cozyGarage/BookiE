@@ -260,6 +260,7 @@ impl DriverTlsFixture {
                 path: self.ssh_key.clone(),
                 passphrase: None,
             },
+            local_port: None,
         }
     }
 

@@ -34,6 +34,7 @@ pub struct SshConfig {
     pub port: u16,
     pub username: String,
     pub auth: SshAuth,
+    pub local_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,6 +193,7 @@ pub struct SshTunnel {
 #[derive(Debug, Clone)]
 enum LocalBind {
     Tcp,
+    FixedTcp { port: u16 },
     Socket { name: String },
 }
 
@@ -262,6 +264,29 @@ impl SshTunnel {
         unknown: UnknownHostKey,
     ) -> Result<Self, SshError> {
         Self::open_chain_with(hops, remote_host, remote_port, LocalBind::Tcp, unknown, None).await
+    }
+
+    pub async fn open_chain_on_port(
+        hops: &[SshConfig],
+        remote_host: String,
+        remote_port: u16,
+        local_port: u16,
+        unknown: UnknownHostKey,
+    ) -> Result<Self, SshError> {
+        let bind = LocalBind::FixedTcp { port: local_port };
+        Self::open_chain_with(hops, remote_host, remote_port, bind, unknown, None).await
+    }
+
+    pub async fn open_chain_on_port_prompted(
+        hops: &[SshConfig],
+        remote_host: String,
+        remote_port: u16,
+        local_port: u16,
+        unknown: UnknownHostKey,
+        prompter: Arc<dyn Prompter>,
+    ) -> Result<Self, SshError> {
+        let bind = LocalBind::FixedTcp { port: local_port };
+        Self::open_chain_with(hops, remote_host, remote_port, bind, unknown, Some(prompter)).await
     }
 
     pub async fn open_chain_prompted(
@@ -516,6 +541,15 @@ async fn bind_local(bind: LocalBind) -> Result<(LocalListener, u16, Option<Local
             let listener = TcpListener::bind((LOCAL_BIND_HOST, 0)).await.map_err(SshError::Bind)?;
             let local_port = listener.local_addr().map_err(SshError::Bind)?.port();
             Ok((LocalListener::Tcp(listener), local_port, None))
+        }
+        LocalBind::FixedTcp { port } => {
+            let listener = TcpListener::bind((LOCAL_BIND_HOST, port)).await.map_err(|error| {
+                SshError::Bind(std::io::Error::new(
+                    error.kind(),
+                    format!("bind {LOCAL_BIND_HOST}:{port}: {error}"),
+                ))
+            })?;
+            Ok((LocalListener::Tcp(listener), port, None))
         }
         LocalBind::Socket { name } => {
             let directory = LocalSocketDir::create(name.len())?;
