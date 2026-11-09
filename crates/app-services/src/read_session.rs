@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bookie_core::{Connection, DriverRegistry, QueryResult, TableInfo};
+use bookie_core::{Connection, DriverRegistry, OperationControl, QueryResult, TableInfo};
 use bookie_policy::Principal;
 use bookie_storage::SavedConnection;
 use bookie_transport::SshEnvironment;
@@ -89,14 +89,21 @@ impl ReadSession {
         table: &TableInfo,
         offset: u64,
         limit: u64,
+        control: &OperationControl,
     ) -> Result<QueryResult, DriverFailurePresentation> {
         let guard = self
             .database
             .guard(self.id, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)?;
         guard
-            .fetch_rows(table.schema.as_deref(), &table.name, offset, limit)
+            .fetch_rows_controlled(table.schema.as_deref(), &table.name, offset, limit, control)
             .await
             .map_err(|error| classify(&error))
+    }
+}
+
+impl Drop for ReadSession {
+    fn drop(&mut self) {
+        self.database.close(self.id);
     }
 }
