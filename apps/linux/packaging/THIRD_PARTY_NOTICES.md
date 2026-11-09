@@ -42,6 +42,7 @@ Unless a file says otherwise, source code and documentation in this Linux reposi
 Packages:
 
 - `bookie-driver-oracle 0.2.5`
+- `bookie-driver-registry 0.2.5`
 - `bookie-results 0.2.5`
 
 ```text
