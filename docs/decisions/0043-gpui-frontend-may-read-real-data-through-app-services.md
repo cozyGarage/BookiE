@@ -1,6 +1,6 @@
 # 0043: The GPUI frontend may read real data through app-services
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-09)
 - **Date**: 2026-11-09
 
 ## Context

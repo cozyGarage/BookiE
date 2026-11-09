@@ -90,7 +90,7 @@ Other options and why they were rejected.
 | [0040](0040-multi-session-window-workspace.md) | Multi-session windows keep a headless workspace model | Accepted | A window may hold several PolicyGuard-backed sessions; tab↔connection maps and restore live in app-services; Relm4 stays the Linux shell. |
 | [0041](0041-frontends-render-services-decide.md) | Frontends render; app-services decides | Proposed | Result paging, find, filter, edit tracking and driver capabilities live in UI-free crates; GTK and experimental frontends hold view state only, and a script checks experiment dependencies. |
 | [0042](0042-dbx-visual-reference-for-gpui.md) | dbx is the visual reference for the GPUI experiment | Proposed | The GPUI experiment follows dbx's tokens, density and layout under its Apache-2.0 licence, without its branding; GTK stays libadwaita. |
-| [0043](0043-gpui-frontend-may-read-real-data-through-app-services.md) | The GPUI frontend may read real data through app-services | Proposed | Lift ADR 0028 and 0036 for reads only, through app-services and PolicyGuard, with typed values, Secret Service credentials and audit; writes and shipping need later decisions. |
+| [0043](0043-gpui-frontend-may-read-real-data-through-app-services.md) | The GPUI frontend may read real data through app-services | Accepted | Lift ADR 0028 and 0036 for reads only, through app-services and PolicyGuard, with typed values, Secret Service credentials and audit; writes and shipping need later decisions. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 
