@@ -59,19 +59,14 @@ pub fn validate_highlight_pattern_lengths(
     let mut preserved = original
         .rules
         .iter()
-        .filter_map(like_pattern)
-        .filter(|(op, pattern)| is_like(*op) && pattern.len() > MAX_LIKE_PATTERN_BYTES)
+        .filter(|rule| is_over_limit_like_rule(rule))
+        .filter_map(|rule| normalize_highlight_rule(rule.clone()))
         .collect::<Vec<_>>();
     for rule in &candidate.rules {
-        let Some((op, pattern)) =
-            like_pattern(rule).filter(|(op, pattern)| is_like(*op) && pattern.len() > MAX_LIKE_PATTERN_BYTES)
-        else {
+        if !is_over_limit_like_rule(rule) {
             continue;
-        };
-        let Some(index) = preserved
-            .iter()
-            .position(|(old_op, old_pattern)| *old_op == op && *old_pattern == pattern)
-        else {
+        }
+        let Some(index) = preserved.iter().position(|old_rule| old_rule == rule) else {
             return Err(HighlightError::PatternTooLong);
         };
         preserved.swap_remove(index);
@@ -83,11 +78,12 @@ fn is_like(op: HighlightOp) -> bool {
     matches!(op, HighlightOp::Like | HighlightOp::NotLike | HighlightOp::Ilike)
 }
 
-fn like_pattern(rule: &HighlightRule) -> Option<(HighlightOp, &str)> {
-    match rule.value.as_ref()? {
-        FilterValue::Single(pattern) => Some((rule.op, pattern)),
-        _ => None,
-    }
+fn is_over_limit_like_rule(rule: &HighlightRule) -> bool {
+    is_like(rule.op)
+        && matches!(
+            rule.value.as_ref(),
+            Some(FilterValue::Single(pattern)) if pattern.len() > MAX_LIKE_PATTERN_BYTES
+        )
 }
 
 fn normalize_highlight_rule(mut rule: HighlightRule) -> Option<HighlightRule> {
@@ -294,6 +290,7 @@ mod tests {
         let legacy = HighlightRuleSet {
             rules: vec![long_like_rule("x".repeat(MAX_LIKE_PATTERN_BYTES + 1))],
         };
+        assert!(validate_highlight_pattern_lengths(&HighlightRuleSet::default(), &legacy).is_err());
         let candidate = HighlightRuleSet {
             rules: vec![legacy.rules[0].clone(), default_highlight_rule("kind")],
         };
@@ -325,6 +322,9 @@ mod tests {
             )
             .is_err()
         );
+        let mut changed = legacy.rules[0].clone();
+        changed.target = HighlightTarget::Row;
+        assert!(validate_highlight_pattern_lengths(&legacy, &HighlightRuleSet { rules: vec![changed] }).is_err());
     }
 
     #[test]
