@@ -4,8 +4,8 @@ mod mutations;
 use std::sync::Arc;
 
 use bookie_app_services::result_editability::{
-    EditTarget, ResultLock, ResultRefusal, SourceTable, editable_target, grammar_for_driver, owned_result_columns,
-    source_table,
+    EditTarget, ResultLock, ResultRefusal, SourceTable, can_stage_result_value, editable_target, grammar_for_driver,
+    mutation_columns, owned_result_columns, source_table,
 };
 use bookie_core::{ColumnInfo, QueryResult, TableInfo};
 use relm4::ComponentSender;
@@ -42,6 +42,7 @@ pub(super) struct ResultEditing {
     state: Option<ResultEdit>,
     result: Option<Arc<QueryResult>>,
     columns: Vec<ColumnInfo>,
+    mutation_columns: Vec<ColumnInfo>,
     table: Option<TableInfo>,
     sql: String,
     driver_id: String,
@@ -83,6 +84,7 @@ impl ResultEditing {
             state: None,
             result: None,
             columns: Vec::new(),
+            mutation_columns: Vec::new(),
             table: None,
             sql: String::new(),
             driver_id: String::new(),
@@ -179,6 +181,7 @@ impl SqlEditor {
         editing.state = None;
         editing.result = None;
         editing.columns.clear();
+        editing.mutation_columns.clear();
         editing.table = None;
         editing.sql.clear();
         editing.selection = None;
@@ -227,6 +230,7 @@ impl SqlEditor {
         editing.state = None;
         editing.result = None;
         editing.columns.clear();
+        editing.mutation_columns.clear();
         editing.table = None;
         editing.selection = None;
         editing.column_view = None;
@@ -378,6 +382,7 @@ impl SqlEditor {
             let Some(editing) = self.result_editing.as_mut() else {
                 return;
             };
+            editing.mutation_columns = mutation_columns(&result.columns, &target);
             editing.columns = owned;
             editing.table = Some(target.table.clone());
             editing.result = Some(editable.clone());

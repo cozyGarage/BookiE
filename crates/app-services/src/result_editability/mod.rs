@@ -2,7 +2,10 @@ mod source_table;
 mod target;
 
 pub use source_table::{SourceItem, SourceName, SourceRefusal, SourceTable, source_table};
-pub use target::{EditTarget, ResultLock, ResultRefusal, editable_target, owned_result_columns};
+pub use target::{
+    EditTarget, ResultLock, ResultRefusal, can_stage_result_value, editable_target, mutation_columns,
+    owned_result_columns,
+};
 
 use bookie_core::sql_syntax::SqlGrammar;
 

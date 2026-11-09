@@ -24,6 +24,11 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Saving a structure change or edited rows appears in history, and the history dialog can filter those out.
 - [ ] `BOOKIE_LOG_FORMAT=json ./target/debug/bookie` writes lines that parse as JSON; unset keeps the human format.
 
+## SQL result editing
+
+- [ ] Create a disposable table with primary key `id` and distinct text columns `a` and `b`. Run `SELECT id AS row_id, b AS a FROM t`, edit the displayed `a`, preview and save. The preview targets source column `b` using key `id`; an independent database query confirms that `a` and the key stayed unchanged. Repeat after sorting the result.
+- [ ] Include a repeated source column and a computed expression in an editable SQL result. Both extra projections remain read-only, including Set NULL and the full-value editor; ordinary source columns remain editable. Discard and refresh restore the query result.
+
 ## Editor sessions (PostgreSQL, MySQL, SQL Server and SQLite files)
 
 - [ ] Turn on Session in an editor tab: `SET search_path` and a `CREATE TEMP TABLE` from one run are still in effect on the next run.
