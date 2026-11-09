@@ -403,3 +403,37 @@ async fn the_sweep_asks_stale_masters_to_exit_and_removes_their_directories() {
         fake.calls()
     );
 }
+
+#[tokio::test]
+async fn a_fixed_loopback_forward_listens_on_the_requested_port() {
+    let fake = Fake::new();
+    let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
+    let target = ForwardTarget::new("db.internal", 5432).unwrap();
+    let port = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+
+    let forward = session.forward(target, ForwardRoute::FixedLoopbackTcp(port)).await.unwrap();
+
+    let LocalEndpoint::Tcp(address) = forward.local_endpoint().clone() else {
+        panic!("expected a loopback port");
+    };
+    assert_eq!(address.port(), port);
+    let spec = format!("-O forward -L 127.0.0.1:{port}:db.internal:5432 -- bookie");
+    assert!(fake.calls().iter().any(|call| call.ends_with(&spec)));
+}
+
+#[tokio::test]
+async fn a_fixed_loopback_forward_on_a_busy_port_is_a_local_bind_error_naming_the_port() {
+    let fake = Fake::new();
+    let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
+    let target = ForwardTarget::new("db.internal", 5432).unwrap();
+    let held = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let busy = held.local_addr().unwrap().port();
+
+    let error = session.forward(target, ForwardRoute::FixedLoopbackTcp(busy)).await.unwrap_err();
+
+    let OpenSshError::LocalBind { detail } = error else {
+        panic!("expected a local bind error, got {error:?}");
+    };
+    assert!(detail.contains(&busy.to_string()), "{detail}");
+    assert!(!fake.calls().iter().any(|call| call.contains("-O forward")));
+}
