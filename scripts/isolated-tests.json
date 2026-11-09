@@ -8,7 +8,7 @@
     [
       "bookie-app",
       "--lib",
-      "services::browse_query::tests::clickhouse_value_query_refetches_the_exact_text_for_a_composite_key"
+      "services::browse_query::tests::clickhouse_value_query_refuses_duplicate_sort_keys"
     ],
     [
       "bookie-app",
