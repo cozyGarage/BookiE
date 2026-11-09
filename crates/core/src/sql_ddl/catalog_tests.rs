@@ -20,7 +20,7 @@ fn postgres_schema_round_trip_sql() {
 }
 
 #[test]
-fn mssql_and_duckdb_plan_schema_without_cascade() {
+fn mssql_schema_drop_omits_unsupported_cascade() {
     assert_eq!(
         build_create_schema("mssql", "reporting").unwrap(),
         "CREATE SCHEMA [reporting]"
@@ -30,12 +30,24 @@ fn mssql_and_duckdb_plan_schema_without_cascade() {
         "DROP SCHEMA [reporting]"
     );
     assert_eq!(
+        build_drop_schema("mssql", "reporting", false).unwrap(),
+        "DROP SCHEMA [reporting]"
+    );
+}
+
+#[test]
+fn duckdb_schema_drop_cascades_when_requested() {
+    assert_eq!(
         build_create_schema("duckdb", "reporting").unwrap(),
         "CREATE SCHEMA \"reporting\""
     );
     assert_eq!(
         build_drop_schema("duckdb", "reporting", false).unwrap(),
         "DROP SCHEMA \"reporting\""
+    );
+    assert_eq!(
+        build_drop_schema("duckdb", "reporting", true).unwrap(),
+        "DROP SCHEMA \"reporting\" CASCADE"
     );
 }
 

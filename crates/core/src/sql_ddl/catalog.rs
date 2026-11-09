@@ -53,7 +53,7 @@ pub fn build_drop_schema(driver_id: &str, schema: &str, cascade: bool) -> Result
     }
     let schema = validate_catalog_name(schema)?;
     let mut sql = format!("DROP SCHEMA {}", quote_ident(driver_id, schema));
-    if cascade && driver_id == "postgres" {
+    if cascade && matches!(driver_id, "postgres" | "duckdb") {
         sql.push_str(" CASCADE");
     }
     Ok(sql)
