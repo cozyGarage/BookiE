@@ -54,6 +54,7 @@ struct GridView {
     dark_mode: bool,
     tabs: Tabs,
     runs: Vec<Run>,
+    run_edits: Vec<grid_edit::Edits>,
     active_run: usize,
     summary_view: bool,
     result_ratio: f32,
@@ -191,6 +192,7 @@ impl GridView {
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
             runs: vec![Run { number: 1, rows: total }],
+            run_edits: vec![grid_edit::Edits::new()],
             active_run: 0,
             summary_view: false,
             result_ratio: DEFAULT_RESULT_RATIO,
@@ -288,6 +290,7 @@ impl GridView {
     fn run_query(&mut self) {
         let run = next_run(&self.runs);
         self.runs.push(run);
+        self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
     }
 
@@ -295,9 +298,11 @@ impl GridView {
         let Some(run) = self.runs.get(index).copied() else {
             return;
         };
+        self.run_edits[self.active_run] = std::mem::take(&mut self.edits);
+        self.edits = std::mem::take(&mut self.run_edits[index]);
+        self.editing = None;
         self.active_run = index;
         self.source = std::sync::Arc::new(Synthetic { total: run.rows });
-        self.edits.clear();
         self.compare = None;
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
