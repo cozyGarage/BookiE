@@ -24,6 +24,7 @@ use gpui::{
     WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
 };
 use text_input::{InputEvent, TextInput};
+use tokio_util::sync::CancellationToken;
 use ui_theme::ThemeExt;
 
 const ROW_HEIGHT: f32 = 26.0;
@@ -78,8 +79,7 @@ struct GridView {
     sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
-    find_generation: u64,
-    filter_generation: u64,
+    operation_cancel: CancellationToken,
     compare: Option<Diff>,
     status: String,
     selection: Option<Selection>,
@@ -144,7 +144,7 @@ impl GridView {
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
-                this.find_generation += 1;
+                this.invalidate_background();
                 this.cursor = MatchCursor::default();
                 this.status.clear();
                 cx.notify();
@@ -155,7 +155,7 @@ impl GridView {
         .detach();
         cx.subscribe(&filter, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
-                this.filter_generation += 1;
+                this.invalidate_background();
                 if this.status == "Filtering…" {
                     this.status.clear();
                 }
@@ -231,8 +231,7 @@ impl GridView {
             sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
-            find_generation: 0,
-            filter_generation: 0,
+            operation_cancel: CancellationToken::new(),
             compare: None,
             status: String::new(),
             selection: None,
@@ -339,7 +338,7 @@ impl GridView {
             return;
         }
         if self.grid_is_query {
-            self.generation += 1;
+            self.invalidate_background();
             self.edits = std::mem::take(&mut self.table_edits);
             self.source = self.table_source.clone();
             self.grid_is_query = false;
@@ -359,12 +358,15 @@ impl GridView {
         let query = match self.tabs.current() {
             Tab::Query => true,
             Tab::Table(name) if name == DATA_TABLE => false,
-            _ => return,
+            _ => {
+                self.invalidate_background();
+                return;
+            }
         };
         if query == self.grid_is_query {
             return;
         }
-        self.generation += 1;
+        self.invalidate_background();
         self.editing = None;
         self.compare = None;
         self.cursor = MatchCursor::default();
@@ -391,7 +393,7 @@ impl GridView {
         let Some(run) = self.runs.get(index).copied() else {
             return;
         };
-        self.generation += 1;
+        self.invalidate_background();
         if let Some(previous) = self.run_edits.get_mut(self.active_run) {
             *previous = std::mem::take(&mut self.edits);
         }
@@ -429,7 +431,7 @@ impl GridView {
         if index != self.active_run {
             return;
         }
-        self.generation += 1;
+        self.invalidate_background();
         self.edits.clear();
         if self.runs.is_empty() {
             self.source = self.table_source.clone();
@@ -467,13 +469,15 @@ impl GridView {
     fn begin_background<T: Send + 'static>(
         &mut self,
         cx: &mut Context<Self>,
-        work: impl FnOnce() -> T + Send + 'static,
+        work: impl FnOnce(CancellationToken) -> T + Send + 'static,
         apply: impl FnOnce(&mut Self, T) + 'static,
     ) {
-        self.generation += 1;
+        self.invalidate_background();
         let generation = self.generation;
+        let cancel = CancellationToken::new();
+        self.operation_cancel = cancel.clone();
         cx.spawn(async move |this, cx| {
-            let result = cx.background_executor().spawn(async move { work() }).await;
+            let result = cx.background_executor().spawn(async move { work(cancel) }).await;
             this.update(cx, |this, cx| {
                 if this.generation == generation {
                     apply(this, result);
@@ -494,13 +498,11 @@ impl GridView {
             return;
         }
         let (source, query) = (self.source.clone(), self.find_text(cx));
-        let find_generation = self.find_generation;
         self.status = "Searching…".into();
         self.begin_background(
             cx,
-            move || source.find(&query, MAX_FIND_MATCHES),
+            move |cancel| source.find(&query, MAX_FIND_MATCHES, &cancel),
             move |this, found| match found {
-                _ if this.find_generation != find_generation => {}
                 Ok(found) => {
                     this.find_capped = found.capped;
                     this.cursor.set(found.matches);
@@ -554,15 +556,11 @@ impl GridView {
         };
         let source = self.source.clone();
         let label = format!("WHERE {}", self.filter.read(cx).content());
-        let filter_generation = self.filter_generation;
         self.status = "Filtering…".into();
         self.begin_background(
             cx,
-            move || source.filter(&predicate),
+            move |cancel| source.filter(&predicate, &cancel),
             move |this, kept| {
-                if this.filter_generation != filter_generation {
-                    return;
-                }
                 let kept = match kept {
                     Ok(kept) => kept,
                     Err(message) => {
@@ -577,7 +575,7 @@ impl GridView {
     }
 
     fn clear_filter(&mut self) {
-        self.generation += 1;
+        self.invalidate_background();
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status.clear();
@@ -591,14 +589,22 @@ impl GridView {
         self.status = "Comparing…".into();
         self.begin_background(
             cx,
-            move || source.compare(keyed),
-            |this, diff| {
-                this.status.clear();
-                this.selection = None;
-                this.compare = Some(diff);
-                this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+            move |cancel| source.compare(keyed, &cancel),
+            |this, result| match result {
+                Ok(diff) => {
+                    this.status.clear();
+                    this.selection = None;
+                    this.compare = Some(diff);
+                    this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
+                }
+                Err(message) => this.status = message.into(),
             },
         );
+    }
+
+    fn invalidate_background(&mut self) {
+        self.generation += 1;
+        self.operation_cancel.cancel();
     }
 
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {

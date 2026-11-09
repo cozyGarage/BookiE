@@ -1,5 +1,6 @@
 use super::model::*;
 use super::source::{ResultSource, Synthetic};
+use tokio_util::sync::CancellationToken;
 
 #[test]
 fn row_count_selection_accepts_only_the_three_sizes() {
@@ -34,7 +35,9 @@ fn integers_beyond_the_float_range_keep_every_digit() {
 
 #[test]
 fn find_matches_any_column_case_insensitively_and_reports_the_scan() {
-    let found = Synthetic::new(150_000).find("sample 14999", 10_000).unwrap();
+    let found = Synthetic::new(150_000)
+        .find("sample 14999", 10_000, &CancellationToken::new())
+        .unwrap();
     assert_eq!(found.matches.first(), Some(&14_999));
     assert!(found.matches.contains(&149_990));
     assert!(!found.capped);
@@ -43,7 +46,9 @@ fn find_matches_any_column_case_insensitively_and_reports_the_scan() {
 
 #[test]
 fn find_stops_at_the_cap_and_says_so() {
-    let found = Synthetic::new(150_000).find("sample", 100).unwrap();
+    let found = Synthetic::new(150_000)
+        .find("sample", 100, &CancellationToken::new())
+        .unwrap();
     assert_eq!(found.matches.len(), 100);
     assert!(found.capped);
     assert_eq!(found.scanned, 101);
@@ -51,25 +56,53 @@ fn find_stops_at_the_cap_and_says_so() {
 
 #[test]
 fn find_refuses_bad_requests() {
-    assert!(Synthetic::new(10).find("", 5).is_err());
-    assert!(Synthetic::new(10).find("x", 0).is_err());
-    assert!(Synthetic::new(10).find("x", MAX_FIND_MATCHES + 1).is_err());
-    assert!(Synthetic::new(10).find(&"x".repeat(257), 5).is_err());
+    assert!(Synthetic::new(10).find("", 5, &CancellationToken::new()).is_err());
+    assert!(Synthetic::new(10).find("x", 0, &CancellationToken::new()).is_err());
+    assert!(
+        Synthetic::new(10)
+            .find("x", MAX_FIND_MATCHES + 1, &CancellationToken::new())
+            .is_err()
+    );
+    assert!(
+        Synthetic::new(10)
+            .find(&"x".repeat(257), 5, &CancellationToken::new())
+            .is_err()
+    );
+}
+
+#[test]
+fn cancelled_scans_return_and_a_cancelled_initialization_can_be_retried() {
+    let source = Synthetic::new(10);
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    assert_eq!(source.find("sample", 10, &cancel), Err("the operation was cancelled"));
+    let predicate = parse_predicate("label contains 1").unwrap();
+    assert_eq!(source.filter(&predicate, &cancel), Err("the operation was cancelled"));
+    assert!(matches!(source.compare(false, &cancel), Err("comparison cancelled")));
+    assert_eq!(
+        source.find("sample 1", 10, &CancellationToken::new()).unwrap().matches,
+        vec![1]
+    );
 }
 
 #[test]
 fn null_never_matches_text_but_not_equals_keeps_it() {
     let source = Synthetic::new(6);
     let equals = parse_predicate("state = true").unwrap();
-    assert_eq!(source.filter(&equals), Ok(vec![2, 4]));
+    assert_eq!(source.filter(&equals, &CancellationToken::new()), Ok(vec![2, 4]));
     let not_equals = parse_predicate("state != true").unwrap();
-    assert_eq!(source.filter(&not_equals), Ok(vec![0, 1, 3, 5]));
+    assert_eq!(
+        source.filter(&not_equals, &CancellationToken::new()),
+        Ok(vec![0, 1, 3, 5])
+    );
 }
 
 #[test]
 fn filtering_keeps_the_exact_typed_integer_text() {
     let predicate = parse_predicate("value != 9007199254740993").unwrap();
-    let kept = Synthetic::new(10).filter(&predicate).unwrap();
+    let kept = Synthetic::new(10)
+        .filter(&predicate, &CancellationToken::new())
+        .unwrap();
     assert_eq!(kept.len(), 9);
     assert_eq!(kept[0], 1);
 }
@@ -96,12 +129,16 @@ fn filtering_typed_values_matches_their_displayed_text() {
         let expected = (0..30)
             .filter(|index| index % 12 == expected_modulo)
             .collect::<Vec<_>>();
-        assert_eq!(source.filter(&predicate), Ok(expected), "{text}");
+        assert_eq!(
+            source.filter(&predicate, &CancellationToken::new()),
+            Ok(expected),
+            "{text}"
+        );
     }
 
     let not_equals = parse_predicate("typed != 2026-11-04").unwrap();
     assert_eq!(
-        source.filter(&not_equals).unwrap(),
+        source.filter(&not_equals, &CancellationToken::new()).unwrap(),
         (0..30).filter(|index| ![2, 14, 26].contains(index)).collect::<Vec<_>>()
     );
 }
@@ -109,7 +146,10 @@ fn filtering_typed_values_matches_their_displayed_text() {
 #[test]
 fn filtering_text_values_is_case_insensitive() {
     let predicate = parse_predicate("label = SAMPLE 1").unwrap();
-    assert_eq!(Synthetic::new(10).filter(&predicate), Ok(vec![1]));
+    assert_eq!(
+        Synthetic::new(10).filter(&predicate, &CancellationToken::new()),
+        Ok(vec![1])
+    );
 }
 
 #[test]
@@ -123,7 +163,7 @@ fn predicates_are_validated() {
 
 #[test]
 fn whole_row_compare_counts_added_and_removed_pairs() {
-    let diff = build_diff(1_000, false);
+    let diff = build_diff(1_000, false, &CancellationToken::new()).unwrap();
     assert!(!diff.summary.keyed);
     assert_eq!(diff.summary.changed, 0);
     let dropped = 10;
@@ -136,7 +176,7 @@ fn whole_row_compare_counts_added_and_removed_pairs() {
 
 #[test]
 fn keyed_compare_pairs_before_and_after_for_changed_rows() {
-    let diff = build_diff(1_000, true);
+    let diff = build_diff(1_000, true, &CancellationToken::new()).unwrap();
     assert!(diff.summary.keyed);
     assert_eq!(diff.summary.changed, 10);
     assert_eq!(diff.summary.added, 0);
@@ -149,7 +189,7 @@ fn keyed_compare_pairs_before_and_after_for_changed_rows() {
 
 #[test]
 fn compare_caps_the_rows_it_shows_but_keeps_exact_counts() {
-    let diff = build_diff(150_000, false);
+    let diff = build_diff(150_000, false, &CancellationToken::new()).unwrap();
     assert_eq!(diff.rows.len(), MAX_DIFF_ROWS);
     assert!(diff.capped);
     assert_eq!(diff.summary.removed, 1_500 + 1_500);
@@ -257,21 +297,29 @@ fn bytes_float_and_undecodable_render_by_their_own_rules() {
 #[test]
 fn a_filter_and_find_can_target_the_typed_column() {
     let predicate = parse_predicate("typed contains deadbeef").unwrap();
-    let hits = Synthetic::new(150_000).filter(&predicate).unwrap();
+    let hits = Synthetic::new(150_000)
+        .filter(&predicate, &CancellationToken::new())
+        .unwrap();
     assert_eq!(hits.first().copied(), Some(1));
     assert!(hits.iter().all(|row| u64::from(*row) % TYPED_KINDS == 1));
     let not_undecodable = parse_predicate("typed != <undecodable numeric(40,20)>").unwrap();
     assert_eq!(
-        Synthetic::new(24).filter(&not_undecodable).map(|kept| kept.len()),
+        Synthetic::new(24)
+            .filter(&not_undecodable, &CancellationToken::new())
+            .map(|kept| kept.len()),
         Ok(22)
     );
-    let found = Synthetic::new(150_000).find("numeric(40,20)", 3).unwrap();
+    let found = Synthetic::new(150_000)
+        .find("numeric(40,20)", 3, &CancellationToken::new())
+        .unwrap();
     assert!(found.matches.is_empty(), "undecodable cells are not searchable");
 }
 
 #[test]
 fn only_the_typed_json_value_contains_the_word_null_and_a_null_cell_never_matches() {
-    let found = Synthetic::new(150_000).find("null", 10).unwrap();
+    let found = Synthetic::new(150_000)
+        .find("null", 10, &CancellationToken::new())
+        .unwrap();
     assert!(!found.matches.is_empty());
     assert!(
         found.matches.iter().all(|row| row % TYPED_KINDS == 8),

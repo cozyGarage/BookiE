@@ -128,11 +128,15 @@ fn changing_find_text_discards_a_pending_search_result(cx: &mut TestAppContext) 
         view.update(cx, |view, cx| {
             view.find.update(cx, |input, cx| input.set_content("Sample 7", cx));
             view.run_find(true, cx);
-            view.find.update(cx, |input, cx| input.set_content("new search", cx));
         });
+    });
+    let cancel = view.read_with(cx, |view, _| view.operation_cancel.clone());
+    view.update(cx, |view, cx| {
+        view.find.update(cx, |input, cx| input.set_content("new search", cx))
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
+    assert!(cancel.is_cancelled());
     view.read_with(cx, |view, _| assert!(view.cursor.matches.is_empty()));
 }
 
@@ -144,12 +148,16 @@ fn changing_filter_text_discards_a_pending_filter(cx: &mut TestAppContext) {
             view.filter
                 .update(cx, |input, cx| input.set_content("label contains 7", cx));
             view.apply_filter(cx);
-            view.filter
-                .update(cx, |input, cx| input.set_content("label contains 8", cx));
         });
+    });
+    let cancel = view.read_with(cx, |view, _| view.operation_cancel.clone());
+    view.update(cx, |view, cx| {
+        view.filter
+            .update(cx, |input, cx| input.set_content("label contains 8", cx))
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
+    assert!(cancel.is_cancelled());
     view.read_with(cx, |view, _| {
         assert!(matches!(view.mode, crate::Mode::All));
         assert_ne!(view.status, "Filtering…");
@@ -382,16 +390,29 @@ impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
         bookie_gpui_grid_prototype::source::ResultSource::row(&Tiny, index)
     }
 
-    fn find(&self, query: &str, cap: usize) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
-        bookie_gpui_grid_prototype::source::ResultSource::find(&Tiny, query, cap)
+    fn find(
+        &self,
+        query: &str,
+        cap: usize,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::find(&Tiny, query, cap, cancel)
     }
 
-    fn filter(&self, predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Result<Vec<u32>, &'static str> {
-        bookie_gpui_grid_prototype::source::ResultSource::filter(&Tiny, predicate)
+    fn filter(
+        &self,
+        predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Vec<u32>, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::filter(&Tiny, predicate, cancel)
     }
 
-    fn compare(&self, keyed: bool) -> bookie_gpui_grid_prototype::model::Diff {
-        bookie_gpui_grid_prototype::source::ResultSource::compare(&Tiny, keyed)
+    fn compare(
+        &self,
+        keyed: bool,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
+        bookie_gpui_grid_prototype::source::ResultSource::compare(&Tiny, keyed, cancel)
     }
 }
 
@@ -544,7 +565,12 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         ]
     }
 
-    fn find(&self, query: &str, _cap: usize) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+    fn find(
+        &self,
+        query: &str,
+        _cap: usize,
+        _cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
         Ok(bookie_gpui_grid_prototype::model::FindResult {
             matches: if query == "tiny 2" { vec![2] } else { Vec::new() },
             capped: false,
@@ -552,12 +578,20 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         })
     }
 
-    fn filter(&self, _predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Result<Vec<u32>, &'static str> {
+    fn filter(
+        &self,
+        _predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        _cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Vec<u32>, &'static str> {
         Ok(vec![1])
     }
 
-    fn compare(&self, keyed: bool) -> bookie_gpui_grid_prototype::model::Diff {
-        bookie_gpui_grid_prototype::model::build_diff(3, keyed)
+    fn compare(
+        &self,
+        keyed: bool,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
+        bookie_gpui_grid_prototype::model::build_diff(3, keyed, cancel)
     }
 }
 
@@ -836,10 +870,12 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.begin_background(cx, || (), |view, ()| view.status = "stale".into());
+            view.begin_background(cx, |_| (), |view, ()| view.status = "stale".into());
+            let cancel = view.operation_cancel.clone();
             let query = view.tabs.active;
             view.tabs.open_home();
             view.sync_grid_owner();
+            assert!(cancel.is_cancelled());
             view.close_tab(query);
         })
     });
@@ -950,7 +986,7 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
             view.edits.insert((1, 1), Cell::Text("first".into()));
             view.run_query();
             view.edits.insert((1, 1), Cell::Text("second".into()));
-            view.begin_background(cx, || (), |view, ()| view.status = "stale result".into());
+            view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
             view.close_run(1);
             assert_eq!(view.active_run, 0);
             assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
@@ -965,7 +1001,7 @@ fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut Tes
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.begin_background(cx, || (), |view, ()| view.status = "stale result".into());
+            view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
             view.run_query();
         });
     });
