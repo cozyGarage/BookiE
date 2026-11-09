@@ -56,6 +56,7 @@ struct GridView {
     runs: Vec<Run>,
     run_edits: Vec<grid_edit::Edits>,
     active_run: usize,
+    next_run_number: usize,
     summary_view: bool,
     result_ratio: f32,
     result_open: bool,
@@ -194,6 +195,7 @@ impl GridView {
             runs: vec![Run { number: 1, rows: total }],
             run_edits: vec![grid_edit::Edits::new()],
             active_run: 0,
+            next_run_number: 2,
             summary_view: false,
             result_ratio: DEFAULT_RESULT_RATIO,
             result_open: true,
@@ -288,7 +290,8 @@ impl GridView {
     }
 
     fn run_query(&mut self) {
-        let run = next_run(&self.runs);
+        let run = next_run(self.next_run_number);
+        self.next_run_number += 1;
         self.runs.push(run);
         self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
@@ -299,7 +302,13 @@ impl GridView {
             return;
         };
         self.generation += 1;
-        self.run_edits[self.active_run] = std::mem::take(&mut self.edits);
+        if let Some(previous) = self.run_edits.get_mut(self.active_run) {
+            *previous = std::mem::take(&mut self.edits);
+        }
+        self.show_run(index, run);
+    }
+
+    fn show_run(&mut self, index: usize, run: Run) {
         self.edits = std::mem::take(&mut self.run_edits[index]);
         self.editing = None;
         self.active_run = index;
@@ -308,6 +317,34 @@ impl GridView {
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
         self.status = format!("{} · {} rows", run.label(), thousands(run.rows));
+    }
+
+    fn close_run(&mut self, index: usize) {
+        if index >= self.runs.len() {
+            return;
+        }
+        self.runs.remove(index);
+        self.run_edits.remove(index);
+        if index < self.active_run {
+            self.active_run -= 1;
+            return;
+        }
+        if index != self.active_run {
+            return;
+        }
+        self.generation += 1;
+        self.edits.clear();
+        if self.runs.is_empty() {
+            self.source = std::sync::Arc::new(Synthetic { total: 0 });
+            self.editing = None;
+            self.compare = None;
+            self.cursor = MatchCursor::default();
+            self.set_mode(Mode::All);
+            self.status = "No results".into();
+            return;
+        }
+        let next = index.min(self.runs.len() - 1);
+        self.show_run(next, self.runs[next]);
     }
 
     fn set_mode(&mut self, mode: Mode) {
@@ -617,6 +654,11 @@ impl GridView {
             action("query", "New query tab", true),
             action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
             action(
+                "close-run",
+                "Close current result",
+                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
+            ),
+            action(
                 "results",
                 if self.result_open {
                     "Hide the results pane"
@@ -708,6 +750,7 @@ impl GridView {
                 window.focus(&self.focus, cx);
             }
             "run" => self.run_query(),
+            "close-run" => self.close_run(self.active_run),
             "results" => self.result_open = !self.result_open,
             "table" => {
                 self.tabs.open_table(DATA_TABLE);

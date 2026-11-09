@@ -156,8 +156,7 @@ impl Run {
     }
 }
 
-pub fn next_run(existing: &[Run]) -> Run {
-    let number = existing.len() + 1;
+pub fn next_run(number: usize) -> Run {
     Run {
         number,
         rows: RUN_ROWS[(number - 1) % RUN_ROWS.len()],
@@ -271,7 +270,7 @@ mod tests {
     fn each_run_gets_the_next_number_and_a_known_row_count() {
         let mut runs = Vec::new();
         for _ in 0..5 {
-            let run = next_run(&runs);
+            let run = next_run(runs.len() + 1);
             runs.push(run);
         }
         assert_eq!(runs.iter().map(|run| run.number).collect::<Vec<_>>(), [1, 2, 3, 4, 5]);

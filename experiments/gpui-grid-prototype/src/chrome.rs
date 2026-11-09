@@ -522,7 +522,23 @@ impl GridView {
                 .rounded(px(theme.radius))
                 .border_1()
                 .cursor_pointer()
-                .child(format!("{} · {} rows", run.label(), thousands(run.rows)));
+                .child(format!("{} · {} rows", run.label(), thousands(run.rows)))
+                .child(
+                    div()
+                        .id(("close-run", index))
+                        .px_1()
+                        .rounded(px(theme.radius))
+                        .hover(move |style| style.bg(rgb(theme.muted)))
+                        .on_mouse_down(
+                            gpui::MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                                this.close_run(index);
+                                cx.stop_propagation();
+                                cx.notify();
+                            }),
+                        )
+                        .child(icon("x", theme.muted_foreground)),
+                );
             let tab = if active {
                 tab.border_color(rgb(theme.border))
                     .bg(rgb(theme.background))
@@ -587,8 +603,7 @@ impl GridView {
                         cx.notify();
                     })),
             );
-        let run = self.runs[self.active_run];
-        let body = if self.summary_view {
+        let body = if let Some(run) = self.runs.get(self.active_run).filter(|_| self.summary_view) {
             div()
                 .flex_1()
                 .flex()
@@ -600,6 +615,8 @@ impl GridView {
                 .child(format!("Rows returned: {}", thousands(run.rows)))
                 .child(format!("Elapsed: {} ms (synthetic)", run.millis()))
                 .child("Source: synthetic generator, no database")
+        } else if self.runs.is_empty() {
+            div().flex_1().p_4().child("No results")
         } else {
             grid
         };

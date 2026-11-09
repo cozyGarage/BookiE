@@ -524,6 +524,72 @@ fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.close_run(0);
+            assert_eq!(view.runs.len(), 1);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
+            view.close_run(0);
+            assert!(view.runs.is_empty());
+            assert!(view.edits.is_empty());
+            assert_eq!(view.dataset_count(), 0);
+            view.run_query();
+            assert_eq!(view.runs[0].number, 3);
+            assert!(view.edits.is_empty());
+        });
+    });
+}
+
+#[gpui::test]
+fn closing_the_final_run_renders_an_empty_result_pane(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.close_run(0);
+            cx.notify();
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.runs.is_empty());
+        assert_eq!(view.status, "No results");
+    });
+}
+
+#[gpui::test]
+fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-shift-p");
+    cx.simulate_input("close current result");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| assert!(view.runs.is_empty()));
+}
+
+#[gpui::test]
+fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.edits.insert((1, 1), Cell::Text("first".into()));
+            view.run_query();
+            view.edits.insert((1, 1), Cell::Text("second".into()));
+            view.begin_background(cx, || (), |view, ()| view.status = "stale result".into());
+            view.close_run(1);
+            assert_eq!(view.active_run, 0);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale result"));
+}
+
+#[gpui::test]
 fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
