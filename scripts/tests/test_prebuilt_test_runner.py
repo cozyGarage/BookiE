@@ -54,6 +54,18 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
              self.assertRaisesRegex(ValueError, 'no prebuilt tests executed'):
             runner.main()
 
+    def test_failed_process_and_missing_summary_fail_the_invocation(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        command = [str(self.binary)]
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
+            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 101, '')):
+                self.assertEqual(runner.main(), 101)
+            with patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, '')), \
+                 self.assertRaisesRegex(ValueError, 'execution evidence missing'):
+                runner.main()
+
     def test_missing_target_fails_instead_of_building_or_running_zero_tests(self):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ["-p", "sample", "--test", "missing"])
