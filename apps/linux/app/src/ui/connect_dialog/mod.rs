@@ -39,6 +39,7 @@ pub struct ConnectDialog {
     tls_row: adw::ActionRow,
     tls_mode: AccessibleChoice,
     tls_root_cert: adw::EntryRow,
+    tls_strict: adw::SwitchRow,
     tls_client_cert: adw::EntryRow,
     tls_client_key: adw::EntryRow,
     read_only: adw::SwitchRow,
@@ -254,6 +255,12 @@ impl Component for ConnectDialog {
             .title(crate::tr!("Certificate authority"))
             .build();
         browse::attach_certificate_picker(&tls_root_cert);
+        let tls_strict = adw::SwitchRow::builder()
+            .title(crate::tr!("Strict encryption (TDS 8.0)"))
+            .subtitle(crate::tr!(
+                "Encrypt before any SQL Server handshake; the connection fails if the server cannot"
+            ))
+            .build();
         let tls_client_cert = adw::EntryRow::builder().title(crate::tr!("Client certificate")).build();
         browse::attach_client_certificate_picker(&tls_client_cert);
         let tls_client_key = adw::EntryRow::builder().title(crate::tr!("Client private key")).build();
@@ -325,6 +332,7 @@ impl Component for ConnectDialog {
         let options_group = adw::PreferencesGroup::builder().title(crate::tr!("Options")).build();
         options_group.add(&tls_row);
         options_group.add(&tls_root_cert);
+        options_group.add(&tls_strict);
         options_group.add(&tls_client_cert);
         options_group.add(&tls_client_key);
         options_group.add(&read_only);
@@ -396,6 +404,7 @@ impl Component for ConnectDialog {
             tls_row,
             tls_mode,
             tls_root_cert,
+            tls_strict,
             tls_client_cert,
             tls_client_key,
             read_only,
@@ -807,8 +816,21 @@ impl ConnectDialog {
             root_cert: self.selected_root_cert(mode),
             client_cert: selected_path(&self.tls_client_cert),
             client_key: selected_path(&self.tls_client_key),
+            strict_encryption: self.tls_strict.is_visible() && self.tls_strict.is_active(),
             ..Default::default()
         }
+    }
+
+    fn strict_encryption_offered(&self) -> bool {
+        let supported = self
+            .drivers
+            .get(self.driver_combo.selected() as usize)
+            .and_then(|entry| self.registry.get(&entry.id))
+            .is_some_and(|driver| driver.capabilities().supports_strict_encryption);
+        supported
+            && !self.form.file_based
+            && !self.uses_local_socket()
+            && !matches!(self.selected_tls_mode(), TlsMode::Disabled | TlsMode::Prefer)
     }
 
     fn selected_root_cert(&self, mode: TlsMode) -> Option<std::path::PathBuf> {
@@ -824,6 +846,7 @@ impl ConnectDialog {
     }
 
     fn apply_tls_visibility(&self) {
+        self.tls_strict.set_visible(self.strict_encryption_offered());
         self.tls_root_cert.set_visible(
             !self.form.file_based && !self.uses_local_socket() && self.selected_tls_mode().verifies_cert(),
         );
@@ -1039,6 +1062,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         query_timeout_secs,
         auth_source: opts_clone.auth_source.clone(),
         attached_databases: opts.attached_databases.clone(),
+        tls_strict_encryption: opts_clone.tls.strict_encryption,
     };
 
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;

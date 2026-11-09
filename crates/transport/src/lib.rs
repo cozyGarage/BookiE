@@ -171,6 +171,7 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
             root_cert: saved.tls_root_cert.clone(),
             client_cert: saved.tls_client_cert.clone(),
             client_key: saved.tls_client_key.clone(),
+            strict_encryption: saved.tls_strict_encryption,
             ..Default::default()
         },
         auth_mode: saved.auth_mode,
@@ -257,6 +258,7 @@ async fn establish_inner(
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), TransportError> {
     check_auth_mode(opts.auth_mode, driver.supports_integrated_auth(), driver.display_name())?;
     validate_client_tls_auth(driver, &opts)?;
+    validate_strict_encryption(driver, &opts)?;
     validate_local_socket(&opts, driver, ssh.is_some())?;
     opts.forwarded_socket_dir = None;
     let tunnel = match ssh {
@@ -266,6 +268,15 @@ async fn establish_inner(
     let timeout = connect_timeout(&opts);
     let raw = connect_with_timeout(driver, opts, timeout).await?;
     Ok((raw, tunnel))
+}
+
+fn validate_strict_encryption(driver: &dyn DatabaseDriver, opts: &ConnectOptions) -> Result<(), TransportError> {
+    if opts.tls.strict_encryption && !driver.supports_strict_encryption() {
+        return Err(
+            DriverError::Unsupported(format!("{} does not support strict encryption", driver.display_name())).into(),
+        );
+    }
+    Ok(())
 }
 
 fn validate_client_tls_auth(driver: &dyn DatabaseDriver, opts: &ConnectOptions) -> Result<(), TransportError> {
