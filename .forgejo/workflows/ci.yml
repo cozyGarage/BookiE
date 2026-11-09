@@ -643,7 +643,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, duckdb]
+        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, duckdb]
         include:
           - driver: duckdb
             tests: --test integration --test read_only --test missing_file

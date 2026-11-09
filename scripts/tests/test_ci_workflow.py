@@ -121,7 +121,7 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("mongodb, duckdb]", driver)
+        self.assertIn("mongodb, oracle, duckdb]", driver)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
         self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
