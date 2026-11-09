@@ -29,8 +29,21 @@ impl ReplaceSnapshot {
         key: &[Value],
         visit_cells: impl FnOnce(&mut dyn FnMut(usize, &Value)),
     ) -> Result<(), ReplaceError> {
+        self.push_row_cancellable(position, key, None, visit_cells)
+    }
+
+    pub fn push_row_cancellable(
+        &mut self,
+        position: u32,
+        key: &[Value],
+        cancel: Option<&tokio_util::sync::CancellationToken>,
+        visit_cells: impl FnOnce(&mut dyn FnMut(usize, &Value)),
+    ) -> Result<(), ReplaceError> {
         if self.rows.len() >= MAX_REPLACE_SNAPSHOT_ROWS {
             return Err(ReplaceError::Budget);
+        }
+        if cancel.is_some_and(tokio_util::sync::CancellationToken::is_cancelled) {
+            return Err(ReplaceError::Cancelled);
         }
         let previous_bytes = self.bytes;
         let row_bytes = retained_key_bytes(key)
@@ -46,8 +59,13 @@ impl ReplaceSnapshot {
             cells: Vec::new(),
         });
         let mut over_budget = false;
+        let mut cancelled = false;
         visit_cells(&mut |column, value| {
-            if over_budget {
+            if over_budget || cancelled {
+                return;
+            }
+            if cancel.is_some_and(tokio_util::sync::CancellationToken::is_cancelled) {
+                cancelled = true;
                 return;
             }
             let cell_bytes = retained_key_bytes(std::slice::from_ref(value))
@@ -62,10 +80,14 @@ impl ReplaceSnapshot {
                 row.cells.push((column, value.clone()));
             }
         });
-        if over_budget {
+        if over_budget || cancelled {
             self.rows.pop();
             self.bytes = previous_bytes;
-            return Err(ReplaceError::Budget);
+            return Err(if cancelled {
+                ReplaceError::Cancelled
+            } else {
+                ReplaceError::Budget
+            });
         }
         Ok(())
     }
