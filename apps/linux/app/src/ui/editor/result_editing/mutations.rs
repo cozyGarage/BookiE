@@ -8,6 +8,73 @@ use super::ResultEdit;
 use crate::services::change_tracker::{RowKey, StatementSource};
 use crate::ui::grid::GridMsg;
 
+fn should_block_mutation_during_save(message: &GridMsg, save_in_flight: bool) -> bool {
+    save_in_flight
+        && matches!(
+            message,
+            GridMsg::CellEdited { .. }
+                | GridMsg::CellEditedValue { .. }
+                | GridMsg::SetCellNull { .. }
+                | GridMsg::DeleteRowAt { .. }
+                | GridMsg::InsertRow
+                | GridMsg::DuplicateRow { .. }
+        )
+}
+
+#[cfg(test)]
+mod save_guard_tests {
+    use super::should_block_mutation_during_save;
+    use crate::ui::grid::GridMsg;
+
+    #[test]
+    fn every_result_mutation_is_blocked_while_a_save_is_in_flight() {
+        let messages = [
+            GridMsg::CellEdited {
+                row_position: 0,
+                col_index: 0,
+                new_value: String::new(),
+                row_key: Vec::new(),
+            },
+            GridMsg::CellEditedValue {
+                row_position: 0,
+                col_index: 0,
+                value: bookie_core::Value::Null,
+                row_key: Vec::new(),
+            },
+            GridMsg::SetCellNull {
+                row_position: 0,
+                col_index: 0,
+                row_key: Vec::new(),
+            },
+            GridMsg::DeleteRowAt {
+                row_position: 0,
+                row_key: Vec::new(),
+            },
+            GridMsg::InsertRow,
+            GridMsg::DuplicateRow { row_position: 0 },
+        ];
+
+        assert!(
+            messages
+                .iter()
+                .all(|message| should_block_mutation_during_save(message, true))
+        );
+        assert!(
+            messages
+                .iter()
+                .all(|message| !should_block_mutation_during_save(message, false))
+        );
+    }
+
+    #[test]
+    fn non_mutating_grid_actions_remain_available_during_a_save() {
+        assert!(!should_block_mutation_during_save(
+            &GridMsg::SortChanged(Vec::new()),
+            true
+        ));
+    }
+}
+
 impl SqlEditor {
     pub(in crate::ui::editor) fn on_editable_grid_message(
         &mut self,
@@ -26,6 +93,12 @@ impl SqlEditor {
         }
         if !self.result_is_editable() {
             return Some(message);
+        }
+        if should_block_mutation_during_save(&message, self.result_save_in_flight()) {
+            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+                "Saving changes. Edit again when the save finishes."
+            )));
+            return None;
         }
         match message {
             GridMsg::CellEdited {
