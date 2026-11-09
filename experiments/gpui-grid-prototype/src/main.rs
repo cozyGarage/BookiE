@@ -56,6 +56,7 @@ struct GridView {
     palette_index: usize,
     dark_mode: bool,
     tabs: Tabs,
+    tab_scroll: ScrollHandle,
     runs: Vec<Run>,
     run_edits: Vec<grid_edit::Edits>,
     active_run: usize,
@@ -202,6 +203,7 @@ impl GridView {
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
+            tab_scroll: ScrollHandle::new(),
             runs: vec![Run { number: 1, rows: total }],
             run_edits: vec![grid_edit::Edits::new()],
             active_run: 0,
@@ -313,6 +315,7 @@ impl GridView {
     }
 
     fn sync_grid_owner(&mut self) {
+        self.tab_scroll.scroll_to_item(self.tabs.active);
         let query = match self.tabs.current() {
             Tab::Query => true,
             Tab::Table(name) if name == DATA_TABLE => false,
@@ -811,7 +814,10 @@ impl GridView {
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
-            "home" => self.tabs.open_home(),
+            "home" => {
+                self.tabs.open_home();
+                self.sync_grid_owner();
+            }
             "query" => {
                 self.tabs.open_query();
                 self.sync_grid_owner();
