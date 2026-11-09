@@ -1,0 +1,18 @@
+# Ratchet ceilings for non-test lines that branch on an engine id (scripts/check-driver-id-branches.py).
+# Lower a count when you replace a branch with a driver capability. Do not raise one.
+apps/linux/app/src/ui/app/backup.rs 1
+apps/linux/app/src/ui/app/catalog_ddl.rs 1
+apps/linux/app/src/ui/app/sidebar_state.rs 1
+apps/linux/app/src/ui/browse_tab/grid_render.rs 5
+apps/linux/app/src/ui/browse_tab/mod.rs 1
+apps/linux/app/src/ui/connect_dialog/form.rs 2
+apps/linux/app/src/ui/connect_dialog/identity.rs 1
+apps/linux/app/src/ui/connection_row.rs 1
+apps/linux/app/src/ui/editor/completion_requests.rs 1
+apps/linux/app/src/ui/export_dialog.rs 1
+apps/linux/app/src/ui/structure_tab/columns.rs 2
+apps/linux/app/src/ui/structure_tab/fks.rs 2
+crates/app-services/src/browse_query/order.rs 1
+crates/app-services/src/browse_query.rs 5
+crates/app-services/src/catalog_changes.rs 1
+crates/app-services/src/database_backup.rs 1

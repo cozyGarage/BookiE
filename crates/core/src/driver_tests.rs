@@ -97,6 +97,10 @@ impl DatabaseDriver for DeclaredCapabilitiesDriver {
         &[crate::CatalogObjectKind::Routine]
     }
 
+    fn data_model(&self) -> DataModel {
+        DataModel::Document
+    }
+
     fn supports_integrated_auth(&self) -> bool {
         true
     }
@@ -131,6 +135,7 @@ fn the_static_capability_profile_reflects_driver_declarations() {
     let capabilities = DeclaredCapabilitiesDriver.capabilities();
 
     assert_eq!(capabilities.maturity, DriverMaturity::Experimental);
+    assert_eq!(capabilities.data_model, DataModel::Document);
     assert_eq!(capabilities.enum_input_style, EnumInputStyle::SqlQuotedLabel);
     assert!(capabilities.is_file_based);
     assert!(capabilities.ddl_is_transactional);

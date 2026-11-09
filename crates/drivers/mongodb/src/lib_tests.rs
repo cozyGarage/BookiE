@@ -283,3 +283,8 @@ async fn connection_option_errors_never_carry_the_password() {
     }
     assert!(failures >= 5, "the hostile cases must actually fail, got {failures}");
 }
+
+#[test]
+fn mongodb_declares_a_document_data_model() {
+    assert_eq!(MongodbDriver.capabilities().data_model, DataModel::Document);
+}

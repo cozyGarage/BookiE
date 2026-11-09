@@ -35,8 +35,17 @@ pub enum EnumInputStyle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DataModel {
+    #[default]
+    Relational,
+    KeyValue,
+    Document,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DriverCapabilities {
     pub maturity: DriverMaturity,
+    pub data_model: DataModel,
     pub enum_input_style: EnumInputStyle,
     pub is_file_based: bool,
     pub ddl_is_transactional: bool,
@@ -73,6 +82,7 @@ pub trait DatabaseDriver: Send + Sync {
     fn capabilities(&self) -> DriverCapabilities {
         DriverCapabilities {
             maturity: self.maturity(),
+            data_model: self.data_model(),
             enum_input_style: self.enum_input_style(),
             is_file_based: self.is_file_based(),
             ddl_is_transactional: self.ddl_is_transactional(),
@@ -95,6 +105,10 @@ pub trait DatabaseDriver: Send + Sync {
 
     fn maturity(&self) -> DriverMaturity {
         DriverMaturity::Stable
+    }
+
+    fn data_model(&self) -> DataModel {
+        DataModel::Relational
     }
 
     fn enum_input_style(&self) -> EnumInputStyle {

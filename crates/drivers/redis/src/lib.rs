@@ -7,7 +7,7 @@ use secrecy::ExposeSecret;
 use tokio::sync::Mutex;
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
+    ColumnInfo, ConnectOptions, Connection, DataModel, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
     error_chain_text, looks_like_tls_failure,
 };
@@ -28,6 +28,10 @@ impl DatabaseDriver for RedisDriver {
 
     fn maturity(&self) -> DriverMaturity {
         DriverMaturity::Experimental
+    }
+
+    fn data_model(&self) -> DataModel {
+        DataModel::KeyValue
     }
 
     fn default_port(&self) -> u16 {

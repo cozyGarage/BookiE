@@ -60,6 +60,9 @@ echo "==> panic sites in production code"
 echo "==> crate boundaries"
 python3 scripts/check-crate-boundaries.py
 
+echo "==> driver id branches"
+python3 scripts/check-driver-id-branches.py
+
 echo "==> function sizes"
 python3 scripts/check-function-size.py
 

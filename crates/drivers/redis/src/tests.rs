@@ -774,3 +774,8 @@ fn hash_fields_and_values_are_previewed_as_pairs_with_the_same_rule() {
         Value::Text(r#"[("name", "<hex:c3>"), ("<hex:80>", "v")]"#.into())
     );
 }
+
+#[test]
+fn redis_declares_a_key_value_data_model() {
+    assert_eq!(RedisDriver.capabilities().data_model, DataModel::KeyValue);
+}
