@@ -225,10 +225,10 @@ impl App {
         self.clear_closed_tabs_stack();
         self.connected_database = None;
         self.workspace_save_token = None;
-        if let Some(id) = self.connection_id.take() {
-            if self.window_state.borrow().last_connection_id == Some(id) {
-                self.set_last_connection_id(None, sender.clone());
-            }
+        if let Some(id) = self.connection_id.take()
+            && self.window_state.borrow().last_connection_id == Some(id)
+        {
+            self.set_last_connection_id(None, sender.clone());
         }
         self.clear_multi_session_state();
         self.current_driver_id = None;
