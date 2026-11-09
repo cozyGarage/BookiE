@@ -37,6 +37,7 @@ pub mod open_failure;
 pub mod ordered_refresh;
 pub mod preparation;
 pub mod read_scopes;
+pub mod read_session;
 pub mod recent_tabs;
 pub mod request_generation;
 pub mod request_ticket;
