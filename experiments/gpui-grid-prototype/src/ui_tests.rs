@@ -78,6 +78,26 @@ fn the_find_field_takes_typed_text_and_enter_runs_the_search(cx: &mut TestAppCon
 }
 
 #[gpui::test]
+fn changing_filter_text_discards_a_pending_filter(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.filter
+                .update(cx, |input, cx| input.set_content("label contains 7", cx));
+            view.apply_filter(cx);
+            view.filter
+                .update(cx, |input, cx| input.set_content("label contains 8", cx));
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(matches!(view.mode, crate::Mode::All));
+        assert_ne!(view.status, "Filtering…");
+    });
+}
+
+#[gpui::test]
 fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("down down right");

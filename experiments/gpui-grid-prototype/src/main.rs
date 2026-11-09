@@ -75,6 +75,7 @@ struct GridView {
     sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
+    filter_generation: u64,
     compare: Option<Diff>,
     status: String,
     selection: Option<Selection>,
@@ -146,10 +147,15 @@ impl GridView {
             InputEvent::Cancel => this.status.clear(),
         })
         .detach();
-        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| {
-            if *event == InputEvent::Submit {
-                this.apply_filter(cx);
+        cx.subscribe(&filter, |this, _, event: &InputEvent, cx| match event {
+            InputEvent::Changed => {
+                this.filter_generation += 1;
+                if this.status == "Filtering…" {
+                    this.status.clear();
+                }
             }
+            InputEvent::Submit => this.apply_filter(cx),
+            InputEvent::Cancel => {}
         })
         .detach();
         let editor = cx.new(|cx| TextInput::new("", cx));
@@ -217,6 +223,7 @@ impl GridView {
             sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
+            filter_generation: 0,
             compare: None,
             status: String::new(),
             selection: None,
@@ -493,11 +500,15 @@ impl GridView {
         };
         let source = self.source.clone();
         let label = format!("WHERE {}", self.filter.read(cx).content());
+        let filter_generation = self.filter_generation;
         self.status = "Filtering…".into();
         self.begin_background(
             cx,
             move || source.filter(&predicate),
             move |this, kept| {
+                if this.filter_generation != filter_generation {
+                    return;
+                }
                 this.set_mode(Mode::Filtered { kept, label });
                 this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
             },
