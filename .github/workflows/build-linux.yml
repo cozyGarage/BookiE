@@ -478,15 +478,18 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
           python3 scripts/ci-test-bundle.py verify reusable-builds/default "$BOOKIE_SOURCE_COMMIT"
-          chmod -R u+X reusable-builds/default/tests reusable-builds/default/bin
+          find reusable-builds/default/tests reusable-builds/default/bin -type f -exec chmod u+x {} +
       - name: Driver, socket and SSH integration
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
         run: |
           mkdir -p "$GITHUB_WORKSPACE/ci-tmp"
+          docker run --rm --entrypoint cat "$BOOKIE_BUILD_IMAGE" /etc/passwd > "$RUNNER_TEMP/bookie-integration-passwd"
+          printf 'bookie-ci:x:%s:%s:CI:%s:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" "$GITHUB_WORKSPACE/ci-tmp" >> "$RUNNER_TEMP/bookie-integration-passwd"
           docker run --rm --network host \
             --user "$(id -u):$(id -g)" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            --volume "$RUNNER_TEMP/bookie-integration-passwd:/etc/passwd:ro" \
             --volume /var/run/docker.sock:/var/run/docker.sock \
             --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
             --volume "$HOME/.docker:/docker:ro" \
