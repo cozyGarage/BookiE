@@ -1,6 +1,29 @@
 use super::*;
 
 #[test]
+fn oversized_keys_do_not_escape_the_retained_plan_budget() {
+    let query = ReplaceQuery {
+        needle: "a".into(),
+        options: Default::default(),
+        column: None,
+    };
+    let value = Value::Text("a".into());
+    let result = plan_replacements(
+        17,
+        |_, visit| visit(0, &value),
+        |_| Some(vec![Value::Text("k".repeat(1024 * 1024))]),
+        ReplaceRequest {
+            query: &query,
+            replacement: "b",
+            editable: &[true],
+        },
+        &CancellationToken::new(),
+        |_| String::new(),
+    );
+    assert!(matches!(result, Err(ReplaceError::Budget)));
+}
+
+#[test]
 fn cancellation_returns_no_plan() {
     let query = ReplaceQuery {
         needle: "a".into(),

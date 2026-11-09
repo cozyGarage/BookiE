@@ -67,7 +67,8 @@ pub fn plan_replacements(
         if cancel.is_cancelled() {
             return Err(ReplaceError::Cancelled);
         }
-        let Some(row_key) = row_key_at(position) else {
+        let Some(row_key) = row_key_at(position).filter(|key| !crate::change_tracker::pk_values_are_unreadable(key))
+        else {
             report.skipped = report.skipped.saturating_add(1);
             continue;
         };
@@ -161,10 +162,13 @@ impl ReplaceReport {
         row_key: &[Value],
         output_bytes: &mut usize,
     ) -> Result<(), ReplaceError> {
-        if text.len() > (16 * 1024 * 1024usize).saturating_sub(*output_bytes) || self.edits.len() >= 10_000 {
+        let retained = retained_key_bytes(row_key)
+            .saturating_add(text.len())
+            .saturating_add(std::mem::size_of::<ReplaceEdit>());
+        if retained > (16 * 1024 * 1024usize).saturating_sub(*output_bytes) || self.edits.len() >= 10_000 {
             return Err(ReplaceError::Budget);
         }
-        *output_bytes += text.len();
+        *output_bytes += retained;
         self.replacements = self.replacements.saturating_add(count);
         self.edits.push(ReplaceEdit {
             position,
@@ -174,4 +178,30 @@ impl ReplaceReport {
         });
         Ok(())
     }
+}
+
+fn retained_key_bytes(key: &[Value]) -> usize {
+    key.iter().fold(0usize, |total, value| {
+        let heap = match value {
+            Value::Text(text) | Value::JsonText(text) | Value::Undecodable(text) => text.len(),
+            Value::Bytes(bytes) => bytes.len(),
+            Value::Json(value) => json_bytes(value),
+            _ => 0,
+        };
+        total.saturating_add(heap).saturating_add(std::mem::size_of::<Value>())
+    })
+}
+
+fn json_bytes(value: &serde_json::Value) -> usize {
+    let heap = match value {
+        serde_json::Value::String(text) => text.len(),
+        serde_json::Value::Array(values) => values
+            .iter()
+            .fold(0usize, |sum, value| sum.saturating_add(json_bytes(value))),
+        serde_json::Value::Object(values) => values.iter().fold(0usize, |sum, (key, value)| {
+            sum.saturating_add(key.len()).saturating_add(json_bytes(value))
+        }),
+        _ => 0,
+    };
+    heap.saturating_add(std::mem::size_of::<serde_json::Value>())
 }
