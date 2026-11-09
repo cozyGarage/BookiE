@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -36,13 +38,12 @@ impl OpenSessionsRecord {
     }
 
     pub fn sanitized(self) -> Self {
-        let mut seen = Vec::new();
+        let mut seen = HashSet::new();
         let mut windows = Vec::with_capacity(self.windows.len());
         for window in self.windows {
             let mut keys = Vec::with_capacity(window.len());
             for key in window {
-                if !seen.contains(&key) {
-                    seen.push(key);
+                if seen.insert(key) {
                     keys.push(key);
                 }
             }
@@ -80,5 +81,6 @@ pub fn parse_open_sessions(bytes: &[u8]) -> OpenSessionsLoad {
 }
 
 pub fn restore_window_keys(keys: &[Uuid], available: &[Uuid]) -> Vec<Uuid> {
+    let available = available.iter().copied().collect::<HashSet<_>>();
     keys.iter().copied().filter(|key| available.contains(key)).collect()
 }
