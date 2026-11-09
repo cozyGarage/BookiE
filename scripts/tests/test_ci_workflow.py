@@ -687,6 +687,16 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("chmod 0755 target/gtk-safety/bookie", gtk_safety)
         self.assertIn("BOOKIE_GTK_BINARY: target/gtk-safety/bookie", gtk_safety)
 
+    def test_gtk_safety_installs_pinned_rust_before_keyring_tests(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
+        toolchain_action = "uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772"
+        keyring_step = "name: Secret Service round-trip"
+
+        self.assertIn(toolchain_action, gtk_safety)
+        self.assertIn("toolchain: 1.98", gtk_safety)
+        self.assertLess(gtk_safety.index(toolchain_action), gtk_safety.index(keyring_step))
+
     def test_postgres_release_runs_on_the_supported_gtk_floor_with_host_docker(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         release = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
