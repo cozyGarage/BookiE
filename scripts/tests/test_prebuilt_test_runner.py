@@ -48,6 +48,12 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_SHA": "b" * 40, "BOOKIE_SOURCE_COMMIT": "a" * 40}, clear=True):
             self.assertEqual(len(runner.commands(self.root, ["-p", "sample", "--test", "integration"])), 1)
 
+    def test_bundle_preparation_rejects_a_different_checkout(self):
+        result = subprocess.run(['bash', str(ROOT / 'scripts/prepare-test-bundle.sh'), '0' * 40, 'default'],
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('differs from the checkout', result.stderr)
+
     def test_executable_cannot_escape_the_verified_bundle(self):
         self.index["tests"][0]["path"] = "../outside"
         (self.root / "index.json").write_text(json.dumps(self.index))
