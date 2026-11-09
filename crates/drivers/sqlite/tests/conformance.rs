@@ -15,7 +15,7 @@ impl conformance::ConformanceEngine for Sqlite {
 
     const FILE_BASED: bool = true;
 
-    fn prepare(path: &std::path::Path) {
+    async fn prepare(path: &std::path::Path) {
         std::fs::File::create(path).expect("create the database file");
     }
 }
