@@ -19,6 +19,13 @@ fn write_refusal(app: &App) -> Option<String> {
     None
 }
 
+fn drop_schema_confirmation_body(driver_id: &str) -> String {
+    if driver_id == "mssql" {
+        return crate::tr!("The schema must be empty before it can be dropped.");
+    }
+    crate::tr!("All objects in this schema will be removed. This can't be undone from inside BookiE.")
+}
+
 fn run_catalog_sql(
     app: &App,
     origin: CatalogOrigin,
@@ -167,7 +174,7 @@ impl App {
             return;
         }
         let title = crate::tr!("Drop {schema}?").replace("{schema}", &schema);
-        let body = crate::tr!("All objects in this schema will be removed. This can't be undone from inside BookiE.");
+        let body = drop_schema_confirmation_body(driver_id);
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
         dialog.add_response("cancel", &crate::tr!("Cancel"));
         dialog.add_response("drop", &crate::tr!("Drop"));
@@ -380,7 +387,19 @@ pub(crate) fn droppable_database(name: &str, current: &str, driver_id: &str) -> 
 
 #[cfg(test)]
 mod tests {
-    use super::droppable_database;
+    use super::{drop_schema_confirmation_body, droppable_database};
+
+    #[test]
+    fn schema_drop_confirmation_matches_engine_behavior() {
+        assert_eq!(
+            drop_schema_confirmation_body("mssql"),
+            "The schema must be empty before it can be dropped."
+        );
+        assert_eq!(
+            drop_schema_confirmation_body("duckdb"),
+            "All objects in this schema will be removed. This can't be undone from inside BookiE."
+        );
+    }
 
     #[test]
     fn the_current_and_system_databases_are_not_offered_for_drop() {
