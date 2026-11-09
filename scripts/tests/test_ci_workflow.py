@@ -23,6 +23,13 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_runs_gpui_model_and_interaction_tests(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("timeout-minutes:", job)
+        self.assertIn("cargo test --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked", job)
+        self.assertNotIn("--lib", job)
+
     def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", workflow, re.M | re.S).group(1)
