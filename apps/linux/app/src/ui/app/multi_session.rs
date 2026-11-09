@@ -4,6 +4,7 @@ use bookie_app_services::window_sessions::{GuardedSessionMap, WindowSessions};
 use bookie_core::TableInfo;
 use bookie_policy::Principal;
 use relm4::ComponentSender;
+use relm4::adw::prelude::*;
 use uuid::Uuid;
 
 use super::types::read_workspace_tab_id;
