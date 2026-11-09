@@ -54,6 +54,13 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('differs from the checkout', result.stderr)
 
+    def test_bundle_builder_rejects_a_different_checkout(self):
+        result = subprocess.run(['bash', str(ROOT / 'scripts/build-test-bundles.sh'), str(self.root / 'out')],
+                                env={**os.environ, 'BOOKIE_SOURCE_COMMIT': '0' * 40}, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('differs from the checkout', result.stderr)
+        self.assertFalse((self.root / 'out').exists())
+
     def test_executable_cannot_escape_the_verified_bundle(self):
         self.index["tests"][0]["path"] = "../outside"
         (self.root / "index.json").write_text(json.dumps(self.index))
