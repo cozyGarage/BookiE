@@ -554,7 +554,7 @@ impl GridView {
                     .hover(move |style| style.bg(rgb(theme.accent)))
             };
             tab.on_click(cx.listener(move |this, _, _, cx| {
-                this.activate_run(index);
+                this.select_run(index);
                 cx.notify();
             }))
         });
