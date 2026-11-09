@@ -4,6 +4,7 @@ members = [
     "apps/linux/app",
     "crates/app-services",
     "crates/core",
+    "crates/registry",
     "crates/policy",
     "crates/results",
     "tests/release",

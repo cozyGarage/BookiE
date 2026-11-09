@@ -42,8 +42,9 @@ ALLOWED = {
     "bookie-mcp": {"bookie-core", "bookie-policy", "bookie-storage"},
     "bookie-agentd": {
         "bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage", "bookie-transport",
-        "bookie-mcp", *DRIVERS,
+        "bookie-mcp", "bookie-driver-registry", *DRIVERS,
     },
+    "bookie-driver-registry": {"bookie-core", *DRIVERS},
     **{driver: {"bookie-core"} for driver in DRIVERS},
 }
 
@@ -76,7 +77,7 @@ def check(metadata):
     return problems
 
 
-EXPERIMENT_ALLOWED = {"bookie-core", "bookie-results", "bookie-app-services"}
+EXPERIMENT_ALLOWED = {"bookie-core", "bookie-results", "bookie-app-services", "bookie-driver-registry"}
 
 
 def experiment_problems(experiments):

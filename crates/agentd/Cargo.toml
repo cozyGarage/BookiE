@@ -25,6 +25,7 @@ bookie-ssh = { path = "../ssh" }
 bookie-storage = { path = "../storage" }
 bookie-transport = { path = "../transport" }
 bookie-mcp = { path = "../mcp" }
+bookie-driver-registry = { path = "../registry" }
 bookie-driver-clickhouse = { path = "../drivers/clickhouse" }
 bookie-driver-duckdb = { path = "../drivers/duckdb" }
 bookie-driver-mongodb = { path = "../drivers/mongodb" }

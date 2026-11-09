@@ -23,6 +23,7 @@ bookie-app-services = { path = "../../../crates/app-services" }
 bookie-core = { path = "../../../crates/core" }
 bookie-policy = { path = "../../../crates/policy" }
 bookie-mcp = { path = "../../../crates/mcp" }
+bookie-driver-registry = { path = "../../../crates/registry" }
 bookie-driver-clickhouse = { path = "../../../crates/drivers/clickhouse" }
 bookie-driver-duckdb = { path = "../../../crates/drivers/duckdb" }
 bookie-driver-mongodb = { path = "../../../crates/drivers/mongodb" }
