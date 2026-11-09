@@ -50,6 +50,7 @@ bookie-driver-sqlite = { path = "../drivers/sqlite" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres", "mysql", "mssql_server"] }
 tokio = { workspace = true, features = ["test-util", "macros", "rt-multi-thread"] }
+bookie-app-services = { path = ".", features = ["test-support"] }
 
 [features]
 # Constructors for frontends' tests: an isolated service with a temporary audit journal.
