@@ -432,10 +432,10 @@ mod tests {
     #[ignore = "requires isolated GTK display"]
     fn local_text_sort_follows_the_locale_collation_not_byte_order() {
         let set = unsafe { libc::setlocale(libc::LC_ALL, c"en_US.UTF-8".as_ptr()) };
-        if set.is_null() {
-            eprintln!("en_US.UTF-8 is not installed; skipping");
-            return;
-        }
+        assert!(
+            !set.is_null(),
+            "generate en_US.UTF-8 before running the isolated locale-sort test"
+        );
         let result = result(vec![
             Value::Text("Zebra".into()),
             Value::Text("éclair".into()),
