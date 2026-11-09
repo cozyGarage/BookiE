@@ -9,9 +9,15 @@ use bookie_results::text_match::TextMatchOptions;
 use tokio_util::sync::CancellationToken;
 
 use crate::core_bridge::{cell_to_value, column_infos, value_to_cell};
-use crate::model::{Cell, Column, Diff, FindResult, Op, PAGE_ROWS, Predicate, build_diff, row_at};
+use crate::model::{
+    Cell, ColumnMeta, Diff, FindResult, Op, PAGE_ROWS, Predicate, build_diff, row_at, synthetic_columns,
+};
 
 pub trait ResultSource: Send + Sync + 'static {
+    fn columns(&self) -> &[ColumnMeta];
+    fn editable(&self) -> bool {
+        false
+    }
     fn total(&self) -> u64;
     fn row(&self, index: u64) -> Vec<Cell>;
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str>;
@@ -25,6 +31,7 @@ pub const MAX_QUERY_BYTES: usize = 256;
 
 pub struct Synthetic {
     total: u64,
+    columns: Vec<ColumnMeta>,
     scan: Mutex<Option<ScanSource>>,
 }
 
@@ -32,6 +39,7 @@ impl Synthetic {
     pub fn new(total: u64) -> Self {
         Self {
             total,
+            columns: synthetic_columns(),
             scan: Mutex::new(None),
         }
     }
@@ -109,6 +117,14 @@ fn display_equals(value: Option<&Value>, normalized_text: &str) -> Option<bool> 
 }
 
 impl ResultSource for Synthetic {
+    fn columns(&self) -> &[ColumnMeta] {
+        &self.columns
+    }
+
+    fn editable(&self) -> bool {
+        true
+    }
+
     fn total(&self) -> u64 {
         self.total
     }
@@ -147,10 +163,7 @@ impl ResultSource for Synthetic {
 
     fn filter(&self, predicate: &Predicate, cancel: &CancellationToken) -> Result<Vec<u32>, &'static str> {
         let scan = self.scan(cancel)?;
-        let column = Column::ALL
-            .iter()
-            .position(|column| *column == predicate.column)
-            .unwrap_or(0);
+        let column = predicate.column;
         let normalized_text = predicate.text.to_lowercase();
         let prepared = if predicate.op == Op::Contains {
             Some(

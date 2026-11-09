@@ -5,14 +5,16 @@ use std::sync::Arc;
 use bookie_app_services::database_service::DatabaseService;
 use bookie_app_services::driver_error_presentation::DriverFailurePresentation;
 use bookie_app_services::read_session::ReadSession;
-use bookie_core::{AuthMode, ConnectOptions, DatabaseDriver, DriverRegistry, Environment, TableInfo, Value};
+use bookie_core::{
+    AuthMode, ConnectOptions, DatabaseDriver, DriverRegistry, Environment, OperationControl, TableInfo, Value,
+};
 use bookie_storage::SavedConnection;
 use uuid::Uuid;
 
-fn saved(path: &std::path::Path) -> SavedConnection {
+fn saved(path: &std::path::Path, id: Uuid) -> SavedConnection {
     SavedConnection {
         auth_source: None,
-        id: Uuid::new_v4(),
+        id,
         name: "session".into(),
         driver_id: "sqlite".into(),
         host: String::new(),
@@ -57,16 +59,12 @@ async fn seeded(path: &std::path::Path) {
     writer.close().await.unwrap();
 }
 
-async fn session(path: &std::path::Path) -> ReadSession {
+async fn session(path: &std::path::Path, id: Uuid, database: Arc<DatabaseService>) -> ReadSession {
     let mut registry = DriverRegistry::new();
     registry.register(Arc::new(drivers_sqlite::SqliteDriver));
-    ReadSession::open(
-        saved(path),
-        Arc::new(registry),
-        Arc::new(DatabaseService::new_isolated()),
-    )
-    .await
-    .expect("open")
+    ReadSession::open(saved(path, id), Arc::new(registry), database)
+        .await
+        .expect("open")
 }
 
 #[tokio::test]
@@ -74,7 +72,9 @@ async fn a_session_lists_tables_and_reads_typed_pages() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
     seeded(&path).await;
-    let session = session(&path).await;
+    let id = Uuid::new_v4();
+    let database = Arc::new(DatabaseService::new_isolated());
+    let session = session(&path, id, database.clone()).await;
 
     let items = session
         .tables
@@ -82,11 +82,50 @@ async fn a_session_lists_tables_and_reads_typed_pages() {
         .find(|table| table.name == "items")
         .expect("items table")
         .clone();
-    let first = session.read_page(&items, 0, 2).await.expect("first page");
-    let last = session.read_page(&items, 2, 2).await.expect("last page");
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let first = session.read_page(&items, 0, 2, &control).await.expect("first page");
+    let last = session.read_page(&items, 2, 2, &control).await.expect("last page");
     assert_eq!(first.rows.len(), 2);
     assert_eq!(last.rows.len(), 1);
     assert_eq!(last.rows.iter().next().map(|row| row[1].clone()), Some(Value::Null));
+}
+
+#[tokio::test]
+async fn a_cancelled_page_read_returns_cancelled() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let id = Uuid::new_v4();
+    let database = Arc::new(DatabaseService::new_isolated());
+    let session = session(&path, id, database).await;
+    let items = session
+        .tables
+        .iter()
+        .find(|table| table.name == "items")
+        .expect("items table");
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    cancellation.cancel();
+    let control = OperationControl::new(cancellation, None);
+
+    assert!(matches!(
+        session.read_page(items, 0, 2, &control).await,
+        Err(DriverFailurePresentation::Cancelled)
+    ));
+}
+
+#[tokio::test]
+async fn dropping_a_session_removes_its_connection() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let id = Uuid::new_v4();
+    let database = Arc::new(DatabaseService::new_isolated());
+    let session = session(&path, id, database.clone()).await;
+    assert!(database.is_active(id));
+
+    drop(session);
+
+    assert!(!database.is_active(id));
 }
 
 #[tokio::test]
@@ -94,13 +133,15 @@ async fn a_missing_table_is_a_typed_query_failure() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("session.db");
     seeded(&path).await;
-    let session = session(&path).await;
+    let id = Uuid::new_v4();
+    let session = session(&path, id, Arc::new(DatabaseService::new_isolated())).await;
 
     let missing = TableInfo {
         schema: None,
         name: "nope".into(),
     };
-    let failure = session.read_page(&missing, 0, 10).await.unwrap_err();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let failure = session.read_page(&missing, 0, 10, &control).await.unwrap_err();
     assert!(
         matches!(failure, DriverFailurePresentation::Query { .. }),
         "{failure:?}"

@@ -124,50 +124,36 @@ pub fn row_at(index: u64) -> Vec<Cell> {
     cells_of(index, &label_of(index))
 }
 
-pub fn column_text(index: u64, column: Column) -> Option<String> {
+pub fn column_text(index: u64, column: usize) -> Option<String> {
     match column {
-        Column::Value => Some(value_of(index).to_string()),
-        Column::Label => Some(label_of(index)),
-        Column::State => match state_of(index) {
+        0 => Some(value_of(index).to_string()),
+        1 => Some(label_of(index)),
+        2 => match state_of(index) {
             Cell::Bool(flag) => Some(flag.to_string()),
             _ => None,
         },
-        Column::Typed => match typed_of(index) {
+        3 => match typed_of(index) {
             Cell::Null => None,
             cell => Some(cell.display()),
         },
+        _ => None,
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Column {
-    Value,
-    Label,
-    State,
-    Typed,
+#[derive(Debug, Clone, PartialEq)]
+pub struct ColumnMeta {
+    pub name: String,
+    pub width: f32,
 }
 
-impl Column {
-    pub const ALL: [Column; 4] = [Column::Value, Column::Label, Column::State, Column::Typed];
-
-    pub fn parse(name: &str) -> Option<Column> {
-        match name {
-            "value" => Some(Column::Value),
-            "label" => Some(Column::Label),
-            "state" => Some(Column::State),
-            "typed" => Some(Column::Typed),
-            _ => None,
-        }
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Column::Value => "value",
-            Column::Label => "label",
-            Column::State => "state",
-            Column::Typed => "typed",
-        }
-    }
+pub fn synthetic_columns() -> Vec<ColumnMeta> {
+    [("value", 240.0), ("label", 280.0), ("state", 120.0), ("typed", 320.0)]
+        .into_iter()
+        .map(|(name, width)| ColumnMeta {
+            name: name.into(),
+            width,
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -190,14 +176,18 @@ impl Op {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Predicate {
-    pub column: Column,
+    pub column: usize,
     pub op: Op,
     pub text: String,
 }
 
-pub fn parse_predicate(input: &str) -> Result<Predicate, &'static str> {
+pub fn parse_predicate(input: &str, columns: &[ColumnMeta]) -> Result<Predicate, &'static str> {
     let mut parts = input.trim().splitn(3, ' ');
-    let column = parts.next().and_then(Column::parse).ok_or("invalid filter")?;
+    let name = parts.next().ok_or("invalid filter")?;
+    let column = columns
+        .iter()
+        .position(|column| column.name.eq_ignore_ascii_case(name))
+        .ok_or("invalid filter")?;
     let op = parts.next().and_then(Op::parse).ok_or("invalid filter")?;
     let text = parts.next().unwrap_or("").trim();
     if text.is_empty() || text.len() > 256 {

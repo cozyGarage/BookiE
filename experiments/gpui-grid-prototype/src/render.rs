@@ -158,10 +158,13 @@ impl Render for GridView {
             .font_weight(gpui::FontWeight::SEMIBOLD)
             .text_color(rgb(theme.muted_foreground))
             .child(fixed_cell(GUTTER_WIDTH, "#".into()))
-            .child(header_cell(self.cell_cursor, 0, CELL_WIDTHS[0], "value", theme))
-            .child(header_cell(self.cell_cursor, 1, CELL_WIDTHS[1], "label", theme))
-            .child(header_cell(self.cell_cursor, 2, CELL_WIDTHS[2], "state", theme))
-            .child(header_cell(self.cell_cursor, 3, CELL_WIDTHS[3], "typed", theme));
+            .children(
+                self.source
+                    .columns()
+                    .iter()
+                    .enumerate()
+                    .map(|(index, column)| header_cell(self.cell_cursor, index, column.width, &column.name, theme)),
+            );
         let list = uniform_list(
             "rows",
             self.visible_count(),
@@ -295,10 +298,13 @@ impl GridView {
             return row_div(position % 2 == 1, false, theme)
                 .id(position)
                 .child(fixed_cell(70.0, row.change.to_string()))
-                .child(display_cell(CELL_WIDTHS[0], &row.cells[0]))
-                .child(display_cell(CELL_WIDTHS[1], &row.cells[1]))
-                .child(display_cell(CELL_WIDTHS[2], &row.cells[2]))
-                .child(display_cell(CELL_WIDTHS[3], &row.cells[3]));
+                .children(
+                    self.source
+                        .columns()
+                        .iter()
+                        .zip(&row.cells)
+                        .map(|(column, cell)| display_cell(column.width, cell)),
+                );
         }
         let dataset_index = self.base() + position as u64;
         let source = self.source_row(dataset_index);
@@ -321,9 +327,11 @@ impl GridView {
                     .justify_end()
                     .text_color(rgb(theme.muted_foreground)),
             )
-            .child(self.data_cell(source, 0, position, &cells[0], cx))
-            .child(self.data_cell(source, 1, position, &cells[1], cx))
-            .child(self.data_cell(source, 2, position, &cells[2], cx))
-            .child(self.data_cell(source, 3, position, &cells[3], cx))
+            .children(
+                cells
+                    .iter()
+                    .enumerate()
+                    .map(|(column, cell)| self.data_cell(source, column, position, cell, cx)),
+            )
     }
 }

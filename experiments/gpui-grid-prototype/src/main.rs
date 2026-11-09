@@ -30,7 +30,6 @@ use ui_theme::ThemeExt;
 const ROW_HEIGHT: f32 = 26.0;
 const HEADER_HEIGHT: f32 = 28.0;
 pub const GUTTER_WIDTH: f32 = 56.0;
-pub const CELL_WIDTHS: [f32; 4] = [240.0, 280.0, 120.0, 320.0];
 
 enum Mode {
     All,
@@ -547,7 +546,7 @@ impl GridView {
         if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
             return;
         }
-        let predicate = match parse_predicate(self.filter.read(cx).content()) {
+        let predicate = match parse_predicate(self.filter.read(cx).content(), self.source.columns()) {
             Ok(predicate) => predicate,
             Err(message) => {
                 self.status = message.into();
@@ -681,7 +680,14 @@ impl GridView {
                 }));
             }
             _ => {
-                let Some(next) = move_cursor(self.cell_cursor, key, rows, self.viewport_rows, ctrl) else {
+                let Some(next) = move_cursor(
+                    self.cell_cursor,
+                    key,
+                    rows,
+                    self.source.columns().len(),
+                    self.viewport_rows,
+                    ctrl,
+                ) else {
                     return;
                 };
                 self.place_cursor(Some(next));
@@ -719,7 +725,11 @@ impl GridView {
             ScrollStrategy::Bottom
         };
         self.scroll.scroll_to_item(cursor.row, strategy);
-        self.status = cursor.label();
+        self.status = cursor.label(&self.column_names());
+    }
+
+    fn column_names(&self) -> Vec<String> {
+        self.source.columns().iter().map(|column| column.name.clone()).collect()
     }
 
     fn palette_actions(&self) -> Vec<Action> {
