@@ -91,6 +91,7 @@ pub(super) struct ColumnSpec {
     pub(super) sort_enabled: bool,
     pub(super) default_min_width: Option<i32>,
     pub(super) column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    pub(super) display_columns: Arc<[ColumnInfo]>,
 }
 
 pub(super) fn build_column(
@@ -107,6 +108,7 @@ pub(super) fn build_column(
         sort_enabled,
         default_min_width,
         column_widths,
+        display_columns,
     } = spec;
     let factory = gtk4::SignalListItemFactory::new();
     let edit_sender = if editable { sender.clone() } else { None };
@@ -145,6 +147,7 @@ pub(super) fn build_column(
     let column_info = info.clone();
     let column_is_editable = is_cell_editable(info);
     let tab_ctx_for_bind = tab_ctx.clone();
+    let display_columns_for_bind = display_columns.clone();
     let row_positions = Rc::new(std::cell::RefCell::new(std::collections::HashMap::new()));
     let positions_for_bind = row_positions.clone();
     factory.connect_bind(move |_, item| {
@@ -165,6 +168,7 @@ pub(super) fn build_column(
             item,
             &row,
             &tab_ctx_for_bind,
+            &display_columns_for_bind,
             BoundColumn {
                 index: idx,
                 editable: editable_for_bind,
@@ -283,6 +287,7 @@ fn bind_row_cell(
     item: &gtk4::ListItem,
     row: &crate::ui::row_object::RowObject,
     context: &TabGridContext,
+    display_columns: &[ColumnInfo],
     bound: BoundColumn<'_>,
 ) {
     let BoundColumn {
@@ -335,6 +340,7 @@ fn bind_row_cell(
             },
             row,
             highlight_rules,
+            display_columns,
         );
         if let Some(child) = item.child() {
             mark_ambiguous_key(&child, ambiguous);
@@ -453,6 +459,7 @@ fn bind_cell(
     binding: CellBinding<'_>,
     row: &crate::ui::row_object::RowObject,
     highlight_rules: &[bookie_app_services::highlight_match::PreparedHighlightRule],
+    display_columns: &[ColumnInfo],
 ) {
     let is_null = view.is_null;
     let inline_editable = binding.editable && view.inline_editable;
@@ -463,6 +470,7 @@ fn bind_cell(
         text.as_ref(),
         is_null,
         row,
+        display_columns,
     );
     let Some(child) = item.child() else { return };
     if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
