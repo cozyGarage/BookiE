@@ -386,7 +386,7 @@ impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
         bookie_gpui_grid_prototype::source::ResultSource::find(&Tiny, query, cap)
     }
 
-    fn filter(&self, predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Vec<u32> {
+    fn filter(&self, predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Result<Vec<u32>, &'static str> {
         bookie_gpui_grid_prototype::source::ResultSource::filter(&Tiny, predicate)
     }
 
@@ -552,8 +552,8 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         })
     }
 
-    fn filter(&self, _predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Vec<u32> {
-        vec![1]
+    fn filter(&self, _predicate: &bookie_gpui_grid_prototype::model::Predicate) -> Result<Vec<u32>, &'static str> {
+        Ok(vec![1])
     }
 
     fn compare(&self, keyed: bool) -> bookie_gpui_grid_prototype::model::Diff {

@@ -135,7 +135,7 @@ impl Focusable for GridView {
 
 impl GridView {
     fn new(total: u64, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        Self::with_source(std::sync::Arc::new(Synthetic { total }), started, window, cx)
+        Self::with_source(std::sync::Arc::new(Synthetic::new(total)), started, window, cx)
     }
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -409,7 +409,7 @@ impl GridView {
         self.edits = std::mem::take(&mut self.run_edits[index]);
         self.editing = None;
         self.active_run = index;
-        self.source = std::sync::Arc::new(Synthetic { total: run.rows });
+        self.source = std::sync::Arc::new(Synthetic::new(run.rows));
         self.compare = None;
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
@@ -563,6 +563,13 @@ impl GridView {
                 if this.filter_generation != filter_generation {
                     return;
                 }
+                let kept = match kept {
+                    Ok(kept) => kept,
+                    Err(message) => {
+                        this.status = message.into();
+                        return;
+                    }
+                };
                 this.set_mode(Mode::Filtered { kept, label });
                 this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
             },

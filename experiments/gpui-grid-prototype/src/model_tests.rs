@@ -1,4 +1,5 @@
 use super::model::*;
+use super::source::{ResultSource, Synthetic};
 
 #[test]
 fn row_count_selection_accepts_only_the_three_sizes() {
@@ -33,7 +34,7 @@ fn integers_beyond_the_float_range_keep_every_digit() {
 
 #[test]
 fn find_matches_any_column_case_insensitively_and_reports_the_scan() {
-    let found = find_rows(150_000, "sample 14999", 10_000).unwrap();
+    let found = Synthetic::new(150_000).find("sample 14999", 10_000).unwrap();
     assert_eq!(found.matches.first(), Some(&14_999));
     assert!(found.matches.contains(&149_990));
     assert!(!found.capped);
@@ -42,7 +43,7 @@ fn find_matches_any_column_case_insensitively_and_reports_the_scan() {
 
 #[test]
 fn find_stops_at_the_cap_and_says_so() {
-    let found = find_rows(150_000, "sample", 100).unwrap();
+    let found = Synthetic::new(150_000).find("sample", 100).unwrap();
     assert_eq!(found.matches.len(), 100);
     assert!(found.capped);
     assert_eq!(found.scanned, 101);
@@ -50,29 +51,25 @@ fn find_stops_at_the_cap_and_says_so() {
 
 #[test]
 fn find_refuses_bad_requests() {
-    assert!(find_rows(10, "", 5).is_err());
-    assert!(find_rows(10, "x", 0).is_err());
-    assert!(find_rows(10, "x", MAX_FIND_MATCHES + 1).is_err());
-    assert!(find_rows(10, &"x".repeat(257), 5).is_err());
+    assert!(Synthetic::new(10).find("", 5).is_err());
+    assert!(Synthetic::new(10).find("x", 0).is_err());
+    assert!(Synthetic::new(10).find("x", MAX_FIND_MATCHES + 1).is_err());
+    assert!(Synthetic::new(10).find(&"x".repeat(257), 5).is_err());
 }
 
 #[test]
 fn null_never_matches_text_but_not_equals_keeps_it() {
+    let source = Synthetic::new(6);
     let equals = parse_predicate("state = true").unwrap();
-    assert!(matches_predicate(2, &equals));
-    assert!(!matches_predicate(0, &equals));
+    assert_eq!(source.filter(&equals), Ok(vec![2, 4]));
     let not_equals = parse_predicate("state != true").unwrap();
-    assert!(matches_predicate(0, &not_equals));
-    assert!(matches_predicate(1, &not_equals));
-    assert!(!matches_predicate(2, &not_equals));
+    assert_eq!(source.filter(&not_equals), Ok(vec![0, 1, 3, 5]));
 }
 
 #[test]
 fn filtering_keeps_the_exact_typed_integer_text() {
     let predicate = parse_predicate("value != 9007199254740993").unwrap();
-    assert!(!matches_predicate(0, &predicate));
-    assert!(matches_predicate(1, &predicate));
-    let kept = filter_rows(10, &predicate);
+    let kept = Synthetic::new(10).filter(&predicate).unwrap();
     assert_eq!(kept.len(), 9);
     assert_eq!(kept[0], 1);
 }
@@ -222,18 +219,18 @@ fn bytes_float_and_undecodable_render_by_their_own_rules() {
 #[test]
 fn a_filter_and_find_can_target_the_typed_column() {
     let predicate = parse_predicate("typed contains deadbeef").unwrap();
-    let hits = filter_rows(150_000, &predicate);
+    let hits = Synthetic::new(150_000).filter(&predicate).unwrap();
     assert_eq!(hits.first().copied(), Some(1));
     assert!(hits.iter().all(|row| u64::from(*row) % TYPED_KINDS == 1));
     let not_undecodable = parse_predicate("typed != <undecodable numeric(40,20)>").unwrap();
-    assert_eq!(filter_rows(24, &not_undecodable).len(), 22);
-    let found = find_rows(150_000, "numeric(40,20)", 3).unwrap();
-    assert_eq!(found.matches, vec![10, 22, 34]);
+    assert_eq!(Synthetic::new(24).filter(&not_undecodable).map(|kept| kept.len()), Ok(22));
+    let found = Synthetic::new(150_000).find("numeric(40,20)", 3).unwrap();
+    assert!(found.matches.is_empty(), "undecodable cells are not searchable");
 }
 
 #[test]
 fn only_the_typed_json_value_contains_the_word_null_and_a_null_cell_never_matches() {
-    let found = find_rows(150_000, "null", 10).unwrap();
+    let found = Synthetic::new(150_000).find("null", 10).unwrap();
     assert!(!found.matches.is_empty());
     assert!(
         found.matches.iter().all(|row| row % TYPED_KINDS == 8),

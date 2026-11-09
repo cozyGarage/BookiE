@@ -1,19 +1,105 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
-use crate::model::{Cell, Diff, FindResult, Predicate, build_diff, filter_rows, find_rows, row_at};
+use bookie_core::import::{ColumnKind, parse_cell};
+use bookie_core::{ColumnInfo, QueryResult, QueryRows, Value};
+use bookie_results::result_find::{FindError, find_matches};
+use bookie_results::result_predicate::{ColumnScope, ResultPredicate};
+use bookie_results::result_scan::{ScanProgress, ScanSource, scan_pages};
+use bookie_results::stream_result_spool::StreamResultSpoolManager;
+use bookie_results::text_match::TextMatchOptions;
+use tokio_util::sync::CancellationToken;
+
+use crate::core_bridge::{cell_to_value, column_infos};
+use crate::model::{Cell, Column, Diff, FindResult, Op, PAGE_ROWS, Predicate, build_diff, row_at};
 
 pub trait ResultSource: Send + Sync + 'static {
     fn total(&self) -> u64;
     fn row(&self, index: u64) -> Vec<Cell>;
     fn find(&self, query: &str, cap: usize) -> Result<FindResult, &'static str>;
-    fn filter(&self, predicate: &Predicate) -> Vec<u32>;
+    fn filter(&self, predicate: &Predicate) -> Result<Vec<u32>, &'static str>;
     fn compare(&self, keyed: bool) -> Diff;
 }
 
 pub type Source = Arc<dyn ResultSource>;
 
+pub const MAX_QUERY_BYTES: usize = 256;
+
 pub struct Synthetic {
-    pub total: u64,
+    total: u64,
+    scan: OnceLock<Result<ScanSource, &'static str>>,
+}
+
+impl Synthetic {
+    pub fn new(total: u64) -> Self {
+        Self {
+            total,
+            scan: OnceLock::new(),
+        }
+    }
+
+    fn scan(&self) -> Result<&ScanSource, &'static str> {
+        self.scan
+            .get_or_init(|| spool_rows(self.total).map_err(|_| "the result could not be prepared for scanning"))
+            .as_ref()
+            .map_err(|message| *message)
+    }
+}
+
+fn spool_rows(total: u64) -> Result<ScanSource, Box<dyn std::error::Error>> {
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    let spool = StreamResultSpoolManager::from_environment().create()?;
+    let columns = column_infos();
+    let mut start = 0;
+    while start < total {
+        let end = (start + PAGE_ROWS).min(total);
+        let rows: Vec<Vec<Value>> = (start..end)
+            .map(|index| row_at(index).iter().map(cell_to_value).collect())
+            .collect();
+        let page = QueryResult {
+            columns: columns.clone(),
+            rows: QueryRows::from_rows(rows),
+            truncated: false,
+        };
+        runtime.block_on(spool.append_page(start / PAGE_ROWS, Arc::new(page)))?;
+        start = end;
+    }
+    Ok(ScanSource::new(spool, columns, total))
+}
+
+fn contains(column: Option<usize>, needle: &str) -> ResultPredicate {
+    ResultPredicate::Contains {
+        scope: column.map_or(ColumnScope::Any, ColumnScope::Column),
+        needle: needle.to_string(),
+        options: TextMatchOptions::default(),
+    }
+}
+
+fn typed_text(column: &ColumnInfo, text: &str) -> Value {
+    let kind = match column.data_type.as_str() {
+        "integer" => Some(ColumnKind::Int),
+        "boolean" => Some(ColumnKind::Bool),
+        _ => None,
+    };
+    kind.and_then(|kind| parse_cell(text, kind).ok())
+        .unwrap_or_else(|| Value::Text(text.to_string()))
+}
+
+fn service_predicate(predicate: &Predicate, columns: &[ColumnInfo]) -> ResultPredicate {
+    let index = Column::ALL
+        .iter()
+        .position(|column| *column == predicate.column)
+        .unwrap_or(0);
+    match predicate.op {
+        Op::Contains => contains(Some(index), &predicate.text),
+        Op::Equals => ResultPredicate::Equals {
+            column: index,
+            value: typed_text(&columns[index], &predicate.text),
+        },
+        Op::NotEquals => ResultPredicate::NotEquals {
+            column: index,
+            value: typed_text(&columns[index], &predicate.text),
+        },
+    }
 }
 
 impl ResultSource for Synthetic {
@@ -26,15 +112,71 @@ impl ResultSource for Synthetic {
     }
 
     fn find(&self, query: &str, cap: usize) -> Result<FindResult, &'static str> {
-        find_rows(self.total, query, cap)
+        if cap == 0 || cap > bookie_results::result_find::MAX_FIND_MATCHES {
+            return Err("match cap exceeds the prototype limit");
+        }
+        if query.is_empty() || query.len() > MAX_QUERY_BYTES {
+            return Err("invalid search text");
+        }
+        let scan = self.scan()?;
+        let report = find_matches(
+            scan,
+            contains(None, query),
+            &CancellationToken::new(),
+            &ScanProgress::default(),
+        )
+        .map_err(find_message)?;
+        let global = |page: usize, row: usize| page as u64 * PAGE_ROWS + row as u64;
+        let mut matches: Vec<u64> = report.matches.iter().map(|hit| global(hit.page, hit.row)).collect();
+        if matches.len() <= cap {
+            return Ok(FindResult {
+                matches,
+                capped: report.capped,
+                scanned: report.rows_scanned,
+            });
+        }
+        let scanned = matches[cap] + 1;
+        matches.truncate(cap);
+        Ok(FindResult {
+            matches,
+            capped: true,
+            scanned,
+        })
     }
 
-    fn filter(&self, predicate: &Predicate) -> Vec<u32> {
-        filter_rows(self.total, predicate)
+    fn filter(&self, predicate: &Predicate) -> Result<Vec<u32>, &'static str> {
+        let scan = self.scan()?;
+        let prepared = service_predicate(predicate, scan.columns())
+            .prepare(scan.columns().len())
+            .map_err(|_| "this filter cannot be applied exactly")?;
+        let mut kept = Vec::new();
+        let mut tally = bookie_results::result_predicate::CellTally::default();
+        scan_pages(
+            scan,
+            &CancellationToken::new(),
+            &ScanProgress::default(),
+            |index, page| {
+                for (row, cells) in page.rows.iter().enumerate() {
+                    if prepared.matches(cells, &mut tally) {
+                        kept.push((index as u64 * PAGE_ROWS + row as u64) as u32);
+                    }
+                }
+                Ok(std::ops::ControlFlow::Continue(()))
+            },
+        )
+        .map_err(|_| "the scan did not finish")?;
+        Ok(kept)
     }
 
     fn compare(&self, keyed: bool) -> Diff {
         build_diff(self.total, keyed)
+    }
+}
+
+fn find_message(error: FindError) -> &'static str {
+    match error {
+        FindError::Predicate(_) => "invalid search text",
+        FindError::Scan(_) => "the scan did not finish",
     }
 }
 
@@ -43,8 +185,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_synthetic_source_answers_like_the_model_functions() {
-        let source: Source = Arc::new(Synthetic { total: 1_000 });
+    fn the_synthetic_source_answers_through_the_results_crate() {
+        let source: Source = Arc::new(Synthetic::new(1_000));
         assert_eq!(source.total(), 1_000);
         assert_eq!(source.row(7), row_at(7));
         assert_eq!(source.find("sample 999", 10).map(|found| found.matches), Ok(vec![999]));

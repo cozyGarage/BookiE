@@ -208,66 +208,11 @@ pub fn parse_predicate(input: &str) -> Result<Predicate, &'static str> {
     })
 }
 
-pub fn matches_predicate(index: u64, predicate: &Predicate) -> bool {
-    let needle = predicate.text.to_lowercase();
-    matches_column_text(column_text(index, predicate.column), predicate.op, &needle)
-}
-
-fn matches_column_text(text: Option<String>, op: Op, needle: &str) -> bool {
-    let text = text.map(|text| text.to_lowercase());
-    match op {
-        Op::Contains => text.is_some_and(|text| text.contains(needle)),
-        Op::Equals => text.is_some_and(|text| text == needle),
-        Op::NotEquals => text.is_none_or(|text| text != needle),
-    }
-}
-
-pub fn filter_rows(total: u64, predicate: &Predicate) -> Vec<u32> {
-    let needle = predicate.text.to_lowercase();
-    (0..total)
-        .filter(|index| matches_column_text(column_text(*index, predicate.column), predicate.op, &needle))
-        .map(|index| index as u32)
-        .collect()
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct FindResult {
     pub matches: Vec<u64>,
     pub capped: bool,
     pub scanned: u64,
-}
-
-pub fn find_rows(total: u64, query: &str, cap: usize) -> Result<FindResult, &'static str> {
-    if cap == 0 || cap > MAX_FIND_MATCHES {
-        return Err("match cap exceeds the prototype limit");
-    }
-    if query.is_empty() || query.len() > 256 {
-        return Err("invalid search text");
-    }
-    let needle = query.to_lowercase();
-    let mut matches = Vec::new();
-    for index in 0..total {
-        let hit = Column::ALL
-            .iter()
-            .filter_map(|column| column_text(index, *column))
-            .any(|text| text.to_lowercase().contains(&needle));
-        if !hit {
-            continue;
-        }
-        if matches.len() == cap {
-            return Ok(FindResult {
-                matches,
-                capped: true,
-                scanned: index + 1,
-            });
-        }
-        matches.push(index);
-    }
-    Ok(FindResult {
-        matches,
-        capped: false,
-        scanned: total,
-    })
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

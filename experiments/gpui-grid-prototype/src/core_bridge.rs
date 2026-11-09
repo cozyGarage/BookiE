@@ -79,7 +79,7 @@ pub fn parse_edit(kind: &str, text: &str) -> Result<Cell, String> {
     })
 }
 
-fn columns() -> Vec<ColumnInfo> {
+pub fn column_infos() -> Vec<ColumnInfo> {
     ["value:integer", "label:text", "state:boolean", "typed:variant"]
         .iter()
         .map(|spec| {
@@ -106,5 +106,5 @@ pub fn render_tsv(rows: impl IntoIterator<Item = Vec<Cell>>, with_headers: bool)
         .into_iter()
         .map(|row| row.iter().map(cell_to_value).collect())
         .collect();
-    bookie_core::export::render_tsv(&columns(), &QueryRows::from_rows(rows), with_headers)
+    bookie_core::export::render_tsv(&column_infos(), &QueryRows::from_rows(rows), with_headers)
 }
