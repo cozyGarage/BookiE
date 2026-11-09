@@ -367,6 +367,9 @@ impl Pager {
     }
 
     pub fn range(&self) -> (u64, u64) {
+        if self.total == 0 {
+            return (0, 0);
+        }
         let start = self.page * PAGE_ROWS;
         (start + 1, (start + PAGE_ROWS).min(self.total))
     }

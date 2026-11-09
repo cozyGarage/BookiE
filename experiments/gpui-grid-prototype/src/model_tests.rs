@@ -146,6 +146,7 @@ fn the_pager_clamps_and_reports_the_visible_range() {
 fn an_empty_result_has_one_empty_page() {
     let pager = Pager::new(0);
     assert_eq!(pager.pages(), 1);
+    assert_eq!(pager.range(), (0, 0));
 }
 
 #[test]
