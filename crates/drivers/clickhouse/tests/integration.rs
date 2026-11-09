@@ -25,8 +25,7 @@ mod non_utf8;
 #[path = "support/temporal.rs"]
 mod temporal;
 
-use bookie_core::sql_dialect::{build_full_row_update, build_single_cell_update};
-use bookie_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, Value};
+use bookie_core::{ConnectOptions, DatabaseDriver, DriverError, OperationControl, Value};
 use clickhouse::{connect, start_clickhouse};
 use drivers_clickhouse::ClickhouseDriver;
 use testcontainers::{ContainerAsync, GenericImage};
@@ -366,13 +365,9 @@ async fn views_appear_in_the_table_list() {
     );
 }
 
-/// The inline-edit Save path renders its UPDATE through
-/// `sql_dialect`, which has to emit `ALTER TABLE … UPDATE` for
-/// ClickHouse. A plain `UPDATE` is a syntax error before 25.7, so this
-/// covers the dialect and the driver's bind path together.
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn inline_edit_update_applies() {
+async fn inline_edit_is_refused_without_unique_row_identity() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
@@ -385,26 +380,26 @@ async fn inline_edit_update_applies() {
 
     let columns = conn.fetch_columns(None, "edits").await.unwrap();
     let original = vec![Value::Int(1), Value::Text("before".into())];
-    let (sql, params) = build_single_cell_update(
-        "clickhouse",
-        "edits",
-        &columns,
-        &original,
-        1,
-        Value::Text("after".into()),
-    )
-    .unwrap();
-    assert!(sql.starts_with("ALTER TABLE"), "unexpected dialect: {sql}");
-    conn.execute_in_transaction(&[(sql, params)]).await.unwrap();
+    assert!(matches!(
+        bookie_core::sql_dialect::build_single_cell_update(
+            "clickhouse",
+            "edits",
+            &columns,
+            &original,
+            1,
+            Value::Text("after".into()),
+        ),
+        Err(bookie_core::sql_dialect::BuildSqlError::NoPrimaryKey)
+    ));
 
     let result = conn.query("SELECT name FROM edits ORDER BY id").await.unwrap();
-    assert_eq!(result.rows[0][0], Value::Text("after".into()));
+    assert_eq!(result.rows[0][0], Value::Text("before".into()));
     assert_eq!(result.rows[1][0], Value::Text("other".into()));
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn full_row_update_applies() {
+async fn full_row_update_is_refused_without_unique_row_identity() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
@@ -413,15 +408,17 @@ async fn full_row_update_applies() {
         .unwrap();
     conn.execute("INSERT INTO rows_edit VALUES (1, 'x', 10)").await.unwrap();
 
-    let columns: Vec<ColumnInfo> = conn.fetch_columns(None, "rows_edit").await.unwrap();
+    let columns = conn.fetch_columns(None, "rows_edit").await.unwrap();
     let original = vec![Value::Int(1), Value::Text("x".into()), Value::Int(10)];
     let new_values = vec![Value::Int(1), Value::Text("y".into()), Value::Int(20)];
-    let (sql, params) = build_full_row_update("clickhouse", "rows_edit", &columns, &original, &new_values).unwrap();
-    conn.execute_in_transaction(&[(sql, params)]).await.unwrap();
+    assert!(matches!(
+        bookie_core::sql_dialect::build_full_row_update("clickhouse", "rows_edit", &columns, &original, &new_values),
+        Err(bookie_core::sql_dialect::BuildSqlError::NoPrimaryKey)
+    ));
 
     let result = conn.query("SELECT a, b FROM rows_edit WHERE id = 1").await.unwrap();
-    assert_eq!(result.rows[0][0], Value::Text("y".into()));
-    assert_eq!(result.rows[0][1], Value::Int(20));
+    assert_eq!(result.rows[0][0], Value::Text("x".into()));
+    assert_eq!(result.rows[0][1], Value::Int(10));
 }
 
 /// A row whose text contains an apostrophe and a `?` would corrupt the
