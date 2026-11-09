@@ -4,6 +4,7 @@ import fnmatch
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -90,14 +91,22 @@ def main():
     bundle = Path(os.environ['BOOKIE_TEST_BUNDLE'])
     index = load_index(bundle)
     execution_environment = environment(bundle, index)
+    passed = 0
     for command in commands(bundle, sys.argv[1:], index):
         entry = next(entry for entry in index['tests'] if (bundle / entry['path']).resolve() == Path(command[0]))
         directory = (ROOT / index['package_directories'][entry['package']]).resolve()
         if not directory.is_relative_to(ROOT.resolve()):
             raise ValueError('package directory is outside the source checkout')
-        result = subprocess.run(command, cwd=directory, env=execution_environment)
+        result = subprocess.run(command, cwd=directory, env=execution_environment, text=True, stdout=subprocess.PIPE)
+        print(result.stdout, end='', flush=True)
         if result.returncode:
             return result.returncode
+        summaries = re.findall(r'^test result: ok\. (\d+) passed; 0 failed;', result.stdout, re.MULTILINE)
+        if len(summaries) != 1:
+            raise ValueError('prebuilt test execution evidence missing')
+        passed += int(summaries[0])
+    if not passed:
+        raise ValueError('no prebuilt tests executed')
     return 0
 
 

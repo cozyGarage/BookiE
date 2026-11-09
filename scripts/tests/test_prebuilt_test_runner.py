@@ -38,6 +38,22 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout.splitlines(), ["rollback", "--include-ignored", "--test-threads=1"])
 
+    def test_invocation_requires_at_least_one_executed_test(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        command = [str(self.binary)]
+        empty = subprocess.CompletedProcess(command, 0, 'test result: ok. 0 passed; 0 failed;\n')
+        passed = subprocess.CompletedProcess(command, 0, 'test result: ok. 1 passed; 0 failed;\n')
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command, command]), \
+             patch.object(runner.subprocess, 'run', side_effect=[empty, passed]), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
+            self.assertEqual(runner.main(), 0)
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.object(runner.subprocess, 'run', return_value=empty), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}), \
+             self.assertRaisesRegex(ValueError, 'no prebuilt tests executed'):
+            runner.main()
+
     def test_missing_target_fails_instead_of_building_or_running_zero_tests(self):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ["-p", "sample", "--test", "missing"])
