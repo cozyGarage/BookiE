@@ -75,6 +75,7 @@ struct GridView {
     sidebar_search: Entity<TextInput>,
     cursor: MatchCursor,
     find_capped: bool,
+    find_generation: u64,
     compare: Option<Diff>,
     status: String,
     selection: Option<Selection>,
@@ -139,7 +140,9 @@ impl GridView {
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
+                this.find_generation += 1;
                 this.cursor = MatchCursor::default();
+                this.status.clear();
                 cx.notify();
             }
             InputEvent::Submit => this.run_find(true, cx),
@@ -217,6 +220,7 @@ impl GridView {
             sidebar_search,
             cursor: MatchCursor::default(),
             find_capped: false,
+            find_generation: 0,
             compare: None,
             status: String::new(),
             selection: None,
@@ -438,11 +442,13 @@ impl GridView {
             return;
         }
         let (source, query) = (self.source.clone(), self.find_text(cx));
+        let find_generation = self.find_generation;
         self.status = "Searching…".into();
         self.begin_background(
             cx,
             move || source.find(&query, MAX_FIND_MATCHES),
             move |this, found| match found {
+                _ if this.find_generation != find_generation => {}
                 Ok(found) => {
                     this.find_capped = found.capped;
                     this.cursor.set(found.matches);
