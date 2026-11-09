@@ -4,13 +4,13 @@ use std::rc::Rc;
 use bookie_app_services::text_match::TextMatchOptions;
 use bookie_core::Value;
 use gtk4 as gtk;
+use gtk4::glib;
 use libadwaita::{self as adw, prelude::*};
 use tokio_util::sync::CancellationToken;
 
 use super::super::super::row_object::RowObject;
 use super::super::GridMsg;
 use super::query::{FindQuery, MAX_MATCHES, matching_rows};
-use super::replace::plan_replacements;
 
 const PREVIEW_CHARS: usize = 80;
 
@@ -18,9 +18,50 @@ pub(crate) struct FindTarget {
     pub names: Vec<String>,
     pub editable: Vec<bool>,
     pub pk_indices: Vec<usize>,
+    pub generation: u64,
     pub edit: Option<relm4::Sender<GridMsg>>,
 }
 
+#[derive(Default)]
+struct ReplaceOperation {
+    generation: Cell<u64>,
+    active: RefCell<Option<(u64, CancellationToken)>>,
+}
+
+struct ReplaceCapture {
+    view: glib::WeakRef<gtk::ColumnView>,
+    model: gtk::SelectionModel,
+    row_store: crate::ui::row_store::RowStore,
+    row_store_generation: u64,
+    total: u32,
+    next_position: Cell<u32>,
+    only_position: Option<u32>,
+    snapshot: RefCell<bookie_app_services::grid_replace::ReplaceSnapshot>,
+    query: FindQuery,
+    replacement: String,
+    editable: Vec<bool>,
+    pk_indices: Vec<usize>,
+    cancel: CancellationToken,
+    sender: relm4::Sender<GridMsg>,
+    widgets: FindWidgets,
+    operation: Rc<ReplaceOperation>,
+    id: u64,
+}
+
+struct ReplacePlan {
+    snapshot: bookie_app_services::grid_replace::ReplaceSnapshot,
+    query: FindQuery,
+    replacement: String,
+    editable: Vec<bool>,
+    cancel: CancellationToken,
+    sender: relm4::Sender<GridMsg>,
+    widgets: FindWidgets,
+    operation: Rc<ReplaceOperation>,
+    id: u64,
+    row_store_generation: u64,
+}
+
+#[derive(Clone)]
 struct FindWidgets {
     content: gtk::Box,
     search: gtk::SearchEntry,
@@ -33,6 +74,7 @@ struct FindWidgets {
     list: gtk::ListBox,
     replace_one: gtk::Button,
     replace_all: gtk::Button,
+    cancel_replace: gtk::Button,
 }
 
 fn flat_toggle(label: &str, tooltip: &str) -> gtk::ToggleButton {
@@ -64,7 +106,7 @@ fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
     find_row.append(&regex);
     find_row.append(&columns);
     content.append(&find_row);
-    let (replace_row, replace_entry, replace_one, replace_all) = replace_controls(can_replace);
+    let (replace_row, replace_entry, replace_one, replace_all, cancel_replace) = replace_controls(can_replace);
     content.append(&replace_row);
     let status = gtk::Label::builder()
         .xalign(0.0)
@@ -99,6 +141,7 @@ fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
         list,
         replace_one,
         replace_all,
+        cancel_replace,
     }
 }
 
@@ -111,7 +154,7 @@ fn column_dropdown(names: &[String]) -> gtk::DropDown {
     dropdown
 }
 
-fn replace_controls(visible: bool) -> (gtk::Box, gtk::Entry, gtk::Button, gtk::Button) {
+fn replace_controls(visible: bool) -> (gtk::Box, gtk::Entry, gtk::Button, gtk::Button, gtk::Button) {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     row.set_margin_start(12);
     row.set_margin_end(12);
@@ -125,10 +168,14 @@ fn replace_controls(visible: bool) -> (gtk::Box, gtk::Entry, gtk::Button, gtk::B
     replace_one.add_css_class("flat");
     let replace_all = gtk::Button::with_label(&crate::tr!("Replace all"));
     replace_all.add_css_class("flat");
+    let cancel_replace = gtk::Button::with_label(&crate::tr!("Cancel"));
+    cancel_replace.add_css_class("flat");
+    cancel_replace.set_visible(false);
     row.append(&entry);
     row.append(&replace_one);
     row.append(&replace_all);
-    (row, entry, replace_one, replace_all)
+    row.append(&cancel_replace);
+    (row, entry, replace_one, replace_all, cancel_replace)
 }
 
 fn result_row(label: &str) -> gtk::ListBoxRow {
@@ -241,9 +288,13 @@ pub(super) fn present(view: &gtk::ColumnView, target: Rc<FindTarget>) {
         target.edit.is_some() && !target.pk_indices.is_empty() && target.editable.iter().any(|editable| *editable);
     let widgets = Rc::new(build_widgets(&target.names, can_replace));
     let positions: Rc<RefCell<Vec<(u32, usize)>>> = Rc::default();
+    let operation = Rc::new(ReplaceOperation::default());
     let refresh = refresh_fn(view, &widgets, &positions, &target.names);
-    wire_search_controls(&widgets, &dialog, refresh.clone());
-    connect_replace(&widgets, view, target.clone(), positions.clone(), refresh);
+    wire_search_controls(&widgets, &dialog, refresh.clone(), operation.clone());
+    connect_replace(&widgets, view, target.clone(), positions.clone(), operation.clone());
+    dialog.connect_closed(move |_| {
+        cancel_replace_operation(&operation);
+    });
     wire_result_selection(&dialog, view, &widgets, positions);
     dialog.set_child(Some(&widgets.content));
     dialog.present(Some(view));
@@ -264,21 +315,45 @@ fn refresh_fn(
     }
 }
 
-fn wire_search_controls(widgets: &FindWidgets, dialog: &adw::Dialog, refresh: impl Fn() + Clone + 'static) {
+fn wire_search_controls(
+    widgets: &FindWidgets,
+    dialog: &adw::Dialog,
+    refresh: impl Fn() + Clone + 'static,
+    operation: Rc<ReplaceOperation>,
+) {
+    let invalidate = {
+        let (operation, widgets) = (operation, widgets.clone());
+        move || {
+            if cancel_replace_operation(&operation) {
+                widgets.status.set_text(&crate::tr!("Replacement cancelled"));
+            }
+            set_replace_running(&widgets, false);
+        }
+    };
     widgets.search.connect_search_changed({
-        let refresh = refresh.clone();
-        move |_| refresh()
+        let (refresh, invalidate) = (refresh.clone(), invalidate.clone());
+        move |_| {
+            invalidate();
+            refresh();
+        }
     });
     for toggle in [&widgets.match_case, &widgets.whole_words, &widgets.regex] {
         toggle.connect_toggled({
-            let refresh = refresh.clone();
-            move |_| refresh()
+            let (refresh, invalidate) = (refresh.clone(), invalidate.clone());
+            move |_| {
+                invalidate();
+                refresh();
+            }
         });
     }
     widgets.columns.connect_selected_notify({
-        let refresh = refresh.clone();
-        move |_| refresh()
+        let (refresh, invalidate) = (refresh.clone(), invalidate.clone());
+        move |_| {
+            invalidate();
+            refresh();
+        }
     });
+    widgets.replace_entry.connect_changed(move |_| invalidate());
     let close = close_on(dialog);
     widgets.search.connect_stop_search(move |_| close());
     widgets.search.connect_activate({
@@ -321,29 +396,46 @@ fn connect_replace(
     view: &gtk::ColumnView,
     target: Rc<FindTarget>,
     positions: Rc<RefCell<Vec<(u32, usize)>>>,
-    refresh: impl Fn() + Clone + 'static,
+    operation: Rc<ReplaceOperation>,
 ) {
     if target.edit.is_none() {
         return;
     }
     widgets.replace_one.connect_clicked({
-        let (view, widgets, target, positions, refresh) = (
+        let (view, widgets, target, positions, operation) = (
             view.downgrade(),
             widgets.clone(),
             target.clone(),
             positions,
-            refresh.clone(),
+            operation.clone(),
         );
         move |_| {
             let Some(view) = view.upgrade() else { return };
-            replace_selected(&view, &widgets, &target, &positions.borrow(), &refresh);
+            replace_selected(&view, &widgets, &target, &positions.borrow(), &operation);
         }
     });
     widgets.replace_all.connect_clicked({
-        let (view, widgets, target, refresh) = (view.downgrade(), widgets.clone(), target, refresh);
+        let (view, widgets, target, operation) = (view.downgrade(), widgets.clone(), target, operation.clone());
         move |_| {
             let Some(view) = view.upgrade() else { return };
-            replace_every(&view, &widgets, &target, &refresh);
+            replace_every(&view, &widgets, &target, &operation);
+        }
+    });
+    widgets.cancel_replace.connect_clicked({
+        let (operation, widgets) = (operation.clone(), widgets.clone());
+        move |_| {
+            cancel_replace_operation(&operation);
+            set_replace_running(&widgets, false);
+            widgets.status.set_text(&crate::tr!("Replacement cancelled"));
+        }
+    });
+    let operation = operation.clone();
+    widgets.replace_entry.connect_activate({
+        let replace_all = widgets.replace_all.clone();
+        move |_| {
+            if operation.active.borrow().is_none() {
+                replace_all.emit_clicked();
+            }
         }
     });
 }
@@ -353,7 +445,7 @@ fn replace_selected(
     widgets: &FindWidgets,
     target: &FindTarget,
     positions: &[(u32, usize)],
-    refresh: &impl Fn(),
+    operation: &Rc<ReplaceOperation>,
 ) {
     let Some(index) = widgets.list.selected_row().map(|row| row.index() as usize) else {
         return;
@@ -361,23 +453,22 @@ fn replace_selected(
     let Some(&(position, column)) = positions.get(index) else {
         return;
     };
-    let report = run_replace(view, widgets, target, Some((position, column)));
-    finish_replace(widgets, target, report, refresh);
+    start_replace(view, widgets, target, Some((position, column)), operation);
 }
 
-fn replace_every(view: &gtk::ColumnView, widgets: &FindWidgets, target: &FindTarget, refresh: &impl Fn()) {
-    let report = run_replace(view, widgets, target, None);
-    finish_replace(widgets, target, report, refresh);
+fn replace_every(view: &gtk::ColumnView, widgets: &FindWidgets, target: &FindTarget, operation: &Rc<ReplaceOperation>) {
+    start_replace(view, widgets, target, None, operation);
 }
 
-fn run_replace(
+fn start_replace(
     view: &gtk::ColumnView,
     widgets: &FindWidgets,
     target: &FindTarget,
     only: Option<(u32, usize)>,
-) -> Result<super::replace::ReplaceReport, super::replace::ReplaceError> {
+    operation: &Rc<ReplaceOperation>,
+) {
     let Some(model) = view.model() else {
-        return Ok(super::replace::ReplaceReport::default());
+        return;
     };
     let query = {
         let mut query = current_query(widgets);
@@ -391,83 +482,278 @@ fn run_replace(
         .downcast_ref::<gtk::MultiSelection>()
         .and_then(|selection| selection.model())
         .and_then(|model| model.downcast::<crate::ui::row_store::RowStore>().ok());
-    let cancel = CancellationToken::new();
-    let only_position = only.map(|(position, _)| position);
-    plan_replacements(
-        model.n_items(),
-        |position, visit| {
-            if only_position.is_some_and(|wanted| wanted != position) {
-                return;
-            }
-            if let Some(store) = row_store.as_ref() {
-                store.visit_search_cells(position, |column, value| {
-                    visit(column, value);
-                    false
-                });
-            } else if let Some(row) = model.item(position).and_then(|item| item.downcast::<RowObject>().ok()) {
-                row.visit_cells(|column, value| {
-                    visit(column, value);
-                    false
-                });
-            }
-        },
-        |position| row_key_values(position, &model, row_store.as_ref(), &target.pk_indices),
-        &query,
-        &replacement,
-        &target.editable,
-        &cancel,
-    )
-}
-
-fn finish_replace(
-    widgets: &FindWidgets,
-    target: &FindTarget,
-    report: Result<super::replace::ReplaceReport, super::replace::ReplaceError>,
-    refresh: &impl Fn(),
-) {
-    let report = match report {
-        Ok(report) => report,
-        Err(super::replace::ReplaceError::Cancelled) => {
-            widgets.status.set_text(&crate::tr!("Replacement cancelled"));
-            return;
-        }
-        Err(super::replace::ReplaceError::Budget) => {
-            widgets.status.set_text(&crate::tr!(
-                "Replacement is too large; narrow the selection or use a shorter replacement"
-            ));
-            return;
-        }
-        Err(super::replace::ReplaceError::Match(_)) => {
-            widgets.status.set_text(&crate::tr!("Invalid regular expression"));
-            return;
-        }
-    };
-    let Some(sender) = &target.edit else {
+    let Some(row_store) = row_store else {
+        widgets
+            .status
+            .set_text(&crate::tr!("These rows are no longer available"));
         return;
     };
-    for edit in &report.edits {
-        sender
-            .send(GridMsg::CellEdited {
-                row_position: edit.position,
-                col_index: edit.column,
-                new_value: edit.new_value.clone(),
-                row_key: edit.row_key.clone(),
-            })
-            .ok();
+    if row_store.generation() != target.generation {
+        widgets
+            .status
+            .set_text(&crate::tr!("These rows changed; run the search again"));
+        return;
     }
-    widgets.status.set_text(&replace_status(&report));
-    refresh();
+    let Some(sender) = target.edit.clone() else { return };
+    let id = begin_replace_operation(operation);
+    let cancel = operation
+        .active
+        .borrow()
+        .as_ref()
+        .map(|(_, cancel)| cancel.clone())
+        .unwrap_or_default();
+    set_replace_running(widgets, true);
+    widgets.status.set_text(&crate::tr!("Preparing replacement…"));
+    let total = only.map_or(model.n_items(), |(position, _)| position.saturating_add(1));
+    let start_position = only.map_or(0, |(position, _)| position);
+    let capture = ReplaceCapture {
+        view: view.downgrade(),
+        model,
+        row_store_generation: row_store.generation(),
+        row_store,
+        total,
+        next_position: Cell::new(start_position),
+        only_position: only.map(|(position, _)| position),
+        snapshot: RefCell::new(bookie_app_services::grid_replace::ReplaceSnapshot::default()),
+        query,
+        replacement,
+        editable: target.editable.clone(),
+        pk_indices: target.pk_indices.clone(),
+        cancel,
+        sender,
+        widgets: widgets.clone(),
+        operation: Rc::clone(operation),
+        id,
+    };
+    glib::idle_add_local(move || collect_snapshot_chunk(&capture));
 }
 
-fn replace_status(report: &super::replace::ReplaceReport) -> String {
-    if report.edits.is_empty() && report.skipped == 0 {
+fn collect_snapshot_chunk(capture: &ReplaceCapture) -> glib::ControlFlow {
+    if !replace_operation_is_current(&capture.operation, capture.id, &capture.cancel) {
+        return glib::ControlFlow::Break;
+    }
+    let Some(view) = capture.view.upgrade() else {
+        cancel_replace_operation(&capture.operation);
+        return glib::ControlFlow::Break;
+    };
+    if view.model().is_none_or(|current| current != capture.model)
+        || capture.row_store.generation() != capture.row_store_generation
+    {
+        finish_replace_ui(
+            &capture.widgets,
+            &capture.operation,
+            capture.id,
+            crate::tr!("These rows changed; run the search again"),
+        );
+        return glib::ControlFlow::Break;
+    }
+    let start = capture.next_position.get();
+    let end = start.saturating_add(64).min(capture.total);
+    if let Err(error) = capture_snapshot_rows(capture, start, end) {
+        finish_replace_ui(
+            &capture.widgets,
+            &capture.operation,
+            capture.id,
+            replace_error_text(error),
+        );
+        return glib::ControlFlow::Break;
+    }
+    capture.next_position.set(end);
+    if end < capture.total {
+        return glib::ControlFlow::Continue;
+    }
+    let snapshot = std::mem::take(&mut *capture.snapshot.borrow_mut());
+    plan_and_apply_replacements(ReplacePlan {
+        snapshot,
+        query: capture.query.clone(),
+        replacement: capture.replacement.clone(),
+        editable: capture.editable.clone(),
+        cancel: capture.cancel.clone(),
+        sender: capture.sender.clone(),
+        widgets: capture.widgets.clone(),
+        operation: Rc::clone(&capture.operation),
+        id: capture.id,
+        row_store_generation: capture.row_store_generation,
+    });
+    glib::ControlFlow::Break
+}
+
+fn capture_snapshot_rows(capture: &ReplaceCapture, start: u32, end: u32) -> Result<(), super::replace::ReplaceError> {
+    for position in start..end {
+        if capture.only_position.is_some_and(|only| only != position) {
+            continue;
+        }
+        let key =
+            row_key_values(position, &capture.model, Some(&capture.row_store), &capture.pk_indices).unwrap_or_default();
+        capture
+            .snapshot
+            .borrow_mut()
+            .push_row_cancellable(position, &key, Some(&capture.cancel), |visit| {
+                capture.row_store.visit_search_cells(position, |column, value| {
+                    if capture.query.column.is_none_or(|wanted| wanted == column) {
+                        visit(column, value);
+                    }
+                    false
+                });
+            })?;
+    }
+    Ok(())
+}
+
+fn plan_and_apply_replacements(plan: ReplacePlan) {
+    let ReplacePlan {
+        snapshot,
+        query,
+        replacement,
+        editable,
+        cancel,
+        sender,
+        widgets,
+        operation,
+        id,
+        row_store_generation,
+    } = plan;
+    glib::spawn_future_local(async move {
+        let worker_cancel = cancel.clone();
+        let planned = gtk::gio::spawn_blocking(move || {
+            super::replace::plan_snapshot_replacements(&snapshot, &query, &replacement, &editable, &worker_cancel)
+        })
+        .await;
+        let report = match planned {
+            Ok(Ok(report)) => report,
+            Ok(Err(error)) => {
+                finish_replace_ui(&widgets, &operation, id, replace_error_text(error));
+                return;
+            }
+            Err(_) => {
+                finish_replace_ui(
+                    &widgets,
+                    &operation,
+                    id,
+                    crate::tr!("Replacement could not be completed"),
+                );
+                return;
+            }
+        };
+        if !replace_operation_is_current(&operation, id, &cancel) {
+            return;
+        }
+        let (reply, result) = tokio::sync::oneshot::channel();
+        if sender
+            .send(GridMsg::ReplaceBatch {
+                report,
+                generation: row_store_generation,
+                cancel: cancel.clone(),
+                reply,
+            })
+            .is_err()
+        {
+            finish_replace_ui(&widgets, &operation, id, crate::tr!("Replacement could not be applied"));
+            return;
+        }
+        finish_replace_apply(&widgets, &operation, id, result.await);
+    });
+}
+
+fn finish_replace_apply(
+    widgets: &FindWidgets,
+    operation: &ReplaceOperation,
+    id: u64,
+    result: Result<
+        Result<
+            bookie_app_services::grid_replace::ReplaceAcknowledgement,
+            bookie_app_services::grid_replace::ReplaceApplyError,
+        >,
+        tokio::sync::oneshot::error::RecvError,
+    >,
+) {
+    match result {
+        Ok(Ok(ack)) => {
+            while let Some(row) = widgets.list.row_at_index(0) {
+                widgets.list.remove(&row);
+            }
+            finish_replace_ui(widgets, operation, id, replace_status(ack.replacements, ack.skipped));
+        }
+        Ok(Err(error)) => finish_replace_ui(widgets, operation, id, replace_apply_error_text(error)),
+        Err(_) => finish_replace_ui(widgets, operation, id, crate::tr!("Replacement could not be applied")),
+    }
+}
+
+fn begin_replace_operation(operation: &ReplaceOperation) -> u64 {
+    cancel_replace_operation(operation);
+    let id = operation.generation.get().wrapping_add(1);
+    operation.generation.set(id);
+    operation.active.replace(Some((id, CancellationToken::new())));
+    id
+}
+
+fn cancel_replace_operation(operation: &ReplaceOperation) -> bool {
+    operation.generation.set(operation.generation.get().wrapping_add(1));
+    if let Some((_, cancel)) = operation.active.borrow_mut().take() {
+        cancel.cancel();
+        true
+    } else {
+        false
+    }
+}
+
+fn replace_operation_is_current(operation: &ReplaceOperation, id: u64, cancel: &CancellationToken) -> bool {
+    operation.generation.get() == id && !cancel.is_cancelled()
+}
+
+fn set_replace_running(widgets: &FindWidgets, running: bool) {
+    widgets.replace_one.set_sensitive(!running);
+    widgets.replace_all.set_sensitive(!running);
+    widgets.cancel_replace.set_visible(running);
+}
+
+fn finish_replace_ui(widgets: &FindWidgets, operation: &ReplaceOperation, id: u64, message: String) {
+    if operation.generation.get() != id {
+        return;
+    }
+    if operation
+        .active
+        .borrow()
+        .as_ref()
+        .is_some_and(|(active, _)| *active == id)
+    {
+        operation.active.borrow_mut().take();
+    }
+    set_replace_running(widgets, false);
+    widgets.status.set_text(&message);
+}
+
+fn replace_error_text(error: super::replace::ReplaceError) -> String {
+    match error {
+        super::replace::ReplaceError::Cancelled => crate::tr!("Replacement cancelled"),
+        super::replace::ReplaceError::Budget => {
+            crate::tr!("Replacement is too large; narrow the selection or use a shorter replacement")
+        }
+        super::replace::ReplaceError::Match(_) => crate::tr!("Invalid regular expression"),
+        super::replace::ReplaceError::Stale => crate::tr!("These rows changed; run the search again"),
+    }
+}
+
+fn replace_apply_error_text(error: bookie_app_services::grid_replace::ReplaceApplyError) -> String {
+    use bookie_app_services::grid_replace::ReplaceApplyError;
+    match error {
+        ReplaceApplyError::Cancelled => crate::tr!("Replacement cancelled"),
+        ReplaceApplyError::Stale => crate::tr!("These rows changed; run the search again"),
+        ReplaceApplyError::NotEditable => crate::tr!("One or more cells can no longer be edited"),
+        ReplaceApplyError::Saving => crate::tr!("Finish saving changes before replacing values"),
+        ReplaceApplyError::InvalidValue => crate::tr!("One or more replacement values are invalid"),
+    }
+}
+
+fn replace_status(replacements: usize, skipped: usize) -> String {
+    if replacements == 0 && skipped == 0 {
         crate::tr!("No replacements")
-    } else if report.skipped == 0 {
-        crate::tr!("Replaced {count} matches").replace("{count}", &report.replacements.to_string())
+    } else if skipped == 0 {
+        crate::tr!("Replaced {count} matches").replace("{count}", &replacements.to_string())
     } else {
         crate::tr!("Replaced {count} matches · skipped {skipped} cells")
-            .replace("{count}", &report.replacements.to_string())
-            .replace("{skipped}", &report.skipped.to_string())
+            .replace("{count}", &replacements.to_string())
+            .replace("{skipped}", &skipped.to_string())
     }
 }
 

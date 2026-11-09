@@ -81,6 +81,17 @@ pub enum GridMsg {
         value: bookie_core::Value,
         row_key: Vec<bookie_core::Value>,
     },
+    ReplaceBatch {
+        report: bookie_app_services::grid_replace::ReplaceReport,
+        generation: u64,
+        cancel: tokio_util::sync::CancellationToken,
+        reply: tokio::sync::oneshot::Sender<
+            Result<
+                bookie_app_services::grid_replace::ReplaceAcknowledgement,
+                bookie_app_services::grid_replace::ReplaceApplyError,
+            >,
+        >,
+    },
     CopyToClipboard(String),
     FetchCellValue {
         col_index: usize,
@@ -358,6 +369,7 @@ pub fn build_column_view(
                 names: columns.iter().map(|column| column.name.clone()).collect(),
                 editable: editable_flags,
                 pk_indices: tab_ctx.pk_col_indices.clone(),
+                generation: store.generation(),
                 edit: edit_sender.clone(),
             },
         );

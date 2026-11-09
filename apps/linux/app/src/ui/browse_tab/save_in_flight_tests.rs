@@ -6,6 +6,8 @@ use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
 use uuid::Uuid;
 
+mod replace_batch_tests;
+
 pub(super) fn column(name: &str, primary_key: bool) -> ColumnInfo {
     ColumnInfo {
         name: name.into(),

@@ -1048,6 +1048,12 @@ impl SimpleComponent for BrowseTab {
                         .set(self.rejected_edit_revision.get().wrapping_add(1));
                 }
             }
+            BrowseTabInput::GridReplaceBatch {
+                report,
+                generation,
+                cancel,
+                reply,
+            } => self.handle_grid_replace_batch(report, generation, cancel, reply),
             BrowseTabInput::GridSetCellNull {
                 row_position,
                 col_index,
