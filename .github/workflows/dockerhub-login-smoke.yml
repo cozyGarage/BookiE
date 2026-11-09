@@ -2,7 +2,7 @@ name: Docker Hub login smoke
 
 on:
   pull_request:
-    branches: [linux, main]
+    branches: [main]
     paths:
       - ".github/actions/dockerhub-login/**"
       - ".github/workflows/dockerhub-login-smoke.yml"

@@ -2,14 +2,14 @@ name: Sonar Rust
 
 on:
   push:
-    branches: [linux]
+    branches: [main]
     paths:
       - "**"
       - "!docs/**"
       - "!**.md"
       - ".github/workflows/sonar-rust.yml"
   pull_request:
-    branches: [linux]
+    branches: [main]
     paths:
       - "**"
       - "!docs/**"

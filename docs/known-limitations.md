@@ -1,4 +1,4 @@
-# Known limitations on the `linux` branch
+# Known limitations
 
 This page describes user-visible behavior and limits in the current source. Current work and acceptance criteria belong to the public issue tracker.
 

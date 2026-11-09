@@ -2,7 +2,7 @@ name: CodeQL
 
 on:
   push:
-    branches: [linux]
+    branches: [main]
     paths:
       - "**"
       - "!docs/**"

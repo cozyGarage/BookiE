@@ -1,6 +1,6 @@
 # Contributing to BookiE
 
-BookiE is a Linux-only Rust and GTK database client. Current development happens on the `linux` branch. Pull requests target `linux` in [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE).
+BookiE is a Linux-only Rust and GTK database client. Current development happens on the `main` branch. Pull requests target `main` in [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE).
 
 ## Start here
 
@@ -15,7 +15,7 @@ Install the native libraries and Rust toolchain listed in the [README](README.md
 ```bash
 git clone https://github.com/OWNER/BookiE.git
 cd BookiE
-git checkout linux
+git checkout main
 rustc --version
 pkg-config --modversion gtk4 libadwaita-1 gtksourceview-5
 cargo run -p bookie-app
