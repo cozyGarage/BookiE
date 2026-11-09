@@ -484,18 +484,20 @@ jobs:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
         run: |
-          mkdir -p "$RUNNER_TEMP/bookie-ci-tmp"
+          task_tmp="$(mktemp -d /tmp/bookie-ci.XXXXXX)"
+          trap 'rm -rf -- "$task_tmp"' EXIT
           docker run --rm --entrypoint cat "$BOOKIE_BUILD_IMAGE" /etc/passwd > "$RUNNER_TEMP/bookie-integration-passwd"
-          printf 'bookie-ci:x:%s:%s:CI:%s:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" "$RUNNER_TEMP/bookie-ci-tmp" >> "$RUNNER_TEMP/bookie-integration-passwd"
+          printf 'bookie-ci:x:%s:%s:CI:%s:/usr/sbin/nologin\n' "$(id -u)" "$(id -g)" "$task_tmp" >> "$RUNNER_TEMP/bookie-integration-passwd"
           docker run --rm --network host \
             --user "$(id -u):$(id -g)" --group-add "$(stat -c '%g' /var/run/docker.sock)" \
             --volume "$RUNNER_TEMP/bookie-integration-passwd:/etc/passwd:ro" \
             --volume /var/run/docker.sock:/var/run/docker.sock \
             --volume "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" \
             --volume "$RUNNER_TEMP:$RUNNER_TEMP" \
+            --volume "$task_tmp:$task_tmp" \
             --volume "$HOME/.docker:/docker:ro" \
             --workdir "$GITHUB_WORKSPACE" \
-            --env HOME="$RUNNER_TEMP/bookie-ci-tmp" --env TMPDIR="$RUNNER_TEMP/bookie-ci-tmp" \
+            --env HOME="$task_tmp" --env TMPDIR="$task_tmp" \
             --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory \
             --env GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
             --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
