@@ -1,7 +1,6 @@
 use std::sync::{Arc, OnceLock};
 
-use bookie_core::import::{ColumnKind, parse_cell};
-use bookie_core::{ColumnInfo, QueryResult, QueryRows, Value};
+use bookie_core::{QueryResult, QueryRows, Value};
 use bookie_results::result_find::{FindError, find_matches};
 use bookie_results::result_predicate::{ColumnScope, ResultPredicate};
 use bookie_results::result_scan::{ScanProgress, ScanSource, scan_pages};
@@ -9,7 +8,7 @@ use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use bookie_results::text_match::TextMatchOptions;
 use tokio_util::sync::CancellationToken;
 
-use crate::core_bridge::{cell_to_value, column_infos};
+use crate::core_bridge::{cell_to_value, column_infos, value_to_cell};
 use crate::model::{Cell, Column, Diff, FindResult, Op, PAGE_ROWS, Predicate, build_diff, row_at};
 
 pub trait ResultSource: Send + Sync + 'static {
@@ -74,32 +73,21 @@ fn contains(column: Option<usize>, needle: &str) -> ResultPredicate {
     }
 }
 
-fn typed_text(column: &ColumnInfo, text: &str) -> Value {
-    let kind = match column.data_type.as_str() {
-        "integer" => Some(ColumnKind::Int),
-        "boolean" => Some(ColumnKind::Bool),
-        _ => None,
-    };
-    kind.and_then(|kind| parse_cell(text, kind).ok())
-        .unwrap_or_else(|| Value::Text(text.to_string()))
-}
-
-fn service_predicate(predicate: &Predicate, columns: &[ColumnInfo]) -> ResultPredicate {
-    let index = Column::ALL
-        .iter()
-        .position(|column| *column == predicate.column)
-        .unwrap_or(0);
-    match predicate.op {
-        Op::Contains => contains(Some(index), &predicate.text),
-        Op::Equals => ResultPredicate::Equals {
-            column: index,
-            value: typed_text(&columns[index], &predicate.text),
-        },
-        Op::NotEquals => ResultPredicate::NotEquals {
-            column: index,
-            value: typed_text(&columns[index], &predicate.text),
-        },
+fn display_equals(value: Option<&Value>, normalized_text: &str) -> Option<bool> {
+    let value = value?;
+    if matches!(value, Value::Null) {
+        return None;
     }
+    if let Value::Text(value) | Value::JsonText(value) = value {
+        return Some(value.to_lowercase() == normalized_text);
+    }
+    let matches = match value {
+        Value::Bool(value) => value.to_string() == normalized_text,
+        Value::Int(value) => value.to_string() == normalized_text,
+        Value::Float(value) => value.to_string() == normalized_text,
+        _ => value_to_cell(value.clone()).display().to_lowercase() == normalized_text,
+    };
+    Some(matches)
 }
 
 impl ResultSource for Synthetic {
@@ -146,9 +134,20 @@ impl ResultSource for Synthetic {
 
     fn filter(&self, predicate: &Predicate) -> Result<Vec<u32>, &'static str> {
         let scan = self.scan()?;
-        let prepared = service_predicate(predicate, scan.columns())
-            .prepare(scan.columns().len())
-            .map_err(|_| "this filter cannot be applied exactly")?;
+        let column = Column::ALL
+            .iter()
+            .position(|column| *column == predicate.column)
+            .unwrap_or(0);
+        let normalized_text = predicate.text.to_lowercase();
+        let prepared = if predicate.op == Op::Contains {
+            Some(
+                contains(Some(column), &predicate.text)
+                    .prepare(scan.columns().len())
+                    .map_err(|_| "this filter cannot be applied exactly")?,
+            )
+        } else {
+            None
+        };
         let mut kept = Vec::new();
         let mut tally = bookie_results::result_predicate::CellTally::default();
         scan_pages(
@@ -157,7 +156,16 @@ impl ResultSource for Synthetic {
             &ScanProgress::default(),
             |index, page| {
                 for (row, cells) in page.rows.iter().enumerate() {
-                    if prepared.matches(cells, &mut tally) {
+                    let matches = match predicate.op {
+                        Op::Contains => prepared
+                            .as_ref()
+                            .is_some_and(|prepared| prepared.matches(cells, &mut tally)),
+                        Op::Equals => display_equals(cells.get(column), &normalized_text).unwrap_or(false),
+                        Op::NotEquals => {
+                            display_equals(cells.get(column), &normalized_text).is_none_or(|matches| !matches)
+                        }
+                    };
+                    if matches {
                         kept.push((index as u64 * PAGE_ROWS + row as u64) as u32);
                     }
                 }
@@ -191,5 +199,11 @@ mod tests {
         assert_eq!(source.row(7), row_at(7));
         assert_eq!(source.find("sample 999", 10).map(|found| found.matches), Ok(vec![999]));
         assert!(!source.compare(false).summary.keyed);
+    }
+
+    #[test]
+    fn display_equality_keeps_unicode_case_insensitive_matching() {
+        let value = Value::Text("Ä".into());
+        assert_eq!(display_equals(Some(&value), &"ä".to_lowercase()), Some(true));
     }
 }
