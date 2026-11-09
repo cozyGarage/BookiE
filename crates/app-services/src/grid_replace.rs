@@ -54,9 +54,7 @@ pub fn plan_replacements(
         replacement,
         editable,
     } = request;
-    if cancel.is_cancelled() {
-        return Err(ReplaceError::Cancelled);
-    }
+    check_cancelled(cancel)?;
     let Some(matcher) = TextMatcher::compile(&query.needle, query.options)? else {
         return Ok(ReplaceReport::default());
     };
@@ -64,9 +62,7 @@ pub fn plan_replacements(
     let mut over_budget = false;
     let mut report = ReplaceReport::default();
     for position in 0..count {
-        if cancel.is_cancelled() {
-            return Err(ReplaceError::Cancelled);
-        }
+        check_cancelled(cancel)?;
         let Some(row_key) = row_key_at(position).filter(|key| !crate::change_tracker::pk_values_are_unreadable(key))
         else {
             report.skipped = report.skipped.saturating_add(1);
@@ -85,6 +81,7 @@ pub fn plan_replacements(
                 &matcher,
                 replacement,
                 &search_text,
+                cancel,
             ) {
                 CellReplace::Budget => over_budget = true,
                 CellReplace::Skip => report.skipped = report.skipped.saturating_add(1),
@@ -99,13 +96,12 @@ pub fn plan_replacements(
                 }
             }
         });
+        check_cancelled(cancel)?;
         if over_budget {
             return Err(ReplaceError::Budget);
         }
     }
-    if cancel.is_cancelled() {
-        return Err(ReplaceError::Cancelled);
-    }
+    check_cancelled(cancel)?;
     Ok(report)
 }
 
@@ -122,6 +118,7 @@ fn replace_cell(
     matcher: &TextMatcher,
     replacement: &str,
     search_text: &impl Fn(&Value) -> String,
+    cancel: &CancellationToken,
 ) -> CellReplace {
     if matches!(value, Value::Undecodable(_)) {
         return CellReplace::Skip;
@@ -142,7 +139,9 @@ fn replace_cell(
     if !matcher.matches(original) {
         return CellReplace::None;
     }
-    let Ok((text, count)) = matcher.replace_all_bounded(original, replacement, 1024 * 1024) else {
+    let Ok((text, count)) =
+        matcher.replace_all_bounded_controlled(original, replacement, 1024 * 1024, || cancel.is_cancelled())
+    else {
         return CellReplace::Budget;
     };
     if count == 0 {
@@ -204,4 +203,11 @@ fn json_bytes(value: &serde_json::Value) -> usize {
         _ => 0,
     };
     heap.saturating_add(std::mem::size_of::<serde_json::Value>())
+}
+
+fn check_cancelled(cancel: &CancellationToken) -> Result<(), ReplaceError> {
+    if cancel.is_cancelled() {
+        return Err(ReplaceError::Cancelled);
+    }
+    Ok(())
 }

@@ -1,6 +1,35 @@
 use super::*;
 
 #[test]
+fn cancellation_on_the_last_row_discards_already_planned_edits() {
+    let query = ReplaceQuery {
+        needle: "a".into(),
+        options: Default::default(),
+        column: None,
+    };
+    let value = Value::Text("a".into());
+    let cancel = CancellationToken::new();
+    let result = plan_replacements(
+        2,
+        |position, visit| {
+            visit(0, &value);
+            if position == 1 {
+                cancel.cancel();
+            }
+        },
+        |position| Some(vec![Value::Int(i64::from(position))]),
+        ReplaceRequest {
+            query: &query,
+            replacement: "b",
+            editable: &[true],
+        },
+        &cancel,
+        |_| String::new(),
+    );
+    assert!(matches!(result, Err(ReplaceError::Cancelled)));
+}
+
+#[test]
 fn oversized_keys_do_not_escape_the_retained_plan_budget() {
     let query = ReplaceQuery {
         needle: "a".into(),

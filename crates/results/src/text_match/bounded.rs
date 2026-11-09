@@ -1,8 +1,12 @@
 use super::{Captures, Strategy, TextMatcher, next_ignore_case_span};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
-#[error("replacement output exceeds its byte limit")]
-pub struct ReplacementLimit;
+pub enum ReplacementLimit {
+    #[error("replacement output exceeds its byte limit")]
+    Budget,
+    #[error("replacement was cancelled")]
+    Cancelled,
+}
 
 impl TextMatcher {
     pub fn replace_all_bounded(
@@ -11,12 +15,28 @@ impl TextMatcher {
         replacement: &str,
         limit: usize,
     ) -> Result<(String, usize), ReplacementLimit> {
+        self.replace_all_bounded_controlled(text, replacement, limit, || false)
+    }
+
+    pub fn replace_all_bounded_controlled(
+        &self,
+        text: &str,
+        replacement: &str,
+        limit: usize,
+        cancelled: impl Fn() -> bool,
+    ) -> Result<(String, usize), ReplacementLimit> {
+        if cancelled() {
+            return Err(ReplacementLimit::Cancelled);
+        }
         let mut out = String::new();
         let mut last = 0;
         let mut count = 0;
         match &self.strategy {
             Strategy::Expression(expression) => {
                 for captures in expression.captures_iter(text) {
+                    if cancelled() {
+                        return Err(ReplacementLimit::Cancelled);
+                    }
                     let Some(found) = captures.get(0).filter(|found| !found.is_empty()) else {
                         continue;
                     };
@@ -32,12 +52,18 @@ impl TextMatcher {
             }
             Strategy::Literal { needle, match_case } => {
                 while let Some((start, end)) = literal_span(&text[last..], needle, *match_case) {
+                    if cancelled() {
+                        return Err(ReplacementLimit::Cancelled);
+                    }
                     append(&mut out, &text[last..last + start], limit)?;
                     append(&mut out, replacement, limit)?;
                     last += end;
                     count += 1;
                 }
             }
+        }
+        if cancelled() {
+            return Err(ReplacementLimit::Cancelled);
         }
         append(&mut out, &text[last..], limit)?;
         Ok((out, count))
@@ -56,7 +82,7 @@ fn literal_span(text: &str, needle: &str, match_case: bool) -> Option<(usize, us
 
 fn append(out: &mut String, fragment: &str, limit: usize) -> Result<(), ReplacementLimit> {
     if fragment.len() > limit.saturating_sub(out.len()) {
-        return Err(ReplacementLimit);
+        return Err(ReplacementLimit::Budget);
     }
     out.push_str(fragment);
     Ok(())

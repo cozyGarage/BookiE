@@ -5,6 +5,16 @@ fn matcher(term: &str, options: TextMatchOptions) -> TextMatcher {
 }
 
 #[test]
+fn bounded_replacement_observes_cancellation_between_matches() {
+    let checks = std::cell::Cell::new(0);
+    let result = matcher("a", TextMatchOptions::default()).replace_all_bounded_controlled("aaaa", "b", 100, || {
+        checks.set(checks.get() + 1);
+        checks.get() >= 3
+    });
+    assert_eq!(result, Err(ReplacementLimit::Cancelled));
+}
+
+#[test]
 fn bounded_replacement_refuses_literal_expansion_before_returning_output() {
     let matcher = matcher("a", TextMatchOptions::default());
     assert!(matcher.replace_all_bounded("aaaa", "xxxx", 15).is_err());
