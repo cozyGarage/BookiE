@@ -37,6 +37,7 @@ enum Mode {
 
 struct GridView {
     source: Source,
+    table_source: Source,
     mode: Mode,
     pager: Pager,
     continuous: bool,
@@ -175,6 +176,7 @@ impl GridView {
         )
         .detach();
         GridView {
+            table_source: source.clone(),
             source,
             mode: Mode::All,
             pager: Pager::new(total),
@@ -227,6 +229,9 @@ impl GridView {
     }
 
     fn dataset_count(&self) -> u64 {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return 0;
+        }
         match &self.mode {
             Mode::All => self.source.total(),
             Mode::Filtered { kept, .. } => kept.len() as u64,
@@ -335,7 +340,7 @@ impl GridView {
         self.generation += 1;
         self.edits.clear();
         if self.runs.is_empty() {
-            self.source = std::sync::Arc::new(Synthetic { total: 0 });
+            self.source = self.table_source.clone();
             self.editing = None;
             self.compare = None;
             self.cursor = MatchCursor::default();
@@ -389,7 +394,7 @@ impl GridView {
     }
 
     fn run_find(&mut self, forward: bool, cx: &mut Context<Self>) {
-        if self.find_text(cx).is_empty() {
+        if self.dataset_count() == 0 || self.find_text(cx).is_empty() {
             return;
         }
         if !self.cursor.matches.is_empty() && self.cursor.status(false) != "No match" {
@@ -440,6 +445,9 @@ impl GridView {
     }
 
     fn apply_filter(&mut self, cx: &mut Context<Self>) {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return;
+        }
         let predicate = match parse_predicate(self.filter.read(cx).content()) {
             Ok(predicate) => predicate,
             Err(message) => {
@@ -468,6 +476,9 @@ impl GridView {
     }
 
     fn compare(&mut self, keyed: bool, cx: &mut Context<Self>) {
+        if matches!(self.tabs.current(), Tab::Query) && self.runs.is_empty() {
+            return;
+        }
         let source = self.source.clone();
         self.status = "Comparing…".into();
         self.begin_background(
@@ -921,6 +932,9 @@ fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.pager.total != self.dataset_count() {
+            self.pager = Pager::new(self.dataset_count());
+        }
         self.note_frame();
         self.pace_frame(window);
         let theme = Theme::current(cx);
