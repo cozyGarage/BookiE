@@ -1,6 +1,6 @@
 # 0039: GPUI source for the experimental frontends
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-09)
 - **Date**: 2026-11-05
 
 ## Context
