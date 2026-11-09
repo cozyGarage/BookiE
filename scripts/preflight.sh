@@ -20,6 +20,7 @@ esac
 
 CRATES=(
   bookie-core
+  bookie-driver-registry
   bookie-policy
   bookie-storage
   bookie-transport

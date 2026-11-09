@@ -899,6 +899,7 @@ dependencies = [
  "bookie-driver-oracle",
  "bookie-driver-postgres",
  "bookie-driver-redis",
+ "bookie-driver-registry",
  "bookie-driver-sqlite",
  "bookie-mcp",
  "bookie-policy",
@@ -932,6 +933,7 @@ dependencies = [
  "bookie-driver-oracle",
  "bookie-driver-postgres",
  "bookie-driver-redis",
+ "bookie-driver-registry",
  "bookie-driver-sqlite",
  "bookie-mcp",
  "bookie-policy",
@@ -1189,6 +1191,22 @@ dependencies = [
  "testcontainers",
  "testcontainers-modules",
  "tokio",
+]
+
+[[package]]
+name = "bookie-driver-registry"
+version = "0.2.5"
+dependencies = [
+ "bookie-core",
+ "bookie-driver-clickhouse",
+ "bookie-driver-duckdb",
+ "bookie-driver-mongodb",
+ "bookie-driver-mssql",
+ "bookie-driver-mysql",
+ "bookie-driver-oracle",
+ "bookie-driver-postgres",
+ "bookie-driver-redis",
+ "bookie-driver-sqlite",
 ]
 
 [[package]]
