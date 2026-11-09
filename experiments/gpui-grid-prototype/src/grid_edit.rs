@@ -38,19 +38,11 @@ impl GridView {
         let text = self.editor.read(cx).content().to_string();
         match parse_edit(editing.kind, &text) {
             Ok(cell) => {
-                println!(
-                    "PROTOTYPE_EDIT applied row={} column={} kind={} value={}",
-                    editing.row,
-                    editing.column,
-                    cell.kind(),
-                    cell.display()
-                );
                 self.edits.insert((editing.row, editing.column), cell);
                 self.status = format!("{} edited in this view only; nothing is saved.", self.edits.len());
                 self.stop_edit(window, cx);
             }
             Err(reason) => {
-                println!("PROTOTYPE_EDIT refused kind={} reason={reason}", editing.kind);
                 self.status = format!("Not applied: {reason}");
                 cx.notify();
             }
