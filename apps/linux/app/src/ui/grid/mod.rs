@@ -246,6 +246,7 @@ pub fn build_column_view(
     } else {
         &result.columns
     };
+    let display_columns: std::sync::Arc<[ColumnInfo]> = columns.to_vec().into();
     let model = tab_ctx.result_model.clone().unwrap_or_else(|| store.clone().upcast());
     let selection = gtk4::MultiSelection::new(Some(model));
     if tab_ctx.result_model.is_none()
@@ -306,6 +307,7 @@ pub fn build_column_view(
                 || (tab_ctx.local_result_sort && tab_ctx.sortable_result_columns.contains(&i)),
             default_min_width,
             column_widths: column_widths.clone(),
+            display_columns: display_columns.clone(),
         };
         let (col, edit_trigger) = build_column(&header, i, spec);
         col.set_id(Some(&i.to_string()));

@@ -140,6 +140,11 @@ fn cell_display_text(value: &Value) -> (Cow<'_, str>, bool) {
     }
 }
 
+pub(super) fn highlight_display_text(value: &Value, column: &ColumnInfo) -> (String, bool) {
+    let view = cell_view_with_column_editability(value, column, false);
+    (view.text_for_bind(false).into_owned(), view.is_null)
+}
+
 fn bounded_owned_text(mut text: String, max_chars: usize) -> (Cow<'static, str>, bool) {
     let Some((cut, _)) = text.char_indices().nth(max_chars) else {
         return (Cow::Owned(text), false);
@@ -321,7 +326,7 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
     preview_display_text(preview, usize::MAX)
 }
 
-fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
+pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
     let total = match preview.byte_count {
         crate::ui::row_object::PreviewByteCount::Exact(bytes) => {
             crate::tr!("{n} bytes total").replace("{n}", &bytes.to_string())

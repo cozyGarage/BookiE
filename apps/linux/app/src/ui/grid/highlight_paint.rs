@@ -1,10 +1,9 @@
 use bookie_app_services::highlight_match::{
     DisplayCell, HighlightPaint, HighlightTarget, PreparedHighlightRule, paint_for_cell,
 };
-use bookie_core::Value;
+use bookie_core::ColumnInfo;
 use gtk4::prelude::*;
 
-use super::display::value_to_display_text;
 use crate::ui::row_object::RowObject;
 
 const HIGHLIGHT_CSS_CLASSES: &[&str] = &[
@@ -80,6 +79,7 @@ pub(super) fn paint_for_bound_cell(
     shown_text: &str,
     shown_null: bool,
     row: &RowObject,
+    columns: &[ColumnInfo],
 ) -> Option<HighlightPaint> {
     if rules.is_empty() {
         return None;
@@ -89,18 +89,39 @@ pub(super) fn paint_for_bound_cell(
         is_null: shown_null,
     };
     paint_for_cell(rules, column, cell, |idx| {
-        let value = row.cell_value_in_row(idx)?;
-        let is_null = matches!(value, Value::Null);
-        Some((value_to_display_text(&value), is_null))
+        if let Some(preview) = row.cell_preview(idx) {
+            return Some((super::display::preview_display_text(&preview, 512), false));
+        }
+        row.with_cell_value(idx, |value| {
+            let column = columns.get(idx)?;
+            Some(super::display::highlight_display_text(value, column))
+        })
+        .flatten()
     })
 }
 
 #[cfg(test)]
 mod tests {
     use bookie_app_services::highlight_match::{HighlightOp, HighlightRule, HighlightTarget, prepare_rules};
-    use bookie_core::{FilterValue, Value};
+    use bookie_core::{ColumnInfo, FilterValue, Value};
 
     use super::*;
+
+    fn column(name: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
+            data_type: "text".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
 
     #[test]
     fn css_class_maps_palette_colour_and_rejects_unknown() {
@@ -141,7 +162,7 @@ mod tests {
         )
         .expect("prepare");
         let row = RowObject::new(vec![Value::Text("bad".into())]);
-        let paint = paint_for_bound_cell(&rules, 0, "bad", false, &row);
+        let paint = paint_for_bound_cell(&rules, 0, "bad", false, &row, &[column("status")]);
         assert_eq!(
             paint,
             Some(HighlightPaint {
@@ -150,5 +171,27 @@ mod tests {
             })
         );
         assert_eq!(row.cell_value(0), Value::Text("bad".into()));
+    }
+
+    #[test]
+    fn row_highlight_does_not_match_text_beyond_another_cells_display_limit() {
+        let rules = prepare_rules(
+            &[HighlightRule {
+                column: "detail".into(),
+                op: HighlightOp::Contains,
+                value: Some(FilterValue::Single("tail-marker".into())),
+                color: "red".into(),
+                target: HighlightTarget::Row,
+            }],
+            &["name", "detail"],
+        )
+        .expect("prepare");
+        let row = RowObject::new(vec![
+            Value::Text("first".into()),
+            Value::Text(format!("{}tail-marker", "a".repeat(512))),
+        ]);
+        let columns = [column("name"), column("detail")];
+        let paint = paint_for_bound_cell(&rules, 0, "first", false, &row, &columns);
+        assert_eq!(paint, None);
     }
 }
