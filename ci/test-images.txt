@@ -4,6 +4,7 @@
 # and not inside a test. Each group lists exactly what the tests it serves start;
 # scripts/tests/test_prepull_test_images.py fails when the two differ.
 postgres postgres:16-alpine
+postgres postgres:18-alpine
 postgres edoburu/pgbouncer:v1.24.1-p1
 mysql mysql:8.1
 mysql mariadb:11
