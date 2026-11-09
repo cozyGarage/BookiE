@@ -253,7 +253,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         let columns = connection.fetch_columns(None, &table).await.unwrap();
         let id_index = columns.iter().position(|column| column.name == "id").unwrap();
         let value_index = columns.iter().position(|column| column.name == "value").unwrap();
-        assert!(columns[id_index].primary_key, "{table} must expose its key for an edit");
+        assert!(
+            !columns[id_index].primary_key,
+            "{table} must not expose its sparse key as a unique row identity"
+        );
         let before = connection
             .query(&format!(
                 "SELECT id, value, toTypeName(value), toJSONString(value) FROM {table}"
@@ -264,15 +267,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         assert_eq!(before.rows[0][2], Value::Text(expected_type.into()));
         assert_eq!(before.rows[0][1], source.rows[0][0]);
 
-        let update = bookie_core::sql_dialect::build_keyed_update(
-            "clickhouse",
-            None,
-            &table,
-            &columns,
-            &[(value_index, before.rows[0][value_index].clone())],
-            &[before.rows[0][id_index].clone()],
-        )
-        .unwrap();
+        let update = (
+            format!("ALTER TABLE `{table}` UPDATE `value` = ? WHERE `id` = ?"),
+            vec![before.rows[0][value_index].clone(), before.rows[0][id_index].clone()],
+        );
         let edit_result = connection.execute_in_transaction(&[update]).await;
         assert!(
             matches!(
@@ -282,7 +280,7 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
                     source,
                 }) if matches!(source.as_ref(), bookie_core::DriverError::Unsupported(_))
             ),
-            "nested {expected_type} grid edit must be refused before changing the row, got {edit_result:?}"
+            "nested {expected_type} mutation must be refused before changing the row, got {edit_result:?}"
         );
         let after = connection
             .query(&format!(

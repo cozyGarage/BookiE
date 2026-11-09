@@ -194,7 +194,7 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
+async fn wide_integer_mutations_bind_exact_values_for_explicit_predicates() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
     conn.execute(
@@ -226,33 +226,15 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
         .await
         .unwrap();
     let id_index = columns.iter().position(|column| column.name == "id").unwrap();
-    let signed_index = columns
-        .iter()
-        .position(|column| column.name == "signed_amount")
-        .unwrap();
-    let unsigned_index = columns
-        .iter()
-        .position(|column| column.name == "unsigned_amount")
-        .unwrap();
-    assert!(columns[id_index].primary_key);
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "wide_grid_edits",
-        &columns,
-        &[
-            (
-                signed_index,
-                Value::Text("-170141183460469231731687303715884105727".into()),
-            ),
-            (
-                unsigned_index,
-                Value::Text("340282366920938463463374607431768211454".into()),
-            ),
+    assert!(!columns[id_index].primary_key);
+    let update = (
+        "ALTER TABLE `wide_grid_edits` UPDATE `signed_amount` = ?, `unsigned_amount` = ? WHERE `id` = ?".to_string(),
+        vec![
+            Value::Text("-170141183460469231731687303715884105727".into()),
+            Value::Text("340282366920938463463374607431768211454".into()),
+            result.rows[0][id_index].clone(),
         ],
-        &[result.rows[0][id_index].clone()],
-    )
-    .unwrap();
+    );
     conn.execute_in_transaction(&[update]).await.unwrap();
 
     let after = conn
@@ -267,21 +249,14 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
             Value::Text("0".into()),
         ]
     );
-    let update = bookie_core::sql_dialect::build_keyed_update(
-        "clickhouse",
-        None,
-        "wide_grid_edits",
-        &columns,
-        &[
-            (
-                signed_index,
-                Value::Text("170141183460469231731687303715884105726".into()),
-            ),
-            (unsigned_index, Value::Text("1".into())),
+    let update = (
+        "ALTER TABLE `wide_grid_edits` UPDATE `signed_amount` = ?, `unsigned_amount` = ? WHERE `id` = ?".to_string(),
+        vec![
+            Value::Text("170141183460469231731687303715884105726".into()),
+            Value::Text("1".into()),
+            after.rows[1][id_index].clone(),
         ],
-        &[after.rows[1][id_index].clone()],
-    )
-    .unwrap();
+    );
     conn.execute_in_transaction(&[update]).await.unwrap();
 
     let final_rows = conn
@@ -327,7 +302,7 @@ async fn copied_in_clause_keeps_backslash_payload_as_data() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn connect_list_tables_and_pk_detection() {
+async fn connect_list_tables_and_primary_sorting_index_detection() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
@@ -351,7 +326,7 @@ async fn connect_list_tables_and_pk_detection() {
     let cols = conn.fetch_columns(None, "pk_demo").await.unwrap();
     assert_eq!(cols.len(), 3);
     let id_col = cols.iter().find(|c| c.name == "id").unwrap();
-    assert!(id_col.primary_key, "ORDER BY key must be detected as primary_key");
+    assert!(!id_col.primary_key, "a sparse sorting key is not a unique row identity");
     assert!(!id_col.nullable);
     let note_col = cols.iter().find(|c| c.name == "note").unwrap();
     assert!(!note_col.primary_key);
