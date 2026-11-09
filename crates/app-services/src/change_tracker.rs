@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use uuid::Uuid;
 
@@ -149,6 +149,25 @@ impl TabChangeTracker {
     }
 
     pub fn track_cell_edit(&mut self, row_key: RowKey, col: usize, original: Value, new: Value) {
+        self.apply_cell_edit(row_key.clone(), col, original, new);
+        self.emit_changed(vec![row_key]);
+    }
+
+    pub fn track_cell_edits(&mut self, edits: Vec<(RowKey, usize, Value, Value)>) {
+        let mut changed_rows = Vec::new();
+        let mut seen_rows = HashSet::new();
+        for (row_key, col, original, new) in edits {
+            if seen_rows.insert(row_key.clone()) {
+                changed_rows.push(row_key.clone());
+            }
+            self.apply_cell_edit(row_key, col, original, new);
+        }
+        if !changed_rows.is_empty() {
+            self.emit_changed(changed_rows);
+        }
+    }
+
+    fn apply_cell_edit(&mut self, row_key: RowKey, col: usize, original: Value, new: Value) {
         let key = (row_key.clone(), col);
         let (base, shown_before) = self.updates.get(&key).map_or_else(
             || (original.clone(), original.clone()),
@@ -173,7 +192,6 @@ impl TabChangeTracker {
             base,
             prev_touched: false,
         });
-        self.emit_changed(vec![row_key]);
     }
 
     pub fn track_insert(&mut self, default_values: Vec<Value>) -> RowKey {
