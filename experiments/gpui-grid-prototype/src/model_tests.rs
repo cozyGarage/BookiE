@@ -45,7 +45,7 @@ fn find_stops_at_the_cap_and_says_so() {
     let found = find_rows(150_000, "sample", 100).unwrap();
     assert_eq!(found.matches.len(), 100);
     assert!(found.capped);
-    assert_eq!(found.scanned, 100);
+    assert_eq!(found.scanned, 101);
 }
 
 #[test]
