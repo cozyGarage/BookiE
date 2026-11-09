@@ -35,6 +35,8 @@ def verify(bundle, revision):
             raise ValueError('unverified test executable')
     if any(path not in index['files'] for path in index.get('binaries', {}).values()):
         raise ValueError('unverified helper executable')
+    if (bundle / 'nextest.tar.zst').exists() and 'nextest.tar.zst' not in index['files']:
+        raise ValueError('unverified nextest archive')
     return index
 
 

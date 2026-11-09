@@ -85,6 +85,11 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unverified helper executable'):
             runner.load_index(self.root)
 
+    def test_unverified_nextest_archive_is_rejected(self):
+        (self.root / 'nextest.tar.zst').write_bytes(b'unverified')
+        with self.assertRaisesRegex(ValueError, 'unverified nextest archive'):
+            runner.load_index(self.root)
+
     def test_missing_package_cannot_be_silently_skipped(self):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ['-p', 'sample', '-p', 'missing', '--tests'])
