@@ -598,6 +598,7 @@ impl GridView {
                     .min_w_0()
                     .gap_1()
                     .overflow_x_scroll()
+                    .track_scroll(&self.run_scroll)
                     .children(run_tabs),
             )
             .child(switch("view-table", "Table Data", !self.summary_view, false, cx))
