@@ -68,3 +68,17 @@ fn the_generated_config_applies_the_policy_before_any_user_file_is_included() {
         assert!(position < first_include, "{keyword} must come before the first Include");
     }
 }
+
+#[test]
+fn every_keyword_is_understood_by_openssh_older_than_8_5() {
+    const KEYWORDS_SINCE_7_5: [&str; 5] = [
+        "HostKeyAlgorithms",
+        "PubkeyAcceptedKeyTypes",
+        "Ciphers",
+        "KexAlgorithms",
+        "MACs",
+    ];
+    for (keyword, _) in REMOVED_ALGORITHMS {
+        assert!(KEYWORDS_SINCE_7_5.contains(&keyword), "{keyword}");
+    }
+}
