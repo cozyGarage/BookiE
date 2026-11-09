@@ -236,7 +236,10 @@ fn datetime64_nine_digit_range_edges_remain_representable() {
         .unwrap()
         .and_hms_nano_opt(23, 47, 16, 854_775_807)
         .unwrap();
-    assert_eq!(literal(&Value::DateTime(lower)).unwrap(), "toDateTime64('1900-01-01 00:00:00', 0)");
+    assert_eq!(
+        literal(&Value::DateTime(lower)).unwrap(),
+        "toDateTime64('1900-01-01 00:00:00', 0)"
+    );
     assert_eq!(
         literal(&Value::TimestampTz(upper.and_utc())).unwrap(),
         "toDateTime64('2262-04-11 23:47:16.854775807', 9, 'UTC')"
