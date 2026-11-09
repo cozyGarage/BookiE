@@ -207,6 +207,7 @@ mod tests {
             client: bookie_storage::SshClient::Builtin,
             agent: false,
             agent_identity: None,
+            local_port: None,
         }
     }
 

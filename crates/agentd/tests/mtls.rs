@@ -147,6 +147,7 @@ async fn agentd_uses_a_saved_client_certificate_through_its_saved_ssh_route() {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     });
     save_connections(std::slice::from_ref(&saved))
         .await

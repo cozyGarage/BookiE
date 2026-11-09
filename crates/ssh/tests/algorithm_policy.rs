@@ -64,6 +64,7 @@ async fn open_config(peer: Config) -> SshError {
             path: PathBuf::from("/nonexistent/id_ed25519"),
             passphrase: None,
         },
+        local_port: None,
     };
     match SshTunnel::open(config, "db.example".into(), 5432, UnknownHostKey::Refuse).await {
         Ok(_) => panic!("the test peer must never yield a usable tunnel"),

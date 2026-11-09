@@ -105,6 +105,7 @@ fn hop() -> SshConfig {
         auth: SshAuth::Password {
             password: secrecy::SecretString::new("unused".to_string().into()),
         },
+        local_port: None,
     }
 }
 

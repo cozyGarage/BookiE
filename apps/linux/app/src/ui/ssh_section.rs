@@ -22,6 +22,7 @@ pub struct SshSection {
     pub auth_combo: adw::ComboRow,
     host: adw::EntryRow,
     port: adw::SpinRow,
+    local_port: adw::SpinRow,
     user: adw::EntryRow,
     password: adw::PasswordEntryRow,
     key_path: adw::EntryRow,
@@ -62,6 +63,9 @@ impl SshSection {
         let port = adw::SpinRow::with_range(1.0, 65535.0, 1.0);
         port.set_title(&crate::tr!("Port"));
         port.set_value(22.0);
+        let local_port = adw::SpinRow::with_range(0.0, 65535.0, 1.0);
+        local_port.set_title(&crate::tr!("Local port"));
+        local_port.set_subtitle(&crate::tr!("0 picks a free port"));
         let user = adw::EntryRow::builder().title(crate::tr!("Username")).build();
 
         let auth_pwd = crate::tr!("Password");
@@ -99,6 +103,7 @@ impl SshSection {
 
         expander.add_row(&host);
         expander.add_row(&port);
+        expander.add_row(&local_port);
         expander.add_row(&user);
         expander.add_row(&auth_combo);
         expander.add_row(&password);
@@ -113,6 +118,7 @@ impl SshSection {
             auth_combo,
             host,
             port,
+            local_port,
             user,
             password,
             key_path,
@@ -127,6 +133,7 @@ impl SshSection {
     pub fn prefill(&self, saved: &SavedSshConfig, password: Option<&SecretString>, passphrase: Option<&SecretString>) {
         self.host.set_text(&saved.host);
         self.port.set_value(f64::from(saved.port));
+        self.local_port.set_value(f64::from(saved.local_port.unwrap_or(0)));
         self.user.set_text(&saved.username);
         self.system_client
             .set_active(saved.client == bookie_storage::SshClient::OpenSsh);
@@ -242,6 +249,7 @@ impl SshSection {
                 port,
                 username: username.clone(),
                 auth,
+                local_port: local_port_setting(self.local_port.value()),
             },
             saved: SavedSshConfig {
                 hop_id: uuid::Uuid::new_v4(),
@@ -258,6 +266,7 @@ impl SshSection {
                     bookie_storage::SshClient::Builtin
                 },
                 agent_identity: if agent { agent_identity } else { None },
+                local_port: local_port_setting(self.local_port.value()),
             },
             secret_to_store: secret,
         })
@@ -272,6 +281,13 @@ impl SshInputs {
                 .map(bookie_transport::SshRoute::OpenSsh)
                 .map_err(|error| error.to_string()),
         }
+    }
+}
+
+fn local_port_setting(value: f64) -> Option<u16> {
+    match value as u16 {
+        0 => None,
+        port => Some(port),
     }
 }
 
@@ -405,5 +421,11 @@ mod tests {
 
         section.agent_key.set_text("");
         assert_eq!(section.collect().unwrap().saved.agent_identity, None);
+    }
+
+    #[test]
+    fn zero_means_an_automatic_local_port() {
+        assert_eq!(local_port_setting(0.0), None);
+        assert_eq!(local_port_setting(15432.0), Some(15432));
     }
 }

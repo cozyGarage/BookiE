@@ -93,7 +93,9 @@ pub(crate) async fn openssh_config_in_sandbox(
                 .into(),
         ));
     }
-    build_openssh_config(&crate::resolve_saved_ssh_hop(id, saved, 0).await?, sandboxed)
+    let mut hop = crate::resolve_saved_ssh_hop(id, saved, 0).await?;
+    hop.local_port = saved.local_port;
+    build_openssh_config(&hop, sandboxed)
 }
 
 pub fn openssh_config_for(config: &SshConfig) -> Result<OpenSshConfig, TransportError> {
@@ -123,6 +125,7 @@ fn build_openssh_config(config: &SshConfig, sandboxed: bool) -> Result<OpenSshCo
         destination,
         jump_hosts: Vec::new(),
         auth,
+        local_port: config.local_port,
     })
 }
 
@@ -141,11 +144,27 @@ pub(crate) async fn open_openssh(
         .await
         .map_err(map_openssh_error)?;
     let target = ForwardTarget::new(remote.0, remote.1).map_err(map_openssh_error)?;
-    let route = match socket_name {
-        Some(name) => ForwardRoute::NamedUnixSocket(name),
-        None => ForwardRoute::LoopbackTcp,
-    };
+    let route = forward_route(socket_name, config.local_port)?;
     session.forward(target, route).await.map_err(map_openssh_error)
+}
+
+pub(crate) fn forward_route(
+    socket_name: Option<String>,
+    local_port: Option<u16>,
+) -> Result<ForwardRoute, TransportError> {
+    match (socket_name, local_port) {
+        (Some(_), Some(port)) => Err(fixed_port_needs_tcp(port)),
+        (Some(name), None) => Ok(ForwardRoute::NamedUnixSocket(name)),
+        (None, Some(port)) => Ok(ForwardRoute::FixedLoopbackTcp(port)),
+        (None, None) => Ok(ForwardRoute::LoopbackTcp),
+    }
+}
+
+pub(crate) fn fixed_port_needs_tcp(port: u16) -> TransportError {
+    TransportError::Ssh(format!(
+        "local port {port} cannot be used because this connection forwards through a Unix socket so TLS can verify \
+         the server name; clear the local port or change the TLS mode"
+    ))
 }
 
 fn map_openssh_error(error: bookie_ssh::openssh::OpenSshError) -> TransportError {
@@ -207,6 +226,25 @@ fn is_executable(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_forward_route_follows_the_socket_name_and_local_port() {
+        assert_eq!(forward_route(None, None).unwrap(), ForwardRoute::LoopbackTcp);
+        assert_eq!(
+            forward_route(None, Some(15432)).unwrap(),
+            ForwardRoute::FixedLoopbackTcp(15432)
+        );
+        assert_eq!(
+            forward_route(Some("pg".into()), None).unwrap(),
+            ForwardRoute::NamedUnixSocket("pg".into())
+        );
+    }
+
+    #[test]
+    fn a_fixed_port_with_a_forwarded_socket_is_refused_naming_the_port() {
+        let error = forward_route(Some("pg".into()), Some(15432)).unwrap_err();
+        assert!(error.to_string().contains("15432"), "{error}");
+    }
+
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
@@ -283,6 +321,7 @@ exec sleep 300
             destination: SshDestination::new("bastion", None, None).unwrap(),
             jump_hosts: Vec::new(),
             auth: OpenSshAuth::Agent,
+            local_port: None,
         };
 
         let cancel = CancellationToken::new();
@@ -363,6 +402,7 @@ mod sandbox_tests {
             port: 22,
             username: "me".into(),
             auth: SshAuth::Agent,
+            local_port: None,
         };
         assert!(matches!(
             build_openssh_config(&config, true),

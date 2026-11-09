@@ -163,6 +163,7 @@ fn open_is_single_hop_wrapper_shape() {
         auth: SshAuth::Password {
             password: SecretString::new("x".to_string().into()),
         },
+        local_port: None,
     };
     let hops = std::slice::from_ref(&cfg);
     assert_eq!(hops.len(), 1);
@@ -519,7 +520,11 @@ fn an_ephemeral_bind_gets_a_nonzero_port() {
 
 #[test]
 fn a_fixed_bind_listens_on_the_requested_port() {
-    let free = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+    let free = std::net::TcpListener::bind(("127.0.0.1", 0))
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
     let (_listener, port, _) = block_on(bind_local(LocalBind::FixedTcp { port: free })).unwrap();
     assert_eq!(port, free);
 }

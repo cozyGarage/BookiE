@@ -97,6 +97,7 @@ impl Fake {
             destination: SshDestination::new("bastion", Some(2222), Some("deploy".to_owned())).unwrap(),
             jump_hosts: SshDestination::parse_jump_list("ops@jump1").unwrap(),
             auth,
+            local_port: None,
         };
         for _ in 0..50 {
             match OpenSshSession::connect(
@@ -234,6 +235,7 @@ async fn a_cancelled_connect_stops_the_master() {
         destination: SshDestination::new("bastion", None, None).unwrap(),
         jump_hosts: Vec::new(),
         auth: OpenSshAuth::Agent,
+        local_port: None,
     };
     let cancel = CancellationToken::new();
     let connecting = OpenSshSession::connect(&config, &fake.context, Arc::new(UnattendedPrompter), cancel.clone());
@@ -409,9 +411,16 @@ async fn a_fixed_loopback_forward_listens_on_the_requested_port() {
     let fake = Fake::new();
     let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
     let target = ForwardTarget::new("db.internal", 5432).unwrap();
-    let port = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap().local_addr().unwrap().port();
+    let port = std::net::TcpListener::bind(("127.0.0.1", 0))
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
 
-    let forward = session.forward(target, ForwardRoute::FixedLoopbackTcp(port)).await.unwrap();
+    let forward = session
+        .forward(target, ForwardRoute::FixedLoopbackTcp(port))
+        .await
+        .unwrap();
 
     let LocalEndpoint::Tcp(address) = forward.local_endpoint().clone() else {
         panic!("expected a loopback port");
@@ -429,7 +438,10 @@ async fn a_fixed_loopback_forward_on_a_busy_port_is_a_local_bind_error_naming_th
     let held = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let busy = held.local_addr().unwrap().port();
 
-    let error = session.forward(target, ForwardRoute::FixedLoopbackTcp(busy)).await.unwrap_err();
+    let error = session
+        .forward(target, ForwardRoute::FixedLoopbackTcp(busy))
+        .await
+        .unwrap_err();
 
     let OpenSshError::LocalBind { detail } = error else {
         panic!("expected a local bind error, got {error:?}");

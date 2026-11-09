@@ -34,6 +34,7 @@ pub struct SshConfig {
     pub port: u16,
     pub username: String,
     pub auth: SshAuth,
+    pub local_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -274,6 +275,18 @@ impl SshTunnel {
     ) -> Result<Self, SshError> {
         let bind = LocalBind::FixedTcp { port: local_port };
         Self::open_chain_with(hops, remote_host, remote_port, bind, unknown, None).await
+    }
+
+    pub async fn open_chain_on_port_prompted(
+        hops: &[SshConfig],
+        remote_host: String,
+        remote_port: u16,
+        local_port: u16,
+        unknown: UnknownHostKey,
+        prompter: Arc<dyn Prompter>,
+    ) -> Result<Self, SshError> {
+        let bind = LocalBind::FixedTcp { port: local_port };
+        Self::open_chain_with(hops, remote_host, remote_port, bind, unknown, Some(prompter)).await
     }
 
     pub async fn open_chain_prompted(
