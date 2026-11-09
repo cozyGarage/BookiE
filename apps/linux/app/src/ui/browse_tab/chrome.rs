@@ -466,26 +466,12 @@ impl BrowseTab {
     }
 
     pub(super) fn update_sort_status_label(&self) {
-        if self.current_sort_keys.is_empty() {
+        let Some(summary) = sort_status_summary(&self.current_sort_keys, &self.current_columns) else {
             self.sort_status_label.set_visible(false);
             self.sort_status_label.set_label("");
             self.clear_sort_button.set_visible(false);
             return;
-        }
-        let parts = self
-            .current_sort_keys
-            .iter()
-            .map(|&(column, ascending)| {
-                let name = self
-                    .current_columns
-                    .get(column)
-                    .map(|column| column.name.as_str())
-                    .unwrap_or("?");
-                let arrow = if ascending { "↑" } else { "↓" };
-                format!("{name} {arrow}")
-            })
-            .collect::<Vec<_>>();
-        let summary = crate::tr!("Sorted by {keys}").replace("{keys}", &parts.join(", "));
+        };
         self.sort_status_label.set_label(&summary);
         self.sort_status_label.set_visible(true);
         self.clear_sort_button.set_visible(true);
@@ -545,6 +531,27 @@ impl BrowseTab {
             .build();
         self.replace_status_child("error", &page);
     }
+}
+
+fn sort_status_summary(keys: &[(usize, bool)], columns: &[ColumnInfo]) -> Option<String> {
+    if keys.is_empty() {
+        return None;
+    }
+    let parts = keys
+        .iter()
+        .map(|&(column, ascending)| {
+            let name = columns.get(column).map(|column| column.name.as_str()).unwrap_or("?");
+            let arrow = if ascending { "↑" } else { "↓" };
+            format!("{name} {arrow}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let template = if keys.len() > 1 {
+        crate::tr!("Secondary sort applies only to the loaded page: {keys}")
+    } else {
+        crate::tr!("Sorted by {keys}")
+    };
+    Some(template.replace("{keys}", &parts))
 }
 
 fn retry_button(sender: &ComponentSender<BrowseTab>) -> gtk::Button {
@@ -693,7 +700,9 @@ pub(super) fn bind_inspector(
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary};
+    use super::{
+        extract_first_keyset_cursor, extract_keyset_cursor, format_thousands, paginator_summary, sort_status_summary,
+    };
     use bookie_core::{ColumnInfo, QueryResult, Value};
 
     #[test]
@@ -733,6 +742,27 @@ mod tests {
             enum_type: None,
             domain_type: None,
         }
+    }
+
+    #[test]
+    fn secondary_sort_status_says_it_only_applies_to_the_loaded_page() {
+        let columns = vec![column("id", true), column("name", false)];
+
+        assert_eq!(
+            sort_status_summary(&[(0, true), (1, false)], &columns).as_deref(),
+            Some("Secondary sort applies only to the loaded page: id ↑, name ↓")
+        );
+    }
+
+    #[test]
+    fn single_key_sort_status_keeps_its_server_sort_wording() {
+        let columns = vec![column("id", true)];
+
+        assert_eq!(
+            sort_status_summary(&[(0, true)], &columns).as_deref(),
+            Some("Sorted by id ↑")
+        );
+        assert_eq!(sort_status_summary(&[], &columns), None);
     }
 
     #[test]
