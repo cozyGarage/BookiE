@@ -1057,8 +1057,13 @@ pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
 }
 
-fn display_cell(width: f32, cell: &Cell) -> Div {
-    let item = cell_div(width, cell_preview(cell));
+fn display_cell(width: f32, cell: &Cell, theme: Theme) -> Div {
+    let mut item = cell_div(width, cell_preview(cell));
+    if let Some(kind) = bookie_gpui_grid_prototype::type_colors::type_kind(cell) {
+        item = item.text_color(rgb(bookie_gpui_grid_prototype::type_colors::type_color(
+            kind, theme.dark,
+        )));
+    }
     if numeric_cell(cell) { item.justify_end() } else { item }
 }
 
