@@ -7,7 +7,7 @@ use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, prelude
 
 use crate::text_input::InputEvent;
 use crate::ui_theme::ThemeExt;
-use crate::{CELL_WIDTHS, GridView, display_cell};
+use crate::{GridView, display_cell};
 use bookie_gpui_grid_prototype::theme::Theme;
 
 pub type Edits = HashMap<(u64, usize), Cell>;
@@ -68,7 +68,7 @@ impl GridView {
 
     pub fn start_edit(&mut self, row: u64, column: usize, window: &mut Window, cx: &mut Context<Self>) {
         let cell = self.cell_at(row, column);
-        if !is_editable(column, &cell) {
+        if !self.source.editable() || !is_editable(column, &cell) {
             self.status = "This cell cannot be edited".into();
             cx.notify();
             return;
@@ -101,7 +101,7 @@ impl GridView {
     }
 
     pub fn data_cell(&self, source: u64, column: usize, position: usize, cell: &Cell, cx: &mut Context<Self>) -> Div {
-        let width = CELL_WIDTHS[column];
+        let width = self.source.columns().get(column).map_or(120.0, |column| column.width);
         if self
             .editing
             .as_ref()

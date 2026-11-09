@@ -76,7 +76,7 @@ fn cancelled_scans_return_and_a_cancelled_initialization_can_be_retried() {
     let cancel = CancellationToken::new();
     cancel.cancel();
     assert_eq!(source.find("sample", 10, &cancel), Err("the operation was cancelled"));
-    let predicate = parse_predicate("label contains 1").unwrap();
+    let predicate = parse_predicate("label contains 1", &synthetic_columns()).unwrap();
     assert_eq!(source.filter(&predicate, &cancel), Err("the operation was cancelled"));
     assert!(matches!(source.compare(false, &cancel), Err("comparison cancelled")));
     assert_eq!(
@@ -88,9 +88,9 @@ fn cancelled_scans_return_and_a_cancelled_initialization_can_be_retried() {
 #[test]
 fn null_never_matches_text_but_not_equals_keeps_it() {
     let source = Synthetic::new(6);
-    let equals = parse_predicate("state = true").unwrap();
+    let equals = parse_predicate("state = true", &synthetic_columns()).unwrap();
     assert_eq!(source.filter(&equals, &CancellationToken::new()), Ok(vec![2, 4]));
-    let not_equals = parse_predicate("state != true").unwrap();
+    let not_equals = parse_predicate("state != true", &synthetic_columns()).unwrap();
     assert_eq!(
         source.filter(&not_equals, &CancellationToken::new()),
         Ok(vec![0, 1, 3, 5])
@@ -99,7 +99,7 @@ fn null_never_matches_text_but_not_equals_keeps_it() {
 
 #[test]
 fn filtering_keeps_the_exact_typed_integer_text() {
-    let predicate = parse_predicate("value != 9007199254740993").unwrap();
+    let predicate = parse_predicate("value != 9007199254740993", &synthetic_columns()).unwrap();
     let kept = Synthetic::new(10)
         .filter(&predicate, &CancellationToken::new())
         .unwrap();
@@ -125,7 +125,7 @@ fn filtering_typed_values_matches_their_displayed_text() {
         ("<undecodable numeric(40,20)>", 10),
     ];
     for (text, expected_modulo) in cases {
-        let predicate = parse_predicate(&format!("typed = {text}")).unwrap();
+        let predicate = parse_predicate(&format!("typed = {text}"), &synthetic_columns()).unwrap();
         let expected = (0..30)
             .filter(|index| index % 12 == expected_modulo)
             .collect::<Vec<_>>();
@@ -136,7 +136,7 @@ fn filtering_typed_values_matches_their_displayed_text() {
         );
     }
 
-    let not_equals = parse_predicate("typed != 2026-11-04").unwrap();
+    let not_equals = parse_predicate("typed != 2026-11-04", &synthetic_columns()).unwrap();
     assert_eq!(
         source.filter(&not_equals, &CancellationToken::new()).unwrap(),
         (0..30).filter(|index| ![2, 14, 26].contains(index)).collect::<Vec<_>>()
@@ -145,7 +145,7 @@ fn filtering_typed_values_matches_their_displayed_text() {
 
 #[test]
 fn filtering_text_values_is_case_insensitive() {
-    let predicate = parse_predicate("label = SAMPLE 1").unwrap();
+    let predicate = parse_predicate("label = SAMPLE 1", &synthetic_columns()).unwrap();
     assert_eq!(
         Synthetic::new(10).filter(&predicate, &CancellationToken::new()),
         Ok(vec![1])
@@ -154,11 +154,11 @@ fn filtering_text_values_is_case_insensitive() {
 
 #[test]
 fn predicates_are_validated() {
-    assert!(parse_predicate("label contains 7").is_ok());
-    assert!(parse_predicate("nope contains 7").is_err());
-    assert!(parse_predicate("label like 7").is_err());
-    assert!(parse_predicate("label contains").is_err());
-    assert!(parse_predicate(&format!("label contains {}", "x".repeat(257))).is_err());
+    assert!(parse_predicate("label contains 7", &synthetic_columns()).is_ok());
+    assert!(parse_predicate("nope contains 7", &synthetic_columns()).is_err());
+    assert!(parse_predicate("label like 7", &synthetic_columns()).is_err());
+    assert!(parse_predicate("label contains", &synthetic_columns()).is_err());
+    assert!(parse_predicate(&format!("label contains {}", "x".repeat(257)), &synthetic_columns()).is_err());
 }
 
 #[test]
@@ -296,13 +296,13 @@ fn bytes_float_and_undecodable_render_by_their_own_rules() {
 
 #[test]
 fn a_filter_and_find_can_target_the_typed_column() {
-    let predicate = parse_predicate("typed contains deadbeef").unwrap();
+    let predicate = parse_predicate("typed contains deadbeef", &synthetic_columns()).unwrap();
     let hits = Synthetic::new(150_000)
         .filter(&predicate, &CancellationToken::new())
         .unwrap();
     assert_eq!(hits.first().copied(), Some(1));
     assert!(hits.iter().all(|row| u64::from(*row) % TYPED_KINDS == 1));
-    let not_undecodable = parse_predicate("typed != <undecodable numeric(40,20)>").unwrap();
+    let not_undecodable = parse_predicate("typed != <undecodable numeric(40,20)>", &synthetic_columns()).unwrap();
     assert_eq!(
         Synthetic::new(24)
             .filter(&not_undecodable, &CancellationToken::new())

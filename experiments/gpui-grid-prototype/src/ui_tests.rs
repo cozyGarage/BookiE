@@ -381,6 +381,14 @@ struct Tiny;
 struct CountingSource(std::sync::Arc<std::sync::atomic::AtomicUsize>);
 
 impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
+    fn editable(&self) -> bool {
+        true
+    }
+
+    fn columns(&self) -> &[bookie_gpui_grid_prototype::model::ColumnMeta] {
+        test_columns()
+    }
+
     fn total(&self) -> u64 {
         3
     }
@@ -552,6 +560,10 @@ fn platform_input_flattens_newlines_like_single_line_paste(cx: &mut TestAppConte
 }
 
 impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
+    fn columns(&self) -> &[bookie_gpui_grid_prototype::model::ColumnMeta] {
+        test_columns()
+    }
+
     fn total(&self) -> u64 {
         3
     }
@@ -1021,4 +1033,84 @@ fn the_results_pane_can_be_hidden_and_the_summary_view_shows_the_run(cx: &mut Te
     cx.simulate_input("show the results");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| assert!(view.result_open));
+}
+
+fn test_columns() -> &'static [bookie_gpui_grid_prototype::model::ColumnMeta] {
+    static COLUMNS: std::sync::OnceLock<Vec<bookie_gpui_grid_prototype::model::ColumnMeta>> =
+        std::sync::OnceLock::new();
+    COLUMNS.get_or_init(bookie_gpui_grid_prototype::model::synthetic_columns)
+}
+
+struct TwoColumns;
+
+impl bookie_gpui_grid_prototype::source::ResultSource for TwoColumns {
+    fn columns(&self) -> &[bookie_gpui_grid_prototype::model::ColumnMeta] {
+        static COLUMNS: std::sync::OnceLock<Vec<bookie_gpui_grid_prototype::model::ColumnMeta>> =
+            std::sync::OnceLock::new();
+        COLUMNS.get_or_init(|| {
+            ["id", "customer_name"]
+                .into_iter()
+                .map(|name| bookie_gpui_grid_prototype::model::ColumnMeta {
+                    name: name.into(),
+                    width: 150.0,
+                })
+                .collect()
+        })
+    }
+
+    fn total(&self) -> u64 {
+        3
+    }
+
+    fn row(&self, index: u64) -> Vec<Cell> {
+        vec![Cell::Int(index as i64), Cell::Text(format!("customer {index}"))]
+    }
+
+    fn find(
+        &self,
+        _query: &str,
+        _cap: usize,
+        _cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+        Err("not needed")
+    }
+
+    fn filter(
+        &self,
+        _predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        _cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Vec<u32>, &'static str> {
+        Err("not needed")
+    }
+
+    fn compare(
+        &self,
+        _keyed: bool,
+        _cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
+        Err("not needed")
+    }
+}
+
+#[gpui::test]
+fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_editing(cx: &mut TestAppContext) {
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        GridView::with_source(std::sync::Arc::new(TwoColumns), Instant::now(), window, cx)
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.run_until_parked();
+    cx.simulate_keystrokes("right right right");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 0, column: 1 }));
+        assert_eq!(view.status, "Row 1, Customer_name");
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(0, 1, window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.editing.is_none(), "a read-only source refuses edits");
+        assert_eq!(view.status, "This cell cannot be edited");
+    });
 }
