@@ -10,6 +10,10 @@ pub(super) struct DatabaseChoice {
     pub current: bool,
 }
 
+pub(super) fn effective_database_name(connected: Option<&str>, saved: Option<&str>) -> String {
+    connected.or(saved).unwrap_or("database").to_owned()
+}
+
 pub(super) fn database_choices(names: &[String], current: &str) -> Vec<DatabaseChoice> {
     let mut choices: Vec<DatabaseChoice> = names
         .iter()
@@ -353,5 +357,22 @@ mod tests {
             "next".to_owned()
         ));
         assert_eq!(pending, Some((requested_connection_id, "next".to_owned())));
+    }
+
+    #[test]
+    fn active_session_database_takes_precedence_over_saved_connection_value() {
+        let active = effective_database_name(Some("session_db"), Some("stale_saved_db"));
+        assert_eq!(active, "session_db");
+        assert!(!super::super::catalog_ddl::droppable_database(
+            "session_db",
+            &active,
+            "postgres"
+        ));
+    }
+
+    #[test]
+    fn saved_database_and_generic_name_are_fallbacks_without_session_identity() {
+        assert_eq!(effective_database_name(None, Some("saved_db")), "saved_db");
+        assert_eq!(effective_database_name(None, None), "database");
     }
 }

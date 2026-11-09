@@ -80,9 +80,11 @@ impl App {
     }
 
     pub(super) fn active_database_name(&self) -> String {
-        self.connection_id
+        let saved = self
+            .connection_id
             .and_then(|id| self.saved_connections.iter().find(|saved| saved.id == id))
-            .map_or_else(|| "database".to_owned(), |saved| saved.database.clone())
+            .map(|saved| saved.database.as_str());
+        super::database_switcher::effective_database_name(self.connected_database.as_deref(), saved)
     }
 
     pub(super) fn on_start_backup_job(&mut self, job: BackupJob, sender: ComponentSender<Self>) {
