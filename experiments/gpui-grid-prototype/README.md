@@ -93,7 +93,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- Synthetic data, no database. The typed column carries the same kinds and exact text as the Tauri prototype, but as canonical text held by a local cell type, converted to and from `bookie_core::Value` at the edges (`src/core_bridge.rs`). A test checks every synthetic cell survives that round trip.
+- Synthetic data, no database. Driver-shaped temporal, decimal, UUID and JSON values retain their original `bookie_core::Value` through the cell bridge. Synthetic edits still use the prototype's local cell representation. Tests cover typed round trips and bounded JSON previews.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - No text editing beyond the minimal fields above, and no SQL editor. A multi-line editor is a much larger piece (Zed's editor is its own crate) and is left until the single-line input has had real keyboard and IME feedback.
 - It measures one machine with one GPU driver; it does not establish performance on other hardware.
