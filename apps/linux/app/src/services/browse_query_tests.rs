@@ -326,7 +326,7 @@ async fn assert_duckdb_value_preview_native(
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
+async fn clickhouse_value_query_refuses_duplicate_sort_keys() {
     use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
     use testcontainers::core::wait::HttpWaitStrategy;
     use testcontainers::core::{IntoContainerPort, WaitFor};
@@ -363,14 +363,15 @@ async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
     let tenant = "tenant ' OR 1=1 --";
     let value = "BookiE-clickhouse-value-".repeat(500);
-    seed_clickhouse_value_preview(&*connection, &control, tenant, &value).await;
-    assert_clickhouse_value_preview_native(&*connection, &control, tenant).await;
+    let duplicate = "different value for the same sort key";
+    seed_clickhouse_value_preview(&*connection, &control, tenant, &value, duplicate).await;
+    assert_clickhouse_value_preview_native(&*connection, &control, tenant, &value, duplicate).await;
 
     let columns = connection
         .fetch_columns_controlled(None, "value_preview_records", &control)
         .await
         .unwrap();
-    assert!(columns[0].primary_key && columns[1].primary_key);
+    assert!(!columns[0].primary_key && !columns[1].primary_key);
     let target = BrowseTarget {
         driver_id: "clickhouse",
         schema: None,
@@ -380,11 +381,11 @@ async fn clickhouse_value_query_refetches_the_exact_text_for_a_composite_key() {
         hidden_columns: None,
         long_text_preview: false,
     };
-    let query = target
-        .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
-        .unwrap();
-    let guarded = guarded_value_refetch(std::sync::Arc::from(connection), "clickhouse", &query, &control).await;
-    assert_eq!(guarded.rows, vec![vec![Value::Text(value)]]);
+    assert!(
+        target
+            .value_query(2, &[Value::Text(tenant.into()), Value::Int(7)])
+            .is_err()
+    );
 }
 
 async fn seed_clickhouse_value_preview(
@@ -392,6 +393,7 @@ async fn seed_clickhouse_value_preview(
     control: &bookie_core::OperationControl,
     tenant: &str,
     value: &str,
+    duplicate: &str,
 ) {
     connection
         .execute_controlled(
@@ -402,11 +404,14 @@ async fn seed_clickhouse_value_preview(
         .unwrap();
     connection
         .execute_params_controlled(
-            "INSERT INTO value_preview_records VALUES (?, ?, ?), (?, ?, ?)",
+            "INSERT INTO value_preview_records VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)",
             &[
                 Value::Text(tenant.into()),
                 Value::Int(7),
                 Value::Text(value.into()),
+                Value::Text(tenant.into()),
+                Value::Int(7),
+                Value::Text(duplicate.into()),
                 Value::Text("other tenant".into()),
                 Value::Int(7),
                 Value::Text("distractor".into()),
@@ -421,10 +426,12 @@ async fn assert_clickhouse_value_preview_native(
     connection: &dyn bookie_core::Connection,
     control: &bookie_core::OperationControl,
     tenant: &str,
+    value: &str,
+    duplicate: &str,
 ) {
     let native = connection
         .query_params_controlled(
-            "SELECT toTypeName(payload), length(payload), hex(substring(payload, 1, 8)) FROM value_preview_records WHERE tenant = ? AND id = ?",
+            "SELECT toTypeName(payload), length(payload), hex(substring(payload, 1, 8)) FROM value_preview_records WHERE tenant = ? AND id = ? ORDER BY length(payload)",
             &[Value::Text(tenant.into()), Value::Int(7)],
             control,
         )
@@ -432,11 +439,18 @@ async fn assert_clickhouse_value_preview_native(
         .unwrap();
     assert_eq!(
         native.rows,
-        vec![vec![
-            Value::Text("String".into()),
-            Value::Int(12000),
-            Value::Text("426F6F6B69452D63".into()),
-        ]]
+        vec![
+            vec![
+                Value::Text("String".into()),
+                Value::Int(duplicate.len() as i64),
+                Value::Text("646966666572656E".into()),
+            ],
+            vec![
+                Value::Text("String".into()),
+                Value::Int(value.len() as i64),
+                Value::Text("426F6F6B69452D63".into()),
+            ],
+        ]
     );
 }
 

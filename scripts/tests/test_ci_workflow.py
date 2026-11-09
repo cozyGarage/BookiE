@@ -336,7 +336,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "a_select_that_calls_a_writing_function_runs_outside_a_read_only_cursor",
                 "mysql_value_query_refetches_the_exact_blob_for_a_composite_key",
                 "mssql_value_query_refetches_the_exact_blob_for_a_composite_key",
-                "clickhouse_value_query_refetches_the_exact_text_for_a_composite_key",
+                "clickhouse_value_query_refuses_duplicate_sort_keys",
                 "mongodb_guarded_refetch_preserves_long_text_and_binary_values",
                 "redis_guarded_refetch_preserves_binary_key_and_value",
                 "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
