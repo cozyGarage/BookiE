@@ -34,6 +34,22 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
     });
 }
 
+#[test]
+fn editing_a_cell_does_not_write_its_value_to_process_output() {
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "ui_tests::a_valid_edit_is_applied_to_the_typed_cell_and_marked",
+            "--nocapture",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+    assert!(!String::from_utf8_lossy(&output.stdout).contains("2026-02-03"));
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("2026-02-03"));
+}
+
 #[gpui::test]
 fn an_invalid_edit_is_refused_and_keeps_the_editor_open(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
