@@ -1,4 +1,5 @@
 pub use bookie_checks as checks;
+pub use bookie_kafka_browser as kafka_browser;
 pub use bookie_pg_sessions as pg_sessions;
 pub use bookie_results::{
     highlight_match, result_compare, result_filter, result_find, result_predicate, result_scan, sidebar_tree,
