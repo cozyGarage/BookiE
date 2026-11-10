@@ -1102,3 +1102,42 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
         assert_eq!(view.status, "This cell cannot be edited");
     });
 }
+
+#[gpui::test]
+fn f3_toggles_a_detail_panel_that_follows_the_active_cell(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("down right right right");
+    view.read_with(cx, |view, _| assert!(!view.detail_open));
+    cx.simulate_keystrokes("f3");
+    view.read_with(cx, |view, _| {
+        assert!(view.detail_open);
+        let (name, detail) = view.detail_target().expect("a cell is active");
+        assert_eq!(name, "typed");
+        let bookie_gpui::detail::Detail::Hex { lines, total, .. } = detail else {
+            panic!("row 1 holds bytes");
+        };
+        assert_eq!(total, 4);
+        assert_eq!(lines[0].hex, "de ad be ef");
+    });
+    cx.simulate_keystrokes("down");
+    view.read_with(cx, |view, _| {
+        let (_, detail) = view.detail_target().expect("still active");
+        assert!(matches!(detail, bookie_gpui::detail::Detail::Text(text) if text == "2026-11-04"));
+    });
+    cx.simulate_keystrokes("f3");
+    view.read_with(cx, |view, _| assert!(!view.detail_open));
+}
+
+#[gpui::test]
+fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let keymap = bookie_gpui::keymap::Keymap::from_overrides(r#"{"toggle-sidebar":"alt-b"}"#).expect("keymap");
+    view.update(cx, |view, _| view.keymap = keymap);
+    let before = view.read_with(cx, |view, _| view.sidebar_open);
+    cx.simulate_keystrokes("ctrl-b");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.sidebar_open, before, "the old chord is free")
+    });
+    cx.simulate_keystrokes("alt-b");
+    view.read_with(cx, |view, _| assert_eq!(view.sidebar_open, !before));
+}
