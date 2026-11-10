@@ -16,56 +16,117 @@ pub enum Origin {
     File(std::path::PathBuf),
 }
 
+pub const ROW_CAP: u64 = 100_000;
+
 const PAGE_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub struct LiveTable {
+pub struct LiveSession {
     runtime: tokio::runtime::Runtime,
     session: Option<ReadSession>,
-    columns: Vec<ColumnMeta>,
-    rows: Vec<Vec<Cell>>,
-    scan: ScanSource,
     pub driver_id: String,
-    pub truncated: bool,
+    pub label: String,
+    pub tables: Vec<String>,
 }
 
-impl LiveTable {
-    pub fn load(origin: &Origin, table: &str, max_rows: u64) -> Result<Self, String> {
+impl LiveSession {
+    pub fn open(origin: &Origin) -> Result<Arc<LiveSession>, String> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let loaded = runtime.block_on(load_pages(origin, table, max_rows));
-        let (session, columns, rows, scan, truncated) = loaded?;
-        let driver_id = session.driver_id.clone();
-        Ok(Self {
+        let (session, label) = runtime.block_on(open_session(origin))?;
+        let tables = session.tables.iter().map(table_label).collect();
+        Ok(Arc::new(LiveSession {
+            driver_id: session.driver_id.clone(),
             runtime,
             session: Some(session),
+            label,
+            tables,
+        }))
+    }
+
+    pub fn load_table(self: &Arc<Self>, table: &str, max_rows: u64) -> Result<LiveTable, String> {
+        let session = self.session.as_ref().ok_or("the session is closed")?;
+        let (columns, rows, scan, truncated) = self.runtime.block_on(read_pages(session, table, max_rows))?;
+        Ok(LiveTable {
+            session: self.clone(),
             columns,
             rows,
             scan,
-            driver_id,
             truncated,
+            table: table.to_string(),
+            row_cap: max_rows,
         })
     }
 }
 
-type Loaded = (ReadSession, Vec<ColumnMeta>, Vec<Vec<Cell>>, ScanSource, bool);
+impl Drop for LiveSession {
+    fn drop(&mut self) {
+        let _inside = self.runtime.enter();
+        drop(self.session.take());
+    }
+}
 
-async fn load_pages(origin: &Origin, table: &str, max_rows: u64) -> Result<Loaded, String> {
+fn table_label(table: &TableInfo) -> String {
+    match &table.schema {
+        Some(schema) => format!("{schema}.{}", table.name),
+        None => table.name.clone(),
+    }
+}
+
+pub struct LiveTable {
+    session: Arc<LiveSession>,
+    columns: Vec<ColumnMeta>,
+    rows: Vec<Vec<Cell>>,
+    scan: ScanSource,
+    pub truncated: bool,
+    table: String,
+    row_cap: u64,
+}
+
+impl LiveTable {
+    pub fn session(&self) -> &Arc<LiveSession> {
+        &self.session
+    }
+
+    pub fn table_name(&self) -> &str {
+        &self.table
+    }
+
+    pub fn load(origin: &Origin, table: &str, max_rows: u64) -> Result<Self, String> {
+        LiveSession::open(origin)?.load_table(table, max_rows)
+    }
+}
+
+async fn open_session(origin: &Origin) -> Result<(ReadSession, String), String> {
     let registry = Arc::new(drivers_registry::default_registry());
-    let session = match origin {
+    let (opened, label) = match origin {
         Origin::Saved(connection) => {
             let saved = list_saved_connections().await?;
             let summary = saved
                 .iter()
                 .find(|saved| saved.id.to_string() == *connection || saved.name == *connection)
                 .ok_or_else(|| format!("no saved connection named or numbered {connection}"))?;
-            ReadSession::open_saved(summary.id, registry).await
+            (
+                ReadSession::open_saved(summary.id, registry).await,
+                summary.name.clone(),
+            )
         }
-        Origin::File(path) => ReadSession::open_file(path, registry).await,
-    }
-    .map_err(|failure| format!("{failure:?}"))?;
+        Origin::File(path) => (
+            ReadSession::open_file(path, registry).await,
+            path.file_name().map_or_else(
+                || path.display().to_string(),
+                |name| name.to_string_lossy().into_owned(),
+            ),
+        ),
+    };
+    Ok((opened.map_err(|failure| format!("{failure:?}"))?, label))
+}
+
+type Pages = (Vec<ColumnMeta>, Vec<Vec<Cell>>, ScanSource, bool);
+
+async fn read_pages(session: &ReadSession, table: &str, max_rows: u64) -> Result<Pages, String> {
     let table = find_table(&session.tables, table)?;
     let spool = StreamResultSpoolManager::from_environment()
         .create()
@@ -102,7 +163,7 @@ async fn load_pages(origin: &Origin, table: &str, max_rows: u64) -> Result<Loade
     }
     let total = rows.len() as u64;
     let columns = infos.iter().map(column_meta).collect();
-    Ok((session, columns, rows, ScanSource::new(spool, infos, total), truncated))
+    Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
 }
 
 fn find_table(tables: &[TableInfo], wanted: &str) -> Result<TableInfo, String> {
@@ -132,6 +193,15 @@ impl ResultSource for LiveTable {
         &self.columns
     }
 
+    fn origin(&self) -> String {
+        let cap = if self.truncated {
+            format!(" · first {} rows only", self.row_cap)
+        } else {
+            String::new()
+        };
+        format!("{} · {} · read-only{cap}", self.session.driver_id, self.table)
+    }
+
     fn total(&self) -> u64 {
         self.rows.len() as u64
     }
@@ -154,13 +224,6 @@ impl ResultSource for LiveTable {
 
     fn compare(&self, _keyed: bool, _cancel: &CancellationToken) -> Result<Diff, &'static str> {
         Err("compare is not available for a live table")
-    }
-}
-
-impl Drop for LiveTable {
-    fn drop(&mut self) {
-        let _inside = self.runtime.enter();
-        drop(self.session.take());
     }
 }
 
@@ -196,10 +259,25 @@ mod tests {
     }
 
     #[test]
+    fn one_session_loads_each_of_its_tables() {
+        let session = LiveSession::open(&fixture()).expect("open");
+        assert_eq!(session.tables, ["customers", "orders"]);
+        assert_eq!(session.label, "orders.sqlite");
+        let customers = session.load_table("customers", 100).expect("customers");
+        let orders = session.load_table("orders", 100).expect("orders");
+        assert_eq!((customers.total(), orders.total()), (2, 6));
+        assert_eq!(customers.columns().len(), 2);
+        assert_eq!(orders.columns().len(), 5);
+    }
+
+    #[test]
     fn the_row_cap_truncates_and_says_so() {
         let table = LiveTable::load(&fixture(), "orders", 4).expect("load");
         assert_eq!(table.total(), 4);
         assert!(table.truncated);
+        assert_eq!(table.origin(), "sqlite · orders · read-only · first 4 rows only");
+        let whole = LiveTable::load(&fixture(), "orders", 100).expect("load");
+        assert_eq!(whole.origin(), "sqlite · orders · read-only");
     }
 
     #[test]

@@ -1141,3 +1141,31 @@ fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("alt-b");
     view.read_with(cx, |view, _| assert_eq!(view.sidebar_open, !before));
 }
+
+#[gpui::test]
+fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, "orders");
+        assert_eq!(view.catalog.tables, ["customers", "orders"]);
+        assert_eq!(view.source.total(), 6);
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named("customers", window, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, "customers");
+        assert_eq!(view.source.total(), 2);
+        assert_eq!(view.source.columns().len(), 2);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("customers".into()));
+        assert!(view.status.is_empty(), "{}", view.status);
+    });
+}

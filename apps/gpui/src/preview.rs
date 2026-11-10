@@ -13,6 +13,16 @@ pub fn cell_preview(cell: &Cell) -> String {
         | Cell::TimestampTz(text)
         | Cell::Decimal(text)
         | Cell::Uuid(text) => text_preview(text),
+        Cell::Exact(value) => match value.as_ref() {
+            bookie_core::Value::Json(value) => json_preview(value),
+            bookie_core::Value::Text(value) | bookie_core::Value::JsonText(value) => text_preview(value),
+            bookie_core::Value::Undecodable(value) => format!("<undecodable {}>", text_preview(value)),
+            bookie_core::Value::Bytes(bytes) if bytes.len() > 16 => {
+                let sample = Cell::Bytes(bytes[..16].to_vec()).display();
+                format!("{sample}… ({} bytes total)", bytes.len())
+            }
+            _ => cell.display(),
+        },
         Cell::Undecodable(name) => format!("<undecodable {}>", text_preview(name)),
         Cell::Bytes(bytes) if bytes.len() > 16 => {
             let sample = Cell::Bytes(bytes[..16].to_vec()).display();
@@ -20,6 +30,48 @@ pub fn cell_preview(cell: &Cell) -> String {
         }
         _ => cell.display(),
     }
+}
+
+struct JsonPreview {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl std::io::Write for JsonPreview {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let remaining = self.limit.saturating_sub(self.bytes.len());
+        let take = remaining.min(bytes.len());
+        self.bytes.extend_from_slice(&bytes[..take]);
+        if take < bytes.len() {
+            return Err(std::io::ErrorKind::WriteZero.into());
+        }
+        Ok(take)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+pub(crate) fn bounded_json(value: &serde_json::Value, limit: usize, pretty: bool) -> (String, bool) {
+    let mut output = JsonPreview {
+        bytes: Vec::with_capacity(limit),
+        limit,
+    };
+    let result = if pretty {
+        serde_json::to_writer_pretty(&mut output, value)
+    } else {
+        serde_json::to_writer(&mut output, value)
+    };
+    let end = std::str::from_utf8(&output.bytes).map_or_else(|error| error.valid_up_to(), str::len);
+    output.bytes.truncate(end);
+    (String::from_utf8(output.bytes).unwrap_or_default(), result.is_err())
+}
+
+fn json_preview(value: &serde_json::Value) -> String {
+    let (text, truncated) = bounded_json(value, MAX_CHARS, false);
+    let text = text_preview(&text);
+    if truncated { format!("{text}…") } else { text }
 }
 
 fn text_preview(text: &str) -> String {
@@ -46,6 +98,31 @@ fn text_preview(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn real_json_is_shared_and_previewed_without_losing_its_value() {
+        let value = bookie_core::Value::Json(Box::new(serde_json::json!({"text": "💾".repeat(100_000)})));
+        let cell = crate::core_bridge::value_to_cell(value.clone());
+        let copy = cell.clone();
+        let (Cell::Exact(first), Cell::Exact(second)) = (&cell, &copy) else {
+            panic!("expected retained values");
+        };
+        assert!(std::sync::Arc::ptr_eq(first, second));
+        let preview = cell_preview(&cell);
+        assert!(preview.len() <= MAX_CHARS + '…'.len_utf8());
+        assert!(preview.ends_with('…'));
+        assert_eq!(crate::core_bridge::cell_to_value(&cell), value);
+    }
+
+    #[test]
+    fn real_json_preview_flattens_unicode_line_separators() {
+        let cell = crate::core_bridge::value_to_cell(bookie_core::Value::Json(Box::new(serde_json::json!({
+            "text": "first\u{2028}second"
+        }))));
+        let shown = cell_preview(&cell);
+        assert!(shown.contains('↵'));
+        assert!(!shown.contains('\u{2028}'));
+    }
 
     #[test]
     fn oversized_unicode_and_json_keep_exact_values_outside_the_preview() {
@@ -97,8 +174,10 @@ mod tests {
             assert!(!shown.contains(['\n', '\r', '\t', '\0']));
             assert_eq!(cell.display(), value);
             assert_eq!(
-                crate::core_bridge::value_to_cell(crate::core_bridge::cell_to_value(&cell)),
-                cell
+                crate::core_bridge::cell_to_value(&crate::core_bridge::value_to_cell(
+                    crate::core_bridge::cell_to_value(&cell)
+                )),
+                crate::core_bridge::cell_to_value(&cell)
             );
         }
     }

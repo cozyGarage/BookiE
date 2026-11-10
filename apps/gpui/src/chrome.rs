@@ -1,4 +1,4 @@
-use bookie_gpui::shell::{CONNECTION, DATA_TABLE, DATABASE, Tab, TreeRow, tree_rows};
+use bookie_gpui::shell::{Tab, TreeRow, tree_rows_in};
 const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
     "FROM synthetic_rows",
@@ -129,15 +129,15 @@ impl GridView {
 
     pub fn sidebar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let search = self.sidebar_search.read(cx).content().to_string();
-        let rows = tree_rows(&search, self.connection_open, self.database_open);
+        let rows = tree_rows_in(&self.catalog, &search, self.connection_open, self.database_open);
         let open_table = self.tabs.current().clone();
         let tree = rows.into_iter().enumerate().map(|(index, (depth, row))| {
-            let (label, chevron) = match row {
-                TreeRow::Connection { open } => (CONNECTION.to_string(), Some(open)),
-                TreeRow::Database { open } => (DATABASE.to_string(), Some(open)),
-                TreeRow::Table(name) => (name.to_string(), None),
+            let (label, chevron) = match &row {
+                TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
+                TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
+                TreeRow::Table(name) => (name.clone(), None),
             };
-            let current = matches!(row, TreeRow::Table(name) if open_table == Tab::Table(name.to_string()));
+            let current = matches!(&row, TreeRow::Table(name) if open_table == Tab::Table(name.clone()));
             let line = div()
                 .id(("tree", index))
                 .flex()
@@ -154,7 +154,7 @@ impl GridView {
                     )
                 })))
                 .child(icon(
-                    match row {
+                    match &row {
                         TreeRow::Connection { .. } => "database",
                         TreeRow::Database { .. } => "folder",
                         TreeRow::Table(_) => "table",
@@ -168,16 +168,10 @@ impl GridView {
                 line.hover(move |style| style.bg(rgb(theme.accent)))
             };
             line.on_click(cx.listener(move |this, _, window, cx| {
-                match row {
+                match &row {
                     TreeRow::Connection { .. } => this.connection_open = !this.connection_open,
                     TreeRow::Database { .. } => this.database_open = !this.database_open,
-                    TreeRow::Table(name) => {
-                        this.tabs.open_table(name);
-                        this.sync_grid_owner();
-                        if this.tabs.shows_grid() {
-                            window.focus(&this.focus, cx);
-                        }
-                    }
+                    TreeRow::Table(name) => this.open_table_named(name, window, cx),
                 }
                 cx.notify();
             }))
@@ -240,7 +234,7 @@ impl GridView {
     }
 
     fn sidebar_matches(&self, search: &str) -> usize {
-        tree_rows(search, true, true)
+        tree_rows_in(&self.catalog, search, true, true)
             .iter()
             .filter(|(_, row)| matches!(row, TreeRow::Table(_)))
             .count()
@@ -300,8 +294,16 @@ impl GridView {
             }
             item.on_click(cx.listener(move |this, _, window, cx| {
                 this.tabs.active = index;
+                if let Tab::Table(name) = this.tabs.current().clone()
+                    && this.live.is_some()
+                    && name != this.catalog.grid_table
+                {
+                    this.open_table_named(&name, window, cx);
+                    cx.notify();
+                    return;
+                }
                 this.sync_grid_owner();
-                if this.tabs.shows_grid() {
+                if this.tabs.shows_grid_for(&this.catalog.grid_table) {
                     window.focus(&this.focus, cx);
                 }
                 cx.notify();
@@ -363,19 +365,20 @@ impl GridView {
                     .flex()
                     .gap_4()
                     .child(
-                        card(theme)
-                            .flex_1()
-                            .child(card_title("Quick Start", theme))
-                            .child(div().p_2().child(
-                                ghost("quick-open", format!("{CONNECTION} → {DATA_TABLE}"), theme).on_click(
-                                    cx.listener(|this, _, window, cx| {
-                                        this.tabs.open_table(DATA_TABLE);
-                                        this.sync_grid_owner();
-                                        window.focus(&this.focus, cx);
-                                        cx.notify();
-                                    }),
-                                ),
-                            )),
+                        card(theme).flex_1().child(card_title("Quick Start", theme)).child(
+                            div().p_2().child(
+                                ghost(
+                                    "quick-open",
+                                    format!("{} → {}", self.catalog.connection, self.catalog.grid_table),
+                                    theme,
+                                )
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    let name = this.catalog.grid_table.clone();
+                                    this.open_table_named(&name, window, cx);
+                                    cx.notify();
+                                })),
+                            ),
+                        ),
                     )
                     .child(
                         card(theme).w(px(300.0)).child(card_title("Shortcuts", theme)).child(
@@ -417,7 +420,7 @@ impl GridView {
     }
 
     pub fn status_bar(&self, theme: Theme) -> Div {
-        let right = if self.tabs.shows_grid() {
+        let right = if self.tabs.shows_grid_for(&self.catalog.grid_table) {
             format!(
                 "{} rows · {}",
                 thousands(self.dataset_count()),
@@ -438,7 +441,7 @@ impl GridView {
             .border_color(rgb(theme.border))
             .text_size(px(12.0))
             .text_color(rgb(theme.muted_foreground))
-            .child("Synthetic data · no database connection")
+            .child(self.source.origin())
             .child(right)
     }
 
@@ -468,7 +471,11 @@ impl GridView {
                             },
                         )),
                     )
-                    .child(div().text_color(rgb(theme.muted_foreground)).child(CONNECTION)),
+                    .child(
+                        div()
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(self.catalog.connection.clone()),
+                    ),
             )
             .child(
                 div()

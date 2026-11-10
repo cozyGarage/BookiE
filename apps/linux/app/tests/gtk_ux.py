@@ -2706,11 +2706,11 @@ GLib.MainLoop().run()
         ui.invoke_named_action_within("default.enum_grid", "Open enum_grid")
         ui.wait_for_node(name="low8", role=pyatspi.ROLE_LABEL)
         click_cell("low8", count=2)
-        for key in "high8":
+        for key in ("apostrophe", *"high8", "apostrophe"):
             ui.press_x11_key(key)
         ui.press_x11_key("Return")
         click_cell("low16", count=2)
-        for key in "high16":
+        for key in ("apostrophe", *"high16", "apostrophe"):
             ui.press_x11_key(key)
         ui.press_x11_key("Return")
         ui.wait_for_node(name="2 unsaved changes")

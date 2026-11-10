@@ -23,6 +23,7 @@ fn column_kind(kind: &str) -> Option<ColumnKind> {
 
 pub fn cell_to_value(cell: &Cell) -> Value {
     match cell {
+        Cell::Exact(value) => value.as_ref().clone(),
         Cell::Null => Value::Null,
         Cell::Bool(value) => Value::Bool(*value),
         Cell::Int(value) => Value::Int(*value),
@@ -46,6 +47,19 @@ fn reparse(kind: ColumnKind, text: &str) -> Value {
 }
 
 pub fn value_to_cell(value: Value) -> Cell {
+    match value {
+        Value::Date(_)
+        | Value::Time(_)
+        | Value::DateTime(_)
+        | Value::TimestampTz(_)
+        | Value::Decimal(_)
+        | Value::Uuid(_)
+        | Value::Json(_) => Cell::Exact(std::sync::Arc::new(value)),
+        other => edit_value_to_cell(other),
+    }
+}
+
+fn edit_value_to_cell(value: Value) -> Cell {
     match value {
         Value::Null => Cell::Null,
         Value::Bool(value) => Cell::Bool(value),
@@ -73,7 +87,7 @@ pub fn parse_edit(kind: &str, text: &str) -> Result<Cell, String> {
         text.trim()
     };
     let value = parse_cell(trimmed, column).map_err(|error| error.to_string())?;
-    Ok(match (kind, value_to_cell(value)) {
+    Ok(match (kind, edit_value_to_cell(value)) {
         ("json_text", Cell::Text(text)) => Cell::JsonText(text),
         (_, cell) => cell,
     })

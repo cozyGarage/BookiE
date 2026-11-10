@@ -2,6 +2,7 @@ use std::ops::Range;
 use std::time::{Duration, Instant};
 
 mod assets;
+mod catalog_nav;
 mod chrome;
 mod detail_panel;
 mod grid_edit;
@@ -16,7 +17,7 @@ use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::selection::{Selection, copy_tsv};
-use bookie_gpui::shell::{DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag};
+use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag};
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
 use gpui::{
@@ -56,6 +57,8 @@ struct GridView {
     palette_input: Entity<TextInput>,
     palette_open: bool,
     detail_open: bool,
+    catalog: Catalog,
+    live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
     keymap: Keymap,
     palette_index: usize,
     dark_mode: bool,
@@ -210,6 +213,8 @@ impl GridView {
             palette_input,
             palette_open: false,
             detail_open: false,
+            catalog: Catalog::synthetic(),
+            live: None,
             keymap: Keymap::default(),
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
@@ -361,7 +366,7 @@ impl GridView {
         self.tab_scroll.scroll_to_item(self.tabs.active);
         let query = match self.tabs.current() {
             Tab::Query => true,
-            Tab::Table(name) if name == DATA_TABLE => false,
+            Tab::Table(name) if *name == self.catalog.grid_table => false,
             _ => {
                 self.invalidate_background();
                 return;
@@ -736,7 +741,7 @@ impl GridView {
                 matches!(self.tabs.current(), Tab::Query),
             ),
             action("home", "Open Home", true),
-            action("table", "Open synthetic_rows", true),
+            action("table", &format!("Open {}", self.catalog.grid_table), true),
             action(
                 "theme",
                 if self.dark_mode {
@@ -828,9 +833,8 @@ impl GridView {
             "close-run" => self.close_run(self.active_run),
             "results" => self.result_open = !self.result_open,
             "table" => {
-                self.tabs.open_table(DATA_TABLE);
-                self.sync_grid_owner();
-                window.focus(&self.focus, cx);
+                let name = self.catalog.grid_table.clone();
+                self.open_table_named(&name, window, cx);
             }
             "theme-dbx" | "theme-adwaita" => {
                 let style = if id == "theme-dbx" { Style::Dbx } else { Style::Adwaita };
@@ -988,7 +992,8 @@ fn display_cell(width: f32, cell: &Cell, theme: Theme) -> Div {
 }
 
 fn numeric_cell(cell: &Cell) -> bool {
-    matches!(cell, Cell::Int(_) | Cell::Float(_) | Cell::Decimal(_))
+    use bookie_gpui::type_colors::{TypeKind, type_kind};
+    matches!(type_kind(cell), Some(TypeKind::Integer | TypeKind::Numeric))
 }
 
 #[cfg(test)]
@@ -1000,6 +1005,9 @@ mod tests {
         assert!(numeric_cell(&Cell::Int(7)));
         assert!(numeric_cell(&Cell::Float(7.5)));
         assert!(numeric_cell(&Cell::Decimal("7.50".into())));
+        assert!(numeric_cell(&bookie_gpui::core_bridge::value_to_cell(
+            bookie_core::Value::Decimal("7.50".parse().unwrap())
+        )));
         assert!(!numeric_cell(&Cell::Text("7".into())));
         assert!(!numeric_cell(&Cell::Null));
     }
@@ -1042,7 +1050,11 @@ fn main() {
                 },
                 |window, cx| {
                     let view = cx.new(|cx| match live.clone() {
-                        Some(source) => GridView::with_source(source, started, window, cx),
+                        Some(table) => {
+                            let mut view = GridView::with_source(table.clone(), started, window, cx);
+                            view.attach_live(table);
+                            view
+                        }
                         None => GridView::new(total, started, window, cx),
                     });
                     let focus = view.read(cx).focus.clone();
@@ -1083,9 +1095,7 @@ fn load_keymap() -> Keymap {
     })
 }
 
-const LIVE_ROW_CAP: u64 = 100_000;
-
-fn live_source() -> Option<Source> {
+fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
     use bookie_gpui::live::{LiveTable, Origin};
     let table = std::env::var("BOOKIE_PROTOTYPE_TABLE").ok()?;
     let origin = match (
@@ -1096,7 +1106,7 @@ fn live_source() -> Option<Source> {
         (None, Some(connection)) => Origin::Saved(connection),
         (None, None) => return None,
     };
-    match LiveTable::load(&origin, &table, LIVE_ROW_CAP) {
+    match LiveTable::load(&origin, &table, bookie_gpui::live::ROW_CAP) {
         Ok(live) => Some(std::sync::Arc::new(live)),
         Err(error) => {
             eprintln!("could not read {table}: {error}");

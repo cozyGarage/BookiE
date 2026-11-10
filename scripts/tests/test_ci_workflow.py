@@ -28,6 +28,7 @@ class CiWorkflowTests(unittest.TestCase):
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("timeout-minutes:", job)
         self.assertIn("CARGO_BUILD_JOBS: 4", job)
+        self.assertIn('RUSTC_WRAPPER: ""', job)
         self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", job)
         self.assertNotIn("--lib", job)
 
@@ -40,6 +41,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", job)
         self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", forgejo)
         self.assertIn("CARGO_BUILD_JOBS: 4", job)
+        self.assertIn('RUSTC_WRAPPER: ""', job)
         self.assertIn('"gpui-tests"', (ROOT / "scripts/check-ci-jobs.py").read_text())
         self.assertIn("libxkbcommon-x11-dev", (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text())
 
