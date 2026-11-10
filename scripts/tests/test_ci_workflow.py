@@ -30,6 +30,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("needs: [test-build]", job)
         self.assertIn('prepare-test-bundle.sh "${{ github.sha }}" gpui', job)
         self.assertIn('nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst"', job)
+        self.assertIn('mkdir -p "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
         self.assertIn('--extract-to "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
         self.assertNotIn("cargo test", job)
         self.assertIn('rm -rf -- "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)

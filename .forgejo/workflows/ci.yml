@@ -113,6 +113,7 @@ jobs:
       - name: GPUI model and simulated interaction tests
         run: |
           cd src
+          mkdir -p "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" \
             --workspace-remap "$GITHUB_WORKSPACE/src/apps/gpui" \
