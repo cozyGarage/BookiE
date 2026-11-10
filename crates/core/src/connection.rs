@@ -530,6 +530,13 @@ pub trait Connection: Send + Sync {
     /// A driver that retires its connection without returning
     /// [`DriverError::Disconnected`] wakes that same sink from the retirement.
     fn attach_fault_notify(&self, _notify: Arc<Notify>) {}
+    async fn execute_controlled_with_token(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<(ExecResult, Option<crate::CommitToken>), (DriverError, Option<crate::CommitToken>)> {
+        self.execute_controlled(sql, control).await.map(|rows| (rows, None)).map_err(|error| (error, None))
+    }
     async fn resolve_commit(&self, _token: &crate::CommitToken) -> Result<crate::CommitResolution, DriverError> {
         Ok(crate::CommitResolution::Unresolvable)
     }
