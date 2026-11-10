@@ -320,6 +320,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::workspace_close::tests::browse_save_dispatch_on_read_only_connection_is_denied_and_audited"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::workspace_close::tests::force_dismissing_connection_deletion_does_not_abort"
     ],
     [
