@@ -60,6 +60,7 @@ struct GridView {
     detail_open: bool,
     catalog: Catalog,
     live: Option<std::sync::Arc<bookie_gpui::live::LiveSession>>,
+    connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
     palette_index: usize,
     dark_mode: bool,
@@ -225,6 +226,7 @@ impl GridView {
             detail_open: false,
             catalog: Catalog::synthetic(),
             live: None,
+            connections: Vec::new(),
             keymap: Keymap::default(),
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
@@ -1135,6 +1137,14 @@ fn main() {
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
     let live = live_source();
     let keymap = load_keymap();
+    let connections = if live.is_some() {
+        Vec::new()
+    } else {
+        bookie_gpui::live::saved_connections().unwrap_or_else(|error| {
+            eprintln!("saved connections unavailable: {error}");
+            Vec::new()
+        })
+    };
     let autoscroll: u32 = env_number("BOOKIE_PROTOTYPE_AUTOSCROLL").unwrap_or(0);
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
@@ -1160,7 +1170,10 @@ fn main() {
                     });
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
-                    view.update(cx, |view, _| view.keymap = keymap.clone());
+                    view.update(cx, |view, _| {
+                        view.keymap = keymap.clone();
+                        view.connections = connections.clone();
+                    });
                     if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
                         view.update(cx, |view, _| {
                             view.tabs.open_query();

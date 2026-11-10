@@ -96,6 +96,9 @@ impl DatabaseDriver for ClickhouseDriver {
         if !opts.database.is_empty() {
             client = client.with_database(opts.database.clone());
         }
+        if opts.read_only {
+            client = client.with_setting("readonly", "2");
+        }
 
         let probe = client.query("SELECT 1").execute();
         match tokio::time::timeout(PROBE_TIMEOUT, probe).await {

@@ -8,14 +8,15 @@ use sqlx::{Connection as SqlxConnection, Pool, Postgres, Row};
 
 use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
-    CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, ConnectOptions, Connection, DatabaseDriver,
-    DriverError, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl,
-    QualifiedTypeName, QueryResult, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable,
+    CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, CommitResolution, CommitToken, ConnectOptions,
+    Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo,
+    MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo, Transport, Value, check_pre_dispatch,
+    run_controlled_setup, run_server_cancellable,
 };
 
 mod array;
 mod catalog;
+mod commit_resolution;
 mod decode;
 mod numeric;
 mod params;
@@ -700,6 +701,10 @@ impl Connection for PgConnection {
 
     fn supports_server_cancellation(&self) -> bool {
         true
+    }
+
+    async fn resolve_commit(&self, token: &CommitToken) -> Result<CommitResolution, DriverError> {
+        commit_resolution::resolve(&self.pool, token).await
     }
 
     async fn ping(&self) -> Result<(), DriverError> {

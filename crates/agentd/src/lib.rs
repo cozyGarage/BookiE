@@ -375,6 +375,13 @@ impl Connection for SessionConnection {
         self.inner.server_version().await
     }
 
+    async fn resolve_commit(
+        &self,
+        token: &bookie_core::CommitToken,
+    ) -> Result<bookie_core::CommitResolution, DriverError> {
+        self.inner.resolve_commit(token).await
+    }
+
     async fn ping(&self) -> Result<(), DriverError> {
         self.inner.ping().await
     }
