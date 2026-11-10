@@ -43,7 +43,7 @@ for base in "${images[@]}"; do
     if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]; then
       apt-get update
       cd /package
-      apt-get install -y "./$DISTRO_FLOOR_DEB_NAME"
+      apt install -y "./$DISTRO_FLOOR_DEB_NAME"
       status=0
       BOOKIE_GTK_BINARY=/usr/bin/bookie bash /src/scripts/test-gtk-safety.sh >/tmp/gtk-safety.log 2>&1 || status=$?
       if [ "$status" -ne 0 ]; then
