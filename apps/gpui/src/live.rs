@@ -38,12 +38,16 @@ pub struct LiveSession {
 
 impl LiveSession {
     pub fn open(origin: &Origin) -> Result<Arc<LiveSession>, String> {
+        Self::open_controlled(origin, &CancellationToken::new())
+    }
+
+    pub fn open_controlled(origin: &Origin, cancellation: &CancellationToken) -> Result<Arc<LiveSession>, String> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
             .build()
             .map_err(|error| error.to_string())?;
-        let (session, label) = runtime.block_on(open_session(origin))?;
+        let (session, label) = runtime.block_on(open_session(origin, cancellation.clone()))?;
         let tables = session.tables.iter().map(table_label).collect();
         Ok(Arc::new(LiveSession {
             driver_id: session.driver_id.clone(),
@@ -146,7 +150,10 @@ impl LiveTable {
     }
 }
 
-async fn open_session(origin: &Origin) -> Result<(ReadSession, String), String> {
+async fn open_session(
+    origin: &Origin,
+    cancellation: CancellationToken,
+) -> Result<(ReadSession, String), String> {
     let registry = Arc::new(drivers_registry::default_registry());
     let (opened, label) = match origin {
         Origin::Saved(connection) => {
@@ -156,12 +163,12 @@ async fn open_session(origin: &Origin) -> Result<(ReadSession, String), String> 
                 .find(|saved| saved.id.to_string() == *connection || saved.name == *connection)
                 .ok_or_else(|| format!("no saved connection named or numbered {connection}"))?;
             (
-                ReadSession::open_saved(summary.id, registry).await,
+                ReadSession::open_saved_controlled(summary.id, registry, cancellation).await,
                 summary.name.clone(),
             )
         }
         Origin::File(path) => (
-            ReadSession::open_file(path, registry).await,
+            ReadSession::open_file_controlled(path, registry, cancellation).await,
             path.file_name().map_or_else(
                 || path.display().to_string(),
                 |name| name.to_string_lossy().into_owned(),
