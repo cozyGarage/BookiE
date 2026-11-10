@@ -129,6 +129,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .send(BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -172,6 +173,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .send(crate::ui::grid::GridMsg::DeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -505,6 +507,7 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
         .send(BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(2)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -940,6 +943,7 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
         BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         },
         BrowseTabInput::Paste(super::paste::PasteAnchor {
             row: 0,
@@ -1039,6 +1043,36 @@ fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn stale_row_menu_delete_does_not_discard_a_new_draft() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("first".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    let first_id = controller.model().row_object_at(0).unwrap().draft_id().unwrap();
+    add_draft_row(
+        &controller,
+        vec![Value::Int(4), Value::Text("second".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDeleteRowAt {
+            row_position: 0,
+            row_key: Vec::new(),
+            draft_id: Some(first_id),
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(pending(&controller), 2, "a stale action must preserve both drafts");
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn the_row_menu_deletes_a_draft_row_by_discarding_it() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
@@ -1050,11 +1084,13 @@ fn the_row_menu_deletes_a_draft_row_by_discarding_it() {
     );
     pump(&observed);
     assert_eq!(pending(&controller), 1);
+    let draft_id = controller.model().row_object_at(0).unwrap().draft_id();
     controller
         .sender()
         .send(BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: Vec::new(),
+            draft_id,
         })
         .unwrap();
     let outputs = pump(&observed);

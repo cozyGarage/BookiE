@@ -3,6 +3,47 @@ use gtk::glib;
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn delete_action_carries_the_selected_draft_identity() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new_draft(17, vec![Value::Int(1)]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, receiver) = relm4::channel();
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[menu_test_column("id", "INTEGER")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::Label::new(None);
+    POSITION_SLOT.set(&cell, 0);
+    menus.context.set(cell.upcast_ref(), 0, "id".into(), Some((0, 17)));
+    rows.insert(0, &crate::ui::row_object::RowObject::new_draft(18, vec![Value::Int(2)]));
+    view.activate_action("cell.delete-row", None).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(
+        message,
+        GridMsg::DeleteRowAt {
+            row_position: 0,
+            draft_id: Some(17),
+            ..
+        }
+    ));
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn source_lookup_supports_alternate_models_and_refuses_unloaded_cells() {
     gtk::init().unwrap();
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();

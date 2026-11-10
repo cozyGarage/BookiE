@@ -189,7 +189,7 @@ fn a_menu_context_does_not_keep_a_removed_cell_alive() {
     let widget: gtk4::Widget = gtk4::Label::new(Some("value")).upcast();
     let weak = widget.downgrade();
     let context = super::cell_context::CellContextStore::default();
-    context.set(&widget, 2, "value".into());
+    context.set(&widget, 2, "value".into(), None);
     {
         let snapshot = context.snapshot().unwrap();
         assert_eq!(snapshot.widget, widget);

@@ -1059,9 +1059,11 @@ impl SimpleComponent for BrowseTab {
                 col_index,
                 row_key,
             } => self.handle_grid_set_cell_null(row_position, col_index, row_key, sender),
-            BrowseTabInput::GridDeleteRowAt { row_position, row_key } => {
-                self.handle_grid_delete_row(row_position, row_key, sender)
-            }
+            BrowseTabInput::GridDeleteRowAt {
+                row_position,
+                row_key,
+                draft_id,
+            } => self.handle_grid_delete_row(row_position, row_key, draft_id, sender),
             BrowseTabInput::GridCopyRowAsStatement(row_positions, statement) => {
                 self.handle_grid_copy_row_as_statement(row_positions, statement, sender)
             }

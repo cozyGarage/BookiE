@@ -550,6 +550,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::stale_row_menu_delete_does_not_discard_a_new_draft"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::undecodable_cell_edit_and_null_messages_do_not_stage_mutations"
     ],
     [
@@ -1416,6 +1421,11 @@
       "bookie-app",
       "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::delete_action_carries_the_selected_draft_identity"
     ],
     [
       "bookie-app",
