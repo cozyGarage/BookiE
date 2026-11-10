@@ -324,6 +324,7 @@ fn column_meta(info: &ColumnInfo) -> ColumnMeta {
         name: info.name.clone(),
         width,
         numeric: numeric_type(&info.data_type),
+        data_type: info.data_type.clone(),
     }
 }
 

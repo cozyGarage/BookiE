@@ -138,20 +138,23 @@ pub struct ColumnMeta {
     pub name: String,
     pub width: f32,
     pub numeric: bool,
+    /// The declared type name, parsed the same way as an edit of this column.
+    pub data_type: String,
 }
 
 pub fn synthetic_columns() -> Vec<ColumnMeta> {
     [
-        ("value", 240.0, true),
-        ("label", 280.0, false),
-        ("state", 120.0, false),
-        ("typed", 320.0, false),
+        ("value", 240.0, true, "integer"),
+        ("label", 280.0, false, "text"),
+        ("state", 120.0, false, "boolean"),
+        ("typed", 320.0, false, "text"),
     ]
     .into_iter()
-    .map(|(name, width, numeric)| ColumnMeta {
+    .map(|(name, width, numeric, data_type)| ColumnMeta {
         name: name.into(),
         width,
         numeric,
+        data_type: data_type.into(),
     })
     .collect()
 }
