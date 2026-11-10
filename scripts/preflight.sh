@@ -29,6 +29,7 @@ CRATES=(
   bookie-ssh
   bookie-checks
   bookie-kafka-browser
+  bookie-avro-container
   bookie-pg-sessions
   bookie-dump
   bookie-mcp
