@@ -235,6 +235,11 @@ impl SqlEditor {
         selection.model()?.downcast::<crate::ui::row_store::RowStore>().ok()
     }
 
+    #[cfg(test)]
+    pub(in crate::ui::editor) fn editable_result_store_for_test(&self) -> Option<crate::ui::row_store::RowStore> {
+        self.result_is_editable().then(|| self.result_list_store()).flatten()
+    }
+
     fn result_row_object(&self, position: u32) -> Option<crate::ui::row_object::RowObject> {
         let model = self.result_editing.as_ref()?.selection.as_ref()?.model()?;
         model
