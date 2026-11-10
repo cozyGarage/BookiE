@@ -1,7 +1,9 @@
+import hashlib
 import importlib.util
 import io
 import json
 import os
+import platform
 from unittest.mock import patch
 from pathlib import Path
 import tarfile
@@ -14,6 +16,22 @@ SPEC.loader.exec_module(registry)
 
 
 class RegistryExtractionTests(unittest.TestCase):
+    def test_bundle_verification_checks_the_requested_group(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            executable = root / 'tests' / 'sample'
+            executable.parent.mkdir()
+            executable.write_bytes(b'test executable')
+            index = {'schema_version': 1, 'source_commit': 'a' * 40, 'build_group': 'gpui',
+                     'architecture': platform.machine(), 'tests': [{'path': 'tests/sample'}],
+                     'binaries': {}, 'files': {'tests/sample': {
+                         'sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
+                         'size': executable.stat().st_size}}}
+            (root / 'index.json').write_text(json.dumps(index))
+            self.assertEqual(registry.bundle.verify(root, 'a' * 40, 'gpui')['build_group'], 'gpui')
+            with self.assertRaisesRegex(ValueError, 'build group mismatch'):
+                registry.bundle.verify(root, 'a' * 40, 'default')
+
     def test_registry_http_errors_identify_the_failed_request(self):
         error = registry.urllib.error.HTTPError(
             'https://registry.example/bundle/bundle.tar.gz', 500, 'Internal Server Error', {}, None)

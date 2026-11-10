@@ -84,6 +84,7 @@ jobs:
           fi
   gpui-tests:
     runs-on: any-host
+    needs: [test-build]
     timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: 4
@@ -103,16 +104,24 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned GPUI test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" gpui
       - name: GPUI model and simulated interaction tests
         run: |
           cd src
-          gpui_tmp=$(mktemp -d "$GITHUB_WORKSPACE/.gpui-tmp.XXXXXX")
-          trap 'rm -rf -- "$gpui_tmp"' EXIT
-          env -u DISPLAY -u WAYLAND_DISPLAY TMPDIR="$gpui_tmp" cargo test --manifest-path apps/gpui/Cargo.toml --locked
+          NEXTEST="$(bash scripts/ensure-nextest.sh)"
+          "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" \
+            --workspace-remap "$GITHUB_WORKSPACE/src/apps/gpui" \
+            --extract-to "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}" --profile default --no-tests=fail
       - name: Finalize runner job
         if: always()
         shell: bash
         run: |
+          rm -rf -- "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"
           if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
             bash src/scripts/cleanup-ci-job.sh
           else
@@ -306,13 +315,19 @@ jobs:
         run: |
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
-          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default
+          cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" all
       - name: Publish the default test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/default" "${{ github.sha }}" default
+      - name: Publish the GPUI test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/gpui" "${{ github.sha }}" gpui
       - name: Clean builder scratch
         if: always()
         run: |
