@@ -388,7 +388,7 @@ impl GridView {
                                         },
                                     ))
                                 }))
-                                .when(!self.catalog.grid_table.is_empty(), |section| {
+                                .when(!self.catalog.tables.is_empty(), |section| {
                                     section.child(
                                         ghost(
                                             "quick-open",

@@ -875,7 +875,7 @@ impl GridView {
             action(
                 "table",
                 &format!("Open {}", self.catalog.grid_table),
-                !self.catalog.grid_table.is_empty(),
+                !self.catalog.tables.is_empty(),
             ),
             action(
                 "theme",

@@ -249,17 +249,18 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
     });
 }
 
-#[gpui::test]
-fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContext) {
-    struct Fixture(std::path::PathBuf);
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_file(&self.0);
-        }
+struct SqliteFixture(std::path::PathBuf);
+
+impl Drop for SqliteFixture {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
     }
+}
+
+fn sqlite_fixture(statements: &[&str]) -> SqliteFixture {
     let path = std::env::temp_dir().join(format!("bookie-empty-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::File::create(&path).expect("create database");
-    let fixture = Fixture(path);
+    let fixture = SqliteFixture(path);
     tokio::runtime::Runtime::new().expect("runtime").block_on(async {
         let registry = drivers_registry::default_registry();
         let driver = registry.get("sqlite").expect("sqlite driver");
@@ -270,13 +271,17 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
             })
             .await
             .expect("open database");
-        connection
-            .execute("CREATE TABLE seed (id INTEGER)")
-            .await
-            .expect("create table");
-        connection.execute("DROP TABLE seed").await.expect("drop table");
+        for statement in statements {
+            connection.execute(statement).await.expect("prepare database");
+        }
         connection.close().await.expect("close database");
     });
+    fixture
+}
+
+#[gpui::test]
+fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
     let (view, cx) = open(cx);
     view.update(cx, |view, _| {
         view.edits
@@ -293,7 +298,12 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
         assert_eq!(view.dataset_count(), 0);
         assert!(view.edits.is_empty());
         assert!(!view.source.origin().contains("Synthetic"));
-        assert!(!view.palette_actions().iter().any(|action| action.id == "table" && action.enabled));
+        assert!(
+            !view
+                .palette_actions()
+                .iter()
+                .any(|action| action.id == "table" && action.enabled)
+        );
     });
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -307,6 +317,26 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
     view.read_with(cx, |view, _| {
         assert_eq!(view.source.total(), 1);
         assert_eq!(view.source.row(0)[0], bookie_gpui::model::Cell::Int(1));
+    });
+}
+
+#[gpui::test]
+fn an_empty_table_name_is_not_an_empty_catalog(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&[r#"CREATE TABLE "" (id INTEGER)"#]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_some(), "{}", view.status);
+        assert_eq!(view.catalog.tables, [""]);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table(String::new()));
+        assert!(
+            view.palette_actions()
+                .iter()
+                .any(|action| action.id == "table" && action.enabled)
+        );
     });
 }
 

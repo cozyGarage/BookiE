@@ -77,7 +77,7 @@ impl GridView {
     }
 
     pub(super) fn open_table_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
-        if name.is_empty() {
+        if self.catalog.tables.is_empty() {
             return;
         }
         let Some(session) = self.live.clone().filter(|_| name != self.catalog.grid_table) else {
