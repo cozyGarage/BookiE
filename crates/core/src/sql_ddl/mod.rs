@@ -16,6 +16,7 @@ mod catalog;
 mod column;
 mod diff;
 mod index_fk;
+mod review;
 mod sequence;
 mod table;
 mod types;
@@ -37,6 +38,8 @@ mod diff_replacement_tests;
 #[cfg(test)]
 mod rename_order_tests;
 #[cfg(test)]
+mod review_tests;
+#[cfg(test)]
 mod sequence_tests;
 #[cfg(test)]
 mod tests;
@@ -52,6 +55,7 @@ pub use diff::{TableState, diff_to_ops, materialize_ops};
 pub use index_fk::{
     build_add_foreign_key, build_create_index, build_drop_constraint, build_drop_foreign_key, build_drop_index,
 };
+pub use review::{DestructiveChange, review_changes};
 pub use sequence::build_restart_sequence;
 pub use table::{build_create_table, build_drop_table, build_rename_table, build_truncate_table};
 pub use types::{
