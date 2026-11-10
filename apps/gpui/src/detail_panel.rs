@@ -42,11 +42,11 @@ impl GridView {
                         .into_iter()
                         .map(|line| div().child(format!("{:08x}  {:<47}  {}", line.offset, line.hex, line.ascii))),
                 )
-                .when_some(decoded, |panel, decoded| {
+                .when_some(decoded, |panel, (label, decoded)| {
                     panel.child(
                         div()
                             .mt_2()
-                            .child(div().text_color(rgb(theme.muted_foreground)).child("MessagePack"))
+                            .child(div().text_color(rgb(theme.muted_foreground)).child(label))
                             .child(decoded),
                     )
                 })

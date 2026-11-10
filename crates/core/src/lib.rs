@@ -18,6 +18,7 @@ mod numeric_input;
 mod operation;
 mod pagination;
 mod params;
+mod protobuf_wire;
 mod query;
 mod query_rows;
 mod registry;
@@ -65,6 +66,7 @@ pub use pagination::{
     keyset_where_clause,
 };
 pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse_parameter_value};
+pub use protobuf_wire::{MAX_PAYLOAD_BYTES as MAX_PROTOBUF_BYTES, ProtobufWireError, decode_protobuf_wire};
 pub use query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_CURSOR_PAGE_ROWS,
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,

@@ -18,7 +18,7 @@ pub enum Detail {
         lines: Vec<HexLine>,
         total: usize,
         shown: usize,
-        decoded: Option<String>,
+        decoded: Option<(&'static str, String)>,
     },
     Json {
         pretty: String,
@@ -52,14 +52,28 @@ pub fn hex_lines(bytes: &[u8]) -> Vec<HexLine> {
         .collect()
 }
 
+fn decoded_preview(bytes: &[u8]) -> Option<(&'static str, String)> {
+    if let Ok(value) = bookie_core::decode_messagepack(bytes) {
+        return serde_json::to_string_pretty(&value).ok().map(|text| ("MessagePack", text));
+    }
+    let printable = bytes.iter().all(|byte| byte.is_ascii_graphic() || byte.is_ascii_whitespace());
+    if printable {
+        return None;
+    }
+    let value = bookie_core::decode_protobuf_wire(bytes).ok()?;
+    let fields = value.as_object().map_or(0, serde_json::Map::len);
+    (fields >= 2)
+        .then(|| serde_json::to_string_pretty(&value).ok())
+        .flatten()
+        .map(|text| ("Possible Protobuf (no schema, field numbers only)", text))
+}
+
 fn hex_detail(bytes: &[u8]) -> Detail {
     Detail::Hex {
         lines: hex_lines(bytes),
         total: bytes.len(),
         shown: bytes.len().min(MAX_HEX_BYTES),
-        decoded: bookie_core::decode_messagepack(bytes)
-            .ok()
-            .and_then(|value| serde_json::to_string_pretty(&value).ok()),
+        decoded: decoded_preview(bytes),
     }
 }
 
@@ -141,13 +155,35 @@ mod tests {
         let Detail::Hex { decoded, lines, .. } = detail_of(&packed) else {
             panic!("bytes show as hex");
         };
-        let decoded = decoded.expect("a messagepack map decodes");
+        let (label, decoded) = decoded.expect("a messagepack map decodes");
+        assert_eq!(label, "MessagePack");
         assert!(decoded.contains("\"a\": 1") && decoded.contains("true"), "{decoded}");
         assert_eq!(lines[0].hex, "82 a1 61 01 a1 62 92 c3 c0", "the hex dump stays alongside");
         let Detail::Hex { decoded, .. } = detail_of(&Cell::Bytes(vec![0xde, 0xad, 0xbe, 0xef])) else {
             panic!("bytes show as hex");
         };
         assert_eq!(decoded, None);
+    }
+
+    #[test]
+    fn protobuf_is_offered_only_as_a_labelled_guess_and_never_for_plain_text() {
+        let message = Cell::Bytes(vec![0x08, 0x96, 0x01, 0x12, 0x07, b't', b'e', b's', b't', b'i', b'n', b'g']);
+        let Detail::Hex { decoded, .. } = detail_of(&message) else {
+            panic!("bytes show as hex");
+        };
+        let (label, text) = decoded.expect("two fields decode");
+        assert!(label.starts_with("Possible Protobuf"), "{label}");
+        assert!(text.contains("\"1\": 150") && text.contains("testing"), "{text}");
+        let text_bytes = Cell::Bytes(b"hello world".to_vec());
+        let Detail::Hex { decoded, .. } = detail_of(&text_bytes) else {
+            panic!("bytes show as hex");
+        };
+        assert_eq!(decoded, None, "printable text is not Protobuf");
+        let one_field = Cell::Bytes(vec![0x08, 0x01]);
+        let Detail::Hex { decoded, .. } = detail_of(&one_field) else {
+            panic!("bytes show as hex");
+        };
+        assert_eq!(decoded, None, "a single field is too weak a signal");
     }
 
     #[test]
