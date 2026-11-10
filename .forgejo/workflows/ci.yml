@@ -1141,8 +1141,7 @@ jobs:
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK scenarios against a real server
-        run: |
-          cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
       - name: Finalize runner job
         if: always()
         shell: bash

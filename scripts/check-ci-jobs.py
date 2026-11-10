@@ -11,6 +11,7 @@ REQUIRED = {
     "preflight",
     "fast",
     "gtk-safety",
+    "gtk-server",
     "integration",
     "b4-rollback",
     "driver-tls",

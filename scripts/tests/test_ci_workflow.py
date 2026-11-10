@@ -49,6 +49,27 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/run-test-layer.py no-default-features", github_builder)
         self.assertIn("python3 scripts/run-test-layer.py no-default-features", forgejo_builder)
 
+    def test_gtk_server_layers_use_the_shared_catalog_on_both_providers(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        forgejo_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+        self.assertIn("server: [clickhouse, mongodb]", github_job)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', github_job)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
+        self.assertIn("Build Linux / postgres-release", layers["gtk-mysql-approval"]["hosted_gate"])
+        self.assertIn("lab-ci / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
+        for layer in ("gtk-clickhouse", "gtk-mongodb"):
+            with self.subTest(layer=layer):
+                self.assertIn("Build Linux / gtk-server", layers[layer]["hosted_gate"])
+                self.assertIn("lab-ci / gtk-server", layers[layer]["hosted_gate"])
+        self.assertIn("gtk-server", checker.REQUIRED)
+        self.assertIn("actions/download-artifact@", github_job)
+        self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", github_job)
+        self.assertIn("python3 scripts/cleanup-testcontainers.py", github_job)
+
     def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -737,7 +758,7 @@ class CiWorkflowTests(unittest.TestCase):
         acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
         self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', acceptance)
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", acceptance)
-        self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
+        self.assertIn("python3 scripts/run-test-layer.py gtk-mysql-approval", acceptance)
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

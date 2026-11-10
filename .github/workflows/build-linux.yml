@@ -449,6 +449,74 @@ jobs:
           path: target/quality/*-layers
           if-no-files-found: error
 
+  gtk-server:
+    name: Installed GTK server scenarios (${{ matrix.server }})
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image, fast]
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        DOCKER_CONFIG: /github/home/.docker
+    defaults:
+      run:
+        working-directory: .
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [clickhouse, mongodb]
+    steps:
+      - name: Install Git before checkout
+        working-directory: /tmp
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Record the commit under test
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/gtk-safety
+      - name: Ensure GTK safety binary is executable
+        run: chmod 0755 target/gtk-safety/bookie
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Installed GTK scenarios against ${{ matrix.server }}
+        env:
+          BOOKIE_GTK_BINARY: target/gtk-safety/bookie
+        run: python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Clean fixture containers
+        if: always()
+        run: |
+          if [[ -f scripts/cleanup-testcontainers.py ]]; then
+            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+          fi
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-gtk-server-${{ matrix.server }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+
   current-stable-clippy:
     name: Current stable Clippy (scheduled)
     timeout-minutes: 30
@@ -765,7 +833,7 @@ jobs:
               cargo build --locked --release -p bookie-app
               install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"
               python3 scripts/run-test-layer.py postgres-release
-              bash scripts/test-gtk-mysql-approval.sh
+              python3 scripts/run-test-layer.py gtk-mysql-approval
             '
 
       - name: Upload validation evidence
@@ -787,6 +855,7 @@ jobs:
       - preflight
       - fast
       - gtk-safety
+      - gtk-server
       - integration
       - b4-rollback
       - driver-tls

@@ -318,7 +318,7 @@
     "gtk-clickhouse": {
       "purpose": "Installed GTK Enum16 grid edit and Structure metadata notices against ClickHouse",
       "prerequisites": "GTK 4.24; Docker with clickhouse/clickhouse-server:24.8; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Local release gate",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -333,7 +333,7 @@
     "gtk-mysql-approval": {
       "purpose": "Human approval dialog policy and dispatch against a native MySQL fixture",
       "prerequisites": "GTK 4.24; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Local release gate",
+      "hosted_gate": "Build Linux / postgres-release; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -348,7 +348,7 @@
     "gtk-mongodb": {
       "purpose": "Installed GTK MongoDB cursor observation and native grid edit",
       "prerequisites": "GTK 4.24; Docker with mongo:7; Rust 1.98; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Local release gate",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
