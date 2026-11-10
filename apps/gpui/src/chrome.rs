@@ -438,7 +438,7 @@ impl GridView {
             .border_color(rgb(theme.border))
             .text_size(px(12.0))
             .text_color(rgb(theme.muted_foreground))
-            .child("Synthetic data · no database connection")
+            .child(self.source.origin())
             .child(right)
     }
 
