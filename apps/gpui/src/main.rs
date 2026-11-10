@@ -988,6 +988,7 @@ impl GridView {
                     matches!(self.tabs.current(), Tab::Query),
                 ),
                 action("home", "Open Home", true),
+                action("settings", "Open settings", true),
                 action("table", &format!("Open {}", self.catalog.grid_table), true),
                 action(
                     "theme",
@@ -1090,6 +1091,10 @@ impl GridView {
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "settings" => {
+                self.tabs.open_settings();
+                self.sync_grid_owner();
+            }
             "home" => {
                 self.tabs.open_home();
                 self.sync_grid_owner();
