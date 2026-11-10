@@ -150,3 +150,15 @@ async fn list_views_includes_non_dbo_views_and_excludes_tables() {
     let tables = conn.list_tables().await.unwrap();
     assert!(!tables.iter().any(|t| t.name == "v_orders"));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn lists_server_collations_with_one_default() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+    let collations = conn.list_collations().await.unwrap();
+    assert!(collations.len() <= bookie_core::MAX_COLLATIONS);
+    let default = collations.iter().filter(|item| item.is_default).collect::<Vec<_>>();
+    assert_eq!(default.len(), 1, "{default:?}");
+    assert!(collations[0].is_default);
+}

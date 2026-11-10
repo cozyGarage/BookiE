@@ -175,3 +175,14 @@ async fn a_column_collation_is_read_and_survives_a_type_change() {
     assert_eq!(altered[0].data_type, "character varying(80)");
     assert_eq!(altered[0].collation.as_deref(), Some("C"));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn lists_server_collations_with_one_default() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    let collations = conn.list_collations().await.unwrap();
+    assert!(collations.len() <= bookie_core::MAX_COLLATIONS);
+    assert!(collations.iter().any(|item| item.name == "C"));
+    assert_eq!(collations.iter().filter(|item| item.is_default).count(), 1);
+}
