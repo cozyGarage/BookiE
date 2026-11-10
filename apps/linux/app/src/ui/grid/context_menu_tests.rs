@@ -329,6 +329,52 @@ fn full_value_edit_does_not_fetch_a_rebound_cell() {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn view_value_does_not_fetch_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    for id in [1, 2] {
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(id), Value::Text("x".repeat(12000))]);
+        row.preview_values_from_result();
+        rows.append(&row);
+    }
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    let (sender, receiver) = relm4::channel();
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[menu_test_column("id", "INTEGER"), menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::CheckButton::new();
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    view.activate_action("cell.view-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::FetchCellValue { row_key, .. } if row_key == vec![Value::Int(1)]));
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.view-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not fetch another row");
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn delete_action_preserves_the_stored_row_selected_when_menu_opened() {
     gtk::init().unwrap();
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();

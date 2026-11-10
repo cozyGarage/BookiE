@@ -299,6 +299,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let row = row_object_at(&view, position(slot));
                 if let Some(value) = pending_cell_value(&slot.widget) {
                     let null_copy_text = matches!(&value, Value::Null)
