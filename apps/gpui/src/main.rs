@@ -6,6 +6,7 @@ mod catalog_nav;
 mod chrome;
 mod detail_panel;
 mod grid_edit;
+mod grid_table;
 mod keys;
 mod render;
 mod text_input;
@@ -42,6 +43,8 @@ enum Mode {
 }
 
 struct GridView {
+    table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
+    _table_events: gpui::Subscription,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -228,7 +231,30 @@ impl GridView {
             },
         )
         .detach();
+        let table = cx.new(|cx| {
+            gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx)
+                .cell_selectable(true)
+                .row_header(false)
+        });
+        let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
+        let table_events = cx.subscribe(
+            &table,
+            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
+                if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
+                    let cursor = bookie_gpui::cursor::Cursor {
+                        row: *row,
+                        column: *column,
+                    };
+                    this.cell_cursor = Some(cursor);
+                    let names = this.column_names();
+                    this.status = cursor.label(&names);
+                    cx.notify();
+                }
+            },
+        );
         GridView {
+            table,
+            _table_events: table_events,
             table_source: source.clone(),
             source,
             mode: Mode::All,
@@ -287,7 +313,7 @@ impl GridView {
             selection: None,
             generation: 0,
             scroll: UniformListScrollHandle::new(),
-            focus: cx.focus_handle(),
+            focus: table_focus,
             started,
             first_frame_reported: false,
             last_frame: None,
