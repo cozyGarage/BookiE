@@ -29,7 +29,7 @@ impl GridView {
         self.status = "Connecting…".into();
         self.begin_background(
             cx,
-            move |_cancel| open_first_table(&origin),
+            move |cancel| open_first_table(&origin, &cancel),
             |this, opened| match opened {
                 Ok(table) => this.connect_live(table),
                 Err(message) => this.status = message,
@@ -100,8 +100,30 @@ fn load(
     Ok((name.to_string(), Arc::new(table)))
 }
 
-fn open_first_table(origin: &Origin) -> Result<Arc<LiveTable>, String> {
-    let session = LiveSession::open(origin)?;
+fn open_first_table(
+    origin: &Origin,
+    cancellation: &tokio_util::sync::CancellationToken,
+) -> Result<Arc<LiveTable>, String> {
+    let session = LiveSession::open_controlled(origin, cancellation)?;
     let first = session.tables.first().cloned().ok_or("this connection has no tables")?;
-    Ok(Arc::new(session.load_table(&first, ROW_CAP)?))
+    Ok(Arc::new(session.load_table_controlled(&first, ROW_CAP, cancellation)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn a_cancelled_connection_request_does_not_open_its_file() {
+        let cancellation = tokio_util::sync::CancellationToken::new();
+        cancellation.cancel();
+        let result = open_first_table(&Origin::File(PathBuf::from("/missing/bookie.db")), &cancellation);
+        assert!(
+            result.as_ref().is_err_and(|message| message.contains("Cancelled")),
+            "{:?}",
+            result.as_ref().map(|_| ())
+        );
+    }
 }

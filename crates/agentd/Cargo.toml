@@ -26,14 +26,7 @@ bookie-storage = { path = "../storage" }
 bookie-transport = { path = "../transport" }
 bookie-mcp = { path = "../mcp" }
 bookie-driver-registry = { path = "../registry" }
-bookie-driver-clickhouse = { path = "../drivers/clickhouse" }
-bookie-driver-duckdb = { path = "../drivers/duckdb" }
-bookie-driver-mongodb = { path = "../drivers/mongodb" }
 bookie-driver-mssql = { path = "../drivers/mssql" }
-bookie-driver-mysql = { path = "../drivers/mysql" }
-bookie-driver-oracle = { path = "../drivers/oracle" }
-bookie-driver-postgres = { path = "../drivers/postgres" }
-bookie-driver-redis = { path = "../drivers/redis" }
 bookie-driver-sqlite = { path = "../drivers/sqlite" }
 async-trait.workspace = true
 chrono.workspace = true
@@ -45,8 +38,13 @@ tracing-subscriber.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+bookie-driver-postgres = { path = "../drivers/postgres" }
 tempfile.workspace = true
 bookie-release-tests = { path = "../../tests/release" }
+
+# Kept so the `kerberos` feature can enable `bookie-driver-mssql/kerberos`; no source file names the crate.
+[package.metadata.cargo-shear]
+ignored = ["drivers_mssql"]
 
 [lints]
 workspace = true

@@ -1,0 +1,17 @@
+[package]
+name = "bookie-checks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "bookie_checks"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { workspace = true, features = ["net", "time"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["net", "time", "macros", "rt", "test-util"] }

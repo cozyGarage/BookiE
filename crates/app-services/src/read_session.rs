@@ -47,21 +47,40 @@ pub struct ReadSession {
 
 impl ReadSession {
     pub async fn open_saved(id: Uuid, registry: Arc<DriverRegistry>) -> Result<Self, OpenFailure> {
+        Self::open_saved_controlled(id, registry, CancellationToken::new()).await
+    }
+
+    pub async fn open_saved_controlled(
+        id: Uuid,
+        registry: Arc<DriverRegistry>,
+        cancellation: CancellationToken,
+    ) -> Result<Self, OpenFailure> {
+        check_open_cancellation(&cancellation)?;
         let saved = bookie_storage::load_connections()
             .await
             .map_err(|error| OpenFailure::Other(error.to_string()))?
             .into_iter()
             .find(|saved| saved.id == id)
             .ok_or_else(|| OpenFailure::Other(format!("connection {id} not found")))?;
-        Self::open(saved, registry, Arc::new(DatabaseService::new())).await
+        check_open_cancellation(&cancellation)?;
+        Self::open_controlled(saved, registry, Arc::new(DatabaseService::new()), cancellation).await
     }
 
     pub async fn open_file(path: &std::path::Path, registry: Arc<DriverRegistry>) -> Result<Self, OpenFailure> {
+        Self::open_file_controlled(path, registry, CancellationToken::new()).await
+    }
+
+    pub async fn open_file_controlled(
+        path: &std::path::Path,
+        registry: Arc<DriverRegistry>,
+        cancellation: CancellationToken,
+    ) -> Result<Self, OpenFailure> {
+        check_open_cancellation(&cancellation)?;
         let file =
             crate::open_request::classify_file(path).map_err(|error| OpenFailure::Other(format!("{error:?}")))?;
         let mut saved = crate::open_request::file_connection(&file);
         saved.read_only = true;
-        Self::open(saved, registry, Arc::new(DatabaseService::new())).await
+        Self::open_controlled(saved, registry, Arc::new(DatabaseService::new()), cancellation).await
     }
 
     pub async fn open(
@@ -69,16 +88,27 @@ impl ReadSession {
         registry: Arc<DriverRegistry>,
         database: Arc<DatabaseService>,
     ) -> Result<Self, OpenFailure> {
+        Self::open_controlled(saved, registry, database, CancellationToken::new()).await
+    }
+
+    pub async fn open_controlled(
+        saved: SavedConnection,
+        registry: Arc<DriverRegistry>,
+        database: Arc<DatabaseService>,
+        cancellation: CancellationToken,
+    ) -> Result<Self, OpenFailure> {
+        check_open_cancellation(&cancellation)?;
         let prepared = open_saved(
             registry,
             saved,
             Vec::new(),
             OPEN_TIMEOUT_SECS,
             SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse),
-            CancellationToken::new(),
+            cancellation.clone(),
             database.candidate_guard_factory(),
         )
         .await?;
+        check_open_cancellation(&cancellation)?;
         let id = prepared.id();
         let mut tables = prepared.tables.clone();
         tables.extend(prepared.views.iter().cloned());
@@ -116,6 +146,11 @@ impl ReadSession {
             .await
             .map_err(|error| classify(&error))
     }
+}
+
+fn check_open_cancellation(cancellation: &CancellationToken) -> Result<(), OpenFailure> {
+    let control = OperationControl::new(cancellation.clone(), None);
+    bookie_core::check_pre_dispatch(&control).map_err(|error| OpenFailure::from_driver(&error))
 }
 
 impl ReadSession {

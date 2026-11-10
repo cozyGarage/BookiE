@@ -27,6 +27,7 @@ CRATES=(
   bookie-app-services
   bookie-results
   bookie-ssh
+  bookie-checks
   bookie-dump
   bookie-mcp
   bookie-agentd

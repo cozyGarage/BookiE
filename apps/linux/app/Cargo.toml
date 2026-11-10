@@ -29,7 +29,6 @@ bookie-driver-duckdb = { path = "../../../crates/drivers/duckdb" }
 bookie-driver-mongodb = { path = "../../../crates/drivers/mongodb" }
 bookie-driver-mssql = { path = "../../../crates/drivers/mssql" }
 bookie-driver-mysql = { path = "../../../crates/drivers/mysql" }
-bookie-driver-oracle = { path = "../../../crates/drivers/oracle" }
 bookie-driver-postgres = { path = "../../../crates/drivers/postgres" }
 bookie-driver-redis = { path = "../../../crates/drivers/redis" }
 bookie-driver-sqlite = { path = "../../../crates/drivers/sqlite" }

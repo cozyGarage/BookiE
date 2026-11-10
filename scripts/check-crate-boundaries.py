@@ -30,6 +30,7 @@ TEST_CRATES = {"bookie-driver-tls-tests", "bookie-release-tests"}
 ALLOWED = {
     "bookie-core": set(),
     "bookie-ssh": set(),
+    "bookie-checks": set(),
     "bookie-dump": {"bookie-core"},
     "bookie-policy": {"bookie-core"},
     "bookie-storage": {"bookie-core", "bookie-policy"},

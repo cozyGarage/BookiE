@@ -218,3 +218,37 @@ async fn cancelling_a_connection_attempt_interrupts_catalog_loading() {
         "{result:?}"
     );
 }
+
+#[tokio::test]
+async fn cancelling_a_read_session_open_interrupts_catalog_loading() {
+    use bookie_app_services::read_session::ReadSession;
+
+    let started = Arc::new(tokio::sync::Notify::new());
+    let mut registry = DriverRegistry::new();
+    registry.register(Arc::new(StalledCatalogDriver(started.clone())));
+    let database = Arc::new(DatabaseService::new_isolated());
+    let cancellation = CancellationToken::new();
+    let opening = ReadSession::open_controlled(
+        saved(std::path::Path::new("unused"), "sqlite"),
+        Arc::new(registry),
+        database,
+        cancellation.clone(),
+    );
+    tokio::pin!(opening);
+    tokio::select! {
+        _ = started.notified() => {},
+        result = &mut opening => panic!("session finished before catalog loading: {}", result.is_ok()),
+    }
+    cancellation.cancel();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), opening).await;
+    use bookie_app_services::driver_error_presentation::DriverFailurePresentation;
+    assert!(
+        matches!(
+            result,
+            Ok(Err(OpenFailure::Driver(DriverFailurePresentation::OperationOutcomeUnknown(ref cause))))
+                if **cause == DriverFailurePresentation::Cancelled
+        ),
+        "{:?}",
+        result.as_ref().map(|_| ())
+    );
+}
