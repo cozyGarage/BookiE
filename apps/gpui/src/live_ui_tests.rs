@@ -341,6 +341,43 @@ fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_ses
     });
 }
 
+fn open_live(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    (view, cx)
+}
+
+#[gpui::test]
+fn running_a_query_with_ctrl_enter_does_not_add_a_line(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|window, cx| {
+        let editor = view.read(cx).sql_input.clone();
+        editor.update(cx, |editor, cx| editor.focus(window, cx));
+    });
+    cx.simulate_input("SELECT id FROM orders");
+
+    cx.simulate_keystrokes("ctrl-enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_input.read(cx).value(), "SELECT id FROM orders");
+        assert_eq!(view.runs.len(), 1, "{}", view.status);
+    });
+}
+
 #[gpui::test]
 fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);

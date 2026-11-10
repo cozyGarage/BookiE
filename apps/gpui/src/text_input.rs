@@ -75,6 +75,7 @@ pub fn bind_keys(cx: &mut App) {
         KeyBinding::new("end", End, Some("TextInput")),
         KeyBinding::new("enter", Submit, Some("TextInput")),
         KeyBinding::new("escape", Cancel, Some("TextInput")),
+        KeyBinding::new("ctrl-enter", gpui::NoAction, Some("Input")),
     ]);
 }
 
