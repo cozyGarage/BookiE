@@ -58,7 +58,7 @@ fn each_job_names_its_tool_and_its_administrative_operation() {
     assert_eq!(restore.operation(), AdministrativeOperation::Restore);
 }
 
-struct IdleConnection;
+pub(crate) struct IdleConnection;
 
 #[async_trait::async_trait]
 impl bookie_core::Connection for IdleConnection {
@@ -116,7 +116,7 @@ impl bookie_core::Connection for IdleConnection {
     }
 }
 
-struct UnusedDriver;
+pub(crate) struct UnusedDriver;
 
 #[async_trait::async_trait]
 impl DatabaseDriver for UnusedDriver {
@@ -146,7 +146,7 @@ impl bookie_policy::AuditSink for DiscardAudit {
     }
 }
 
-fn guard() -> PolicyGuard {
+pub(crate) fn guard() -> PolicyGuard {
     PolicyGuard::new(
         Arc::new(IdleConnection),
         bookie_policy::GuardContext {
