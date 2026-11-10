@@ -86,12 +86,12 @@ class InventoryIgnoredTestsTests(unittest.TestCase):
             if not existed:
                 shutil.rmtree(BUILD_TREE, ignore_errors=True)
 
-    def test_a_known_gpui_limitation_has_an_inventory_tier(self):
+    def test_a_resolved_gpui_limitation_is_not_in_the_ignored_inventory(self):
         result = subprocess.run(
             [sys.executable, str(SCRIPT)], cwd=ROOT, capture_output=True, text=True, timeout=120
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(
+        self.assertNotIn(
             "| [the_cursor_crosses_to_the_next_page_and_back](../apps/gpui/src/ui_tests.rs) | GPUI |",
             result.stdout,
         )

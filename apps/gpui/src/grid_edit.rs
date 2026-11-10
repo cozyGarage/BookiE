@@ -80,7 +80,6 @@ impl GridView {
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
     }
 
-    /// A double-click on a table row edits the active column of that row.
     pub(crate) fn edit_clicked_row(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
         if self.compare.is_some() || row >= self.visible_count() {
             return;
