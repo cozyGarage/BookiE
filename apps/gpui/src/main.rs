@@ -44,6 +44,7 @@ enum Mode {
 
 struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
+    _table_events: gpui::Subscription,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -232,8 +233,21 @@ impl GridView {
         .detach();
         let table =
             cx.new(|cx| gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx));
+        let table_events = cx.subscribe(
+            &table,
+            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
+                if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
+                    this.cell_cursor = Some(bookie_gpui::cursor::Cursor {
+                        row: *row,
+                        column: *column,
+                    });
+                    cx.notify();
+                }
+            },
+        );
         GridView {
             table,
+            _table_events: table_events,
             table_source: source.clone(),
             source,
             mode: Mode::All,
