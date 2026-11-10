@@ -23,6 +23,20 @@ pub fn type_kind(cell: &Cell) -> Option<TypeKind> {
         Cell::Uuid(_) => Some(TypeKind::Identifier),
         Cell::Bytes(_) => Some(TypeKind::Binary),
         Cell::Null | Cell::Undecodable(_) => None,
+        Cell::Exact(value) => match value.as_ref() {
+            bookie_core::Value::Int(_) => Some(TypeKind::Integer),
+            bookie_core::Value::Float(_) | bookie_core::Value::Decimal(_) => Some(TypeKind::Numeric),
+            bookie_core::Value::Text(_) => Some(TypeKind::String),
+            bookie_core::Value::Bool(_) => Some(TypeKind::Boolean),
+            bookie_core::Value::Date(_)
+            | bookie_core::Value::Time(_)
+            | bookie_core::Value::DateTime(_)
+            | bookie_core::Value::TimestampTz(_) => Some(TypeKind::Temporal),
+            bookie_core::Value::Json(_) | bookie_core::Value::JsonText(_) => Some(TypeKind::Structured),
+            bookie_core::Value::Uuid(_) => Some(TypeKind::Identifier),
+            bookie_core::Value::Bytes(_) => Some(TypeKind::Binary),
+            bookie_core::Value::Null | bookie_core::Value::Undecodable(_) => None,
+        },
     }
 }
 
@@ -84,5 +98,20 @@ mod tests {
         }
         assert_eq!(type_color(TypeKind::Integer, false), 0x1d4ed8);
         assert_eq!(type_color(TypeKind::Integer, true), 0x93c5fd);
+    }
+
+    #[test]
+    fn retained_driver_values_keep_their_type_colors() {
+        use chrono::TimeZone;
+        let date = bookie_core::Value::TimestampTz(chrono::Utc.with_ymd_and_hms(10000, 1, 1, 0, 0, 0).unwrap());
+        let decimal = bookie_core::Value::Decimal("12.50".parse().unwrap());
+        let json = bookie_core::Value::Json(Box::new(serde_json::json!({"n": 1})));
+        for (value, expected) in [
+            (date, TypeKind::Temporal),
+            (decimal, TypeKind::Numeric),
+            (json, TypeKind::Structured),
+        ] {
+            assert_eq!(type_kind(&crate::core_bridge::value_to_cell(value)), Some(expected));
+        }
     }
 }

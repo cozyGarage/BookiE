@@ -54,6 +54,23 @@ pub fn hex_lines(bytes: &[u8]) -> Vec<HexLine> {
 pub fn detail_of(cell: &Cell) -> Detail {
     match cell {
         Cell::Null => Detail::Null,
+        Cell::Exact(value) => match value.as_ref() {
+            bookie_core::Value::Null => Detail::Null,
+            bookie_core::Value::Bytes(bytes) => Detail::Hex {
+                lines: hex_lines(bytes),
+                total: bytes.len(),
+                shown: bytes.len().min(MAX_HEX_BYTES),
+            },
+            bookie_core::Value::Json(value) => {
+                let (text, truncated) = crate::preview::bounded_json(value, MAX_PRETTY_BYTES, true);
+                if truncated {
+                    Detail::Text(format!("{text}…"))
+                } else {
+                    Detail::Json { pretty: text }
+                }
+            }
+            _ => Detail::Text(cell.display()),
+        },
         Cell::Bytes(bytes) => Detail::Hex {
             lines: hex_lines(bytes),
             total: bytes.len(),
@@ -75,6 +92,20 @@ pub fn detail_of(cell: &Cell) -> Detail {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retained_json_has_bounded_detail_and_keeps_its_value() {
+        let value = bookie_core::Value::Json(Box::new(serde_json::json!({"text": "💾".repeat(100_000)})));
+        let cell = crate::core_bridge::value_to_cell(value.clone());
+        let Detail::Text(text) = detail_of(&cell) else {
+            panic!("large JSON is bounded")
+        };
+        assert!(text.len() <= MAX_PRETTY_BYTES + '…'.len_utf8());
+        assert!(text.ends_with('…'));
+        assert_eq!(crate::core_bridge::cell_to_value(&cell), value);
+        let small = crate::core_bridge::value_to_cell(bookie_core::Value::Json(Box::new(serde_json::json!({"n": 1}))));
+        assert!(matches!(detail_of(&small), Detail::Json { .. }));
+    }
 
     #[test]
     fn bytes_become_offset_hex_and_ascii_lines_sixteen_wide() {

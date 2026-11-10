@@ -24,6 +24,7 @@ pub enum Cell {
     Json(String),
     JsonText(String),
     Undecodable(String),
+    Exact(std::sync::Arc<bookie_core::Value>),
 }
 
 impl Cell {
@@ -44,6 +45,23 @@ impl Cell {
             Cell::Json(_) => "json",
             Cell::JsonText(_) => "json_text",
             Cell::Undecodable(_) => "undecodable",
+            Cell::Exact(value) => match value.as_ref() {
+                bookie_core::Value::Date(_) => "date",
+                bookie_core::Value::Time(_) => "time",
+                bookie_core::Value::DateTime(_) => "datetime",
+                bookie_core::Value::TimestampTz(_) => "timestamptz",
+                bookie_core::Value::Decimal(_) => "decimal",
+                bookie_core::Value::Uuid(_) => "uuid",
+                bookie_core::Value::Json(_) => "json",
+                bookie_core::Value::Null => "null",
+                bookie_core::Value::Bool(_) => "boolean",
+                bookie_core::Value::Int(_) => "integer",
+                bookie_core::Value::Float(_) => "float",
+                bookie_core::Value::Text(_) => "text",
+                bookie_core::Value::Bytes(_) => "bytes",
+                bookie_core::Value::JsonText(_) => "json_text",
+                bookie_core::Value::Undecodable(_) => "undecodable",
+            },
         }
     }
 
@@ -58,6 +76,22 @@ impl Cell {
                 format!("\\x{hex}")
             }
             Cell::Undecodable(type_name) => format!("<undecodable {type_name}>"),
+            Cell::Exact(value) => match value.as_ref() {
+                bookie_core::Value::Date(value) => value.to_string(),
+                bookie_core::Value::Time(value) => value.to_string(),
+                bookie_core::Value::DateTime(value) => value.to_string(),
+                bookie_core::Value::TimestampTz(value) => value.to_rfc3339(),
+                bookie_core::Value::Decimal(value) => value.to_string(),
+                bookie_core::Value::Uuid(value) => value.to_string(),
+                bookie_core::Value::Json(value) => value.to_string(),
+                bookie_core::Value::Null => "NULL".into(),
+                bookie_core::Value::Bool(value) => value.to_string(),
+                bookie_core::Value::Int(value) => value.to_string(),
+                bookie_core::Value::Float(value) => value.to_string(),
+                bookie_core::Value::Text(value) | bookie_core::Value::JsonText(value) => value.clone(),
+                bookie_core::Value::Bytes(value) => Cell::Bytes(value.clone()).display(),
+                bookie_core::Value::Undecodable(value) => format!("<undecodable {value}>"),
+            },
             Cell::Text(value)
             | Cell::Date(value)
             | Cell::Time(value)
