@@ -417,6 +417,29 @@ fn connecting_does_not_discard_an_active_cell_editor(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_late_connection_does_not_replace_a_cell_editor(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.connect(origin, cx);
+            view.start_edit(0, 1, window, cx);
+            view.editor
+                .update(cx, |editor, cx| editor.set_content("late draft", cx));
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert!(view.live.is_none());
+        assert!(view.editing.is_some());
+        assert_eq!(view.editor.read(cx).content(), "late draft");
+        assert!(view.status.contains("current cell edit"));
+    });
+}
+
+#[gpui::test]
 fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: &mut TestAppContext) {
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);

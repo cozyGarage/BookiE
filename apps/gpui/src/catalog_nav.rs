@@ -33,8 +33,7 @@ impl GridView {
     }
 
     pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
-        if self.editing.is_some() {
-            self.status = "Finish or cancel the current cell edit before connecting.".into();
+        if self.reject_active_editor() {
             cx.notify();
             return;
         }
@@ -50,6 +49,9 @@ impl GridView {
     }
 
     fn connect_live(&mut self, opened: Opened) {
+        if self.reject_active_editor() {
+            return;
+        }
         self.edits.clear();
         self.table_edits.clear();
         self.compare = None;
@@ -78,6 +80,14 @@ impl GridView {
         self.connection_open = true;
         self.database_open = true;
         self.status = "Connected".into();
+    }
+
+    fn reject_active_editor(&mut self) -> bool {
+        if self.editing.is_none() {
+            return false;
+        }
+        self.status = "Finish or cancel the current cell edit before connecting.".into();
+        true
     }
 
     pub(super) fn open_table_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
