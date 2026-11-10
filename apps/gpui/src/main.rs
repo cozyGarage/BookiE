@@ -14,8 +14,8 @@ mod ui_theme;
 
 use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
 use bookie_gpui::cursor::Cursor;
-use bookie_gpui::keymap::Keymap;
 use bookie_gpui::font_settings;
+use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
@@ -40,7 +40,10 @@ pub const GUTTER_WIDTH: f32 = 56.0;
 
 enum Mode {
     All,
-    Filtered { kept: Vec<u32>, label: String },
+    Filtered {
+        kept: std::sync::Arc<Vec<u32>>,
+        label: String,
+    },
 }
 
 struct GridView {
@@ -790,7 +793,10 @@ impl GridView {
         }
         let kept = self.cursor.matches.iter().map(|row| *row as u32).collect();
         let label = format!("FILTER {}", self.find_text(cx));
-        self.set_mode(Mode::Filtered { kept, label });
+        self.set_mode(Mode::Filtered {
+            kept: std::sync::Arc::new(kept),
+            label,
+        });
         self.status = format!("Showing {} matching rows", thousands(self.dataset_count()));
     }
 
@@ -819,7 +825,10 @@ impl GridView {
                         return;
                     }
                 };
-                this.set_mode(Mode::Filtered { kept, label });
+                this.set_mode(Mode::Filtered {
+                    kept: std::sync::Arc::new(kept),
+                    label,
+                });
                 this.status = format!("Showing {} matching rows", thousands(this.dataset_count()));
             },
         );
