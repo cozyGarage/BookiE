@@ -22,7 +22,6 @@ pub trait ResultSource: Send + Sync + 'static {
         "Synthetic data · no database connection".into()
     }
     fn total(&self) -> u64;
-    /// True when the source holds only part of what the query or table has.
     fn is_partial(&self) -> bool {
         false
     }

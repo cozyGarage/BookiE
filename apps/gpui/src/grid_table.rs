@@ -9,7 +9,6 @@ use bookie_gpui::model::{Cell, Diff};
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::source::Source;
 
-/// Maps the visible page's table rows to source rows (or compare rows); O(1) to build, so cheap every frame.
 #[derive(Default)]
 pub struct RowMap {
     base: u64,
@@ -90,8 +89,25 @@ impl TableDelegate for GridDelegate {
 }
 
 impl GridDelegate {
-    // Cells of one row render back to back, so one fetch per row serves all its columns.
-    /// The text of one cell and whether it is right-aligned (numbers, and NULLs in numeric columns).
+    fn is_changed(
+        &self,
+        source: &Source,
+        columns: &[(String, f32)],
+        numeric: &[bool],
+        map: &RowMap,
+        edits: &Edits,
+        editor: &Option<(usize, usize, gpui::AnyView)>,
+    ) -> bool {
+        let same_source = self.source.as_ref().is_some_and(|current| Arc::ptr_eq(current, source));
+        !same_source
+            || self.columns != columns
+            || self.numeric != numeric
+            || self.map != *map
+            || self.edits != *edits
+            || self.editor.as_ref().map(|(row, column, _)| (*row, *column))
+                != editor.as_ref().map(|(row, column, _)| (*row, *column))
+    }
+
     pub(crate) fn label_of(&mut self, row_ix: usize, col_ix: usize) -> (String, bool) {
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
             let numeric = &self.numeric;
@@ -183,17 +199,7 @@ impl GridView {
             }
             let delegate = table.delegate_mut();
             delegate.cached = None;
-            let same_source = delegate
-                .source
-                .as_ref()
-                .is_some_and(|source| Arc::ptr_eq(source, &self.source));
-            let changed = !same_source
-                || delegate.columns != columns
-                || delegate.numeric != numeric
-                || delegate.map != map
-                || delegate.edits != self.edits
-                || delegate.editor.as_ref().map(|(r, c, _)| (*r, *c)) != editor.as_ref().map(|(r, c, _)| (*r, *c));
-            if !changed {
+            if !delegate.is_changed(&self.source, &columns, &numeric, &map, &self.edits, &editor) {
                 return;
             }
             delegate.columns = columns;

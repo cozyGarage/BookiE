@@ -247,7 +247,6 @@ impl Render for GridView {
     }
 }
 
-/// The result title: a trailing `+` says the load stopped at its cap and the source has more rows.
 pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -> String {
     let more = if partial { "+" } else { "" };
     let count = thousands(rows);
