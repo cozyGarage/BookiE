@@ -1,5 +1,4 @@
 use super::*;
-use crate::assets::icon;
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
