@@ -837,6 +837,7 @@ class CiWorkflowTests(unittest.TestCase):
                     "DISPLAY=:\"${display:-1234}\" exec \"$@\"\n"
                 ),
                 "python3": "printf 'simulated GTK initialization failure\\n' >&2\nexit 23\n",
+                "localedef": "exit 0\n",
                 "xdpyinfo": "printf '%s\\n' \"$*\" >> \"$XDPYINFO_LOG\"\nexit 1\n",
             }
             for name, contents in commands.items():
