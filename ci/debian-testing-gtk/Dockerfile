@@ -8,6 +8,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         git \
+        gettext \
         nodejs \
         locales \
         pkg-config \
@@ -18,6 +19,7 @@ RUN apt-get update \
         libsecret-1-dev \
         libkrb5-dev \
         libsqlite3-dev \
+        libxkbcommon-x11-dev \
         clang \
         dbus-daemon \
         docker-cli \

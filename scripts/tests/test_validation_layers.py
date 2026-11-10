@@ -264,7 +264,9 @@ class LayerRunnerTests(unittest.TestCase):
         gtk_app = script.split("run_gtk_app() {", 1)[1].split("run_integration()", 1)[0]
         self.assertIn("cargo clippy --locked -p bookie-app --all-targets", gtk_app)
         self.assertIn("nextest run --locked -p bookie-app --lib --bins", gtk_app)
-        self.assertNotIn("--workspace", gtk_app)
+        self.assertIn('--archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst"', gtk_app)
+        self.assertIn("BOOKIE_REQUIRE_PREBUILT", gtk_app)
+        self.assertIn("package(=bookie-app)", gtk_app)
         self.assertNotIn("test-sandbox.sh", gtk_app)
 
     def test_driver_layer_timeout_fits_hosted_integration_job(self):

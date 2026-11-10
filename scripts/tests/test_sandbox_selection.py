@@ -40,10 +40,17 @@ class SandboxSelectionTests(unittest.TestCase):
     def test_unit_tier_keeps_library_and_binary_unit_targets(self):
         script = (ROOT / "scripts/preflight.sh").read_text()
         commands = [line for line in script.splitlines() if '"$NEXTEST" nextest run' in line]
-        self.assertEqual(len(commands), 1)
-        self.assertIn("--lib", commands[0].split())
-        self.assertIn("--bins", commands[0].split())
-        self.assertNotIn("--tests", commands[0].split())
+        self.assertEqual(len(commands), 2)
+        self.assertTrue(any("--archive-file" in line for line in commands))
+        self.assertTrue(any("--lib" in line and "--bins" in line for line in commands))
+        self.assertTrue(all("--tests" not in line for line in commands))
+
+    def test_preflight_requires_and_verifies_a_source_pinned_bundle_when_requested(self):
+        script = (ROOT / "scripts/preflight.sh").read_text()
+        self.assertIn('if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then', script)
+        self.assertIn('ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE"', script)
+        self.assertIn('elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then', script)
+        self.assertIn('package(=$crate)', script)
 
     def test_sandbox_selects_all_integration_targets_without_repeating_unit_targets(self):
         with tempfile.TemporaryDirectory() as temporary:

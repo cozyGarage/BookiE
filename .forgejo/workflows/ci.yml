@@ -85,6 +85,8 @@ jobs:
   gpui-tests:
     runs-on: any-host
     timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: 4
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
