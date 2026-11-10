@@ -213,6 +213,7 @@ fn applying_empty_text_stages_empty_text_without_converting_it_to_null() {
             row_position: 4,
             col_index: 2,
             row_key: vec![Value::Int(7)],
+            draft_id: None,
             nullable: true,
             kind: FullValueKind::Text,
             sender,
@@ -227,6 +228,7 @@ fn applying_empty_text_stages_empty_text_without_converting_it_to_null() {
             col_index: 2,
             value: Value::Text(text),
             row_key,
+            draft_id: None,
         }) if text.is_empty() && row_key == vec![Value::Int(7)]
     ));
     parent.close();
@@ -248,6 +250,7 @@ fn invalid_json_stages_nothing_and_valid_apply_keeps_json_typed() {
             row_position: 2,
             col_index: 1,
             row_key: vec![Value::Int(9)],
+            draft_id: None,
             nullable: true,
             kind: FullValueKind::Json,
             sender,
@@ -268,6 +271,7 @@ fn invalid_json_stages_nothing_and_valid_apply_keeps_json_typed() {
             col_index: 1,
             value: Value::Json(value),
             row_key,
+            draft_id: None,
         }) if value["after"] == 2 && row_key == vec![Value::Int(9)]
     ));
     parent.close();
@@ -290,6 +294,7 @@ fn the_value_editor_marks_whitespace_only_when_preferences_ask() {
             row_position: 0,
             col_index: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
             nullable: true,
             kind: FullValueKind::Text,
             sender,
@@ -340,6 +345,7 @@ fn set_null_stages_null_and_cancel_stages_nothing() {
             row_position: 1,
             col_index: 0,
             row_key: vec![Value::Int(3)],
+            draft_id: None,
             nullable: true,
             kind: FullValueKind::Text,
             sender,
@@ -352,7 +358,28 @@ fn set_null_stages_null_and_cancel_stages_nothing() {
             row_position: 1,
             col_index: 0,
             row_key,
+            ..
         }) if row_key == vec![Value::Int(3)]
+    ));
+    let (sender, receiver) = relm4::channel::<super::super::GridMsg>();
+    let dialog = present(
+        &parent,
+        "notes",
+        "draft",
+        EditContext {
+            row_position: 0,
+            col_index: 0,
+            row_key: Vec::new(),
+            draft_id: Some(42),
+            nullable: true,
+            kind: FullValueKind::Text,
+            sender,
+        },
+    );
+    button(dialog.child().unwrap().upcast_ref(), &crate::tr!("Set to NULL")).emit_clicked();
+    assert!(matches!(
+        receiver.recv().now_or_never().flatten(),
+        Some(super::super::GridMsg::SetCellNull { draft_id: Some(42), .. })
     ));
     let (sender, receiver) = relm4::channel::<super::super::GridMsg>();
     let dialog = present(
@@ -363,6 +390,7 @@ fn set_null_stages_null_and_cancel_stages_nothing() {
             row_position: 1,
             col_index: 0,
             row_key: vec![Value::Int(3)],
+            draft_id: None,
             nullable: true,
             kind: FullValueKind::Text,
             sender,

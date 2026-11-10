@@ -915,7 +915,8 @@ GLib.MainLoop().run()
         for index in range(5):
             result_rows = rows + index * 1_000
             marker = f"retention-{repetitions}-{index + 1}"
-            ui.invoke_accessible_action("win.open-editor")
+            if index:
+                ui.invoke_accessible_action("win.open-editor")
             ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
             started = time.monotonic()
             query = (
@@ -951,7 +952,9 @@ GLib.MainLoop().run()
             ui.wait_for_node(name=marker, present=False)
             teardown_samples.append({"stage": f"after_editor_close_{marker}", **app_memory_profile_kb()})
         time.sleep(3)
-        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        frame = ui.find_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        if frame is not None:
+            ui.wait_within(frame, name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
         teardown_samples.append({"stage": "after_all_editors_closed_idle_3s", **app_memory_profile_kb()})
         with open(os.environ["BOOKIE_PROFILE_OUT"], "a", encoding="utf-8") as out:
             out.write(json.dumps({

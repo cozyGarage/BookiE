@@ -170,6 +170,45 @@ impl ReadSession {
     }
 }
 
+impl ReadSession {
+    pub async fn with_subscription<T, F, Fut>(
+        &self,
+        registry: &bookie_core::DriverRegistry,
+        control: &OperationControl,
+        work: F,
+    ) -> Result<T, DriverFailurePresentation>
+    where
+        F: FnOnce(bookie_core::ConnectOptions) -> Fut,
+        Fut: std::future::Future<Output = Result<T, bookie_core::DriverError>>,
+    {
+        let guard = self
+            .database
+            .guard(self.id, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        let saved = bookie_storage::load_connections()
+            .await
+            .map_err(|error| DriverFailurePresentation::Unsupported(error.to_string()))?
+            .into_iter()
+            .find(|saved| saved.id == self.id)
+            .ok_or_else(|| {
+                DriverFailurePresentation::Unsupported("only a saved connection can be subscribed to".into())
+            })?;
+        let driver = registry.get(&self.driver_id).ok_or_else(|| {
+            DriverFailurePresentation::Unsupported(format!("driver {} not registered", self.driver_id))
+        })?;
+        let environment = bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse);
+        crate::database_subscription::with_subscription_endpoint(&guard, &*driver, &saved, &environment, control, work)
+            .await
+            .map_err(|error| classify(&error))
+    }
+}
+
+impl ReadSession {
+    pub fn overview(&self) -> Vec<crate::database_service::ConnectionOverview> {
+        self.database.connection_overview()
+    }
+}
+
 impl Drop for ReadSession {
     fn drop(&mut self) {
         self.database.close_generation(self.id, self.generation);

@@ -592,3 +592,79 @@ fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_ses
         assert!(matches!(view.tabs.current(), crate::Tab::Query));
     });
 }
+
+#[gpui::test]
+fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("local");
+    view.read_with(cx, |view, cx| {
+        let labels: Vec<String> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].label.clone())
+            .collect();
+        assert!(labels.iter().all(|label| !label.starts_with("Check TCP")), "{labels:?}");
+    });
+    cx.simulate_input("");
+    cx.update(|_, cx| {
+        let input = view.read(cx).palette_input.clone();
+        input.update(cx, |input, cx| input.set_content(&address, cx));
+    });
+    cx.simulate_keystrokes("enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let entries = view.messages.entries();
+        assert_eq!(entries.len(), 1, "{}", view.status);
+        assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
+        assert!(
+            entries[0].text.starts_with(&format!("{address} is up · ")),
+            "{}",
+            entries[0].text
+        );
+        assert!(entries[0].text.ends_with("up 1/1 checks"));
+    });
+    drop(listener);
+}
+
+#[gpui::test]
+fn the_redis_listen_command_is_not_offered_on_other_engines(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("news.*");
+    view.read_with(cx, |view, cx| {
+        let labels: Vec<String> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].label.clone())
+            .collect();
+        assert!(labels.iter().all(|label| !label.contains("Redis")), "{labels:?}");
+    });
+}
+
+#[gpui::test]
+fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.show_status()));
+    view.read_with(cx, |view, _| {
+        let entries = view.messages.entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
+        assert!(
+            entries[0].text.ends_with(" · sqlite · healthy · direct"),
+            "{}",
+            entries[0].text
+        );
+    });
+}

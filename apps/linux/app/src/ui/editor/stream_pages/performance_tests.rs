@@ -282,3 +282,46 @@ fn independent_active_streams_release_their_own_pages() {
     drop(caches);
     assert!(pages.iter().all(|page| page.upgrade().is_none()));
 }
+
+#[test]
+fn completed_stream_export_keeps_spool_after_result_and_pin_are_dropped() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    let mut cache = StreamPageCache::default();
+    let result = byte_page(64 * 1024);
+    let weak = Arc::downgrade(&result);
+    runtime.block_on(spool.append_page(0, result.clone())).unwrap();
+    cache.append(0, result).unwrap();
+    let snapshot = cache.snapshot_with_spool(
+        StreamTerminal::Complete,
+        Some(crate::ui::export_dialog::StreamExportQuery {
+            driver_id: "postgres".into(),
+            suggested_name: "result".into(),
+        }),
+        0,
+        Some(spool.clone()),
+    );
+    let export = snapshot.export.clone().expect("complete stream can be exported");
+    let outcome = StatementOutcome {
+        identity: StatementIdentity::default(),
+        sql_preview: "SELECT payload".into(),
+        sql: "SELECT payload".into(),
+        elapsed_ms: 0,
+        kind: StatementOutcomeKind::Streamed(Box::new(snapshot)),
+        pinned: false,
+    };
+    let mut pins = PinnedResults::default();
+    pins.add_pin(outcome);
+    drop(spool);
+    drop(cache);
+    drop(pins);
+    assert!(weak.upgrade().is_none());
+    assert!(manager.reserved_bytes() > 0);
+    let restored = runtime
+        .block_on(export.spool.as_ref().unwrap().load_page(0, export.columns.clone()))
+        .unwrap();
+    assert_eq!(restored.rows[0][0], Value::Bytes(vec![7; 64 * 1024]));
+    drop(export);
+    assert_eq!(manager.reserved_bytes(), 0);
+}

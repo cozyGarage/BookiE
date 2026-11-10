@@ -225,11 +225,12 @@ class LayerRunnerTests(unittest.TestCase):
         self.assertIn("value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision", result.stdout)
         self.assertIn("App server", result.stdout)
 
-    def test_linux_workflows_are_all_registered_for_lint(self):
-        workflows = ROOT / ".github/workflows"
-        expected = {f".github/workflows/{path.name}" for path in workflows.glob("*linux*.yml")}
-        expected.add(".github/workflows/gtk-soak.yml")
-        expected.add(".github/workflows/release.yml")
+    def test_hosted_workflows_are_all_registered_for_lint(self):
+        github = ROOT / ".github/workflows"
+        forgejo = ROOT / ".forgejo/workflows"
+        expected = {f".github/workflows/{path.name}" for path in github.glob("*linux*.yml")}
+        expected.update({".github/workflows/gtk-soak.yml", ".github/workflows/release.yml"})
+        expected.update(f".forgejo/workflows/{path.name}" for path in forgejo.glob("*.yml"))
         selected = set(runner.catalog()["workflow-lint"]["steps"][0]["argv"][1:])
         self.assertEqual(selected, expected)
 

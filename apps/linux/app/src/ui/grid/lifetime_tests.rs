@@ -189,13 +189,19 @@ fn a_menu_context_does_not_keep_a_removed_cell_alive() {
     let widget: gtk4::Widget = gtk4::Label::new(Some("value")).upcast();
     let weak = widget.downgrade();
     let context = super::cell_context::CellContextStore::default();
-    context.set(&widget, 2, "value".into());
+    let row = crate::ui::row_object::RowObject::new(vec![bookie_core::Value::Int(1)]);
+    let weak_row = row.downgrade();
+    context.set(&widget, 2, "value".into(), None, Some(&row));
     {
         let snapshot = context.snapshot().unwrap();
         assert_eq!(snapshot.widget, widget);
         assert_eq!(snapshot.col_index, 2);
         assert_eq!(snapshot.column_name, "value");
+        assert_eq!(snapshot.row.as_ref(), Some(&row));
     }
+    drop(row);
+    assert!(weak_row.upgrade().is_none());
+    assert!(context.snapshot().unwrap().row.is_none());
     drop(widget);
     assert!(weak.upgrade().is_none());
     assert!(context.snapshot().is_none());

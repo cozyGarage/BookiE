@@ -75,11 +75,15 @@ pub(super) fn install_grid_context_menus(
     let edit_action = gio::SimpleAction::new("edit", None);
     {
         let context = context.clone();
+        let view = column_view.downgrade();
+        let columns = columns.clone();
         edit_action.connect_activate(move |_, _| {
             if let Some(slot) = context.snapshot().as_ref()
-                && let Ok(label) = slot.widget.clone().downcast::<crate::ui::cell_editor::CellEditor>()
+                && let Some(view) = view.upgrade()
+                && full_value_target(&view, slot, &columns).is_some()
+                && let Some(label) = slot.widget.downcast_ref::<crate::ui::cell_editor::CellEditor>()
             {
-                enter_edit_mode(&label);
+                enter_edit_mode(label);
             }
         });
     }
@@ -99,20 +103,17 @@ pub(super) fn install_grid_context_menus(
             if !super::full_value_editor::is_full_value_column(&column.data_type) {
                 return;
             }
-            let Some(row) = row_object_at(&view, position(slot)) else {
+            let Some((row_position, row)) = full_value_target(&view, slot, &columns) else {
                 return;
             };
-            let (_, row_key) = cell_row_identity(&slot.widget);
-            if row.draft_id().is_none() && !has_persisted_row_key(&row_key) {
-                return;
-            }
+            let row_key = slot.row_key.clone();
             if row.cell_is_partial(slot.col_index) {
                 sender
                     .send(GridMsg::FetchCellValue {
                         col_index: slot.col_index,
                         column_name: slot.column_name.clone(),
                         row_key,
-                        edit_row_position: Some(position(slot)),
+                        edit_row_position: Some(row_position),
                     })
                     .ok();
                 return;
@@ -130,9 +131,10 @@ pub(super) fn install_grid_context_menus(
                 &slot.column_name,
                 &initial_text,
                 super::full_value_editor::EditContext {
-                    row_position: position(slot),
+                    row_position,
                     col_index: slot.col_index,
                     row_key,
+                    draft_id: row.draft_id(),
                     nullable: column.nullable,
                     kind,
                     sender: sender.clone(),
@@ -147,7 +149,11 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("copy-value")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let row = view.upgrade().and_then(|view| row_object_at(&view, position(slot)));
+                    let Some(view) = view.upgrade() else { return };
+                    if !menu_target_matches(&view, slot) {
+                        return;
+                    }
+                    let row = row_object_at(&view, position(slot));
                     if row.as_ref().is_some_and(|row| row.cell_is_partial(slot.col_index)) {
                         let (_, row_key) = cell_row_identity(&slot.widget);
                         if !row_key.is_empty() {
@@ -293,6 +299,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let row = row_object_at(&view, position(slot));
                 if let Some(value) = pending_cell_value(&slot.widget) {
                     let null_copy_text = matches!(&value, Value::Null)
@@ -339,6 +348,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let Some(row) = complete_row_at(&view, position(slot)) else {
                     sender.send(GridMsg::IncompleteRowData).ok();
                     return;
@@ -399,12 +411,15 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("set-null")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let (row_position, row_key) = cell_row_identity(&slot.widget);
+                    let Some(row_position) = slot.row_position else { return };
+                    let row_key = slot.row_key.clone();
+                    let draft_id = slot.draft_target.map(|(_, id)| id);
                     sender
                         .send(GridMsg::SetCellNull {
                             row_position,
                             col_index: slot.col_index,
                             row_key,
+                            draft_id,
                         })
                         .ok();
                 }
@@ -414,11 +429,30 @@ pub(super) fn install_grid_context_menus(
     let delete_row_action = {
         let context = context.clone();
         let sender = sender.clone();
+        let view = column_view.downgrade();
         gio::ActionEntry::builder("delete-row")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let (row_position, row_key) = cell_row_identity(&slot.widget);
-                    sender.send(GridMsg::DeleteRowAt { row_position, row_key }).ok();
+                    let Some(current_position) = slot.row_position else {
+                        return;
+                    };
+                    let row_key = slot.row_key.clone();
+                    let current_draft = view
+                        .upgrade()
+                        .and_then(|view| row_object_at(&view, current_position))
+                        .and_then(|row| row.draft_id());
+                    let (row_position, draft_id) = match slot.draft_target {
+                        Some((position, id)) => (position, Some(id)),
+                        None if current_draft.is_some() => return,
+                        None => (current_position, None),
+                    };
+                    sender
+                        .send(GridMsg::DeleteRowAt {
+                            row_position,
+                            row_key,
+                            draft_id,
+                        })
+                        .ok();
                 }
             })
             .build()
@@ -459,13 +493,16 @@ pub(super) fn install_grid_context_menus(
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
                     let Some(view) = view.upgrade() else { return };
-                    if complete_row_at(&view, position(slot)).is_none() {
+                    let Some(row_position) = slot.row_position else { return };
+                    if complete_row_at(&view, row_position).is_none() {
                         sender.send(GridMsg::IncompleteRowData).ok();
                         return;
                     }
                     sender
                         .send(GridMsg::DuplicateRow {
-                            row_position: position(slot),
+                            row_position,
+                            row_key: slot.row_key.clone(),
+                            draft_id: slot.draft_target.map(|(_, id)| id),
                         })
                         .ok();
                 }
@@ -686,6 +723,9 @@ fn go_to_reference_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -717,6 +757,9 @@ fn show_referencing_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -745,6 +788,9 @@ fn filter_by_value_action(
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
             let Some(view) = view.upgrade() else { return };
+            if !menu_target_matches(&view, slot) {
+                return;
+            }
             let value = match &local_result_view {
                 Some(_) => source_value_at(&view, position(slot), slot.col_index),
                 None => row_at(&view, position(slot)).and_then(|row| row.get(slot.col_index).cloned()),
@@ -848,7 +894,15 @@ fn prepare_cell_menu(
 ) -> gtk::PopoverMenu {
     let position = POSITION_SLOT.get(widget).unwrap_or(0);
     select_row_for_menu(view, position);
-    menus.context.set(widget, options.idx, options.column_name.clone());
+    let row = row_object_at(view, position);
+    let draft_target = row.as_ref().and_then(|row| row.draft_id()).map(|id| (position, id));
+    menus.context.set(
+        widget,
+        options.idx,
+        options.column_name.clone(),
+        draft_target,
+        row.as_ref(),
+    );
     menus
         .edit_action
         .set_enabled(edit_enabled_for(widget, options.is_text_editable));
@@ -884,6 +938,15 @@ fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {
 
 fn position(slot: &CellContext) -> u32 {
     POSITION_SLOT.get(&slot.widget).unwrap_or(0)
+}
+
+fn menu_target_matches(view: &gtk::ColumnView, slot: &CellContext) -> bool {
+    let Some(position) = slot.row_position else {
+        return false;
+    };
+    slot.row.is_some()
+        && POSITION_SLOT.get(&slot.widget) == Some(position)
+        && row_object_at(view, position).as_ref() == slot.row.as_ref()
 }
 
 enum TextSeed {
@@ -955,6 +1018,32 @@ fn row_has_full_text_value(view: &gtk::ColumnView, widget: &gtk::Widget, positio
 
 fn has_persisted_row_key(row_key: &[Value]) -> bool {
     crate::services::change_tracker::RowKey::from_pk_values(row_key).is_some()
+}
+
+fn full_value_target(
+    view: &gtk::ColumnView,
+    slot: &CellContext,
+    columns: &[ColumnInfo],
+) -> Option<(u32, crate::ui::row_object::RowObject)> {
+    let position = slot.row_position?;
+    if POSITION_SLOT.get(&slot.widget) != Some(position) || cell_row_identity(&slot.widget).1 != slot.row_key {
+        return None;
+    }
+    let row = row_object_at(view, position)?;
+    if row.draft_id() != slot.draft_target.map(|(_, id)| id) {
+        return None;
+    }
+    if row.draft_id().is_none() {
+        let keys: Vec<_> = columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| column.primary_key.then_some(index))
+            .collect();
+        if !has_persisted_row_key(&slot.row_key) || row.row_identity(&keys).pk_values.as_ref() != slot.row_key {
+            return None;
+        }
+    }
+    Some((position, row))
 }
 
 fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
@@ -1097,6 +1186,7 @@ pub(crate) fn present_loaded_cell_editor(view: &gtk::ColumnView, edit: LoadedCel
             row_position: edit.row_position,
             col_index: edit.col_index,
             row_key: edit.row_key,
+            draft_id: row.draft_id(),
             nullable: edit.column.nullable,
             kind,
             sender: edit.sender,

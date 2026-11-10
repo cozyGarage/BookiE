@@ -18,7 +18,7 @@ for tool in pg_dump pg_restore; do
 #!/bin/sh
 exec "$DOCKER" run --rm --network host --user "$(id -u):$(id -g)" \\
   --volume "$SHARED_TMP:$SHARED_TMP" \\
-  -e LC_ALL -e PGHOST -e PGHOSTADDR -e PGPORT -e PGDATABASE -e PGUSER -e PGAPPNAME \\
+  -e LC_ALL -e PGHOST -e PGHOSTADDR -e PGPORT -e PGDATABASE -e PGUSER -e PGPASSWORD -e PGAPPNAME \\
   -e PGSSLMODE -e PGSSLROOTCERT -e PGSSLCERT -e PGSSLKEY -e PGCONNECT_TIMEOUT -e PGPASSFILE \\
   "$IMAGE" $tool "\$@"
 EOF
