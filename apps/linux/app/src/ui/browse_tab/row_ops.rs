@@ -745,8 +745,7 @@ impl BrowseTab {
     ) -> Option<BrowseTabInput> {
         let changes_tracker = matches!(
             msg,
-            BrowseTabInput::DuplicateRow { .. }
-                | BrowseTabInput::GridDuplicateRow { .. }
+            BrowseTabInput::GridDuplicateRow { .. }
                 | BrowseTabInput::InsertRow
                 | BrowseTabInput::DeleteSelectedRow
                 | BrowseTabInput::GridCellEdited { .. }
@@ -976,7 +975,6 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
     matches!(
         input,
         BrowseTabInput::InsertRow
-            | BrowseTabInput::DuplicateRow { .. }
             | BrowseTabInput::GridDuplicateRow { .. }
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
@@ -1009,7 +1007,6 @@ fn requires_row_key(input: &BrowseTabInput) -> bool {
     matches!(
         input,
         BrowseTabInput::InsertRow
-            | BrowseTabInput::DuplicateRow { .. }
             | BrowseTabInput::GridDuplicateRow { .. }
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }

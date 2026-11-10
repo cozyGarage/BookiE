@@ -104,7 +104,11 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
     controller.model().insert_button.emit_clicked();
     controller
         .sender()
-        .send(BrowseTabInput::DuplicateRow { row_position: 0 })
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
         .unwrap();
     assert!(activate_shortcut(&controller, "Delete"));
     assert!(activate_shortcut(&controller, "<Primary>n"));
@@ -967,7 +971,11 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
         BrowseTabInput::Redo,
         BrowseTabInput::DiscardAll,
         BrowseTabInput::InsertRow,
-        BrowseTabInput::DuplicateRow { row_position: 0 },
+        BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        },
         BrowseTabInput::DeleteSelectedRow,
         BrowseTabInput::GridCellEdited {
             row_position: 0,

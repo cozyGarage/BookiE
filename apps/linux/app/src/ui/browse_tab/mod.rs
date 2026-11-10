@@ -1030,7 +1030,6 @@ impl SimpleComponent for BrowseTab {
                 self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
-            BrowseTabInput::DuplicateRow { row_position } => self.handle_duplicate_row(row_position, sender),
             BrowseTabInput::GridDuplicateRow {
                 row_position,
                 row_key,
