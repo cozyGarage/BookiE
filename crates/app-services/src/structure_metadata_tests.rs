@@ -18,6 +18,7 @@ struct Calls {
     indexes: AtomicUsize,
     foreign_keys: AtomicUsize,
     fail_indexes: AtomicBool,
+    collation_mode: AtomicUsize,
     cancel_after_indexes: AtomicBool,
     cancellation: CancellationToken,
 }
@@ -66,6 +67,18 @@ impl Connection for MetadataConnection {
 
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
+    }
+
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        match self.0.collation_mode.load(Ordering::SeqCst) {
+            1 => Ok(vec![bookie_core::CollationInfo {
+                name: "utf8mb4_bin".into(),
+                charset: "utf8mb4".into(),
+                is_default: false,
+            }]),
+            2 => Err(DriverError::query("collation catalog failed")),
+            _ => Err(DriverError::Unsupported("listing collations".into())),
+        }
     }
 
     async fn fetch_indexes(
@@ -222,4 +235,61 @@ async fn expired_deadline_refuses_before_metadata_dispatch() {
     assert!(matches!(result, Err(DriverError::TimedOut)));
     assert_eq!(calls.indexes.load(Ordering::SeqCst), 0);
     assert_eq!(calls.foreign_keys.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn the_server_collations_are_loaded_with_the_structure() {
+    let calls = Arc::new(Calls::default());
+    calls.collation_mode.store(1, Ordering::SeqCst);
+    let connection = MetadataConnection(Arc::clone(&calls));
+
+    let metadata = load_structure_metadata(
+        &connection,
+        None,
+        "items",
+        DriverCapabilities::default(),
+        &control(&calls),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(metadata.collations.len(), 1);
+    assert_eq!(metadata.collations[0].name, "utf8mb4_bin");
+}
+
+#[tokio::test]
+async fn an_engine_without_collation_listing_still_loads_the_structure() {
+    let calls = Arc::new(Calls::default());
+    let connection = MetadataConnection(Arc::clone(&calls));
+
+    let metadata = load_structure_metadata(
+        &connection,
+        None,
+        "items",
+        DriverCapabilities::default(),
+        &control(&calls),
+    )
+    .await
+    .unwrap();
+
+    assert!(metadata.collations.is_empty());
+}
+
+#[tokio::test]
+async fn a_failing_collation_catalog_does_not_block_the_structure() {
+    let calls = Arc::new(Calls::default());
+    calls.collation_mode.store(2, Ordering::SeqCst);
+    let connection = MetadataConnection(Arc::clone(&calls));
+
+    let metadata = load_structure_metadata(
+        &connection,
+        None,
+        "items",
+        DriverCapabilities::default(),
+        &control(&calls),
+    )
+    .await
+    .unwrap();
+
+    assert!(metadata.collations.is_empty());
 }

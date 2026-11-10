@@ -38,7 +38,7 @@ impl GridView {
         let wanted = name.to_string();
         self.begin_background(
             cx,
-            move |_cancel| load(&session, &wanted),
+            move |cancel| load(&session, &wanted, &cancel),
             move |this, loaded| match loaded {
                 Ok((name, table)) => this.show_loaded_table(name, table),
                 Err(message) => this.status = message,
@@ -62,7 +62,11 @@ impl GridView {
     }
 }
 
-fn load(session: &Arc<LiveSession>, name: &str) -> Result<(String, Source), String> {
-    let table = session.load_table(name, ROW_CAP)?;
+fn load(
+    session: &Arc<LiveSession>,
+    name: &str,
+    cancellation: &tokio_util::sync::CancellationToken,
+) -> Result<(String, Source), String> {
+    let table = session.load_table_controlled(name, ROW_CAP, cancellation)?;
     Ok((name.to_string(), Arc::new(table)))
 }

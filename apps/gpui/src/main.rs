@@ -352,7 +352,7 @@ impl GridView {
             self.status = "Running…".into();
             self.begin_background(
                 cx,
-                move |_cancel| session.run_query(&sql, bookie_gpui::live::ROW_CAP),
+                move |cancel| session.run_query_controlled(&sql, bookie_gpui::live::ROW_CAP, &cancel),
                 |this, result| match result {
                     Ok(table) => this.add_run(Some(std::sync::Arc::new(table))),
                     Err(message) => this.status = message,

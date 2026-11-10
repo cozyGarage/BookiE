@@ -166,6 +166,30 @@ struct PgConnection {
 
 #[async_trait]
 impl Connection for PgConnection {
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT collname::text,
+                    CASE WHEN collencoding = -1 THEN '' ELSE pg_encoding_to_char(collencoding) END,
+                    collname = 'default'
+             FROM pg_collation
+             WHERE collencoding IN (-1, pg_char_to_encoding(pg_encoding_to_char((SELECT encoding FROM pg_database WHERE datname = current_database()))))
+             ORDER BY collname
+             LIMIT $1",
+        )
+        .bind(bookie_core::MAX_COLLATIONS as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| bookie_core::CollationInfo {
+                name: row.get(0),
+                charset: row.get(1),
+                is_default: row.get(2),
+            })
+            .collect())
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
             "SELECT datname FROM pg_database
