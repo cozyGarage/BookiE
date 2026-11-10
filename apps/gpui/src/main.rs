@@ -341,24 +341,24 @@ impl GridView {
         }
     }
 
-    fn base(&self) -> u64 {
+    fn window(&self) -> (u64, u64) {
         if self.continuous {
-            0
+            (0, self.dataset_count())
         } else {
-            self.pager.page * PAGE_ROWS
+            self.pager.window()
         }
+    }
+
+    fn base(&self) -> u64 {
+        self.window().0
     }
 
     fn visible_count(&self) -> usize {
         if let Some(diff) = &self.compare {
             return diff.rows.len();
         }
-        let remaining = self.dataset_count().saturating_sub(self.base());
-        if self.continuous {
-            remaining as usize
-        } else {
-            remaining.min(PAGE_ROWS) as usize
-        }
+        let (start, end) = self.window();
+        (end - start) as usize
     }
 
     fn source_row(&self, dataset_index: u64) -> u64 {
@@ -702,7 +702,7 @@ impl GridView {
 
     fn set_mode(&mut self, mode: Mode) {
         self.mode = mode;
-        self.pager = Pager::new(self.dataset_count());
+        self.pager = self.pager.with_total(self.dataset_count());
         self.selection = None;
         self.cell_cursor = None;
         self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
@@ -876,7 +876,7 @@ impl GridView {
     }
 
     fn previous_page(&mut self) -> bool {
-        let moved = !self.continuous && self.pager.page > 0;
+        let moved = !self.continuous && self.pager.page > 0 && !self.pager.append;
         if moved {
             self.pager.previous();
         }

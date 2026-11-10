@@ -3,7 +3,7 @@ use super::*;
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.pager.total != self.dataset_count() {
-            self.pager = Pager::new(self.dataset_count());
+            self.pager = self.pager.with_total(self.dataset_count());
         }
         self.note_frame();
         self.pace_frame(window);
@@ -46,6 +46,30 @@ impl Render for GridView {
                 cx.notify();
             })))
             .child(div().child(range_label))
+            .child(
+                button("page-size", format!("{} rows", self.pager.rows), theme).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        let index = PAGE_SIZES.iter().position(|size| *size == this.pager.rows).unwrap_or(0);
+                        this.pager = this.pager.resized(PAGE_SIZES[(index + 1) % PAGE_SIZES.len()]);
+                        cx.notify();
+                    },
+                )),
+            )
+            .child(
+                button(
+                    "load-more",
+                    if self.pager.append {
+                        "Load more ✓"
+                    } else {
+                        "Load more"
+                    },
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.pager.append = !this.pager.append;
+                    cx.notify();
+                })),
+            )
             .child(button("next", "›", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.next();
                 cx.notify();

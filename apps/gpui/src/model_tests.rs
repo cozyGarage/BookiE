@@ -327,3 +327,24 @@ fn only_the_typed_json_value_contains_the_word_null_and_a_null_cell_never_matche
         found.matches
     );
 }
+
+#[test]
+fn load_more_grows_the_window_from_the_first_row() {
+    let mut pager = Pager::new(12_000);
+    pager.append = true;
+    assert_eq!(pager.window(), (0, 5_000));
+    pager.next();
+    assert_eq!(pager.window(), (0, 10_000));
+    pager.next();
+    assert_eq!(pager.range(), (1, 12_000));
+}
+
+#[test]
+fn resizing_keeps_the_first_row_in_view() {
+    let mut pager = Pager::new(12_000);
+    pager.next();
+    let resized = pager.resized(1_000);
+    assert_eq!(resized.page, 5);
+    assert_eq!(resized.window(), (5_000, 6_000));
+    assert_eq!(resized.with_total(3_000).page, 0);
+}
