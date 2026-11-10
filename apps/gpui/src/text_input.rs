@@ -59,6 +59,7 @@ pub enum InputEvent {
 impl EventEmitter<InputEvent> for TextInput {}
 
 pub fn bind_keys(cx: &mut App) {
+    gpui_kit::init(cx);
     cx.bind_keys([
         KeyBinding::new("backspace", Backspace, Some("TextInput")),
         KeyBinding::new("delete", Delete, Some("TextInput")),
