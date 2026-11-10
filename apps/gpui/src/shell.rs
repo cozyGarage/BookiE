@@ -8,28 +8,57 @@ pub const DATABASE: &str = "sample";
 pub const DATA_TABLE: &str = "synthetic_rows";
 pub const TABLES: [&str; 4] = [DATA_TABLE, "customers", "orders", "audit_log"];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Catalog {
+    pub connection: String,
+    pub database: String,
+    pub tables: Vec<String>,
+    pub grid_table: String,
+}
+
+impl Catalog {
+    pub fn synthetic() -> Catalog {
+        Catalog {
+            connection: CONNECTION.into(),
+            database: DATABASE.into(),
+            tables: TABLES.iter().map(|name| (*name).to_string()).collect(),
+            grid_table: DATA_TABLE.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TreeRow {
     Connection { open: bool },
     Database { open: bool },
-    Table(&'static str),
+    Table(String),
 }
 
 pub fn tree_rows(search: &str, connection_open: bool, database_open: bool) -> Vec<(usize, TreeRow)> {
+    tree_rows_in(&Catalog::synthetic(), search, connection_open, database_open)
+}
+
+pub fn tree_rows_in(
+    catalog: &Catalog,
+    search: &str,
+    connection_open: bool,
+    database_open: bool,
+) -> Vec<(usize, TreeRow)> {
     let searching = !search.trim().is_empty();
-    let infos: Vec<TableInfo> = TABLES
+    let infos: Vec<TableInfo> = catalog
+        .tables
         .iter()
         .map(|name| TableInfo {
             schema: None,
-            name: (*name).to_string(),
+            name: name.clone(),
         })
         .collect();
     let nodes = build_nodes(&infos, &[]);
     let shown = visible_nodes_with_hidden_schemas(&nodes, &CollapseState::default(), search, &HashSet::new());
-    let tables: Vec<&'static str> = shown
+    let tables: Vec<String> = shown
         .into_iter()
         .filter_map(|index| match &nodes[index].kind {
-            NodeKind::Table { name, .. } => TABLES.iter().copied().find(|table| table == name),
+            NodeKind::Table { name, .. } => catalog.tables.iter().find(|table| *table == name).cloned(),
             _ => None,
         })
         .collect();
@@ -120,7 +149,11 @@ impl Tabs {
     }
 
     pub fn shows_grid(&self) -> bool {
-        matches!(self.current(), Tab::Query) || *self.current() == Tab::Table(DATA_TABLE.into())
+        self.shows_grid_for(DATA_TABLE)
+    }
+
+    pub fn shows_grid_for(&self, grid_table: &str) -> bool {
+        matches!(self.current(), Tab::Query) || *self.current() == Tab::Table(grid_table.into())
     }
 }
 
@@ -178,6 +211,20 @@ mod tests {
                 format!("{depth}:{name}")
             })
             .collect()
+    }
+
+    #[test]
+    fn a_live_catalog_lists_its_own_connection_database_and_tables() {
+        let catalog = Catalog {
+            connection: "sqlite · shop.db".into(),
+            database: "shop.db".into(),
+            tables: vec!["customers".into(), "main.orders".into()],
+            grid_table: "orders".into(),
+        };
+        let rows = tree_rows_in(&catalog, "", true, true);
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[3].1, TreeRow::Table("main.orders".into()));
+        assert_eq!(tree_rows_in(&catalog, "cust", false, false).len(), 3);
     }
 
     #[test]
