@@ -88,7 +88,6 @@ mod tests {
                 name: name.into(),
                 width: 100.0,
                 numeric: false,
-                data_type: "text".into(),
             })
             .collect()
     }

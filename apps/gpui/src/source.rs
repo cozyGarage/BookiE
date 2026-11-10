@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use bookie_core::{QueryResult, QueryRows, Value};
+use bookie_core::{FilterValueKind, QueryResult, QueryRows, Value, filter_value_kind};
 use bookie_results::result_compare::{CompareError, CompareInput, CompareReport, CompareRequest, compare_results};
 use bookie_results::result_find::{FindError, find_matches};
 use bookie_results::result_predicate::{ColumnScope, ResultPredicate};
@@ -121,11 +121,15 @@ enum Equality {
 
 fn equality(scan: &ScanSource, predicate: &Predicate) -> Result<Equality, &'static str> {
     let negate = predicate.op == Op::NotEquals;
-    let kind = scan
-        .columns()
-        .get(predicate.column)
-        .map_or(String::new(), |column| column.data_type.to_lowercase());
-    match crate::core_bridge::parse_edit(&kind, &predicate.text) {
+    let kind = scan.columns().get(predicate.column).map(filter_value_kind);
+    // Text is compared on its displayed text, which is already the exact text.
+    let typed = match kind {
+        None | Some(FilterValueKind::Text) => Err(()),
+        Some(kind) => {
+            crate::core_bridge::parse_edit(crate::core_bridge::edit_kind(kind), &predicate.text).map_err(|_| ())
+        }
+    };
+    match typed {
         Ok(value) => {
             let result = if negate {
                 ResultPredicate::NotEquals {

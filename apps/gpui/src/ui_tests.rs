@@ -1124,7 +1124,6 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
                     name: name.into(),
                     width: 150.0,
                     numeric: false,
-                    data_type: "text".into(),
                 })
                 .collect()
         })
