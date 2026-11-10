@@ -120,3 +120,101 @@ async fn seed(path: &std::path::Path) {
         .unwrap();
     connection.close().await.unwrap();
 }
+
+struct StalledCatalogDriver(Arc<tokio::sync::Notify>);
+struct StalledCatalog(Arc<tokio::sync::Notify>);
+
+#[async_trait::async_trait]
+impl bookie_core::DatabaseDriver for StalledCatalogDriver {
+    fn id(&self) -> &'static str {
+        "sqlite"
+    }
+    fn display_name(&self) -> &'static str {
+        "Stalled catalog"
+    }
+    fn default_port(&self) -> u16 {
+        0
+    }
+    fn is_file_based(&self) -> bool {
+        true
+    }
+    async fn connect(&self, _: bookie_core::ConnectOptions) -> Result<Box<dyn Connection>, bookie_core::DriverError> {
+        Ok(Box::new(StalledCatalog(self.0.clone())))
+    }
+}
+
+#[async_trait::async_trait]
+impl Connection for StalledCatalog {
+    async fn list_tables(&self) -> Result<Vec<bookie_core::TableInfo>, bookie_core::DriverError> {
+        self.0.notify_one();
+        std::future::pending().await
+    }
+    async fn fetch_columns(
+        &self,
+        _: Option<&str>,
+        _: &str,
+    ) -> Result<Vec<bookie_core::ColumnInfo>, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Internal("unused".into()))
+    }
+    async fn fetch_rows(
+        &self,
+        _: Option<&str>,
+        _: &str,
+        _: u64,
+        _: u64,
+    ) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Internal("unused".into()))
+    }
+    async fn query(&self, _: &str) -> Result<bookie_core::QueryResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Internal("unused".into()))
+    }
+    async fn execute(&self, _: &str) -> Result<bookie_core::ExecResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Internal("unused".into()))
+    }
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<bookie_core::ExecResult, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Internal("unused".into()))
+    }
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, bookie_core::DriverError> {
+        Err(bookie_core::DriverError::Internal("unused".into()))
+    }
+    async fn ping(&self) -> Result<(), bookie_core::DriverError> {
+        Ok(())
+    }
+    async fn close(self: Box<Self>) -> Result<(), bookie_core::DriverError> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn cancelling_a_connection_attempt_interrupts_catalog_loading() {
+    let started = Arc::new(tokio::sync::Notify::new());
+    let mut registry = DriverRegistry::new();
+    registry.register(Arc::new(StalledCatalogDriver(started.clone())));
+    let database = DatabaseService::new_isolated();
+    let cancellation = CancellationToken::new();
+    let opening = open_saved(
+        Arc::new(registry),
+        saved(std::path::Path::new("unused"), "sqlite"),
+        Vec::new(),
+        30,
+        SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Refuse),
+        cancellation.clone(),
+        database.candidate_guard_factory(),
+    );
+    tokio::pin!(opening);
+    tokio::select! {
+        _ = started.notified() => {},
+        result = &mut opening => panic!("connection finished before catalog loading: {result:?}"),
+    }
+    cancellation.cancel();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), opening).await;
+    use bookie_app_services::driver_error_presentation::DriverFailurePresentation;
+    assert!(
+        matches!(
+            result,
+            Ok(Err(OpenFailure::Driver(DriverFailurePresentation::OperationOutcomeUnknown(ref cause))))
+                if **cause == DriverFailurePresentation::Cancelled
+        ),
+        "{result:?}"
+    );
+}
