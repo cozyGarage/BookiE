@@ -4,7 +4,7 @@
     "harness": {
       "purpose": "Test the test runners, function-size guard and workflow contracts",
       "prerequisites": "Python 3",
-      "hosted_gate": "Linux CI contracts / harness",
+      "hosted_gate": "Linux CI contracts / harness; lab-ci / guards",
       "steps": [
         {
           "argv": [
@@ -65,7 +65,7 @@
     "gpui": {
       "purpose": "GPUI model and simulated interaction regressions",
       "prerequisites": "Rust 1.98; GPUI native build libraries; no display",
-      "hosted_gate": "Build Linux / GPUI model and simulated interaction tests",
+      "hosted_gate": "Build Linux / GPUI model and simulated interaction tests; lab-ci / gpui-tests",
       "steps": [
         {
           "argv": [
@@ -88,7 +88,7 @@
     "gtk-app": {
       "purpose": "GTK app Clippy and library/binary unit regressions after the non-GTK preflight tier",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "Build Linux / fast",
+      "hosted_gate": "Build Linux / fast; lab-ci / clippy and unit",
       "steps": [
         {
           "argv": [
@@ -104,7 +104,7 @@
     "change-contracts": {
       "purpose": "Run focused, required regressions for changed Data-lane value-path Rust files",
       "prerequisites": "Python 3; Rust 1.98; mapped crates' native development libraries",
-      "hosted_gate": "Build Linux / fast",
+      "hosted_gate": "Build Linux / fast; lab-ci / unit",
       "steps": [
         {
           "argv": [
@@ -119,7 +119,7 @@
     "sandbox": {
       "purpose": "Tests without database containers or a display",
       "prerequisites": "Rust 1.98; native non-GTK development libraries; local sockets permitted",
-      "hosted_gate": "Build Linux / preflight",
+      "hosted_gate": "Build Linux / preflight; lab-ci / sandbox",
       "steps": [
         {
           "argv": [
@@ -132,9 +132,9 @@
       ]
     },
     "drivers": {
-      "purpose": "Six server drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
+      "purpose": "Database drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
-      "hosted_gate": "Build Linux / integration",
+      "hosted_gate": "Build Linux / integration; lab-ci / driver, consumers and socket-ssh",
       "steps": [
         {
           "argv": [
@@ -150,7 +150,7 @@
     "b4-rollback": {
       "purpose": "Focused MySQL failed-batch rollback and PostgreSQL rollback-failure acceptance",
       "prerequisites": "Rust 1.98; Docker; native TLS build dependencies",
-      "hosted_gate": "Build Linux / Policy rollback acceptance",
+      "hosted_gate": "Build Linux / Policy rollback acceptance; lab-ci / driver",
       "steps": [
         {
           "argv": [
@@ -191,7 +191,7 @@
     "tls": {
       "purpose": "Certificate authority, hostname and TLS-mode contracts",
       "prerequisites": "Rust 1.98; Docker Compose; OpenSSL",
-      "hosted_gate": "Build Linux / driver-tls",
+      "hosted_gate": "Build Linux / driver-tls; lab-ci / driver-tls",
       "steps": [
         {
           "argv": [
@@ -227,7 +227,7 @@
     "ssh": {
       "purpose": "Agent authentication and OpenSSH sessions",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration",
+      "hosted_gate": "Build Linux / integration; lab-ci / socket-ssh",
       "steps": [
         {
           "argv": [
@@ -242,7 +242,7 @@
     "postgres-release": {
       "purpose": "Authorization, TLS/SSH, cancellation, locks and reconnect fixture",
       "prerequisites": "Rust 1.98; Docker Compose; OpenSSH; OpenSSL; private D-Bus/keyring tools",
-      "hosted_gate": "Build Linux / postgres-release",
+      "hosted_gate": "Build Linux / postgres-release; lab-ci / pg-release",
       "steps": [
         {
           "argv": [
@@ -254,10 +254,41 @@
         }
       ]
     },
+    "pg-dump": {
+      "purpose": "PostgreSQL dump and restore integration through the packaged client tools",
+      "prerequisites": "Rust 1.98; Docker with postgres:18-alpine; source-pinned test bundle",
+      "hosted_gate": "Build Linux / integration; lab-ci / pg-dump",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-pg-dump.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
+    "distro-floor": {
+      "purpose": "Installed package GTK acceptance on Debian testing",
+      "prerequisites": "BookiE Debian package; Docker with debian:testing; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Build Linux / distro-floor-scenarios; lab-ci / distro-floor-scenarios",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-distro-floor.sh",
+            "debian:testing"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit"
+        }
+      ]
+    },
     "app-server": {
       "purpose": "App parser and grid edit contracts against PostgreSQL, MongoDB, MySQL, and SQL Server",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker",
-      "hosted_gate": "Build Linux / fast",
+      "hosted_gate": "Build Linux / fast; lab-ci / consumers",
       "steps": [
         {
           "argv": [
@@ -273,7 +304,7 @@
     "widgets": {
       "purpose": "Isolated GTK widget contracts",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Xvfb; private D-Bus",
-      "hosted_gate": "Build Linux / fast",
+      "hosted_gate": "Build Linux / fast; lab-ci / widgets",
       "steps": [
         {
           "argv": [
@@ -288,7 +319,7 @@
     "keyring": {
       "purpose": "Secret Service persistence and transport contracts",
       "prerequisites": "Rust 1.98; gnome-keyring; libsecret tools; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-safety",
+      "hosted_gate": "Build Linux / gtk-safety; lab-ci / keyring",
       "steps": [
         {
           "argv": [
@@ -303,7 +334,7 @@
     "ui": {
       "purpose": "Installed application safety flows through AT-SPI under X11",
       "prerequisites": "GTK 4.24; Rust 1.98 or BOOKIE_GTK_BINARY; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-safety; GTK Safety Soak",
+      "hosted_gate": "Build Linux / gtk-safety; lab-ci / gtk; GTK Safety Soak",
       "steps": [
         {
           "argv": [
@@ -318,7 +349,7 @@
     "gtk-clickhouse": {
       "purpose": "Installed GTK Enum16 grid edit and Structure metadata notices against ClickHouse",
       "prerequisites": "GTK 4.24; Docker with clickhouse/clickhouse-server:24.8; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Local release gate",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -330,10 +361,40 @@
         }
       ]
     },
+    "gtk-postgres": {
+      "purpose": "Installed GTK database flows against PostgreSQL",
+      "prerequisites": "GTK 4.24; Docker with postgres:17-alpine; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-postgres.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit"
+        }
+      ]
+    },
+    "gtk-mysql": {
+      "purpose": "Installed GTK database flows against MySQL",
+      "prerequisites": "GTK 4.24; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-mysql.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit"
+        }
+      ]
+    },
     "gtk-mysql-approval": {
       "purpose": "Human approval dialog policy and dispatch against a native MySQL fixture",
       "prerequisites": "GTK 4.24; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Local release gate",
+      "hosted_gate": "Build Linux / postgres-release; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -348,7 +409,7 @@
     "gtk-mongodb": {
       "purpose": "Installed GTK MongoDB cursor observation and native grid edit",
       "prerequisites": "GTK 4.24; Docker with mongo:7; Rust 1.98; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Local release gate",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
@@ -379,12 +440,12 @@
     "security-policy": {
       "purpose": "Policy and MCP authorization, input limits and audit regressions",
       "prerequisites": "Rust 1.98; native non-GTK libraries; local sockets permitted",
-      "hosted_gate": "Linux Security / security-policy",
+      "hosted_gate": "Linux Security / security-policy; lab-ci / security-policy",
       "steps": [
         {
           "argv": [
-            "cargo",
-            "test",
+            "bash",
+            "scripts/run-rust-tests.sh",
             "--locked",
             "-p",
             "bookie-policy",
@@ -401,7 +462,7 @@
     "supply-chain": {
       "purpose": "Dependency advisory, license and source checks using repository exceptions",
       "prerequisites": "cargo-deny; cargo-audit; network to registries and advisory database",
-      "hosted_gate": "Linux Security / supply-chain",
+      "hosted_gate": "Linux Security / supply-chain; lab-ci / supply-chain",
       "steps": [
         {
           "argv": [
@@ -481,7 +542,7 @@
     "no-default-features": {
       "purpose": "Workspace and test targets compile without the default Kerberos feature",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "None yet: add a Forgejo merge-tier job that runs this layer",
+      "hosted_gate": "Build Linux / reusable-test-builds; lab-ci / test-build",
       "steps": [
         {
           "argv": [
