@@ -177,6 +177,9 @@ impl Render for GridView {
         self.sync_table(cx);
         let grid = div()
             .flex_1()
+            .capture_key_down(
+                cx.listener(|this, event: &gpui::KeyDownEvent, window, cx| this.capture_key_down(event, window, cx)),
+            )
             .flex()
             .flex_col()
             .min_h_0()
