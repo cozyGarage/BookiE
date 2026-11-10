@@ -1237,38 +1237,50 @@ fn grid_save_runs_through_policy_and_records_its_outcome() {
             .await
             .unwrap();
         raw.execute("INSERT INTO notes VALUES (1, 'a', 'b')").await.unwrap();
-        let audit = Arc::new(GridSaveAudit::default());
-        let guard = PolicyGuard::new(
-            raw,
-            GuardContext {
-                connection_id: Uuid::new_v4(),
-                connection_name: "grid test".into(),
-                driver_id: "sqlite".into(),
-                environment: Environment::Local,
-                read_only: false,
-                principal: Principal::human_gui(),
-                policy: Arc::new(PolicyConfig::default()),
-                approval: Arc::new(AutoApproveSink),
-                audit: audit.clone(),
-                audit_state: Arc::new(AuditState::new()),
-            },
-        );
-        let control = OperationControl::with_timeout(Duration::from_secs(5));
-        guard
-            .execute_in_transaction_checked_controlled(&statements, &[0], &control)
-            .await
-            .unwrap();
-        let rows = guard.query("SELECT title FROM notes WHERE id = 1").await.unwrap().rows;
-        assert_eq!(rows, vec![vec![Value::Text("changed".into())]]);
-        assert!(
-            audit
-                .0
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|event| event.phase == AuditRecordPhase::Outcome
-                    && event.operation_class == AuditOperationClass::Mutation
-                    && event.terminal_status == AuditTerminalStatus::Succeeded)
-        );
+        for read_only in [true, false] {
+            let audit = Arc::new(GridSaveAudit::default());
+            let guard = PolicyGuard::new(
+                raw.clone(),
+                GuardContext {
+                    connection_id: Uuid::new_v4(),
+                    connection_name: "grid test".into(),
+                    driver_id: "sqlite".into(),
+                    environment: Environment::Local,
+                    read_only,
+                    principal: Principal::human_gui(),
+                    policy: Arc::new(PolicyConfig::default()),
+                    approval: Arc::new(AutoApproveSink),
+                    audit: audit.clone(),
+                    audit_state: Arc::new(AuditState::new()),
+                },
+            );
+            let control = OperationControl::with_timeout(Duration::from_secs(5));
+            let result = guard
+                .execute_in_transaction_checked_controlled(&statements, &[0], &control)
+                .await;
+            if read_only {
+                assert!(matches!(result, Err(bookie_core::DriverError::PolicyDenied(_))));
+            } else {
+                result.unwrap();
+            }
+            let rows = guard.query("SELECT title FROM notes WHERE id = 1").await.unwrap().rows;
+            let expected = if read_only { "a" } else { "changed" };
+            assert_eq!(rows, vec![vec![Value::Text(expected.into())]]);
+            let status = if read_only {
+                AuditTerminalStatus::Denied
+            } else {
+                AuditTerminalStatus::Succeeded
+            };
+            assert!(
+                audit
+                    .0
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|event| event.phase == AuditRecordPhase::Outcome
+                        && event.operation_class == AuditOperationClass::Mutation
+                        && event.terminal_status == status)
+            );
+        }
     });
 }
