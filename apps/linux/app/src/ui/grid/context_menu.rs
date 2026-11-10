@@ -418,7 +418,10 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("delete-row")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let (current_position, row_key) = cell_row_identity(&slot.widget);
+                    let Some(current_position) = slot.row_position else {
+                        return;
+                    };
+                    let row_key = slot.row_key.clone();
                     let current_draft = view
                         .upgrade()
                         .and_then(|view| row_object_at(&view, current_position))

@@ -8,6 +8,8 @@ pub(super) struct CellContext {
     pub(super) col_index: usize,
     pub(super) column_name: String,
     pub(super) draft_target: Option<(u32, u64)>,
+    pub(super) row_position: Option<u32>,
+    pub(super) row_key: Vec<bookie_core::Value>,
 }
 
 struct WeakCellContext {
@@ -15,6 +17,8 @@ struct WeakCellContext {
     col_index: usize,
     column_name: String,
     draft_target: Option<(u32, u64)>,
+    row_position: Option<u32>,
+    row_key: Vec<bookie_core::Value>,
 }
 
 #[derive(Clone, Default)]
@@ -33,6 +37,10 @@ impl CellContextStore {
             col_index,
             column_name,
             draft_target,
+            row_position: super::display::POSITION_SLOT.get(widget),
+            row_key: super::display::ROW_KEY_SLOT
+                .cloned(widget)
+                .map_or_else(Vec::new, |key| key.to_vec()),
         }));
     }
 
@@ -44,6 +52,8 @@ impl CellContextStore {
             col_index: state.col_index,
             column_name: state.column_name.clone(),
             draft_target: state.draft_target,
+            row_position: state.row_position,
+            row_key: state.row_key.clone(),
         })
     }
 }
