@@ -162,4 +162,4 @@ fn transport_error(error: TransportError) -> DriverError {
 
 #[cfg(test)]
 #[path = "database_backup_tests.rs"]
-mod tests;
+pub(crate) mod tests;
