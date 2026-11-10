@@ -43,6 +43,15 @@ fn launch(tab_id: Uuid) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutp
 }
 
 pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
+    launch_for_driver(id, read_only, "postgres", Some("public"))
+}
+
+fn launch_for_driver(
+    id: Uuid,
+    read_only: bool,
+    driver_id: &str,
+    schema: Option<&str>,
+) -> (Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
     let (output_sender, output_receiver) = relm4::channel::<BrowseTabOutput>();
     let (observed_sender, observed) = std::sync::mpsc::channel();
     relm4::spawn_local(async move {
@@ -56,9 +65,9 @@ pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<Br
         .launch(BrowseTabInit {
             change_trackers: Default::default(),
             tab_id: id,
-            schema: Some("public".into()),
+            schema: schema.map(str::to_owned),
             table: "notes".into(),
-            driver_id: "postgres".into(),
+            driver_id: driver_id.into(),
             enum_input_style: bookie_core::EnumInputStyle::RawValue,
             browse_filters: true,
             connection_id: None,
@@ -1172,3 +1181,94 @@ fn undoing_a_second_edit_keeps_the_persisted_original_for_later_edits_and_the_sa
 
 #[path = "bulk_cancel_tests.rs"]
 mod bulk_cancel_tests;
+
+#[derive(Default)]
+struct GridSaveAudit(std::sync::Mutex<Vec<bookie_policy::AuditEvent>>);
+
+#[async_trait::async_trait]
+impl bookie_policy::AuditSink for GridSaveAudit {
+    async fn record(&self, event: bookie_policy::AuditEvent) -> Result<(), bookie_policy::AuditError> {
+        self.0.lock().unwrap().push(event);
+        Ok(())
+    }
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn grid_save_runs_through_policy_and_records_its_outcome() {
+    use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, OperationControl};
+    use bookie_policy::{
+        AuditOperationClass, AuditRecordPhase, AuditState, AuditTerminalStatus, AutoApproveSink, GuardContext,
+        PolicyConfig, PolicyGuard, Principal,
+    };
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch_for_driver(Uuid::new_v4(), false, "sqlite", None);
+    load_two_rows(&controller, &observed);
+    edit(&controller, 1, "changed");
+    pump(&observed);
+    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    let outputs = pump(&observed);
+    let statements = outputs
+        .iter()
+        .find_map(|output| match output {
+            BrowseTabOutput::ExecuteTransaction { statements, .. } => Some(statements.clone()),
+            _ => None,
+        })
+        .expect("grid save emits its transaction");
+    controller.detach_runtime();
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let raw: Arc<dyn Connection> = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .into();
+        raw.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT, body TEXT)")
+            .await
+            .unwrap();
+        raw.execute("INSERT INTO notes VALUES (1, 'a', 'b')").await.unwrap();
+        let audit = Arc::new(GridSaveAudit::default());
+        let guard = PolicyGuard::new(
+            raw,
+            GuardContext {
+                connection_id: Uuid::new_v4(),
+                connection_name: "grid test".into(),
+                driver_id: "sqlite".into(),
+                environment: Environment::Local,
+                read_only: false,
+                principal: Principal::human_gui(),
+                policy: Arc::new(PolicyConfig::default()),
+                approval: Arc::new(AutoApproveSink),
+                audit: audit.clone(),
+                audit_state: Arc::new(AuditState::new()),
+            },
+        );
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        guard
+            .execute_in_transaction_checked_controlled(&statements, &[0], &control)
+            .await
+            .unwrap();
+        let rows = guard.query("SELECT title FROM notes WHERE id = 1").await.unwrap().rows;
+        assert_eq!(rows, vec![vec![Value::Text("changed".into())]]);
+        assert!(
+            audit
+                .0
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|event| event.phase == AuditRecordPhase::Outcome
+                    && event.operation_class == AuditOperationClass::Mutation
+                    && event.terminal_status == AuditTerminalStatus::Succeeded)
+        );
+    });
+}
