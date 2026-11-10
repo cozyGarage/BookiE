@@ -1,8 +1,12 @@
 use gtk4 as gtk;
 use gtk4::prelude::*;
 use libadwaita as adw;
+use libadwaita::prelude::AdwDialogExt;
+use std::cell::Cell;
 use std::io::{self, Write};
+use std::rc::Rc;
 
+use bookie_app_services::image_preview::previewable_image;
 use bookie_core::Value;
 
 use super::display::{readonly_null_sentinel, value_to_copy_text, value_to_full_edit_text};
@@ -155,9 +159,45 @@ fn wrap_mode(text: &str) -> gtk::WrapMode {
     }
 }
 
+fn image_preview_picture(value: &Value, closed: &Rc<Cell<bool>>) -> Option<gtk::Picture> {
+    let Value::Bytes(bytes) = value else {
+        return None;
+    };
+    previewable_image(bytes)?;
+    let picture = gtk::Picture::builder()
+        .visible(false)
+        .can_shrink(true)
+        .content_fit(gtk::ContentFit::Contain)
+        .height_request(240)
+        .build();
+    picture.set_accessible_role(gtk::AccessibleRole::Img);
+    let owned = bytes.clone();
+    let weak = picture.downgrade();
+    let closed = closed.clone();
+    gtk::glib::spawn_future_local(async move {
+        let decoded =
+            gtk::gio::spawn_blocking(move || gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from_owned(owned))).await;
+        let (Ok(Ok(texture)), Some(picture)) = (decoded, weak.upgrade()) else {
+            return;
+        };
+        if closed.get() {
+            return;
+        }
+        picture.set_paintable(Some(&texture));
+        picture.set_visible(true);
+    });
+    Some(picture)
+}
+
 pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value, null_copy_text: Option<String>) {
     let view = build_text_view(&body(&value));
     let scroller = gtk::ScrolledWindow::builder().child(&view).vexpand(true).build();
+    let closed = Rc::new(Cell::new(false));
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    if let Some(picture) = image_preview_picture(&value, &closed) {
+        content.append(&picture);
+    }
+    content.append(&scroller);
 
     let copy = gtk::Button::with_label(&crate::tr!("Copy value"));
     copy.add_css_class("suggested-action");
@@ -172,7 +212,7 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
     header.pack_end(&copy);
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&header);
-    toolbar.set_content(Some(&scroller));
+    toolbar.set_content(Some(&content));
 
     let dialog = adw::Dialog::builder()
         .title(column)
@@ -183,6 +223,7 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
     dialog
         .upcast_ref::<gtk::Widget>()
         .update_property(&[gtk::accessible::Property::Label(column)]);
+    dialog.connect_closed(move |_| closed.set(true));
     crate::ui::leak_probe::present_tracked("value_viewer", &dialog, parent);
 }
 
@@ -383,5 +424,41 @@ mod tests {
             .unwrap();
         assert_eq!(received.as_str(), value);
         window.close();
+    }
+
+    const TWO_BY_TWO_PNG: [u8; 74] = [
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00,
+        0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x08, 0x06, 0x00, 0x00, 0x00, 0x72, 0xb6, 0x0d, 0x24, 0x00, 0x00, 0x00,
+        0x11, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0xf0, 0x1f, 0x84, 0x19, 0x60, 0x0c, 0x00,
+        0x47, 0xca, 0x07, 0xf9, 0x67, 0x59, 0x6e, 0xb7, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42,
+        0x60, 0x82,
+    ];
+
+    fn decode(bytes: Vec<u8>) -> Result<gtk::gdk::Texture, gtk::glib::Error> {
+        gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from_owned(bytes))
+    }
+
+    #[test]
+    fn a_previewable_png_decodes_to_its_declared_size() {
+        assert!(previewable_image(&TWO_BY_TWO_PNG).is_some());
+        let texture = decode(TWO_BY_TWO_PNG.to_vec()).unwrap();
+        assert_eq!((texture.width(), texture.height()), (2, 2));
+    }
+
+    #[test]
+    fn a_truncated_or_corrupt_png_is_not_decoded_and_keeps_the_hex_dump() {
+        let truncated = TWO_BY_TWO_PNG[..40].to_vec();
+        assert!(decode(truncated.clone()).is_err());
+        assert!(body(&Value::Bytes(truncated)).starts_with("00000000  "));
+        let mut corrupt = TWO_BY_TWO_PNG.to_vec();
+        corrupt[50] ^= 0xff;
+        assert!(decode(corrupt).is_err());
+    }
+
+    #[test]
+    fn non_image_binary_is_not_previewed_and_shows_the_hex_dump() {
+        let binary = vec![0x00, 0x41, 0xff, 0x10];
+        assert!(previewable_image(&binary).is_none());
+        assert!(body(&Value::Bytes(binary)).starts_with("00000000  "));
     }
 }
