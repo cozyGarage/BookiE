@@ -514,13 +514,15 @@
       ]
     },
     "workflow-lint": {
-      "purpose": "GitHub workflow schema, expressions and embedded shell validation",
+      "purpose": "GitHub and Forgejo workflow schema, expressions and embedded shell validation",
       "prerequisites": "actionlint v1.7.12 and shellcheck",
       "hosted_gate": "Linux CI contracts / workflow-lint",
       "steps": [
         {
           "argv": [
             "actionlint",
+            ".forgejo/workflows/ci.yml",
+            ".forgejo/workflows/nightly.yml",
             ".github/workflows/build-linux.yml",
             ".github/workflows/gtk-soak.yml",
             ".github/workflows/linux-quality.yml",
