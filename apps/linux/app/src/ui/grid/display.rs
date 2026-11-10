@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::cell::Cell;
-use std::io::{self, Write};
 use std::marker::PhantomData;
 use std::sync::OnceLock;
 
@@ -250,10 +249,8 @@ fn json_to_display_text_with_limits(
     char_limit: usize,
     bound_complete: bool,
 ) -> (Cow<'static, str>, bool) {
-    let mut writer = BoundedJsonWriter::new(byte_limit);
-    let result = serde_json::to_writer(&mut writer, value);
-    let byte_budget_exceeded = result.is_err();
-    let (text, truncated) = json_prefix_for_display(writer.into_display(), byte_budget_exceeded, char_limit);
+    let (text, byte_budget_exceeded) = crate::ui::row_object::bounded_json_prefix(value, byte_limit);
+    let (text, truncated) = json_prefix_for_display(text, byte_budget_exceeded, char_limit);
     if truncated {
         (Cow::Owned(text), true)
     } else if bound_complete {
@@ -273,41 +270,6 @@ fn json_prefix_for_display(mut text: String, byte_budget_exceeded: bool, char_li
         return (format!("{text}…"), true);
     }
     (format!("{text}…"), true)
-}
-
-struct BoundedJsonWriter {
-    bytes: Vec<u8>,
-    limit: usize,
-}
-
-impl BoundedJsonWriter {
-    fn new(limit: usize) -> Self {
-        Self {
-            bytes: Vec::new(),
-            limit,
-        }
-    }
-
-    fn into_display(self) -> String {
-        let end = match std::str::from_utf8(&self.bytes) {
-            Ok(_) => self.bytes.len(),
-            Err(error) => error.valid_up_to(),
-        };
-        String::from_utf8_lossy(&self.bytes[..end]).into_owned()
-    }
-}
-
-impl Write for BoundedJsonWriter {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let remaining = self.limit.saturating_sub(self.bytes.len());
-        let written = remaining.min(bytes.len());
-        self.bytes.extend_from_slice(&bytes[..written]);
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 pub(crate) fn value_to_search_text(value: &Value) -> Cow<'_, str> {
