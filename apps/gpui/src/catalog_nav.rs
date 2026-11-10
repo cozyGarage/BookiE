@@ -33,6 +33,11 @@ impl GridView {
     }
 
     pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
+        if self.editing.is_some() {
+            self.status = "Finish or cancel the current cell edit before connecting.".into();
+            cx.notify();
+            return;
+        }
         self.status = "Connecting…".into();
         self.begin_background(
             cx,
@@ -47,7 +52,6 @@ impl GridView {
     fn connect_live(&mut self, opened: Opened) {
         self.edits.clear();
         self.table_edits.clear();
-        self.editing = None;
         self.compare = None;
         self.cursor = Default::default();
         self.tabs = bookie_gpui::shell::Tabs::default();

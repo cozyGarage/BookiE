@@ -283,10 +283,6 @@ fn sqlite_fixture(statements: &[&str]) -> SqliteFixture {
 fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContext) {
     let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
     let (view, cx) = open(cx);
-    view.update(cx, |view, _| {
-        view.edits
-            .insert((0, 1), bookie_gpui::model::Cell::Text("previous edit".into()));
-    });
     let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
@@ -296,7 +292,6 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
         assert!(view.catalog.tables.is_empty());
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Query);
         assert_eq!(view.dataset_count(), 0);
-        assert!(view.edits.is_empty());
         assert!(!view.source.origin().contains("Synthetic"));
         assert!(
             !view
@@ -337,6 +332,25 @@ fn an_empty_table_name_is_not_an_empty_catalog(cx: &mut TestAppContext) {
                 .iter()
                 .any(|action| action.id == "table" && action.enabled)
         );
+    });
+}
+
+#[gpui::test]
+fn connecting_does_not_discard_an_active_cell_editor(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.start_edit(0, 1, window, cx);
+            view.editor
+                .update(cx, |editor, cx| editor.set_content("draft text", cx));
+            view.connect(bookie_gpui::live::Origin::File("/missing/bookie.db".into()), cx);
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        assert!(view.live.is_none());
+        assert!(view.editing.is_some());
+        assert_eq!(view.editor.read(cx).content(), "draft text");
+        assert!(view.status.contains("current cell edit"));
     });
 }
 
