@@ -1338,6 +1338,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_capped_load_is_marked_with_a_plus_in_the_title() {
+        assert_eq!(render::progress_text("", 100_000, true, 20), "100,000+ rows · 20 pages");
+        assert_eq!(render::progress_text("", 40, false, 1), "40 rows");
+        assert_eq!(render::progress_text("label · ", 1_500, true, 1), "label · 1,500+ rows");
+    }
+
+    #[test]
     fn only_numeric_cells_use_right_alignment() {
         assert!(numeric_cell(&Cell::Int(7)));
         assert!(numeric_cell(&Cell::Float(7.5)));

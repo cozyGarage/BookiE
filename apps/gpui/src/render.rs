@@ -18,12 +18,7 @@ impl Render for GridView {
             Mode::Filtered { label, .. } => format!("{label} · "),
             Mode::All => String::new(),
         };
-        let pages = self.pager.pages();
-        let progress = if pages > 1 {
-            format!("{title}{} rows · {pages} pages", thousands(self.dataset_count()))
-        } else {
-            format!("{title}{} rows", thousands(self.dataset_count()))
-        };
+        let progress = progress_text(&title, self.dataset_count(), self.source.is_partial(), self.pager.pages());
         let range_label = if self.dataset_count() == 0 {
             "Rows 0".to_string()
         } else if self.continuous {
@@ -273,6 +268,17 @@ impl Render for GridView {
             )
             .child(self.status_bar(theme))
             .children(palette)
+    }
+}
+
+/// The result title: a trailing `+` says the load stopped at its cap and the source has more rows.
+pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -> String {
+    let more = if partial { "+" } else { "" };
+    let count = thousands(rows);
+    if pages > 1 {
+        format!("{title}{count}{more} rows · {pages} pages")
+    } else {
+        format!("{title}{count}{more} rows")
     }
 }
 
