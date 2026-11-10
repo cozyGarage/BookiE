@@ -27,7 +27,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("timeout-minutes:", job)
-        self.assertIn("cargo test --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked", job)
+        self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", job)
         self.assertNotIn("--lib", job)
 
     def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):

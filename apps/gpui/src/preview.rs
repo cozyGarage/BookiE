@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn shared_large_cells_keep_exact_values_across_preview_and_core_conversion() {
         let fixtures: serde_json::Value =
-            serde_json::from_str(include_str!("../../fixtures/large-cells.json")).unwrap();
+            serde_json::from_str(include_str!("../../../experiments/fixtures/large-cells.json")).unwrap();
         for fixture in fixtures.as_array().unwrap() {
             let value = format!(
                 "{}{}{}",
