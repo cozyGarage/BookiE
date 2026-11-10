@@ -8,24 +8,24 @@ This file records the license expressions declared by package authors and the co
 
 Packages:
 
-- `bookie-agentd 0.2.5`
-- `bookie-app 0.2.5`
-- `bookie-app-services 0.2.5`
-- `bookie-core 0.2.5`
-- `bookie-driver-clickhouse 0.2.5`
-- `bookie-driver-duckdb 0.2.5`
-- `bookie-driver-mongodb 0.2.5`
-- `bookie-driver-mssql 0.2.5`
-- `bookie-driver-mysql 0.2.5`
-- `bookie-driver-postgres 0.2.5`
-- `bookie-driver-redis 0.2.5`
-- `bookie-driver-sqlite 0.2.5`
-- `bookie-dump 0.2.5`
-- `bookie-mcp 0.2.5`
-- `bookie-policy 0.2.5`
-- `bookie-ssh 0.2.5`
-- `bookie-storage 0.2.5`
-- `bookie-transport 0.2.5`
+- `bookie-agentd 0.2.6`
+- `bookie-app 0.2.6`
+- `bookie-app-services 0.2.6`
+- `bookie-core 0.2.6`
+- `bookie-driver-clickhouse 0.2.6`
+- `bookie-driver-duckdb 0.2.6`
+- `bookie-driver-mongodb 0.2.6`
+- `bookie-driver-mssql 0.2.6`
+- `bookie-driver-mysql 0.2.6`
+- `bookie-driver-postgres 0.2.6`
+- `bookie-driver-redis 0.2.6`
+- `bookie-driver-sqlite 0.2.6`
+- `bookie-dump 0.2.6`
+- `bookie-mcp 0.2.6`
+- `bookie-policy 0.2.6`
+- `bookie-ssh 0.2.6`
+- `bookie-storage 0.2.6`
+- `bookie-transport 0.2.6`
 
 ```text
 # License
@@ -41,10 +41,10 @@ Unless a file says otherwise, source code and documentation in this Linux reposi
 
 Packages:
 
-- `bookie-driver-cassandra 0.2.5`
-- `bookie-driver-oracle 0.2.5`
-- `bookie-driver-registry 0.2.5`
-- `bookie-results 0.2.5`
+- `bookie-driver-cassandra 0.2.6`
+- `bookie-driver-oracle 0.2.6`
+- `bookie-driver-registry 0.2.6`
+- `bookie-results 0.2.6`
 
 ```text
 GNU AFFERO GENERAL PUBLIC LICENSE

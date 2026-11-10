@@ -2,6 +2,78 @@
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-11-10
+
+### Added
+
+- DataGrip imports keep each data source's group. (#2461)
+- Navicat and RESP.app connection exports import as drafts. (#2462)
+- Sidebar: functions, procedures and triggers are listed under the Catalog group. (#2464)
+- Keyboard shortcuts to move focus between the SQL editor and its active result grid. (#2506)
+- Edit SQL editor results that read one table and include its primary key. (#2507)
+- Choose how the data browser shows dates and timestamps. (#2509)
+- Create and drop databases and schemas from the sidebar and database switcher. (#2510)
+- Ctrl+Shift+E exports results from the front tab. (#2515)
+- The full-value editor can mark spaces, tabs and line breaks. (#2516)
+- Result and browse grids keep a sticky row-number gutter while columns scroll sideways. (#2519)
+- Nested folders for saved connections on the welcome list. (#2521)
+- Result grids can Find with match case, whole words, regular expressions and a column scope, and Replace only in editable text cells on the loaded page. (#2522)
+- Result grids can sort by multiple local column keys from the header, with clear. (#2524)
+- Toggle and jump SQL editor line bookmarks. (#2528)
+- Highlight Rules editor to add, edit, and remove per-table grid colouring. (#2544)
+- Open several database connections in one BookiE window and switch between them. (#2565)
+- An experimental, read-only Oracle Database driver (SELECT queries and browsing over plain TCP). (#2634)
+- SSH tunnels can listen on a fixed local port chosen in the connection form. (#2657)
+- SQL Server connections can require TDS 8.0 strict encryption. (#2666)
+- Structure lets you pick a column collation from the list the server supports. (#2686)
+- PostgreSQL sequences show their current value in the catalog and can be restarted at a chosen value. (#2693)
+- View Value shows a preview of PNG, JPEG, GIF and WebP images stored in binary cells. (#2698)
+- An experimental read-only Cassandra and ScyllaDB driver for browsing keyspaces and running SELECT queries. (#2705)
+
+### Changed
+
+- Large byte values display a compact byte-count summary in result cells. (#2480)
+- Hidden PostgreSQL schemas are excluded from GUI catalog listings for that connection. (#2552)
+- Copying binary values uses fewer temporary allocations. (#2557)
+- Editing SQL results preserves source-column ownership when columns are aliased. (#2562)
+- ClickHouse grid editing is disabled when table metadata cannot establish a unique row identity. (#2568)
+- Case-insensitive Replace All handles cells with many matches without rescanning the cell for each match. (#2601)
+- PostgreSQL catalogs stay responsive when many schemas are hidden. (#2603)
+- Browse now explains that secondary sort keys apply only to the loaded page. (#2633)
+- Row highlight matches are reused while a grid renders. (#2644)
+
+### Fixed
+
+- Result comparison keeps key choices and actions reachable when results have many columns. (#2440)
+- Dismissing a dirty-tab close confirmation no longer crashes the application. (#2446)
+- Dismissing history deletion confirmations no longer crashes the application. (#2446)
+- A restricted PostgreSQL role no longer sees tables and views it cannot reach in the sidebar, completion and tools. (#2413)
+- Dismissing connection organization and URL import dialogs no longer crashes the application. (#2467)
+- Failed saved result pages can be retried without changing pages. (#2456)
+- Dismissing a referenced-row chooser no longer crashes the application. (#2466)
+- Dismissing a connection failure no longer crashes the application. (#2463)
+- A restricted PostgreSQL role no longer sees routines, triggers, sequences, types or grants it cannot reach. (#2414)
+- Importing a DBeaver connection list keeps nested folders, written as a path like prod/finance, as one connection group, and an odd folder definition no longer blocks the import. (#2474)
+- Toasts, banners, History and other rows, group names and error pages now show text containing &, < or > exactly as written instead of blank or garbled. (#2470)
+- Dismissing connection confirmations no longer aborts the app. (#2477)
+- Settings saves refuse temporary-file collisions without overwriting unrelated files. (#2486)
+- Refused disabled cleartext MySQL authentication before sending a password. (#2487)
+- Explain refused cleartext MySQL authentication with guidance for configuring secure authentication. (#2489)
+- Copy Value keeps the full hex form of binary cells instead of a byte-count placeholder. (#2550)
+- New editor tabs use the currently selected connection. (#2573)
+- Grid Replace All stays responsive, can be cancelled, and stages edits only after the loaded rows are revalidated. (#2589)
+- Row insert and duplicate actions no longer discard edits while a result save is in progress. (#2607)
+- Explain the highlight pattern limit and prevent saving new patterns that exceed it. (#2632)
+- Show when a saved highlight pattern is too long to apply. (#2638)
+- Oracle connections now apply the configured connection timeout through the native client. (#2639)
+- Oracle stored functions in queries require policy approval. (#2641)
+- SSH tunnels through system OpenSSH older than 8.5 no longer fail on the weak-algorithm policy. (#2653)
+- Cancelling a connection attempt interrupts catalog loading. (#2685)
+- Closing the window with an open session transaction keeps its confirmation responsive. (#2699)
+- A read-only ClickHouse connection now refuses writes at the driver, not only through the policy guard. (#2701)
+- The experimental Oracle driver now refuses a locking SELECT … FOR UPDATE even when comments sit between the keywords. (#2708)
+- Row highlight rules with complicated LIKE patterns no longer stall grid rendering. (#2628)
+
 ## [0.2.5] - 2026-11-04
 
 ### Added
