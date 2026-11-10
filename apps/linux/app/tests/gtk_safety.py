@@ -1098,7 +1098,13 @@ def run_scenario(binary, scenario):
         artifact_dir = None
         if os.environ.get("BOOKIE_GTK_ARTIFACT_DIR"):
             artifact_dir = Path(os.environ["BOOKIE_GTK_ARTIFACT_DIR"])
-            artifact_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as error:
+                artifact_dir = None
+                stderr += f"\nFailure artifact directory unavailable: {error}\n"
+                if failure is None:
+                    failure = error
         if failure is not None and artifact_dir is not None:
             try:
                 (artifact_dir / f"{scenario.__name__}-accessibility.txt").write_text(

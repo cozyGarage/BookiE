@@ -29,6 +29,12 @@ class GtkFailureCleanupTests(TestCase):
             with self.assertRaisesRegex(AssertionError, "original scenario failure"):
                 namespace["run_scenario"]("binary", scenario)
         self.assertEqual(len(stopped), 1)
+        with tempfile.NamedTemporaryFile() as artifact_file, patch.dict(
+            os.environ, {"BOOKIE_GTK_ARTIFACT_DIR": artifact_file.name}
+        ):
+            with self.assertRaisesRegex(AssertionError, "original scenario failure"):
+                namespace["run_scenario"]("binary", scenario)
+        self.assertEqual(len(stopped), 2)
 
 
 if __name__ == "__main__":
