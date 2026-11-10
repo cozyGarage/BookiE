@@ -6,6 +6,7 @@ mod catalog_nav;
 mod chrome;
 mod detail_panel;
 mod grid_edit;
+mod grid_table;
 mod keys;
 mod render;
 mod text_input;
@@ -42,6 +43,7 @@ enum Mode {
 }
 
 struct GridView {
+    table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -228,7 +230,10 @@ impl GridView {
             },
         )
         .detach();
+        let table =
+            cx.new(|cx| gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx));
         GridView {
+            table,
             table_source: source.clone(),
             source,
             mode: Mode::All,

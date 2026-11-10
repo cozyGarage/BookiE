@@ -419,6 +419,7 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     use std::sync::atomic::{AtomicUsize, Ordering};
     let requests = std::sync::Arc::new(AtomicUsize::new(0));
     let source = std::sync::Arc::new(CountingSource(requests.clone()));
+    cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
     cx.run_until_parked();
     let full = "💾".repeat(10_000);
