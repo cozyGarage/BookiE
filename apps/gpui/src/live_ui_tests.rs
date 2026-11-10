@@ -412,7 +412,7 @@ fn connecting_does_not_discard_an_active_cell_editor(cx: &mut TestAppContext) {
         assert!(view.live.is_none());
         assert!(view.editing.is_some());
         assert_eq!(view.editor.read(cx).content(), "draft text");
-        assert!(view.status.contains("current cell edit"));
+        assert!(view.status.contains("view-only edits"));
     });
 }
 
@@ -435,7 +435,69 @@ fn a_late_connection_does_not_replace_a_cell_editor(cx: &mut TestAppContext) {
         assert!(view.live.is_none());
         assert!(view.editing.is_some());
         assert_eq!(view.editor.read(cx).content(), "late draft");
-        assert!(view.status.contains("current cell edit"));
+        assert!(view.status.contains("view-only edits"));
+    });
+}
+
+#[gpui::test]
+fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("active".into()));
+            view.table_edits
+                .insert((1, 1), bookie_gpui::model::Cell::Text("table".into()));
+            view.run_edits[0].insert((2, 1), bookie_gpui::model::Cell::Text("run".into()));
+            view.connect(origin.clone(), cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_none());
+        assert_eq!(
+            (view.edits.len(), view.table_edits.len(), view.run_edits[0].len()),
+            (1, 1, 1)
+        );
+        assert!(view.status.contains("Discard all view-only edits"));
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("Discard all view-only edits");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert!(view.edits.is_empty() && view.table_edits.is_empty());
+        assert!(view.run_edits.iter().all(|edits| edits.is_empty()));
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.live.is_some(), "{}", view.status));
+}
+
+#[gpui::test]
+fn a_late_connection_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.connect(origin, cx);
+            view.edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("late edit".into()));
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_none());
+        assert_eq!(
+            view.edits.get(&(0, 1)),
+            Some(&bookie_gpui::model::Cell::Text("late edit".into()))
+        );
+        assert!(view.status.contains("view-only edits"));
     });
 }
 

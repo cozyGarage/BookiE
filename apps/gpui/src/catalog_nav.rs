@@ -33,7 +33,7 @@ impl GridView {
     }
 
     pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
-        if self.reject_active_editor() {
+        if self.reject_view_edits() {
             cx.notify();
             return;
         }
@@ -49,7 +49,7 @@ impl GridView {
     }
 
     fn connect_live(&mut self, opened: Opened) {
-        if self.reject_active_editor() {
+        if self.reject_view_edits() {
             return;
         }
         self.edits.clear();
@@ -82,12 +82,29 @@ impl GridView {
         self.status = "Connected".into();
     }
 
-    fn reject_active_editor(&mut self) -> bool {
-        if self.editing.is_none() {
+    pub(super) fn has_view_edits(&self) -> bool {
+        self.editing.is_some()
+            || !self.edits.is_empty()
+            || !self.table_edits.is_empty()
+            || self.run_edits.iter().any(|edits| !edits.is_empty())
+    }
+
+    fn reject_view_edits(&mut self) -> bool {
+        if !self.has_view_edits() {
             return false;
         }
-        self.status = "Finish or cancel the current cell edit before connecting.".into();
+        self.status = "Discard all view-only edits using Commands before connecting.".into();
         true
+    }
+
+    pub(super) fn discard_view_edits(&mut self) {
+        self.editing = None;
+        self.edits.clear();
+        self.table_edits.clear();
+        for edits in &mut self.run_edits {
+            edits.clear();
+        }
+        self.status = "Discarded all view-only edits.".into();
     }
 
     pub(super) fn open_table_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {

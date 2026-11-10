@@ -852,6 +852,11 @@ impl GridView {
             action("clear-selection", "Clear row selection", self.selection.is_some()),
             action("edit", "Edit the active cell", self.cell_cursor.is_some()),
             action(
+                "discard-view-edits",
+                "Discard all view-only edits",
+                self.has_view_edits(),
+            ),
+            action(
                 "sidebar",
                 if self.sidebar_open {
                     "Hide the sidebar"
@@ -976,6 +981,7 @@ impl GridView {
             "sessions" => self.show_sessions(window, cx),
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
+            "discard-view-edits" => self.discard_view_edits(),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
             "home" => {
                 self.tabs.open_home();
