@@ -1100,14 +1100,17 @@ def run_scenario(binary, scenario):
             artifact_dir = Path(os.environ["BOOKIE_GTK_ARTIFACT_DIR"])
             artifact_dir.mkdir(parents=True, exist_ok=True)
         if failure is not None and artifact_dir is not None:
-            (artifact_dir / f"{scenario.__name__}-accessibility.txt").write_text(
-                accessible_snapshot(), encoding="utf-8"
-            )
-            if shutil.which("scrot"):
-                subprocess.run(
-                    ["scrot", str(artifact_dir / f"{scenario.__name__}.png")],
-                    check=False,
+            try:
+                (artifact_dir / f"{scenario.__name__}-accessibility.txt").write_text(
+                    accessible_snapshot(), encoding="utf-8"
                 )
+                if shutil.which("scrot"):
+                    subprocess.run(
+                        ["scrot", str(artifact_dir / f"{scenario.__name__}.png")],
+                        check=False,
+                    )
+            except Exception as error:
+                stderr += f"\nFailure artifact collection failed: {error}\n"
         if process is not None:
             try:
                 stderr += stop_application(process)
