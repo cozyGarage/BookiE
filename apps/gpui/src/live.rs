@@ -26,6 +26,8 @@ pub struct LiveTable {
     scan: ScanSource,
     pub driver_id: String,
     pub truncated: bool,
+    table: String,
+    row_cap: u64,
 }
 
 impl LiveTable {
@@ -46,6 +48,8 @@ impl LiveTable {
             scan,
             driver_id,
             truncated,
+            table: table.to_string(),
+            row_cap: max_rows,
         })
     }
 }
@@ -132,6 +136,15 @@ impl ResultSource for LiveTable {
         &self.columns
     }
 
+    fn origin(&self) -> String {
+        let cap = if self.truncated {
+            format!(" · first {} rows only", self.row_cap)
+        } else {
+            String::new()
+        };
+        format!("{} · {} · read-only{cap}", self.driver_id, self.table)
+    }
+
     fn total(&self) -> u64 {
         self.rows.len() as u64
     }
@@ -200,6 +213,9 @@ mod tests {
         let table = LiveTable::load(&fixture(), "orders", 4).expect("load");
         assert_eq!(table.total(), 4);
         assert!(table.truncated);
+        assert_eq!(table.origin(), "sqlite · orders · read-only · first 4 rows only");
+        let whole = LiveTable::load(&fixture(), "orders", 100).expect("load");
+        assert_eq!(whole.origin(), "sqlite · orders · read-only");
     }
 
     #[test]
