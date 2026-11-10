@@ -122,6 +122,8 @@ for path in sorted(
             tier, enable = "TLS", "scripts/test-driver-tls.sh"
         elif relative.startswith("tests/release/"):
             tier, enable = "Release", POSTGRES_RELEASE_RUNNER
+        elif relative.startswith("apps/gpui/") and "known issue:" in reason.lower():
+            tier, enable = "GPUI", "cargo test --manifest-path apps/gpui/Cargo.toml -- --include-ignored"
         elif "postgres release fixture" in reason.lower():
             tier, enable = "Release", POSTGRES_RELEASE_RUNNER
         elif relative == "crates/agentd/tests/mtls.rs":

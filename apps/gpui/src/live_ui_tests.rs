@@ -130,6 +130,50 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
 }
 
 #[gpui::test]
+fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut TestAppContext) {
+    let origin = bookie_gpui::live::Origin::File(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"),
+    );
+    let table = std::sync::Arc::new(bookie_gpui::live::LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input.update(cx, |input, cx| {
+                input.set_value("SELECT customer FROM orders", window, cx)
+            });
+            view.run_query(cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("unchanged".into()));
+        view.update(cx, |view, cx| {
+            view.click_row(0, false);
+            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::Insert, cx);
+        });
+    });
+    let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(clipboard.as_deref(), Some("unchanged"));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert!(
+            !view
+                .palette_actions()
+                .iter()
+                .any(|action| action.id == "copy-insert" && action.enabled)
+        );
+    });
+}
+
+#[gpui::test]
 fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
@@ -246,6 +290,214 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("customers".into()));
         assert_eq!(view.status, "Connected");
         assert!(view.runs.is_empty(), "the synthetic run is gone");
+    });
+}
+
+struct SqliteFixture(std::path::PathBuf);
+
+impl Drop for SqliteFixture {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+fn sqlite_fixture(statements: &[&str]) -> SqliteFixture {
+    let path = std::env::temp_dir().join(format!("bookie-empty-{}.sqlite", uuid::Uuid::new_v4()));
+    std::fs::File::create(&path).expect("create database");
+    let fixture = SqliteFixture(path);
+    tokio::runtime::Runtime::new().expect("runtime").block_on(async {
+        let registry = drivers_registry::default_registry();
+        let driver = registry.get("sqlite").expect("sqlite driver");
+        let connection = driver
+            .connect(bookie_core::ConnectOptions {
+                database: fixture.0.to_string_lossy().into_owned(),
+                ..Default::default()
+            })
+            .await
+            .expect("open database");
+        for statement in statements {
+            connection.execute(statement).await.expect("prepare database");
+        }
+        connection.close().await.expect("close database");
+    });
+    fixture
+}
+
+#[gpui::test]
+fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_some(), "{}", view.status);
+        assert!(view.catalog.tables.is_empty());
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Query);
+        assert_eq!(view.dataset_count(), 0);
+        assert!(!view.source.origin().contains("Synthetic"));
+        assert!(
+            !view
+                .palette_actions()
+                .iter()
+                .any(|action| action.id == "table" && action.enabled)
+        );
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 1", window, cx));
+            view.run_query(cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.source.total(), 1);
+        assert_eq!(view.source.row(0)[0], bookie_gpui::model::Cell::Int(1));
+    });
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("unchanged".into()));
+        view.update(cx, |view, cx| {
+            view.click_row(0, false);
+            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::Insert, cx);
+        });
+    });
+    let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(clipboard.as_deref(), Some("unchanged"));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert!(
+            !view
+                .palette_actions()
+                .iter()
+                .any(|action| action.id == "copy-insert" && action.enabled)
+        );
+    });
+}
+
+#[gpui::test]
+fn an_empty_table_name_is_not_an_empty_catalog(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&[r#"CREATE TABLE "" (id INTEGER)"#]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_some(), "{}", view.status);
+        assert_eq!(view.catalog.tables, [""]);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table(String::new()));
+        assert!(
+            view.palette_actions()
+                .iter()
+                .any(|action| action.id == "table" && action.enabled)
+        );
+    });
+}
+
+#[gpui::test]
+fn connecting_does_not_discard_an_active_cell_editor(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.start_edit(0, 1, window, cx);
+            view.editor
+                .update(cx, |editor, cx| editor.set_content("draft text", cx));
+            view.connect(bookie_gpui::live::Origin::File("/missing/bookie.db".into()), cx);
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        assert!(view.live.is_none());
+        assert!(view.editing.is_some());
+        assert_eq!(view.editor.read(cx).content(), "draft text");
+        assert!(view.status.contains("view-only edits"));
+    });
+}
+
+#[gpui::test]
+fn a_late_connection_does_not_replace_a_cell_editor(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.connect(origin, cx);
+            view.start_edit(0, 1, window, cx);
+            view.editor
+                .update(cx, |editor, cx| editor.set_content("late draft", cx));
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert!(view.live.is_none());
+        assert!(view.editing.is_some());
+        assert_eq!(view.editor.read(cx).content(), "late draft");
+        assert!(view.status.contains("view-only edits"));
+    });
+}
+
+#[gpui::test]
+fn connecting_keeps_view_edits_until_the_user_discards_them(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("active".into()));
+            view.table_edits
+                .insert((1, 1), bookie_gpui::model::Cell::Text("table".into()));
+            view.run_edits[0].insert((2, 1), bookie_gpui::model::Cell::Text("run".into()));
+            view.connect(origin.clone(), cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_none());
+        assert_eq!(
+            (view.edits.len(), view.table_edits.len(), view.run_edits[0].len()),
+            (1, 1, 1)
+        );
+        assert!(view.status.contains("Discard all view-only edits"));
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("Discard all view-only edits");
+    cx.simulate_keystrokes("enter");
+    view.read_with(cx, |view, _| {
+        assert!(view.edits.is_empty() && view.table_edits.is_empty());
+        assert!(view.run_edits.iter().all(|edits| edits.is_empty()));
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.live.is_some(), "{}", view.status));
+}
+
+#[gpui::test]
+fn a_late_connection_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&["CREATE TABLE seed (id INTEGER)", "DROP TABLE seed"]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.connect(origin, cx);
+            view.edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("late edit".into()));
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_none());
+        assert_eq!(
+            view.edits.get(&(0, 1)),
+            Some(&bookie_gpui::model::Cell::Text("late edit".into()))
+        );
+        assert!(view.status.contains("view-only edits"));
     });
 }
 

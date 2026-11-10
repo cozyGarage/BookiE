@@ -181,7 +181,7 @@ fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAp
 }
 
 #[gpui::test]
-#[ignore = "known issue: DataTable moves within the loaded page; keyboard page crossing is not yet ported (docs/known-issues)"]
+#[ignore = "known issue: DataTable moves within the loaded page; keyboard page crossing is not yet ported (docs/known-limitations)"]
 fn the_cursor_crosses_to_the_next_page_and_back(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-end");

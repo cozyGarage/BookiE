@@ -641,20 +641,25 @@ impl GridView {
                                                 },
                                             ))
                                         }))
-                                        .child(
-                                            ghost(
-                                                "quick-open",
-                                                format!("{} → {}", self.catalog.connection, self.catalog.grid_table),
-                                                theme,
+                                        .when(!self.catalog.tables.is_empty(), |section| {
+                                            section.child(
+                                                ghost(
+                                                    "quick-open",
+                                                    format!(
+                                                        "{} → {}",
+                                                        self.catalog.connection, self.catalog.grid_table
+                                                    ),
+                                                    theme,
+                                                )
+                                                .on_click(cx.listener(
+                                                    |this, _, window, cx| {
+                                                        let name = this.catalog.grid_table.clone();
+                                                        this.open_table_named(&name, window, cx);
+                                                        cx.notify();
+                                                    },
+                                                )),
                                             )
-                                            .on_click(cx.listener(
-                                                |this, _, window, cx| {
-                                                    let name = this.catalog.grid_table.clone();
-                                                    this.open_table_named(&name, window, cx);
-                                                    cx.notify();
-                                                },
-                                            )),
-                                        ),
+                                        }),
                                 ),
                             )
                             .child(

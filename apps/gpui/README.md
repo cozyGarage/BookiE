@@ -24,7 +24,11 @@ Ctrl+Shift+P opens a command palette (`src/palette.rs` and an overlay in `src/ma
 
 Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as the Tauri prototype (and so as `bookie_core::import::parse_cell`), without depending on any BookiE crate. Opening a value containing a newline is refused with a single-line editor notice, preserving its full value. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere. Copy includes the full pending values.
 
+Connection changes wait while view-only edits or a cell editor are open. **Commands → Discard all view-only edits** discards all such edits and allows the change.
+
 Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text. The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
+
+Copy as INSERT is available for table rows. Query results do not infer an INSERT target from the previously browsed table.
 
 The look follows DBX (MIT, <https://github.com/t8y2/dbx>): its light and dark design tokens from `apps/desktop/src/styles/tokens.css` (white and near-black surfaces, `#e5e5e5` borders, 4 px radii, a muted header), its data-grid constants (26 px rows, 13 px text, striped rows `#f0f0f0`, blue active row, italic muted NULL) and outline buttons. Only colour values and sizes were taken; no DBX code.
 
@@ -95,7 +99,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- The default source is synthetic. A saved connection can also be opened from the Home page. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only, capped at 100,000 rows and subject to the shared decoded-byte and cell budgets. The status marks results that may be incomplete. Pages are separate reads, not a consistent snapshot; concurrent changes can affect the rows shown.
+- The default source is synthetic. A saved connection can also be opened from the Home page. An empty catalog opens a query tab on the live connection. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only, capped at 100,000 rows and subject to the shared decoded-byte and cell budgets. The status marks results that may be incomplete. Pages are separate reads, not a consistent snapshot; concurrent changes can affect the rows shown.
 - Driver-shaped temporal, decimal, UUID and JSON values retain their original `bookie_core::Value` through the cell bridge. Synthetic edits still use the prototype's local cell representation. Tests cover typed round trips and bounded JSON previews.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - Cell editing uses a single-line field; values containing newlines cannot be edited there.

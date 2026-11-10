@@ -412,6 +412,10 @@ impl GridView {
     }
 
     fn copy_selection_as(&mut self, format: CopyFormat, cx: &mut Context<Self>) {
+        if format == CopyFormat::Insert && (self.grid_is_query || self.catalog.tables.is_empty()) {
+            self.status = "Copy as INSERT is available for table rows only.".into();
+            return;
+        }
         let Some(selection) = self.selection else { return };
         if !selection.copyable() {
             self.status = selection.label();
@@ -979,7 +983,7 @@ impl GridView {
                 action(
                     "copy-insert",
                     "Copy selected rows as INSERT statements",
-                    self.selection.is_some(),
+                    self.selection.is_some() && !self.grid_is_query && !self.catalog.tables.is_empty(),
                 ),
                 action(
                     "sessions",
@@ -989,6 +993,11 @@ impl GridView {
                 action("status", "Show connection and tunnel status", self.live.is_some()),
                 action("clear-selection", "Clear row selection", self.selection.is_some()),
                 action("edit", "Edit the active cell", self.cell_cursor.is_some()),
+                action(
+                    "discard-view-edits",
+                    "Discard all view-only edits",
+                    self.has_view_edits(),
+                ),
                 action(
                     "sidebar",
                     if self.sidebar_open {
@@ -1029,7 +1038,11 @@ impl GridView {
                 ),
                 action("home", "Open Home", true),
                 action("settings", "Open settings", true),
-                action("table", &format!("Open {}", self.catalog.grid_table), true),
+                action(
+                    "table",
+                    &format!("Open {}", self.catalog.grid_table),
+                    !self.catalog.tables.is_empty(),
+                ),
                 action(
                     "theme",
                     if self.dark_mode {
@@ -1111,6 +1124,7 @@ impl GridView {
             "copy-markdown" => self.copy_selection_as(CopyFormat::Markdown, cx),
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
+            "discard-view-edits" => self.discard_view_edits(),
             "sessions" => self.show_sessions(window, cx),
             "kafka-topics" => {
                 if let Some(broker) = check_address.clone() {
