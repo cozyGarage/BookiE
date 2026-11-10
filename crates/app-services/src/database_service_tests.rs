@@ -648,3 +648,21 @@ async fn each_connection_keeps_its_own_metadata() {
     assert!(service.metadata(first).is_none());
     assert_eq!(service.metadata(second).map(|m| m.name), Some("second".to_string()));
 }
+
+#[tokio::test]
+async fn the_overview_lists_open_connections_by_name_with_health_and_no_tunnel() {
+    let service = DatabaseService::new_isolated();
+    assert!(service.connection_overview().is_empty());
+    open_memory_connection(&service, "zeta").await;
+    open_memory_connection(&service, "Alpha").await;
+
+    let overview = service.connection_overview();
+
+    let names: Vec<&str> = overview.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, ["Alpha", "zeta"]);
+    for connection in &overview {
+        assert_eq!(connection.driver_id, "sqlite");
+        assert_eq!(connection.tunnel, TunnelState::Direct);
+        assert_eq!(connection.health, ConnectionHealth::Healthy);
+    }
+}
