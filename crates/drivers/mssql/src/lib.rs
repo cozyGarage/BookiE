@@ -376,6 +376,31 @@ impl Connection for MssqlConnection {
         session::open(&self.session_options).await
     }
 
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        let sql = format!(
+            "SELECT TOP {} name, CAST(COLLATIONPROPERTY(name, 'CodePage') AS varchar(10)),
+                    CASE WHEN name = CAST(SERVERPROPERTY('Collation') AS nvarchar(128)) THEN '1' ELSE '0' END
+             FROM sys.fn_helpcollations()
+             ORDER BY CASE WHEN name = CAST(SERVERPROPERTY('Collation') AS nvarchar(128)) THEN 0 ELSE 1 END, name",
+            bookie_core::MAX_COLLATIONS
+        );
+        let mut client = self.client().await?;
+        let result = self
+            .query_result(&mut client, &sql, &[], bookie_core::MAX_COLLATIONS)
+            .await?;
+        Ok(result
+            .rows
+            .iter()
+            .filter_map(|row| {
+                Some(bookie_core::CollationInfo {
+                    name: as_text(row.first())?,
+                    charset: as_text(row.get(1)).unwrap_or_default(),
+                    is_default: as_text(row.get(2)).as_deref() == Some("1"),
+                })
+            })
+            .collect())
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         let sql = "SELECT name FROM sys.databases WHERE database_id > 4 AND HAS_DBACCESS(name) = 1 ORDER BY name";
         let mut client = self.client().await?;
