@@ -1127,11 +1127,16 @@ def run_scenario(binary, scenario):
         if failure is None and "does not have a minimum size" in stderr:
             failure = AssertionError(f"a window with breakpoints has no minimum size:\n{stderr}")
         if artifact_dir is not None:
-            (artifact_dir / f"{scenario.__name__}-stderr.txt").write_text(stderr, encoding="utf-8")
-            (artifact_dir / f"{scenario.__name__}-result.json").write_text(json.dumps({
-                "scenario": scenario.__name__, "status": "passed" if failure is None else "failed",
-                "error": str(failure) if failure is not None else None,
-            }) + "\n", encoding="utf-8")
+            try:
+                (artifact_dir / f"{scenario.__name__}-stderr.txt").write_text(stderr, encoding="utf-8")
+                (artifact_dir / f"{scenario.__name__}-result.json").write_text(json.dumps({
+                    "scenario": scenario.__name__, "status": "passed" if failure is None else "failed",
+                    "error": str(failure) if failure is not None else None,
+                }) + "\n", encoding="utf-8")
+            except OSError as error:
+                stderr += f"\nFailure artifact write failed: {error}\n"
+                if failure is None:
+                    failure = error
         shutil.rmtree(base, ignore_errors=True)
     if failure is not None:
         raise AssertionError(f"{failure}\napplication stderr:\n{stderr}") from failure
