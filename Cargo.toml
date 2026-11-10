@@ -21,6 +21,7 @@ members = [
     "crates/drivers/mssql",
     "crates/drivers/mysql",
     "crates/drivers/oracle",
+    "crates/drivers/cassandra",
     "crates/drivers/postgres",
     "crates/drivers/redis",
     "crates/drivers/sqlite",
