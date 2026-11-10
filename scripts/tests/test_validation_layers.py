@@ -257,6 +257,24 @@ class LayerRunnerTests(unittest.TestCase):
         for script in ["preflight.sh", "ci-local.sh"]:
             self.assertIn("scripts/test-harness.sh", (ROOT / "scripts" / script).read_text())
 
+    def test_security_policy_layer_uses_prebuilt_test_wrapper(self):
+        layer = runner.catalog()["security-policy"]
+
+        self.assertEqual(
+            layer["steps"][0]["argv"],
+            [
+                "bash",
+                "scripts/run-rust-tests.sh",
+                "--locked",
+                "-p",
+                "bookie-policy",
+                "-p",
+                "bookie-mcp",
+                "--lib",
+                "--tests",
+            ],
+        )
+
     def test_gtk_app_layer_targets_only_the_app_unit_and_lint_checks(self):
         layer = runner.catalog()["gtk-app"]
         self.assertEqual(layer["steps"][0]["argv"], ["bash", "scripts/ci-local.sh", "gtk-app"])

@@ -32,6 +32,14 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn(invocation, github)
                 self.assertIn(invocation, forgejo)
 
+    def test_forgejo_runs_the_shared_security_policy_layer(self):
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_security = (ROOT / ".github/workflows/linux-security.yml").read_text()
+        security_policy = re.search(r"(?ms)^  security-policy:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py security-policy", security_policy)
+        self.assertIn('run: python3 scripts/run-test-layer.py "$VALIDATION_LAYER"', github_security)
+
     def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()

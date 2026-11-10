@@ -379,12 +379,12 @@
     "security-policy": {
       "purpose": "Policy and MCP authorization, input limits and audit regressions",
       "prerequisites": "Rust 1.98; native non-GTK libraries; local sockets permitted",
-      "hosted_gate": "Linux Security / security-policy",
+      "hosted_gate": "Linux Security / security-policy; lab-ci / security-policy",
       "steps": [
         {
           "argv": [
-            "cargo",
-            "test",
+            "bash",
+            "scripts/run-rust-tests.sh",
             "--locked",
             "-p",
             "bookie-policy",
