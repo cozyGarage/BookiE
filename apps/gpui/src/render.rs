@@ -174,6 +174,7 @@ impl Render for GridView {
         .track_scroll(&self.scroll)
         .flex_1();
         let palette = self.palette_open.then(|| self.palette_overlay(cx));
+        self.sync_table(cx);
         let grid = div()
             .flex_1()
             .flex()
@@ -182,8 +183,9 @@ impl Render for GridView {
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
-            .child(header)
-            .child(list)
+            .children(self.compare.is_some().then(|| header))
+            .children(self.compare.is_some().then(|| list))
+            .children(self.compare.is_none().then(|| self.data_table()))
             .children(self.detail_panel(theme));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
