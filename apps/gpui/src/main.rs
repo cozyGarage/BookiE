@@ -1014,6 +1014,7 @@ impl GridView {
                     matches!(self.tabs.current(), Tab::Query),
                 ),
                 action("home", "Open Home", true),
+                action("settings", "Open settings", true),
                 action("table", &format!("Open {}", self.catalog.grid_table), true),
                 action(
                     "theme",
@@ -1116,6 +1117,10 @@ impl GridView {
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "settings" => {
+                self.tabs.open_settings();
+                self.sync_grid_owner();
+            }
             "home" => {
                 self.tabs.open_home();
                 self.sync_grid_owner();
@@ -1327,6 +1332,17 @@ fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
         .bg(rgb(background))
 }
 
+fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
+    view.update(cx, |view, _| {
+        match name {
+            "settings" => view.tabs.open_settings(),
+            "query" => view.tabs.open_query(),
+            _ => return,
+        }
+        view.sync_grid_owner();
+    });
+}
+
 fn main() {
     let started = Instant::now();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
@@ -1369,11 +1385,8 @@ fn main() {
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
                     });
-                    if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
-                        view.update(cx, |view, _| {
-                            view.tabs.open_query();
-                            view.sync_grid_owner();
-                        });
+                    if let Ok(start_tab) = std::env::var("BOOKIE_PROTOTYPE_START") {
+                        open_requested_start_tab(&view, &start_tab, cx);
                     }
                     if autoscroll > 0 {
                         view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));

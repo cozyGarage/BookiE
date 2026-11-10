@@ -1045,8 +1045,10 @@ impl SimpleComponent for BrowseTab {
                 new_value,
                 value,
                 row_key,
+                draft_id,
             } => {
                 let accepted = match value {
+                    Some(_) if self.row_object_at(row_position).and_then(|row| row.draft_id()) != draft_id => false,
                     Some(value) => self.handle_grid_cell_value_edited(row_position, col_index, value, row_key, sender),
                     None => self.handle_grid_cell_edited(row_position, col_index, new_value, row_key, sender),
                 };

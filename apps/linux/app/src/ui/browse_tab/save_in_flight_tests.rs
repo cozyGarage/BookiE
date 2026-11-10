@@ -120,6 +120,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
             new_value: "changed".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -226,7 +227,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
         .count();
-    assert_eq!(refused, 14, "every read-only database mutation must be refused");
+    assert_eq!(refused, 15, "every read-only database mutation must be refused");
     assert!(
         outputs
             .iter()
@@ -438,6 +439,7 @@ fn keyless_tab_rejects_inline_edits_and_insert_actions() {
             new_value: "changed".into(),
             value: None,
             row_key: Vec::new(),
+            draft_id: None,
         })
         .unwrap();
     controller.sender().send(BrowseTabInput::InsertRow).unwrap();
@@ -520,6 +522,7 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
             new_value: "stale edit".into(),
             value: None,
             row_key: vec![Value::Int(2)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -602,6 +605,7 @@ fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
             new_value: "forged value".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -652,6 +656,7 @@ fn undecodable_cell_edit_and_null_messages_do_not_stage_mutations() {
             new_value: "forged value".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -851,6 +856,7 @@ pub(super) fn edit(controller: &relm4::Controller<BrowseTab>, col_index: usize, 
             new_value: new_value.into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
 }
@@ -983,6 +989,7 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
             new_value: "during save".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         },
         BrowseTabInput::GridSetCellNull {
             row_position: 0,
@@ -1114,6 +1121,17 @@ fn stale_set_null_does_not_modify_a_replacement_draft() {
         })
         .unwrap();
     controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("stale full value".into()),
+            row_key: Vec::new(),
+            draft_id: first_id,
+        })
+        .unwrap();
+    controller
         .sender()
         .send(BrowseTabInput::GridDuplicateRow {
             row_position: 0,
@@ -1126,6 +1144,23 @@ fn stale_set_null_does_not_modify_a_replacement_draft() {
     assert_eq!(
         controller.model().row_object_at(0).unwrap().cell_value(1),
         Value::Text("second".into())
+    );
+    let current_id = controller.model().row_object_at(0).unwrap().draft_id();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("accepted".into()),
+            row_key: Vec::new(),
+            draft_id: current_id,
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(
+        controller.model().row_object_at(0).unwrap().cell_value(1),
+        Value::Text("accepted".into())
     );
     controller.detach_runtime();
 }
@@ -1309,6 +1344,7 @@ fn copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_ed
             new_value: "edited".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     pump(&observed);

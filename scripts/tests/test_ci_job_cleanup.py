@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import subprocess
@@ -255,6 +256,58 @@ class CiJobCleanupTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(job_tmp.exists())
+
+    def test_driver_finalizer_removes_only_its_scoped_scratch_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            scratch = "/var/cache/ci/tmp/bookie-driver-123-2-mysql"
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_JOB": "driver",
+                    "TMPDIR": scratch,
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertIn(["-rf", "--", scratch], rm_calls)
+
+            calls.unlink()
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_JOB": "unit",
+                    "TMPDIR": scratch,
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertNotIn(["-rf", "--", scratch], rm_calls)
 
     def test_driver_tls_workflow_assigns_a_run_scoped_fixture_project(self):
         job = runner_jobs(WORKFLOWS[0])["driver-tls"]

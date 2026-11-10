@@ -15,6 +15,7 @@ icons!(
     "chevron-down",
     "chevron-right",
     "chevrons-right",
+    "settings",
     "arrow-down-up",
     "folder-plus",
     "refresh-cw",

@@ -1105,3 +1105,31 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
         assert_eq!(view.status, "This cell cannot be edited");
     });
 }
+
+#[gpui::test]
+fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_settings();
+            view.sync_grid_owner();
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Settings)
+    });
+}
+
+#[gpui::test]
+fn the_palette_opens_the_settings_tab(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("open settings");
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Settings)
+    });
+}
