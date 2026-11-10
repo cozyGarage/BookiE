@@ -1,22 +1,29 @@
 use std::sync::Arc;
 
 use bookie_gpui::live::{LiveSession, LiveTable, Origin, ROW_CAP};
+use bookie_gpui::model::{Cell, ColumnMeta, Diff, FindResult, Predicate};
 use bookie_gpui::shell::{Catalog, Tab};
-use bookie_gpui::source::Source;
+use bookie_gpui::source::{ResultSource, Source};
 use gpui::{Context, Window};
+use tokio_util::sync::CancellationToken;
 
 use crate::{GridView, Mode};
 
 impl GridView {
     pub(super) fn attach_live(&mut self, table: Arc<LiveTable>) {
         let session = table.session().clone();
+        let table_name = table.table_name().to_string();
+        self.tabs.items[1] = Tab::Table(table_name.clone());
+        self.attach_session(session, table_name);
+    }
+
+    fn attach_session(&mut self, session: Arc<LiveSession>, table_name: String) {
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
             database: session.label.clone(),
             tables: session.tables.clone(),
-            grid_table: table.table_name().to_string(),
+            grid_table: table_name,
         };
-        self.tabs.items[1] = Tab::Table(self.catalog.grid_table.clone());
         self.live = Some(session);
         self.runs.clear();
         self.run_sources.clear();
@@ -26,6 +33,10 @@ impl GridView {
     }
 
     pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
+        if self.reject_view_edits() {
+            cx.notify();
+            return;
+        }
         self.status = "Connecting…".into();
         self.begin_background(
             cx,
@@ -37,16 +48,33 @@ impl GridView {
         );
     }
 
-    fn connect_live(&mut self, table: Arc<LiveTable>) {
-        self.source = table.clone();
-        self.table_source = table.clone();
+    fn connect_live(&mut self, opened: Opened) {
+        if self.reject_view_edits() {
+            return;
+        }
         self.edits.clear();
         self.table_edits.clear();
         self.compare = None;
         self.cursor = Default::default();
         self.tabs = bookie_gpui::shell::Tabs::default();
-        self.attach_live(table);
-        self.grid_is_query = false;
+        match opened {
+            Opened::Table(table) => {
+                self.source = table.clone();
+                self.table_source = table.clone();
+                self.attach_live(table);
+                self.grid_is_query = false;
+            }
+            Opened::Empty(session) => {
+                let origin = format!("{} · {} · read-only", session.driver_id, session.label);
+                let source: Source = Arc::new(EmptySource(origin));
+                self.source = source.clone();
+                self.table_source = source;
+                self.tabs.items.truncate(1);
+                self.tabs.open_query();
+                self.attach_session(session, String::new());
+                self.grid_is_query = true;
+            }
+        }
         self.set_mode(Mode::All);
         self.tabs.active = 1;
         self.connection_open = true;
@@ -54,7 +82,35 @@ impl GridView {
         self.status = "Connected".into();
     }
 
+    pub(super) fn has_view_edits(&self) -> bool {
+        self.editing.is_some()
+            || !self.edits.is_empty()
+            || !self.table_edits.is_empty()
+            || self.run_edits.iter().any(|edits| !edits.is_empty())
+    }
+
+    fn reject_view_edits(&mut self) -> bool {
+        if !self.has_view_edits() {
+            return false;
+        }
+        self.status = "Discard all view-only edits using Commands before connecting.".into();
+        true
+    }
+
+    pub(super) fn discard_view_edits(&mut self) {
+        self.editing = None;
+        self.edits.clear();
+        self.table_edits.clear();
+        for edits in &mut self.run_edits {
+            edits.clear();
+        }
+        self.status = "Discarded all view-only edits.".into();
+    }
+
     pub(super) fn open_table_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.catalog.tables.is_empty() {
+            return;
+        }
         let Some(session) = self.live.clone().filter(|_| name != self.catalog.grid_table) else {
             self.tabs.open_table(name);
             self.sync_grid_owner();
@@ -100,17 +156,50 @@ fn load(
     Ok((name.to_string(), Arc::new(table)))
 }
 
-fn open_first_table(
-    origin: &Origin,
-    cancellation: &tokio_util::sync::CancellationToken,
-) -> Result<Arc<LiveTable>, String> {
+enum Opened {
+    Table(Arc<LiveTable>),
+    Empty(Arc<LiveSession>),
+}
+
+fn open_first_table(origin: &Origin, cancellation: &CancellationToken) -> Result<Opened, String> {
     let session = LiveSession::open_controlled(origin, cancellation)?;
-    let first = session.tables.first().cloned().ok_or("this connection has no tables")?;
-    Ok(Arc::new(session.load_table_controlled(
-        &first,
-        ROW_CAP,
-        cancellation,
-    )?))
+    if cancellation.is_cancelled() {
+        return Err("The operation was cancelled.".into());
+    }
+    match session.tables.first() {
+        Some(first) => Ok(Opened::Table(Arc::new(session.load_table_controlled(
+            first,
+            ROW_CAP,
+            cancellation,
+        )?))),
+        None => Ok(Opened::Empty(session)),
+    }
+}
+
+struct EmptySource(String);
+
+impl ResultSource for EmptySource {
+    fn columns(&self) -> &[ColumnMeta] {
+        &[]
+    }
+    fn origin(&self) -> String {
+        self.0.clone()
+    }
+    fn total(&self) -> u64 {
+        0
+    }
+    fn row(&self, _index: u64) -> Vec<Cell> {
+        Vec::new()
+    }
+    fn find(&self, _query: &str, _cap: usize, _cancel: &CancellationToken) -> Result<FindResult, &'static str> {
+        Err("No result is loaded")
+    }
+    fn filter(&self, _predicate: &Predicate, _cancel: &CancellationToken) -> Result<Vec<u32>, &'static str> {
+        Err("No result is loaded")
+    }
+    fn compare(&self, _keyed: bool, _cancel: &CancellationToken) -> Result<Diff, &'static str> {
+        Err("No result is loaded")
+    }
 }
 
 #[cfg(test)]

@@ -122,6 +122,8 @@ for path in sorted(
             tier, enable = "TLS", "scripts/test-driver-tls.sh"
         elif relative.startswith("tests/release/"):
             tier, enable = "Release", POSTGRES_RELEASE_RUNNER
+        elif relative.startswith("apps/gpui/") and "known issue:" in reason.lower():
+            tier, enable = "GPUI", "cargo test --manifest-path apps/gpui/Cargo.toml -- --include-ignored"
         elif "postgres release fixture" in reason.lower():
             tier, enable = "Release", POSTGRES_RELEASE_RUNNER
         elif relative == "crates/agentd/tests/mtls.rs":
@@ -144,6 +146,8 @@ for path in sorted(
             if name not in mapped:
                 raise RuntimeError(f"unmapped app-server test: {name}")
             tier, enable = "App server", "scripts/run-test-layer.py app-server"
+        elif relative.startswith("apps/gpui/") and "known issue" in reason.lower():
+            tier, enable = "GPUI", "Keep ignored until the known issue is resolved"
         elif "docker" in reason.lower() and relative.startswith("crates/ssh/"):
             targets = re.findall(r"--test\s+([\w-]+)", (root / "scripts/test-ssh.sh").read_text())
             if path.stem not in targets:

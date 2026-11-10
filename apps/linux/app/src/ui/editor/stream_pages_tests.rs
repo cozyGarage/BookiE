@@ -48,6 +48,35 @@ fn retains_all_small_pages_within_the_byte_budget_and_counts_all_delivered_rows(
 }
 
 #[test]
+fn a_stream_with_an_unspooled_page_cannot_export_as_complete() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::with_limit(1)
+        .create()
+        .unwrap();
+    let page = page(&["id"], &[1]);
+    assert!(runtime.block_on(spool.append_page(0, page.clone())).is_err());
+
+    let mut cache = StreamPageCache::default();
+    cache.append_with_storage_status(0, page, false).unwrap();
+    let snapshot = cache.snapshot_with_spool(
+        StreamTerminal::Failed("temporary storage quota reached".into()),
+        Some(crate::ui::export_dialog::StreamExportQuery {
+            driver_id: "postgres".into(),
+            suggested_name: "items".into(),
+        }),
+        0,
+        Some(spool),
+    );
+
+    assert_eq!(snapshot.retained_rows, 1);
+    assert!(snapshot.export.is_none());
+    assert!(matches!(snapshot.terminal, StreamTerminal::Failed(_)));
+}
+
+#[test]
 fn page_row_starts_keep_short_and_empty_page_offsets() {
     assert_eq!(page_row_starts_from_counts(&[2, 0, 1, 3]), vec![1, 3, 3, 4]);
 }

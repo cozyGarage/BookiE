@@ -127,13 +127,26 @@ impl GridView {
         item.on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, event: &MouseDownEvent, window, cx| {
-                this.cell_cursor = Some(Cursor { row: position, column });
-                if event.click_count == 2 {
-                    this.start_edit(source, column, window, cx);
-                    cx.stop_propagation();
-                }
+                this.click_cell(source, position, column, event.click_count, window, cx);
             }),
         )
+    }
+
+    pub(crate) fn click_cell(
+        &mut self,
+        source: u64,
+        position: usize,
+        column: usize,
+        click_count: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.cell_cursor = Some(Cursor { row: position, column });
+        window.focus(&self.focus, cx);
+        if click_count == 2 {
+            self.start_edit(source, column, window, cx);
+            cx.stop_propagation();
+        }
     }
 }
 

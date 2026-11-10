@@ -1126,6 +1126,20 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
 }
 
 #[gpui::test]
+fn clicking_a_cell_gives_the_grid_the_keyboard_so_the_arrows_move_from_it(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let find = view.read_with(cx, |view, cx| view.find.read(cx).focus_handle_for_tests());
+    cx.update(|window, cx| window.focus(&find, cx));
+
+    cx.update(|window, cx| view.update(cx, |view, cx| view.click_cell(2, 2, 1, 1, window, cx)));
+    cx.simulate_keystrokes("down");
+
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 3, column: 1 }));
+    });
+}
+
+#[gpui::test]
 fn the_settings_tab_opens_and_shows_the_appearance_page(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
@@ -1150,5 +1164,28 @@ fn the_palette_opens_the_settings_tab(cx: &mut TestAppContext) {
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Settings)
+    });
+}
+
+#[gpui::test]
+fn a_search_typed_on_one_tab_is_not_left_in_the_find_box_of_the_next(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.find.update(cx, |find, cx| find.set_content("Sample 99999", cx))
+        })
+    });
+    cx.run_until_parked();
+
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Query);
+        assert_eq!(
+            view.find.read(cx).content(),
+            "",
+            "the Query result must not inherit the table's search"
+        );
     });
 }
