@@ -157,6 +157,14 @@ impl Tabs {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ResultView {
+    #[default]
+    Table,
+    Summary,
+    Messages,
+}
+
 pub const MIN_RESULT_RATIO: f32 = 0.2;
 pub const MAX_RESULT_RATIO: f32 = 0.8;
 pub const DEFAULT_RESULT_RATIO: f32 = 0.68;

@@ -13,11 +13,12 @@ mod ui_theme;
 
 use bookie_gpui::cursor::Cursor;
 use bookie_gpui::keymap::Keymap;
+use bookie_gpui::messages::MessageLog;
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::selection::{Selection, copy_tsv};
-use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag};
+use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag};
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
 use gpui::{
@@ -71,7 +72,8 @@ struct GridView {
     active_run: usize,
     run_scroll: ScrollHandle,
     next_run_number: usize,
-    summary_view: bool,
+    result_view: ResultView,
+    messages: MessageLog,
     result_ratio: f32,
     result_open: bool,
     resizing_split: bool,
@@ -236,7 +238,8 @@ impl GridView {
             active_run: 0,
             run_scroll: ScrollHandle::new(),
             next_run_number: 2,
-            summary_view: false,
+            result_view: ResultView::Table,
+            messages: MessageLog::default(),
             result_ratio: DEFAULT_RESULT_RATIO,
             result_open: true,
             resizing_split: false,
@@ -352,10 +355,29 @@ impl GridView {
             self.status = "Running…".into();
             self.begin_background(
                 cx,
-                move |cancel| session.run_query_controlled(&sql, bookie_gpui::live::ROW_CAP, &cancel),
-                |this, result| match result {
-                    Ok(table) => this.add_run(Some(std::sync::Arc::new(table))),
-                    Err(message) => this.status = message,
+                {
+                    let statement = sql.clone();
+                    move |cancel| {
+                        let started = Instant::now();
+                        let result = session.run_query_controlled(&statement, bookie_gpui::live::ROW_CAP, &cancel);
+                        (statement, started.elapsed(), result)
+                    }
+                },
+                |this, (sql, elapsed, result)| match result {
+                    Ok(table) => {
+                        this.messages.statement_ok(
+                            &sql,
+                            bookie_gpui::source::ResultSource::total(&table),
+                            table.truncated,
+                            elapsed,
+                        );
+                        this.add_run(Some(std::sync::Arc::new(table)));
+                    }
+                    Err(message) => {
+                        this.messages.statement_failed(&sql, &message, elapsed);
+                        this.result_view = ResultView::Messages;
+                        this.status = message;
+                    }
                 },
             );
             return;
