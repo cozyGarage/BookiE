@@ -1377,10 +1377,8 @@ mod tests {
     fn only_numeric_cells_use_right_alignment() {
         assert!(numeric_cell(&Cell::Int(7)));
         assert!(numeric_cell(&Cell::Float(7.5)));
-        assert!(numeric_cell(&Cell::Decimal("7.50".into())));
-        assert!(numeric_cell(&bookie_gpui::core_bridge::value_to_cell(
-            bookie_core::Value::Decimal("7.50".parse().unwrap())
-        )));
+        assert!(numeric_cell(&Cell::Decimal("7.50".parse().unwrap())));
+        assert!(numeric_cell(&bookie_core::Value::Decimal("7.50".parse().unwrap())));
         assert!(!numeric_cell(&Cell::Text("7".into())));
         assert!(!numeric_cell(&Cell::Null));
     }
