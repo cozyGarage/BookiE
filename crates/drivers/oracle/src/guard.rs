@@ -202,11 +202,7 @@ mod tests {
             "select q'[unterminated from t",
             "with c as (select 1 a from dual) select * from c for/*x*/update",
         ] {
-            assert_eq!(
-                read_only_statement(sql),
-                Some(sql.trim().to_string()).filter(|_| false),
-                "{sql}"
-            );
+            assert_eq!(read_only_statement(sql), None, "{sql}");
         }
     }
 
