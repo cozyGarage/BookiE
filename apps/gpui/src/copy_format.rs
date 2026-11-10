@@ -1,6 +1,6 @@
 use bookie_core::export::{CsvOptions, render_csv, render_in_clause, render_json, render_markdown};
 use bookie_core::sql_literal::build_insert_literal;
-use bookie_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, TableInfo, Value};
 
 use crate::model::{Cell, ColumnMeta};
 
@@ -16,7 +16,7 @@ pub enum CopyFormat {
 pub struct CopyContext<'a> {
     pub columns: &'a [ColumnMeta],
     pub driver_id: &'a str,
-    pub table: &'a str,
+    pub target: Option<TableInfo>,
     pub column: usize,
 }
 
@@ -42,14 +42,11 @@ pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Cell>])
             Ok(Copied { text: list.sql, note })
         }
         CopyFormat::Insert => {
-            let (schema, table) = match context.table.split_once('.') {
-                Some((schema, table)) => (Some(schema), table),
-                None => (None, context.table),
-            };
+            let target = context.target.as_ref().ok_or("no table target is available")?;
             let statements: Result<Vec<String>, String> = values
                 .iter()
                 .map(|row| {
-                    build_insert_literal(context.driver_id, schema, table, &infos, row)
+                    build_insert_literal(context.driver_id, target.schema.as_deref(), &target.name, &infos, row)
                         .map_err(|error| format!("{error:?}"))
                 })
                 .collect();
@@ -104,7 +101,10 @@ mod tests {
         CopyContext {
             columns,
             driver_id: "postgres",
-            table: "public.people",
+            target: Some(TableInfo {
+                schema: Some("public".into()),
+                name: "people".into(),
+            }),
             column: 1,
         }
     }
@@ -144,6 +144,77 @@ mod tests {
     }
 
     #[test]
+    fn insert_target_components_keep_dots_inside_each_identifier() {
+        let columns = columns();
+        let context = CopyContext {
+            columns: &columns,
+            driver_id: "postgres",
+            target: Some(TableInfo {
+                schema: Some("schema.with.dot\"quote".into()),
+                name: "table.name\"with quote".into(),
+            }),
+            column: 0,
+        };
+        let copied = render(CopyFormat::Insert, &context, &rows()).unwrap().text;
+        assert!(
+            copied.starts_with(
+                "INSERT INTO \"schema.with.dot\"\"quote\".\"table.name\"\"with quote\" (\"id\", \"name\") VALUES (1,"
+            ),
+            "{copied}"
+        );
+    }
+
+    #[test]
+    fn duplicate_names_and_empty_names_keep_their_exact_target_identity() {
+        let columns = columns();
+        let first = CopyContext {
+            columns: &columns,
+            driver_id: "postgres",
+            target: Some(TableInfo {
+                schema: Some("sales".into()),
+                name: "orders".into(),
+            }),
+            column: 0,
+        };
+        let second = CopyContext {
+            columns: &columns,
+            driver_id: "postgres",
+            target: Some(TableInfo {
+                schema: Some("archive".into()),
+                name: "orders".into(),
+            }),
+            column: 0,
+        };
+        let empty = CopyContext {
+            columns: &columns,
+            driver_id: "postgres",
+            target: Some(TableInfo {
+                schema: Some("sales".into()),
+                name: String::new(),
+            }),
+            column: 0,
+        };
+        assert!(
+            render(CopyFormat::Insert, &first, &rows())
+                .unwrap()
+                .text
+                .starts_with("INSERT INTO \"sales\".\"orders\"")
+        );
+        assert!(
+            render(CopyFormat::Insert, &second, &rows())
+                .unwrap()
+                .text
+                .starts_with("INSERT INTO \"archive\".\"orders\"")
+        );
+        assert!(
+            render(CopyFormat::Insert, &empty, &rows())
+                .unwrap()
+                .text
+                .starts_with("INSERT INTO \"sales\".\"\"")
+        );
+    }
+
+    #[test]
     fn an_in_list_uses_the_chosen_column_and_says_what_it_left_out() {
         let columns = columns();
         let copied = render(CopyFormat::InList, &context(&columns), &rows()).unwrap();
@@ -151,5 +222,17 @@ mod tests {
         assert_eq!(copied.note.as_deref(), Some("1 values left out"));
         let none = vec![vec![Cell::Int(1), Cell::Null]];
         assert!(render(CopyFormat::InList, &context(&columns), &none).is_err());
+    }
+
+    #[test]
+    fn insert_without_a_structured_target_is_refused() {
+        let columns = columns();
+        let context = CopyContext {
+            columns: &columns,
+            driver_id: "postgres",
+            target: None,
+            column: 0,
+        };
+        assert!(render(CopyFormat::Insert, &context, &rows()).is_err());
     }
 }

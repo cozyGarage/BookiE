@@ -28,7 +28,7 @@ Connection and table changes are refused while view-only edits are pending. Clos
 
 Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text. The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
 
-Copy as INSERT is available for table rows. Query results do not infer an INSERT target from the previously browsed table.
+Copy as INSERT is available for table rows. Catalog, tabs and generated SQL retain the selected table's schema and name as separate identifiers, including names containing dots or quotes. Query results do not infer an INSERT target from the previously browsed table.
 
 The look follows DBX (MIT, <https://github.com/t8y2/dbx>): its light and dark design tokens from `apps/desktop/src/styles/tokens.css` (white and near-black surfaces, `#e5e5e5` borders, 4 px radii, a muted header), its data-grid constants (26 px rows, 13 px text, striped rows `#f0f0f0`, blue active row, italic muted NULL) and outline buttons. Only colour values and sizes were taken; no DBX code.
 

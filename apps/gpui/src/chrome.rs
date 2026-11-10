@@ -1,6 +1,6 @@
 use bookie_gpui::font_settings;
 use bookie_gpui::messages::MessageKind;
-use bookie_gpui::shell::{ResultView, Tab, TreeRow, tree_rows_in};
+use bookie_gpui::shell::{ResultView, Tab, TreeRow, table_label, tree_rows_in};
 const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
     "FROM synthetic_rows",
@@ -233,9 +233,9 @@ impl GridView {
             let (label, chevron) = match &row {
                 TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
                 TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
-                TreeRow::Table(name) => (name.clone(), None),
+                TreeRow::Table(table) => (table_label(table), None),
             };
-            let current = matches!(&row, TreeRow::Table(name) if open_table == Tab::Table(name.clone()));
+            let current = matches!(&row, TreeRow::Table(table) if open_table == Tab::Table(table.clone()));
             let line = div()
                 .id(("tree", index))
                 .flex()
@@ -277,7 +277,7 @@ impl GridView {
                 match &row {
                     TreeRow::Connection { .. } => this.connection_open = !this.connection_open,
                     TreeRow::Database { .. } => this.database_open = !this.database_open,
-                    TreeRow::Table(name) => this.open_table_named(name, window, cx),
+                    TreeRow::Table(table) => this.open_table_named(table, window, cx),
                 }
                 cx.notify();
             }))
@@ -647,7 +647,8 @@ impl GridView {
                                                     "quick-open",
                                                     format!(
                                                         "{} → {}",
-                                                        self.catalog.connection, self.catalog.grid_table
+                                                        self.catalog.connection,
+                                                        table_label(&self.catalog.grid_table)
                                                     ),
                                                     theme,
                                                 )
@@ -971,7 +972,11 @@ impl GridView {
                     Some(took) => format!("Elapsed: {took}"),
                     None => format!("Elapsed: {} ms (synthetic)", run.millis()),
                 })
-                .children(self.live.is_none().then_some("Source: synthetic generator, no database"))
+                .children(
+                    self.live
+                        .is_none()
+                        .then_some("Source: synthetic generator, no database"),
+                )
         } else if self.runs.is_empty() {
             div().flex_1().p_4().child("No results")
         } else {

@@ -5,6 +5,8 @@ use gpui::TestAppContext;
 use crate::GridView;
 use crate::text_input;
 use crate::ui_tests::open;
+use bookie_core::TableInfo;
+use bookie_gpui::shell::table_info;
 
 #[gpui::test]
 fn f3_toggles_a_detail_panel_that_follows_the_active_cell(cx: &mut TestAppContext) {
@@ -50,7 +52,17 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
     use bookie_gpui::live::{LiveTable, Origin};
     let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
     let origin = Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -58,18 +70,25 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
         view
     });
     view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "orders");
-        assert_eq!(view.catalog.tables, ["customers", "orders"]);
+        assert_eq!(view.catalog.grid_table, table_info("orders"));
+        assert_eq!(view.catalog.tables, [table_info("customers"), table_info("orders")]);
         assert_eq!(view.source.total(), 6);
     });
-    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named("customers", window, cx)));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_table_named(&table_info("customers"), window, cx)
+        })
+    });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "customers");
+        assert_eq!(view.catalog.grid_table, table_info("customers"));
         assert_eq!(view.source.total(), 2);
         assert_eq!(view.source.columns().len(), 2);
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("customers".into()));
+        assert_eq!(
+            view.tabs.current(),
+            &bookie_gpui::shell::Tab::Table(table_info("customers"))
+        );
         assert!(view.status.is_empty(), "{}", view.status);
     });
 }
@@ -79,7 +98,17 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     use bookie_gpui::live::{LiveTable, Origin};
     let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
     let origin = Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -105,7 +134,10 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     view.read_with(cx, |view, _| {
         assert_eq!(view.runs.len(), 1, "{}", view.status);
         assert_eq!(view.source.total(), 3);
-        assert!(view.runs[0].measured().is_some(), "a run against a database records its real time");
+        assert!(
+            view.runs[0].measured().is_some(),
+            "a run against a database records its real time"
+        );
         let names: Vec<&str> = view
             .source
             .columns()
@@ -135,7 +167,17 @@ fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut Te
     let origin = bookie_gpui::live::Origin::File(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"),
     );
-    let table = std::sync::Arc::new(bookie_gpui::live::LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        bookie_gpui::live::LiveTable::load(
+            &origin,
+            &bookie_core::TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -178,7 +220,17 @@ fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut Te
 fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -222,7 +274,17 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
     use bookie_gpui::messages::MessageKind;
     use bookie_gpui::shell::ResultView;
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -277,7 +339,7 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
     let (view, cx) = open(cx);
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
-        assert_eq!(view.catalog.grid_table, "synthetic_rows");
+        assert_eq!(view.catalog.grid_table, table_info("synthetic_rows"));
     });
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
@@ -285,10 +347,13 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert!(view.live.is_some(), "{}", view.status);
-        assert_eq!(view.catalog.tables, ["customers", "orders"]);
-        assert_eq!(view.catalog.grid_table, "customers");
+        assert_eq!(view.catalog.tables, [table_info("customers"), table_info("orders")]);
+        assert_eq!(view.catalog.grid_table, table_info("customers"));
         assert_eq!(view.source.total(), 2);
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("customers".into()));
+        assert_eq!(
+            view.tabs.current(),
+            &bookie_gpui::shell::Tab::Table(table_info("customers"))
+        );
         assert_eq!(view.status, "Connected");
         assert!(view.runs.is_empty(), "the synthetic run is gone");
     });
@@ -388,8 +453,8 @@ fn an_empty_table_name_is_not_an_empty_catalog(cx: &mut TestAppContext) {
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert!(view.live.is_some(), "{}", view.status);
-        assert_eq!(view.catalog.tables, [""]);
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table(String::new()));
+        assert_eq!(view.catalog.tables, [table_info("")]);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table(table_info("")));
         assert!(
             view.palette_actions()
                 .iter()
@@ -522,13 +587,13 @@ fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut T
                 .insert((1, 1), bookie_gpui::model::Cell::Text("saved table draft".into()));
             view.run_edits.push(Default::default());
             view.run_edits[0].insert((2, 1), bookie_gpui::model::Cell::Text("result draft".into()));
-            view.open_table_named("beta", window, cx);
+            view.open_table_named(&table_info("beta"), window, cx);
         });
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "alpha");
+        assert_eq!(view.catalog.grid_table, table_info("alpha"));
         assert_eq!(view.edits.len(), 1);
         assert_eq!(view.table_edits.len(), 1);
         assert_eq!(view.run_edits[0].len(), 1);
@@ -550,7 +615,7 @@ fn a_late_table_load_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.open_table_named("beta", window, cx);
+            view.open_table_named(&table_info("beta"), window, cx);
             view.edits
                 .insert((0, 1), bookie_gpui::model::Cell::Text("late table draft".into()));
         });
@@ -558,7 +623,7 @@ fn a_late_table_load_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "alpha");
+        assert_eq!(view.catalog.grid_table, table_info("alpha"));
         assert_eq!(
             view.edits.get(&(0, 1)),
             Some(&bookie_gpui::model::Cell::Text("late table draft".into()))
@@ -578,12 +643,15 @@ fn a_failed_table_switch_keeps_the_current_table(cx: &mut TestAppContext) {
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
-    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named("missing", window, cx)));
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named(&table_info("missing"), window, cx)));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "alpha");
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("alpha".into()));
+        assert_eq!(view.catalog.grid_table, table_info("alpha"));
+        assert_eq!(
+            view.tabs.current(),
+            &bookie_gpui::shell::Tab::Table(table_info("alpha"))
+        );
         assert!(!view.status.is_empty());
     });
 }
@@ -602,15 +670,18 @@ fn cancelling_a_table_switch_keeps_the_current_table(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.open_table_named("beta", window, cx);
+            view.open_table_named(&table_info("beta"), window, cx);
             view.operation_cancel.cancel();
         });
     });
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "alpha");
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("alpha".into()));
+        assert_eq!(view.catalog.grid_table, table_info("alpha"));
+        assert_eq!(
+            view.tabs.current(),
+            &bookie_gpui::shell::Tab::Table(table_info("alpha"))
+        );
     });
 }
 
@@ -667,7 +738,7 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
-        assert_eq!(view.catalog.grid_table, "synthetic_rows");
+        assert_eq!(view.catalog.grid_table, table_info("synthetic_rows"));
         assert!(
             view.status.contains("NotADatabase") || view.status.contains("Other"),
             "{}",
@@ -680,7 +751,17 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
 fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -720,7 +801,17 @@ fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppC
 fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_sessions_query(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -749,7 +840,17 @@ fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_ses
 fn open_live(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
@@ -839,7 +940,17 @@ fn the_redis_listen_command_is_not_offered_on_other_engines(cx: &mut TestAppCont
 fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
