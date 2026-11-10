@@ -32,6 +32,7 @@ ALLOWED = {
     "bookie-ssh": set(),
     "bookie-checks": set(),
     "bookie-kafka-browser": set(),
+    "bookie-avro-container": set(),
     "bookie-pg-sessions": {"bookie-core"},
     "bookie-dump": {"bookie-core"},
     "bookie-policy": {"bookie-core"},
