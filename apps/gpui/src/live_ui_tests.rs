@@ -172,6 +172,61 @@ fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext)
 }
 
 #[gpui::test]
+fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    use bookie_gpui::messages::MessageKind;
+    use bookie_gpui::shell::ResultView;
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    let run = |cx: &mut gpui::VisualTestContext, sql: &str| {
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.sql_input.update(cx, |input, cx| input.set_content(sql, cx))
+            })
+        });
+        cx.simulate_keystrokes("ctrl-enter");
+        cx.executor().advance_clock(std::time::Duration::from_secs(1));
+        cx.run_until_parked();
+    };
+    run(cx, "SELECT id\n  FROM orders");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.result_view, ResultView::Table, "a good run keeps the table view");
+        let entries = view.messages.entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].kind, MessageKind::Success);
+        assert!(
+            entries[0].text.starts_with("SELECT id FROM orders · 6 rows · "),
+            "{}",
+            entries[0].text
+        );
+    });
+    run(cx, "DELETE FROM orders");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.result_view, ResultView::Messages, "a refused statement shows why");
+        let entries = view.messages.entries();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[1].kind, MessageKind::Error);
+        assert!(
+            entries[1].text.starts_with("DELETE FROM orders · "),
+            "{}",
+            entries[1].text
+        );
+        assert_eq!(view.runs.len(), 1, "no result tab for a refused statement");
+    });
+}
+
+#[gpui::test]
 fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx: &mut TestAppContext) {
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);

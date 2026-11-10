@@ -5,6 +5,7 @@ pub mod detail;
 pub mod edit;
 pub mod keymap;
 pub mod live;
+pub mod messages;
 pub mod model;
 pub mod palette;
 pub mod preview;

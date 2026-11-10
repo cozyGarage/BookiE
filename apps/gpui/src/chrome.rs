@@ -1,4 +1,5 @@
-use bookie_gpui::shell::{Tab, TreeRow, tree_rows_in};
+use bookie_gpui::messages::MessageKind;
+use bookie_gpui::shell::{ResultView, Tab, TreeRow, tree_rows_in};
 const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
     "FROM synthetic_rows",
@@ -598,7 +599,8 @@ impl GridView {
                 cx.notify();
             }))
         });
-        let switch = |id: &'static str, label: &'static str, selected: bool, summary: bool, cx: &mut Context<Self>| {
+        let switch = |id: &'static str, label: &'static str, view: ResultView, cx: &mut Context<Self>| {
+            let selected = self.result_view == view;
             let button = div()
                 .id(id)
                 .flex()
@@ -614,7 +616,7 @@ impl GridView {
                 button.text_color(rgb(theme.muted_foreground))
             };
             button.on_click(cx.listener(move |this, _, _, cx| {
-                this.summary_view = summary;
+                this.result_view = view;
                 cx.notify();
             }))
         };
@@ -641,8 +643,9 @@ impl GridView {
                     .track_scroll(&self.run_scroll)
                     .children(run_tabs),
             )
-            .child(switch("view-table", "Table Data", !self.summary_view, false, cx))
-            .child(switch("view-summary", "Summary", self.summary_view, true, cx))
+            .child(switch("view-table", "Table Data", ResultView::Table, cx))
+            .child(switch("view-summary", "Summary", ResultView::Summary, cx))
+            .child(switch("view-messages", "Messages", ResultView::Messages, cx))
             .child(
                 ghost("toggle-results", "", theme)
                     .child(icon(
@@ -658,7 +661,39 @@ impl GridView {
                         cx.notify();
                     })),
             );
-        let body = if let Some(run) = self.runs.get(self.active_run).filter(|_| self.summary_view) {
+        let body = if self.result_view == ResultView::Messages {
+            div().flex_1().min_h_0().flex().flex_col().child(
+                div()
+                    .id("messages")
+                    .flex_1()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .p_4()
+                    .overflow_y_scroll()
+                    .children(if self.messages.entries().is_empty() {
+                        vec![div().text_color(rgb(theme.muted_foreground)).child("No messages yet")]
+                    } else {
+                        self.messages
+                            .entries()
+                            .iter()
+                            .rev()
+                            .map(|message| {
+                                let line = div().child(message.text.clone());
+                                match message.kind {
+                                    MessageKind::Error => line.text_color(rgb(theme.warning)),
+                                    MessageKind::Info => line.text_color(rgb(theme.muted_foreground)),
+                                    MessageKind::Success => line,
+                                }
+                            })
+                            .collect()
+                    }),
+            )
+        } else if let Some(run) = self
+            .runs
+            .get(self.active_run)
+            .filter(|_| self.result_view == ResultView::Summary)
+        {
             div()
                 .flex_1()
                 .flex()
