@@ -365,6 +365,35 @@ impl Connection for PolicyGuard {
             .await
     }
 
+    async fn execute_controlled_with_token(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<(ExecResult, Option<bookie_core::CommitToken>), (DriverError, Option<bookie_core::CommitToken>)> {
+        let authorization = self.authorize(sql, false, Some(control)).await.map_err(|error| (error, None))?;
+        let token = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let captured = token.clone();
+        let result = self
+            .execute_write(sql, None, authorization, move |inner| async move {
+                match inner.execute_controlled_with_token(sql, control).await {
+                    Ok((rows, found)) => {
+                        *captured.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = found;
+                        Ok(rows)
+                    }
+                    Err((error, found)) => {
+                        *captured.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = found;
+                        Err(error)
+                    }
+                }
+            })
+            .await;
+        let found = token.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
+        match result {
+            Ok(rows) => Ok((rows, found)),
+            Err(error) => Err((error, found)),
+        }
+    }
+
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
         let authorization = self.authorize(sql, true, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute_params(sql, params))
