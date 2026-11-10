@@ -40,6 +40,15 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/run-test-layer.py security-policy", security_policy)
         self.assertIn('run: python3 scripts/run-test-layer.py "$VALIDATION_LAYER"', github_security)
 
+    def test_both_test_builders_run_the_shared_no_default_features_layer(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_builder = re.search(r"(?ms)^  reusable-test-builds:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        forgejo_builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py no-default-features", github_builder)
+        self.assertIn("python3 scripts/run-test-layer.py no-default-features", forgejo_builder)
+
     def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()

@@ -481,7 +481,7 @@
     "no-default-features": {
       "purpose": "Workspace and test targets compile without the default Kerberos feature",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "None yet: add a Forgejo merge-tier job that runs this layer",
+      "hosted_gate": "Build Linux / reusable-test-builds; lab-ci / test-build",
       "steps": [
         {
           "argv": [

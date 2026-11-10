@@ -220,6 +220,8 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all
+      - name: Check the no-default-features layer
+        run: python3 scripts/run-test-layer.py no-default-features
       - name: Upload source-pinned default bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
