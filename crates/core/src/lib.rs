@@ -13,6 +13,7 @@ pub mod export;
 pub mod filter;
 pub mod import;
 mod join_skeleton;
+mod messagepack;
 mod numeric_input;
 mod operation;
 mod pagination;
@@ -50,6 +51,7 @@ pub use filter::{
     cell_filter_rule, equality_rule, filter_value_kind,
 };
 pub use join_skeleton::{JoinSkeletonError, MAX_JOINS, join_skeleton};
+pub use messagepack::{MAX_PAYLOAD_BYTES as MAX_MESSAGEPACK_BYTES, MessagePackError, decode_messagepack};
 pub use numeric_input::{
     FloatInputError, is_numeric_input, parse_float_input, single_precision_as_f64, sqlite_affinity_decimal,
     sqlite_declared_type_has_numeric_affinity,

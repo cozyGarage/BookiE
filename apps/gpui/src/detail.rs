@@ -18,6 +18,7 @@ pub enum Detail {
         lines: Vec<HexLine>,
         total: usize,
         shown: usize,
+        decoded: Option<String>,
     },
     Json {
         pretty: String,
@@ -51,16 +52,23 @@ pub fn hex_lines(bytes: &[u8]) -> Vec<HexLine> {
         .collect()
 }
 
+fn hex_detail(bytes: &[u8]) -> Detail {
+    Detail::Hex {
+        lines: hex_lines(bytes),
+        total: bytes.len(),
+        shown: bytes.len().min(MAX_HEX_BYTES),
+        decoded: bookie_core::decode_messagepack(bytes)
+            .ok()
+            .and_then(|value| serde_json::to_string_pretty(&value).ok()),
+    }
+}
+
 pub fn detail_of(cell: &Cell) -> Detail {
     match cell {
         Cell::Null => Detail::Null,
         Cell::Exact(value) => match value.as_ref() {
             bookie_core::Value::Null => Detail::Null,
-            bookie_core::Value::Bytes(bytes) => Detail::Hex {
-                lines: hex_lines(bytes),
-                total: bytes.len(),
-                shown: bytes.len().min(MAX_HEX_BYTES),
-            },
+            bookie_core::Value::Bytes(bytes) => hex_detail(bytes),
             bookie_core::Value::Json(value) => {
                 let (text, truncated) = crate::preview::bounded_json(value, MAX_PRETTY_BYTES, true);
                 if truncated {
@@ -71,11 +79,7 @@ pub fn detail_of(cell: &Cell) -> Detail {
             }
             _ => Detail::Text(cell.display()),
         },
-        Cell::Bytes(bytes) => Detail::Hex {
-            lines: hex_lines(bytes),
-            total: bytes.len(),
-            shown: bytes.len().min(MAX_HEX_BYTES),
-        },
+        Cell::Bytes(bytes) => hex_detail(bytes),
         Cell::Json(text) | Cell::JsonText(text) if text.len() <= MAX_PRETTY_BYTES => {
             match serde_json::from_str::<serde_json::Value>(text)
                 .ok()
@@ -124,11 +128,26 @@ mod tests {
     #[test]
     fn a_large_blob_is_cut_at_the_cap_and_reports_its_full_size() {
         let blob = Cell::Bytes(vec![7; MAX_HEX_BYTES + 100]);
-        let Detail::Hex { lines, total, shown } = detail_of(&blob) else {
+        let Detail::Hex { lines, total, shown, .. } = detail_of(&blob) else {
             panic!("bytes show as hex");
         };
         assert_eq!((total, shown), (MAX_HEX_BYTES + 100, MAX_HEX_BYTES));
         assert_eq!(lines.len(), MAX_HEX_BYTES / HEX_BYTES_PER_LINE);
+    }
+
+    #[test]
+    fn messagepack_bytes_get_a_decoded_preview_and_other_bytes_stay_hex_only() {
+        let packed = Cell::Bytes(vec![0x82, 0xa1, b'a', 0x01, 0xa1, b'b', 0x92, 0xc3, 0xc0]);
+        let Detail::Hex { decoded, lines, .. } = detail_of(&packed) else {
+            panic!("bytes show as hex");
+        };
+        let decoded = decoded.expect("a messagepack map decodes");
+        assert!(decoded.contains("\"a\": 1") && decoded.contains("true"), "{decoded}");
+        assert_eq!(lines[0].hex, "82 a1 61 01 a1 62 92 c3 c0", "the hex dump stays alongside");
+        let Detail::Hex { decoded, .. } = detail_of(&Cell::Bytes(vec![0xde, 0xad, 0xbe, 0xef])) else {
+            panic!("bytes show as hex");
+        };
+        assert_eq!(decoded, None);
     }
 
     #[test]
