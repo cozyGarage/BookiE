@@ -19,9 +19,9 @@ use tls::https_connector;
 use value_literal::literal;
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
-    error_chain_text, looks_like_tls_failure, run_server_cancellable, sql_dialect::quote_ident,
+    ColumnInfo, CommitResolution, CommitToken, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle,
+    ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows,
+    TableInfo, Value, error_chain_text, looks_like_tls_failure, run_server_cancellable, sql_dialect::quote_ident,
 };
 
 const DRIVER_ID: &str = "clickhouse";
@@ -80,39 +80,42 @@ impl DatabaseDriver for ClickhouseDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        let scheme = if opts.tls.mode.encrypts() { "https" } else { "http" };
-        let url = endpoint_url(scheme, &opts.host, opts.port);
-        let http =
-            HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls, opts.service_address().0)?);
-        let mut client = clickhouse::Client::with_http_client(http)
-            .with_url(url)
-            .with_product_info("bookie-linux", env!("CARGO_PKG_VERSION"));
-        if !opts.username.is_empty() {
-            client = client.with_user(opts.username);
-        }
-        if !opts.password.expose_secret().is_empty() {
-            client = client.with_password(opts.password.expose_secret());
-        }
-        if !opts.database.is_empty() {
-            client = client.with_database(opts.database.clone());
-        }
-        if opts.read_only {
-            client = client.with_setting("readonly", "2");
-        }
-
-        let probe = client.query("SELECT 1").execute();
-        match tokio::time::timeout(PROBE_TIMEOUT, probe).await {
-            Ok(result) => result.map_err(|err| map_clickhouse_connect_error(err, opts.tls.mode.verifies_cert()))?,
-            Err(_) => return Err(DriverError::ConnectionRefused),
-        }
-
-        let database = if opts.database.is_empty() {
-            resolve_current_database(&client).await
-        } else {
-            opts.database
-        };
-        Ok(Box::new(ClickhouseConnection { client, database }))
+        Ok(Box::new(open(opts).await?))
     }
+}
+
+pub async fn open(opts: ConnectOptions) -> Result<ClickhouseConnection, DriverError> {
+    let scheme = if opts.tls.mode.encrypts() { "https" } else { "http" };
+    let url = endpoint_url(scheme, &opts.host, opts.port);
+    let http = HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls, opts.service_address().0)?);
+    let mut client = clickhouse::Client::with_http_client(http)
+        .with_url(url)
+        .with_product_info("bookie-linux", env!("CARGO_PKG_VERSION"));
+    if !opts.username.is_empty() {
+        client = client.with_user(opts.username);
+    }
+    if !opts.password.expose_secret().is_empty() {
+        client = client.with_password(opts.password.expose_secret());
+    }
+    if !opts.database.is_empty() {
+        client = client.with_database(opts.database.clone());
+    }
+    if opts.read_only {
+        client = client.with_setting("readonly", "2");
+    }
+
+    let probe = client.query("SELECT 1").execute();
+    match tokio::time::timeout(PROBE_TIMEOUT, probe).await {
+        Ok(result) => result.map_err(|err| map_clickhouse_connect_error(err, opts.tls.mode.verifies_cert()))?,
+        Err(_) => return Err(DriverError::ConnectionRefused),
+    }
+
+    let database = if opts.database.is_empty() {
+        resolve_current_database(&client).await
+    } else {
+        opts.database
+    };
+    Ok(open_connection(client, database))
 }
 
 fn endpoint_url(scheme: &str, host: &str, port: u16) -> String {
@@ -134,9 +137,45 @@ async fn resolve_current_database(client: &clickhouse::Client) -> String {
         .unwrap_or_else(|_| "default".into())
 }
 
-struct ClickhouseConnection {
+pub struct ClickhouseConnection {
     client: clickhouse::Client,
     database: String,
+}
+
+fn open_connection(client: clickhouse::Client, database: String) -> ClickhouseConnection {
+    ClickhouseConnection { client, database }
+}
+
+pub fn commit_token() -> CommitToken {
+    CommitToken::ClickhouseQuery {
+        query_id: query::new_query_id(),
+    }
+}
+
+impl ClickhouseConnection {
+    pub async fn execute_with_token(&self, sql: &str, token: &CommitToken) -> Result<u64, DriverError> {
+        let CommitToken::ClickhouseQuery { query_id } = token else {
+            return Err(DriverError::Unsupported(
+                "the commit token is not a ClickHouse token".into(),
+            ));
+        };
+        self.execute_tagged(sql, Some(query_id)).await
+    }
+}
+
+#[derive(Debug, Deserialize, clickhouse::Row)]
+struct QueryLogKind {
+    kind: String,
+}
+
+fn resolution_from_kinds(kinds: &[String]) -> CommitResolution {
+    if kinds.iter().any(|kind| kind == "QueryFinish") {
+        CommitResolution::Applied
+    } else if kinds.iter().any(|kind| kind.starts_with("Exception")) {
+        CommitResolution::NotApplied
+    } else {
+        CommitResolution::Unresolvable
+    }
 }
 
 impl ClickhouseConnection {
@@ -182,6 +221,30 @@ impl ClickhouseConnection {
 
 #[async_trait]
 impl Connection for ClickhouseConnection {
+    async fn resolve_commit(&self, token: &CommitToken) -> Result<CommitResolution, DriverError> {
+        let CommitToken::ClickhouseQuery { query_id } = token else {
+            return Ok(CommitResolution::Unresolvable);
+        };
+        if !query_id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+            return Ok(CommitResolution::Unresolvable);
+        }
+        self.client
+            .query("SYSTEM FLUSH LOGS")
+            .execute()
+            .await
+            .map_err(map_clickhouse_error)?;
+        let rows = self
+            .client
+            .query(&format!(
+                "SELECT toString(type) AS kind FROM system.query_log WHERE query_id = '{query_id}'"
+            ))
+            .fetch_all::<QueryLogKind>()
+            .await
+            .map_err(map_clickhouse_error)?;
+        let kinds: Vec<String> = rows.into_iter().map(|row| row.kind).collect();
+        Ok(resolution_from_kinds(&kinds))
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         #[derive(Debug, Deserialize, clickhouse::Row)]
         struct NameRow {
