@@ -19,6 +19,7 @@ icons!(
     "crosshair",
     "sliders-horizontal",
     "chevrons-down-up",
+    "settings",
     "arrow-down-up",
     "folder-plus",
     "refresh-cw",

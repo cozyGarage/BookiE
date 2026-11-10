@@ -1450,6 +1450,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::context_menu::tests::full_value_edit_does_not_fetch_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::context_menu::tests::view_value_resolves_pending_text_null_and_draft_values_from_the_cell"
     ],
     [

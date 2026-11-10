@@ -430,6 +430,7 @@ fn connect_apply(
                 col_index: context.col_index,
                 value,
                 row_key: context.row_key.clone(),
+                draft_id: context.draft_id,
             })
             .ok();
         if let Some(dialog) = dialog.upgrade() {

@@ -362,6 +362,17 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
     fixture
         .controller
         .sender()
+        .send(SqlEditorInput::Grid(GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("stale".into()),
+            row_key: Vec::new(),
+            draft_id: Some(first_id),
+        }))
+        .unwrap();
+    fixture
+        .controller
+        .sender()
         .send(SqlEditorInput::Grid(GridMsg::DuplicateRow {
             row_position: 0,
             row_key: Vec::new(),
@@ -382,6 +393,23 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
         .unwrap();
     fixture.process_inputs();
     assert_eq!(replacement.cell_value(1), Value::Text("original".into()));
+    let current = model.item(0).unwrap().downcast::<RowObject>().unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Grid(GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("accepted".into()),
+            row_key: Vec::new(),
+            draft_id: current.draft_id(),
+        }))
+        .unwrap();
+    fixture.process_inputs();
+    assert_eq!(
+        model.item(0).unwrap().downcast::<RowObject>().unwrap().cell_value(1),
+        Value::Text("accepted".into())
+    );
 }
 
 fn parameter_response() -> SqlEditorInput {

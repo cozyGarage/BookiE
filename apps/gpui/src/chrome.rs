@@ -302,7 +302,7 @@ impl GridView {
                             .cursor_pointer()
                             .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
                             .children(
-                                (self.sidebar_width >= 300.0)
+                                (self.sidebar_width >= 320.0)
                                     .then(|| div().flex_1().min_w_0().child("Import / Export")),
                             )
                             .on_click(cx.listener(|this, _, _, cx| {
@@ -388,6 +388,7 @@ impl GridView {
                 .child(icon(
                     match tab {
                         Tab::Home => "house",
+                        Tab::Settings => "settings",
                         Tab::Query => "play",
                         Tab::Table(_) => "table",
                     },
@@ -453,6 +454,30 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .children(tabs)
+    }
+
+    pub fn settings_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let view = cx.entity();
+        let dark_mode = gpui_kit::component::setting::SettingField::switch(
+            |cx| Theme::current(cx).dark,
+            move |on, cx| {
+                if Theme::current(cx).dark != on {
+                    Theme::current(cx).toggled().install(cx);
+                }
+                view.update(cx, |this, _| this.dark_mode = on);
+            },
+        );
+        let page = gpui_kit::component::setting::SettingPage::new("Appearance")
+            .default_open(true)
+            .group(
+                gpui_kit::component::setting::SettingGroup::new()
+                    .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
+            );
+        div()
+            .flex_1()
+            .min_h_0()
+            .bg(rgb(theme.background))
+            .child(gpui_kit::component::setting::Settings::new("bookie-settings").page(page))
     }
 
     pub fn home_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {

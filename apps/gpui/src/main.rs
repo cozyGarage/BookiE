@@ -6,6 +6,7 @@ mod catalog_nav;
 mod chrome;
 mod detail_panel;
 mod grid_edit;
+mod grid_table;
 mod keys;
 mod render;
 mod text_input;
@@ -42,6 +43,8 @@ enum Mode {
 }
 
 struct GridView {
+    table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
+    _table_events: gpui::Subscription,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -229,7 +232,30 @@ impl GridView {
             },
         )
         .detach();
+        let table = cx.new(|cx| {
+            gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx)
+                .cell_selectable(true)
+                .row_header(false)
+        });
+        let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
+        let table_events = cx.subscribe(
+            &table,
+            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
+                if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
+                    let cursor = bookie_gpui::cursor::Cursor {
+                        row: *row,
+                        column: *column,
+                    };
+                    this.cell_cursor = Some(cursor);
+                    let names = this.column_names();
+                    this.status = cursor.label(&names);
+                    cx.notify();
+                }
+            },
+        );
         GridView {
+            table,
+            _table_events: table_events,
             table_source: source.clone(),
             source,
             mode: Mode::All,
@@ -276,7 +302,7 @@ impl GridView {
             check_histories: Vec::new(),
             sidebar_open: true,
             import_menu_open: false,
-            sidebar_width: 260.0,
+            sidebar_width: 340.0,
             resizing_sidebar: false,
             connection_open: true,
             database_open: true,
@@ -289,7 +315,7 @@ impl GridView {
             selection: None,
             generation: 0,
             scroll: UniformListScrollHandle::new(),
-            focus: cx.focus_handle(),
+            focus: table_focus,
             started,
             first_frame_reported: false,
             last_frame: None,
@@ -990,6 +1016,7 @@ impl GridView {
                     matches!(self.tabs.current(), Tab::Query),
                 ),
                 action("home", "Open Home", true),
+                action("settings", "Open settings", true),
                 action("table", &format!("Open {}", self.catalog.grid_table), true),
                 action(
                     "theme",
@@ -1092,6 +1119,10 @@ impl GridView {
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "settings" => {
+                self.tabs.open_settings();
+                self.sync_grid_owner();
+            }
             "home" => {
                 self.tabs.open_home();
                 self.sync_grid_owner();
@@ -1303,6 +1334,17 @@ fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
         .bg(rgb(background))
 }
 
+fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
+    view.update(cx, |view, _| {
+        match name {
+            "settings" => view.tabs.open_settings(),
+            "query" => view.tabs.open_query(),
+            _ => return,
+        }
+        view.sync_grid_owner();
+    });
+}
+
 fn main() {
     let started = Instant::now();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
@@ -1345,11 +1387,8 @@ fn main() {
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
                     });
-                    if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
-                        view.update(cx, |view, _| {
-                            view.tabs.open_query();
-                            view.sync_grid_owner();
-                        });
+                    if let Ok(start_tab) = std::env::var("BOOKIE_PROTOTYPE_START") {
+                        open_requested_start_tab(&view, &start_tab, cx);
                     }
                     if autoscroll > 0 {
                         view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
