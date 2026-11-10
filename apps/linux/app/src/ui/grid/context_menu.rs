@@ -772,6 +772,13 @@ fn filter_by_value_action(
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
             let Some(view) = view.upgrade() else { return };
+            let Some(row_position) = slot.row_position else { return };
+            if POSITION_SLOT.get(&slot.widget) != Some(row_position)
+                || row_object_at(&view, row_position).as_ref() != slot.row.as_ref()
+                || slot.row.is_none()
+            {
+                return;
+            }
             let value = match &local_result_view {
                 Some(_) => source_value_at(&view, position(slot), slot.col_index),
                 None => row_at(&view, position(slot)).and_then(|row| row.get(slot.col_index).cloned()),
@@ -875,12 +882,15 @@ fn prepare_cell_menu(
 ) -> gtk::PopoverMenu {
     let position = POSITION_SLOT.get(widget).unwrap_or(0);
     select_row_for_menu(view, position);
-    let draft_target = row_object_at(view, position)
-        .and_then(|row| row.draft_id())
-        .map(|id| (position, id));
-    menus
-        .context
-        .set(widget, options.idx, options.column_name.clone(), draft_target);
+    let row = row_object_at(view, position);
+    let draft_target = row.as_ref().and_then(|row| row.draft_id()).map(|id| (position, id));
+    menus.context.set(
+        widget,
+        options.idx,
+        options.column_name.clone(),
+        draft_target,
+        row.as_ref(),
+    );
     menus
         .edit_action
         .set_enabled(edit_enabled_for(widget, options.is_text_editable));
