@@ -1,6 +1,6 @@
 # Local dependency patches
 
-BookiE maintains patched dependency snapshots under `vendor/`, applied through the workspace `[patch.crates-io]` entries. Each snapshot contains the base crate and the corresponding local patch file. `python3 scripts/vendor-patches.py check` verifies the snapshot against the registry crate plus the recorded patch.
+BookiE maintains patched dependency snapshots under `vendor/`, applied through workspace or experiment `[patch.crates-io]` entries. Each snapshot contains the base crate and the corresponding local patch file. `python3 scripts/vendor-patches.py check` verifies the snapshot against the registry crate plus the recorded patch.
 
 ## Local behavior
 
