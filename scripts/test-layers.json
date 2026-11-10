@@ -254,6 +254,37 @@
         }
       ]
     },
+    "pg-dump": {
+      "purpose": "PostgreSQL dump and restore integration through the packaged client tools",
+      "prerequisites": "Rust 1.98; Docker with postgres:18-alpine; source-pinned test bundle",
+      "hosted_gate": "Build Linux / integration; lab-ci / pg-dump",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-pg-dump.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
+    "distro-floor": {
+      "purpose": "Installed package GTK acceptance on Debian testing",
+      "prerequisites": "BookiE Debian package; Docker with debian:testing; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Build Linux / distro-floor-scenarios; lab-ci / distro-floor-scenarios",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-distro-floor.sh",
+            "debian:testing"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit"
+        }
+      ]
+    },
     "app-server": {
       "purpose": "App parser and grid edit contracts against PostgreSQL, MongoDB, MySQL, and SQL Server",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker",
@@ -326,6 +357,36 @@
             "scripts/test-gtk-clickhouse.sh"
           ],
           "timeout_seconds": 1500,
+          "evidence": "exit"
+        }
+      ]
+    },
+    "gtk-postgres": {
+      "purpose": "Installed GTK database flows against PostgreSQL",
+      "prerequisites": "GTK 4.24; Docker with postgres:17-alpine; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-postgres.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit"
+        }
+      ]
+    },
+    "gtk-mysql": {
+      "purpose": "Installed GTK database flows against MySQL",
+      "prerequisites": "GTK 4.24; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / e2e",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-mysql.sh"
+          ],
+          "timeout_seconds": 1800,
           "evidence": "exit"
         }
       ]

@@ -167,7 +167,7 @@ class PrepullTestImagesTests(unittest.TestCase):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         for job, group, command in (
             ("pg-release", "pg-release", "python3 scripts/run-test-layer.py postgres-release"),
-            ("pg-dump", "pg-dump", "./scripts/test-pg-dump.sh"),
+            ("pg-dump", "pg-dump", "python3 scripts/run-test-layer.py pg-dump"),
             ("socket-ssh", "socket-ssh", "./scripts/test-postgres-socket.sh"),
             ("driver-tls", "driver-tls", "python3 scripts/run-test-layer.py tls"),
         ):
