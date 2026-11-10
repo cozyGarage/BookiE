@@ -320,12 +320,22 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::workspace_close::tests::browse_save_denied_by_approval_preserves_data_and_audits"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::workspace_close::tests::browse_save_dispatch_executes_and_audits_a_guarded_transaction"
     ],
     [
       "bookie-app",
       "--lib",
       "ui::app::workspace_close::tests::browse_save_dispatch_on_read_only_connection_is_denied_and_audited"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_waits_for_approval_before_writing"
     ],
     [
       "bookie-app",
