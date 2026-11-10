@@ -77,8 +77,12 @@ impl Connection for HeldConnection {
         Ok(Vec::new())
     }
 
-    async fn fetch_columns(&self, _schema: Option<&str>, _table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        Ok(Vec::new())
+    async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        Ok(if table == "edit_fixture" {
+            vec![edit_column("id", true), edit_column("name", false)]
+        } else {
+            Vec::new()
+        })
     }
 
     async fn fetch_rows(
@@ -284,6 +288,81 @@ fn success() -> Result<QueryResultBatch, DriverError> {
         rows: Vec::new().into(),
         truncated: false,
     }))
+}
+
+fn edit_column(name: &str, primary_key: bool) -> ColumnInfo {
+    ColumnInfo {
+        name: name.into(),
+        data_type: if primary_key { "integer" } else { "text" }.into(),
+        nullable: !primary_key,
+        primary_key,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
+    use crate::ui::grid::GridMsg;
+    use crate::ui::row_object::RowObject;
+
+    let fixture = EditorFixture::new();
+    fixture
+        .controller
+        .model()
+        .source_view
+        .buffer()
+        .set_text("SELECT id, name FROM edit_fixture");
+    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    let query = fixture.next_query();
+    fixture.finish(
+        query,
+        Ok(QueryResultBatch::single(QueryResult {
+            columns: vec![edit_column("id", true), edit_column("name", false)],
+            rows: vec![vec![Value::Int(1), Value::Text("original".into())]].into(),
+            truncated: false,
+        })),
+    );
+    let mut model = None;
+    spin_until(|| {
+        model = fixture.controller.model().editable_result_store_for_test();
+        model.is_some()
+    });
+    let model = model.unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Grid(GridMsg::DuplicateRow { row_position: 0 }))
+        .unwrap();
+    spin_until(|| model.n_items() == 2);
+    let first = model.item(0).unwrap().downcast::<RowObject>().unwrap();
+    let first_id = first.draft_id().unwrap();
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Grid(GridMsg::DuplicateRow { row_position: 1 }))
+        .unwrap();
+    spin_until(|| model.n_items() == 3);
+    let replacement = model.item(0).unwrap().downcast::<RowObject>().unwrap();
+    assert_ne!(replacement.draft_id(), Some(first_id));
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Grid(GridMsg::SetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: Vec::new(),
+            draft_id: Some(first_id),
+        }))
+        .unwrap();
+    fixture.process_inputs();
+    assert_eq!(replacement.cell_value(1), Value::Text("original".into()));
 }
 
 fn parameter_response() -> SqlEditorInput {
