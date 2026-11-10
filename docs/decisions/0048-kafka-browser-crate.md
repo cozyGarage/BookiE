@@ -1,6 +1,6 @@
 # 0048: Kafka topics are browsed through a UI-free crate on a pure-Rust client
 
-- **Status**: Proposed (2026-11-10)
+- **Status**: Accepted (2026-11-10)
 - **Date**: 2026-11-10
 
 ## Context
