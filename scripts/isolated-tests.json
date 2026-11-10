@@ -315,6 +315,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::workspace_close::tests::browse_grid_edit_save_reaches_guarded_connection_and_audit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::workspace_close::tests::browse_save_dispatch_executes_and_audits_a_guarded_transaction"
     ],
     [
