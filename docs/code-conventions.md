@@ -85,7 +85,7 @@ The baseline file does not distinguish these from the rest, on purpose. A UI fil
 
 The letters are only useful here as five specific obligations.
 
-**Single responsibility.** A module owns one concern and its name says which. `crates/policy/src/classify.rs` classifies statements and does not evaluate rules. When a module's name needs "and" or "util", split it. This applies at file level, which is why `check-file-size.sh` exists: a 1,200-line file has almost always accumulated a second responsibility.
+**Single responsibility.** A module owns one concern and its name says which. `crates/policy/src/classify.rs` classifies statements and does not evaluate rules. When a module's name needs "and" or "util", split it. This applies at file level. `check-file-size.sh` limits file size, while responsibility determines where to split a module.
 
 **Open/closed.** Register engines through static driver crates and the owning composition roots, following [the driver guide](adding-drivers.md). Shared SQL builders, policy classifiers and grid parsers already have dialect-specific branches. Extend those only for a concrete native contract and update affected consumers together. Reuse a capability where one exists; repeated dialect branches alone do not justify a new abstraction.
 
