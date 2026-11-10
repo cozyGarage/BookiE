@@ -317,6 +317,7 @@ mod tests {
                 added: 0,
                 removed: 0,
                 changed: 1,
+                unknown: 0,
             },
             rows: vec![DiffRow {
                 change: "changed",

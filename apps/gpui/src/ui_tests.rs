@@ -623,7 +623,7 @@ impl bookie_gpui::source::ResultSource for Tiny {
         keyed: bool,
         cancel: &tokio_util::sync::CancellationToken,
     ) -> Result<bookie_gpui::model::Diff, &'static str> {
-        bookie_gpui::model::build_diff(3, keyed, cancel)
+        bookie_gpui::source::ResultSource::compare(&bookie_gpui::source::Synthetic::new(3), keyed, cancel)
     }
 }
 

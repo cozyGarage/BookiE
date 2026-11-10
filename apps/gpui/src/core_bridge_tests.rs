@@ -55,3 +55,26 @@ fn the_copy_text_is_what_core_renders_for_the_same_rows() {
     assert_eq!(text.lines().next(), Some("value\tlabel\tstate\ttyped"));
     assert_eq!(text.lines().count(), 4);
 }
+
+#[test]
+fn driver_type_names_map_to_the_edit_kind_that_parses_them() {
+    use bookie_core::{ColumnInfo, filter_value_kind};
+    let info = |data_type: &str| ColumnInfo {
+        name: "c".into(),
+        data_type: data_type.into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let kind = |data_type: &str| crate::core_bridge::edit_kind(filter_value_kind(&info(data_type)));
+    assert_eq!(kind("NUMERIC(10,2)"), "decimal");
+    assert_eq!(kind("bigint"), "integer");
+    assert_eq!(kind("timestamp with time zone"), "timestamptz");
+    assert_eq!(kind("varchar(20)"), "text");
+}

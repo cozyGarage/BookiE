@@ -23,7 +23,12 @@ impl Render for GridView {
             Mode::Filtered { label, .. } => format!("{label} · "),
             Mode::All => String::new(),
         };
-        let progress = progress_text(&title, self.dataset_count(), self.source.is_partial(), self.pager.pages());
+        let progress = progress_text(
+            &title,
+            self.dataset_count(),
+            self.source.is_partial(),
+            self.pager.pages(),
+        );
         let range_label = if self.dataset_count() == 0 {
             "Rows 0".to_string()
         } else if self.continuous {
@@ -149,6 +154,11 @@ impl Render for GridView {
                     thousands(s.added),
                     thousands(s.removed)
                 )
+            };
+            let summary = if s.unknown > 0 {
+                format!("{summary} · Unknown {}", thousands(s.unknown))
+            } else {
+                summary
             };
             let capped = if diff.capped {
                 format!(" · first {MAX_DIFF_ROWS} differences shown")

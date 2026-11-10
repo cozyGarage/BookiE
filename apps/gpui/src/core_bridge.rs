@@ -1,5 +1,5 @@
 use bookie_core::import::{ColumnKind, parse_cell};
-use bookie_core::{ColumnInfo, QueryRows, Value};
+use bookie_core::{ColumnInfo, FilterValueKind, QueryRows, Value};
 
 use crate::model::Cell;
 
@@ -19,6 +19,24 @@ fn column_kind(kind: &str) -> Option<ColumnKind> {
         "text" | "json_text" | "null" => ColumnKind::Text,
         _ => return None,
     })
+}
+
+/// The edit-kind name that `parse_edit` understands for a core filter kind.
+pub fn edit_kind(kind: FilterValueKind) -> &'static str {
+    match kind {
+        FilterValueKind::Text => "text",
+        FilterValueKind::Bool => "boolean",
+        FilterValueKind::Int => "integer",
+        FilterValueKind::Float => "float",
+        FilterValueKind::Decimal => "decimal",
+        FilterValueKind::Date => "date",
+        FilterValueKind::Time => "time",
+        FilterValueKind::DateTime => "datetime",
+        FilterValueKind::TimestampTz => "timestamptz",
+        FilterValueKind::Uuid => "uuid",
+        FilterValueKind::Json => "json",
+        FilterValueKind::Bytes => "bytes",
+    }
 }
 
 pub fn parse_edit(kind: &str, text: &str) -> Result<Cell, String> {
