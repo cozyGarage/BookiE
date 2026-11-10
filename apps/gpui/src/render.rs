@@ -1,4 +1,5 @@
 use super::*;
+use crate::assets::icon;
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -194,6 +195,7 @@ impl Render for GridView {
         let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
         let toolbar = self.toolbar(theme, cx);
         let tab_bar = self.tab_bar(theme, cx);
+        let tab_row = tab_bar;
         div()
             .size_full()
             .relative()
@@ -233,7 +235,7 @@ impl Render for GridView {
                     .flex()
                     .min_h_0()
                     .children(sidebar)
-                    .child(div().flex_1().flex().flex_col().min_w_0().child(tab_bar).child(content)),
+                    .child(div().flex_1().flex().flex_col().min_w_0().child(tab_row).child(content)),
             )
             .child(self.status_bar(theme))
             .children(palette)

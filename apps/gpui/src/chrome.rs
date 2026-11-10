@@ -30,6 +30,50 @@ fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme)
         .child(label.into())
 }
 
+fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
+    div()
+        .id("sidebar-open-top-left")
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(32.0))
+        .h(px(28.0))
+        .cursor_pointer()
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon("chevrons-right", theme.muted_foreground))
+        .on_click(cx.listener(|this, _, _, cx| {
+            this.sidebar_open = true;
+            cx.notify();
+        }))
+}
+
+fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(24.0))
+        .h(px(24.0))
+        .cursor_pointer()
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
+}
+
+fn window_button(id: &'static str, glyph: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(32.0))
+        .h(px(28.0))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(glyph)
+}
+
 fn ghost_icon(id: &'static str, name: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
@@ -89,42 +133,59 @@ impl GridView {
                     .flex()
                     .items_center()
                     .gap_1()
-                    .child(inert("new-connection", "plus", "New Connection", cx))
+                    .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
+                    .child(inert("new-connection", "database", "New Connection", cx))
+                    .child(inert("new-query", "file-plus", "New Query", cx))
                     .child(inert("data-transfer", "arrow-left-right", "Data Transfer", cx))
                     .child(inert("driver-manager", "package", "Driver Manager", cx))
                     .child(inert("plugin-center", "puzzle", "Plugin Center", cx))
                     .child(inert("more", "chevron-down", "More", cx)),
             )
+            .child(self.toolbar_right(theme, cx))
+    }
+
+    fn toolbar_right(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex()
+            .items_center()
+            .gap_1()
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .child(
-                        ghost_icon("palette", "command", "Commands", theme)
-                            .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
-                    )
-                    .child(
-                        ghost_icon("sidebar-toggle", "panel-left", "Sidebar", theme).on_click(cx.listener(
-                            |this, _, _, cx| {
-                                this.sidebar_open = !this.sidebar_open;
-                                cx.notify();
-                            },
-                        )),
-                    )
-                    .child(
-                        ghost_icon(
-                            "theme-toggle",
-                            if theme.dark { "sun" } else { "moon" },
-                            if theme.dark { "Light" } else { "Dark" },
-                            theme,
-                        )
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.dark_mode = !this.dark_mode;
-                            Theme::current(cx).toggled().install(cx);
-                            window.refresh();
-                        })),
-                    ),
+                ghost_icon("palette", "command", "Commands", theme)
+                    .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
+            )
+            .child(
+                ghost_icon("sidebar-toggle", "panel-left", "Sidebar", theme).on_click(cx.listener(|this, _, _, cx| {
+                    this.sidebar_open = !this.sidebar_open;
+                    cx.notify();
+                })),
+            )
+            .child(
+                ghost_icon(
+                    "theme-toggle",
+                    if theme.dark { "sun" } else { "moon" },
+                    if theme.dark { "Light" } else { "Dark" },
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.dark_mode = !this.dark_mode;
+                    Theme::current(cx).toggled().install(cx);
+                    window.refresh();
+                })),
+            )
+            .child(
+                window_button("win-min", "\u{2013}", theme).on_click(cx.listener(|_, _, window, _| {
+                    window.minimize_window();
+                })),
+            )
+            .child(
+                window_button("win-max", "\u{25a1}", theme).on_click(cx.listener(|_, _, window, _| {
+                    window.zoom_window();
+                })),
+            )
+            .child(
+                window_button("win-close", "\u{00d7}", theme).on_click(cx.listener(|_, _, window, _| {
+                    window.remove_window();
+                })),
             )
     }
 
@@ -162,7 +223,15 @@ impl GridView {
                     },
                     theme.muted_foreground,
                 ))
-                .child(label);
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(label),
+                );
             let line = if current {
                 line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
             } else {
@@ -203,15 +272,76 @@ impl GridView {
                     .border_b_1()
                     .border_color(rgb(theme.border))
                     .text_color(rgb(theme.muted_foreground))
-                    .child("Import / Export ⌄")
                     .child(
-                        ghost("collapse-sidebar", "«", theme).on_click(cx.listener(|this, _, _, cx| {
-                            this.sidebar_open = false;
-                            cx.notify();
-                        })),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .child(icon("arrow-down-up", theme.muted_foreground))
+                            .child("Import / Export ⌄"),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .child(header_icon("header-collapse-all", "x", theme))
+                            .child(header_icon("header-new-folder", "folder-plus", theme))
+                            .child(header_icon("header-refresh", "refresh-cw", theme))
+                            .child(
+                                header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(
+                                    |this, _, _, cx| {
+                                        this.sidebar_open = false;
+                                        cx.notify();
+                                    },
+                                )),
+                            ),
                     ),
             )
-            .child(div().p_2().child(self.sidebar_search.clone()))
+            .child(
+                div()
+                    .p_2()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .child(div().flex_1().min_w_0().child(self.sidebar_search.clone()))
+                    .child(
+                        div()
+                            .id("sidebar-expand-all")
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(26.0))
+                            .h(px(26.0))
+                            .cursor_pointer()
+                            .hover(move |style| style.bg(rgb(theme.accent)))
+                            .child(icon("folder", theme.muted_foreground)),
+                    )
+                    .child(
+                        div()
+                            .id("sidebar-tables")
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(26.0))
+                            .h(px(26.0))
+                            .cursor_pointer()
+                            .hover(move |style| style.bg(rgb(theme.accent)))
+                            .child(icon("table", theme.muted_foreground)),
+                    )
+                    .child(
+                        div()
+                            .id("sidebar-clear-search")
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(26.0))
+                            .h(px(26.0))
+                            .cursor_pointer()
+                            .hover(move |style| style.bg(rgb(theme.accent)))
+                            .child(icon("x", theme.muted_foreground)),
+                    ),
+            )
             .child(div().flex().flex_col().px_2().children(tree).children(empty))
             .child(
                 div()
@@ -327,12 +457,20 @@ impl GridView {
     }
 
     pub fn home_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let stat = |label: &str, value: &str| {
+        let stat = |label: &str, icon_name: &'static str, value: &str| {
             card(theme)
                 .flex_1()
                 .p_4()
                 .gap_1()
-                .child(div().text_color(rgb(theme.muted_foreground)).child(label.to_string()))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(icon(icon_name, theme.muted_foreground))
+                        .child(label.to_string()),
+                )
                 .child(
                     div()
                         .text_size(px(22.0))
@@ -340,8 +478,8 @@ impl GridView {
                         .child(value.to_string()),
                 )
         };
-        let shortcut = |id: &'static str, label: &'static str, cx: &mut Context<Self>| {
-            ghost(id, label, theme).on_click(cx.listener(|this, _, _, cx| {
+        let shortcut = |id: &'static str, icon_name: &'static str, label: &'static str, cx: &mut Context<Self>| {
+            ghost_icon(id, icon_name, label, theme).on_click(cx.listener(|this, _, _, cx| {
                 this.status = "Synthetic prototype: nothing to open here.".into();
                 cx.notify();
             }))
@@ -349,85 +487,96 @@ impl GridView {
         div()
             .flex_1()
             .flex()
-            .flex_col()
-            .gap_4()
+            .justify_center()
             .p_6()
             .bg(rgb(theme.background))
             .child(
                 div()
+                    .pt(px(96.0))
+                    .w(px(980.0))
+                    .max_w_full()
                     .flex()
-                    .gap_4()
-                    .child(stat("Connections", &self.connections.len().max(1).to_string()))
-                    .child(stat(
-                        "Connected",
-                        &usize::from(self.live.is_some() || self.connections.is_empty()).to_string(),
-                    ))
-                    .child(stat("Database Types", "1")),
-            )
-            .child(
-                div()
-                    .flex()
+                    .flex_col()
                     .gap_4()
                     .child(
-                        card(theme).flex_1().child(card_title("Quick Start", theme)).child(
-                            div()
-                                .p_2()
-                                .flex()
-                                .flex_col()
-                                .children(self.connections.iter().enumerate().map(|(index, saved)| {
-                                    let name = saved.name.clone();
-                                    ghost(
-                                        ("saved-connection", index),
-                                        format!("{} · {}", saved.name, saved.driver_id),
-                                        theme,
-                                    )
-                                    .on_click(cx.listener(
-                                        move |this, _, _, cx| {
-                                            this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
-                                            cx.notify();
-                                        },
-                                    ))
-                                }))
-                                .child(
-                                    ghost(
-                                        "quick-open",
-                                        format!("{} → {}", self.catalog.connection, self.catalog.grid_table),
-                                        theme,
-                                    )
-                                    .on_click(cx.listener(
-                                        |this, _, window, cx| {
-                                            let name = this.catalog.grid_table.clone();
-                                            this.open_table_named(&name, window, cx);
-                                            cx.notify();
-                                        },
-                                    )),
-                                ),
-                        ),
+                        div()
+                            .flex()
+                            .gap_4()
+                            .child(stat(
+                                "Connections",
+                                "database",
+                                &self.connections.len().max(1).to_string(),
+                            ))
+                            .child(stat(
+                                "Connected",
+                                "play",
+                                &usize::from(self.live.is_some() || self.connections.is_empty()).to_string(),
+                            ))
+                            .child(stat("Database Types", "package", "1")),
                     )
                     .child(
-                        card(theme).w(px(300.0)).child(card_title("Shortcuts", theme)).child(
+                        div()
+                            .flex()
+                            .gap_4()
+                            .child(
+                                card(theme).flex_1().child(card_title("Quick Start", theme)).child(
+                                    div()
+                                        .p_2()
+                                        .flex()
+                                        .flex_col()
+                                        .children(self.connections.iter().enumerate().map(|(index, saved)| {
+                                            let name = saved.name.clone();
+                                            ghost(
+                                                ("saved-connection", index),
+                                                format!("{} · {}", saved.name, saved.driver_id),
+                                                theme,
+                                            )
+                                            .on_click(cx.listener(
+                                                move |this, _, _, cx| {
+                                                    this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
+                                                    cx.notify();
+                                                },
+                                            ))
+                                        }))
+                                        .child(
+                                            ghost(
+                                                "quick-open",
+                                                format!("{} → {}", self.catalog.connection, self.catalog.grid_table),
+                                                theme,
+                                            )
+                                            .on_click(cx.listener(
+                                                |this, _, window, cx| {
+                                                    let name = this.catalog.grid_table.clone();
+                                                    this.open_table_named(&name, window, cx);
+                                                    cx.notify();
+                                                },
+                                            )),
+                                        ),
+                                ),
+                            )
+                            .child(
+                                card(theme).w(px(300.0)).child(card_title("Shortcuts", theme)).child(
+                                    div()
+                                        .p_2()
+                                        .flex()
+                                        .flex_col()
+                                        .child(shortcut("s-new", "plus", "New Connection", cx))
+                                        .child(shortcut("s-history", "clock", "History", cx))
+                                        .child(shortcut("s-import", "download", "Import Connections", cx)),
+                                ),
+                            ),
+                    )
+                    .child(
+                        card(theme).child(card_title("Query History", theme)).child(
                             div()
-                                .p_2()
-                                .flex()
-                                .flex_col()
-                                .child(shortcut("s-new", "+  New Connection", cx))
-                                .child(shortcut("s-history", "History", cx))
-                                .child(shortcut("s-import", "Import Connections", cx)),
+                                .p_4()
+                                .text_color(rgb(theme.muted_foreground))
+                                .child("No SQL Library records yet"),
                         ),
-                    ),
-            )
-            .child(
-                card(theme).child(card_title("Query History", theme)).child(
-                    div()
-                        .p_4()
-                        .text_color(rgb(theme.muted_foreground))
-                        .child("No SQL Library records yet"),
-                ),
-            )
-            .child(
-                div()
-                    .text_color(rgb(theme.muted_foreground))
-                    .child("Layout prototype with synthetic data only. Open the synthetic_rows table in the sidebar."),
+                    )
+                    .child(div().w_full().text_color(rgb(theme.muted_foreground)).child(
+                        "Layout prototype with synthetic data only. Open the synthetic_rows table in the sidebar.",
+                    )),
             )
     }
 
