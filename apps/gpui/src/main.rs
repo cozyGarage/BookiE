@@ -3,25 +3,26 @@ use std::time::{Duration, Instant};
 
 mod assets;
 mod chrome;
+mod detail_panel;
 mod grid_edit;
+mod keys;
 mod render;
 mod text_input;
 mod ui_theme;
 
-use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
-use bookie_gpui_grid_prototype::model::*;
-use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui_grid_prototype::preview::cell_preview;
-use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
-use bookie_gpui_grid_prototype::shell::{
-    DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag,
-};
-use bookie_gpui_grid_prototype::source::{Source, Synthetic};
-use bookie_gpui_grid_prototype::theme::{Style, Theme};
+use bookie_gpui::cursor::Cursor;
+use bookie_gpui::keymap::Keymap;
+use bookie_gpui::model::*;
+use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
+use bookie_gpui::preview::cell_preview;
+use bookie_gpui::selection::{Selection, copy_tsv};
+use bookie_gpui::shell::{DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag};
+use bookie_gpui::source::{Source, Synthetic};
+use bookie_gpui::theme::{Style, Theme};
 use gpui::{
-    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
-    MouseDownEvent, ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds,
-    WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
+    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, MouseDownEvent,
+    ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
+    prelude::*, px, rgb, size, uniform_list,
 };
 use text_input::{InputEvent, TextInput};
 use tokio_util::sync::CancellationToken;
@@ -54,6 +55,8 @@ struct GridView {
     viewport_rows: usize,
     palette_input: Entity<TextInput>,
     palette_open: bool,
+    detail_open: bool,
+    keymap: Keymap,
     palette_index: usize,
     dark_mode: bool,
     tabs: Tabs,
@@ -206,6 +209,8 @@ impl GridView {
             viewport_rows: 10,
             palette_input,
             palette_open: false,
+            detail_open: false,
+            keymap: Keymap::default(),
             palette_index: 0,
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
@@ -606,99 +611,6 @@ impl GridView {
         self.operation_cancel.cancel();
     }
 
-    fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        let stroke = &event.keystroke;
-        let modifiers = stroke.modifiers;
-        let key = stroke.key.as_str();
-        if self.palette_open {
-            match key {
-                "down" | "up" => {
-                    let count = self.palette_shown(cx).len();
-                    self.palette_index = palette_step(self.palette_index, count, key == "down");
-                    cx.notify();
-                }
-                "escape" => self.close_palette(window, cx),
-                _ => {}
-            }
-            return;
-        }
-        if modifiers.control && modifiers.shift && key == "p" {
-            self.open_palette(window, cx);
-            return;
-        }
-        if modifiers.control {
-            match key {
-                "f" => {
-                    self.filter_visible = true;
-                    window.focus(&self.filter.read(cx).focus_handle(cx), cx);
-                }
-                "c" if self.focus.is_focused(window) => self.copy_selection(modifiers.shift, cx),
-                "b" => self.sidebar_open = !self.sidebar_open,
-                "t" => {
-                    self.tabs.open_query();
-                    self.sync_grid_owner();
-                    window.focus(&self.focus, cx);
-                }
-                "enter" if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
-                _ => {}
-            }
-            if !matches!(key, "home" | "end") {
-                cx.notify();
-                return;
-            }
-        }
-        if self.focus.is_focused(window) && self.editing.is_none() && self.compare.is_none() && self.tabs.shows_grid() {
-            self.grid_key(key, modifiers.shift, modifiers.control, window, cx);
-        }
-    }
-
-    fn grid_key(&mut self, key: &str, shift: bool, ctrl: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let rows = self.visible_count();
-        match key {
-            "space" => {
-                if let Some(cursor) = self.cell_cursor {
-                    self.click_row(self.base() + cursor.row as u64, false);
-                }
-            }
-            "enter" | "f2" => {
-                if let Some(cursor) = self.cell_cursor {
-                    let source = self.source_row(self.base() + cursor.row as u64);
-                    self.start_edit(source, cursor.column, window, cx);
-                }
-            }
-            "down" if self.cell_cursor.is_some_and(|c| c.row + 1 == rows) && self.next_page() => {
-                self.place_cursor(Some(Cursor {
-                    row: 0,
-                    column: self.cell_cursor.map_or(0, |c| c.column),
-                }));
-            }
-            "up" if self.cell_cursor.is_some_and(|c| c.row == 0) && self.previous_page() => {
-                let last = self.visible_count().saturating_sub(1);
-                self.place_cursor(Some(Cursor {
-                    row: last,
-                    column: self.cell_cursor.map_or(0, |c| c.column),
-                }));
-            }
-            _ => {
-                let Some(next) = move_cursor(
-                    self.cell_cursor,
-                    key,
-                    rows,
-                    self.source.columns().len(),
-                    self.viewport_rows,
-                    ctrl,
-                ) else {
-                    return;
-                };
-                self.place_cursor(Some(next));
-                if shift && matches!(key, "up" | "down") {
-                    self.click_row(self.base() + next.row as u64, true);
-                }
-            }
-        }
-        cx.notify();
-    }
-
     fn next_page(&mut self) -> bool {
         let moved = !self.continuous && self.pager.page + 1 < self.pager.pages();
         if moved {
@@ -764,6 +676,15 @@ impl GridView {
             action("filter", "Filter rows (WHERE)", true),
             action("clear-filter", "Clear filter", filtering),
             action("compare", "Compare results", true),
+            action(
+                "detail",
+                if self.detail_open {
+                    "Hide cell details"
+                } else {
+                    "Show cell details"
+                },
+                true,
+            ),
             action(
                 "continuous",
                 if self.continuous {
@@ -883,6 +804,7 @@ impl GridView {
             }
             "clear-filter" => self.clear_filter(),
             "compare" => self.compare(false, cx),
+            "detail" => self.toggle_detail(),
             "continuous" => {
                 self.continuous = !self.continuous;
                 self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
@@ -1059,10 +981,8 @@ pub fn cell_div(width: f32, text: String) -> Div {
 
 fn display_cell(width: f32, cell: &Cell, theme: Theme) -> Div {
     let mut item = cell_div(width, cell_preview(cell));
-    if let Some(kind) = bookie_gpui_grid_prototype::type_colors::type_kind(cell) {
-        item = item.text_color(rgb(bookie_gpui_grid_prototype::type_colors::type_color(
-            kind, theme.dark,
-        )));
+    if let Some(kind) = bookie_gpui::type_colors::type_kind(cell) {
+        item = item.text_color(rgb(bookie_gpui::type_colors::type_color(kind, theme.dark)));
     }
     if numeric_cell(cell) { item.justify_end() } else { item }
 }
@@ -1109,6 +1029,7 @@ fn main() {
     let started = Instant::now();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
     let live = live_source();
+    let keymap = load_keymap();
     let autoscroll: u32 = env_number("BOOKIE_PROTOTYPE_AUTOSCROLL").unwrap_or(0);
     let width: f32 = env_number("BOOKIE_PROTOTYPE_WIDTH").unwrap_or(1100.0);
     let height: f32 = env_number("BOOKIE_PROTOTYPE_HEIGHT").unwrap_or(800.0);
@@ -1130,6 +1051,7 @@ fn main() {
                     });
                     let focus = view.read(cx).focus.clone();
                     focus.focus(window, cx);
+                    view.update(cx, |view, _| view.keymap = keymap.clone());
                     if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
                         view.update(cx, |view, _| {
                             view.tabs.open_query();
@@ -1152,10 +1074,23 @@ fn main() {
 #[cfg(test)]
 mod ui_tests;
 
+fn load_keymap() -> Keymap {
+    let Some(path) = bookie_app_services::config_io::xdg_config_path("gpui-keymap.json") else {
+        return Keymap::default();
+    };
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Keymap::default();
+    };
+    Keymap::from_overrides(&text).unwrap_or_else(|error| {
+        eprintln!("ignoring {}: {error}", path.display());
+        Keymap::default()
+    })
+}
+
 const LIVE_ROW_CAP: u64 = 100_000;
 
 fn live_source() -> Option<Source> {
-    use bookie_gpui_grid_prototype::live::{LiveTable, Origin};
+    use bookie_gpui::live::{LiveTable, Origin};
     let table = std::env::var("BOOKIE_PROTOTYPE_TABLE").ok()?;
     let origin = match (
         std::env::var("BOOKIE_PROTOTYPE_FILE").ok(),

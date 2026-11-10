@@ -186,7 +186,8 @@ impl Render for GridView {
             .children(filter_row)
             .children(compare_bar)
             .child(header)
-            .child(list);
+            .child(list)
+            .children(self.detail_panel(theme));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),

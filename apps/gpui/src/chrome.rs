@@ -1,4 +1,4 @@
-use bookie_gpui_grid_prototype::shell::{CONNECTION, DATA_TABLE, DATABASE, Tab, TreeRow, tree_rows};
+use bookie_gpui::shell::{CONNECTION, DATA_TABLE, DATABASE, Tab, TreeRow, tree_rows};
 const SQL: [&str; 3] = [
     "SELECT value, label, state, typed",
     "FROM synthetic_rows",
@@ -9,7 +9,7 @@ use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, 
 use crate::assets::icon;
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, thousands};
-use bookie_gpui_grid_prototype::theme::Theme;
+use bookie_gpui::theme::Theme;
 
 const TOOLBAR_HEIGHT: f32 = 40.0;
 const TAB_HEIGHT: f32 = 32.0;
@@ -438,7 +438,7 @@ impl GridView {
             .border_color(rgb(theme.border))
             .text_size(px(12.0))
             .text_color(rgb(theme.muted_foreground))
-            .child("Synthetic data · no database connection")
+            .child(self.source.origin())
             .child(right)
     }
 

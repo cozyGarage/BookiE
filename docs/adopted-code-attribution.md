@@ -12,7 +12,7 @@ BookiE and the TablePro Linux client are both AGPL-3.0, so a reviewed file may b
 |---|---|---|
 | `crates/app-services/src/er_diagram/layout.rs`, `scene.rs`, `zoom.rs` | `layout.rs`, `scene.rs`, `zoom.rs` | Moved to the services crate and made public; comments removed; tests kept. |
 | `apps/linux/app/src/ui/diagram/card_text.rs`, `draw.rs`, `palette.rs` | `card_text.rs`, `draw.rs`, `palette.rs` | Comments removed; the palette takes a light or dark theme; GTK tests registered as isolated tests. |
-| `experiments/gpui-grid-prototype/src/type_colors.rs` | dbx (Apache-2.0, commit `39a77b5`) `apps/desktop/src/lib/dataGrid/dataGridTypeColorScheme.ts`, default light and dark palettes | Only the eight colour pairs that match BookiE's cell kinds (no spatial kind); the mapping from `Cell` is BookiE's own. |
+| `apps/gpui/src/type_colors.rs` | dbx (Apache-2.0, commit `39a77b5`) `apps/desktop/src/lib/dataGrid/dataGridTypeColorScheme.ts`, default light and dark palettes | Only the eight colour pairs that match BookiE's cell kinds (no spatial kind); the mapping from `Cell` is BookiE's own. |
 
 The model, the bounded metadata read, the canvas, the dialog and the accessible descriptions are BookiE's own. The export and movable-card nodes are not adopted.
 

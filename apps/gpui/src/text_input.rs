@@ -538,7 +538,7 @@ impl Element for TextElement {
                         point(bounds.left() + cursor_pos, bounds.top()),
                         size(px(2.), bounds.bottom() - bounds.top()),
                     ),
-                    rgb(bookie_gpui_grid_prototype::theme::Theme::current(cx).foreground),
+                    rgb(bookie_gpui::theme::Theme::current(cx).foreground),
                 )),
             )
         } else {
@@ -575,7 +575,9 @@ impl Element for TextElement {
         if let Some(selection) = prepaint.selection.take() {
             window.paint_quad(selection)
         }
-        let line = prepaint.line.take().unwrap();
+        let Some(line) = prepaint.line.take() else {
+            return;
+        };
         line.paint(
             bounds.origin,
             window.line_height(),
@@ -584,7 +586,7 @@ impl Element for TextElement {
             window,
             cx,
         )
-        .unwrap();
+        .ok();
 
         if focus_handle.is_focused(window)
             && let Some(cursor) = prepaint.cursor.take()
@@ -601,7 +603,7 @@ impl Element for TextElement {
 
 impl Render for TextInput {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = bookie_gpui_grid_prototype::theme::Theme::current(cx);
+        let theme = bookie_gpui::theme::Theme::current(cx);
         div()
             .flex()
             .key_context("TextInput")

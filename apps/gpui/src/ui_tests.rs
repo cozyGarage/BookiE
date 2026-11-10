@@ -1,9 +1,9 @@
 use std::time::Instant;
 
-use bookie_gpui_grid_prototype::model::Cell;
+use bookie_gpui::model::Cell;
 use gpui::{TestAppContext, VisualTestContext};
 
-use bookie_gpui_grid_prototype::cursor::Cursor;
+use bookie_gpui::cursor::Cursor;
 
 use crate::GridView;
 use crate::text_input;
@@ -65,7 +65,7 @@ fn opening_a_query_reveals_its_tab_in_an_overflowing_workspace(cx: &mut TestAppC
     cx.simulate_keystrokes("ctrl-t");
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.tabs.current(), &bookie_gpui_grid_prototype::shell::Tab::Query);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Query);
         assert!(view.tab_scroll.offset().x < gpui::px(0.0));
     });
     cx.simulate_keystrokes("ctrl-shift-p");
@@ -73,7 +73,7 @@ fn opening_a_query_reveals_its_tab_in_an_overflowing_workspace(cx: &mut TestAppC
     cx.simulate_keystrokes("enter");
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.tabs.current(), &bookie_gpui_grid_prototype::shell::Tab::Home);
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Home);
         assert_eq!(view.tab_scroll.offset().x, gpui::px(0.0));
     });
 }
@@ -264,21 +264,16 @@ fn the_palette_hides_actions_that_do_not_apply_and_arrows_pick_the_next_one(cx: 
 #[gpui::test]
 fn the_palette_switches_between_the_light_and_dark_theme(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    cx.update(|_, cx| {
-        assert!(
-            !bookie_gpui_grid_prototype::theme::Theme::current(cx).dark,
-            "light is the default"
-        )
-    });
+    cx.update(|_, cx| assert!(!bookie_gpui::theme::Theme::current(cx).dark, "light is the default"));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("dark theme");
     cx.simulate_keystrokes("enter");
-    cx.update(|_, cx| assert!(bookie_gpui_grid_prototype::theme::Theme::current(cx).dark));
+    cx.update(|_, cx| assert!(bookie_gpui::theme::Theme::current(cx).dark));
     view.read_with(cx, |view, _| assert!(view.dark_mode));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("light theme");
     cx.simulate_keystrokes("enter");
-    cx.update(|_, cx| assert!(!bookie_gpui_grid_prototype::theme::Theme::current(cx).dark));
+    cx.update(|_, cx| assert!(!bookie_gpui::theme::Theme::current(cx).dark));
 }
 
 #[gpui::test]
@@ -318,7 +313,7 @@ fn the_sidebar_search_takes_typed_text_and_filters_the_tree(cx: &mut TestAppCont
     cx.simulate_input("aud");
     view.read_with(cx, |view, cx| {
         assert_eq!(view.sidebar_search.read(cx).content(), "aud");
-        let rows = bookie_gpui_grid_prototype::shell::tree_rows("aud", true, true);
+        let rows = bookie_gpui::shell::tree_rows("aud", true, true);
         assert_eq!(rows.len(), 3, "connection, database and the one matching table");
     });
 }
@@ -356,22 +351,17 @@ fn the_palette_lists_installed_fonts_and_the_chosen_one_becomes_the_ui_font(cx: 
 
 #[gpui::test]
 fn the_palette_switches_the_theme_style_and_light_dark_keeps_it(cx: &mut TestAppContext) {
-    use bookie_gpui_grid_prototype::theme::Style;
+    use bookie_gpui::theme::Style;
     let (_view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("adwaita");
     cx.simulate_keystrokes("enter");
-    cx.update(|_, cx| {
-        assert_eq!(
-            bookie_gpui_grid_prototype::theme::Theme::current(cx).style,
-            Style::Adwaita
-        )
-    });
+    cx.update(|_, cx| assert_eq!(bookie_gpui::theme::Theme::current(cx).style, Style::Adwaita));
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.simulate_input("dark theme");
     cx.simulate_keystrokes("enter");
     cx.update(|_, cx| {
-        let theme = bookie_gpui_grid_prototype::theme::Theme::current(cx);
+        let theme = bookie_gpui::theme::Theme::current(cx);
         assert_eq!((theme.style, theme.dark), (Style::Adwaita, true));
     });
 }
@@ -380,12 +370,12 @@ struct Tiny;
 
 struct CountingSource(std::sync::Arc<std::sync::atomic::AtomicUsize>);
 
-impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
+impl bookie_gpui::source::ResultSource for CountingSource {
     fn editable(&self) -> bool {
         true
     }
 
-    fn columns(&self) -> &[bookie_gpui_grid_prototype::model::ColumnMeta] {
+    fn columns(&self) -> &[bookie_gpui::model::ColumnMeta] {
         test_columns()
     }
 
@@ -395,7 +385,7 @@ impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
 
     fn row(&self, index: u64) -> Vec<Cell> {
         self.0.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        bookie_gpui_grid_prototype::source::ResultSource::row(&Tiny, index)
+        bookie_gpui::source::ResultSource::row(&Tiny, index)
     }
 
     fn find(
@@ -403,24 +393,24 @@ impl bookie_gpui_grid_prototype::source::ResultSource for CountingSource {
         query: &str,
         cap: usize,
         cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
-        bookie_gpui_grid_prototype::source::ResultSource::find(&Tiny, query, cap, cancel)
+    ) -> Result<bookie_gpui::model::FindResult, &'static str> {
+        bookie_gpui::source::ResultSource::find(&Tiny, query, cap, cancel)
     }
 
     fn filter(
         &self,
-        predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        predicate: &bookie_gpui::model::Predicate,
         cancel: &tokio_util::sync::CancellationToken,
     ) -> Result<Vec<u32>, &'static str> {
-        bookie_gpui_grid_prototype::source::ResultSource::filter(&Tiny, predicate, cancel)
+        bookie_gpui::source::ResultSource::filter(&Tiny, predicate, cancel)
     }
 
     fn compare(
         &self,
         keyed: bool,
         cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
-        bookie_gpui_grid_prototype::source::ResultSource::compare(&Tiny, keyed, cancel)
+    ) -> Result<bookie_gpui::model::Diff, &'static str> {
+        bookie_gpui::source::ResultSource::compare(&Tiny, keyed, cancel)
     }
 }
 
@@ -458,9 +448,9 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
         });
     });
     let actual = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
-    let mut row = bookie_gpui_grid_prototype::model::row_at(20);
+    let mut row = bookie_gpui::model::row_at(20);
     row[1] = Cell::Text(value.into());
-    let expected = bookie_gpui_grid_prototype::selection::copy_tsv([row], false);
+    let expected = bookie_gpui::selection::copy_tsv([row], false);
     assert_eq!(actual.as_deref(), Some(expected.as_str()));
 }
 
@@ -488,7 +478,7 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
     let bytes = vec![0xab; 1_000_000];
     let json = format!("{{\"raw\":  \"{}\"}}", "x".repeat(1_000_000));
     view.update(cx, |view, cx| {
-        view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+        view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
         view.edits.insert((0, 1), Cell::Text(text.clone()));
         view.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
         view.edits.insert((1, 3), Cell::JsonText(json.clone()));
@@ -559,8 +549,8 @@ fn platform_input_flattens_newlines_like_single_line_paste(cx: &mut TestAppConte
     cx.run_until_parked();
 }
 
-impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
-    fn columns(&self) -> &[bookie_gpui_grid_prototype::model::ColumnMeta] {
+impl bookie_gpui::source::ResultSource for Tiny {
+    fn columns(&self) -> &[bookie_gpui::model::ColumnMeta] {
         test_columns()
     }
 
@@ -582,8 +572,8 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         query: &str,
         _cap: usize,
         _cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
-        Ok(bookie_gpui_grid_prototype::model::FindResult {
+    ) -> Result<bookie_gpui::model::FindResult, &'static str> {
+        Ok(bookie_gpui::model::FindResult {
             matches: if query == "tiny 2" { vec![2] } else { Vec::new() },
             capped: false,
             scanned: 3,
@@ -592,7 +582,7 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
 
     fn filter(
         &self,
-        _predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        _predicate: &bookie_gpui::model::Predicate,
         _cancel: &tokio_util::sync::CancellationToken,
     ) -> Result<Vec<u32>, &'static str> {
         Ok(vec![1])
@@ -602,8 +592,8 @@ impl bookie_gpui_grid_prototype::source::ResultSource for Tiny {
         &self,
         keyed: bool,
         cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
-        bookie_gpui_grid_prototype::model::build_diff(3, keyed, cancel)
+    ) -> Result<bookie_gpui::model::Diff, &'static str> {
+        bookie_gpui::model::build_diff(3, keyed, cancel)
     }
 }
 
@@ -634,7 +624,7 @@ fn the_view_renders_and_searches_whatever_source_it_is_given(cx: &mut TestAppCon
 
 #[gpui::test]
 fn ctrl_t_opens_one_query_tab_and_ctrl_enter_adds_a_run_with_its_own_result(cx: &mut TestAppContext) {
-    use bookie_gpui_grid_prototype::shell::Tab;
+    use bookie_gpui::shell::Tab;
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");
     view.read_with(cx, |view, _| {
@@ -753,7 +743,7 @@ fn closing_the_last_query_result_keeps_the_synthetic_table_available(cx: &mut Te
         view.update(cx, |view, _| {
             view.close_run(0);
             assert_eq!(view.dataset_count(), 0);
-            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
             assert_eq!(view.dataset_count(), 150_000);
         });
     });
@@ -766,14 +756,14 @@ fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut Tes
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             view.close_run(0);
-            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
             view.sync_grid_owner();
             view.edits.insert((1, 1), Cell::Text("table edit".into()));
             view.tabs.open_query();
             view.sync_grid_owner();
             view.run_query();
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
-            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
             view.sync_grid_owner();
             assert_eq!(view.cell_at(1, 1), Cell::Text("table edit".into()));
         });
@@ -793,7 +783,7 @@ fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppC
         view.update(cx, |view, _| {
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
             view.edits.insert((1, 1), Cell::Text("query".into()));
-            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
             view.sync_grid_owner();
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
             view.tabs.open_query();
@@ -843,7 +833,7 @@ fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
         view.update(cx, |view, _| {
             view.edits.insert((1, 1), Cell::Text("query".into()));
             let query = view.tabs.active;
-            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
             view.sync_grid_owner();
             view.close_tab(query);
             assert!(view.runs.is_empty());
@@ -868,7 +858,7 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
             view.tabs.open_home();
             view.sync_grid_owner();
             view.close_tab(query);
-            view.tabs.open_table(bookie_gpui_grid_prototype::shell::DATA_TABLE);
+            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
             view.sync_grid_owner();
             assert!(view.runs.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
@@ -1035,22 +1025,20 @@ fn the_results_pane_can_be_hidden_and_the_summary_view_shows_the_run(cx: &mut Te
     view.read_with(cx, |view, _| assert!(view.result_open));
 }
 
-fn test_columns() -> &'static [bookie_gpui_grid_prototype::model::ColumnMeta] {
-    static COLUMNS: std::sync::OnceLock<Vec<bookie_gpui_grid_prototype::model::ColumnMeta>> =
-        std::sync::OnceLock::new();
-    COLUMNS.get_or_init(bookie_gpui_grid_prototype::model::synthetic_columns)
+fn test_columns() -> &'static [bookie_gpui::model::ColumnMeta] {
+    static COLUMNS: std::sync::OnceLock<Vec<bookie_gpui::model::ColumnMeta>> = std::sync::OnceLock::new();
+    COLUMNS.get_or_init(bookie_gpui::model::synthetic_columns)
 }
 
 struct TwoColumns;
 
-impl bookie_gpui_grid_prototype::source::ResultSource for TwoColumns {
-    fn columns(&self) -> &[bookie_gpui_grid_prototype::model::ColumnMeta] {
-        static COLUMNS: std::sync::OnceLock<Vec<bookie_gpui_grid_prototype::model::ColumnMeta>> =
-            std::sync::OnceLock::new();
+impl bookie_gpui::source::ResultSource for TwoColumns {
+    fn columns(&self) -> &[bookie_gpui::model::ColumnMeta] {
+        static COLUMNS: std::sync::OnceLock<Vec<bookie_gpui::model::ColumnMeta>> = std::sync::OnceLock::new();
         COLUMNS.get_or_init(|| {
             ["id", "customer_name"]
                 .into_iter()
-                .map(|name| bookie_gpui_grid_prototype::model::ColumnMeta {
+                .map(|name| bookie_gpui::model::ColumnMeta {
                     name: name.into(),
                     width: 150.0,
                 })
@@ -1071,13 +1059,13 @@ impl bookie_gpui_grid_prototype::source::ResultSource for TwoColumns {
         _query: &str,
         _cap: usize,
         _cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<bookie_gpui_grid_prototype::model::FindResult, &'static str> {
+    ) -> Result<bookie_gpui::model::FindResult, &'static str> {
         Err("not needed")
     }
 
     fn filter(
         &self,
-        _predicate: &bookie_gpui_grid_prototype::model::Predicate,
+        _predicate: &bookie_gpui::model::Predicate,
         _cancel: &tokio_util::sync::CancellationToken,
     ) -> Result<Vec<u32>, &'static str> {
         Err("not needed")
@@ -1087,7 +1075,7 @@ impl bookie_gpui_grid_prototype::source::ResultSource for TwoColumns {
         &self,
         _keyed: bool,
         _cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<bookie_gpui_grid_prototype::model::Diff, &'static str> {
+    ) -> Result<bookie_gpui::model::Diff, &'static str> {
         Err("not needed")
     }
 }
@@ -1113,4 +1101,43 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
         assert!(view.editing.is_none(), "a read-only source refuses edits");
         assert_eq!(view.status, "This cell cannot be edited");
     });
+}
+
+#[gpui::test]
+fn f3_toggles_a_detail_panel_that_follows_the_active_cell(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("down right right right");
+    view.read_with(cx, |view, _| assert!(!view.detail_open));
+    cx.simulate_keystrokes("f3");
+    view.read_with(cx, |view, _| {
+        assert!(view.detail_open);
+        let (name, detail) = view.detail_target().expect("a cell is active");
+        assert_eq!(name, "typed");
+        let bookie_gpui::detail::Detail::Hex { lines, total, .. } = detail else {
+            panic!("row 1 holds bytes");
+        };
+        assert_eq!(total, 4);
+        assert_eq!(lines[0].hex, "de ad be ef");
+    });
+    cx.simulate_keystrokes("down");
+    view.read_with(cx, |view, _| {
+        let (_, detail) = view.detail_target().expect("still active");
+        assert!(matches!(detail, bookie_gpui::detail::Detail::Text(text) if text == "2026-11-04"));
+    });
+    cx.simulate_keystrokes("f3");
+    view.read_with(cx, |view, _| assert!(!view.detail_open));
+}
+
+#[gpui::test]
+fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let keymap = bookie_gpui::keymap::Keymap::from_overrides(r#"{"toggle-sidebar":"alt-b"}"#).expect("keymap");
+    view.update(cx, |view, _| view.keymap = keymap);
+    let before = view.read_with(cx, |view, _| view.sidebar_open);
+    cx.simulate_keystrokes("ctrl-b");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.sidebar_open, before, "the old chord is free")
+    });
+    cx.simulate_keystrokes("alt-b");
+    view.read_with(cx, |view, _| assert_eq!(view.sidebar_open, !before));
 }

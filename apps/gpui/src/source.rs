@@ -18,6 +18,9 @@ pub trait ResultSource: Send + Sync + 'static {
     fn editable(&self) -> bool {
         false
     }
+    fn origin(&self) -> String {
+        "Synthetic data · no database connection".into()
+    }
     fn total(&self) -> u64;
     fn row(&self, index: u64) -> Vec<Cell>;
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str>;

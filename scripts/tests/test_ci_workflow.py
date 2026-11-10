@@ -27,8 +27,23 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("timeout-minutes:", job)
-        self.assertIn("cargo test --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked", job)
+        self.assertIn("CARGO_BUILD_JOBS: 4", job)
+        self.assertIn('RUSTC_WRAPPER: ""', job)
+        self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", job)
         self.assertNotIn("--lib", job)
+
+    def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", job)
+        self.assertIn("ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", job)
+        self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", job)
+        self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", forgejo)
+        self.assertIn("CARGO_BUILD_JOBS: 4", job)
+        self.assertIn('RUSTC_WRAPPER: ""', job)
+        self.assertIn('"gpui-tests"', (ROOT / "scripts/check-ci-jobs.py").read_text())
+        self.assertIn("libxkbcommon-x11-dev", (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text())
 
     def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -132,6 +147,21 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("--test integration --test read_only --test missing_file", driver)
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
         self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
+
+    def test_github_reuses_the_source_pinned_test_bundle_for_both_fast_tiers(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        for name in ("preflight", "fast"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("reusable-test-builds", job)
+                self.assertIn("actions/download-artifact@", job)
+                self.assertIn('ci-test-bundle.py verify "$RUNNER_TEMP/bookie-bundle"', job)
+                self.assertIn('find "$RUNNER_TEMP/bookie-bundle/tests" "$RUNNER_TEMP/bookie-bundle/bin" -type f -exec chmod u+x {} +', job)
+                self.assertIn("BOOKIE_REQUIRE_PREBUILT=1", job)
+                self.assertIn("GSETTINGS_SCHEMA_DIR=%s/bookie-bundle/schemas", job)
+        preflight = re.search(r"(?ms)^  preflight:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("needs.ensure-ci-gtk-image.outputs.tag", preflight)
+        self.assertIn("--workspace-remap", (ROOT / "scripts/preflight.sh").read_text())
 
     def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -468,8 +498,8 @@ class CiWorkflowTests(unittest.TestCase):
         preflight = workflow.split("  preflight:\n", 1)[1].split("  fast:\n", 1)[0]
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
         ensure = workflow.split("  ensure-ci-gtk-image:\n", 1)[1].split("  preflight:\n", 1)[0]
-        self.assertIn("needs: pin-revision", preflight)
-        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", fast)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", preflight)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", fast)
         self.assertNotIn("needs: preflight", fast)
         self.assertIn("mozilla-actions/sccache-action@", preflight)
         self.assertIn("mozilla-actions/sccache-action@", fast)
@@ -823,6 +853,56 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("exit=23", result.stderr)
             self.assertIn("display_alive=unavailable", result.stderr)
             self.assertIn("-display :", xdpyinfo_log.read_text())
+
+    def test_widget_wrapper_generates_missing_locale_in_its_private_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            locale_log = directory / "locale.log"
+            localedef_log = directory / "localedef.log"
+            for name, contents in {
+                "dbus-run-session": "while [ \"$1\" != -- ]; do shift; done\nshift\nexec \"$@\"\n",
+                "xvfb-run": (
+                    "while [ $# -gt 0 ]; do\n"
+                    "  case \"$1\" in\n"
+                    "    -e|-s|--server-num) shift 2 ;;\n"
+                    "    --server-num=*) shift ;;\n"
+                    "    --auto-servernum) shift ;;\n"
+                    "    *) break ;;\n"
+                    "  esac\n"
+                    "done\n"
+                    "DISPLAY=:1234 exec \"$@\"\n"
+                ),
+                "localedef": "printf '%s\\n' \"$*\" > \"$LOCALEDEF_LOG\"\nmkdir -p \"${6%/*}\"\n",
+                "python3": (
+                    "if [ \"$1\" = -c ]; then exit 1; fi\n"
+                    "printf '%s\\n%s\\n' \"$LOCPATH\" \"$XDG_RUNTIME_DIR\" > \"$LOCALE_LOG\"\n"
+                ),
+            }.items():
+                executable = binaries / name
+                executable.write_text("#!/bin/sh\n" + contents)
+                executable.chmod(0o755)
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{binaries}{os.pathsep}{environment['PATH']}",
+                    "LOCALE_LOG": str(locale_log),
+                    "LOCALEDEF_LOG": str(localedef_log),
+                }
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-gtk-widgets.sh")],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            locale_path, runtime_path = locale_log.read_text().splitlines()
+            self.assertEqual(Path(locale_path).parent, Path(runtime_path).parent)
+            self.assertTrue(localedef_log.read_text().endswith(f" {locale_path}/en_US.UTF-8\n"))
 
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()

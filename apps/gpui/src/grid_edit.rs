@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
-use bookie_gpui_grid_prototype::cursor::Cursor;
-use bookie_gpui_grid_prototype::edit::{is_editable, parse_edit};
-use bookie_gpui_grid_prototype::model::Cell;
+use bookie_gpui::cursor::Cursor;
+use bookie_gpui::edit::{is_editable, parse_edit};
+use bookie_gpui::model::Cell;
 use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, prelude::*, rgb};
 
 use crate::text_input::InputEvent;
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, display_cell};
-use bookie_gpui_grid_prototype::theme::Theme;
+use bookie_gpui::theme::Theme;
 
 pub type Edits = HashMap<(u64, usize), Cell>;
 

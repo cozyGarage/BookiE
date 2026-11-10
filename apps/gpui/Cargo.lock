@@ -1339,7 +1339,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bookie-gpui-grid-prototype"
+name = "bookie-gpui"
 version = "0.1.0"
 dependencies = [
  "bookie-app-services",

@@ -67,6 +67,9 @@ impl Connection for CatalogConn {
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         self.answer(vec!["db".into()])
     }
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.answer(Vec::new())
+    }
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         self.answer(vec![table()])
     }
@@ -229,6 +232,7 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
     }
     vec![
         read!(guard.list_databases(), |c| guard.list_databases_controlled(c)),
+        read!(guard.list_collations(), |c| guard.list_collations_controlled(c)),
         read!(guard.list_tables(), |c| guard.list_tables_controlled(c)),
         read!(guard.list_tables_excluding(&[]), |c| guard
             .list_tables_excluding_controlled(&[], c)),

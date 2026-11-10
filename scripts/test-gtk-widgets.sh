@@ -18,6 +18,11 @@ export XDG_DATA_HOME="$widget_root/data"
 export XDG_CACHE_HOME="$widget_root/cache"
 xvfb_error_log="$widget_root/xvfb.log"
 mkdir -m 700 "$XDG_RUNTIME_DIR" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+if ! python3 -c 'import locale; locale.setlocale(locale.LC_ALL, "en_US.UTF-8")' >/dev/null 2>&1; then
+  mkdir -m 700 "$widget_root/locales"
+  localedef --no-archive -i en_US -f UTF-8 "$widget_root/locales/en_US.UTF-8"
+  export LOCPATH="$widget_root/locales"
+fi
 export G_DEBUG=fatal-criticals GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=test GIO_USE_VFS=local
 xvfb_server_num=$((1000 + RANDOM))
 if dbus-run-session -- xvfb-run --auto-servernum --server-num="$xvfb_server_num" -e "$xvfb_error_log" -s "-screen 0 1600x1200x24" bash -c '

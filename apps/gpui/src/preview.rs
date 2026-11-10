@@ -32,13 +32,16 @@ pub fn cell_preview(cell: &Cell) -> String {
     }
 }
 
-struct JsonPreview(Vec<u8>);
+struct JsonPreview {
+    bytes: Vec<u8>,
+    limit: usize,
+}
 
 impl std::io::Write for JsonPreview {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let remaining = MAX_CHARS.saturating_sub(self.0.len());
+        let remaining = self.limit.saturating_sub(self.bytes.len());
         let take = remaining.min(bytes.len());
-        self.0.extend_from_slice(&bytes[..take]);
+        self.bytes.extend_from_slice(&bytes[..take]);
         if take < bytes.len() {
             return Err(std::io::ErrorKind::WriteZero.into());
         }
@@ -50,12 +53,24 @@ impl std::io::Write for JsonPreview {
     }
 }
 
+pub(crate) fn bounded_json(value: &serde_json::Value, limit: usize, pretty: bool) -> (String, bool) {
+    let mut output = JsonPreview {
+        bytes: Vec::with_capacity(limit),
+        limit,
+    };
+    let result = if pretty {
+        serde_json::to_writer_pretty(&mut output, value)
+    } else {
+        serde_json::to_writer(&mut output, value)
+    };
+    let end = std::str::from_utf8(&output.bytes).map_or_else(|error| error.valid_up_to(), str::len);
+    output.bytes.truncate(end);
+    (String::from_utf8(output.bytes).unwrap_or_default(), result.is_err())
+}
+
 fn json_preview(value: &serde_json::Value) -> String {
-    let mut output = JsonPreview(Vec::with_capacity(MAX_CHARS));
-    let truncated = serde_json::to_writer(&mut output, value).is_err();
-    let end = std::str::from_utf8(&output.0).map_or_else(|error| error.valid_up_to(), str::len);
-    output.0.truncate(end);
-    let text = text_preview(&String::from_utf8(output.0).unwrap_or_default());
+    let (text, truncated) = bounded_json(value, MAX_CHARS, false);
+    let text = text_preview(&text);
     if truncated { format!("{text}…") } else { text }
 }
 
@@ -141,7 +156,7 @@ mod tests {
     #[test]
     fn shared_large_cells_keep_exact_values_across_preview_and_core_conversion() {
         let fixtures: serde_json::Value =
-            serde_json::from_str(include_str!("../../fixtures/large-cells.json")).unwrap();
+            serde_json::from_str(include_str!("../../../experiments/fixtures/large-cells.json")).unwrap();
         for fixture in fixtures.as_array().unwrap() {
             let value = format!(
                 "{}{}{}",

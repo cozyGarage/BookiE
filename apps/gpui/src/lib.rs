@@ -1,6 +1,8 @@
 pub mod core_bridge;
 pub mod cursor;
+pub mod detail;
 pub mod edit;
+pub mod keymap;
 pub mod live;
 pub mod model;
 pub mod palette;

@@ -180,8 +180,23 @@ impl Default for ConnectOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollationInfo {
+    pub name: String,
+    pub charset: String,
+    pub is_default: bool,
+}
+
+pub const MAX_COLLATIONS: usize = 2000;
+
 #[async_trait]
 pub trait Connection: Send + Sync {
+    async fn list_collations(&self) -> Result<Vec<CollationInfo>, DriverError> {
+        Err(DriverError::Unsupported("listing collations".into()))
+    }
+    async fn list_collations_controlled(&self, control: &OperationControl) -> Result<Vec<CollationInfo>, DriverError> {
+        run_controlled(self.list_collations(), control).await
+    }
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         Err(DriverError::Unsupported("listing databases".into()))
     }

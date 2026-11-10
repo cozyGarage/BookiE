@@ -1,6 +1,6 @@
-# GPUI result-grid experiment
+# BookiE GPUI app
 
-This isolated experiment renders the same synthetic result grid as `experiments/tauri-grid-prototype` with `gpui-pre` 0.3.11, so the two can be compared. It uses synthetic values by default and can also load a table through the experimental read service. It is **not a supported frontend** or package. The shipped application continues to use GTK ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)), and the experiment is governed by [ADR 0028](../../docs/decisions/0028-isolated-frontend-experiments.md).
+The GPUI frontend for BookiE, built with `gpui-pre` 0.3.11. By default it shows a synthetic result grid, the same one as `experiments/tauri-grid-prototype`, so the two can be compared. With `BOOKIE_PROTOTYPE_FILE` (a SQLite or DuckDB file) or `BOOKIE_PROTOTYPE_CONNECTION` (a saved connection name or id) plus `BOOKIE_PROTOTYPE_TABLE` it reads a real table, read-only, through `bookie-app-services` ([ADR 0043](../../docs/decisions/0043-gpui-frontend-may-read-real-data-through-app-services.md)). It is **not shipped**: no package or release includes it, and the GTK application stays the product ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)). Its location is [ADR 0044](../../docs/decisions/0044-gpui-app-lives-under-apps.md).
 
 It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on `bookie-core` for typed values and `bookie-results` for bounded scanning and text search. Equality filters keep the prototype's case-insensitive displayed-text behavior in the experiment adapter; they do not weaken typed equality in shared result consumers.
 
@@ -40,7 +40,7 @@ Visible cell text is limited to 512 Unicode characters before layout. Line break
 
 ## Renderer boundary
 
-The formatter tests expand the [shared large-cell inputs](../fixtures/README.md), also used by the Tauri frontend tests. They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
+The formatter tests expand the [shared large-cell inputs](../../experiments/fixtures/README.md), also used by the Tauri frontend tests. They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
 
 The planned modularisation puts application logic in app-services and leaves the application as a renderer. This prototype already splits that way, so it shows what a renderer would need. The library half (`src/lib.rs`) has no `gpui` import and is tested without a display:
 
@@ -69,9 +69,9 @@ Row counts are 150,000, 500,000 or 1,000,000 through `BOOKIE_PROTOTYPE_ROWS`. Re
 From the repository root:
 
 ```bash
-cargo test --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked
-cargo deny --manifest-path experiments/gpui-grid-prototype/Cargo.toml --config deny.toml check advisories licenses
-cargo run --release --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked
+cargo test --manifest-path apps/gpui/Cargo.toml --locked
+cargo deny --manifest-path apps/gpui/Cargo.toml --config deny.toml check advisories licenses
+cargo run --release --manifest-path apps/gpui/Cargo.toml --locked
 ```
 
 Forgejo runs the model and simulated interaction tests without a display. Native rendering and system clipboard behavior require a desktop session.
@@ -84,8 +84,8 @@ To measure both prototypes the same way, run `experiments/profile.sh` from a des
 
 
 ```bash
-cargo build --release --locked --manifest-path experiments/gpui-grid-prototype/Cargo.toml
-node experiments/gpui-grid-prototype/measure.mjs --rows=150000 --steps=120 --runs=3
+cargo build --release --locked --manifest-path apps/gpui/Cargo.toml
+node apps/gpui/measure.mjs --rows=150000 --steps=120 --runs=3
 ```
 
 The script starts the release binary on the current display, waits for the application to report its first frame, scrolls the first 5,000-row page from top to bottom in the requested number of steps, samples resident and proportional memory of the process every 400 ms, and prints one JSON line per run. It uses the same cadence as the Tauri script (a step, then a short wait) so total elapsed time is comparable.
@@ -95,7 +95,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- The default source is synthetic. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only and capped at 100,000 rows. The loader does not yet bound total retained bytes or correctly report every truncated page ([#2673](https://github.com/cozyGarage/BookiE/issues/2673)).
+- The default source is synthetic. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only and capped at 100,000 rows. The loader does not yet bound total retained bytes or correctly report every truncated page ([#2673](https://github.com/cozyGarage/BookiE/issues/2673)).
 - Driver-shaped temporal, decimal, UUID and JSON values retain their original `bookie_core::Value` through the cell bridge. Synthetic edits still use the prototype's local cell representation. Tests cover typed round trips and bounded JSON previews.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - No text editing beyond the minimal fields above, and no SQL editor. A multi-line editor is a much larger piece (Zed's editor is its own crate) and is left until the single-line input has had real keyboard and IME feedback.
