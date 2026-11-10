@@ -40,6 +40,9 @@ fn delete_action_preserves_the_stored_row_selected_when_menu_opened() {
     assert!(
         matches!(message, GridMsg::DeleteRowAt { row_position: 0, row_key, draft_id: None } if row_key == vec![Value::Int(1)])
     );
+    view.activate_action("cell.set-null", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::SetCellNull { row_position: 0, row_key, .. } if row_key == vec![Value::Int(1)]));
 }
 
 #[test]

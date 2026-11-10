@@ -73,8 +73,9 @@ impl SqlEditor {
                 row_position,
                 col_index,
                 row_key,
+                draft_id,
             } => {
-                self.handle_result_set_null(row_position, col_index, row_key, sender);
+                self.handle_result_set_null(row_position, col_index, row_key, draft_id, sender);
                 None
             }
             GridMsg::InsertRow => {
@@ -323,8 +324,12 @@ impl SqlEditor {
         row_position: u32,
         col_index: usize,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
         sender: &ComponentSender<Self>,
     ) {
+        if self.result_row_object(row_position).and_then(|row| row.draft_id()) != draft_id {
+            return;
+        }
         if self.reject_stale_result_edit(row_position, &row_key, sender) {
             return;
         }
@@ -761,6 +766,7 @@ mod save_guard_tests {
                 row_position: 0,
                 col_index: 0,
                 row_key: Vec::new(),
+                draft_id: None,
             },
             GridMsg::DeleteRowAt {
                 row_position: 0,

@@ -74,6 +74,7 @@ pub enum BrowseTabInput {
         row_position: u32,
         col_index: usize,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
     },
     GridDeleteRowAt {
         row_position: u32,

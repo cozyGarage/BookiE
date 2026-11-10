@@ -48,6 +48,7 @@ use column::{ColumnSpec, build_column, header_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
+pub(crate) use display::focused_cell_draft_id;
 pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
@@ -109,6 +110,7 @@ pub enum GridMsg {
         row_position: u32,
         col_index: usize,
         row_key: Vec<bookie_core::Value>,
+        draft_id: Option<u64>,
     },
     DeleteRowAt {
         row_position: u32,

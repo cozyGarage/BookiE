@@ -40,7 +40,8 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             row_position,
             col_index,
             row_key,
-        } => set_null_input(row_position, col_index, row_key),
+            draft_id,
+        } => set_null_input(row_position, col_index, row_key, draft_id),
         GridMsg::DeleteRowAt {
             row_position,
             row_key,
@@ -63,11 +64,17 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
     }
 }
 
-fn set_null_input(row_position: u32, col_index: usize, row_key: Vec<bookie_core::Value>) -> BrowseTabInput {
+fn set_null_input(
+    row_position: u32,
+    col_index: usize,
+    row_key: Vec<bookie_core::Value>,
+    draft_id: Option<u64>,
+) -> BrowseTabInput {
     BrowseTabInput::GridSetCellNull {
         row_position,
         col_index,
         row_key,
+        draft_id,
     }
 }
 
