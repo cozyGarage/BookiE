@@ -438,6 +438,22 @@ impl GridView {
         );
     }
 
+    fn kafka_topics(&mut self, broker: String, cx: &mut Context<Self>) {
+        self.status = format!("Listing topics at {broker}…");
+        self.begin_background(
+            cx,
+            move |_| bookie_gpui::net_check::kafka_topics(&broker),
+            |this, outcome| {
+                let (kind, text) = match outcome {
+                    Ok(text) => (MessageKind::Success, text),
+                    Err(error) => (MessageKind::Error, format!("Kafka · {error}")),
+                };
+                this.messages.push(kind, text.clone());
+                this.status = text;
+            },
+        );
+    }
+
     fn check_tcp(&mut self, address: String, cx: &mut Context<Self>) {
         self.status = format!("Checking {address}…");
         let target = address.clone();
@@ -1055,6 +1071,11 @@ impl GridView {
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
             "sessions" => self.show_sessions(window, cx),
+            "kafka-topics" => {
+                if let Some(broker) = check_address.clone() {
+                    self.kafka_topics(broker, cx);
+                }
+            }
             "status" => self.show_status(),
             "sample-pubsub" => {
                 if let Some(pattern) = listen_pattern {
