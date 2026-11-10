@@ -1145,6 +1145,23 @@ fn stale_set_null_does_not_modify_a_replacement_draft() {
         controller.model().row_object_at(0).unwrap().cell_value(1),
         Value::Text("second".into())
     );
+    let current_id = controller.model().row_object_at(0).unwrap().draft_id();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("accepted".into()),
+            row_key: Vec::new(),
+            draft_id: current_id,
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(
+        controller.model().row_object_at(0).unwrap().cell_value(1),
+        Value::Text("accepted".into())
+    );
     controller.detach_runtime();
 }
 
