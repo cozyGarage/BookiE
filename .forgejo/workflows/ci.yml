@@ -311,6 +311,10 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Install the GPUI linker dependency
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends libxkbcommon-x11-dev
       - name: Build the default test bundle
         run: |
           exec 9>>/target/.bookie-build-cache.lock
