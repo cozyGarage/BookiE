@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 
-pub(super) struct PageWindow<T> {
+pub struct PageWindow<T> {
     wanted: Vec<u64>,
     pending: HashSet<u64>,
     failed: HashSet<u64>,
@@ -12,7 +12,7 @@ pub(super) struct PageWindow<T> {
 }
 
 impl<T> PageWindow<T> {
-    pub(super) fn new(byte_limit: usize, concurrent_limit: usize) -> Self {
+    pub fn new(byte_limit: usize, concurrent_limit: usize) -> Self {
         Self {
             wanted: Vec::new(),
             pending: HashSet::new(),
@@ -25,7 +25,7 @@ impl<T> PageWindow<T> {
         }
     }
 
-    pub(super) fn show(&mut self, wanted: &[u64]) {
+    pub fn show(&mut self, wanted: &[u64]) {
         if self.wanted != wanted {
             self.wanted = wanted.to_vec();
             if wanted.len() <= 2 {
@@ -37,7 +37,7 @@ impl<T> PageWindow<T> {
         }
     }
 
-    pub(super) fn next_request(&mut self) -> Option<u64> {
+    pub fn next_request(&mut self) -> Option<u64> {
         if self.pending.len() >= self.concurrent_limit {
             return None;
         }
@@ -51,7 +51,7 @@ impl<T> PageWindow<T> {
         Some(page)
     }
 
-    pub(super) fn loaded(&mut self, page: u64, data: T, bytes: usize) -> Option<Vec<u64>> {
+    pub fn loaded(&mut self, page: u64, data: T, bytes: usize) -> Option<Vec<u64>> {
         let mut evictions = Vec::new();
         if !self.pending.remove(&page) || !self.wanted.contains(&page) {
             return None;
@@ -75,37 +75,35 @@ impl<T> PageWindow<T> {
         Some(evictions)
     }
 
-    pub(super) fn failed(&mut self, page: u64) {
+    pub fn failed(&mut self, page: u64) {
         if self.pending.remove(&page) && self.wanted.contains(&page) {
             self.failed.insert(page);
         }
     }
 
-    #[cfg(test)]
-    pub(super) fn retry(&mut self, page: u64) {
+    pub fn retry(&mut self, page: u64) {
         self.failed.remove(&page);
         self.deferred.remove(&page);
     }
 
-    pub(super) fn retry_visible(&mut self) {
+    pub fn retry_visible(&mut self) {
         self.failed.clear();
         self.deferred.clear();
     }
 
-    pub(super) fn has_deferred(&self) -> bool {
+    pub fn has_deferred(&self) -> bool {
         !self.deferred.is_empty()
     }
 
-    pub(super) fn has_failed(&self) -> bool {
+    pub fn has_failed(&self) -> bool {
         !self.failed.is_empty()
     }
 
-    #[cfg(test)]
-    pub(super) fn is_failed(&self, page: u64) -> bool {
+    pub fn is_failed(&self, page: u64) -> bool {
         self.failed.contains(&page)
     }
 
-    pub(super) fn get(&self, page: u64) -> Option<&T> {
+    pub fn get(&self, page: u64) -> Option<&T> {
         self.pages
             .iter()
             .find(|(index, _, _)| *index == page)

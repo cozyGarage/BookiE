@@ -3,9 +3,9 @@ use gtk4::subclass::prelude::*;
 use gtk4::{gio, glib};
 use std::cell::{Cell, RefCell};
 
-use super::page_index::PageIndex;
-use super::page_window::PageWindow;
 use crate::ui::row_object::RowObject;
+use bookie_results::stream_page_index::PageIndex;
+use bookie_results::stream_page_window::PageWindow;
 
 mod imp {
     use super::*;
