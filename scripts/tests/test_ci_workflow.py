@@ -774,6 +774,21 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED | {checker.SCHEDULED}:
             self.assertIn(f"      - {name}\n", section)
 
+    def test_forgejo_regression_gate_waits_for_every_workflow_job(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        jobs = workflow.split("jobs:\n", 1)[1]
+        job_names = [
+            name for name in re.findall(r"(?m)^  ([a-z][a-z0-9-]+):\n", jobs) if name != "regression-gate"
+        ]
+        section = jobs.split("  regression-gate:\n", 1)[1]
+
+        self.assertIn("if: always()", section)
+        self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
+        self.assertIn("python3 src/scripts/check-forgejo-ci-jobs.py", section)
+        for name in job_names:
+            with self.subTest(job=name):
+                self.assertIn(f"      - {name}\n", section)
+
     def test_b4_rollback_gate_runs_focused_mysql_and_postgres_tests_before_broad_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         focused = workflow.split("  b4-rollback:\n", 1)[1].split("  driver-tls:\n", 1)[0]
