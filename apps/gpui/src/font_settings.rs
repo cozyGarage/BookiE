@@ -72,6 +72,20 @@ pub fn load() -> FontSettings {
         .map_or_else(FontSettings::default, |text| parse(&text))
 }
 
+pub fn save(settings: &FontSettings) -> std::io::Result<()> {
+    let Some(path) = path() else {
+        return Ok(());
+    };
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    std::fs::write(path, to_json(settings))
+}
+
+pub fn clamp_size(size: f64) -> f32 {
+    (size as f32).clamp(MIN_SIZE, MAX_SIZE)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,6 +101,13 @@ mod tests {
         let settings = parse(r#"{"ui_font_size": 2, "buffer_font_size": 400}"#);
         assert_eq!(settings.ui_size, MIN_SIZE);
         assert_eq!(settings.editor_size, MAX_SIZE);
+    }
+
+    #[test]
+    fn a_typed_size_is_clamped_before_it_is_stored() {
+        assert_eq!(clamp_size(0.0), MIN_SIZE);
+        assert_eq!(clamp_size(1000.0), MAX_SIZE);
+        assert_eq!(clamp_size(15.0), 15.0);
     }
 
     #[test]
