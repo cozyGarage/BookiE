@@ -197,6 +197,7 @@ pub fn result_ratio_from_drag(pointer_y: f32, top: f32, height: f32) -> f32 {
 pub struct Run {
     pub number: usize,
     pub rows: u64,
+    pub elapsed_ms: Option<u64>,
 }
 
 impl Run {
@@ -205,7 +206,12 @@ impl Run {
     }
 
     pub fn millis(self) -> u64 {
-        self.rows / 1_000 + 3
+        self.elapsed_ms.unwrap_or(self.rows / 1_000 + 3)
+    }
+
+    pub fn measured(self) -> Option<String> {
+        self.elapsed_ms
+            .map(|ms| crate::messages::format_elapsed(std::time::Duration::from_millis(ms)))
     }
 }
 
@@ -213,6 +219,7 @@ pub fn next_run(number: usize) -> Run {
     Run {
         number,
         rows: RUN_ROWS[(number - 1) % RUN_ROWS.len()],
+        elapsed_ms: None,
     }
 }
 
@@ -347,5 +354,8 @@ mod tests {
         );
         assert_eq!(runs[0].label(), "Run 1");
         assert_eq!(runs[1].millis(), 1_003);
+        assert_eq!(runs[1].measured(), None, "a synthetic run has no measured time");
+        let measured = Run { elapsed_ms: Some(12), ..runs[1] };
+        assert_eq!((measured.millis(), measured.measured().as_deref()), (12, Some("12 ms")));
     }
 }

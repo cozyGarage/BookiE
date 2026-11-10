@@ -292,7 +292,11 @@ impl GridView {
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
-            runs: vec![Run { number: 1, rows: total }],
+            runs: vec![Run {
+                number: 1,
+                rows: total,
+                elapsed_ms: None,
+            }],
             run_edits: vec![grid_edit::Edits::new()],
             run_sources: vec![None],
             sql_input,
@@ -553,13 +557,12 @@ impl GridView {
                 },
                 |this, (sql, elapsed, result)| match result {
                     Ok(table) => {
-                        this.messages.statement_ok(
-                            &sql,
-                            bookie_gpui::source::ResultSource::total(&table),
-                            table.truncated,
-                            elapsed,
-                        );
+                        let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
+                        this.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.add_run(Some(std::sync::Arc::new(table)));
+                        if let Some(run) = this.runs.last_mut() {
+                            run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                        }
                     }
                     Err(message) => {
                         this.messages.statement_failed(&sql, &message, elapsed);
@@ -1317,6 +1320,40 @@ pub fn fixed_cell(width: f32, text: String) -> Div {
 
 pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
+}
+
+/// A number is right-aligned; so is a NULL in a numeric column, so it lines up with its neighbours.
+fn right_aligned(numeric_column: bool, cell: &Cell) -> bool {
+    numeric_cell(cell) || (numeric_column && matches!(cell, Cell::Null))
+}
+
+fn numeric_cell(cell: &Cell) -> bool {
+    use bookie_gpui::type_colors::{TypeKind, type_kind};
+    matches!(type_kind(cell), Some(TypeKind::Integer | TypeKind::Numeric))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_numeric_cells_use_right_alignment() {
+        assert!(numeric_cell(&Cell::Int(7)));
+        assert!(numeric_cell(&Cell::Float(7.5)));
+        assert!(numeric_cell(&Cell::Decimal("7.50".into())));
+        assert!(numeric_cell(&bookie_gpui::core_bridge::value_to_cell(
+            bookie_core::Value::Decimal("7.50".parse().unwrap())
+        )));
+        assert!(!numeric_cell(&Cell::Text("7".into())));
+        assert!(!numeric_cell(&Cell::Null));
+    }
+
+    #[test]
+    fn a_null_in_a_numeric_column_aligns_with_the_numbers() {
+        assert!(right_aligned(true, &Cell::Null));
+        assert!(!right_aligned(false, &Cell::Null));
+        assert!(!right_aligned(true, &Cell::Text("7".into())));
+    }
 }
 
 fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {

@@ -450,9 +450,9 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
         view.sync_table(cx);
         view.table.update(cx, |table, _| {
             let delegate = table.delegate_mut();
-            let edited = delegate.row_cell_text(1, 1);
+            let edited = delegate.label_of(1, 1).0;
             assert_eq!(edited, bookie_gpui::preview::cell_preview(&Cell::Text(full.clone())));
-            assert_ne!(edited, delegate.row_cell_text(1, 0));
+            assert_ne!(edited, delegate.label_of(1, 0).0);
         });
         assert_eq!(requests.load(Ordering::Relaxed), 1);
     });
@@ -1069,6 +1069,7 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
                 .map(|name| bookie_gpui::model::ColumnMeta {
                     name: name.into(),
                     width: 150.0,
+                    numeric: false,
                 })
                 .collect()
         })

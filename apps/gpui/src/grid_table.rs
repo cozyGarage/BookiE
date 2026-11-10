@@ -5,7 +5,7 @@ use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
 use crate::grid_edit::Edits;
-use bookie_gpui::model::Diff;
+use bookie_gpui::model::{Cell, Diff};
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::source::Source;
 
@@ -48,9 +48,10 @@ impl RowMap {
 #[derive(Default)]
 pub struct GridDelegate {
     columns: Vec<(String, f32)>,
+    numeric: Vec<bool>,
     source: Option<Source>,
     map: RowMap,
-    cached: Option<(usize, Vec<String>)>,
+    cached: Option<(usize, Vec<(String, bool)>)>,
     edits: Edits,
     editor: Option<(usize, usize, gpui::AnyView)>,
 }
@@ -80,17 +81,22 @@ impl TableDelegate for GridDelegate {
     ) -> impl IntoElement {
         match &self.editor {
             Some((row, column, view)) if *row == row_ix && *column == col_ix => div().flex_1().child(view.clone()),
-            _ => div().child(self.row_cell_text(row_ix, col_ix)),
+            _ => {
+                let (text, right) = self.label_of(row_ix, col_ix);
+                div().w_full().flex().when(right, |cell| cell.justify_end()).child(text)
+            }
         }
     }
 }
 
 impl GridDelegate {
     // Cells of one row render back to back, so one fetch per row serves all its columns.
-    pub(crate) fn row_cell_text(&mut self, row_ix: usize, col_ix: usize) -> String {
+    /// The text of one cell and whether it is right-aligned (numbers, and NULLs in numeric columns).
+    pub(crate) fn label_of(&mut self, row_ix: usize, col_ix: usize) -> (String, bool) {
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
-            let cells = match (&self.map.compare, &self.source) {
-                (Some(diff), _) => compare_cells(diff, row_ix),
+            let numeric = &self.numeric;
+            let labels = match (&self.map.compare, &self.source) {
+                (Some(diff), _) => compare_labels(diff, row_ix, numeric),
                 (None, Some(source)) => match self.map.source_row(row_ix) {
                     Some(index) => {
                         let mut cells = source.row(index);
@@ -99,17 +105,17 @@ impl GridDelegate {
                                 *cell = edit.clone();
                             }
                         }
-                        cells.iter().map(cell_preview).collect()
+                        labels(&cells, numeric)
                     }
                     None => Vec::new(),
                 },
                 (None, None) => Vec::new(),
             };
-            self.cached = Some((row_ix, cells));
+            self.cached = Some((row_ix, labels));
         }
         self.cached
             .as_ref()
-            .and_then(|(_, cells)| cells.get(col_ix))
+            .and_then(|(_, labels)| labels.get(col_ix))
             .cloned()
             .unwrap_or_default()
     }
@@ -143,6 +149,12 @@ impl GridView {
             .iter()
             .map(|column| (column.name.clone(), column.width))
             .collect();
+        let numeric: Vec<bool> = self.source.columns().iter().map(|column| column.numeric).collect();
+        let numeric = if self.compare.is_some() {
+            std::iter::once(false).chain(numeric).collect()
+        } else {
+            numeric
+        };
         let columns = if self.compare.is_some() {
             std::iter::once(("Change".to_string(), COMPARE_CHANGE_WIDTH))
                 .chain(columns)
@@ -177,6 +189,7 @@ impl GridView {
                 .is_some_and(|source| Arc::ptr_eq(source, &self.source));
             let changed = !same_source
                 || delegate.columns != columns
+                || delegate.numeric != numeric
                 || delegate.map != map
                 || delegate.edits != self.edits
                 || delegate.editor.as_ref().map(|(r, c, _)| (*r, *c)) != editor.as_ref().map(|(r, c, _)| (*r, *c));
@@ -184,6 +197,7 @@ impl GridView {
                 return;
             }
             delegate.columns = columns;
+            delegate.numeric = numeric;
             delegate.source = Some(self.source.clone());
             delegate.map = map;
             delegate.edits = self.edits.clone();
@@ -199,12 +213,23 @@ impl GridView {
 
 const COMPARE_CHANGE_WIDTH: f32 = 70.0;
 
-fn compare_cells(diff: &Diff, row: usize) -> Vec<String> {
+fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
+    cells
+        .iter()
+        .enumerate()
+        .map(|(column, cell)| {
+            let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
+            (cell_preview(cell), right)
+        })
+        .collect()
+}
+
+fn compare_labels(diff: &Diff, row: usize, numeric: &[bool]) -> Vec<(String, bool)> {
     let Some(row) = diff.rows.get(row) else {
         return Vec::new();
     };
-    std::iter::once(row.change.to_string())
-        .chain(row.cells.iter().map(cell_preview))
+    std::iter::once((row.change.to_string(), false))
+        .chain(labels(&row.cells, numeric.get(1..).unwrap_or(&[])))
         .collect()
 }
 
@@ -238,10 +263,10 @@ mod tests {
             ..Default::default()
         };
         let expected = cell_preview(&Synthetic::new(10).row(7)[1]);
-        assert_eq!(delegate.row_cell_text(1, 1), expected);
+        assert_eq!(delegate.label_of(1, 1).0, expected);
         assert_eq!(delegate.cached.as_ref().map(|(row, _)| *row), Some(1));
-        assert_eq!(delegate.row_cell_text(1, 1), expected);
-        assert_eq!(delegate.row_cell_text(9, 0), "");
+        assert_eq!(delegate.label_of(1, 1).0, expected);
+        assert_eq!(delegate.label_of(9, 0).0, "");
     }
 
     #[test]
@@ -302,7 +327,19 @@ mod tests {
             },
             ..Default::default()
         };
-        assert_eq!(delegate.row_cell_text(0, 0), "changed");
-        assert_eq!(delegate.row_cell_text(0, 2), "7");
+        assert_eq!(delegate.label_of(0, 0).0, "changed");
+        assert_eq!(delegate.label_of(0, 2).0, "7");
+    }
+
+    #[test]
+    fn numbers_and_nulls_in_numeric_columns_are_right_aligned() {
+        let flags: Vec<bool> = labels(
+            &[Cell::Int(7), Cell::Null, Cell::Text("x".into())],
+            &[true, true, false],
+        )
+        .into_iter()
+        .map(|(_, right)| right)
+        .collect();
+        assert_eq!(flags, vec![true, true, false]);
     }
 }

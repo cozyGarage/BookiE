@@ -88,6 +88,7 @@ mod tests {
             .map(|name| ColumnMeta {
                 name: name.into(),
                 width: 100.0,
+                numeric: false,
             })
             .collect()
     }

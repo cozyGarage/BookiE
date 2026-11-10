@@ -331,7 +331,15 @@ fn column_meta(info: &ColumnInfo) -> ColumnMeta {
     ColumnMeta {
         name: info.name.clone(),
         width,
+        numeric: numeric_type(&info.data_type),
     }
+}
+
+fn numeric_type(data_type: &str) -> bool {
+    let lower = data_type.to_ascii_lowercase();
+    ["int", "serial", "numeric", "decimal", "number", "float", "double", "real", "money"]
+        .iter()
+        .any(|word| lower.contains(word))
 }
 
 impl ResultSource for LiveTable {
@@ -376,6 +384,16 @@ impl ResultSource for LiveTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn declared_number_types_are_numeric_and_text_types_are_not() {
+        for numeric in ["INTEGER", "bigint", "NUMERIC(10,2)", "double precision", "BIGSERIAL", "REAL", "decimal"] {
+            assert!(numeric_type(numeric), "{numeric}");
+        }
+        for other in ["TEXT", "varchar(20)", "timestamp", "uuid", "BLOB", ""] {
+            assert!(!numeric_type(other), "{other}");
+        }
+    }
 
     struct FixtureFile(std::path::PathBuf);
 
