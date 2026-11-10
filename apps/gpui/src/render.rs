@@ -14,11 +14,12 @@ impl Render for GridView {
             Mode::Filtered { label, .. } => format!("{label} · "),
             Mode::All => String::new(),
         };
-        let progress = format!(
-            "{title}Complete · Received {} rows · {} pages",
-            thousands(self.dataset_count()),
-            self.pager.pages()
-        );
+        let pages = self.pager.pages();
+        let progress = if pages > 1 {
+            format!("{title}{} rows · {pages} pages", thousands(self.dataset_count()))
+        } else {
+            format!("{title}{} rows", thousands(self.dataset_count()))
+        };
         let range_label = if self.dataset_count() == 0 {
             "Rows 0".to_string()
         } else if self.continuous {
@@ -28,59 +29,49 @@ impl Render for GridView {
         };
         let strip = div()
             .flex()
-            .flex_wrap()
             .items_center()
-            .gap_2()
-            .p_2()
+            .gap_1()
+            .px_2()
+            .py_1()
             .bg(rgb(theme.chrome))
             .border_b_1()
             .border_color(rgb(theme.border))
             .child(div().child(progress))
-            .child(button("first", "First", theme).on_click(cx.listener(|this, _, _, cx| {
+            .child(button("first", "|‹", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.first();
                 cx.notify();
             })))
-            .child(
-                button("prev", "Previous page", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.pager.previous();
-                    cx.notify();
-                })),
-            )
+            .child(button("prev", "‹", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.pager.previous();
+                cx.notify();
+            })))
             .child(div().child(range_label))
-            .child(
-                button("next", "Next page", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.pager.next();
-                    cx.notify();
-                })),
-            )
-            .child(button("last", "Last", theme).on_click(cx.listener(|this, _, _, cx| {
+            .child(button("next", "›", theme).on_click(cx.listener(|this, _, _, cx| {
+                this.pager.next();
+                cx.notify();
+            })))
+            .child(button("last", "›|", theme).on_click(cx.listener(|this, _, _, cx| {
                 this.pager.last();
                 cx.notify();
             })))
-            .child(div().w(px(260.0)).child(self.find.clone()))
+            .child(div().w(px(110.0)).flex_none().child(self.find.clone()))
+            .child(button("find-prev", "↑", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
+            .child(button("find-next", "↓", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(
-                button("find-prev", "Previous match", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))),
-            )
-            .child(
-                button("find-next", "Next match", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))),
-            )
-            .child(
-                button("show", "Show matching rows", theme).on_click(cx.listener(|this, _, _, cx| {
+                button("show", "Matches only", theme).on_click(cx.listener(|this, _, _, cx| {
                     this.show_matching(cx);
                     cx.notify();
                 })),
             )
-            .child(button("compare", "Compare…", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
-            .child(button("export", "Export all rows…", theme))
+            .child(button("compare", "Compare", theme).on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))))
+            .child(button("export", "Export…", theme))
             .child(
                 button(
                     "continuous",
                     if self.continuous {
-                        "Continuous scrolling: on"
+                        "Continuous ✓"
                     } else {
-                        "Continuous scrolling"
+                        "Continuous"
                     },
                     theme,
                 )
@@ -90,7 +81,13 @@ impl Render for GridView {
                     cx.notify();
                 })),
             )
-            .child(div().text_color(rgb(theme.muted_foreground)).child(self.status.clone()));
+            .child(
+                div()
+                    .ml_auto()
+                    .whitespace_nowrap()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(self.status.clone()),
+            );
         let filter_row = self.filter_visible.then(|| {
             div()
                 .flex()
