@@ -45,7 +45,12 @@ def verify(bundle, revision, expected_group=None):
     return index
 
 
-def create(bundle, messages, revision, group, archive=None, archive_only=False, kinds=None, package_names=None):
+def target_selected(package, kind, kinds, package_kinds):
+    return not kinds and not package_kinds or kind in kinds or (package, kind) in package_kinds
+
+
+def create(bundle, messages, revision, group, archive=None, archive_only=False, kinds=None, package_names=None,
+           package_kinds=None):
     if bundle.exists():
         raise ValueError('bundle destination already exists')
     metadata_command = ['cargo', 'metadata', '--locked', '--no-deps', '--format-version=1']
@@ -78,7 +83,7 @@ def create(bundle, messages, revision, group, archive=None, archive_only=False, 
         source = Path(message['executable'])
         if message['profile']['test']:
             kind = 'test' if 'test' in target['kind'] else 'bin' if 'bin' in target['kind'] else 'lib'
-            if kinds and kind not in kinds:
+            if not target_selected(name, kind, kinds or set(), package_kinds or set()):
                 continue
             destination = 'tests/' + name + '-' + source.name
             if not archive_only:
@@ -110,12 +115,19 @@ def main():
     parser.add_argument('--archive-only', action='store_true')
     parser.add_argument('--test-kind', action='append', choices=['lib', 'bin', 'test'])
     parser.add_argument('--package', action='append')
+    parser.add_argument('--package-kind', action='append', default=[])
     args = parser.parse_args()
     if args.operation == 'create':
         if not args.messages:
             parser.error('create requires --messages')
+        package_kinds = set()
+        for value in args.package_kind:
+            package, separator, kind = value.partition(':')
+            if not separator or not package or kind not in {'lib', 'bin', 'test'}:
+                parser.error('--package-kind must be PACKAGE:lib, PACKAGE:bin or PACKAGE:test')
+            package_kinds.add((package, kind))
         create(args.bundle, args.messages, args.revision, args.group, args.archive, args.archive_only,
-               set(args.test_kind or []), set(args.package or []))
+               set(args.test_kind or []), set(args.package or []), package_kinds)
     else:
         index = verify(args.bundle, args.revision, args.expected_group)
         contents = 'Nextest archive' if index.get('archive_only') else f"{len(index['tests'])} test executables"

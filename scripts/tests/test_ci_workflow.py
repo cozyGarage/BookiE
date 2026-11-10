@@ -20,9 +20,22 @@ bounded_spec.loader.exec_module(bounded_checker)
 port_spec = importlib.util.spec_from_file_location("ci_mcp_port", ROOT / "scripts/ci-mcp-port.py")
 port_helper = importlib.util.module_from_spec(port_spec)
 port_spec.loader.exec_module(port_helper)
+bundle_spec = importlib.util.spec_from_file_location("ci_test_bundle", ROOT / "scripts/ci-test-bundle.py")
+bundle_helper = importlib.util.module_from_spec(bundle_spec)
+bundle_spec.loader.exec_module(bundle_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_direct_bundle_selection_keeps_integration_and_required_isolated_library_tests(self):
+        kinds = {"test"}
+        package_kinds = {("bookie-app", "lib"), ("bookie-storage", "lib"), ("bookie-transport", "lib")}
+
+        self.assertTrue(bundle_helper.target_selected("bookie-driver-postgres", "test", kinds, package_kinds))
+        self.assertTrue(bundle_helper.target_selected("bookie-app", "lib", kinds, package_kinds))
+        self.assertTrue(bundle_helper.target_selected("bookie-storage", "lib", kinds, package_kinds))
+        self.assertFalse(bundle_helper.target_selected("bookie-core", "lib", kinds, package_kinds))
+        self.assertFalse(bundle_helper.target_selected("bookie-app", "bin", kinds, package_kinds))
+
     def test_forgejo_workflow_and_actionlint_config_changes_run_contract_checks(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
 
@@ -309,6 +322,11 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("needs.ensure-ci-gtk-image.outputs.tag", preflight)
         preflight_script = (ROOT / "scripts/preflight.sh").read_text()
         sandbox_script = (ROOT / "scripts/test-sandbox.sh").read_text()
+        builder = (ROOT / "scripts/build-test-bundles.sh").read_text()
+        self.assertIn("--group direct --test-kind test", builder)
+        for package in ("bookie-app:lib", "bookie-storage:lib", "bookie-transport:lib"):
+            with self.subTest(package=package):
+                self.assertIn(f"--package-kind {package}", builder)
         self.assertIn('BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', preflight_script)
         self.assertIn('BOOKIE_SANDBOX_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', sandbox_script)
         self.assertIn("--workspace-remap", preflight_script)

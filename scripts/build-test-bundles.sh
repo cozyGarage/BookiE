@@ -34,7 +34,9 @@ build_forgejo_bundles() {
   if [[ ! -f "$build_messages" ]]; then
     cargo test --locked --workspace --lib --bins --tests --no-run --message-format=json-render-diagnostics > "$build_messages"
   fi
-  python3 scripts/ci-test-bundle.py create "$output/direct" "$revision" --messages "$build_messages" --group direct
+  python3 scripts/ci-test-bundle.py create "$output/direct" "$revision" --messages "$build_messages" \
+    --group direct --test-kind test \
+    --package-kind bookie-app:lib --package-kind bookie-storage:lib --package-kind bookie-transport:lib
   "$nextest" nextest archive --locked --workspace --lib --bins --archive-file "$output/unit-nextest.tar.zst"
   python3 scripts/ci-test-bundle.py create "$output/unit" "$revision" --messages "$build_messages" \
     --group unit --archive "$output/unit-nextest.tar.zst" --archive-only --test-kind lib --test-kind bin
