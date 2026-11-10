@@ -149,7 +149,11 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("copy-value")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let row = view.upgrade().and_then(|view| row_object_at(&view, position(slot)));
+                    let Some(view) = view.upgrade() else { return };
+                    if !menu_target_matches(&view, slot) {
+                        return;
+                    }
+                    let row = row_object_at(&view, position(slot));
                     if row.as_ref().is_some_and(|row| row.cell_is_partial(slot.col_index)) {
                         let (_, row_key) = cell_row_identity(&slot.widget);
                         if !row_key.is_empty() {
