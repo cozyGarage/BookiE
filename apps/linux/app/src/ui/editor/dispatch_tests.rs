@@ -338,7 +338,11 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::Grid(GridMsg::DuplicateRow { row_position: 0 }))
+        .send(SqlEditorInput::Grid(GridMsg::DuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        }))
         .unwrap();
     spin_until(|| model.n_items() == 2);
     let first = model.item(0).unwrap().downcast::<RowObject>().unwrap();
@@ -346,11 +350,26 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
     fixture
         .controller
         .sender()
-        .send(SqlEditorInput::Grid(GridMsg::DuplicateRow { row_position: 1 }))
+        .send(SqlEditorInput::Grid(GridMsg::DuplicateRow {
+            row_position: 1,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        }))
         .unwrap();
     spin_until(|| model.n_items() == 3);
     let replacement = model.item(0).unwrap().downcast::<RowObject>().unwrap();
     assert_ne!(replacement.draft_id(), Some(first_id));
+    fixture
+        .controller
+        .sender()
+        .send(SqlEditorInput::Grid(GridMsg::DuplicateRow {
+            row_position: 0,
+            row_key: Vec::new(),
+            draft_id: Some(first_id),
+        }))
+        .unwrap();
+    fixture.process_inputs();
+    assert_eq!(model.n_items(), 3);
     fixture
         .controller
         .sender()
