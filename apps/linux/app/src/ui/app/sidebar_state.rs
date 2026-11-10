@@ -223,8 +223,15 @@ impl App {
             &self.database,
             &self.preferences,
             self.catalog_dialog_cancel.borrow().clone(),
-            kind,
-            self.hidden_schema_names(),
+            crate::ui::catalog_dialog::CatalogRequest {
+                initial_kind: kind,
+                hidden_schemas: self.hidden_schema_names(),
+                can_restart_sequences: self
+                    .current_driver_id
+                    .as_deref()
+                    .and_then(|id| self.registry.get(id))
+                    .is_some_and(|driver| driver.capabilities().supports_sequence_restart),
+            },
         );
     }
 

@@ -42,6 +42,7 @@ pub mod recent_tabs;
 pub mod request_generation;
 pub mod request_ticket;
 pub mod schema_compare;
+pub mod sequence_value;
 pub mod single_flight;
 pub mod snippets;
 pub mod state_file;

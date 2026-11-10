@@ -94,6 +94,10 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
+    fn supports_sequence_restart(&self) -> bool {
+        true
+    }
+
     fn supports_client_tls_auth(&self) -> bool {
         true
     }
