@@ -550,6 +550,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::keyboard_set_null_targets_the_focused_draft"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::the_row_menu_deletes_a_draft_row_by_discarding_it"
     ],
     [

@@ -1,6 +1,8 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
 use bookie_core::{ColumnInfo, QueryResult, Value};
-use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
+use relm4::gtk::prelude::{
+    ButtonExt, GtkWindowExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt,
+};
 use relm4::gtk::{gio::prelude::ListModelExt, glib::prelude::Cast};
 use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
@@ -1000,6 +1002,47 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
         transaction_count, 0,
         "post-submit actions cannot dispatch another transaction"
     );
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn keyboard_set_null_targets_the_focused_draft() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
+    );
+    let window = relm4::gtk::Window::builder()
+        .child(controller.widget())
+        .default_width(800)
+        .default_height(500)
+        .build();
+    window.present();
+    pump(&observed);
+    let view = controller.model().current_column_view.clone().unwrap();
+    let column = (0..view.columns().n_items())
+        .find_map(|index| {
+            let column = view
+                .columns()
+                .item(index)?
+                .downcast::<relm4::gtk::ColumnViewColumn>()
+                .ok()?;
+            (column.id().as_deref() == Some("1")).then_some(column)
+        })
+        .unwrap();
+    view.scroll_to(0, Some(&column), relm4::gtk::ListScrollFlags::FOCUS, None);
+    pump(&observed);
+    assert_eq!(
+        crate::ui::grid::focused_cell_identity(&view).map(|(row, col, _)| (row, col)),
+        Some((0, 1))
+    );
+    assert!(activate_shortcut(&controller, "<Primary><Shift>n"));
+    pump(&observed);
+    assert_eq!(controller.model().row_object_at(0).unwrap().cell_value(1), Value::Null);
+    window.destroy();
+    controller.detach_runtime();
 }
 
 #[test]

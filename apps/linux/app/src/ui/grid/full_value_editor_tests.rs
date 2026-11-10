@@ -363,6 +363,26 @@ fn set_null_stages_null_and_cancel_stages_nothing() {
     let dialog = present(
         &parent,
         "notes",
+        "draft",
+        EditContext {
+            row_position: 0,
+            col_index: 0,
+            row_key: Vec::new(),
+            draft_id: Some(42),
+            nullable: true,
+            kind: FullValueKind::Text,
+            sender,
+        },
+    );
+    button(dialog.child().unwrap().upcast_ref(), &crate::tr!("Set to NULL")).emit_clicked();
+    assert!(matches!(
+        receiver.recv().now_or_never().flatten(),
+        Some(super::super::GridMsg::SetCellNull { draft_id: Some(42), .. })
+    ));
+    let (sender, receiver) = relm4::channel::<super::super::GridMsg>();
+    let dialog = present(
+        &parent,
+        "notes",
         "before",
         EditContext {
             row_position: 1,
