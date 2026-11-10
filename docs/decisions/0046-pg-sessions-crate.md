@@ -1,6 +1,6 @@
 # 0046: PostgreSQL sessions and locks live in a UI-free crate
 
-- **Status**: Proposed (2026-11-10)
+- **Status**: Accepted (2026-11-10)
 - **Date**: 2026-11-10
 
 ## Context
