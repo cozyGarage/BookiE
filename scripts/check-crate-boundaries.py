@@ -31,6 +31,7 @@ ALLOWED = {
     "bookie-core": set(),
     "bookie-ssh": set(),
     "bookie-checks": set(),
+    "bookie-pg-sessions": {"bookie-core"},
     "bookie-dump": {"bookie-core"},
     "bookie-policy": {"bookie-core"},
     "bookie-storage": {"bookie-core", "bookie-policy"},
