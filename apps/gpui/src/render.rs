@@ -1,4 +1,5 @@
 use super::*;
+use bookie_gpui::model::ColumnMeta;
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -160,7 +161,7 @@ impl Render for GridView {
                     .columns()
                     .iter()
                     .enumerate()
-                    .map(|(index, column)| header_cell(self.cell_cursor, index, column.width, &column.name, theme)),
+                    .map(|(index, column)| header_cell(self.cell_cursor, index, column, theme)),
             );
         let list = uniform_list(
             "rows",
@@ -245,10 +246,10 @@ impl Render for GridView {
     }
 }
 
-fn header_cell(cursor: Option<Cursor>, column: usize, width: f32, text: &str, theme: Theme) -> Div {
-    let cell = cell_div(width, text.to_string());
-    let cell = if column == 0 { cell.justify_end() } else { cell };
-    match super::grid_edit::cursor_column_background(cursor, column, theme) {
+fn header_cell(cursor: Option<Cursor>, index: usize, column: &ColumnMeta, theme: Theme) -> Div {
+    let cell = cell_div(column.width, column.name.clone());
+    let cell = if column.numeric { cell.justify_end() } else { cell };
+    match super::grid_edit::cursor_column_background(cursor, index, theme) {
         Some(background) => cell.bg(rgb(background)),
         None => cell,
     }
@@ -306,7 +307,7 @@ impl GridView {
                         .columns()
                         .iter()
                         .zip(&row.cells)
-                        .map(|(column, cell)| display_cell(column.width, cell, theme)),
+                        .map(|(column, cell)| display_cell(column.width, column.numeric, cell, theme)),
                 );
         }
         let dataset_index = self.base() + position as u64;

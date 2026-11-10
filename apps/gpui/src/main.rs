@@ -1291,12 +1291,17 @@ pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
 }
 
-fn display_cell(width: f32, cell: &Cell, theme: Theme) -> Div {
+fn display_cell(width: f32, numeric_column: bool, cell: &Cell, theme: Theme) -> Div {
     let mut item = cell_div(width, cell_preview(cell));
     if let Some(kind) = bookie_gpui::type_colors::type_kind(cell) {
         item = item.text_color(rgb(bookie_gpui::type_colors::type_color(kind, theme.dark)));
     }
-    if numeric_cell(cell) { item.justify_end() } else { item }
+    if right_aligned(numeric_column, cell) { item.justify_end() } else { item }
+}
+
+/// A number is right-aligned; so is a NULL in a numeric column, so it lines up with its neighbours.
+fn right_aligned(numeric_column: bool, cell: &Cell) -> bool {
+    numeric_cell(cell) || (numeric_column && matches!(cell, Cell::Null))
 }
 
 fn numeric_cell(cell: &Cell) -> bool {
@@ -1318,6 +1323,13 @@ mod tests {
         )));
         assert!(!numeric_cell(&Cell::Text("7".into())));
         assert!(!numeric_cell(&Cell::Null));
+    }
+
+    #[test]
+    fn a_null_in_a_numeric_column_aligns_with_the_numbers() {
+        assert!(right_aligned(true, &Cell::Null));
+        assert!(!right_aligned(false, &Cell::Null));
+        assert!(!right_aligned(true, &Cell::Text("7".into())));
     }
 }
 
