@@ -1068,7 +1068,8 @@ fn display_cell(width: f32, cell: &Cell, theme: Theme) -> Div {
 }
 
 fn numeric_cell(cell: &Cell) -> bool {
-    matches!(cell, Cell::Int(_) | Cell::Float(_) | Cell::Decimal(_))
+    use bookie_gpui_grid_prototype::type_colors::{TypeKind, type_kind};
+    matches!(type_kind(cell), Some(TypeKind::Integer | TypeKind::Numeric))
 }
 
 #[cfg(test)]
@@ -1080,6 +1081,9 @@ mod tests {
         assert!(numeric_cell(&Cell::Int(7)));
         assert!(numeric_cell(&Cell::Float(7.5)));
         assert!(numeric_cell(&Cell::Decimal("7.50".into())));
+        assert!(numeric_cell(&bookie_gpui_grid_prototype::core_bridge::value_to_cell(
+            bookie_core::Value::Decimal("7.50".parse().unwrap())
+        )));
         assert!(!numeric_cell(&Cell::Text("7".into())));
         assert!(!numeric_cell(&Cell::Null));
     }
