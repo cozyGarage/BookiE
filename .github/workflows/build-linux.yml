@@ -220,6 +220,8 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all
+      - name: Check the no-default-features layer
+        run: python3 scripts/run-test-layer.py no-default-features
       - name: Upload source-pinned default bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -265,9 +267,12 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-gpui-bundle" "${{ needs.pin-revision.outputs.revision }}" --expected-group gpui
+          workspace_root="$(cd apps/gpui && pwd -P)"
+          test -r "$workspace_root/tests/fixtures/orders.sqlite"
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
+          mkdir -p "$RUNNER_TEMP/bookie-gpui-extract"
           "$NEXTEST" nextest run --archive-file "$RUNNER_TEMP/bookie-gpui-bundle/nextest.tar.zst" \
-            --workspace-remap "$GITHUB_WORKSPACE/apps/gpui" \
+            --workspace-remap "$workspace_root" \
             --extract-to "$RUNNER_TEMP/bookie-gpui-extract" --profile default --no-tests=fail
       - name: Finalize runner job
         if: always()
@@ -447,6 +452,74 @@ jobs:
           path: target/quality/*-layers
           if-no-files-found: error
 
+  gtk-server:
+    name: Installed GTK server scenarios (${{ matrix.server }})
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image, fast]
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        DOCKER_CONFIG: /github/home/.docker
+    defaults:
+      run:
+        working-directory: .
+    env:
+      BOOKIE_GTK_SCENARIO_RETRIES: "0"
+      BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+    strategy:
+      fail-fast: false
+      matrix:
+        server: [clickhouse, mongodb, postgres, mysql]
+    steps:
+      - name: Install Git before checkout
+        working-directory: /tmp
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git ca-certificates
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - name: Record the commit under test
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git rev-parse HEAD
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/gtk-safety
+      - name: Ensure GTK safety binary is executable
+        run: chmod 0755 target/gtk-safety/bookie
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Installed GTK scenarios against ${{ matrix.server }}
+        env:
+          BOOKIE_GTK_BINARY: target/gtk-safety/bookie
+        run: python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+      - name: Clean fixture containers
+        if: always()
+        run: |
+          if [[ -f scripts/cleanup-testcontainers.py ]]; then
+            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+          fi
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-gtk-server-${{ matrix.server }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+
   current-stable-clippy:
     name: Current stable Clippy (scheduled)
     timeout-minutes: 30
@@ -509,7 +582,7 @@ jobs:
 
   integration:
     name: Driver integration tests (docker)
-    timeout-minutes: 55
+    timeout-minutes: 90
     runs-on: ubuntu-24.04
     needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]
     defaults:
@@ -569,7 +642,7 @@ jobs:
             --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
             --env BOOKIE_TEST_BUNDLE="$RUNNER_TEMP/bookie-bundle" \
             --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
-            "$BOOKIE_BUILD_IMAGE" python3 scripts/run-test-layer.py drivers
+            "$BOOKIE_BUILD_IMAGE" bash -euo pipefail -c 'python3 scripts/run-test-layer.py drivers && python3 scripts/run-test-layer.py pg-dump'
 
       - name: Upload validation evidence
         if: always()
@@ -717,6 +790,7 @@ jobs:
       - name: PostgreSQL release and GTK acceptance on the supported toolkit floor
         env:
           BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           set -euo pipefail
           toolchain_bin="$(dirname "$(rustup which cargo --toolchain 1.98)")"
@@ -747,6 +821,8 @@ jobs:
             --env DOCKER_CONFIG=/docker \
             --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
             --env BOOKIE_GTK_BINARY="$BOOKIE_GTK_BINARY" \
+            --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
+            --env GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" \
             "$BOOKIE_BUILD_IMAGE" \
             bash -euo pipefail -c '
               git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -763,14 +839,90 @@ jobs:
               cargo build --locked --release -p bookie-app
               install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"
               python3 scripts/run-test-layer.py postgres-release
-              bash scripts/test-gtk-mysql-approval.sh
+              python3 scripts/run-test-layer.py gtk-mysql-approval
+              if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
+                cargo build --locked --release -p bookie-agentd -p bookie-ssh --bin bookie-askpass
+                DEB_OUT="$GITHUB_WORKSPACE/floor-package" BOOKIE_BUILD_PROFILE=release DEB_SKIP_BUILD=1 \
+                  bash scripts/build-deb.sh
+                package=$(find "$GITHUB_WORKSPACE/floor-package" -maxdepth 1 -name '*.deb' -print -quit)
+                python3 scripts/ci-gtk-artifact.py create --package "$package" \
+                  "$GITHUB_WORKSPACE/floor-artifact" "$BOOKIE_SOURCE_COMMIT"
+              fi
             '
+
+      - name: Upload the Debian package for distro-floor scenarios
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
+          path: floor-artifact/
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Upload validation evidence
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: regression-postgres-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+
+  distro-floor-scenarios:
+    name: Debian testing package GTK scenarios (${{ matrix.shard_group }})
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04
+    needs: [pin-revision, ensure-ci-gtk-image, postgres-release]
+    container:
+      image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+      env:
+        DEBIAN_FRONTEND: noninteractive
+        DOCKER_CONFIG: /github/home/.docker
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard_group: [1, 2]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: floor-package-${{ github.run_id }}-${{ github.run_attempt }}
+          path: floor-artifact/
+      - name: Verify the package under test
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+        run: |
+          package=$(python3 scripts/ci-gtk-artifact.py verify --package floor-artifact "$BOOKIE_SOURCE_COMMIT")
+          printf 'DISTRO_FLOOR_PACKAGE=%s\n' "$package" >> "$GITHUB_ENV"
+      - name: Log in to Docker Hub
+        uses: ./.github/actions/dockerhub-login
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Pre-pull the Debian testing image
+        run: bash scripts/prepull-test-images.sh distro-floor
+      - name: Run distro-floor scenario shards
+        env:
+          SHARD_GROUP: ${{ matrix.shard_group }}
+        run: |
+          for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do
+            python3 scripts/ci-mcp-port.py "$((10 + shard))"
+            BOOKIE_GTK_SHARD="${shard}/6" python3 scripts/run-test-layer.py distro-floor
+          done
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-distro-floor-${{ matrix.shard_group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/quality/*-layers
           if-no-files-found: error
 
@@ -785,10 +937,12 @@ jobs:
       - preflight
       - fast
       - gtk-safety
+      - gtk-server
       - integration
       - b4-rollback
       - driver-tls
       - postgres-release
+      - distro-floor-scenarios
       - current-stable-clippy
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09

@@ -195,7 +195,7 @@ pub fn diff_to_ops(
     ops
 }
 
-fn same_index(left: &IndexInfo, right: &IndexInfo) -> bool {
+pub(super) fn same_index(left: &IndexInfo, right: &IndexInfo) -> bool {
     left.name == right.name
         && left.columns == right.columns
         && left.unique == right.unique

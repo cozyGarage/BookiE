@@ -166,9 +166,10 @@ class PrepullTestImagesTests(unittest.TestCase):
     def test_forgejo_fixture_jobs_pre_pull_their_container_images(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         for job, group, command in (
-            ("pg-release", "pg-release", "./scripts/test-postgres-release.sh"),
-            ("pg-dump", "pg-dump", "./scripts/test-pg-dump.sh"),
+            ("pg-release", "pg-release", "python3 scripts/run-test-layer.py postgres-release"),
+            ("pg-dump", "pg-dump", "python3 scripts/run-test-layer.py pg-dump"),
             ("socket-ssh", "socket-ssh", "./scripts/test-postgres-socket.sh"),
+            ("driver-tls", "driver-tls", "python3 scripts/run-test-layer.py tls"),
         ):
             body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", ci).group(1)
             prepull = body.index(f"bash src/scripts/prepull-test-images.sh {group}")

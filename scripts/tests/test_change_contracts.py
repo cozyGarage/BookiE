@@ -12,6 +12,33 @@ SPEC.loader.exec_module(CHECKER)
 
 
 class ChangeContractTests(unittest.TestCase):
+    def test_change_contract_commands_use_the_prebuilt_test_wrapper(self):
+        package = "bookie-driver-postgres"
+        full_suite = {
+            "package": package,
+            "target": "--tests",
+            "full_suite": True,
+            "required_tests": [],
+        }
+        exact = {
+            "package": "bookie-app",
+            "target": "--test=stale_grid_update",
+            "full_suite": False,
+            "required_tests": ["stale_sqlite_grid_update_rolls_back_the_batch"],
+        }
+
+        self.assertEqual(
+            CHECKER.test_command(full_suite),
+            ["bash", str(CHECKER.ROOT / "scripts/run-rust-tests.sh"), "--locked", "-p", package,
+             "--tests", "--", "--test-threads=1"],
+        )
+        self.assertEqual(
+            CHECKER.test_command(exact, exact["required_tests"][0]),
+            ["bash", str(CHECKER.ROOT / "scripts/run-rust-tests.sh"), "--locked", "-p", "bookie-app",
+             "--test=stale_grid_update", "stale_sqlite_grid_update_rolls_back_the_batch", "--", "--exact",
+             "--test-threads=1"],
+        )
+
     def test_exact_test_map_rejects_a_stale_rust_function_name(self):
         data = copy.deepcopy(CHECKER.load_map())
         data["exact_tests"]["crates/core/src/sql_dialect.rs"]["tests"][0] = (

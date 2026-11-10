@@ -1597,6 +1597,30 @@ GLib.MainLoop().run()
         with sqlite3.connect(database) as connection:
             assert connection.execute("SELECT COUNT(*) FROM transaction_close_probe").fetchone()[0] == 0
 
+    def closing_window_with_open_session_transaction_dismisses_confirmation(database, base):
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.press_x11_key("q", ("Control_L",))
+        ui.wait_for_node(name="Close with open session transactions?")
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Close with open session transactions?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} — BookiE")
+
+        ui.press_x11_key("q", ("Control_L",))
+        ui.wait_for_node(name="Close with open session transactions?")
+        time.sleep(0.5)
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Close with open session transactions?", present=False)
+
+        ui.press_x11_key("q", ("Control_L",))
+        ui.wait_for_node(name="Close with open session transactions?")
+        ui.invoke(ui.wait_for_node(name="Roll Back and Close", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Close with open session transactions?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} — BookiE", present=False)
+
     def wait_for_editor_text(expected):
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
@@ -3096,6 +3120,7 @@ GLib.MainLoop().run()
         session_transaction_label_and_toggle_off_confirmation,
         opening_another_connection_keeps_the_original_transaction,
         closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back,
+        closing_window_with_open_session_transaction_dismisses_confirmation,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
