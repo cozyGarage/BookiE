@@ -453,6 +453,19 @@ impl GridView {
         );
     }
 
+    fn show_status(&mut self) {
+        let Some(live) = self.live.clone() else {
+            return;
+        };
+        let lines = bookie_gpui::status_view::describe(&live.overview());
+        if let Some((_, headline)) = lines.first() {
+            self.status = headline.clone();
+        }
+        for (kind, text) in lines {
+            self.messages.push(kind, text);
+        }
+    }
+
     fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.tabs.open_query();
         self.sync_grid_owner();
@@ -917,6 +930,7 @@ impl GridView {
                     "Show PostgreSQL sessions and blockers",
                     self.live.as_ref().is_some_and(|live| live.driver_id == "postgres"),
                 ),
+                action("status", "Show connection and tunnel status", self.live.is_some()),
                 action("clear-selection", "Clear row selection", self.selection.is_some()),
                 action("edit", "Edit the active cell", self.cell_cursor.is_some()),
                 action(
@@ -1041,6 +1055,7 @@ impl GridView {
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
             "sessions" => self.show_sessions(window, cx),
+            "status" => self.show_status(),
             "sample-pubsub" => {
                 if let Some(pattern) = listen_pattern {
                     self.sample_pubsub(pattern, cx);
