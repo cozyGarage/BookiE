@@ -59,7 +59,8 @@ fn opening_a_query_reveals_its_tab_in_an_overflowing_workspace(cx: &mut TestAppC
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             for index in 0..15 {
-                view.tabs.open_table(&format!("table_{index}"));
+                view.tabs
+                    .open_table(&bookie_gpui::shell::table_info(&format!("table_{index}")));
             }
             cx.notify();
         });
@@ -508,7 +509,8 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
     let bytes = vec![0xab; 1_000_000];
     let json = format!("{{\"raw\":  \"{}\"}}", "x".repeat(1_000_000));
     view.update(cx, |view, cx| {
-        view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+        view.tabs
+            .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
         view.edits.insert((0, 1), Cell::Text(text.clone()));
         view.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
         view.edits.insert((1, 3), Cell::JsonText(json.clone()));
@@ -741,7 +743,7 @@ fn switching_grid_tabs_keeps_an_active_cell_editor_open(cx: &mut TestAppContext)
         assert!(!view.grid_is_query);
         assert_eq!(
             view.tabs.current(),
-            &bookie_gpui::shell::Tab::Table(bookie_gpui::shell::DATA_TABLE.into())
+            &bookie_gpui::shell::Tab::Table(bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE))
         );
         assert!(view.editing.is_some());
         assert_eq!(view.editor.read(cx).content(), "cell draft");
@@ -824,7 +826,8 @@ fn closing_the_last_query_result_keeps_the_synthetic_table_available(cx: &mut Te
         view.update(cx, |view, _| {
             view.close_run(0);
             assert_eq!(view.dataset_count(), 0);
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             assert_eq!(view.dataset_count(), 150_000);
         });
     });
@@ -837,14 +840,16 @@ fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut Tes
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             view.close_run(0);
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             view.edits.insert((1, 1), Cell::Text("table edit".into()));
             view.tabs.open_query();
             view.sync_grid_owner();
             view.add_run(None);
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             assert_eq!(view.cell_at(1, 1), Cell::Text("table edit".into()));
         });
@@ -864,7 +869,8 @@ fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppC
         view.update(cx, |view, _| {
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
             view.edits.insert((1, 1), Cell::Text("query".into()));
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
             view.tabs.open_query();
@@ -912,7 +918,8 @@ fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             let query = view.tabs.active;
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             view.close_tab(query);
             assert!(view.runs.is_empty());
@@ -936,7 +943,8 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
             view.tabs.open_home();
             view.sync_grid_owner();
             view.close_tab(query);
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             assert!(view.runs.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
