@@ -32,6 +32,17 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn(invocation, github)
                 self.assertIn(invocation, forgejo)
 
+    def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        preflight = (ROOT / "scripts/preflight.sh").read_text()
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+
+        self.assertIn("python3 scripts/run-test-layer.py quick", github)
+        self.assertIn('"$ROOT/scripts/test-sandbox.sh"', preflight)
+        self.assertEqual(layers["sandbox"]["steps"][0]["argv"], ["bash", "scripts/test-sandbox.sh"])
+        self.assertIn("python3 scripts/run-test-layer.py sandbox", forgejo)
+
     def test_forgejo_runs_gpui_model_and_interaction_tests(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
