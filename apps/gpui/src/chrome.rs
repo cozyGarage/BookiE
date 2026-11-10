@@ -121,6 +121,20 @@ fn ghost_icon(id: &'static str, name: &'static str, label: impl Into<String>, th
         )
 }
 
+fn toolbar_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(32.0))
+        .h(px(28.0))
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
+}
+
 fn card(theme: Theme) -> Div {
     div()
         .flex()
@@ -143,8 +157,8 @@ fn card_title(text: &str, theme: Theme) -> Div {
 
 impl GridView {
     pub fn toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        let inert = |id: &'static str, name: &'static str, label: &'static str, cx: &mut Context<Self>| {
-            ghost_icon(id, name, label, theme).on_click(cx.listener(|this, _, _, cx| {
+        let inert = |id: &'static str, name: &'static str, cx: &mut Context<Self>| {
+            toolbar_icon(id, name, theme).on_click(cx.listener(|this, _, _, cx| {
                 this.status = "Synthetic prototype: nothing to open here.".into();
                 cx.notify();
             }))
@@ -165,12 +179,12 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
-                    .child(inert("new-connection", "database", "New Connection", cx))
-                    .child(inert("new-query", "file-plus", "New Query", cx))
-                    .child(inert("data-transfer", "arrow-left-right", "Data Transfer", cx))
-                    .child(inert("driver-manager", "package", "Driver Manager", cx))
-                    .child(inert("plugin-center", "puzzle", "Plugin Center", cx))
-                    .child(inert("more", "chevron-down", "More", cx)),
+                    .child(inert("new-connection", "database", cx))
+                    .child(inert("new-query", "file-plus", cx))
+                    .child(inert("data-transfer", "arrow-left-right", cx))
+                    .child(inert("driver-manager", "package", cx))
+                    .child(inert("plugin-center", "puzzle", cx))
+                    .child(inert("more", "chevron-down", cx)),
             )
             .child(self.toolbar_right(theme, cx))
     }
@@ -181,21 +195,17 @@ impl GridView {
             .items_center()
             .gap_1()
             .child(
-                ghost_icon("palette", "command", "Commands", theme)
+                toolbar_icon("palette", "command", theme)
                     .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
             )
             .child(
-                ghost_icon(
-                    "theme-toggle",
-                    if theme.dark { "sun" } else { "moon" },
-                    if theme.dark { "Light" } else { "Dark" },
-                    theme,
-                )
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.dark_mode = !this.dark_mode;
-                    Theme::current(cx).toggled().install(cx);
-                    window.refresh();
-                })),
+                toolbar_icon("theme-toggle", if theme.dark { "sun" } else { "moon" }, theme).on_click(cx.listener(
+                    |this, _, window, cx| {
+                        this.dark_mode = !this.dark_mode;
+                        Theme::current(cx).toggled().install(cx);
+                        window.refresh();
+                    },
+                )),
             )
             .child(
                 window_button("win-min", "\u{2013}", theme).on_click(cx.listener(|_, _, window, _| {
