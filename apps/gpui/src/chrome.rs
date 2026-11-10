@@ -522,11 +522,11 @@ impl GridView {
                             .flex_col()
                             .children(SQL.iter().map(|line| div().h(px(20.0)).child((*line).to_string())))
                     }))
-                    .children(
-                        self.live
-                            .is_some()
-                            .then(|| div().flex_1().child(self.sql_input.clone())),
-                    ),
+                    .children(self.live.is_some().then(|| {
+                        div()
+                            .flex_1()
+                            .child(gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)))
+                    })),
             );
         let divider = div()
             .id("split-divider")

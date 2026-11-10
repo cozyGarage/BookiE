@@ -54,9 +54,13 @@ pub fn hex_lines(bytes: &[u8]) -> Vec<HexLine> {
 
 fn decoded_preview(bytes: &[u8]) -> Option<(&'static str, String)> {
     if let Ok(value) = bookie_core::decode_messagepack(bytes) {
-        return serde_json::to_string_pretty(&value).ok().map(|text| ("MessagePack", text));
+        return serde_json::to_string_pretty(&value)
+            .ok()
+            .map(|text| ("MessagePack", text));
     }
-    let printable = bytes.iter().all(|byte| byte.is_ascii_graphic() || byte.is_ascii_whitespace());
+    let printable = bytes
+        .iter()
+        .all(|byte| byte.is_ascii_graphic() || byte.is_ascii_whitespace());
     if printable {
         return None;
     }
@@ -142,7 +146,10 @@ mod tests {
     #[test]
     fn a_large_blob_is_cut_at_the_cap_and_reports_its_full_size() {
         let blob = Cell::Bytes(vec![7; MAX_HEX_BYTES + 100]);
-        let Detail::Hex { lines, total, shown, .. } = detail_of(&blob) else {
+        let Detail::Hex {
+            lines, total, shown, ..
+        } = detail_of(&blob)
+        else {
             panic!("bytes show as hex");
         };
         assert_eq!((total, shown), (MAX_HEX_BYTES + 100, MAX_HEX_BYTES));
@@ -158,7 +165,10 @@ mod tests {
         let (label, decoded) = decoded.expect("a messagepack map decodes");
         assert_eq!(label, "MessagePack");
         assert!(decoded.contains("\"a\": 1") && decoded.contains("true"), "{decoded}");
-        assert_eq!(lines[0].hex, "82 a1 61 01 a1 62 92 c3 c0", "the hex dump stays alongside");
+        assert_eq!(
+            lines[0].hex, "82 a1 61 01 a1 62 92 c3 c0",
+            "the hex dump stays alongside"
+        );
         let Detail::Hex { decoded, .. } = detail_of(&Cell::Bytes(vec![0xde, 0xad, 0xbe, 0xef])) else {
             panic!("bytes show as hex");
         };
@@ -167,7 +177,9 @@ mod tests {
 
     #[test]
     fn protobuf_is_offered_only_as_a_labelled_guess_and_never_for_plain_text() {
-        let message = Cell::Bytes(vec![0x08, 0x96, 0x01, 0x12, 0x07, b't', b'e', b's', b't', b'i', b'n', b'g']);
+        let message = Cell::Bytes(vec![
+            0x08, 0x96, 0x01, 0x12, 0x07, b't', b'e', b's', b't', b'i', b'n', b'g',
+        ]);
         let Detail::Hex { decoded, .. } = detail_of(&message) else {
             panic!("bytes show as hex");
         };

@@ -27,6 +27,7 @@ use gpui::{
     ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
     prelude::*, px, rgb, size, uniform_list,
 };
+use gpui_kit::component::input::EditorState;
 use text_input::{InputEvent, TextInput};
 use tokio_util::sync::CancellationToken;
 use ui_theme::ThemeExt;
@@ -70,7 +71,7 @@ struct GridView {
     runs: Vec<Run>,
     run_edits: Vec<grid_edit::Edits>,
     run_sources: Vec<Option<Source>>,
-    sql_input: Entity<TextInput>,
+    sql_input: Entity<EditorState>,
     active_run: usize,
     run_scroll: ScrollHandle,
     next_run_number: usize,
@@ -184,12 +185,19 @@ impl GridView {
         font_names.sort();
         font_names.dedup();
         let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
-        let sql_input = cx.new(|cx| TextInput::new("SELECT … (one statement, Enter runs it)", cx));
-        cx.subscribe(&sql_input, |this, _, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Submit) {
-                this.run_query(cx);
-            }
-        })
+        let sql_input =
+            cx.new(|cx| EditorState::new(window, cx).placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)"));
+        cx.subscribe(
+            &sql_input,
+            |this, _, event: &gpui_kit::component::input::InputEvent, cx| {
+                if matches!(
+                    event,
+                    gpui_kit::component::input::InputEvent::PressEnter { secondary: true, .. }
+                ) {
+                    this.run_query(cx);
+                }
+            },
+        )
         .detach();
         cx.subscribe(&sidebar_search, |_, _, _: &InputEvent, cx| cx.notify())
             .detach();
@@ -385,7 +393,7 @@ impl GridView {
 
     fn run_query(&mut self, cx: &mut Context<Self>) {
         if let Some(session) = self.live.clone() {
-            let sql = self.sql_input.read(cx).content().to_string();
+            let sql = self.sql_input.read(cx).value().to_string();
             if sql.trim().is_empty() {
                 self.status = "Type a statement first".into();
                 return;

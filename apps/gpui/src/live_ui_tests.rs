@@ -92,9 +92,9 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     });
     cx.simulate_keystrokes("ctrl-t");
     let run = |cx: &mut gpui::VisualTestContext, sql: &str| {
-        cx.update(|_, cx| {
+        cx.update(|window, cx| {
             view.update(cx, |view, cx| {
-                view.sql_input.update(cx, |input, cx| input.set_content(sql, cx))
+                view.sql_input.update(cx, |input, cx| input.set_value(sql, window, cx))
             })
         });
         cx.simulate_keystrokes("ctrl-enter");
@@ -190,9 +190,9 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
     });
     cx.simulate_keystrokes("ctrl-t");
     let run = |cx: &mut gpui::VisualTestContext, sql: &str| {
-        cx.update(|_, cx| {
+        cx.update(|window, cx| {
             view.update(cx, |view, cx| {
-                view.sql_input.update(cx, |input, cx| input.set_content(sql, cx))
+                view.sql_input.update(cx, |input, cx| input.set_value(sql, window, cx))
             })
         });
         cx.simulate_keystrokes("ctrl-enter");
@@ -268,5 +268,45 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
             "{}",
             view.status
         );
+    });
+}
+
+#[gpui::test]
+fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|window, cx| {
+        let editor = view.read(cx).sql_input.clone();
+        editor.update(cx, |editor, cx| editor.focus(window, cx));
+    });
+    cx.simulate_input("SELECT id");
+    cx.simulate_keystrokes("enter");
+    cx.simulate_input("FROM orders");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(
+            view.sql_input.read(cx).value(),
+            "SELECT id\nFROM orders",
+            "Enter adds a line, it does not run"
+        );
+        assert_eq!(view.runs.len(), 0, "nothing ran yet");
+    });
+    cx.simulate_keystrokes("ctrl-enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.runs.len(), 1, "{}", view.status);
+        assert_eq!(view.source.total(), 6);
     });
 }
