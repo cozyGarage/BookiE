@@ -1119,8 +1119,10 @@ checksum = "119771309b95163ec7aaf79810da82f7cd0599c19722d48b9c03894dca833966"
 name = "bookie-app-services"
 version = "0.2.6"
 dependencies = [
+ "bookie-checks",
  "bookie-core",
  "bookie-dump",
+ "bookie-pg-sessions",
  "bookie-policy",
  "bookie-results",
  "bookie-ssh",
@@ -1138,6 +1140,13 @@ dependencies = [
  "tracing",
  "unicode-width",
  "uuid",
+]
+
+[[package]]
+name = "bookie-checks"
+version = "0.2.6"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]
@@ -1275,7 +1284,6 @@ dependencies = [
  "oracledb",
  "rust_decimal",
  "secrecy",
- "serde_json",
  "tokio",
 ]
 
@@ -1374,6 +1382,13 @@ dependencies = [
  "tokio-util",
  "unicode-segmentation",
  "uuid",
+]
+
+[[package]]
+name = "bookie-pg-sessions"
+version = "0.2.6"
+dependencies = [
+ "bookie-core",
 ]
 
 [[package]]

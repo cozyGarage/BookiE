@@ -106,7 +106,11 @@ fn open_first_table(
 ) -> Result<Arc<LiveTable>, String> {
     let session = LiveSession::open_controlled(origin, cancellation)?;
     let first = session.tables.first().cloned().ok_or("this connection has no tables")?;
-    Ok(Arc::new(session.load_table_controlled(&first, ROW_CAP, cancellation)?))
+    Ok(Arc::new(session.load_table_controlled(
+        &first,
+        ROW_CAP,
+        cancellation,
+    )?))
 }
 
 #[cfg(test)]

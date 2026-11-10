@@ -394,6 +394,15 @@ impl GridView {
         }
     }
 
+    fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.tabs.open_query();
+        self.sync_grid_owner();
+        self.sql_input.update(cx, |input, cx| {
+            input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
+        });
+        self.run_query(cx);
+    }
+
     fn run_query(&mut self, cx: &mut Context<Self>) {
         if let Some(session) = self.live.clone() {
             let sql = self.sql_input.read(cx).value().to_string();
@@ -831,6 +840,11 @@ impl GridView {
                 "Copy selected rows as INSERT statements",
                 self.selection.is_some(),
             ),
+            action(
+                "sessions",
+                "Show PostgreSQL sessions and blockers",
+                self.live.as_ref().is_some_and(|live| live.driver_id == "postgres"),
+            ),
             action("clear-selection", "Clear row selection", self.selection.is_some()),
             action("edit", "Edit the active cell", self.cell_cursor.is_some()),
             action(
@@ -951,6 +965,7 @@ impl GridView {
             "copy-markdown" => self.copy_selection_as(CopyFormat::Markdown, cx),
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
+            "sessions" => self.show_sessions(window, cx),
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,

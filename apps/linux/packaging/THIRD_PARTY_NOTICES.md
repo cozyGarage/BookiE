@@ -41,9 +41,11 @@ Unless a file says otherwise, source code and documentation in this Linux reposi
 
 Packages:
 
+- `bookie-checks 0.2.6`
 - `bookie-driver-cassandra 0.2.6`
 - `bookie-driver-oracle 0.2.6`
 - `bookie-driver-registry 0.2.6`
+- `bookie-pg-sessions 0.2.6`
 - `bookie-results 0.2.6`
 
 ```text

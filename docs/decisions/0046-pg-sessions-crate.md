@@ -17,3 +17,5 @@ The GPUI plan lists a sessions and lock panel as a Phase 3 DBA module. [ADR 0041
 ## Consequences
 
 A frontend can list who is connected, who waits, and who blocks them, with no new logic. Other engines need their own reader.
+
+`bookie-app-services` re-exports `bookie-pg-sessions` and `bookie-checks` (`bookie_app_services::pg_sessions`, `::checks`), so the GPUI app reaches them through the dependencies ADR 0044 already allows. The GPUI command "Show PostgreSQL sessions and blockers" puts `SESSIONS_SQL` in the Query editor and runs it; it is listed only on a PostgreSQL connection.
