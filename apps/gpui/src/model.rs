@@ -179,8 +179,6 @@ pub fn column_text(index: u64, column: usize) -> Option<String> {
 pub struct ColumnMeta {
     pub name: String,
     pub width: f32,
-    /// Values in this column are numbers, so the column reads right-aligned,
-    /// NULLs and header included.
     pub numeric: bool,
 }
 
@@ -327,7 +325,6 @@ pub struct Pager {
     pub total: u64,
     pub page: u64,
     pub rows: u64,
-    /// Load more: the window grows from the first row instead of moving to the next page.
     pub append: bool,
 }
 
@@ -345,7 +342,6 @@ impl Pager {
         self.total.div_ceil(self.rows).max(1)
     }
 
-    /// Load-more windows always start at row one, so going back is a no-op there.
     pub fn first(&mut self) {
         if !self.append {
             self.page = 0;
@@ -366,7 +362,6 @@ impl Pager {
         }
     }
 
-    /// Dataset rows in view as `[start, end)`.
     pub fn window(&self) -> (u64, u64) {
         if self.total == 0 {
             return (0, 0);
@@ -388,12 +383,10 @@ impl Pager {
         self.page = (row / self.rows).min(self.pages() - 1);
     }
 
-    /// Keeps the page size and load mode, returns to the first page.
     pub fn with_total(self, total: u64) -> Self {
         Pager { total, page: 0, ..self }
     }
 
-    /// Changes the page size and keeps the first row in view.
     pub fn resized(self, rows: u64) -> Self {
         let first_row = self.page * self.rows;
         let mut next = Pager { rows, page: 0, ..self };
