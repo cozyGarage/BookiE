@@ -1057,6 +1057,7 @@ pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
         | DriverError::IntegratedAuth(_)
         | DriverError::Tls(_)
         | DriverError::Internal(_)
+        | DriverError::CommitUnconfirmed(_)
         | DriverError::OperationOutcomeUnknown { .. } => true,
         DriverError::Transaction { source, .. } | DriverError::PartiallyApplied { source, .. } => {
             is_ambiguous_post_dispatch(source)
@@ -1085,7 +1086,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
         DriverError::Internal(_) => AuditErrorCategory::Internal,
         DriverError::Cancelled => AuditErrorCategory::Cancelled,
         DriverError::TimedOut => AuditErrorCategory::Timeout,
-        DriverError::OperationOutcomeUnknown { .. } => AuditErrorCategory::Unknown,
+        DriverError::OperationOutcomeUnknown { .. } | DriverError::CommitUnconfirmed(_) => AuditErrorCategory::Unknown,
         DriverError::Transaction { .. } | DriverError::PartiallyApplied { .. } => AuditErrorCategory::Transaction,
         DriverError::TransactionRollbackFailed { .. } => AuditErrorCategory::Unknown,
     }

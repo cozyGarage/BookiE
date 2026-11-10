@@ -44,6 +44,7 @@ fn driver_code(error: &DriverError) -> &'static str {
         DriverError::TimedOut => "timed_out",
         DriverError::ConcurrentModification => "concurrent_modification",
         DriverError::OperationOutcomeUnknown { .. } => "outcome_unknown",
+        DriverError::CommitUnconfirmed(_) => "commit_unconfirmed",
         DriverError::IntegratedAuth(_) => "integrated_authentication_failed",
         DriverError::Transaction { .. } => "transaction_failed",
         DriverError::PartiallyApplied { .. } => "partially_applied",

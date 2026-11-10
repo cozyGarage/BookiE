@@ -85,6 +85,7 @@ impl McpToolError {
     pub(crate) fn from_write_error(error: &DriverError) -> Self {
         let (code, operation_outcome, transaction_outcome, message) = match error {
             DriverError::OperationOutcomeUnknown { .. }
+            | DriverError::CommitUnconfirmed(_)
             | DriverError::ConnectionRefused
             | DriverError::AuthFailed
             | DriverError::Disconnected
