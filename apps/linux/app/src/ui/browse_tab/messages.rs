@@ -82,8 +82,10 @@ pub enum BrowseTabInput {
         draft_id: Option<u64>,
     },
     GridCopyRowAsStatement(Vec<u32>, bookie_core::sql_literal::RowStatement),
-    DuplicateRow {
+    GridDuplicateRow {
         row_position: u32,
+        row_key: Vec<Value>,
+        draft_id: Option<u64>,
     },
     GridCopyToClipboard(String),
     GridFetchCellValue {

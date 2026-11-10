@@ -104,7 +104,11 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
     controller.model().insert_button.emit_clicked();
     controller
         .sender()
-        .send(BrowseTabInput::DuplicateRow { row_position: 0 })
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
         .unwrap();
     assert!(activate_shortcut(&controller, "Delete"));
     assert!(activate_shortcut(&controller, "<Primary>n"));
@@ -132,6 +136,14 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .send(BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(2)],
             draft_id: None,
         })
         .unwrap();
@@ -168,7 +180,11 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
     controller
         .model()
         .grid_sender
-        .send(crate::ui::grid::GridMsg::DuplicateRow { row_position: 0 })
+        .send(crate::ui::grid::GridMsg::DuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
         .unwrap();
     controller
         .model()
@@ -490,6 +506,14 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
     let snapshot = controller.model().capture_paste_snapshot();
     controller
         .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(2)],
+            draft_id: None,
+        })
+        .unwrap();
+    controller
+        .sender()
         .send(BrowseTabInput::GridCellEdited {
             row_position: 0,
             col_index: 1,
@@ -542,10 +566,24 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
             .iter()
             .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
             .count(),
-        4,
+        5,
         "each stale entry point reports that the row identity changed"
     );
     assert_eq!(row.cell_value(1), Value::Text("a".into()));
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(pending(&controller), 1);
+    assert_eq!(
+        controller.model().row_object_at(0).unwrap().cell_value(1),
+        Value::Text("a".into())
+    );
     controller.detach_runtime();
 }
 
@@ -933,7 +971,11 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
         BrowseTabInput::Redo,
         BrowseTabInput::DiscardAll,
         BrowseTabInput::InsertRow,
-        BrowseTabInput::DuplicateRow { row_position: 0 },
+        BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        },
         BrowseTabInput::DeleteSelectedRow,
         BrowseTabInput::GridCellEdited {
             row_position: 0,
@@ -1071,7 +1113,16 @@ fn stale_set_null_does_not_modify_a_replacement_draft() {
             draft_id: first_id,
         })
         .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: Vec::new(),
+            draft_id: first_id,
+        })
+        .unwrap();
     pump(&observed);
+    assert_eq!(pending(&controller), 2);
     assert_eq!(
         controller.model().row_object_at(0).unwrap().cell_value(1),
         Value::Text("second".into())
