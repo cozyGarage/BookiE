@@ -1,33 +1,13 @@
 use std::collections::HashMap;
 
-use bookie_gpui::cursor::Cursor;
 use bookie_gpui::edit::{is_editable, parse_edit};
 use bookie_gpui::model::Cell;
-use gpui::{Context, Div, Focusable, MouseButton, MouseDownEvent, Window, prelude::*, rgb};
+use gpui::{Context, Focusable, Window};
 
+use crate::GridView;
 use crate::text_input::InputEvent;
-use crate::ui_theme::ThemeExt;
-use crate::{GridView, display_cell};
-use bookie_gpui::theme::Theme;
 
 pub type Edits = HashMap<(u64, usize), Cell>;
-
-pub(super) fn cursor_row(cursor: Option<Cursor>, row: usize) -> bool {
-    cursor.is_some_and(|cursor| cursor.row == row)
-}
-
-pub(super) fn cursor_column_background(cursor: Option<Cursor>, column: usize, theme: Theme) -> Option<u32> {
-    cursor.filter(|cursor| cursor.column == column).map(|_| theme.chrome)
-}
-
-fn cursor_cell_background(cursor: Option<Cursor>, row: usize, column: usize, theme: Theme) -> Option<u32> {
-    let cursor = cursor?;
-    if cursor_row(Some(cursor), row) && cursor.column == column {
-        Some(theme.background)
-    } else {
-        cursor_column_background(Some(cursor), column, theme)
-    }
-}
 
 pub struct Editing {
     pub row: u64,
@@ -100,72 +80,14 @@ impl GridView {
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
     }
 
-    pub fn data_cell(&self, source: u64, column: usize, position: usize, cell: &Cell, cx: &mut Context<Self>) -> Div {
-        let width = self.source.columns().get(column).map_or(120.0, |column| column.width);
-        if self
-            .editing
-            .as_ref()
-            .is_some_and(|e| e.row == source && e.column == column)
-        {
-            return crate::flex_cell(width).px_0().child(self.editor.clone());
+    /// A double-click on a table row edits the active column of that row.
+    pub(crate) fn edit_clicked_row(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if self.compare.is_some() || row >= self.visible_count() {
+            return;
         }
-        let theme = Theme::current(cx);
-        let cell = self.edits.get(&(source, column)).unwrap_or(cell);
-        let numeric = self.source.columns().get(column).is_some_and(|column| column.numeric);
-        let mut item = display_cell(width, numeric, cell, theme);
-        if matches!(cell, Cell::Null) {
-            item = item.italic().text_color(rgb(theme.muted_foreground));
-        }
-        if self.edits.contains_key(&(source, column)) {
-            item = item.border_b_2().border_color(rgb(theme.warning));
-        }
-        if let Some(background) = cursor_cell_background(self.cell_cursor, position, column, theme) {
-            item = item.bg(rgb(background));
-        }
-        if self.cell_cursor == Some(Cursor { row: position, column }) {
-            item = item.border_2().border_color(rgb(theme.info));
-        }
-        item.on_mouse_down(
-            MouseButton::Left,
-            cx.listener(move |this, event: &MouseDownEvent, window, cx| {
-                this.click_cell(source, position, column, event.click_count, window, cx);
-            }),
-        )
-    }
-
-    pub(crate) fn click_cell(
-        &mut self,
-        source: u64,
-        position: usize,
-        column: usize,
-        click_count: usize,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.cell_cursor = Some(Cursor { row: position, column });
-        window.focus(&self.focus, cx);
-        if click_count == 2 {
-            self.start_edit(source, column, window, cx);
-            cx.stop_propagation();
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn active_cell_highlights_its_row_column_and_intersection() {
-        let theme = Theme::dbx_light();
-        let cursor = Some(Cursor { row: 4, column: 2 });
-
-        assert!(cursor_row(cursor, 4));
-        assert!(!cursor_row(cursor, 5));
-        assert_eq!(cursor_column_background(cursor, 2, theme), Some(theme.chrome));
-        assert_eq!(cursor_column_background(cursor, 1, theme), None);
-        assert_eq!(cursor_cell_background(cursor, 4, 2, theme), Some(theme.background));
-        assert_eq!(cursor_cell_background(cursor, 5, 2, theme), Some(theme.chrome));
-        assert_eq!(cursor_cell_background(cursor, 4, 1, theme), None);
+        let column = self.cell_cursor.map_or(0, |cursor| cursor.column);
+        let source = self.source_row(self.base() + row as u64);
+        self.cell_cursor = Some(bookie_gpui::cursor::Cursor { row, column });
+        self.start_edit(source, column, window, cx);
     }
 }
