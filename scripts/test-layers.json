@@ -62,6 +62,29 @@
         }
       ]
     },
+    "gpui": {
+      "purpose": "GPUI model and simulated interaction regressions",
+      "prerequisites": "Rust 1.98; GPUI native build libraries; no display",
+      "hosted_gate": "Build Linux / GPUI model and simulated interaction tests",
+      "steps": [
+        {
+          "argv": [
+            "env",
+            "-u",
+            "DISPLAY",
+            "-u",
+            "WAYLAND_DISPLAY",
+            "cargo",
+            "test",
+            "--manifest-path",
+            "apps/gpui/Cargo.toml",
+            "--locked"
+          ],
+          "timeout_seconds": 2700,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
     "gtk-app": {
       "purpose": "GTK app Clippy and library/binary unit regressions after the non-GTK preflight tier",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
