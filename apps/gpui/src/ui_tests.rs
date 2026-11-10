@@ -447,7 +447,13 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     view.update(cx, |view, cx| {
         view.edits.insert((1, 1), Cell::Text(full.clone()));
         requests.store(0, Ordering::Relaxed);
-        let _ = view.row_at_position(1, cx);
+        view.sync_table(cx);
+        view.table.update(cx, |table, _| {
+            let delegate = table.delegate_mut();
+            let edited = delegate.row_cell_text(1, 1);
+            assert_eq!(edited, bookie_gpui::preview::cell_preview(&Cell::Text(full.clone())));
+            assert_ne!(edited, delegate.row_cell_text(1, 0));
+        });
         assert_eq!(requests.load(Ordering::Relaxed), 1);
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
@@ -1126,16 +1132,21 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
 }
 
 #[gpui::test]
-fn clicking_a_cell_gives_the_grid_the_keyboard_so_the_arrows_move_from_it(cx: &mut TestAppContext) {
+fn a_table_cell_selection_sets_the_cursor_and_the_arrows_move_from_it(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    let find = view.read_with(cx, |view, cx| view.find.read(cx).focus_handle_for_tests());
-    cx.update(|window, cx| window.focus(&find, cx));
-
-    cx.update(|window, cx| view.update(cx, |view, cx| view.click_cell(2, 2, 1, 1, window, cx)));
-    cx.simulate_keystrokes("down");
-
+    let table = view.read_with(cx, |view, _| view.table.clone());
+    cx.update(|_, cx| {
+        table.update(cx, |_, cx| {
+            cx.emit(gpui_kit::component::table::TableEvent::SelectCell(2, 1))
+        });
+    });
+    cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.cell_cursor, Some(Cursor { row: 3, column: 1 }));
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 2, column: 1 }))
+    });
+    cx.simulate_keystrokes("down");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 3, column: 1 }))
     });
 }
 

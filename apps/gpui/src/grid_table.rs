@@ -4,15 +4,35 @@ use gpui::{App, Context, IntoElement, Window, div, prelude::*, px};
 use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
+use crate::grid_edit::Edits;
+use bookie_gpui::model::Diff;
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::source::Source;
 
-/// Maps the visible page's table rows to source rows; O(1) to build, so it is cheap every frame.
-#[derive(Default, PartialEq)]
+/// Maps the visible page's table rows to source rows (or compare rows); O(1) to build, so cheap every frame.
+#[derive(Default)]
 pub struct RowMap {
     base: u64,
     count: usize,
     kept: Option<Arc<Vec<u32>>>,
+    compare: Option<Arc<Diff>>,
+}
+
+impl PartialEq for RowMap {
+    fn eq(&self, other: &Self) -> bool {
+        self.base == other.base
+            && self.count == other.count
+            && same_arc(&self.kept, &other.kept)
+            && same_arc(&self.compare, &other.compare)
+    }
+}
+
+fn same_arc<T>(a: &Option<Arc<T>>, b: &Option<Arc<T>>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(a), Some(b)) => Arc::ptr_eq(a, b),
+        _ => false,
+    }
 }
 
 impl RowMap {
@@ -31,6 +51,7 @@ pub struct GridDelegate {
     source: Option<Source>,
     map: RowMap,
     cached: Option<(usize, Vec<String>)>,
+    edits: Edits,
     editor: Option<(usize, usize, gpui::AnyView)>,
 }
 
@@ -66,11 +87,23 @@ impl TableDelegate for GridDelegate {
 
 impl GridDelegate {
     // Cells of one row render back to back, so one fetch per row serves all its columns.
-    fn row_cell_text(&mut self, row_ix: usize, col_ix: usize) -> String {
+    pub(crate) fn row_cell_text(&mut self, row_ix: usize, col_ix: usize) -> String {
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
-            let cells = match (&self.source, self.map.source_row(row_ix)) {
-                (Some(source), Some(index)) => source.row(index).iter().map(cell_preview).collect(),
-                _ => Vec::new(),
+            let cells = match (&self.map.compare, &self.source) {
+                (Some(diff), _) => compare_cells(diff, row_ix),
+                (None, Some(source)) => match self.map.source_row(row_ix) {
+                    Some(index) => {
+                        let mut cells = source.row(index);
+                        for (column, cell) in cells.iter_mut().enumerate() {
+                            if let Some(edit) = self.edits.get(&(index, column)) {
+                                *cell = edit.clone();
+                            }
+                        }
+                        cells.iter().map(cell_preview).collect()
+                    }
+                    None => Vec::new(),
+                },
+                (None, None) => Vec::new(),
             };
             self.cached = Some((row_ix, cells));
         }
@@ -84,8 +117,13 @@ impl GridDelegate {
 
 impl GridView {
     fn row_map(&self) -> RowMap {
-        if self.compare.is_some() {
-            return RowMap::default();
+        if let Some(diff) = &self.compare {
+            return RowMap {
+                base: 0,
+                count: diff.rows.len(),
+                kept: None,
+                compare: Some(diff.clone()),
+            };
         }
         RowMap {
             base: self.base(),
@@ -94,6 +132,7 @@ impl GridView {
                 crate::Mode::All => None,
                 crate::Mode::Filtered { kept, .. } => Some(kept.clone()),
             },
+            compare: None,
         }
     }
 
@@ -104,6 +143,13 @@ impl GridView {
             .iter()
             .map(|column| (column.name.clone(), column.width))
             .collect();
+        let columns = if self.compare.is_some() {
+            std::iter::once(("Change".to_string(), COMPARE_CHANGE_WIDTH))
+                .chain(columns)
+                .collect()
+        } else {
+            columns
+        };
         let map = self.row_map();
         let editor = self.editing.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
@@ -132,6 +178,7 @@ impl GridView {
             let changed = !same_source
                 || delegate.columns != columns
                 || delegate.map != map
+                || delegate.edits != self.edits
                 || delegate.editor.as_ref().map(|(r, c, _)| (*r, *c)) != editor.as_ref().map(|(r, c, _)| (*r, *c));
             if !changed {
                 return;
@@ -139,6 +186,7 @@ impl GridView {
             delegate.columns = columns;
             delegate.source = Some(self.source.clone());
             delegate.map = map;
+            delegate.edits = self.edits.clone();
             delegate.editor = editor;
             table.refresh(cx);
         });
@@ -147,6 +195,17 @@ impl GridView {
     pub(crate) fn data_table(&self) -> DataTable<GridDelegate> {
         DataTable::new(&self.table).stripe(true)
     }
+}
+
+const COMPARE_CHANGE_WIDTH: f32 = 70.0;
+
+fn compare_cells(diff: &Diff, row: usize) -> Vec<String> {
+    let Some(row) = diff.rows.get(row) else {
+        return Vec::new();
+    };
+    std::iter::once(row.change.to_string())
+        .chain(row.cells.iter().map(cell_preview))
+        .collect()
 }
 
 pub fn table_cell(cursor: Option<bookie_gpui::cursor::Cursor>) -> Option<(usize, usize)> {
@@ -162,6 +221,7 @@ pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_gpui::cursor::Cu
 mod tests {
     use super::*;
     use bookie_gpui::cursor::Cursor;
+    use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
 
     #[test]
@@ -173,6 +233,7 @@ mod tests {
                 base: 0,
                 count: 2,
                 kept: Some(Arc::new(vec![3, 7])),
+                compare: None,
             },
             ..Default::default()
         };
@@ -189,12 +250,14 @@ mod tests {
             base: 5_000,
             count: 2,
             kept: None,
+            compare: None,
         };
         assert_eq!(plain.source_row(1), Some(5_001));
         let filtered = RowMap {
             base: 0,
             count: 2,
             kept: Some(Arc::new(vec![9, 4])),
+            compare: None,
         };
         assert_eq!(filtered.source_row(1), Some(4));
         assert_eq!(filtered.source_row(2), None);
@@ -211,5 +274,35 @@ mod tests {
     fn a_table_cell_survives_the_trip_through_the_cursor() {
         assert_eq!(table_cell(cursor_at(Some((0, 5)))), Some((0, 5)));
         assert_eq!(table_cell(cursor_at(None)), None);
+    }
+
+    #[test]
+    fn a_compare_row_shows_its_change_then_its_cells() {
+        use bookie_gpui::model::{Diff, DiffRow, DiffSummary};
+        let diff = Diff {
+            summary: DiffSummary {
+                keyed: false,
+                equal: 0,
+                added: 0,
+                removed: 0,
+                changed: 1,
+            },
+            rows: vec![DiffRow {
+                change: "changed",
+                cells: vec![Cell::Text("a".into()), Cell::Int(7)],
+            }],
+            capped: false,
+        };
+        let mut delegate = GridDelegate {
+            map: RowMap {
+                base: 0,
+                count: 1,
+                kept: None,
+                compare: Some(Arc::new(diff)),
+            },
+            ..Default::default()
+        };
+        assert_eq!(delegate.row_cell_text(0, 0), "changed");
+        assert_eq!(delegate.row_cell_text(0, 2), "7");
     }
 }

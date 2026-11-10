@@ -1,4 +1,3 @@
-use std::ops::Range;
 use std::time::{Duration, Instant};
 
 mod assets;
@@ -19,15 +18,14 @@ use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui::preview::cell_preview;
 use bookie_gpui::selection::{Selection, copy_tsv};
 use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag};
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
 use gpui::{
-    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, MouseDownEvent,
-    ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size, uniform_list,
+    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
+    ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
+    size,
 };
 use gpui_kit::component::input::EditorState;
 use text_input::{InputEvent, TextInput};
@@ -35,7 +33,6 @@ use tokio_util::sync::CancellationToken;
 use ui_theme::ThemeExt;
 
 const ROW_HEIGHT: f32 = 26.0;
-const HEADER_HEIGHT: f32 = 28.0;
 pub const GUTTER_WIDTH: f32 = 56.0;
 
 enum Mode {
@@ -105,7 +102,7 @@ struct GridView {
     cursor: MatchCursor,
     find_capped: bool,
     operation_cancel: CancellationToken,
-    compare: Option<Diff>,
+    compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
     generation: u64,
@@ -861,7 +858,7 @@ impl GridView {
                 Ok(diff) => {
                     this.status.clear();
                     this.selection = None;
-                    this.compare = Some(diff);
+                    this.compare = Some(std::sync::Arc::new(diff));
                     this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
                 }
                 Err(message) => this.status = message.into(),
@@ -1315,52 +1312,6 @@ pub fn fixed_cell(width: f32, text: String) -> Div {
 
 pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
-}
-
-fn display_cell(width: f32, cell: &Cell, theme: Theme) -> Div {
-    let mut item = cell_div(width, cell_preview(cell));
-    if let Some(kind) = bookie_gpui::type_colors::type_kind(cell) {
-        item = item.text_color(rgb(bookie_gpui::type_colors::type_color(kind, theme.dark)));
-    }
-    if numeric_cell(cell) { item.justify_end() } else { item }
-}
-
-fn numeric_cell(cell: &Cell) -> bool {
-    use bookie_gpui::type_colors::{TypeKind, type_kind};
-    matches!(type_kind(cell), Some(TypeKind::Integer | TypeKind::Numeric))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn only_numeric_cells_use_right_alignment() {
-        assert!(numeric_cell(&Cell::Int(7)));
-        assert!(numeric_cell(&Cell::Float(7.5)));
-        assert!(numeric_cell(&Cell::Decimal("7.50".into())));
-        assert!(numeric_cell(&bookie_gpui::core_bridge::value_to_cell(
-            bookie_core::Value::Decimal("7.50".parse().unwrap())
-        )));
-        assert!(!numeric_cell(&Cell::Text("7".into())));
-        assert!(!numeric_cell(&Cell::Null));
-    }
-}
-
-fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
-    let background = if selected {
-        theme.active_row
-    } else if stripe {
-        theme.stripe
-    } else {
-        theme.background
-    };
-    div()
-        .flex()
-        .items_center()
-        .h(px(ROW_HEIGHT))
-        .w_full()
-        .bg(rgb(background))
 }
 
 fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
