@@ -8,8 +8,14 @@ pub trait ConformanceEngine {
     type Driver: DatabaseDriver;
     fn driver() -> Self::Driver;
     const FILE_BASED: bool;
+    /// False for an engine whose key is a sort key, not a unique row identity.
+    const UNIQUE_PRIMARY_KEY: bool = true;
     /// Make a fresh, empty database for one case; `path` is unique per case.
     async fn prepare(_path: &Path) {}
+    /// The engine's dialect of the one table the suite uses.
+    fn schema() -> &'static str {
+        SCHEMA
+    }
     /// Connection options for the database `prepare` made for `path`.
     fn options(path: &Path, read_only: bool) -> ConnectOptions {
         ConnectOptions {
@@ -36,7 +42,7 @@ pub async fn seeded<E: ConformanceEngine>() -> (TempDir, std::path::PathBuf) {
     let path = directory.path().join("conformance.db");
     E::prepare(&path).await;
     let writer = open::<E>(&path, false).await;
-    writer.execute(SCHEMA).await.expect("create table");
+    writer.execute(E::schema()).await.expect("create table");
     for statement in SEED {
         writer.execute(statement).await.expect("seed row");
     }
@@ -117,7 +123,8 @@ pub async fn the_catalog_names_the_table_and_describes_its_columns<E: Conformanc
     let columns = connection.fetch_columns(None, "conf_items").await.expect("columns");
     let names: Vec<&str> = columns.iter().map(|column| column.name.as_str()).collect();
     assert_eq!(names, ["id", "label", "n"]);
-    assert!(columns[0].primary_key && !columns[1].primary_key);
+    assert_eq!(columns[0].primary_key, E::UNIQUE_PRIMARY_KEY);
+    assert!(!columns[1].primary_key);
     assert!(columns[1].nullable);
 }
 
