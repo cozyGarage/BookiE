@@ -185,14 +185,19 @@ pub struct ColumnMeta {
 }
 
 pub fn synthetic_columns() -> Vec<ColumnMeta> {
-    [("value", 240.0, true), ("label", 280.0, false), ("state", 120.0, false), ("typed", 320.0, false)]
-        .into_iter()
-        .map(|(name, width, numeric)| ColumnMeta {
-            name: name.into(),
-            width,
-            numeric,
-        })
-        .collect()
+    [
+        ("value", 240.0, true),
+        ("label", 280.0, false),
+        ("state", 120.0, false),
+        ("typed", 320.0, false),
+    ]
+    .into_iter()
+    .map(|(name, width, numeric)| ColumnMeta {
+        name: name.into(),
+        width,
+        numeric,
+    })
+    .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

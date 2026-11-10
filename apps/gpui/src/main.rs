@@ -49,6 +49,7 @@ enum Mode {
 struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
+    keystroke_hook: Option<gpui::Subscription>,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -263,6 +264,7 @@ impl GridView {
             fonts: font_settings::load(),
             table,
             _table_events: table_events,
+            keystroke_hook: None,
             table_source: source.clone(),
             source,
             mode: Mode::All,
@@ -1322,7 +1324,11 @@ fn display_cell(width: f32, numeric_column: bool, cell: &Cell, theme: Theme) -> 
     if let Some(kind) = bookie_gpui::type_colors::type_kind(cell) {
         item = item.text_color(rgb(bookie_gpui::type_colors::type_color(kind, theme.dark)));
     }
-    if right_aligned(numeric_column, cell) { item.justify_end() } else { item }
+    if right_aligned(numeric_column, cell) {
+        item.justify_end()
+    } else {
+        item
+    }
 }
 
 /// A number is right-aligned; so is a NULL in a numeric column, so it lines up with its neighbours.
