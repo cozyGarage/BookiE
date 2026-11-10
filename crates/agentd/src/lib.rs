@@ -312,6 +312,17 @@ impl Connection for SessionConnection {
             .await
     }
 
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.inner.list_collations().await
+    }
+
+    async fn list_collations_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.inner.list_collations_controlled(control).await
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         self.inner.list_databases().await
     }

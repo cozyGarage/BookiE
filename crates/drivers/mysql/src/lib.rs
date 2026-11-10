@@ -148,6 +148,27 @@ struct MysqlConnection {
 
 #[async_trait]
 impl Connection for MysqlConnection {
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT CAST(collation_name AS CHAR), CAST(character_set_name AS CHAR), is_default = 'Yes'
+             FROM information_schema.collations
+             ORDER BY collation_name
+             LIMIT ?",
+        )
+        .bind(bookie_core::MAX_COLLATIONS as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| bookie_core::CollationInfo {
+                name: row.get(0),
+                charset: row.get(1),
+                is_default: row.get(2),
+            })
+            .collect())
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
             "SELECT CAST(schema_name AS CHAR) FROM information_schema.schemata

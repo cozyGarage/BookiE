@@ -14,28 +14,23 @@ impl Connection for PolicyGuard {
         .unwrap_or(false)
     }
 
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.governed_list_collations().await
+    }
+
+    async fn list_collations_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.governed_list_collations_controlled(control).await
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
-        let operation = self.metadata_operation("LIST DATABASES", Vec::new());
-        self.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self.caught_read("LIST DATABASES", self.inner.list_databases()).await;
-        let rows = result.as_ref().ok().map(|databases| databases.len() as u64);
-        self.audit_read_result(&operation, start, &result, rows).await?;
-        result
+        self.governed_list_databases().await
     }
 
     async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
-        check_pre_dispatch(control)?;
-        let operation = self.metadata_operation("LIST DATABASES", Vec::new());
-        self.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self
-            .caught_read("LIST DATABASES", self.inner.list_databases_controlled(control))
-            .await;
-        let rows = result.as_ref().ok().map(|databases| databases.len() as u64);
-        self.audit_controlled_read_result(&operation, start, &result, rows)
-            .await?;
-        result
+        self.governed_list_databases_controlled(control).await
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
