@@ -266,6 +266,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-gpui-bundle" "${{ needs.pin-revision.outputs.revision }}" --expected-group gpui
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
+          mkdir -p "$RUNNER_TEMP/bookie-gpui-extract"
           "$NEXTEST" nextest run --archive-file "$RUNNER_TEMP/bookie-gpui-bundle/nextest.tar.zst" \
             --workspace-remap "$GITHUB_WORKSPACE/apps/gpui" \
             --extract-to "$RUNNER_TEMP/bookie-gpui-extract" --profile default --no-tests=fail

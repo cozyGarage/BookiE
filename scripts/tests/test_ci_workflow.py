@@ -44,6 +44,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui", job)
         self.assertIn("--expected-group gpui", job)
         self.assertIn("nextest run --archive-file", job)
+        self.assertIn('mkdir -p "$RUNNER_TEMP/bookie-gpui-extract"', job)
         self.assertIn('--extract-to "$RUNNER_TEMP/bookie-gpui-extract"', job)
         self.assertNotIn("cargo test", job)
         self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all', builder)
