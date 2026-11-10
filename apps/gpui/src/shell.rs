@@ -197,7 +197,6 @@ pub fn result_ratio_from_drag(pointer_y: f32, top: f32, height: f32) -> f32 {
 pub struct Run {
     pub number: usize,
     pub rows: u64,
-    /// Measured time of a run against a database; `None` for synthetic runs.
     pub elapsed_ms: Option<u64>,
 }
 
@@ -210,7 +209,6 @@ impl Run {
         self.elapsed_ms.unwrap_or(self.rows / 1_000 + 3)
     }
 
-    /// The measured time for the run tab, or nothing when the run is synthetic.
     pub fn measured(self) -> Option<String> {
         self.elapsed_ms
             .map(|ms| crate::messages::format_elapsed(std::time::Duration::from_millis(ms)))

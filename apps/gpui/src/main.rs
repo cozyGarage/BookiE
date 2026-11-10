@@ -1324,7 +1324,6 @@ fn display_cell(width: f32, numeric_column: bool, cell: &Cell, theme: Theme) -> 
     if right_aligned(numeric_column, cell) { item.justify_end() } else { item }
 }
 
-/// A number is right-aligned; so is a NULL in a numeric column, so it lines up with its neighbours.
 fn right_aligned(numeric_column: bool, cell: &Cell) -> bool {
     numeric_cell(cell) || (numeric_column && matches!(cell, Cell::Null))
 }

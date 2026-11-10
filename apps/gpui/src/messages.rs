@@ -52,7 +52,6 @@ impl MessageLog {
     }
 }
 
-/// A duration for display: milliseconds below a second, seconds above.
 pub fn format_elapsed(elapsed: Duration) -> String {
     if elapsed < Duration::from_secs(1) {
         format!("{} ms", elapsed.as_millis())
