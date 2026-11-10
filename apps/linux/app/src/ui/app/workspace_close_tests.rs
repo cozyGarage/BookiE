@@ -443,6 +443,7 @@ fn browse_grid_edit_save_reaches_guarded_connection_and_audit() {
 struct PausedApproval {
     requested: std::sync::atomic::AtomicUsize,
     release: tokio::sync::Notify,
+    outcome: bookie_policy::ApprovalOutcome,
 }
 
 #[async_trait::async_trait]
@@ -450,7 +451,7 @@ impl bookie_policy::ApprovalSink for PausedApproval {
     async fn request(&self, _request: bookie_policy::ApprovalRequest) -> bookie_policy::ApprovalOutcome {
         self.requested.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.release.notified().await;
-        bookie_policy::ApprovalOutcome::AllowOnce
+        self.outcome
     }
 }
 
@@ -481,6 +482,7 @@ fn browse_save_waits_for_approval_before_writing() {
     let approval = Arc::new(PausedApproval {
         requested: std::sync::atomic::AtomicUsize::new(0),
         release: tokio::sync::Notify::new(),
+        outcome: bookie_policy::ApprovalOutcome::AllowOnce,
     });
     controller.model().database.set_approval_sink(approval.clone());
     controller.widget().present();
@@ -522,4 +524,81 @@ fn browse_save_waits_for_approval_before_writing() {
                 && event["terminal_status"] == "succeeded"
         })
     ));
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn browse_save_denied_by_approval_preserves_data_and_audits() {
+    use crate::services::change_tracker::StatementSource;
+    use bookie_core::{Environment, Value};
+    use std::sync::atomic::Ordering;
+
+    adw::init().unwrap();
+    gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
+    relm4::main_application()
+        .register(None::<&gtk4::gio::Cancellable>)
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("notes.sqlite");
+    std::fs::File::create(&path).unwrap();
+    let prepared = prepared_sqlite_connection(true, Some(&path), Environment::Local);
+    drop(prepared);
+    let prepared = prepared_sqlite_connection(false, Some(&path), Environment::Prod);
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _entered = runtime.enter();
+    let controller = launch(directory.path());
+    let approval = Arc::new(PausedApproval {
+        requested: std::sync::atomic::AtomicUsize::new(0),
+        release: tokio::sync::Notify::new(),
+        outcome: bookie_policy::ApprovalOutcome::Deny,
+    });
+    controller.model().database.set_approval_sink(approval.clone());
+    controller.widget().present();
+    controller.emit(AppMsg::OpenConnect);
+    spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
+    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    spin_until(|| controller.model().window_connection().is_some());
+    let connection = controller.model().window_connection().unwrap();
+    controller.emit(AppMsg::ExecuteBrowseTransaction {
+        tab_id: uuid::Uuid::new_v4(),
+        save_id: uuid::Uuid::new_v4(),
+        statements: vec![(
+            "INSERT INTO notes (id, title) VALUES (?, ?)".into(),
+            vec![Value::Int(1), Value::Text("approved".into())],
+        )],
+        sources: vec![StatementSource::Insert { draft_id: 1 }],
+    });
+    spin_until(|| approval.requested.load(Ordering::SeqCst) > 0);
+    assert!(
+        runtime
+            .block_on(connection.query("SELECT title FROM notes WHERE id = 1"))
+            .unwrap()
+            .rows
+            .is_empty()
+    );
+    approval.release.notify_one();
+    let journal = controller.model().database.audit_journal_path_for_test();
+    spin_until(|| {
+        std::fs::read_to_string(&journal).is_ok_and(|contents| {
+            contents.lines().any(|line| {
+                serde_json::from_str::<serde_json::Value>(line).is_ok_and(|record| {
+                    let event = &record["event"];
+                    event["operation_class"] == "mutation"
+                        && event["phase"] == "outcome"
+                        && event["terminal_status"] == "denied"
+                })
+            })
+        })
+    });
+    spin_until(|| controller.model().in_flight_saves.get() == 0);
+    assert!(
+        runtime
+            .block_on(connection.query("SELECT title FROM notes WHERE id = 1"))
+            .unwrap()
+            .rows
+            .is_empty()
+    );
 }
