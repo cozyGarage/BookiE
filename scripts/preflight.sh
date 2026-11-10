@@ -38,6 +38,7 @@ CRATES=(
   bookie-driver-redis
   bookie-driver-mongodb
   bookie-driver-oracle
+  bookie-driver-cassandra
   bookie-release-tests
   bookie-driver-tls-tests
 )

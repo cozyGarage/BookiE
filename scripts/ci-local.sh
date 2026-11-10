@@ -91,7 +91,7 @@ run_integration() {
   echo "==> SQL and document/key-value driver integration"
   bash scripts/run-rust-tests.sh --locked --test integration \
     -p bookie-driver-postgres -p bookie-driver-mysql -p bookie-driver-mssql \
-    -p bookie-driver-clickhouse -p bookie-driver-redis -p bookie-driver-mongodb -p bookie-driver-oracle \
+    -p bookie-driver-clickhouse -p bookie-driver-redis -p bookie-driver-mongodb -p bookie-driver-oracle -p bookie-driver-cassandra \
     -- --include-ignored --test-threads=1
   bash scripts/run-rust-tests.sh --locked -p bookie-driver-duckdb \
     --test integration --test read_only --test missing_file -- --include-ignored --test-threads=1

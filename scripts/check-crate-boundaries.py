@@ -24,7 +24,7 @@ GUI = {
 }
 DRIVERS = {
     f"bookie-driver-{engine}"
-    for engine in ("clickhouse", "duckdb", "mongodb", "mssql", "mysql", "oracle", "postgres", "redis", "sqlite")
+    for engine in ("cassandra", "clickhouse", "duckdb", "mongodb", "mssql", "mysql", "oracle", "postgres", "redis", "sqlite")
 }
 TEST_CRATES = {"bookie-driver-tls-tests", "bookie-release-tests"}
 ALLOWED = {
