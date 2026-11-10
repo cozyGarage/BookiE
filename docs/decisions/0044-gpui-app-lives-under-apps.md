@@ -1,6 +1,6 @@
 # 0044: The GPUI app lives under apps/
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-11-10)
 - **Date**: 2026-11-10
 
 ## Context
