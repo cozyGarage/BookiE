@@ -424,7 +424,7 @@ jobs:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
           BOOKIE_NEXTEST_PROFILE: ci
         run: |
-          cd src && bash scripts/test-sandbox.sh
+          cd src && python3 scripts/run-test-layer.py sandbox
 
       - name: Finalize runner job
         if: always()
@@ -461,8 +461,7 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: GTK widget tests
-        run: |
-          cd src && bash scripts/test-gtk-widgets.sh
+        run: cd src && python3 scripts/run-test-layer.py widgets
 
       - name: Finalize runner job
         if: always()
@@ -914,7 +913,7 @@ jobs:
       - name: PostgreSQL release fixture
         run: |
           mkdir -p "$TMPDIR"
-          cd src && ./scripts/test-postgres-release.sh
+          cd src && python3 scripts/run-test-layer.py postgres-release
 
       - name: Finalize runner job
         if: always()
@@ -1140,8 +1139,7 @@ jobs:
       - name: Pre-pull fixture images
         run: bash src/scripts/prepull-test-images.sh driver-tls
       - name: Driver TLS fixtures
-        run: |
-          cd src && ./scripts/test-driver-tls.sh
+        run: cd src && python3 scripts/run-test-layer.py tls
 
       - name: Finalize runner job
         if: always()
@@ -1181,8 +1179,7 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Secret Service tier
-        run: |
-          cd src && ./scripts/test-secret-service.sh
+        run: cd src && python3 scripts/run-test-layer.py keyring
 
       - name: Finalize runner job
         if: always()

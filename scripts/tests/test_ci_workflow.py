@@ -23,6 +23,15 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_shared_github_and_forgejo_tiers_use_the_layer_catalog(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for layer in ("widgets", "keyring", "tls", "postgres-release"):
+            with self.subTest(layer=layer):
+                invocation = f"python3 scripts/run-test-layer.py {layer}"
+                self.assertIn(invocation, github)
+                self.assertIn(invocation, forgejo)
+
     def test_forgejo_runs_gpui_model_and_interaction_tests(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
@@ -135,7 +144,7 @@ class CiWorkflowTests(unittest.TestCase):
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
         widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("test-gtk-widgets.sh", widgets)
+        self.assertIn("python3 scripts/run-test-layer.py widgets", widgets)
         self.assertNotRegex(widgets, r"(?m)^    (if|continue-on-error):")
 
     def test_default_test_jobs_wait_for_the_one_test_bundle_and_duckdb_runs_with_the_drivers(self):
