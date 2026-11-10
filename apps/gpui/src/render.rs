@@ -29,7 +29,6 @@ impl Render for GridView {
         };
         let strip = div()
             .flex()
-            .flex_wrap()
             .items_center()
             .gap_1()
             .px_2()
@@ -55,7 +54,7 @@ impl Render for GridView {
                 this.pager.last();
                 cx.notify();
             })))
-            .child(div().w(px(110.0)).child(self.find.clone()))
+            .child(div().w(px(110.0)).flex_none().child(self.find.clone()))
             .child(button("find-prev", "↑", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(false, cx))))
             .child(button("find-next", "↓", theme).on_click(cx.listener(|this, _, _, cx| this.run_find(true, cx))))
             .child(
@@ -82,7 +81,13 @@ impl Render for GridView {
                     cx.notify();
                 })),
             )
-            .child(div().text_color(rgb(theme.muted_foreground)).child(self.status.clone()));
+            .child(
+                div()
+                    .ml_auto()
+                    .whitespace_nowrap()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(self.status.clone()),
+            );
         let filter_row = self.filter_visible.then(|| {
             div()
                 .flex()
