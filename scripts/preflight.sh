@@ -84,13 +84,17 @@ cargo clippy "${PKG_ARGS[@]}" --all-targets -- -D warnings
 
 echo "==> nextest --lib --bins (non-GTK crates)"
 NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
-  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE" "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}"
+unit_bundle="${BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}}"
+if [[ -n "$unit_bundle" ]]; then
+  expected_group=()
+  if [[ -n "${BOOKIE_UNIT_BUNDLE:-}" ]]; then expected_group+=(--expected-group unit); fi
+  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$unit_bundle" \
+    "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}" "${expected_group[@]}"
   packages=""
   for crate in "${CRATES[@]}"; do
     packages+="${packages:+ | }package(=$crate)"
   done
-  "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" \
+  "$NEXTEST" nextest run --archive-file "$unit_bundle/nextest.tar.zst" \
     --workspace-remap "$ROOT" --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail \
     -E "($packages) & (kind(lib) | kind(bin))"
 elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then

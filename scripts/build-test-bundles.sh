@@ -12,7 +12,7 @@ requested_group=${2:-default}
 case "$requested_group" in
   default) groups=(default) ;;
   gpui) groups=(gpui) ;;
-  all) groups=(default gpui) ;;
+  all) groups=() ;;
   forgejo) groups=() ;;
   *) printf 'Unknown test bundle group: %s\n' "$requested_group" >&2; exit 2 ;;
 esac

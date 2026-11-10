@@ -288,20 +288,30 @@ class CiWorkflowTests(unittest.TestCase):
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
         self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
 
-    def test_github_reuses_the_source_pinned_test_bundle_for_both_fast_tiers(self):
+    def test_github_jobs_fetch_the_bundle_groups_they_execute(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        for name in ("preflight", "fast"):
+        expected = {"preflight": ("unit", "sandbox"), "fast": ("unit", "direct"), "integration": ("direct",)}
+        for name, groups in expected.items():
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("reusable-test-builds", job)
                 self.assertIn("actions/download-artifact@", job)
-                self.assertIn('ci-test-bundle.py verify "$RUNNER_TEMP/bookie-bundle"', job)
-                self.assertIn('find "$RUNNER_TEMP/bookie-bundle/tests" "$RUNNER_TEMP/bookie-bundle/bin" -type f -exec chmod u+x {} +', job)
-                self.assertIn("BOOKIE_REQUIRE_PREBUILT=1", job)
-                self.assertIn("GSETTINGS_SCHEMA_DIR=%s/bookie-bundle/schemas", job)
+                for group in groups:
+                    with self.subTest(group=group):
+                        self.assertIn(f"--expected-group {group}", job)
+                        self.assertIn(f"bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}", job)
+                self.assertNotIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-default", job)
+        for name in ("preflight", "fast"):
+            job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+            self.assertIn("BOOKIE_REQUIRE_PREBUILT=1", job)
+            self.assertIn("GSETTINGS_SCHEMA_DIR=%s/bookie-unit-bundle/schemas", job)
         preflight = re.search(r"(?ms)^  preflight:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         self.assertIn("needs.ensure-ci-gtk-image.outputs.tag", preflight)
-        self.assertIn("--workspace-remap", (ROOT / "scripts/preflight.sh").read_text())
+        preflight_script = (ROOT / "scripts/preflight.sh").read_text()
+        sandbox_script = (ROOT / "scripts/test-sandbox.sh").read_text()
+        self.assertIn('BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', preflight_script)
+        self.assertIn('BOOKIE_SANDBOX_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', sandbox_script)
+        self.assertIn("--workspace-remap", preflight_script)
 
     def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
