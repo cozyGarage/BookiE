@@ -167,6 +167,12 @@ class ExperimentBoundaryTests(unittest.TestCase):
         root = self.manifest('db = { package = "bookie-storage", path = "x" }')
         self.assertEqual(len(checker.experiment_problems(root)), 1)
 
+    def test_the_gpui_app_follows_the_same_rule(self):
+        root = self.manifest('bookie-driver-sqlite = { path = "x" }')
+        empty = tempfile.TemporaryDirectory()
+        self.addCleanup(empty.cleanup)
+        self.assertEqual(len(checker.experiment_problems(empty.name, Path(root) / "demo")), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

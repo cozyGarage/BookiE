@@ -1,4 +1,4 @@
-use bookie_gpui_grid_prototype::theme::Theme;
+use bookie_gpui::theme::Theme;
 use gpui::{App, Global};
 
 struct Active(Theme);

@@ -17,7 +17,7 @@ const width = Number(options.width ?? 1100);
 const height = Number(options.height ?? 800);
 const pacing = options.pacing ?? 'timer';
 const scope = options.scope ?? 'page';
-const binary = options.binary ?? path.join(here, 'target/release/bookie-gpui-grid-prototype');
+const binary = options.binary ?? path.join(here, 'target/release/bookie-gpui');
 const timeoutMs = Number(options.timeout ?? 120000);
 const classes = { app: /^bookie-gpui-gr/ };
 

@@ -80,9 +80,12 @@ def check(metadata):
 EXPERIMENT_ALLOWED = {"bookie-core", "bookie-results", "bookie-app-services", "bookie-driver-registry"}
 
 
-def experiment_problems(experiments):
+def experiment_problems(experiments, gpui_app=None):
     problems = []
-    for manifest in sorted(Path(experiments).glob("*/Cargo.toml")):
+    manifests = sorted(Path(experiments).glob("*/Cargo.toml"))
+    if gpui_app:
+        manifests.append(Path(gpui_app) / "Cargo.toml")
+    for manifest in manifests:
         data = tomllib.loads(manifest.read_text())
         for table in ("dependencies", "dev-dependencies", "build-dependencies"):
             for name, spec in data.get(table, {}).items():
@@ -124,8 +127,9 @@ def main():
         return output.returncode
     metadata = json.loads(output.stdout)
     preflight = (Path(__file__).resolve().parent / "preflight.sh").read_text()
-    experiments = Path(__file__).resolve().parents[1] / "experiments"
-    problems = check(metadata) + unlisted_in_preflight(metadata, preflight) + experiment_problems(experiments)
+    root = Path(__file__).resolve().parents[1]
+    experiments = root / "experiments"
+    problems = check(metadata) + unlisted_in_preflight(metadata, preflight) + experiment_problems(experiments, root / "apps" / "gpui")
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:

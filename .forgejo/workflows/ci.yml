@@ -105,7 +105,7 @@ jobs:
           cd src
           gpui_tmp=$(mktemp -d "$GITHUB_WORKSPACE/.gpui-tmp.XXXXXX")
           trap 'rm -rf -- "$gpui_tmp"' EXIT
-          env -u DISPLAY -u WAYLAND_DISPLAY TMPDIR="$gpui_tmp" cargo test --manifest-path experiments/gpui-grid-prototype/Cargo.toml --locked
+          env -u DISPLAY -u WAYLAND_DISPLAY TMPDIR="$gpui_tmp" cargo test --manifest-path apps/gpui/Cargo.toml --locked
       - name: Finalize runner job
         if: always()
         shell: bash

@@ -8,16 +8,14 @@ mod render;
 mod text_input;
 mod ui_theme;
 
-use bookie_gpui_grid_prototype::cursor::{Cursor, move_cursor};
-use bookie_gpui_grid_prototype::model::*;
-use bookie_gpui_grid_prototype::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui_grid_prototype::preview::cell_preview;
-use bookie_gpui_grid_prototype::selection::{Selection, copy_tsv};
-use bookie_gpui_grid_prototype::shell::{
-    DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag,
-};
-use bookie_gpui_grid_prototype::source::{Source, Synthetic};
-use bookie_gpui_grid_prototype::theme::{Style, Theme};
+use bookie_gpui::cursor::{Cursor, move_cursor};
+use bookie_gpui::model::*;
+use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
+use bookie_gpui::preview::cell_preview;
+use bookie_gpui::selection::{Selection, copy_tsv};
+use bookie_gpui::shell::{DATA_TABLE, DEFAULT_RESULT_RATIO, Run, Tab, Tabs, next_run, result_ratio_from_drag};
+use bookie_gpui::source::{Source, Synthetic};
+use bookie_gpui::theme::{Style, Theme};
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, KeyDownEvent, MouseButton,
     MouseDownEvent, ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds,
@@ -1059,10 +1057,8 @@ pub fn cell_div(width: f32, text: String) -> Div {
 
 fn display_cell(width: f32, cell: &Cell, theme: Theme) -> Div {
     let mut item = cell_div(width, cell_preview(cell));
-    if let Some(kind) = bookie_gpui_grid_prototype::type_colors::type_kind(cell) {
-        item = item.text_color(rgb(bookie_gpui_grid_prototype::type_colors::type_color(
-            kind, theme.dark,
-        )));
+    if let Some(kind) = bookie_gpui::type_colors::type_kind(cell) {
+        item = item.text_color(rgb(bookie_gpui::type_colors::type_color(kind, theme.dark)));
     }
     if numeric_cell(cell) { item.justify_end() } else { item }
 }
@@ -1151,7 +1147,7 @@ mod ui_tests;
 const LIVE_ROW_CAP: u64 = 100_000;
 
 fn live_source() -> Option<Source> {
-    use bookie_gpui_grid_prototype::live::{LiveTable, Origin};
+    use bookie_gpui::live::{LiveTable, Origin};
     let table = std::env::var("BOOKIE_PROTOTYPE_TABLE").ok()?;
     let origin = match (
         std::env::var("BOOKIE_PROTOTYPE_FILE").ok(),
