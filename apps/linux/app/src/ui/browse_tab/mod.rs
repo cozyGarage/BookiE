@@ -549,6 +549,7 @@ impl SimpleComponent for BrowseTab {
                         row_position,
                         col_index,
                         row_key,
+                        draft_id: crate::ui::grid::focused_cell_draft_id(widget, row_position),
                     })
                     .ok();
                 glib::Propagation::Stop
@@ -1058,7 +1059,8 @@ impl SimpleComponent for BrowseTab {
                 row_position,
                 col_index,
                 row_key,
-            } => self.handle_grid_set_cell_null(row_position, col_index, row_key, sender),
+                draft_id,
+            } => self.handle_grid_set_cell_null(row_position, col_index, row_key, draft_id, sender),
             BrowseTabInput::GridDeleteRowAt {
                 row_position,
                 row_key,

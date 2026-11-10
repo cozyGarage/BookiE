@@ -1,6 +1,8 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
 use bookie_core::{ColumnInfo, QueryResult, Value};
-use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
+use relm4::gtk::prelude::{
+    ButtonExt, GtkWindowExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt,
+};
 use relm4::gtk::{gio::prelude::ListModelExt, glib::prelude::Cast};
 use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
@@ -122,6 +124,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -183,6 +186,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -500,6 +504,7 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(2)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -567,6 +572,7 @@ fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     let outputs = pump(&observed);
@@ -616,6 +622,7 @@ fn undecodable_cell_edit_and_null_messages_do_not_stage_mutations() {
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     let outputs = pump(&observed);
@@ -939,6 +946,7 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         },
         BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
@@ -998,6 +1006,81 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn keyboard_set_null_targets_the_focused_draft() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
+    );
+    let window = relm4::gtk::Window::builder()
+        .child(controller.widget())
+        .default_width(800)
+        .default_height(500)
+        .build();
+    window.present();
+    pump(&observed);
+    let view = controller.model().current_column_view.clone().unwrap();
+    let column = (0..view.columns().n_items())
+        .find_map(|index| {
+            let column = view
+                .columns()
+                .item(index)?
+                .downcast::<relm4::gtk::ColumnViewColumn>()
+                .ok()?;
+            (column.id().as_deref() == Some("1")).then_some(column)
+        })
+        .unwrap();
+    view.scroll_to(0, Some(&column), relm4::gtk::ListScrollFlags::FOCUS, None);
+    pump(&observed);
+    assert_eq!(
+        crate::ui::grid::focused_cell_identity(&view).map(|(row, col, _)| (row, col)),
+        Some((0, 1))
+    );
+    assert!(activate_shortcut(&controller, "<Primary><Shift>n"));
+    pump(&observed);
+    assert_eq!(controller.model().row_object_at(0).unwrap().cell_value(1), Value::Null);
+    window.destroy();
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn stale_set_null_does_not_modify_a_replacement_draft() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("first".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    let first_id = controller.model().row_object_at(0).unwrap().draft_id();
+    add_draft_row(
+        &controller,
+        vec![Value::Int(4), Value::Text("second".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    controller
+        .sender()
+        .send(BrowseTabInput::GridSetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: Vec::new(),
+            draft_id: first_id,
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(
+        controller.model().row_object_at(0).unwrap().cell_value(1),
+        Value::Text("second".into())
+    );
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
@@ -1008,12 +1091,14 @@ fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
         vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
     );
     pump(&observed);
+    let draft_id = controller.model().row_object_at(0).unwrap().draft_id();
     controller
         .sender()
         .send(BrowseTabInput::GridSetCellNull {
             row_position: 0,
             col_index: 1,
             row_key: Vec::new(),
+            draft_id,
         })
         .unwrap();
     let outputs = pump(&observed);

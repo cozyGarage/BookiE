@@ -546,8 +546,12 @@ impl BrowseTab {
         row_position: u32,
         col_index: usize,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
         sender: ComponentSender<Self>,
     ) {
+        if self.row_object_at(row_position).and_then(|row| row.draft_id()) != draft_id {
+            return;
+        }
         if self.reject_stale_row_edit(row_position, &row_key, &sender) {
             return;
         }

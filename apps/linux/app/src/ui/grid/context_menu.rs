@@ -133,6 +133,7 @@ pub(super) fn install_grid_context_menus(
                     row_position: position(slot),
                     col_index: slot.col_index,
                     row_key,
+                    draft_id: row.draft_id(),
                     nullable: column.nullable,
                     kind,
                     sender: sender.clone(),
@@ -399,12 +400,15 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("set-null")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let (row_position, row_key) = cell_row_identity(&slot.widget);
+                    let Some(row_position) = slot.row_position else { return };
+                    let row_key = slot.row_key.clone();
+                    let draft_id = slot.draft_target.map(|(_, id)| id);
                     sender
                         .send(GridMsg::SetCellNull {
                             row_position,
                             col_index: slot.col_index,
                             row_key,
+                            draft_id,
                         })
                         .ok();
                 }
@@ -1121,6 +1125,7 @@ pub(crate) fn present_loaded_cell_editor(view: &gtk::ColumnView, edit: LoadedCel
             row_position: edit.row_position,
             col_index: edit.col_index,
             row_key: edit.row_key,
+            draft_id: row.draft_id(),
             nullable: edit.column.nullable,
             kind,
             sender: edit.sender,

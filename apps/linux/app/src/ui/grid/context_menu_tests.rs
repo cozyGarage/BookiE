@@ -40,6 +40,9 @@ fn delete_action_preserves_the_stored_row_selected_when_menu_opened() {
     assert!(
         matches!(message, GridMsg::DeleteRowAt { row_position: 0, row_key, draft_id: None } if row_key == vec![Value::Int(1)])
     );
+    view.activate_action("cell.set-null", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::SetCellNull { row_position: 0, row_key, .. } if row_key == vec![Value::Int(1)]));
 }
 
 #[test]
@@ -68,7 +71,9 @@ fn delete_action_carries_the_selected_draft_identity() {
     );
     let cell = gtk::Label::new(None);
     POSITION_SLOT.set(&cell, 0);
-    menus.context.set(cell.upcast_ref(), 0, "id".into(), Some((0, 17)));
+    super::super::display::COLUMN_SLOT.set(&cell, 0);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
     rows.insert(0, &crate::ui::row_object::RowObject::new_draft(18, vec![Value::Int(2)]));
     view.activate_action("cell.delete-row", None).unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -76,6 +81,16 @@ fn delete_action_carries_the_selected_draft_identity() {
     assert!(matches!(
         message,
         GridMsg::DeleteRowAt {
+            row_position: 0,
+            draft_id: Some(17),
+            ..
+        }
+    ));
+    view.activate_action("cell.set-null", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(
+        message,
+        GridMsg::SetCellNull {
             row_position: 0,
             draft_id: Some(17),
             ..
