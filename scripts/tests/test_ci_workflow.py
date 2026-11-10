@@ -134,6 +134,14 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("cargo test", job)
         self.assertIn('rm -rf -- "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
 
+    def test_forgejo_jobs_fetch_the_bundle_group_they_execute(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name, group in (("unit", "unit"), ("sandbox", "sandbox"), ("gpui-tests", "gpui"),
+                            ("widgets", "direct"), ("driver", "direct"), ("consumers", "direct")):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn(f'prepare-test-bundle.sh "${{{{ github.sha }}}}" {group}', job)
+
     def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
