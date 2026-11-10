@@ -795,8 +795,7 @@ jobs:
           bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1
           bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_mssql -- --include-ignored --test-threads=1
       - name: App server tests
-        run: |
-          cd src && python3 scripts/run-isolated-tests.py app-server
+        run: cd src && python3 scripts/run-test-layer.py app-server
 
       - name: Finalize runner job
         if: always()
@@ -861,7 +860,7 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
       - name: Installed GTK end-to-end suite, one third
         run: |
-          cd src && BOOKIE_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
+          cd src && BOOKIE_GTK_SHARD="${{ matrix.shard }}/3" python3 scripts/run-test-layer.py ui
 
       - name: Finalize runner job
         if: always()

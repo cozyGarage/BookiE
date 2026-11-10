@@ -26,7 +26,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_shared_github_and_forgejo_tiers_use_the_layer_catalog(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        for layer in ("widgets", "keyring", "tls", "postgres-release"):
+        for layer in ("app-server", "widgets", "keyring", "ui", "tls", "postgres-release"):
             with self.subTest(layer=layer):
                 invocation = f"python3 scripts/run-test-layer.py {layer}"
                 self.assertIn(invocation, github)
