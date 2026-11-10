@@ -11,6 +11,7 @@ members = [
     "crates/mcp",
     "crates/agentd",
     "crates/ssh",
+    "crates/checks",
     "crates/dump",
     "crates/storage",
     "crates/transport",

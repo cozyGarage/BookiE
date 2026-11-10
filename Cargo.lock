@@ -1102,6 +1102,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bookie-checks"
+version = "0.2.6"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "bookie-core"
 version = "0.2.6"
 dependencies = [
