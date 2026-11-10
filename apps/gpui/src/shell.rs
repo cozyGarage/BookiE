@@ -81,6 +81,7 @@ pub enum Tab {
     Home,
     Table(String),
     Query,
+    Settings,
 }
 
 impl Tab {
@@ -89,6 +90,7 @@ impl Tab {
             Tab::Home => "Home".into(),
             Tab::Table(name) => name.clone(),
             Tab::Query => "Query 1".into(),
+            Tab::Settings => "Settings".into(),
         }
     }
 }
@@ -129,6 +131,16 @@ impl Tabs {
             Some(index) => index,
             None => {
                 self.items.push(Tab::Query);
+                self.items.len() - 1
+            }
+        };
+    }
+
+    pub fn open_settings(&mut self) {
+        self.active = match self.items.iter().position(|item| *item == Tab::Settings) {
+            Some(index) => index,
+            None => {
+                self.items.push(Tab::Settings);
                 self.items.len() - 1
             }
         };

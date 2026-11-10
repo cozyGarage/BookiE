@@ -99,20 +99,17 @@ pub(super) fn install_grid_context_menus(
             if !super::full_value_editor::is_full_value_column(&column.data_type) {
                 return;
             }
-            let Some(row) = row_object_at(&view, position(slot)) else {
+            let Some((row_position, row)) = full_value_target(&view, slot, &columns) else {
                 return;
             };
-            let (_, row_key) = cell_row_identity(&slot.widget);
-            if row.draft_id().is_none() && !has_persisted_row_key(&row_key) {
-                return;
-            }
+            let row_key = slot.row_key.clone();
             if row.cell_is_partial(slot.col_index) {
                 sender
                     .send(GridMsg::FetchCellValue {
                         col_index: slot.col_index,
                         column_name: slot.column_name.clone(),
                         row_key,
-                        edit_row_position: Some(position(slot)),
+                        edit_row_position: Some(row_position),
                     })
                     .ok();
                 return;
@@ -130,7 +127,7 @@ pub(super) fn install_grid_context_menus(
                 &slot.column_name,
                 &initial_text,
                 super::full_value_editor::EditContext {
-                    row_position: position(slot),
+                    row_position,
                     col_index: slot.col_index,
                     row_key,
                     draft_id: row.draft_id(),
@@ -986,6 +983,32 @@ fn row_has_full_text_value(view: &gtk::ColumnView, widget: &gtk::Widget, positio
 
 fn has_persisted_row_key(row_key: &[Value]) -> bool {
     crate::services::change_tracker::RowKey::from_pk_values(row_key).is_some()
+}
+
+fn full_value_target(
+    view: &gtk::ColumnView,
+    slot: &CellContext,
+    columns: &[ColumnInfo],
+) -> Option<(u32, crate::ui::row_object::RowObject)> {
+    let position = slot.row_position?;
+    if POSITION_SLOT.get(&slot.widget) != Some(position) || cell_row_identity(&slot.widget).1 != slot.row_key {
+        return None;
+    }
+    let row = row_object_at(view, position)?;
+    if row.draft_id() != slot.draft_target.map(|(_, id)| id) {
+        return None;
+    }
+    if row.draft_id().is_none() {
+        let keys: Vec<_> = columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| column.primary_key.then_some(index))
+            .collect();
+        if !has_persisted_row_key(&slot.row_key) || row.row_identity(&keys).pk_values.as_ref() != slot.row_key {
+            return None;
+        }
+    }
+    Some((position, row))
 }
 
 fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
