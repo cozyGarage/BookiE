@@ -228,6 +228,7 @@ fn applying_empty_text_stages_empty_text_without_converting_it_to_null() {
             col_index: 2,
             value: Value::Text(text),
             row_key,
+            draft_id: None,
         }) if text.is_empty() && row_key == vec![Value::Int(7)]
     ));
     parent.close();
@@ -270,6 +271,7 @@ fn invalid_json_stages_nothing_and_valid_apply_keeps_json_typed() {
             col_index: 1,
             value: Value::Json(value),
             row_key,
+            draft_id: None,
         }) if value["after"] == 2 && row_key == vec![Value::Int(9)]
     ));
     parent.close();

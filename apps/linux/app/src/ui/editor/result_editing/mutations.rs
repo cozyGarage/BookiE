@@ -65,8 +65,11 @@ impl SqlEditor {
                 col_index,
                 value,
                 row_key,
+                draft_id,
             } => {
-                self.handle_result_cell_value_edited(row_position, col_index, value, row_key, sender);
+                if self.result_row_object(row_position).and_then(|row| row.draft_id()) == draft_id {
+                    self.handle_result_cell_value_edited(row_position, col_index, value, row_key, sender);
+                }
                 None
             }
             GridMsg::SetCellNull {
@@ -775,6 +778,7 @@ mod save_guard_tests {
                 col_index: 0,
                 value: bookie_core::Value::Null,
                 row_key: Vec::new(),
+                draft_id: None,
             },
             GridMsg::SetCellNull {
                 row_position: 0,

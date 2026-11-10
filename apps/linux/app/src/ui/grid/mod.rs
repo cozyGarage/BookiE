@@ -81,6 +81,7 @@ pub enum GridMsg {
         col_index: usize,
         value: bookie_core::Value,
         row_key: Vec<bookie_core::Value>,
+        draft_id: Option<u64>,
     },
     ReplaceBatch {
         report: bookie_app_services::grid_replace::ReplaceReport,

@@ -44,6 +44,7 @@ pub enum BrowseTabInput {
         new_value: String,
         value: Option<Value>,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
     },
     GridReplaceBatch {
         report: bookie_app_services::grid_replace::ReplaceReport,

@@ -362,6 +362,17 @@ fn stale_set_null_does_not_modify_a_replacement_query_result_draft() {
     fixture
         .controller
         .sender()
+        .send(SqlEditorInput::Grid(GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("stale".into()),
+            row_key: Vec::new(),
+            draft_id: Some(first_id),
+        }))
+        .unwrap();
+    fixture
+        .controller
+        .sender()
         .send(SqlEditorInput::Grid(GridMsg::DuplicateRow {
             row_position: 0,
             row_key: Vec::new(),
