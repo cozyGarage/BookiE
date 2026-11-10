@@ -65,6 +65,13 @@ impl GridView {
                 .map(|position| (position, editing.column, gpui::AnyView::from(self.editor.clone())))
         });
         self.table.update(cx, |table, cx| {
+            let cell = table_cell(self.cell_cursor);
+            if table.selected_cell() != cell {
+                match cell {
+                    Some((row, column)) => table.set_selected_cell(row, column, cx),
+                    None => table.clear_selection(cx),
+                }
+            }
             let delegate = table.delegate();
             let changed = delegate.columns != columns
                 || delegate.rows != rows
@@ -82,5 +89,32 @@ impl GridView {
 
     pub(crate) fn data_table(&self) -> DataTable<GridDelegate> {
         DataTable::new(&self.table).stripe(true)
+    }
+}
+
+pub fn table_cell(cursor: Option<bookie_gpui::cursor::Cursor>) -> Option<(usize, usize)> {
+    cursor.map(|cursor| (cursor.row, cursor.column))
+}
+
+pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_gpui::cursor::Cursor> {
+    cell.map(|(row, column)| bookie_gpui::cursor::Cursor { row, column })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bookie_gpui::cursor::Cursor;
+
+    #[test]
+    fn a_cursor_survives_the_trip_through_the_table_cell() {
+        let cursor = Some(Cursor { row: 3, column: 2 });
+        assert_eq!(cursor_at(table_cell(cursor)), cursor);
+        assert_eq!(cursor_at(table_cell(None)), None);
+    }
+
+    #[test]
+    fn a_table_cell_survives_the_trip_through_the_cursor() {
+        assert_eq!(table_cell(cursor_at(Some((0, 5)))), Some((0, 5)));
+        assert_eq!(table_cell(cursor_at(None)), None);
     }
 }
