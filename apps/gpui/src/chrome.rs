@@ -457,13 +457,15 @@ impl GridView {
             .children(tabs)
     }
 
-    pub fn settings_page(&self, theme: Theme) -> Div {
+    pub fn settings_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let view = cx.entity();
         let dark_mode = gpui_kit::component::setting::SettingField::switch(
             |cx| Theme::current(cx).dark,
-            |on, cx| {
+            move |on, cx| {
                 if Theme::current(cx).dark != on {
                     Theme::current(cx).toggled().install(cx);
                 }
+                view.update(cx, |this, _| this.dark_mode = on);
             },
         );
         let page = gpui_kit::component::setting::SettingPage::new("Appearance")

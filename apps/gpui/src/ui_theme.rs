@@ -16,6 +16,12 @@ impl ThemeExt for Theme {
     }
 
     fn install(self, cx: &mut App) {
+        let mode = if self.dark {
+            gpui_kit::component::theme::ThemeMode::Dark
+        } else {
+            gpui_kit::component::theme::ThemeMode::Light
+        };
+        gpui_kit::component::theme::Theme::change(mode, None, cx);
         cx.set_global(Active(self));
     }
 }

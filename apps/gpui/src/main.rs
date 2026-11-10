@@ -1343,6 +1343,12 @@ fn main() {
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
                     });
+                    if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("settings") {
+                        view.update(cx, |view, _| {
+                            view.tabs.open_settings();
+                            view.sync_grid_owner();
+                        });
+                    }
                     if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
                         view.update(cx, |view, _| {
                             view.tabs.open_query();
