@@ -66,7 +66,7 @@ pub fn classify(error: &DriverError) -> DriverFailurePresentation {
             sqlstate: sqlstate.clone(),
             position: *position,
         },
-        DriverError::Disconnected => DriverFailurePresentation::Disconnected,
+        DriverError::Disconnected | DriverError::CommitUnconfirmed(_) => DriverFailurePresentation::Disconnected,
         DriverError::ReadOnly => DriverFailurePresentation::ReadOnly,
         DriverError::PolicyDenied(detail) => DriverFailurePresentation::PolicyDenied(detail.clone()),
         DriverError::Unsupported(detail) => DriverFailurePresentation::Unsupported(detail.clone()),

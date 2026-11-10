@@ -6,6 +6,10 @@ pub(super) async fn execute_in_transaction_checked(
     expect_one: &[usize],
 ) -> Result<Vec<u64>, DriverError> {
     let mut tx = pool.begin().await.map_err(map_sqlx_error)?;
+    let xid: i64 = sqlx::query_scalar("SELECT pg_catalog.txid_current()")
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(map_sqlx_error)?;
     let mut affected = Vec::with_capacity(statements.len());
     for (index, (sql, params)) in statements.iter().enumerate() {
         let inferred_text_types = if needs_text_type_inference(params) {
@@ -35,6 +39,14 @@ pub(super) async fn execute_in_transaction_checked(
             Err(error) => return Err(transaction_failure(tx, index, map_sqlx_error(error)).await),
         }
     }
-    tx.commit().await.map_err(map_sqlx_error)?;
-    Ok(affected)
+    match tx.commit().await {
+        Ok(()) => Ok(affected),
+        Err(sqlx::Error::Io(_)) => Err(DriverError::OperationOutcomeUnknown {
+            source: Box::new(DriverError::CommitUnconfirmed(CommitToken::PostgresXid {
+                xid: u64::try_from(xid).unwrap_or_default(),
+                legacy_txid: true,
+            })),
+        }),
+        Err(error) => Err(map_sqlx_error(error)),
+    }
 }
