@@ -1,5 +1,3 @@
-use tokio_util::sync::CancellationToken;
-
 pub const ALLOWED_ROWS: [u64; 3] = [150_000, 500_000, 1_000_000];
 pub const DEFAULT_ROWS: u64 = 1_000_000;
 pub const MAX_FIND_MATCHES: usize = 10_000;
@@ -219,6 +217,8 @@ pub struct DiffSummary {
     pub added: u64,
     pub removed: u64,
     pub changed: u64,
+    /// Rows that could not be compared exactly (an unreadable cell on either side).
+    pub unknown: u64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -242,50 +242,13 @@ fn right_state(index: u64) -> &'static str {
     }
 }
 
-pub fn build_diff(total: u64, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
-    if cancel.is_cancelled() {
-        return Err("comparison cancelled");
+/// The right-hand side of the synthetic comparison: `None` when the row was dropped.
+pub fn right_row(index: u64) -> Option<Vec<Cell>> {
+    match right_state(index) {
+        "dropped" => None,
+        "edited" => Some(cells_of(index, &format!("{} (edited)", label_of(index)))),
+        _ => Some(row_at(index)),
     }
-    let mut summary = DiffSummary {
-        keyed,
-        ..DiffSummary::default()
-    };
-    let mut rows: Vec<DiffRow> = Vec::new();
-    let mut capped = false;
-    for index in 0..total {
-        if index.is_multiple_of(1_024) && cancel.is_cancelled() {
-            return Err("comparison cancelled");
-        }
-        let mut produced: Vec<(&'static str, Vec<Cell>)> = Vec::new();
-        let original = label_of(index);
-        let edited = format!("{original} (edited)");
-        match right_state(index) {
-            "same" => summary.equal += 1,
-            "dropped" => {
-                summary.removed += 1;
-                produced.push(("Removed", cells_of(index, &original)));
-            }
-            _ if keyed => {
-                summary.changed += 1;
-                produced.push(("Before", cells_of(index, &original)));
-                produced.push(("After", cells_of(index, &edited)));
-            }
-            _ => {
-                summary.removed += 1;
-                summary.added += 1;
-                produced.push(("Removed", cells_of(index, &original)));
-                produced.push(("Added", cells_of(index, &edited)));
-            }
-        }
-        for (change, cells) in produced {
-            if rows.len() < MAX_DIFF_ROWS {
-                rows.push(DiffRow { change, cells });
-            } else {
-                capped = true;
-            }
-        }
-    }
-    Ok(Diff { summary, rows, capped })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
