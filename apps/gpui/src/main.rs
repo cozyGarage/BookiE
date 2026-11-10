@@ -1029,7 +1029,11 @@ impl GridView {
                 ),
                 action("home", "Open Home", true),
                 action("settings", "Open settings", true),
-                action("table", &format!("Open {}", self.catalog.grid_table), true),
+                action(
+                    "table",
+                    &format!("Open {}", self.catalog.grid_table),
+                    !self.catalog.tables.is_empty(),
+                ),
                 action(
                     "theme",
                     if self.dark_mode {
