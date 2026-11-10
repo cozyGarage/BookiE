@@ -1,6 +1,7 @@
 pub mod core_bridge;
 pub mod cursor;
 pub mod edit;
+pub mod live;
 pub mod model;
 pub mod palette;
 pub mod preview;
@@ -8,6 +9,7 @@ pub mod selection;
 pub mod shell;
 pub mod source;
 pub mod theme;
+pub mod type_colors;
 
 #[cfg(test)]
 mod core_bridge_tests;

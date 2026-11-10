@@ -111,7 +111,7 @@ impl GridView {
         }
         let theme = Theme::current(cx);
         let cell = self.edits.get(&(source, column)).unwrap_or(cell);
-        let mut item = display_cell(width, cell);
+        let mut item = display_cell(width, cell, theme);
         if matches!(cell, Cell::Null) {
             item = item.italic().text_color(rgb(theme.muted_foreground));
         }
