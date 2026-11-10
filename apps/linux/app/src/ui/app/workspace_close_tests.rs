@@ -340,3 +340,97 @@ fn browse_save_dispatch_on_read_only_connection_is_denied_and_audited() {
         event["operation_class"] == "mutation" && event["phase"] == "outcome" && event["terminal_status"] == "denied"
     }));
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn browse_grid_edit_save_reaches_guarded_connection_and_audit() {
+    use crate::ui::browse_tab::BrowseTabInput;
+    use bookie_core::Value;
+
+    adw::init().unwrap();
+    gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
+    relm4::main_application()
+        .register(None::<&gtk4::gio::Cancellable>)
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let controller = launch(directory.path());
+    controller.widget().present();
+    controller.emit(AppMsg::OpenConnect);
+    spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
+    let prepared = prepared_sqlite_connection(false, None);
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _entered = runtime.enter();
+    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    spin_until(|| controller.model().window_connection().is_some());
+    let connection = controller.model().window_connection().unwrap();
+    runtime
+        .block_on(connection.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)"))
+        .unwrap();
+    runtime
+        .block_on(connection.execute("INSERT INTO notes VALUES (1, 'before')"))
+        .unwrap();
+    controller.emit(AppMsg::SelectTable {
+        schema: None,
+        name: "notes".into(),
+        open_mode: super::super::OpenMode::NewTab,
+    });
+    spin_until(|| {
+        controller.model().workspace_tabs.borrow().values().any(|tab| {
+            tab.browse_controller()
+                .is_some_and(|browse| browse.model().row_cells_at(0).is_some())
+        })
+    });
+    let id = controller
+        .model()
+        .workspace_tabs
+        .borrow()
+        .iter()
+        .find_map(|(id, tab)| tab.browse_controller().map(|_| *id))
+        .unwrap();
+    {
+        let model = controller.model();
+        let tabs = model.workspace_tabs.borrow();
+        let browse = tabs.get(&id).unwrap().browse_controller().unwrap();
+        browse.emit(BrowseTabInput::GridCellEdited {
+            row_position: 0,
+            col_index: 1,
+            new_value: "changed".into(),
+            value: None,
+            row_key: vec![Value::Int(1)],
+        });
+    }
+    spin_until(|| {
+        controller
+            .model()
+            .change_trackers
+            .with_tab_ref(id, |tracker| tracker.pending_count())
+            .unwrap_or(0)
+            == 1
+    });
+    controller.emit(AppMsg::SaveActiveBrowseTabById(id));
+    spin_until(|| {
+        runtime
+            .block_on(connection.query("SELECT title FROM notes WHERE id = 1"))
+            .is_ok_and(|result| result.rows == vec![vec![Value::Text("changed".into())]])
+    });
+    spin_until(|| {
+        controller
+            .model()
+            .change_trackers
+            .with_tab_ref(id, |tracker| tracker.pending_count())
+            .unwrap_or(1)
+            == 0
+    });
+    let contents = std::fs::read_to_string(controller.model().database.audit_journal_path_for_test()).unwrap();
+    assert!(contents.lines().any(
+        |line| serde_json::from_str::<serde_json::Value>(line).is_ok_and(|record| {
+            let event = &record["event"];
+            event["operation_class"] == "mutation"
+                && event["phase"] == "outcome"
+                && event["terminal_status"] == "succeeded"
+        })
+    ));
+}
