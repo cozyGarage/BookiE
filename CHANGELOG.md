@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-11-11
+
+### Fixed
+
+- Result pages finishing after their rows disappear no longer remain unnecessarily loaded. (#2751)
+- A delayed row delete no longer discards a different unsaved draft after the grid changes. (#2755)
+- A grid menu no longer redirects a row delete to another row if the cell changes while the menu is open. (#2756)
+- Set NULL no longer follows a changed grid-cell binding to another row. (#2758)
+- Duplicating a row from its menu no longer targets a different row after the grid changes. (#2764)
+- The full-value editor no longer opens a different row after the grid changes. (#2774)
+- Applying a full-value edit no longer changes a replacement draft row. (#2777)
+- A stale cell menu no longer starts editing a replacement row. (#2778)
+- A stale cell menu no longer filters using a replacement row. (#2782)
+- Cell menu actions no longer use a different row after the grid changes. (#2786)
+- Large JSON cell previews avoid scanning the full value. (#2798)
+- The AppImage now uses libadwaita's own styling, with proper spacing and text hierarchy in dialogs and Preferences. (#2807)
+
 ## [0.2.6] - 2026-11-10
 
 ### Added
