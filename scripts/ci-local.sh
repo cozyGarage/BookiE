@@ -67,7 +67,17 @@ run_gtk_app() {
 
   echo "==> nextest (GTK app library and binaries)"
   NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-  "$NEXTEST" nextest run --locked -p bookie-app --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+  if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
+    python3 "$ROOT/scripts/ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE" "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}"
+    "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" \
+      --workspace-remap "$ROOT" --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail \
+      -E 'package(=bookie-app) & (kind(lib) | kind(bin))'
+  elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
+    echo 'a source-matched prebuilt test bundle is required' >&2
+    exit 1
+  else
+    "$NEXTEST" nextest run --locked -p bookie-app --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+  fi
 }
 
 run_integration() {

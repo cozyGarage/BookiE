@@ -7,6 +7,7 @@ import sys
 REQUIRED = {
     "pin-revision",
     "reusable-test-builds",
+    "gpui-tests",
     "preflight",
     "fast",
     "gtk-safety",

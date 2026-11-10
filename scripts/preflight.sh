@@ -79,7 +79,21 @@ cargo clippy "${PKG_ARGS[@]}" --all-targets -- -D warnings
 
 echo "==> nextest --lib --bins (non-GTK crates)"
 NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-"$NEXTEST" nextest run "${PKG_ARGS[@]}" --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
+  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE" "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}"
+  packages=""
+  for crate in "${CRATES[@]}"; do
+    packages+="${packages:+ | }package(=$crate)"
+  done
+  "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" \
+    --workspace-remap "$ROOT" --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail \
+    -E "($packages) & (kind(lib) | kind(bin))"
+elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
+  echo 'a source-matched prebuilt test bundle is required' >&2
+  exit 1
+else
+  "$NEXTEST" nextest run "${PKG_ARGS[@]}" --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+fi
 
 echo "==> sandbox integration tier"
 "$ROOT/scripts/test-sandbox.sh"

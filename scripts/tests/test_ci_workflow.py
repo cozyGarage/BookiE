@@ -27,8 +27,21 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("timeout-minutes:", job)
+        self.assertIn("CARGO_BUILD_JOBS: 4", job)
         self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", job)
         self.assertNotIn("--lib", job)
+
+    def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", job)
+        self.assertIn("ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", job)
+        self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", job)
+        self.assertIn("cargo test --manifest-path apps/gpui/Cargo.toml --locked", forgejo)
+        self.assertIn("CARGO_BUILD_JOBS: 4", job)
+        self.assertIn('"gpui-tests"', (ROOT / "scripts/check-ci-jobs.py").read_text())
+        self.assertIn("libxkbcommon-x11-dev", (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text())
 
     def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -132,6 +145,21 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("--test integration --test read_only --test missing_file", driver)
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
         self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
+
+    def test_github_reuses_the_source_pinned_test_bundle_for_both_fast_tiers(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        for name in ("preflight", "fast"):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("reusable-test-builds", job)
+                self.assertIn("actions/download-artifact@", job)
+                self.assertIn('ci-test-bundle.py verify "$RUNNER_TEMP/bookie-bundle"', job)
+                self.assertIn('find "$RUNNER_TEMP/bookie-bundle/tests" "$RUNNER_TEMP/bookie-bundle/bin" -type f -exec chmod u+x {} +', job)
+                self.assertIn("BOOKIE_REQUIRE_PREBUILT=1", job)
+                self.assertIn("GSETTINGS_SCHEMA_DIR=%s/bookie-bundle/schemas", job)
+        preflight = re.search(r"(?ms)^  preflight:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("needs.ensure-ci-gtk-image.outputs.tag", preflight)
+        self.assertIn("--workspace-remap", (ROOT / "scripts/preflight.sh").read_text())
 
     def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -468,8 +496,8 @@ class CiWorkflowTests(unittest.TestCase):
         preflight = workflow.split("  preflight:\n", 1)[1].split("  fast:\n", 1)[0]
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
         ensure = workflow.split("  ensure-ci-gtk-image:\n", 1)[1].split("  preflight:\n", 1)[0]
-        self.assertIn("needs: pin-revision", preflight)
-        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", fast)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", preflight)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", fast)
         self.assertNotIn("needs: preflight", fast)
         self.assertIn("mozilla-actions/sccache-action@", preflight)
         self.assertIn("mozilla-actions/sccache-action@", fast)
