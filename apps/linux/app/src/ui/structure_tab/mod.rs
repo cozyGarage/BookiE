@@ -111,6 +111,7 @@ pub struct StructureTab {
     column_comment_capability: ColumnCommentCapability,
     supports_index_metadata: bool,
     supports_foreign_key_metadata: bool,
+    collations: Rc<[String]>,
     columns: Rc<RefCell<Vec<DraftColumn>>>,
     indexes: Rc<RefCell<Vec<IndexInfo>>>,
     foreign_keys: Rc<RefCell<Vec<ForeignKeyInfo>>>,
@@ -230,6 +231,7 @@ pub enum ColumnField {
     AutoIncrement(bool),
     Default(Option<String>),
     Comment(Option<String>),
+    Collation(Option<String>),
 }
 
 #[derive(Debug)]
@@ -339,6 +341,23 @@ impl StructureTab {
         self.sql_buffer.set_text(&text);
     }
 
+    fn append_column_rows(&self, list: &gtk::ListBox, sender: &ComponentSender<Self>) {
+        for (i, col) in self.columns.borrow().iter().enumerate() {
+            list.append(&build_column_expander_row(
+                i,
+                col,
+                &self.driver_id,
+                columns::ColumnEditing {
+                    comment_capability: self.column_comment_capability,
+                    collations: &self.collations,
+                },
+                sender.clone(),
+                self.suppress_emit.clone(),
+                self.column_popovers.clone(),
+            ));
+        }
+    }
+
     fn rebuild_columns_view(&self, sender: ComponentSender<Self>) {
         // Tear down + rebuild. Editing happens infrequently enough
         // that rebuilding the whole layout per change is cheap.
@@ -366,7 +385,6 @@ impl StructureTab {
             }
         }
         clear_box(&self.columns_box);
-        let driver_id = self.driver_id.clone();
 
         // Native column editor: boxed-list `gtk::ListBox` of one
         // `adw::ExpanderRow` per column. Each expander's collapsed
@@ -377,17 +395,7 @@ impl StructureTab {
         // same boxed-list — the GNOME pattern matching Settings's
         // "Add Network" or Builder's run-config list.
         let list = boxed_list();
-        for (i, col) in self.columns.borrow().iter().enumerate() {
-            list.append(&build_column_expander_row(
-                i,
-                col,
-                &driver_id,
-                self.column_comment_capability,
-                sender.clone(),
-                self.suppress_emit.clone(),
-                self.column_popovers.clone(),
-            ));
-        }
+        self.append_column_rows(&list, &sender);
         let sender_for_add = sender.clone();
         append_add_button(&list, &crate::tr!("Add Column"), move || {
             sender_for_add.input(StructureTabInput::AddColumn);
@@ -815,6 +823,7 @@ impl SimpleComponent for StructureTab {
             column_comment_capability: init.column_comment_capability,
             supports_index_metadata: false,
             supports_foreign_key_metadata: false,
+            collations: Rc::from(Vec::new()),
             columns: Rc::new(RefCell::new(Vec::new())),
             indexes: Rc::new(RefCell::new(Vec::new())),
             foreign_keys: Rc::new(RefCell::new(Vec::new())),
@@ -863,6 +872,7 @@ impl SimpleComponent for StructureTab {
                 *self.original_fks.borrow_mut() = metadata.foreign_keys;
                 self.supports_index_metadata = metadata.indexes_supported;
                 self.supports_foreign_key_metadata = metadata.foreign_keys_supported;
+                self.collations = metadata.collations.iter().map(|item| item.name.clone()).collect();
                 self.inner_stack.set_visible_child_name("editor");
                 // End of refetch window: snapshots are now authoritative,
                 // so resume diff-based dirty tracking. The recompute call
@@ -927,6 +937,7 @@ impl SimpleComponent for StructureTab {
                     ColumnField::AutoIncrement(b) => col.auto_increment = b,
                     ColumnField::Default(s) => col.default_value = s,
                     ColumnField::Comment(s) => col.comment = s,
+                    ColumnField::Collation(s) => col.collation = s,
                 }
                 let new_col = col.clone();
                 drop(cols);

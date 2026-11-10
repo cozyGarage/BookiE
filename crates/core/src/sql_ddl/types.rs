@@ -374,9 +374,7 @@ impl DraftColumn {
     /// True when something other than the name differs, which is what
     /// decides whether an `AlterColumn` has any work to do. A rename is
     /// its own op, so a column that only changed name must not raise an
-    /// alter: SQLite refuses every alter and would fail the whole save,
-    /// and MySQL would restate the column definition from a model that
-    /// does not carry collation or character set.
+    /// alter: SQLite refuses every alter and would fail the whole save.
     pub fn differs_beyond_name(&self) -> bool {
         match &self.original {
             None => true,
@@ -387,6 +385,7 @@ impl DraftColumn {
                     || orig.is_auto_increment != self.auto_increment
                     || orig.default_value != self.default_value
                     || orig.comment != self.comment
+                    || orig.collation != self.collation
             }
         }
     }

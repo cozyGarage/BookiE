@@ -43,7 +43,7 @@ pub(super) async fn open_candidate(
     bootstrap: CandidateBootstrap<'_>,
 ) -> Result<OpenedCandidate, String> {
     let (conn, tunnel) =
-        bookie_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
+        bookie_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation.clone())
             .await
             .map_err(crate::services::error_text::transport_message)?;
     let conn: Arc<dyn bookie_core::Connection> = Arc::from(conn);
@@ -56,7 +56,7 @@ pub(super) async fn open_candidate(
         Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),
         Err(_) => None,
     };
-    let control = crate::services::operation_control::bounded(timeout_secs);
+    let control = crate::services::operation_control::bounded_with(timeout_secs, cancellation);
     let tables = crate::services::catalog::list_tables_excluding(&guarded, bootstrap.hidden_schemas, &control)
         .await
         .map_err(|error| crate::services::error_text::driver_message(&error))?;

@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bookie_app_services::read_session::{ReadSession, list_saved_connections};
-use bookie_core::{ColumnInfo, OperationControl, TableInfo};
+use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, TableInfo};
 use bookie_results::result_scan::ScanSource;
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use tokio_util::sync::CancellationToken;
@@ -47,8 +47,22 @@ impl LiveSession {
     }
 
     pub fn load_table(self: &Arc<Self>, table: &str, max_rows: u64) -> Result<LiveTable, String> {
+        self.load_table_controlled(table, max_rows, &CancellationToken::new())
+    }
+
+    pub fn load_table_controlled(
+        self: &Arc<Self>,
+        table: &str,
+        max_rows: u64,
+        cancellation: &CancellationToken,
+    ) -> Result<LiveTable, String> {
+        if max_rows == 0 || max_rows > ROW_CAP {
+            return Err(format!("Row limit must be between 1 and {ROW_CAP}."));
+        }
         let session = self.session.as_ref().ok_or("the session is closed")?;
-        let (columns, rows, scan, truncated) = self.runtime.block_on(read_pages(session, table, max_rows))?;
+        let (columns, rows, scan, truncated) =
+            self.runtime
+                .block_on(read_pages(session, table, max_rows, cancellation))?;
         Ok(LiveTable {
             session: self.clone(),
             columns,
@@ -56,7 +70,6 @@ impl LiveSession {
             scan,
             truncated,
             table: table.to_string(),
-            row_cap: max_rows,
         })
     }
 }
@@ -82,7 +95,6 @@ pub struct LiveTable {
     scan: ScanSource,
     pub truncated: bool,
     table: String,
-    row_cap: u64,
 }
 
 impl LiveTable {
@@ -126,7 +138,12 @@ async fn open_session(origin: &Origin) -> Result<(ReadSession, String), String> 
 
 type Pages = (Vec<ColumnMeta>, Vec<Vec<Cell>>, ScanSource, bool);
 
-async fn read_pages(session: &ReadSession, table: &str, max_rows: u64) -> Result<Pages, String> {
+async fn read_pages(
+    session: &ReadSession,
+    table: &str,
+    max_rows: u64,
+    cancellation: &CancellationToken,
+) -> Result<Pages, String> {
     let table = find_table(&session.tables, table)?;
     let spool = StreamResultSpoolManager::from_environment()
         .create()
@@ -135,16 +152,21 @@ async fn read_pages(session: &ReadSession, table: &str, max_rows: u64) -> Result
     let mut rows: Vec<Vec<Cell>> = Vec::new();
     let mut truncated = false;
     let mut page_index = 0;
+    let mut budget = QueryResultBudget::default();
     while (rows.len() as u64) < max_rows {
         let limit = PAGE_ROWS.min(max_rows - rows.len() as u64);
-        let control = OperationControl::with_timeout(PAGE_TIMEOUT);
-        let page = session
+        let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
+        let mut page = session
             .read_page(&table, rows.len() as u64, limit, &control)
             .await
             .map_err(|failure| format!("{failure:?}"))?;
         if infos.is_empty() {
             infos.clone_from(&page.columns);
         }
+        if cancellation.is_cancelled() {
+            return Err("The operation was cancelled.".into());
+        }
+        let incomplete = bound_page(&mut page, &mut budget);
         let count = page.rows.len() as u64;
         rows.extend(
             page.rows
@@ -155,7 +177,14 @@ async fn read_pages(session: &ReadSession, table: &str, max_rows: u64) -> Result
             .append_page(page_index, Arc::new(page))
             .await
             .map_err(|error| error.to_string())?;
+        if cancellation.is_cancelled() {
+            return Err("The operation was cancelled.".into());
+        }
         page_index += 1;
+        if incomplete {
+            truncated = true;
+            break;
+        }
         if count < limit {
             break;
         }
@@ -164,6 +193,14 @@ async fn read_pages(session: &ReadSession, table: &str, max_rows: u64) -> Result
     let total = rows.len() as u64;
     let columns = infos.iter().map(column_meta).collect();
     Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
+}
+
+fn bound_page(page: &mut QueryResult, budget: &mut QueryResultBudget) -> bool {
+    let admitted = page.rows.iter().take_while(|row| budget.admit(row)).count();
+    let incomplete = page.truncated || admitted < page.rows.len();
+    page.rows.truncate(admitted);
+    page.truncated = incomplete;
+    incomplete
 }
 
 fn find_table(tables: &[TableInfo], wanted: &str) -> Result<TableInfo, String> {
@@ -195,7 +232,7 @@ impl ResultSource for LiveTable {
 
     fn origin(&self) -> String {
         let cap = if self.truncated {
-            format!(" · first {} rows only", self.row_cap)
+            format!(" · {} rows loaded; result may be incomplete", self.rows.len())
         } else {
             String::new()
         };
@@ -230,6 +267,93 @@ impl ResultSource for LiveTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FixtureFile(std::path::PathBuf);
+
+    impl Drop for FixtureFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    fn oversized_fixture() -> FixtureFile {
+        let path = std::env::temp_dir().join(format!("bookie-gpui-budget-{}.sqlite", uuid::Uuid::new_v4()));
+        std::fs::File::create(&path).unwrap();
+        let file = FixtureFile(path);
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let registry = drivers_registry::default_registry();
+            let driver = registry.get("sqlite").unwrap();
+            let connection = driver
+                .connect(bookie_core::ConnectOptions {
+                    database: file.0.to_string_lossy().into_owned(),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+            connection.execute("CREATE TABLE wide (value BLOB)").await.unwrap();
+            connection
+                .execute("INSERT INTO wide VALUES (zeroblob(67108865))")
+                .await
+                .unwrap();
+            connection.close().await.unwrap();
+        });
+        file
+    }
+
+    #[test]
+    fn a_driver_truncated_page_is_reported_as_incomplete() {
+        let file = oversized_fixture();
+        let table = LiveTable::load(&Origin::File(file.0.clone()), "wide", 100).unwrap();
+        assert_eq!(table.total(), 0);
+        assert!(table.truncated);
+    }
+
+    #[test]
+    fn an_empty_or_oversized_row_cap_is_refused() {
+        let session = LiveSession::open(&fixture()).unwrap();
+        assert!(session.load_table("orders", 0).is_err());
+        assert!(session.load_table("orders", ROW_CAP + 1).is_err());
+    }
+
+    #[test]
+    fn a_cancelled_live_load_is_not_returned_as_a_complete_table() {
+        let session = LiveSession::open(&fixture()).unwrap();
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        assert!(session.load_table_controlled("orders", 100, &cancellation).is_err());
+    }
+
+    #[test]
+    fn decoded_budget_is_shared_across_pages_and_keeps_a_whole_row_prefix() {
+        let make_page = || QueryResult {
+            columns: Vec::new(),
+            rows: bookie_core::QueryRows::from_rows(
+                (0..40)
+                    .map(|index| {
+                        vec![
+                            bookie_core::Value::Int(index),
+                            bookie_core::Value::Text("x".repeat(1024 * 1024)),
+                        ]
+                    })
+                    .collect(),
+            ),
+            truncated: false,
+        };
+        let mut budget = QueryResultBudget::default();
+        let mut first = make_page();
+        assert!(!bound_page(&mut first, &mut budget));
+        assert_eq!(first.rows.len(), 40);
+        drop(first);
+
+        let mut second = make_page();
+        assert!(bound_page(&mut second, &mut budget));
+        assert!(second.truncated);
+        assert!((1..40).contains(&second.rows.len()));
+        for (index, row) in second.rows.iter().enumerate() {
+            assert_eq!(row[0], bookie_core::Value::Int(index as i64));
+        }
+    }
 
     fn fixture() -> Origin {
         Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"))
@@ -275,7 +399,10 @@ mod tests {
         let table = LiveTable::load(&fixture(), "orders", 4).expect("load");
         assert_eq!(table.total(), 4);
         assert!(table.truncated);
-        assert_eq!(table.origin(), "sqlite · orders · read-only · first 4 rows only");
+        assert_eq!(
+            table.origin(),
+            "sqlite · orders · read-only · 4 rows loaded; result may be incomplete"
+        );
         let whole = LiveTable::load(&fixture(), "orders", 100).expect("load");
         assert_eq!(whole.origin(), "sqlite · orders · read-only");
     }

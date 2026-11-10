@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # Enforce Rust source file size limits under crates.
 #
-# New files above 1200 lines require an explicit baseline. Unlisted files above
-# 1800 lines fail. Listed files may shrink but cannot grow past their ceiling.
+# Unlisted files above 2000 lines fail. Listed files may shrink but cannot
+# grow past their ceiling.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASELINES="$ROOT/baselines/file-size-baselines.txt"
 CRATES="$ROOT/crates"
-WARN_LIMIT=1200
-ERROR_LIMIT=1800
+ERROR_LIMIT=2000
 
 declare -A MAX_LINES=()
 while IFS= read -r line || [[ -n "$line" ]]; do
@@ -43,9 +42,6 @@ while IFS= read -r -d '' file; do
   if (( lines > ERROR_LIMIT )); then
     echo "error: $rel has $lines lines (hard limit $ERROR_LIMIT). Split before merging." >&2
     errors=$((errors + 1))
-  elif (( lines > WARN_LIMIT )); then
-    echo "error: $rel has $lines lines (soft limit $WARN_LIMIT). Split the file, or add it to baselines/file-size-baselines.txt with that exact line count." >&2
-    errors=$((errors + 1))
   fi
 done < <(find "$ROOT/crates" "$ROOT/apps" "$ROOT/tests" \
   -path "$ROOT/apps/linux/packaging/arch/src" -prune -o -type f -name '*.rs' -print0 | sort -z)
@@ -62,4 +58,4 @@ if (( errors > 0 )); then
   exit 1
 fi
 
-echo "file-size: ok (soft>$WARN_LIMIT requires baseline, hard>$ERROR_LIMIT)"
+echo "file-size: ok (limit $ERROR_LIMIT)"

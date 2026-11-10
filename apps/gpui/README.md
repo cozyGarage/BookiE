@@ -95,7 +95,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- The default source is synthetic. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only and capped at 100,000 rows. The loader does not yet bound total retained bytes or correctly report every truncated page ([#2673](https://github.com/cozyGarage/BookiE/issues/2673)).
+- The default source is synthetic. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only, capped at 100,000 rows and subject to the shared decoded-byte and cell budgets. The status marks results that may be incomplete. Pages are separate reads, not a consistent snapshot; concurrent changes can affect the rows shown.
 - Driver-shaped temporal, decimal, UUID and JSON values retain their original `bookie_core::Value` through the cell bridge. Synthetic edits still use the prototype's local cell representation. Tests cover typed round trips and bounded JSON previews.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - No text editing beyond the minimal fields above, and no SQL editor. A multi-line editor is a much larger piece (Zed's editor is its own crate) and is left until the single-line input has had real keyboard and IME feedback.
