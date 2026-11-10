@@ -1,13 +1,18 @@
+use std::sync::Arc;
+
 use gpui::{App, Context, IntoElement, Window, div, prelude::*, px};
 use gpui_kit::component::table::{Column, DataTable, TableDelegate, TableState};
 
 use crate::GridView;
 use bookie_gpui::preview::cell_preview;
+use bookie_gpui::source::Source;
 
 #[derive(Default)]
 pub struct GridDelegate {
     columns: Vec<(String, f32)>,
-    rows: Vec<Vec<String>>,
+    source: Option<Source>,
+    source_rows: Vec<u64>,
+    cached: Option<(usize, Vec<String>)>,
     editor: Option<(usize, usize, gpui::AnyView)>,
 }
 
@@ -17,7 +22,7 @@ impl TableDelegate for GridDelegate {
     }
 
     fn rows_count(&self, _cx: &App) -> usize {
-        self.rows.len()
+        self.source_rows.len()
     }
 
     fn column(&self, col_ix: usize, _cx: &App) -> Column {
@@ -36,8 +41,26 @@ impl TableDelegate for GridDelegate {
     ) -> impl IntoElement {
         match &self.editor {
             Some((row, column, view)) if *row == row_ix && *column == col_ix => div().flex_1().child(view.clone()),
-            _ => div().child(self.rows[row_ix][col_ix].clone()),
+            _ => div().child(self.row_cell_text(row_ix, col_ix)),
         }
+    }
+}
+
+impl GridDelegate {
+    // Cells of one row render back to back, so one fetch per row serves all its columns.
+    fn row_cell_text(&mut self, row_ix: usize, col_ix: usize) -> String {
+        if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
+            let cells = match (&self.source, self.source_rows.get(row_ix)) {
+                (Some(source), Some(&index)) => source.row(index).iter().map(cell_preview).collect(),
+                _ => Vec::new(),
+            };
+            self.cached = Some((row_ix, cells));
+        }
+        self.cached
+            .as_ref()
+            .and_then(|(_, cells)| cells.get(col_ix))
+            .cloned()
+            .unwrap_or_default()
     }
 }
 
@@ -49,39 +72,43 @@ impl GridView {
             .iter()
             .map(|column| (column.name.clone(), column.width))
             .collect();
-        let rows: Vec<Vec<String>> = if self.compare.is_some() {
+        let source_rows: Vec<u64> = if self.compare.is_some() {
             Vec::new()
         } else {
             (0..self.visible_count())
-                .map(|position| {
-                    let source = self.source_row(self.base() + position as u64);
-                    self.source.row(source).iter().map(cell_preview).collect()
-                })
+                .map(|position| self.source_row(self.base() + position as u64))
                 .collect()
         };
         let editor = self.editing.as_ref().and_then(|editing| {
-            (0..self.visible_count())
-                .find(|position| self.source_row(self.base() + *position as u64) == editing.row)
+            source_rows
+                .iter()
+                .position(|row| *row == editing.row)
                 .map(|position| (position, editing.column, gpui::AnyView::from(self.editor.clone())))
         });
         self.table.update(cx, |table, cx| {
-            let cell = table_cell(self.cell_cursor).or((!rows.is_empty()).then_some((0, 0)));
+            let cell = table_cell(self.cell_cursor).or((!source_rows.is_empty()).then_some((0, 0)));
             if table.selected_cell() != cell {
                 match cell {
                     Some((row, column)) => table.set_selected_cell(row, column, cx),
                     None => table.clear_selection(cx),
                 }
             }
-            let delegate = table.delegate();
-            let changed = delegate.columns != columns
-                || delegate.rows != rows
+            let delegate = table.delegate_mut();
+            delegate.cached = None;
+            let same_source = delegate
+                .source
+                .as_ref()
+                .is_some_and(|source| Arc::ptr_eq(source, &self.source));
+            let changed = !same_source
+                || delegate.columns != columns
+                || delegate.source_rows != source_rows
                 || delegate.editor.as_ref().map(|(r, c, _)| (*r, *c)) != editor.as_ref().map(|(r, c, _)| (*r, *c));
             if !changed {
                 return;
             }
-            let delegate = table.delegate_mut();
             delegate.columns = columns;
-            delegate.rows = rows;
+            delegate.source = Some(self.source.clone());
+            delegate.source_rows = source_rows;
             delegate.editor = editor;
             table.refresh(cx);
         });
@@ -104,6 +131,22 @@ pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_gpui::cursor::Cu
 mod tests {
     use super::*;
     use bookie_gpui::cursor::Cursor;
+    use bookie_gpui::source::{ResultSource, Synthetic};
+
+    #[test]
+    fn a_cell_reads_the_source_row_it_maps_to_and_keeps_that_row_cached() {
+        let source: Source = Arc::new(Synthetic::new(10));
+        let mut delegate = GridDelegate {
+            source: Some(source),
+            source_rows: vec![3, 7],
+            ..Default::default()
+        };
+        let expected = cell_preview(&Synthetic::new(10).row(7)[1]);
+        assert_eq!(delegate.row_cell_text(1, 1), expected);
+        assert_eq!(delegate.cached.as_ref().map(|(row, _)| *row), Some(1));
+        assert_eq!(delegate.row_cell_text(1, 1), expected);
+        assert_eq!(delegate.row_cell_text(9, 0), "");
+    }
 
     #[test]
     fn a_cursor_survives_the_trip_through_the_table_cell() {
