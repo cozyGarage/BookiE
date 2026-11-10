@@ -496,6 +496,7 @@ jobs:
   floor-build:
     runs-on: build-host
     needs: [guards, clippy]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 45
     defaults:
       run:
@@ -578,7 +579,7 @@ jobs:
   distro-floor-scenarios:
     runs-on: any-host
     needs: [floor-build]
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
@@ -651,7 +652,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, duckdb]
+        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, cassandra, duckdb]
         include:
           - driver: duckdb
             tests: --test integration --test read_only --test missing_file

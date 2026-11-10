@@ -25,6 +25,8 @@ GROUP_SOURCES = {
     "clickhouse": "crates/drivers/clickhouse/tests",
     "redis": "crates/drivers/redis/tests",
     "mongodb": "crates/drivers/mongodb/tests",
+    "oracle": "crates/drivers/oracle/tests",
+    "cassandra": "crates/drivers/cassandra/tests",
     "app-server": "apps/linux/app",
 }
 DRIVER_TLS_FIXTURES = ROOT / "tests/fixtures/driver-tls"
@@ -151,7 +153,7 @@ class PrepullTestImagesTests(unittest.TestCase):
 
     def test_the_list_covers_each_driver_and_the_tls_fixtures(self):
         groups = {line.split()[0] for line in IMAGES.read_text().splitlines() if line and not line.startswith("#")}
-        for group in ("postgres", "mysql", "mssql", "clickhouse", "redis", "mongodb", "driver-tls"):
+        for group in ("postgres", "mysql", "mssql", "clickhouse", "redis", "mongodb", "oracle", "cassandra", "driver-tls"):
             self.assertIn(group, groups)
 
     def test_each_group_pulls_exactly_the_images_its_tests_start(self):
