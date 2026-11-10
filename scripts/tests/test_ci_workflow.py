@@ -56,6 +56,17 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("driver: duckdb", driver)
         self.assertIn("tests: --test integration --test read_only --test missing_file", driver)
 
+    def test_github_and_forgejo_run_the_same_change_contract_layer(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        unit = re.search(r"(?ms)^  unit:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py change-contracts", github)
+        self.assertIn("python3 scripts/run-test-layer.py change-contracts", unit)
+        self.assertIn('git merge-base HEAD origin/main', unit)
+        self.assertIn("github.event.before", unit)
+        self.assertIn('github.event_name }}" != "push"', unit)
+
     def test_forgejo_runs_gpui_model_and_interaction_tests(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)

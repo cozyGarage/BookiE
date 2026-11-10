@@ -384,6 +384,15 @@ jobs:
           mkdir -p "$CARGO_TARGET_DIR"
           export TMPDIR="$CARGO_TARGET_DIR"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
+      - name: Focused Data-lane change contracts
+        run: |
+          cd src
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.event_name }}" != "push" ]]; then
+            export BOOKIE_CHANGE_BASE="${{ github.event.before || 'HEAD^' }}"
+          else
+            export BOOKIE_CHANGE_BASE="$(git merge-base HEAD origin/main)"
+          fi
+          python3 scripts/run-test-layer.py change-contracts
 
       - name: Finalize runner job
         if: always()
