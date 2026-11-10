@@ -301,7 +301,10 @@ impl GridView {
                             .gap_1()
                             .cursor_pointer()
                             .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
-                            .child(div().flex_1().min_w_0().whitespace_normal().child("Import / Export"))
+                            .children(
+                                (self.sidebar_width >= 300.0)
+                                    .then(|| div().flex_1().min_w_0().child("Import / Export")),
+                            )
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.import_menu_open = !this.import_menu_open;
                                 cx.notify();
@@ -334,9 +337,9 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .child(div().flex_1().min_w_0().child(self.sidebar_search.clone()))
-                    .child(header_icon("sidebar-expand-all", "folder", theme))
-                    .child(header_icon("sidebar-tables", "table", theme))
-                    .child(header_icon("sidebar-clear-search", "x", theme)),
+                    .child(header_icon("sidebar-locate", "crosshair", theme))
+                    .child(header_icon("sidebar-filter", "sliders-horizontal", theme))
+                    .child(header_icon("sidebar-active-only", "circle", theme)),
             )
             .child(div().flex().flex_col().px_2().children(tree).children(empty))
             .child(
