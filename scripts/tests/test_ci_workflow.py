@@ -62,6 +62,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
         self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
+        self.assertIn('--message-format=json-render-diagnostics', build)
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         gtk_build = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)

@@ -26,7 +26,7 @@ for group in "${groups[@]}"; do
     selection=()
     manifest=(--manifest-path apps/gpui/Cargo.toml)
   fi
-  cargo test --locked "${manifest[@]}" "${selection[@]}" --lib --bins --tests --no-run --message-format=json > "$output/$group-build.jsonl"
+  cargo test --locked "${manifest[@]}" "${selection[@]}" --lib --bins --tests --no-run --message-format=json-render-diagnostics > "$output/$group-build.jsonl"
   nextest="$(bash scripts/ensure-nextest.sh)"
   "$nextest" nextest archive --locked "${manifest[@]}" "${selection[@]}" --lib --bins --tests --archive-file "$output/$group-nextest.tar.zst"
   python3 scripts/ci-test-bundle.py create "$output/$group" "$revision" --messages "$output/$group-build.jsonl" --group "$group" --archive "$output/$group-nextest.tar.zst"
