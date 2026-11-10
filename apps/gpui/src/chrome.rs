@@ -300,8 +300,8 @@ impl GridView {
                             .items_center()
                             .gap_1()
                             .cursor_pointer()
-                            .child(icon("arrow-down-up", theme.muted_foreground))
-                            .child(div().min_w_0().whitespace_normal().child("Import / Export"))
+                            .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
+                            .child(div().flex_1().min_w_0().whitespace_normal().child("Import / Export"))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.import_menu_open = !this.import_menu_open;
                                 cx.notify();
