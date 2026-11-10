@@ -358,6 +358,28 @@ impl Connection for ClickhouseConnection {
         self.query_controlled(&bound, control).await
     }
 
+    async fn execute_controlled_with_token(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<(ExecResult, Option<CommitToken>), (DriverError, Option<CommitToken>)> {
+        let query_id = query::new_query_id();
+        let token = CommitToken::ClickhouseQuery {
+            query_id: query_id.clone(),
+        };
+        let written = run_server_cancellable(
+            self.execute_tagged(sql, Some(&query_id)),
+            request_cancellation(&self.client, &query_id),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        match written {
+            Ok(rows_affected) => Ok((ExecResult { rows_affected }, Some(token))),
+            Err(error) => Err((error, Some(token))),
+        }
+    }
+
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
         let query_id = new_query_id();
         let rows_affected = run_server_cancellable(
