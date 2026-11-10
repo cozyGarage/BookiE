@@ -278,7 +278,7 @@ impl GridView {
                             .items_center()
                             .gap_1()
                             .child(icon("arrow-down-up", theme.muted_foreground))
-                            .child("Import / Export ⌄"),
+                            .child(div().min_w_0().child("Import / Export ⌄")),
                     )
                     .child(
                         div()
