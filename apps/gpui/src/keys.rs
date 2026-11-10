@@ -5,6 +5,48 @@ use gpui::{Context, Focusable, KeyDownEvent, Window};
 use crate::{GridView, Tab, palette_step};
 
 impl GridView {
+    /// Runs before the table's own arrow handling, so a move past the page edge can take the page instead.
+    pub(super) fn capture_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let modifiers = event.keystroke.modifiers;
+        let plain = !(modifiers.shift || modifiers.control || modifiers.alt);
+        let ready = self.focus.is_focused(window)
+            && plain
+            && self.editing.is_none()
+            && self.compare.is_none()
+            && !self.continuous
+            && !self.palette_open
+            && self.tabs.shows_grid();
+        if ready && self.cross_page_edge(event.keystroke.key.as_str()) {
+            cx.stop_propagation();
+            cx.notify();
+        }
+    }
+
+    /// Moves the cursor to the next or previous page when an arrow leaves the current one.
+    pub(super) fn cross_page_edge(&mut self, key: &str) -> bool {
+        let Some(cursor) = self.cell_cursor else { return false };
+        let rows = self.visible_count();
+        match key {
+            "down" if cursor.row + 1 == rows && self.next_page() => {
+                let row = if self.pager.append { rows } else { 0 };
+                self.place_cursor(Some(Cursor {
+                    row,
+                    column: cursor.column,
+                }));
+                true
+            }
+            "up" if cursor.row == 0 && self.previous_page() => {
+                let row = self.visible_count().saturating_sub(1);
+                self.place_cursor(Some(Cursor {
+                    row,
+                    column: cursor.column,
+                }));
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub(super) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let stroke = &event.keystroke;
         let modifiers = stroke.modifiers;
@@ -22,6 +64,7 @@ impl GridView {
             return;
         }
         if self.focus.is_focused(window)
+            && !modifiers.control
             && matches!(
                 key,
                 "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown"

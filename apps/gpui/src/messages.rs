@@ -52,6 +52,15 @@ impl MessageLog {
     }
 }
 
+/// A duration for display: milliseconds below a second, seconds above.
+pub fn format_elapsed(elapsed: Duration) -> String {
+    if elapsed < Duration::from_secs(1) {
+        format!("{} ms", elapsed.as_millis())
+    } else {
+        format!("{:.2} s", elapsed.as_secs_f64())
+    }
+}
+
 fn one_line(sql: &str) -> String {
     let flat = sql.split_whitespace().collect::<Vec<_>>().join(" ");
     match flat.char_indices().nth(MAX_STATEMENT_CHARS) {
@@ -63,6 +72,13 @@ fn one_line(sql: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_duration_reads_in_milliseconds_below_a_second_and_seconds_above() {
+        assert_eq!(format_elapsed(Duration::from_millis(0)), "0 ms");
+        assert_eq!(format_elapsed(Duration::from_millis(999)), "999 ms");
+        assert_eq!(format_elapsed(Duration::from_millis(1240)), "1.24 s");
+    }
 
     #[test]
     fn a_statement_is_flattened_to_one_line_with_its_outcome_and_time() {

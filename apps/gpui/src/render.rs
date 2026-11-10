@@ -239,6 +239,7 @@ impl Render for GridView {
                 root.font_family(self.fonts.ui_family.clone())
             })
             .track_focus(&self.focus)
+            .capture_key_down(cx.listener(Self::capture_key))
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
                 if this.resizing_sidebar {
