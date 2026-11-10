@@ -646,6 +646,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
+      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
     strategy:
       fail-fast: false
@@ -693,6 +694,7 @@ jobs:
           trap cleanup_testcontainers EXIT
           trap 'cleanup_testcontainers; exit 143' TERM
           trap 'cleanup_testcontainers; exit 130' INT
+          mkdir -p "$TMPDIR"
           bash scripts/run-rust-tests.sh --locked -p bookie-driver-${{ matrix.driver }} ${{ matrix.tests || '--test integration' }} -- --include-ignored --test-threads=1
 
       - name: Finalize runner job

@@ -538,6 +538,20 @@ pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, us
     Some((position, column, row_key))
 }
 
+pub(crate) fn focused_cell_draft_id(widget: &impl IsA<gtk4::Widget>, position: u32) -> Option<u64> {
+    let window = widget.root()?.dynamic_cast::<gtk4::Window>().ok()?;
+    let focused = gtk4::prelude::GtkWindowExt::focus(&window)?;
+    let view = focused
+        .ancestor(gtk4::ColumnView::static_type())?
+        .downcast::<gtk4::ColumnView>()
+        .ok()?;
+    view.model()?
+        .item(position)?
+        .downcast::<crate::ui::row_object::RowObject>()
+        .ok()?
+        .draft_id()
+}
+
 pub(crate) fn focused_row_position(view: &gtk4::ColumnView) -> Option<u32> {
     let window = view.root()?.downcast::<gtk4::Window>().ok()?;
     let focused = gtk4::prelude::GtkWindowExt::focus(&window)?;

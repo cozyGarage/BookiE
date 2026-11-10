@@ -174,6 +174,7 @@ impl Render for GridView {
         .track_scroll(&self.scroll)
         .flex_1();
         let palette = self.palette_open.then(|| self.palette_overlay(cx));
+        self.sync_table(cx);
         let grid = div()
             .flex_1()
             .flex()
@@ -182,11 +183,13 @@ impl Render for GridView {
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
-            .child(header)
-            .child(list)
+            .children(self.compare.is_some().then(|| header))
+            .children(self.compare.is_some().then(|| list))
+            .children(self.compare.is_none().then(|| self.data_table()))
             .children(self.detail_panel(theme));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
+            Tab::Settings => self.settings_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(name) => self.placeholder_page(&name, theme),
@@ -194,6 +197,7 @@ impl Render for GridView {
         let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
         let toolbar = self.toolbar(theme, cx);
         let tab_bar = self.tab_bar(theme, cx);
+        let tab_row = tab_bar;
         div()
             .size_full()
             .relative()
@@ -201,13 +205,14 @@ impl Render for GridView {
             .flex_col()
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
-            .text_size(px(13.0))
+            .text_size(px(self.fonts.ui_size))
             .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
+            .when(!self.fonts.ui_family.is_empty(), |root| root.font_family(self.fonts.ui_family.clone()))
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
                 if this.resizing_sidebar {
-                    this.sidebar_width = f32::from(event.position.x).clamp(180.0, 480.0);
+                    this.sidebar_width = f32::from(event.position.x).clamp(260.0, 480.0);
                     cx.notify();
                 }
                 if this.resizing_split {
@@ -233,7 +238,7 @@ impl Render for GridView {
                     .flex()
                     .min_h_0()
                     .children(sidebar)
-                    .child(div().flex_1().flex().flex_col().min_w_0().child(tab_bar).child(content)),
+                    .child(div().flex_1().flex().flex_col().min_w_0().child(tab_row).child(content)),
             )
             .child(self.status_bar(theme))
             .children(palette)

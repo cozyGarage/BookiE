@@ -429,3 +429,27 @@ fn the_redis_listen_command_is_not_offered_on_other_engines(cx: &mut TestAppCont
         assert!(labels.iter().all(|label| !label.contains("Redis")), "{labels:?}");
     });
 }
+
+#[gpui::test]
+fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.show_status()));
+    view.read_with(cx, |view, _| {
+        let entries = view.messages.entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
+        assert!(
+            entries[0].text.ends_with(" · sqlite · healthy · direct"),
+            "{}",
+            entries[0].text
+        );
+    });
+}

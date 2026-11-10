@@ -206,6 +206,14 @@ impl Connection for SessionConnection {
         self.inner.execute_controlled(sql, control).await
     }
 
+    async fn execute_controlled_with_token(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<(ExecResult, Option<bookie_core::CommitToken>), (DriverError, Option<bookie_core::CommitToken>)> {
+        self.inner.execute_controlled_with_token(sql, control).await
+    }
+
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
         self.inner.execute_params(sql, params).await
     }

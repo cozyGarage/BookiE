@@ -31,6 +31,8 @@ ALLOWED = {
     "bookie-core": set(),
     "bookie-ssh": set(),
     "bookie-checks": set(),
+    "bookie-kafka-browser": set(),
+    "bookie-avro-container": set(),
     "bookie-pg-sessions": {"bookie-core"},
     "bookie-dump": {"bookie-core"},
     "bookie-policy": {"bookie-core"},
@@ -38,7 +40,7 @@ ALLOWED = {
     "bookie-transport": {"bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage"},
     "bookie-results": {"bookie-core"},
     "bookie-app-services": {
-        "bookie-core", "bookie-checks", "bookie-pg-sessions", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
+        "bookie-core", "bookie-checks", "bookie-kafka-browser", "bookie-pg-sessions", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
         "bookie-transport",
     },
     "bookie-mcp": {"bookie-core", "bookie-policy", "bookie-storage"},

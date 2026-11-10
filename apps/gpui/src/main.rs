@@ -6,6 +6,7 @@ mod catalog_nav;
 mod chrome;
 mod detail_panel;
 mod grid_edit;
+mod grid_table;
 mod keys;
 mod render;
 mod text_input;
@@ -14,6 +15,7 @@ mod ui_theme;
 use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
 use bookie_gpui::cursor::Cursor;
 use bookie_gpui::keymap::Keymap;
+use bookie_gpui::font_settings;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
@@ -42,6 +44,8 @@ enum Mode {
 }
 
 struct GridView {
+    table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
+    _table_events: gpui::Subscription,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -81,12 +85,14 @@ struct GridView {
     result_open: bool,
     resizing_split: bool,
     font: gpui::SharedString,
+    fonts: font_settings::FontSettings,
     font_names: Vec<String>,
     palette_fonts: bool,
     palette_address: Option<String>,
     palette_pattern: Option<String>,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     sidebar_open: bool,
+    import_menu_open: bool,
     sidebar_width: f32,
     resizing_sidebar: bool,
     connection_open: bool,
@@ -228,7 +234,31 @@ impl GridView {
             },
         )
         .detach();
+        let table = cx.new(|cx| {
+            gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx)
+                .cell_selectable(true)
+                .row_header(false)
+        });
+        let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
+        let table_events = cx.subscribe(
+            &table,
+            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
+                if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
+                    let cursor = bookie_gpui::cursor::Cursor {
+                        row: *row,
+                        column: *column,
+                    };
+                    this.cell_cursor = Some(cursor);
+                    let names = this.column_names();
+                    this.status = cursor.label(&names);
+                    cx.notify();
+                }
+            },
+        );
         GridView {
+            fonts: font_settings::load(),
+            table,
+            _table_events: table_events,
             table_source: source.clone(),
             source,
             mode: Mode::All,
@@ -274,7 +304,8 @@ impl GridView {
             palette_pattern: None,
             check_histories: Vec::new(),
             sidebar_open: true,
-            sidebar_width: 260.0,
+            import_menu_open: false,
+            sidebar_width: 340.0,
             resizing_sidebar: false,
             connection_open: true,
             database_open: true,
@@ -287,7 +318,7 @@ impl GridView {
             selection: None,
             generation: 0,
             scroll: UniformListScrollHandle::new(),
-            focus: cx.focus_handle(),
+            focus: table_focus,
             started,
             first_frame_reported: false,
             last_frame: None,
@@ -438,6 +469,22 @@ impl GridView {
         );
     }
 
+    fn kafka_topics(&mut self, broker: String, cx: &mut Context<Self>) {
+        self.status = format!("Listing topics at {broker}…");
+        self.begin_background(
+            cx,
+            move |_| bookie_gpui::net_check::kafka_topics(&broker),
+            |this, outcome| {
+                let (kind, text) = match outcome {
+                    Ok(text) => (MessageKind::Success, text),
+                    Err(error) => (MessageKind::Error, format!("Kafka · {error}")),
+                };
+                this.messages.push(kind, text.clone());
+                this.status = text;
+            },
+        );
+    }
+
     fn check_tcp(&mut self, address: String, cx: &mut Context<Self>) {
         self.status = format!("Checking {address}…");
         let target = address.clone();
@@ -451,6 +498,19 @@ impl GridView {
                 this.status = text;
             },
         );
+    }
+
+    fn show_status(&mut self) {
+        let Some(live) = self.live.clone() else {
+            return;
+        };
+        let lines = bookie_gpui::status_view::describe(&live.overview());
+        if let Some((_, headline)) = lines.first() {
+            self.status = headline.clone();
+        }
+        for (kind, text) in lines {
+            self.messages.push(kind, text);
+        }
     }
 
     fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -917,6 +977,7 @@ impl GridView {
                     "Show PostgreSQL sessions and blockers",
                     self.live.as_ref().is_some_and(|live| live.driver_id == "postgres"),
                 ),
+                action("status", "Show connection and tunnel status", self.live.is_some()),
                 action("clear-selection", "Clear row selection", self.selection.is_some()),
                 action("edit", "Edit the active cell", self.cell_cursor.is_some()),
                 action(
@@ -958,6 +1019,7 @@ impl GridView {
                     matches!(self.tabs.current(), Tab::Query),
                 ),
                 action("home", "Open Home", true),
+                action("settings", "Open settings", true),
                 action("table", &format!("Open {}", self.catalog.grid_table), true),
                 action(
                     "theme",
@@ -1041,6 +1103,12 @@ impl GridView {
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
             "sessions" => self.show_sessions(window, cx),
+            "kafka-topics" => {
+                if let Some(broker) = check_address.clone() {
+                    self.kafka_topics(broker, cx);
+                }
+            }
+            "status" => self.show_status(),
             "sample-pubsub" => {
                 if let Some(pattern) = listen_pattern {
                     self.sample_pubsub(pattern, cx);
@@ -1054,6 +1122,10 @@ impl GridView {
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
+            "settings" => {
+                self.tabs.open_settings();
+                self.sync_grid_owner();
+            }
             "home" => {
                 self.tabs.open_home();
                 self.sync_grid_owner();
@@ -1265,6 +1337,17 @@ fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
         .bg(rgb(background))
 }
 
+fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
+    view.update(cx, |view, _| {
+        match name {
+            "settings" => view.tabs.open_settings(),
+            "query" => view.tabs.open_query(),
+            _ => return,
+        }
+        view.sync_grid_owner();
+    });
+}
+
 fn main() {
     let started = Instant::now();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());
@@ -1307,11 +1390,8 @@ fn main() {
                         view.keymap = keymap.clone();
                         view.connections = connections.clone();
                     });
-                    if std::env::var("BOOKIE_PROTOTYPE_START").as_deref() == Ok("query") {
-                        view.update(cx, |view, _| {
-                            view.tabs.open_query();
-                            view.sync_grid_owner();
-                        });
+                    if let Ok(start_tab) = std::env::var("BOOKIE_PROTOTYPE_START") {
+                        open_requested_start_tab(&view, &start_tab, cx);
                     }
                     if autoscroll > 0 {
                         view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));

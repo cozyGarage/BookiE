@@ -226,6 +226,7 @@ pub(super) struct EditContext {
     pub(super) row_position: u32,
     pub(super) col_index: usize,
     pub(super) row_key: Vec<Value>,
+    pub(super) draft_id: Option<u64>,
     pub(super) nullable: bool,
     pub(super) kind: FullValueKind,
     pub(super) sender: relm4::Sender<super::GridMsg>,
@@ -364,6 +365,7 @@ fn connect_set_null(button: Option<gtk::Button>, dialog: &adw::Dialog, context: 
     let row_key = context.row_key.clone();
     let row_position = context.row_position;
     let col_index = context.col_index;
+    let draft_id = context.draft_id;
     let dialog = dialog.downgrade();
     button.connect_clicked(move |_| {
         sender
@@ -371,6 +373,7 @@ fn connect_set_null(button: Option<gtk::Button>, dialog: &adw::Dialog, context: 
                 row_position,
                 col_index,
                 row_key: row_key.clone(),
+                draft_id,
             })
             .ok();
         if let Some(dialog) = dialog.upgrade() {
@@ -406,6 +409,7 @@ fn connect_apply(
         row_position: context.row_position,
         col_index: context.col_index,
         row_key: context.row_key.clone(),
+        draft_id: context.draft_id,
         nullable: context.nullable,
         kind: context.kind,
         sender: context.sender.clone(),
@@ -426,6 +430,7 @@ fn connect_apply(
                 col_index: context.col_index,
                 value,
                 row_key: context.row_key.clone(),
+                draft_id: context.draft_id,
             })
             .ok();
         if let Some(dialog) = dialog.upgrade() {

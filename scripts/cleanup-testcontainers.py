@@ -12,10 +12,10 @@ def cleanup(run_id):
         check=True,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=120,
     ).stdout.split()
     if containers:
-        subprocess.run(["docker", "rm", "-f", *containers], check=True, timeout=30)
+        subprocess.run(["docker", "rm", "-f", *containers], check=True, timeout=120)
 
 
 if __name__ == "__main__":

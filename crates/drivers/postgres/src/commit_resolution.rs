@@ -4,7 +4,9 @@ use sqlx::PgPool;
 use crate::map_sqlx_error;
 
 pub(crate) async fn resolve(pool: &PgPool, token: &CommitToken) -> Result<CommitResolution, DriverError> {
-    let CommitToken::PostgresXid { xid, legacy_txid } = token;
+    let CommitToken::PostgresXid { xid, legacy_txid } = token else {
+        return Ok(CommitResolution::Unresolvable);
+    };
     let sql = if *legacy_txid {
         "SELECT pg_catalog.txid_status($1::text::int8)::text"
     } else {

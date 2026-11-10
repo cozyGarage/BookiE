@@ -46,6 +46,10 @@ impl SqlEditor {
             )));
             return None;
         }
+        self.dispatch_editable_grid_message(message, sender)
+    }
+
+    fn dispatch_editable_grid_message(&mut self, message: GridMsg, sender: &ComponentSender<Self>) -> Option<GridMsg> {
         match message {
             GridMsg::CellEdited {
                 row_position,
@@ -61,28 +65,45 @@ impl SqlEditor {
                 col_index,
                 value,
                 row_key,
+                draft_id,
             } => {
-                self.handle_result_cell_value_edited(row_position, col_index, value, row_key, sender);
+                if self.result_row_object(row_position).and_then(|row| row.draft_id()) == draft_id {
+                    self.handle_result_cell_value_edited(row_position, col_index, value, row_key, sender);
+                }
                 None
             }
             GridMsg::SetCellNull {
                 row_position,
                 col_index,
                 row_key,
+                draft_id,
             } => {
-                self.handle_result_set_null(row_position, col_index, row_key, sender);
+                self.handle_result_set_null(row_position, col_index, row_key, draft_id, sender);
                 None
             }
             GridMsg::InsertRow => {
                 self.handle_result_insert_row(sender);
                 None
             }
-            GridMsg::DuplicateRow { row_position } => {
-                self.handle_result_duplicate_row(row_position, sender);
+            GridMsg::DuplicateRow {
+                row_position,
+                row_key,
+                draft_id,
+            } => {
+                if self.result_row_object(row_position).and_then(|row| row.draft_id()) == draft_id
+                    && (draft_id.is_some() || !row_key.is_empty())
+                    && !self.reject_stale_result_edit(row_position, &row_key, sender)
+                {
+                    self.handle_result_duplicate_row(row_position, sender);
+                }
                 None
             }
-            GridMsg::DeleteRowAt { row_position, row_key } => {
-                self.handle_result_delete_row(row_position, row_key, sender);
+            GridMsg::DeleteRowAt {
+                row_position,
+                row_key,
+                draft_id,
+            } => {
+                self.handle_result_delete_row(row_position, row_key, draft_id, sender);
                 None
             }
             other => Some(other),
@@ -217,6 +238,11 @@ impl SqlEditor {
         selection.model()?.downcast::<crate::ui::row_store::RowStore>().ok()
     }
 
+    #[cfg(test)]
+    pub(in crate::ui::editor) fn editable_result_store_for_test(&self) -> Option<crate::ui::row_store::RowStore> {
+        self.result_is_editable().then(|| self.result_list_store()).flatten()
+    }
+
     fn result_row_object(&self, position: u32) -> Option<crate::ui::row_object::RowObject> {
         let model = self.result_editing.as_ref()?.selection.as_ref()?.model()?;
         model
@@ -315,8 +341,12 @@ impl SqlEditor {
         row_position: u32,
         col_index: usize,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
         sender: &ComponentSender<Self>,
     ) {
+        if self.result_row_object(row_position).and_then(|row| row.draft_id()) != draft_id {
+            return;
+        }
         if self.reject_stale_result_edit(row_position, &row_key, sender) {
             return;
         }
@@ -488,7 +518,16 @@ impl SqlEditor {
         }
     }
 
-    fn handle_result_delete_row(&mut self, row_position: u32, row_key: Vec<Value>, sender: &ComponentSender<Self>) {
+    fn handle_result_delete_row(
+        &mut self,
+        row_position: u32,
+        row_key: Vec<Value>,
+        draft_id: Option<u64>,
+        sender: &ComponentSender<Self>,
+    ) {
+        if self.result_row_object(row_position).and_then(|row| row.draft_id()) != draft_id {
+            return;
+        }
         if self.reject_stale_result_edit(row_position, &row_key, sender) {
             return;
         }
@@ -739,18 +778,25 @@ mod save_guard_tests {
                 col_index: 0,
                 value: bookie_core::Value::Null,
                 row_key: Vec::new(),
+                draft_id: None,
             },
             GridMsg::SetCellNull {
                 row_position: 0,
                 col_index: 0,
                 row_key: Vec::new(),
+                draft_id: None,
             },
             GridMsg::DeleteRowAt {
                 row_position: 0,
                 row_key: Vec::new(),
+                draft_id: None,
             },
             GridMsg::InsertRow,
-            GridMsg::DuplicateRow { row_position: 0 },
+            GridMsg::DuplicateRow {
+                row_position: 0,
+                row_key: Vec::new(),
+                draft_id: None,
+            },
         ];
 
         assert!(

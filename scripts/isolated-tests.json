@@ -315,7 +315,27 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::workspace_close::tests::browse_grid_edit_save_reaches_guarded_connection_and_audit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_denied_by_approval_preserves_data_and_audits"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::workspace_close::tests::browse_save_dispatch_executes_and_audits_a_guarded_transaction"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_dispatch_on_read_only_connection_is_denied_and_audited"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_waits_for_approval_before_writing"
     ],
     [
       "bookie-app",
@@ -525,7 +545,22 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::stale_set_null_does_not_modify_a_replacement_draft"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::keyboard_set_null_targets_the_focused_draft"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::the_row_menu_deletes_a_draft_row_by_discarding_it"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::stale_row_menu_delete_does_not_discard_a_new_draft"
     ],
     [
       "bookie-app",
@@ -876,6 +911,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::the_results_panel_can_be_hidden_without_releasing_or_rerunning_its_result"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::dispatch_tests::stale_set_null_does_not_modify_a_replacement_query_result_draft"
     ],
     [
       "bookie-app",
@@ -1396,6 +1436,41 @@
       "bookie-app",
       "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::delete_action_carries_the_selected_draft_identity"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::delete_action_preserves_the_stored_row_selected_when_menu_opened"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::full_value_edit_does_not_fetch_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::filter_menu_does_not_use_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::inline_edit_does_not_open_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::reference_menu_does_not_navigate_from_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::view_value_does_not_fetch_a_rebound_cell"
     ],
     [
       "bookie-app",

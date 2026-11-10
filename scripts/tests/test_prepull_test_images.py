@@ -180,6 +180,7 @@ class PrepullTestImagesTests(unittest.TestCase):
         inspect = script.index('if ! docker image inspect "$IMAGE"')
         pull = script.index('docker pull --quiet "$IMAGE"')
         self.assertLess(inspect, pull)
+        self.assertIn("-e PGPASSWORD", script)
 
     def test_a_tag_given_by_constant_resolves_to_that_tag(self):
         text = 'const DB_TAG: &str = "7";\nlet c = Mongo::default().with_tag(DB_TAG).start();'

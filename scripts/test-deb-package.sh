@@ -59,21 +59,21 @@ for base in "${images[@]}"; do
       test "$(cat ~/.config/bookie/connections.json)" = keep
       test "$(cat ~/.local/share/bookie/history.db)" = keep
     }
-    apt-get install -y -qq "$older" >/dev/null
+    apt install -y -qq "$older" >/dev/null
     bash /src/scripts/check-installed-deb.sh
-    apt-get install -y -qq --reinstall "$older" >/dev/null
+    apt install -y -qq --reinstall "$older" >/dev/null
     bash /src/scripts/check-installed-deb.sh
-    apt-get install -y -qq "$newer" >/dev/null
+    apt install -y -qq "$newer" >/dev/null
     test "$(installed_version)" = "$newer_version"
     bash /src/scripts/check-installed-deb.sh
     keeps_user_data
-    apt-get install -y -qq --allow-downgrades "$older" >/dev/null
+    apt install -y -qq --allow-downgrades "$older" >/dev/null
     test "$(installed_version)" = "$older_version"
     bash /src/scripts/check-installed-deb.sh
     keeps_user_data
     if [ -n "${PREVIOUS_DEB_NAME:-}" ]; then
       apt-get purge -y -qq bookie >/dev/null
-      apt-get install -y -qq "/previous/$PREVIOUS_DEB_NAME" >/dev/null
+      apt install -y -qq "/previous/$PREVIOUS_DEB_NAME" >/dev/null
       previous_package=$(dpkg-deb -f "/previous/$PREVIOUS_DEB_NAME" Package)
       test "$(dpkg-query -W -f="\${Version}" "$previous_package")" = "$(dpkg-deb -f "/previous/$PREVIOUS_DEB_NAME" Version)"
       keeps_user_data

@@ -54,6 +54,19 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
              self.assertRaisesRegex(ValueError, 'no prebuilt tests executed'):
             runner.main()
 
+    def test_nested_libtest_output_keeps_the_outer_test_run_valid(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        command = [str(self.binary)]
+        output = (
+            'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 86 filtered out\n'
+            'test result: ok. 86 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n'
+        )
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.object(runner.subprocess, 'run', return_value=subprocess.CompletedProcess(command, 0, output)), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
+            self.assertEqual(runner.main(), 0)
+
     def test_failed_process_and_missing_summary_fail_the_invocation(self):
         self.index['package_directories']['sample'] = '.'
         (self.root / 'index.json').write_text(json.dumps(self.index))

@@ -549,6 +549,7 @@ impl SimpleComponent for BrowseTab {
                         row_position,
                         col_index,
                         row_key,
+                        draft_id: crate::ui::grid::focused_cell_draft_id(widget, row_position),
                     })
                     .ok();
                 glib::Propagation::Stop
@@ -1029,7 +1030,13 @@ impl SimpleComponent for BrowseTab {
                 self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
-            BrowseTabInput::DuplicateRow { row_position } => self.handle_duplicate_row(row_position, sender),
+            BrowseTabInput::GridDuplicateRow {
+                row_position,
+                row_key,
+                draft_id,
+            } => {
+                self.handle_grid_duplicate_row(row_position, row_key, draft_id, sender);
+            }
             BrowseTabInput::InsertRow => self.handle_insert_row(sender),
             BrowseTabInput::DeleteSelectedRow => self.handle_delete_selected_row(sender),
             BrowseTabInput::GridCellEdited {
@@ -1038,8 +1045,10 @@ impl SimpleComponent for BrowseTab {
                 new_value,
                 value,
                 row_key,
+                draft_id,
             } => {
                 let accepted = match value {
+                    Some(_) if self.row_object_at(row_position).and_then(|row| row.draft_id()) != draft_id => false,
                     Some(value) => self.handle_grid_cell_value_edited(row_position, col_index, value, row_key, sender),
                     None => self.handle_grid_cell_edited(row_position, col_index, new_value, row_key, sender),
                 };
@@ -1058,10 +1067,13 @@ impl SimpleComponent for BrowseTab {
                 row_position,
                 col_index,
                 row_key,
-            } => self.handle_grid_set_cell_null(row_position, col_index, row_key, sender),
-            BrowseTabInput::GridDeleteRowAt { row_position, row_key } => {
-                self.handle_grid_delete_row(row_position, row_key, sender)
-            }
+                draft_id,
+            } => self.handle_grid_set_cell_null(row_position, col_index, row_key, draft_id, sender),
+            BrowseTabInput::GridDeleteRowAt {
+                row_position,
+                row_key,
+                draft_id,
+            } => self.handle_grid_delete_row(row_position, row_key, draft_id, sender),
             BrowseTabInput::GridCopyRowAsStatement(row_positions, statement) => {
                 self.handle_grid_copy_row_as_statement(row_positions, statement, sender)
             }

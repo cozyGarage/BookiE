@@ -3,6 +3,7 @@ pub mod core_bridge;
 pub mod cursor;
 pub mod detail;
 pub mod edit;
+pub mod font_settings;
 pub mod keymap;
 pub mod live;
 pub mod messages;
@@ -14,6 +15,7 @@ pub mod pubsub_view;
 pub mod selection;
 pub mod shell;
 pub mod source;
+pub mod status_view;
 pub mod theme;
 pub mod type_colors;
 

@@ -203,6 +203,12 @@ impl ReadSession {
     }
 }
 
+impl ReadSession {
+    pub fn overview(&self) -> Vec<crate::database_service::ConnectionOverview> {
+        self.database.connection_overview()
+    }
+}
+
 impl Drop for ReadSession {
     fn drop(&mut self) {
         self.database.close_generation(self.id, self.generation);

@@ -95,6 +95,10 @@ Other options and why they were rejected.
 | [0045](0045-network-checks-crate.md) | TCP checks with history live in a UI-free crate | Accepted | `bookie-checks` holds `check_tcp` and a bounded `History` with a summary; HTTP checks, scheduling and persistence follow separately. |
 | [0046](0046-pg-sessions-crate.md) | PostgreSQL sessions and locks live in a UI-free crate | Accepted | `bookie-pg-sessions` lists sessions with waits and blocking pids and ranks blockers; reads only, terminating a backend is a separate decision. |
 | [0047](0047-redis-pubsub-sample.md) | Redis pub/sub is read as a bounded sample | Proposed | `sample_pubsub` subscribes by pattern and returns after N messages or a time window; a continuous monitor, streams and LISTEN/NOTIFY are separate. |
+| [0048](0048-kafka-browser-crate.md) | Kafka topics are browsed through a UI-free crate on a pure-Rust client | Accepted | `bookie-kafka-browser` lists topics with offsets and tails a partition over `rskafka`; reads only, and not wired to a saved connection until audit and credentials are decided. |
+| [0049](0049-command-event-bridge.md) | Frontends talk to app-services through typed commands and events | Accepted | Typed `Command` and `Event` enums carry an epoch so a frontend applies only current answers; reads only in phase 1, every command still goes through `PolicyGuard`; GTK unchanged. |
+| [0050](0050-avro-container-decode.md) | Avro object container files are decoded with their own schema | Proposed | `bookie-avro-container` decodes a container file (schema in its header) to at most 1000 JSON records; raw datums need a schema source and are out of scope. |
+| [0051](0051-clickhouse-write-commit-token.md) | Writes carry a commit token so an unknown outcome can be resolved | Accepted | Adds a token-returning write to `Connection` (default unsupported), audited through the policy guard and forwarded by agentd; ClickHouse and PostgreSQL implement it. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

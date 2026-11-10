@@ -21,6 +21,14 @@ impl GridView {
             }
             return;
         }
+        if self.focus.is_focused(window)
+            && matches!(
+                key,
+                "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown"
+            )
+        {
+            return;
+        }
         let chord = Chord::new(modifiers.control, modifiers.shift, modifiers.alt, key);
         if let Some(command) = self.keymap.resolve(&chord) {
             self.run_command(command, window, cx);
