@@ -530,6 +530,9 @@ pub trait Connection: Send + Sync {
     /// A driver that retires its connection without returning
     /// [`DriverError::Disconnected`] wakes that same sink from the retirement.
     fn attach_fault_notify(&self, _notify: Arc<Notify>) {}
+    async fn resolve_commit(&self, _token: &crate::CommitToken) -> Result<crate::CommitResolution, DriverError> {
+        Ok(crate::CommitResolution::Unresolvable)
+    }
     async fn ping(&self) -> Result<(), DriverError>;
     async fn close(self: Box<Self>) -> Result<(), DriverError>;
 }

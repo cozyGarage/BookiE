@@ -692,6 +692,14 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn resolve_commit(
+        &self,
+        token: &bookie_core::CommitToken,
+    ) -> Result<bookie_core::CommitResolution, DriverError> {
+        self.caught_read("RESOLVE COMMIT", self.inner.resolve_commit(token))
+            .await
+    }
+
     async fn ping(&self) -> Result<(), DriverError> {
         self.caught_read("PING", self.inner.ping()).await
     }
