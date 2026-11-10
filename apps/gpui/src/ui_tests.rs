@@ -181,7 +181,26 @@ fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAp
 }
 
 #[gpui::test]
-#[ignore = "known issue: DataTable moves within the loaded page; keyboard page crossing is not yet ported (docs/known-issues)"]
+fn an_arrow_past_the_page_edge_takes_the_neighbouring_page(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.place_cursor(Some(Cursor { row: 4_998, column: 3 }));
+            assert!(!view.cross_page_edge("down"), "not the last row yet");
+            view.place_cursor(Some(Cursor { row: 4_999, column: 3 }));
+            assert!(view.cross_page_edge("down"));
+            assert_eq!(view.pager.page, 1);
+            assert_eq!(view.cell_cursor, Some(Cursor { row: 0, column: 3 }));
+            assert!(view.cross_page_edge("up"));
+            assert_eq!(view.pager.page, 0);
+            assert_eq!(view.cell_cursor, Some(Cursor { row: 4_999, column: 3 }));
+            assert!(!view.cross_page_edge("left"));
+        })
+    });
+}
+
+#[gpui::test]
+#[ignore = "known issue: simulate_keystrokes does not reach the capture handler after ctrl-end; cross_page_edge is unit-tested (docs/known-issues)"]
 fn the_cursor_crosses_to_the_next_page_and_back(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-end");
