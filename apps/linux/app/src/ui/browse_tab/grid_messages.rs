@@ -46,13 +46,13 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             row_position,
             row_key,
             draft_id,
-        } => BrowseTabInput::GridDeleteRowAt {
+        } => delete_row_input(row_position, row_key, draft_id),
+        GridMsg::InsertRow => BrowseTabInput::InsertRow,
+        GridMsg::DuplicateRow {
             row_position,
             row_key,
             draft_id,
-        },
-        GridMsg::InsertRow => BrowseTabInput::InsertRow,
-        GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
+        } => duplicate_row_input(row_position, row_key, draft_id),
         GridMsg::FilterByValue { column, value, exclude } => BrowseTabInput::FilterByValue { column, value, exclude },
         GridMsg::FilterWholeResult { .. } => {
             BrowseTabInput::ShowToast(crate::tr!("Whole-result filters apply to query results"))
@@ -61,6 +61,22 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
         GridMsg::HighlightRulesChanged => BrowseTabInput::HighlightRulesChanged,
+    }
+}
+
+fn delete_row_input(row_position: u32, row_key: Vec<bookie_core::Value>, draft_id: Option<u64>) -> BrowseTabInput {
+    BrowseTabInput::GridDeleteRowAt {
+        row_position,
+        row_key,
+        draft_id,
+    }
+}
+
+fn duplicate_row_input(row_position: u32, row_key: Vec<bookie_core::Value>, draft_id: Option<u64>) -> BrowseTabInput {
+    BrowseTabInput::GridDuplicateRow {
+        row_position,
+        row_key,
+        draft_id,
     }
 }
 

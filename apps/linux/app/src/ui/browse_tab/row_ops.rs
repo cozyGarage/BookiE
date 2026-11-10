@@ -3,6 +3,21 @@ use relm4::ComponentSender;
 use super::*;
 
 impl BrowseTab {
+    pub(super) fn handle_grid_duplicate_row(
+        &mut self,
+        row_position: u32,
+        row_key: Vec<Value>,
+        draft_id: Option<u64>,
+        sender: ComponentSender<Self>,
+    ) {
+        if self.row_object_at(row_position).and_then(|row| row.draft_id()) != draft_id
+            || (draft_id.is_none() && row_key.is_empty())
+            || self.reject_stale_row_edit(row_position, &row_key, &sender)
+        {
+            return;
+        }
+        self.handle_duplicate_row(row_position, sender);
+    }
     pub(super) fn reject_keyless_mutation(&self, input: &BrowseTabInput, sender: &ComponentSender<Self>) -> bool {
         if self.allows_keyed_row_mutations() || !requires_row_key(input) {
             return false;
@@ -731,6 +746,7 @@ impl BrowseTab {
         let changes_tracker = matches!(
             msg,
             BrowseTabInput::DuplicateRow { .. }
+                | BrowseTabInput::GridDuplicateRow { .. }
                 | BrowseTabInput::InsertRow
                 | BrowseTabInput::DeleteSelectedRow
                 | BrowseTabInput::GridCellEdited { .. }
@@ -961,6 +977,7 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
         input,
         BrowseTabInput::InsertRow
             | BrowseTabInput::DuplicateRow { .. }
+            | BrowseTabInput::GridDuplicateRow { .. }
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
@@ -993,6 +1010,7 @@ fn requires_row_key(input: &BrowseTabInput) -> bool {
         input,
         BrowseTabInput::InsertRow
             | BrowseTabInput::DuplicateRow { .. }
+            | BrowseTabInput::GridDuplicateRow { .. }
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }

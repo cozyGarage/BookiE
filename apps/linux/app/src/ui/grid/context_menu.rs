@@ -482,13 +482,16 @@ pub(super) fn install_grid_context_menus(
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
                     let Some(view) = view.upgrade() else { return };
-                    if complete_row_at(&view, position(slot)).is_none() {
+                    let Some(row_position) = slot.row_position else { return };
+                    if complete_row_at(&view, row_position).is_none() {
                         sender.send(GridMsg::IncompleteRowData).ok();
                         return;
                     }
                     sender
                         .send(GridMsg::DuplicateRow {
-                            row_position: position(slot),
+                            row_position,
+                            row_key: slot.row_key.clone(),
+                            draft_id: slot.draft_target.map(|(_, id)| id),
                         })
                         .ok();
                 }

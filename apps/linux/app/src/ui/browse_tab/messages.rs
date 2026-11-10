@@ -85,6 +85,11 @@ pub enum BrowseTabInput {
     DuplicateRow {
         row_position: u32,
     },
+    GridDuplicateRow {
+        row_position: u32,
+        row_key: Vec<Value>,
+        draft_id: Option<u64>,
+    },
     GridCopyToClipboard(String),
     GridFetchCellValue {
         col_index: usize,

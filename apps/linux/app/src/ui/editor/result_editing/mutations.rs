@@ -82,8 +82,17 @@ impl SqlEditor {
                 self.handle_result_insert_row(sender);
                 None
             }
-            GridMsg::DuplicateRow { row_position } => {
-                self.handle_result_duplicate_row(row_position, sender);
+            GridMsg::DuplicateRow {
+                row_position,
+                row_key,
+                draft_id,
+            } => {
+                if self.result_row_object(row_position).and_then(|row| row.draft_id()) == draft_id
+                    && (draft_id.is_some() || !row_key.is_empty())
+                    && !self.reject_stale_result_edit(row_position, &row_key, sender)
+                {
+                    self.handle_result_duplicate_row(row_position, sender);
+                }
                 None
             }
             GridMsg::DeleteRowAt {
@@ -774,7 +783,11 @@ mod save_guard_tests {
                 draft_id: None,
             },
             GridMsg::InsertRow,
-            GridMsg::DuplicateRow { row_position: 0 },
+            GridMsg::DuplicateRow {
+                row_position: 0,
+                row_key: Vec::new(),
+                draft_id: None,
+            },
         ];
 
         assert!(

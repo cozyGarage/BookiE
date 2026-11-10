@@ -120,6 +120,8 @@ pub enum GridMsg {
     InsertRow,
     DuplicateRow {
         row_position: u32,
+        row_key: Vec<bookie_core::Value>,
+        draft_id: Option<u64>,
     },
     FilterByValue {
         column: String,

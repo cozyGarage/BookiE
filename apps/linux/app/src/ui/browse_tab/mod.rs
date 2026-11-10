@@ -1031,6 +1031,13 @@ impl SimpleComponent for BrowseTab {
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
             BrowseTabInput::DuplicateRow { row_position } => self.handle_duplicate_row(row_position, sender),
+            BrowseTabInput::GridDuplicateRow {
+                row_position,
+                row_key,
+                draft_id,
+            } => {
+                self.handle_grid_duplicate_row(row_position, row_key, draft_id, sender);
+            }
             BrowseTabInput::InsertRow => self.handle_insert_row(sender),
             BrowseTabInput::DeleteSelectedRow => self.handle_delete_selected_row(sender),
             BrowseTabInput::GridCellEdited {
