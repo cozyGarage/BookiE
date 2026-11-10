@@ -139,7 +139,7 @@ pub async fn open_saved(
         opts.clone(),
         ssh_hops.clone(),
         &ssh_environment,
-        cancellation,
+        cancellation.clone(),
     )
     .await
     .map_err(OpenFailure::from)?;
@@ -159,7 +159,7 @@ pub async fn open_saved(
         Err(error @ bookie_core::DriverError::PolicyDenied(_)) => return Err(OpenFailure::from_driver(&error)),
         Err(_) => None,
     };
-    let control = crate::operation_control::bounded(timeout_secs);
+    let control = crate::operation_control::bounded_with(timeout_secs, cancellation);
     let tables = crate::catalog::list_tables_excluding(&guarded, &hidden_schemas, &control)
         .await
         .map_err(|error| OpenFailure::from_driver(&error))?;
