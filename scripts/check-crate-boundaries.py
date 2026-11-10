@@ -30,13 +30,15 @@ TEST_CRATES = {"bookie-driver-tls-tests", "bookie-release-tests"}
 ALLOWED = {
     "bookie-core": set(),
     "bookie-ssh": set(),
+    "bookie-checks": set(),
+    "bookie-pg-sessions": {"bookie-core"},
     "bookie-dump": {"bookie-core"},
     "bookie-policy": {"bookie-core"},
     "bookie-storage": {"bookie-core", "bookie-policy"},
     "bookie-transport": {"bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage"},
     "bookie-results": {"bookie-core"},
     "bookie-app-services": {
-        "bookie-core", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
+        "bookie-core", "bookie-checks", "bookie-pg-sessions", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
         "bookie-transport",
     },
     "bookie-mcp": {"bookie-core", "bookie-policy", "bookie-storage"},

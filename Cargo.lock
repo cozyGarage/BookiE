@@ -988,14 +988,8 @@ version = "0.2.6"
 dependencies = [
  "async-trait",
  "bookie-core",
- "bookie-driver-clickhouse",
- "bookie-driver-duckdb",
- "bookie-driver-mongodb",
  "bookie-driver-mssql",
- "bookie-driver-mysql",
- "bookie-driver-oracle",
  "bookie-driver-postgres",
- "bookie-driver-redis",
  "bookie-driver-registry",
  "bookie-driver-sqlite",
  "bookie-mcp",
@@ -1027,7 +1021,6 @@ dependencies = [
  "bookie-driver-mongodb",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
- "bookie-driver-oracle",
  "bookie-driver-postgres",
  "bookie-driver-redis",
  "bookie-driver-registry",
@@ -1072,12 +1065,14 @@ version = "0.2.6"
 dependencies = [
  "async-trait",
  "bookie-app-services",
+ "bookie-checks",
  "bookie-core",
  "bookie-driver-mssql",
  "bookie-driver-mysql",
  "bookie-driver-postgres",
  "bookie-driver-sqlite",
  "bookie-dump",
+ "bookie-pg-sessions",
  "bookie-policy",
  "bookie-results",
  "bookie-ssh",
@@ -1099,6 +1094,13 @@ dependencies = [
  "tracing-subscriber",
  "unicode-width",
  "uuid",
+]
+
+[[package]]
+name = "bookie-checks"
+version = "0.2.6"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]
@@ -1262,7 +1264,6 @@ dependencies = [
  "oracledb",
  "rust_decimal",
  "secrecy",
- "serde_json",
  "testcontainers",
  "tokio",
 ]
@@ -1406,6 +1407,18 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "bookie-pg-sessions"
+version = "0.2.6"
+dependencies = [
+ "bookie-core",
+ "bookie-driver-postgres",
+ "secrecy",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
 ]
 
 [[package]]

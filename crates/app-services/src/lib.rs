@@ -1,3 +1,5 @@
+pub use bookie_checks as checks;
+pub use bookie_pg_sessions as pg_sessions;
 pub use bookie_results::{
     highlight_match, result_compare, result_filter, result_find, result_predicate, result_scan, sidebar_tree,
     stream_result_spool, text_match, value_exact,

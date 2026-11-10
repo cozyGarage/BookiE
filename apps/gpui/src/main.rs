@@ -14,7 +14,7 @@ mod ui_theme;
 use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
 use bookie_gpui::cursor::Cursor;
 use bookie_gpui::keymap::Keymap;
-use bookie_gpui::messages::MessageLog;
+use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui::preview::cell_preview;
@@ -83,6 +83,8 @@ struct GridView {
     font: gpui::SharedString,
     font_names: Vec<String>,
     palette_fonts: bool,
+    palette_address: Option<String>,
+    check_histories: Vec<(String, bookie_app_services::checks::History)>,
     sidebar_open: bool,
     sidebar_width: f32,
     resizing_sidebar: bool,
@@ -152,7 +154,7 @@ impl GridView {
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let total = source.total();
-        let find = cx.new(|cx| TextInput::new("Find in all rows", cx));
+        let find = cx.new(|cx| TextInput::new("Find", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
@@ -185,8 +187,11 @@ impl GridView {
         font_names.sort();
         font_names.dedup();
         let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
-        let sql_input =
-            cx.new(|cx| EditorState::new(window, cx).placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)"));
+        let sql_input = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("sql")
+                .placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)")
+        });
         cx.subscribe(
             &sql_input,
             |this, _, event: &gpui_kit::component::input::InputEvent, cx| {
@@ -208,6 +213,7 @@ impl GridView {
             |this, _, event: &InputEvent, window, cx| match event {
                 InputEvent::Changed => {
                     this.palette_index = 0;
+                    this.palette_address = bookie_gpui::net_check::parse_address(this.palette_input.read(cx).content());
                     cx.notify();
                 }
                 InputEvent::Submit => this.run_palette(window, cx),
@@ -257,6 +263,8 @@ impl GridView {
             font: default_font(&font_names).into(),
             font_names,
             palette_fonts: false,
+            palette_address: None,
+            check_histories: Vec::new(),
             sidebar_open: true,
             sidebar_width: 260.0,
             resizing_sidebar: false,
@@ -389,6 +397,30 @@ impl GridView {
             }
             Err(message) => self.status = message,
         }
+    }
+
+    fn check_tcp(&mut self, address: String, cx: &mut Context<Self>) {
+        self.status = format!("Checking {address}…");
+        let target = address.clone();
+        self.begin_background(
+            cx,
+            move |_| bookie_gpui::net_check::run_check(&target),
+            move |this, outcome| {
+                let (up, text) = bookie_gpui::net_check::record(&mut this.check_histories, &address, outcome);
+                let kind = if up { MessageKind::Success } else { MessageKind::Error };
+                this.messages.push(kind, text.clone());
+                this.status = text;
+            },
+        );
+    }
+
+    fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.tabs.open_query();
+        self.sync_grid_owner();
+        self.sql_input.update(cx, |input, cx| {
+            input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
+        });
+        self.run_query(cx);
     }
 
     fn run_query(&mut self, cx: &mut Context<Self>) {
@@ -774,112 +806,125 @@ impl GridView {
         }
         let filtering = matches!(self.mode, Mode::Filtered { .. });
         let paged = !self.continuous;
+        let check = self.palette_address.as_ref().map(|address| Action {
+            id: "check-tcp",
+            label: format!("Check TCP port {address}"),
+            enabled: true,
+        });
         let action = |id, label: &str, enabled| Action {
             id,
             label: label.to_string(),
             enabled,
         };
-        vec![
-            action("first", "Go to first page", paged),
-            action("previous", "Go to previous page", paged && self.pager.page > 0),
-            action(
-                "next",
-                "Go to next page",
-                paged && self.pager.page + 1 < self.pager.pages(),
-            ),
-            action("last", "Go to last page", paged),
-            action("find", "Find in all rows", !filtering),
-            action("filter", "Filter rows (WHERE)", true),
-            action("clear-filter", "Clear filter", filtering),
-            action("compare", "Compare results", true),
-            action(
-                "detail",
-                if self.detail_open {
-                    "Hide cell details"
-                } else {
-                    "Show cell details"
-                },
-                true,
-            ),
-            action(
-                "continuous",
-                if self.continuous {
-                    "Switch to paged scrolling"
-                } else {
-                    "Switch to continuous scrolling"
-                },
-                true,
-            ),
-            action("copy", "Copy selected rows", self.selection.is_some()),
-            action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
-            action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
-            action(
-                "copy-markdown",
-                "Copy selected rows as a Markdown table",
-                self.selection.is_some(),
-            ),
-            action(
-                "copy-in-list",
-                "Copy the active column as an IN list",
-                self.selection.is_some(),
-            ),
-            action(
-                "copy-insert",
-                "Copy selected rows as INSERT statements",
-                self.selection.is_some(),
-            ),
-            action("clear-selection", "Clear row selection", self.selection.is_some()),
-            action("edit", "Edit the active cell", self.cell_cursor.is_some()),
-            action(
-                "sidebar",
-                if self.sidebar_open {
-                    "Hide the sidebar"
-                } else {
-                    "Show the sidebar"
-                },
-                true,
-            ),
-            action("font", "Choose font…", true),
-            action("theme-dbx", "Theme: DBX style", true),
-            action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
-            action("query", "New query tab", true),
-            action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
-            action(
-                "previous-run",
-                "Previous result",
-                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
-            ),
-            action(
-                "next-run",
-                "Next result",
-                matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
-            ),
-            action(
-                "close-run",
-                "Close current result",
-                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
-            ),
-            action(
-                "results",
-                if self.result_open {
-                    "Hide the results pane"
-                } else {
-                    "Show the results pane"
-                },
-                matches!(self.tabs.current(), Tab::Query),
-            ),
-            action("home", "Open Home", true),
-            action("table", &format!("Open {}", self.catalog.grid_table), true),
-            action(
-                "theme",
-                if self.dark_mode {
-                    "Switch to light theme"
-                } else {
-                    "Switch to dark theme"
-                },
-                true,
-            ),
-        ]
+        check
+            .into_iter()
+            .chain(vec![
+                action("first", "Go to first page", paged),
+                action("previous", "Go to previous page", paged && self.pager.page > 0),
+                action(
+                    "next",
+                    "Go to next page",
+                    paged && self.pager.page + 1 < self.pager.pages(),
+                ),
+                action("last", "Go to last page", paged),
+                action("find", "Find in all rows", !filtering),
+                action("filter", "Filter rows (WHERE)", true),
+                action("clear-filter", "Clear filter", filtering),
+                action("compare", "Compare results", true),
+                action(
+                    "detail",
+                    if self.detail_open {
+                        "Hide cell details"
+                    } else {
+                        "Show cell details"
+                    },
+                    true,
+                ),
+                action(
+                    "continuous",
+                    if self.continuous {
+                        "Switch to paged scrolling"
+                    } else {
+                        "Switch to continuous scrolling"
+                    },
+                    true,
+                ),
+                action("copy", "Copy selected rows", self.selection.is_some()),
+                action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
+                action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
+                action(
+                    "copy-markdown",
+                    "Copy selected rows as a Markdown table",
+                    self.selection.is_some(),
+                ),
+                action(
+                    "copy-in-list",
+                    "Copy the active column as an IN list",
+                    self.selection.is_some(),
+                ),
+                action(
+                    "copy-insert",
+                    "Copy selected rows as INSERT statements",
+                    self.selection.is_some(),
+                ),
+                action(
+                    "sessions",
+                    "Show PostgreSQL sessions and blockers",
+                    self.live.as_ref().is_some_and(|live| live.driver_id == "postgres"),
+                ),
+                action("clear-selection", "Clear row selection", self.selection.is_some()),
+                action("edit", "Edit the active cell", self.cell_cursor.is_some()),
+                action(
+                    "sidebar",
+                    if self.sidebar_open {
+                        "Hide the sidebar"
+                    } else {
+                        "Show the sidebar"
+                    },
+                    true,
+                ),
+                action("font", "Choose font…", true),
+                action("theme-dbx", "Theme: DBX style", true),
+                action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
+                action("query", "New query tab", true),
+                action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
+                action(
+                    "previous-run",
+                    "Previous result",
+                    matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
+                ),
+                action(
+                    "next-run",
+                    "Next result",
+                    matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
+                ),
+                action(
+                    "close-run",
+                    "Close current result",
+                    matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
+                ),
+                action(
+                    "results",
+                    if self.result_open {
+                        "Hide the results pane"
+                    } else {
+                        "Show the results pane"
+                    },
+                    matches!(self.tabs.current(), Tab::Query),
+                ),
+                action("home", "Open Home", true),
+                action("table", &format!("Open {}", self.catalog.grid_table), true),
+                action(
+                    "theme",
+                    if self.dark_mode {
+                        "Switch to light theme"
+                    } else {
+                        "Switch to dark theme"
+                    },
+                    true,
+                ),
+            ])
+            .collect()
     }
 
     fn palette_shown(&self, cx: &App) -> Vec<usize> {
@@ -912,6 +957,7 @@ impl GridView {
             return;
         };
         let id = actions[index].id;
+        let check_address = self.palette_address.clone();
         if id == "font" {
             self.palette_fonts = true;
             self.palette_index = 0;
@@ -948,6 +994,12 @@ impl GridView {
             "copy-markdown" => self.copy_selection_as(CopyFormat::Markdown, cx),
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
+            "sessions" => self.show_sessions(window, cx),
+            "check-tcp" => {
+                if let Some(address) = check_address {
+                    self.check_tcp(address, cx);
+                }
+            }
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
@@ -1073,8 +1125,8 @@ fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<
         .id(id)
         .flex()
         .items_center()
-        .h(px(28.0))
-        .px_3()
+        .h(px(24.0))
+        .px_2()
         .rounded(px(4.0))
         .border_1()
         .border_color(rgb(theme.border))

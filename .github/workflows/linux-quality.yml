@@ -47,6 +47,7 @@ jobs:
           - {label: policy-1, package: bookie-policy, shard: 0/2}
           - {label: policy-2, package: bookie-policy, shard: 1/2}
           - {label: ssh, package: bookie-ssh, shard: 0/1}
+          - {label: checks, package: bookie-checks, shard: 0/1}
           - {label: redis, package: bookie-driver-redis, shard: 0/1}
           - {label: postgres, package: bookie-driver-postgres, shard: 0/1}
     env:

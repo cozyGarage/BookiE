@@ -7,6 +7,7 @@ pub mod keymap;
 pub mod live;
 pub mod messages;
 pub mod model;
+pub mod net_check;
 pub mod palette;
 pub mod preview;
 pub mod selection;
