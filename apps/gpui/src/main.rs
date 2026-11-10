@@ -872,7 +872,11 @@ impl GridView {
                 matches!(self.tabs.current(), Tab::Query),
             ),
             action("home", "Open Home", true),
-            action("table", &format!("Open {}", self.catalog.grid_table), true),
+            action(
+                "table",
+                &format!("Open {}", self.catalog.grid_table),
+                !self.catalog.grid_table.is_empty(),
+            ),
             action(
                 "theme",
                 if self.dark_mode {

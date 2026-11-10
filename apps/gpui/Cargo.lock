@@ -1275,7 +1275,6 @@ dependencies = [
  "oracledb",
  "rust_decimal",
  "secrecy",
- "serde_json",
  "tokio",
 ]
 

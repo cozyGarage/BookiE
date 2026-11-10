@@ -250,6 +250,67 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
 }
 
 #[gpui::test]
+fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContext) {
+    struct Fixture(std::path::PathBuf);
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+    let path = std::env::temp_dir().join(format!("bookie-empty-{}.sqlite", uuid::Uuid::new_v4()));
+    std::fs::File::create(&path).expect("create database");
+    let fixture = Fixture(path);
+    tokio::runtime::Runtime::new().expect("runtime").block_on(async {
+        let registry = drivers_registry::default_registry();
+        let driver = registry.get("sqlite").expect("sqlite driver");
+        let connection = driver
+            .connect(bookie_core::ConnectOptions {
+                database: fixture.0.to_string_lossy().into_owned(),
+                ..Default::default()
+            })
+            .await
+            .expect("open database");
+        connection
+            .execute("CREATE TABLE seed (id INTEGER)")
+            .await
+            .expect("create table");
+        connection.execute("DROP TABLE seed").await.expect("drop table");
+        connection.close().await.expect("close database");
+    });
+    let (view, cx) = open(cx);
+    view.update(cx, |view, _| {
+        view.edits
+            .insert((0, 1), bookie_gpui::model::Cell::Text("previous edit".into()));
+    });
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.live.is_some(), "{}", view.status);
+        assert!(view.catalog.tables.is_empty());
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Query);
+        assert_eq!(view.dataset_count(), 0);
+        assert!(view.edits.is_empty());
+        assert!(!view.source.origin().contains("Synthetic"));
+        assert!(!view.palette_actions().iter().any(|action| action.id == "table" && action.enabled));
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 1", window, cx));
+            view.run_query(cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.source.total(), 1);
+        assert_eq!(view.source.row(0)[0], bookie_gpui::model::Cell::Int(1));
+    });
+}
+
+#[gpui::test]
 fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: &mut TestAppContext) {
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);

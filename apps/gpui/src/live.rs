@@ -150,10 +150,7 @@ impl LiveTable {
     }
 }
 
-async fn open_session(
-    origin: &Origin,
-    cancellation: CancellationToken,
-) -> Result<(ReadSession, String), String> {
+async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Result<(ReadSession, String), String> {
     let registry = Arc::new(drivers_registry::default_registry());
     let (opened, label) = match origin {
         Origin::Saved(connection) => {
