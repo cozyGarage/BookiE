@@ -2,6 +2,12 @@ use super::*;
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.keystroke_hook.is_none() {
+            let view = cx.entity();
+            self.keystroke_hook = Some(cx.intercept_keystrokes(move |event, window, cx| {
+                view.update(cx, |this, cx| this.intercept_key(event, window, cx));
+            }));
+        }
         if self.pager.total != self.dataset_count() {
             self.pager = self.pager.with_total(self.dataset_count());
         }
@@ -205,7 +211,6 @@ impl Render for GridView {
                 root.font_family(self.fonts.ui_family.clone())
             })
             .track_focus(&self.focus)
-            .capture_key_down(cx.listener(Self::capture_key))
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
                 if this.resizing_sidebar {

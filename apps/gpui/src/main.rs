@@ -46,6 +46,7 @@ enum Mode {
 struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
+    keystroke_hook: Option<gpui::Subscription>,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -265,6 +266,7 @@ impl GridView {
             fonts: font_settings::load(),
             table,
             _table_events: table_events,
+            keystroke_hook: None,
             table_source: source.clone(),
             source,
             mode: Mode::All,

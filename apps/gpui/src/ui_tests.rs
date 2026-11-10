@@ -200,7 +200,6 @@ fn an_arrow_past_the_page_edge_takes_the_neighbouring_page(cx: &mut TestAppConte
 }
 
 #[gpui::test]
-#[ignore = "known issue: simulate_keystrokes does not reach the capture handler after ctrl-end; cross_page_edge is unit-tested (docs/known-issues)"]
 fn the_cursor_crosses_to_the_next_page_and_back(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-end");

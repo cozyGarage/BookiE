@@ -1,11 +1,12 @@
 use bookie_gpui::cursor::{Cursor, move_cursor};
 use bookie_gpui::keymap::{Chord, Command};
-use gpui::{Context, Focusable, KeyDownEvent, Window};
+use gpui::{Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
 
 use crate::{GridView, Tab, palette_step};
 
 impl GridView {
-    pub(super) fn capture_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    /// Runs before key bindings, so the table's own arrow actions never see an edge key we handle.
+    pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = event.keystroke.modifiers;
         let plain = !(modifiers.shift || modifiers.control || modifiers.alt);
         let ready = self.focus.is_focused(window)
