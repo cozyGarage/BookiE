@@ -87,6 +87,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_BUILD_JOBS: 4
+      RUSTC_WRAPPER: ""
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}

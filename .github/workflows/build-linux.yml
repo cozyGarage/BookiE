@@ -241,6 +241,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 4
       CARGO_TARGET_DIR: ${{ github.workspace }}/target/gpui-${{ github.run_id }}-${{ github.run_attempt }}
+      RUSTC_WRAPPER: ""
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
