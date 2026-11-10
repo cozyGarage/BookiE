@@ -10,6 +10,7 @@ pub(super) struct CellContext {
     pub(super) draft_target: Option<(u32, u64)>,
     pub(super) row_position: Option<u32>,
     pub(super) row_key: Vec<bookie_core::Value>,
+    pub(super) row: Option<crate::ui::row_object::RowObject>,
 }
 
 struct WeakCellContext {
@@ -19,6 +20,7 @@ struct WeakCellContext {
     draft_target: Option<(u32, u64)>,
     row_position: Option<u32>,
     row_key: Vec<bookie_core::Value>,
+    row: Option<glib::WeakRef<crate::ui::row_object::RowObject>>,
 }
 
 #[derive(Clone, Default)]
@@ -31,12 +33,14 @@ impl CellContextStore {
         col_index: usize,
         column_name: String,
         draft_target: Option<(u32, u64)>,
+        row: Option<&crate::ui::row_object::RowObject>,
     ) {
         self.0.replace(Some(WeakCellContext {
             widget: widget.downgrade(),
             col_index,
             column_name,
             draft_target,
+            row: row.map(|row| row.downgrade()),
             row_position: super::display::POSITION_SLOT.get(widget),
             row_key: super::display::ROW_KEY_SLOT
                 .cloned(widget)
@@ -54,6 +58,7 @@ impl CellContextStore {
             draft_target: state.draft_target,
             row_position: state.row_position,
             row_key: state.row_key.clone(),
+            row: state.row.as_ref().and_then(glib::WeakRef::upgrade),
         })
     }
 }
