@@ -47,6 +47,23 @@ fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<D
         }))
 }
 
+fn import_menu(theme: Theme) -> Div {
+    let item = |label: &'static str| div().px_3().py_1().text_color(rgb(theme.foreground)).child(label);
+    div()
+        .flex()
+        .flex_col()
+        .py_1()
+        .border_b_1()
+        .border_color(rgb(theme.border))
+        .child(item("Import DBX Config"))
+        .child(item("Import Navicat NCX"))
+        .child(item("Import DBeaver"))
+        .child(item("Import DataGrip"))
+        .child(item("Import RDM"))
+        .child(item("Import AnotherRDM"))
+        .child(item("Export Connections"))
+}
+
 fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
@@ -267,25 +284,36 @@ impl GridView {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .h(px(36.0))
+                    .min_h(px(36.0))
+                    .py_1()
                     .px_2()
                     .border_b_1()
                     .border_color(rgb(theme.border))
                     .text_color(rgb(theme.muted_foreground))
                     .child(
                         div()
+                            .id("import-export-menu")
+                            .flex_1()
+                            .min_w_0()
                             .flex()
+                            .flex_wrap()
                             .items_center()
                             .gap_1()
+                            .cursor_pointer()
                             .child(icon("arrow-down-up", theme.muted_foreground))
-                            .child(div().min_w_0().child("Import / Export ⌄")),
+                            .child(div().min_w_0().whitespace_normal().child("Import / Export"))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.import_menu_open = !this.import_menu_open;
+                                cx.notify();
+                            })),
                     )
                     .child(
                         div()
+                            .flex_none()
                             .flex()
                             .items_center()
                             .gap_1()
-                            .child(header_icon("header-collapse-all", "x", theme))
+                            .child(header_icon("header-collapse-all", "chevrons-down-up", theme))
                             .child(header_icon("header-new-folder", "folder-plus", theme))
                             .child(header_icon("header-refresh", "refresh-cw", theme))
                             .child(
@@ -298,6 +326,7 @@ impl GridView {
                             ),
                     ),
             )
+            .children(self.import_menu_open.then(|| import_menu(theme)))
             .child(
                 div()
                     .p_2()
@@ -305,42 +334,9 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .child(div().flex_1().min_w_0().child(self.sidebar_search.clone()))
-                    .child(
-                        div()
-                            .id("sidebar-expand-all")
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(px(26.0))
-                            .h(px(26.0))
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(rgb(theme.accent)))
-                            .child(icon("folder", theme.muted_foreground)),
-                    )
-                    .child(
-                        div()
-                            .id("sidebar-tables")
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(px(26.0))
-                            .h(px(26.0))
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(rgb(theme.accent)))
-                            .child(icon("table", theme.muted_foreground)),
-                    )
-                    .child(
-                        div()
-                            .id("sidebar-clear-search")
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(px(26.0))
-                            .h(px(26.0))
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(rgb(theme.accent)))
-                            .child(icon("x", theme.muted_foreground)),
-                    ),
+                    .child(header_icon("sidebar-expand-all", "folder", theme))
+                    .child(header_icon("sidebar-tables", "table", theme))
+                    .child(header_icon("sidebar-clear-search", "x", theme)),
             )
             .child(div().flex().flex_col().px_2().children(tree).children(empty))
             .child(
