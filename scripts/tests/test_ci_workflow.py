@@ -431,7 +431,8 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
-        self.assertIn("TMPDIR: /var/cache/ci/target/driver-${{ matrix.driver }}", driver)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
+        self.assertIn('mkdir -p "$TMPDIR"', driver)
         self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
         self.assertIn("cleanup-testcontainers.py", driver)
         self.assertIn("trap cleanup_testcontainers EXIT", driver)
