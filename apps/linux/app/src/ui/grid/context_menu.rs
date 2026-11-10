@@ -418,11 +418,16 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("delete-row")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let (row_position, row_key) = cell_row_identity(&slot.widget);
-                    let draft_id = view
+                    let (current_position, row_key) = cell_row_identity(&slot.widget);
+                    let current_draft = view
                         .upgrade()
-                        .and_then(|view| row_object_at(&view, row_position))
+                        .and_then(|view| row_object_at(&view, current_position))
                         .and_then(|row| row.draft_id());
+                    let (row_position, draft_id) = match slot.draft_target {
+                        Some((position, id)) => (position, Some(id)),
+                        None if current_draft.is_some() => return,
+                        None => (current_position, None),
+                    };
                     sender
                         .send(GridMsg::DeleteRowAt {
                             row_position,
@@ -859,7 +864,12 @@ fn prepare_cell_menu(
 ) -> gtk::PopoverMenu {
     let position = POSITION_SLOT.get(widget).unwrap_or(0);
     select_row_for_menu(view, position);
-    menus.context.set(widget, options.idx, options.column_name.clone());
+    let draft_target = row_object_at(view, position)
+        .and_then(|row| row.draft_id())
+        .map(|id| (position, id));
+    menus
+        .context
+        .set(widget, options.idx, options.column_name.clone(), draft_target);
     menus
         .edit_action
         .set_enabled(edit_enabled_for(widget, options.is_text_editable));
