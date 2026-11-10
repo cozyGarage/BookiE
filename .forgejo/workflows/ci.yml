@@ -646,6 +646,7 @@ jobs:
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
+      TMPDIR: /var/cache/ci/target/driver-${{ matrix.driver }}
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
     strategy:
       fail-fast: false
