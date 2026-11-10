@@ -466,7 +466,7 @@ impl GridView {
                     .child(
                         ghost_icon("run-query", "play", "Run  Ctrl+Enter", theme).on_click(cx.listener(
                             |this, _, _, cx| {
-                                this.run_query();
+                                this.run_query(cx);
                                 cx.notify();
                             },
                         )),
@@ -485,18 +485,23 @@ impl GridView {
                     .p_2()
                     .gap_3()
                     .overflow_hidden()
-                    .child(
+                    .children(self.live.is_none().then(|| {
                         div()
                             .flex()
                             .flex_col()
                             .text_color(rgb(theme.muted_foreground))
-                            .children((1..=SQL.len()).map(|number| div().h(px(20.0)).child(number.to_string()))),
-                    )
-                    .child(
+                            .children((1..=SQL.len()).map(|number| div().h(px(20.0)).child(number.to_string())))
+                    }))
+                    .children(self.live.is_none().then(|| {
                         div()
                             .flex()
                             .flex_col()
-                            .children(SQL.iter().map(|line| div().h(px(20.0)).child((*line).to_string()))),
+                            .children(SQL.iter().map(|line| div().h(px(20.0)).child((*line).to_string())))
+                    }))
+                    .children(
+                        self.live
+                            .is_some()
+                            .then(|| div().flex_1().child(self.sql_input.clone())),
                     ),
             );
         let divider = div()
