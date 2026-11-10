@@ -14,6 +14,7 @@ pub mod pubsub_view;
 pub mod selection;
 pub mod shell;
 pub mod source;
+pub mod status_view;
 pub mod theme;
 pub mod type_colors;
 

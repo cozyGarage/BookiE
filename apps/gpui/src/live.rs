@@ -85,6 +85,10 @@ impl LiveSession {
         })
     }
 
+    pub fn overview(&self) -> Vec<bookie_app_services::database_service::ConnectionOverview> {
+        self.session.as_ref().map(ReadSession::overview).unwrap_or_default()
+    }
+
     pub fn sample_pubsub(
         &self,
         patterns: &[String],
@@ -168,10 +172,7 @@ impl LiveTable {
     }
 }
 
-async fn open_session(
-    origin: &Origin,
-    cancellation: CancellationToken,
-) -> Result<(ReadSession, String), String> {
+async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Result<(ReadSession, String), String> {
     let registry = Arc::new(drivers_registry::default_registry());
     let (opened, label) = match origin {
         Origin::Saved(connection) => {
