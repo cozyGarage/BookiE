@@ -231,8 +231,12 @@ impl GridView {
             },
         )
         .detach();
-        let table =
-            cx.new(|cx| gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx));
+        let table = cx.new(|cx| {
+            gpui_kit::component::table::TableState::new(grid_table::GridDelegate::default(), window, cx)
+                .cell_selectable(true)
+                .row_header(false)
+        });
+        let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
         let table_events = cx.subscribe(
             &table,
             |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
@@ -306,7 +310,7 @@ impl GridView {
             selection: None,
             generation: 0,
             scroll: UniformListScrollHandle::new(),
-            focus: cx.focus_handle(),
+            focus: table_focus,
             started,
             first_frame_reported: false,
             last_frame: None,
