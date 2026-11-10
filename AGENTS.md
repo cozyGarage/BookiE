@@ -59,6 +59,14 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
 11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or edits to another lane's ledger/sprint/policy files.
 
+## Reuse before building
+
+1. Before writing a UI control, grid, editor, settings page or protocol client, check the ready-made crate or component already in the dependency graph: `gpui-component` (table, editor, setting, tree, dialog, sidebar) for the GPUI app, and the GTK stack for the GTK app. Read its installed source; do not invent its API.
+2. Adopt a component through its crate. Our code is only the adapter: it maps our `ResultSource`, `Connection` and policy types onto the component. Do not copy component source into this repository.
+3. Adopting a component that is not yet a dependency needs an ADR and the licence and advisory review in [Validation](#validation), in the same pull request.
+4. A replacement lands as one pull request. It adds the adapter, moves every caller, deletes the code it replaces, and keeps the tests that proved the old behaviour. Two paths for the same feature are not allowed after a merge.
+5. A feature slice may be larger than a single fix when it is one replacement or one feature end to end. The size rules still apply: no baseline raised, no function over 60 lines, and every changed behaviour has a test.
+
 ## Principles
 
 1. Security comes first. Validate input at system boundaries and deny unsafe operations by default.
