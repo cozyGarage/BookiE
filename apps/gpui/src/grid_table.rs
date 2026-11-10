@@ -65,7 +65,7 @@ impl GridView {
                 .map(|position| (position, editing.column, gpui::AnyView::from(self.editor.clone())))
         });
         self.table.update(cx, |table, cx| {
-            let cell = table_cell(self.cell_cursor);
+            let cell = table_cell(self.cell_cursor).or((!rows.is_empty()).then_some((0, 0)));
             if table.selected_cell() != cell {
                 match cell {
                     Some((row, column)) => table.set_selected_cell(row, column, cx),

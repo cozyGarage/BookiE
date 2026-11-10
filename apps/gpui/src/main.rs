@@ -241,10 +241,13 @@ impl GridView {
             &table,
             |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
                 if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
-                    this.cell_cursor = Some(bookie_gpui::cursor::Cursor {
+                    let cursor = bookie_gpui::cursor::Cursor {
                         row: *row,
                         column: *column,
-                    });
+                    };
+                    this.cell_cursor = Some(cursor);
+                    let names = this.column_names();
+                    this.status = cursor.label(&names);
                     cx.notify();
                 }
             },

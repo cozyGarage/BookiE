@@ -5,17 +5,6 @@ use gpui::{Context, Focusable, KeyDownEvent, Window};
 use crate::{GridView, Tab, palette_step};
 
 impl GridView {
-    pub(super) fn capture_key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        let movement = matches!(
-            event.keystroke.key.as_str(),
-            "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown"
-        );
-        if movement && self.cell_cursor.is_none() && self.focus.is_focused(window) && self.tabs.shows_grid() {
-            self.table.update(cx, |table, cx| table.set_selected_cell(0, 0, cx));
-            cx.stop_propagation();
-        }
-    }
-
     pub(super) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let stroke = &event.keystroke;
         let modifiers = stroke.modifiers;
