@@ -1,3 +1,4 @@
+use bookie_gpui::font_settings;
 use bookie_gpui::messages::MessageKind;
 use bookie_gpui::shell::{ResultView, Tab, TreeRow, tree_rows_in};
 const SQL: [&str; 3] = [
@@ -476,6 +477,7 @@ impl GridView {
 
     pub fn settings_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let view = cx.entity();
+        let fonts = self.font_group(view.clone());
         let dark_mode = gpui_kit::component::setting::SettingField::switch(
             |cx| Theme::current(cx).dark,
             move |on, cx| {
@@ -490,12 +492,71 @@ impl GridView {
             .group(
                 gpui_kit::component::setting::SettingGroup::new()
                     .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
-            );
+            )
+            .group(fonts);
         div()
             .flex_1()
             .min_h_0()
             .bg(rgb(theme.background))
             .child(gpui_kit::component::setting::Settings::new("bookie-settings").page(page))
+    }
+
+    fn font_group(&self, view: gpui::Entity<Self>) -> gpui_kit::component::setting::SettingGroup {
+        use gpui_kit::component::setting::{NumberFieldOptions, SettingField, SettingGroup, SettingItem};
+        let size_options = || NumberFieldOptions {
+            min: f64::from(font_settings::MIN_SIZE),
+            max: f64::from(font_settings::MAX_SIZE),
+            step: 1.0,
+        };
+        let family = |get: fn(&font_settings::FontSettings) -> &String,
+                      set: fn(&mut font_settings::FontSettings, String)| {
+            let (read, write) = (view.clone(), view.clone());
+            SettingField::input(
+                move |cx| get(&read.read(cx).fonts).clone().into(),
+                move |value: gpui::SharedString, cx| {
+                    write.update(cx, |this, cx| {
+                        this.edit_fonts(|fonts| set(fonts, value.to_string()), cx)
+                    });
+                },
+            )
+        };
+        let size = |get: fn(&font_settings::FontSettings) -> f32, set: fn(&mut font_settings::FontSettings, f32)| {
+            let (read, write) = (view.clone(), view.clone());
+            SettingField::number_input(
+                size_options(),
+                move |cx| f64::from(get(&read.read(cx).fonts)),
+                move |value: f64, cx| {
+                    write.update(cx, |this, cx| {
+                        this.edit_fonts(|fonts| set(fonts, font_settings::clamp_size(value)), cx)
+                    });
+                },
+            )
+        };
+        SettingGroup::new()
+            .item(SettingItem::new(
+                "UI font",
+                family(|f| &f.ui_family, |f, v| f.ui_family = v),
+            ))
+            .item(SettingItem::new(
+                "UI font size",
+                size(|f| f.ui_size, |f, v| f.ui_size = v),
+            ))
+            .item(SettingItem::new(
+                "Editor font",
+                family(|f| &f.editor_family, |f, v| f.editor_family = v),
+            ))
+            .item(SettingItem::new(
+                "Editor font size",
+                size(|f| f.editor_size, |f, v| f.editor_size = v),
+            ))
+    }
+
+    pub fn edit_fonts(&mut self, edit: impl FnOnce(&mut font_settings::FontSettings), cx: &mut Context<Self>) {
+        edit(&mut self.fonts);
+        if let Err(error) = font_settings::save(&self.fonts) {
+            self.status = format!("Could not save font settings: {error}");
+        }
+        cx.notify();
     }
 
     pub fn home_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -716,6 +777,10 @@ impl GridView {
                     .children(self.live.is_some().then(|| {
                         div()
                             .flex_1()
+                            .when(!self.fonts.editor_family.is_empty(), |pane| {
+                                pane.font_family(self.fonts.editor_family.clone())
+                            })
+                            .text_size(px(self.fonts.editor_size))
                             .child(gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)))
                     })),
             );
