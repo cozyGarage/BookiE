@@ -226,7 +226,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
         .count();
-    assert_eq!(refused, 14, "every read-only database mutation must be refused");
+    assert_eq!(refused, 15, "every read-only database mutation must be refused");
     assert!(
         outputs
             .iter()
