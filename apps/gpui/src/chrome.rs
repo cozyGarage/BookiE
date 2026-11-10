@@ -829,7 +829,10 @@ impl GridView {
                 .rounded(px(theme.radius))
                 .border_1()
                 .cursor_pointer()
-                .child(format!("{} · {} rows", run.label(), thousands(run.rows)))
+                .child(match run.measured() {
+                    Some(took) => format!("{} · {} rows · {took}", run.label(), thousands(run.rows)),
+                    None => format!("{} · {} rows", run.label(), thousands(run.rows)),
+                })
                 .child(
                     div()
                         .id(("close-run", index))
@@ -962,10 +965,13 @@ impl GridView {
                 .gap_1()
                 .p_4()
                 .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child("Execution summary"))
-                .child(format!("Statement: {}", SQL.join(" ")))
+                .children(self.live.is_none().then(|| format!("Statement: {}", SQL.join(" "))))
                 .child(format!("Rows returned: {}", thousands(run.rows)))
-                .child(format!("Elapsed: {} ms (synthetic)", run.millis()))
-                .child("Source: synthetic generator, no database")
+                .child(match run.measured() {
+                    Some(took) => format!("Elapsed: {took}"),
+                    None => format!("Elapsed: {} ms (synthetic)", run.millis()),
+                })
+                .children(self.live.is_none().then_some("Source: synthetic generator, no database"))
         } else if self.runs.is_empty() {
             div().flex_1().p_4().child("No results")
         } else {

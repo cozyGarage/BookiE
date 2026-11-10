@@ -105,6 +105,7 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
     view.read_with(cx, |view, _| {
         assert_eq!(view.runs.len(), 1, "{}", view.status);
         assert_eq!(view.source.total(), 3);
+        assert!(view.runs[0].measured().is_some(), "a run against a database records its real time");
         let names: Vec<&str> = view
             .source
             .columns()

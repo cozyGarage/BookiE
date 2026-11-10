@@ -290,7 +290,7 @@ impl GridView {
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
-            runs: vec![Run { number: 1, rows: total }],
+            runs: vec![Run { number: 1, rows: total, elapsed_ms: None }],
             run_edits: vec![grid_edit::Edits::new()],
             run_sources: vec![None],
             sql_input,
@@ -551,13 +551,12 @@ impl GridView {
                 },
                 |this, (sql, elapsed, result)| match result {
                     Ok(table) => {
-                        this.messages.statement_ok(
-                            &sql,
-                            bookie_gpui::source::ResultSource::total(&table),
-                            table.truncated,
-                            elapsed,
-                        );
+                        let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
+                        this.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.add_run(Some(std::sync::Arc::new(table)));
+                        if let Some(run) = this.runs.last_mut() {
+                            run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                        }
                     }
                     Err(message) => {
                         this.messages.statement_failed(&sql, &message, elapsed);
