@@ -8,6 +8,7 @@ use super::*;
 pub enum AdministrativeOperation {
     Backup,
     Restore,
+    Subscribe,
 }
 
 impl AdministrativeOperation {
@@ -15,6 +16,7 @@ impl AdministrativeOperation {
         match self {
             Self::Backup => "BACKUP DATABASE",
             Self::Restore => "RESTORE DATABASE",
+            Self::Subscribe => "SUBSCRIBE CHANNELS",
         }
     }
 
@@ -22,6 +24,7 @@ impl AdministrativeOperation {
         match self {
             Self::Backup => "administrative_backup",
             Self::Restore => "administrative_restore",
+            Self::Subscribe => "administrative_subscribe",
         }
     }
 
@@ -167,7 +170,7 @@ impl PolicyGuard {
         if self.ctx.principal.is_agent() {
             return Decision::Deny {
                 rule: "agent_administrative_operation".into(),
-                message: "agents cannot run backups or restores".into(),
+                message: "agents cannot run backups, restores or subscriptions".into(),
             };
         }
         if !operation.replaces_data() {
