@@ -152,7 +152,7 @@ impl GridView {
 
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let total = source.total();
-        let find = cx.new(|cx| TextInput::new("Find in all rows", cx));
+        let find = cx.new(|cx| TextInput::new("Find", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
         cx.subscribe(&find, |this, _, event: &InputEvent, cx| match event {
             InputEvent::Changed => {
@@ -1073,8 +1073,8 @@ fn button(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<
         .id(id)
         .flex()
         .items_center()
-        .h(px(28.0))
-        .px_3()
+        .h(px(24.0))
+        .px_2()
         .rounded(px(4.0))
         .border_1()
         .border_color(rgb(theme.border))
