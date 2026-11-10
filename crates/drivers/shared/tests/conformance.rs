@@ -8,6 +8,8 @@ pub trait ConformanceEngine {
     type Driver: DatabaseDriver;
     fn driver() -> Self::Driver;
     const FILE_BASED: bool;
+    /// False for an engine with no per-connection read-only mode, where only PolicyGuard refuses writes.
+    const DRIVER_ENFORCES_READ_ONLY: bool = true;
     /// Make a fresh, empty database for one case; `path` is unique per case.
     async fn prepare(_path: &Path) {}
     /// Connection options for the database `prepare` made for `path`.
@@ -51,6 +53,9 @@ pub async fn declared_capabilities_match_the_suite<E: ConformanceEngine>() {
 }
 
 pub async fn read_only_connections_refuse_every_write_and_keep_the_rows<E: ConformanceEngine>() {
+    if !E::DRIVER_ENFORCES_READ_ONLY {
+        return;
+    }
     let (_directory, path) = seeded::<E>().await;
     let reader = open::<E>(&path, true).await;
     for statement in [

@@ -1202,6 +1202,7 @@ dependencies = [
  "secrecy",
  "serde_json",
  "socket2",
+ "tempfile",
  "testcontainers",
  "testcontainers-modules",
  "tiberius",

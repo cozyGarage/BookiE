@@ -33,6 +33,7 @@ This page describes user-visible behavior and limits in the current source. Curr
 - **Database attachment paths can be skipped if missing, and errors applying existing paths are not surfaced** ([#1993](https://github.com/cozyGarage/BookiE/issues/1993)).
 - **Local socket endpoint differences:** PostgreSQL selects a socket directory plus port; MySQL and MariaDB select the full socket-file path. Local sockets reject TLS and SSH and never fall back to TCP. Connection URLs use `?socket=/path/to/mysqld.sock` for MySQL/MariaDB or `?host=/socket/directory` for PostgreSQL, with an empty host or `localhost` and no other option.
 - **SQL Server query cancellation is disabled.** An interrupted operation may have an unknown outcome, so its connection or session is retired ([#850](https://github.com/cozyGarage/BookiE/issues/850)).
+- **The SQL Server driver does not refuse writes on a read-only connection by itself.** SQL Server has no per-connection read-only mode, so the driver sends a write it is given; only the policy guard (every GUI, agent and MCP path goes through it) refuses it. The shared driver conformance suite records this as the one case SQL Server skips.
 - **DuckDB read-only flat files** require Linux and a writable directory on the same filesystem as the input file. The driver pins the selected file through a private link. Read-only in-memory connections are refused.
 
 ## Interface
