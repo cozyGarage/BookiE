@@ -211,7 +211,7 @@ impl Render for GridView {
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
                 if this.resizing_sidebar {
-                    this.sidebar_width = f32::from(event.position.x).clamp(180.0, 480.0);
+                    this.sidebar_width = f32::from(event.position.x).clamp(260.0, 480.0);
                     cx.notify();
                 }
                 if this.resizing_split {
