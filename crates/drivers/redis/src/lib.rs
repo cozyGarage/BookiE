@@ -12,7 +12,9 @@ use bookie_core::{
     error_chain_text, looks_like_tls_failure,
 };
 
+mod pubsub;
 mod value;
+pub use pubsub::{MAX_SAMPLE_MESSAGES, PubSubMessage, PubSubSample, sample_pubsub};
 
 pub struct RedisDriver;
 
@@ -52,16 +54,7 @@ impl DatabaseDriver for RedisDriver {
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let verifies = opts.tls.mode.verifies_cert();
-        let info = connection_url(&opts)?
-            .into_connection_info()
-            .map_err(|err| map_redis_connect_error(err, verifies))?
-            .set_tcp_settings(tcp_settings());
-        let client = if opts.tls.mode.encrypts() {
-            Client::build_with_tls(info, tls_certificates_for(&opts, verifies)?)
-                .map_err(|err| map_redis_connect_error(err, verifies))?
-        } else {
-            Client::open(info).map_err(|err| map_redis_connect_error(err, verifies))?
-        };
+        let client = build_client(&opts)?;
         let manager = match tokio::time::timeout(CONNECT_TIMEOUT, establish_connection_manager(client.clone())).await {
             Ok(result) => result.map_err(|err| map_redis_connect_error(err, verifies))?,
             Err(_) => return Err(DriverError::ConnectionRefused),
@@ -71,6 +64,20 @@ impl DatabaseDriver for RedisDriver {
             db_count: 16,
             browse_client: client,
         }))
+    }
+}
+
+fn build_client(opts: &ConnectOptions) -> Result<Client, DriverError> {
+    let verifies = opts.tls.mode.verifies_cert();
+    let info = connection_url(opts)?
+        .into_connection_info()
+        .map_err(|err| map_redis_connect_error(err, verifies))?
+        .set_tcp_settings(tcp_settings());
+    if opts.tls.mode.encrypts() {
+        Client::build_with_tls(info, tls_certificates_for(opts, verifies)?)
+            .map_err(|err| map_redis_connect_error(err, verifies))
+    } else {
+        Client::open(info).map_err(|err| map_redis_connect_error(err, verifies))
     }
 }
 

@@ -26,6 +26,7 @@ pub mod connection_save_turn;
 pub mod connection_service;
 pub mod database_backup;
 pub mod database_service;
+pub mod database_subscription;
 pub mod driver_diagnostics;
 pub mod driver_error_presentation;
 pub mod editor_bookmarks;

@@ -1300,6 +1300,7 @@ version = "0.2.6"
 dependencies = [
  "async-trait",
  "bookie-core",
+ "futures",
  "redis",
  "secrecy",
  "serde_json",

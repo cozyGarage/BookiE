@@ -377,3 +377,55 @@ fn running_a_query_with_ctrl_enter_does_not_add_a_line(cx: &mut TestAppContext) 
         assert_eq!(view.runs.len(), 1, "{}", view.status);
     });
 }
+
+#[gpui::test]
+fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("local");
+    view.read_with(cx, |view, cx| {
+        let labels: Vec<String> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].label.clone())
+            .collect();
+        assert!(labels.iter().all(|label| !label.starts_with("Check TCP")), "{labels:?}");
+    });
+    cx.simulate_input("");
+    cx.update(|_, cx| {
+        let input = view.read(cx).palette_input.clone();
+        input.update(cx, |input, cx| input.set_content(&address, cx));
+    });
+    cx.simulate_keystrokes("enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let entries = view.messages.entries();
+        assert_eq!(entries.len(), 1, "{}", view.status);
+        assert_eq!(entries[0].kind, bookie_gpui::messages::MessageKind::Success);
+        assert!(
+            entries[0].text.starts_with(&format!("{address} is up · ")),
+            "{}",
+            entries[0].text
+        );
+        assert!(entries[0].text.ends_with("up 1/1 checks"));
+    });
+    drop(listener);
+}
+
+#[gpui::test]
+fn the_redis_listen_command_is_not_offered_on_other_engines(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("news.*");
+    view.read_with(cx, |view, cx| {
+        let labels: Vec<String> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].label.clone())
+            .collect();
+        assert!(labels.iter().all(|label| !label.contains("Redis")), "{labels:?}");
+    });
+}

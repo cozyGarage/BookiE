@@ -14,7 +14,7 @@ mod ui_theme;
 use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
 use bookie_gpui::cursor::Cursor;
 use bookie_gpui::keymap::Keymap;
-use bookie_gpui::messages::MessageLog;
+use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
 use bookie_gpui::preview::cell_preview;
@@ -83,6 +83,9 @@ struct GridView {
     font: gpui::SharedString,
     font_names: Vec<String>,
     palette_fonts: bool,
+    palette_address: Option<String>,
+    palette_pattern: Option<String>,
+    check_histories: Vec<(String, bookie_app_services::checks::History)>,
     sidebar_open: bool,
     sidebar_width: f32,
     resizing_sidebar: bool,
@@ -211,6 +214,13 @@ impl GridView {
             |this, _, event: &InputEvent, window, cx| match event {
                 InputEvent::Changed => {
                     this.palette_index = 0;
+                    let typed = this.palette_input.read(cx).content().to_string();
+                    this.palette_address = bookie_gpui::net_check::parse_address(&typed);
+                    this.palette_pattern = this
+                        .live
+                        .as_ref()
+                        .filter(|live| live.driver_id == "redis")
+                        .and_then(|_| bookie_gpui::pubsub_view::parse_pattern(&typed));
                     cx.notify();
                 }
                 InputEvent::Submit => this.run_palette(window, cx),
@@ -260,6 +270,9 @@ impl GridView {
             font: default_font(&font_names).into(),
             font_names,
             palette_fonts: false,
+            palette_address: None,
+            palette_pattern: None,
+            check_histories: Vec::new(),
             sidebar_open: true,
             sidebar_width: 260.0,
             resizing_sidebar: false,
@@ -392,6 +405,52 @@ impl GridView {
             }
             Err(message) => self.status = message,
         }
+    }
+
+    fn sample_pubsub(&mut self, pattern: String, cx: &mut Context<Self>) {
+        let Some(live) = self.live.clone() else {
+            return;
+        };
+        self.status = format!(
+            "Listening to {pattern} for {} s…",
+            bookie_gpui::pubsub_view::SAMPLE_SECONDS
+        );
+        let target = pattern.clone();
+        self.begin_background(
+            cx,
+            move |cancel| {
+                live.sample_pubsub(
+                    std::slice::from_ref(&target),
+                    bookie_gpui::pubsub_view::SAMPLE_MESSAGES,
+                    Duration::from_secs(bookie_gpui::pubsub_view::SAMPLE_SECONDS),
+                    &cancel,
+                )
+            },
+            move |this, outcome| {
+                let lines = bookie_gpui::pubsub_view::describe(&pattern, outcome);
+                if let Some((_, headline)) = lines.first() {
+                    this.status = headline.clone();
+                }
+                for (kind, text) in lines {
+                    this.messages.push(kind, text);
+                }
+            },
+        );
+    }
+
+    fn check_tcp(&mut self, address: String, cx: &mut Context<Self>) {
+        self.status = format!("Checking {address}…");
+        let target = address.clone();
+        self.begin_background(
+            cx,
+            move |_| bookie_gpui::net_check::run_check(&target),
+            move |this, outcome| {
+                let (up, text) = bookie_gpui::net_check::record(&mut this.check_histories, &address, outcome);
+                let kind = if up { MessageKind::Success } else { MessageKind::Error };
+                this.messages.push(kind, text.clone());
+                this.status = text;
+            },
+        );
     }
 
     fn show_sessions(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -786,117 +845,131 @@ impl GridView {
         }
         let filtering = matches!(self.mode, Mode::Filtered { .. });
         let paged = !self.continuous;
+        let check = self.palette_address.as_ref().map(|address| Action {
+            id: "check-tcp",
+            label: format!("Check TCP port {address}"),
+            enabled: true,
+        });
+        let listen = self.palette_pattern.as_ref().map(|pattern| Action {
+            id: "sample-pubsub",
+            label: format!("Listen to Redis channels {pattern}"),
+            enabled: true,
+        });
         let action = |id, label: &str, enabled| Action {
             id,
             label: label.to_string(),
             enabled,
         };
-        vec![
-            action("first", "Go to first page", paged),
-            action("previous", "Go to previous page", paged && self.pager.page > 0),
-            action(
-                "next",
-                "Go to next page",
-                paged && self.pager.page + 1 < self.pager.pages(),
-            ),
-            action("last", "Go to last page", paged),
-            action("find", "Find in all rows", !filtering),
-            action("filter", "Filter rows (WHERE)", true),
-            action("clear-filter", "Clear filter", filtering),
-            action("compare", "Compare results", true),
-            action(
-                "detail",
-                if self.detail_open {
-                    "Hide cell details"
-                } else {
-                    "Show cell details"
-                },
-                true,
-            ),
-            action(
-                "continuous",
-                if self.continuous {
-                    "Switch to paged scrolling"
-                } else {
-                    "Switch to continuous scrolling"
-                },
-                true,
-            ),
-            action("copy", "Copy selected rows", self.selection.is_some()),
-            action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
-            action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
-            action(
-                "copy-markdown",
-                "Copy selected rows as a Markdown table",
-                self.selection.is_some(),
-            ),
-            action(
-                "copy-in-list",
-                "Copy the active column as an IN list",
-                self.selection.is_some(),
-            ),
-            action(
-                "copy-insert",
-                "Copy selected rows as INSERT statements",
-                self.selection.is_some(),
-            ),
-            action(
-                "sessions",
-                "Show PostgreSQL sessions and blockers",
-                self.live.as_ref().is_some_and(|live| live.driver_id == "postgres"),
-            ),
-            action("clear-selection", "Clear row selection", self.selection.is_some()),
-            action("edit", "Edit the active cell", self.cell_cursor.is_some()),
-            action(
-                "sidebar",
-                if self.sidebar_open {
-                    "Hide the sidebar"
-                } else {
-                    "Show the sidebar"
-                },
-                true,
-            ),
-            action("font", "Choose font…", true),
-            action("theme-dbx", "Theme: DBX style", true),
-            action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
-            action("query", "New query tab", true),
-            action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
-            action(
-                "previous-run",
-                "Previous result",
-                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
-            ),
-            action(
-                "next-run",
-                "Next result",
-                matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
-            ),
-            action(
-                "close-run",
-                "Close current result",
-                matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
-            ),
-            action(
-                "results",
-                if self.result_open {
-                    "Hide the results pane"
-                } else {
-                    "Show the results pane"
-                },
-                matches!(self.tabs.current(), Tab::Query),
-            ),
-            action("home", "Open Home", true),
-            action("table", &format!("Open {}", self.catalog.grid_table), true),
-            action(
-                "theme",
-                if self.dark_mode {
-                    "Switch to light theme"
-                } else {
-                    "Switch to dark theme"
-                },
-                true,
-            ),
-        ]
+        check
+            .into_iter()
+            .chain(listen)
+            .chain(vec![
+                action("first", "Go to first page", paged),
+                action("previous", "Go to previous page", paged && self.pager.page > 0),
+                action(
+                    "next",
+                    "Go to next page",
+                    paged && self.pager.page + 1 < self.pager.pages(),
+                ),
+                action("last", "Go to last page", paged),
+                action("find", "Find in all rows", !filtering),
+                action("filter", "Filter rows (WHERE)", true),
+                action("clear-filter", "Clear filter", filtering),
+                action("compare", "Compare results", true),
+                action(
+                    "detail",
+                    if self.detail_open {
+                        "Hide cell details"
+                    } else {
+                        "Show cell details"
+                    },
+                    true,
+                ),
+                action(
+                    "continuous",
+                    if self.continuous {
+                        "Switch to paged scrolling"
+                    } else {
+                        "Switch to continuous scrolling"
+                    },
+                    true,
+                ),
+                action("copy", "Copy selected rows", self.selection.is_some()),
+                action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
+                action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
+                action(
+                    "copy-markdown",
+                    "Copy selected rows as a Markdown table",
+                    self.selection.is_some(),
+                ),
+                action(
+                    "copy-in-list",
+                    "Copy the active column as an IN list",
+                    self.selection.is_some(),
+                ),
+                action(
+                    "copy-insert",
+                    "Copy selected rows as INSERT statements",
+                    self.selection.is_some(),
+                ),
+                action(
+                    "sessions",
+                    "Show PostgreSQL sessions and blockers",
+                    self.live.as_ref().is_some_and(|live| live.driver_id == "postgres"),
+                ),
+                action("clear-selection", "Clear row selection", self.selection.is_some()),
+                action("edit", "Edit the active cell", self.cell_cursor.is_some()),
+                action(
+                    "sidebar",
+                    if self.sidebar_open {
+                        "Hide the sidebar"
+                    } else {
+                        "Show the sidebar"
+                    },
+                    true,
+                ),
+                action("font", "Choose font…", true),
+                action("theme-dbx", "Theme: DBX style", true),
+                action("theme-adwaita", "Theme: Adwaita style (our GTK app)", true),
+                action("query", "New query tab", true),
+                action("run", "Run the query", matches!(self.tabs.current(), Tab::Query)),
+                action(
+                    "previous-run",
+                    "Previous result",
+                    matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty() && self.active_run > 0,
+                ),
+                action(
+                    "next-run",
+                    "Next result",
+                    matches!(self.tabs.current(), Tab::Query) && self.active_run + 1 < self.runs.len(),
+                ),
+                action(
+                    "close-run",
+                    "Close current result",
+                    matches!(self.tabs.current(), Tab::Query) && !self.runs.is_empty(),
+                ),
+                action(
+                    "results",
+                    if self.result_open {
+                        "Hide the results pane"
+                    } else {
+                        "Show the results pane"
+                    },
+                    matches!(self.tabs.current(), Tab::Query),
+                ),
+                action("home", "Open Home", true),
+                action("table", &format!("Open {}", self.catalog.grid_table), true),
+                action(
+                    "theme",
+                    if self.dark_mode {
+                        "Switch to light theme"
+                    } else {
+                        "Switch to dark theme"
+                    },
+                    true,
+                ),
+            ])
+            .collect()
     }
 
     fn palette_shown(&self, cx: &App) -> Vec<usize> {
@@ -929,6 +1002,8 @@ impl GridView {
             return;
         };
         let id = actions[index].id;
+        let check_address = self.palette_address.clone();
+        let listen_pattern = self.palette_pattern.clone();
         if id == "font" {
             self.palette_fonts = true;
             self.palette_index = 0;
@@ -966,6 +1041,16 @@ impl GridView {
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
             "sessions" => self.show_sessions(window, cx),
+            "sample-pubsub" => {
+                if let Some(pattern) = listen_pattern {
+                    self.sample_pubsub(pattern, cx);
+                }
+            }
+            "check-tcp" => {
+                if let Some(address) = check_address {
+                    self.check_tcp(address, cx);
+                }
+            }
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,

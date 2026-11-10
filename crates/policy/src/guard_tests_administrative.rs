@@ -89,8 +89,41 @@ async fn a_backup_on_a_read_only_connection_runs_without_approval_and_is_audited
 }
 
 #[tokio::test]
-async fn agents_cannot_back_up_or_restore() {
-    for operation in [AdministrativeOperation::Backup, AdministrativeOperation::Restore] {
+async fn a_subscription_on_a_read_only_connection_runs_without_approval_and_is_audited() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let approval = Arc::new(CountingApprovalSink { calls: calls.clone() });
+    let guard = guard(
+        Principal::human_gui(),
+        true,
+        approval,
+        audit.clone(),
+        Arc::new(AuditState::new()),
+    );
+    let ran = Arc::new(AtomicUsize::new(0));
+
+    run(&guard, AdministrativeOperation::Subscribe, &ran)
+        .await
+        .expect("subscribe");
+
+    assert_eq!(ran.load(Ordering::SeqCst), 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        statuses(&audit),
+        [
+            (AuditRecordPhase::Intent, AuditTerminalStatus::Pending),
+            (AuditRecordPhase::Outcome, AuditTerminalStatus::Succeeded),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn agents_cannot_back_up_restore_or_subscribe() {
+    for operation in [
+        AdministrativeOperation::Backup,
+        AdministrativeOperation::Restore,
+        AdministrativeOperation::Subscribe,
+    ] {
         let audit = Arc::new(SequenceAuditSink::new(vec![]));
         let guard = guard(
             agent(),
