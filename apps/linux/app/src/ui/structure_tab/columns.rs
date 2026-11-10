@@ -178,11 +178,17 @@ fn bind_expander_arrow(row: &adw::ExpanderRow) {
 /// `rebuild_columns_view` to silence the `changed` / `toggled`
 /// emissions GTK fires while initial values are stamped onto the
 /// freshly-built widgets.
+#[derive(Clone, Copy)]
+pub(super) struct ColumnEditing<'a> {
+    pub comment_capability: ColumnCommentCapability,
+    pub collations: &'a [String],
+}
+
 pub(super) fn build_column_expander_row(
     index: usize,
     col: &DraftColumn,
     driver_id: &str,
-    column_comment_capability: ColumnCommentCapability,
+    editing: ColumnEditing<'_>,
     sender: ComponentSender<StructureTab>,
     suppress_emit: Rc<Cell<bool>>,
     popover_registry: Rc<RefCell<Vec<gtk::Popover>>>,
@@ -350,9 +356,72 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&auto_row);
 
-    add_comment_row(&row, index, col, column_comment_capability, sender, suppress_emit);
+    add_collation_row(
+        &row,
+        index,
+        col,
+        editing.collations,
+        sender.clone(),
+        suppress_emit.clone(),
+    );
+    add_comment_row(&row, index, col, editing.comment_capability, sender, suppress_emit);
 
     row
+}
+
+pub(super) fn collation_choices(collations: &[String], current: Option<&str>) -> Vec<String> {
+    let mut choices = collations.to_vec();
+    if let Some(current) = current
+        && !choices.iter().any(|name| name == current)
+    {
+        choices.insert(0, current.to_owned());
+    }
+    choices
+}
+
+pub(super) fn collation_selection(choices: &[String], selected: u32) -> Option<String> {
+    let index = (selected as usize).checked_sub(1)?;
+    choices.get(index).cloned()
+}
+
+fn add_collation_row(
+    row: &adw::ExpanderRow,
+    index: usize,
+    col: &DraftColumn,
+    collations: &[String],
+    sender: ComponentSender<StructureTab>,
+    suppress_emit: Rc<Cell<bool>>,
+) {
+    if collations.is_empty() {
+        return;
+    }
+    let choices = collation_choices(collations, col.collation.as_deref());
+    let default_label = crate::tr!("Server default");
+    let labels: Vec<&str> = std::iter::once(default_label.as_str())
+        .chain(choices.iter().map(String::as_str))
+        .collect();
+    let combo = adw::ComboRow::builder()
+        .title(crate::tr!("Collation"))
+        .model(&gtk::StringList::new(&labels))
+        .enable_search(true)
+        .build();
+    combo.set_widget_name(&format!("col-collation-{index}"));
+    let selected = col
+        .collation
+        .as_deref()
+        .and_then(|current| choices.iter().position(|name| name == current))
+        .map_or(0, |position| position as u32 + 1);
+    combo.set_selected(selected);
+    combo.connect_selected_notify(move |combo| {
+        if suppress_emit.get() {
+            return;
+        }
+        sender.input(StructureTabInput::ColumnEdited {
+            index,
+            field: ColumnField::Collation(collation_selection(&choices, combo.selected())),
+        });
+    });
+    row.add_row(&combo);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -489,6 +558,7 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
 mod tests {
     use super::{CommentEditability, comment_editability, configure_comment_row};
     use super::{bind_expander_arrow, expander_arrow};
+    use super::{collation_choices, collation_selection};
     use bookie_core::sql_ddl::ColumnCommentCapability;
     use relm4::adw::prelude::*;
     use relm4::{adw, gtk};
@@ -594,5 +664,22 @@ mod tests {
                 "{capability:?}, existing: {is_existing}"
             );
         }
+    }
+
+    #[test]
+    fn the_first_collation_entry_means_the_server_default() {
+        let choices = vec!["a".to_owned(), "b".to_owned()];
+        assert_eq!(collation_selection(&choices, 0), None);
+        assert_eq!(collation_selection(&choices, 1), Some("a".to_owned()));
+        assert_eq!(collation_selection(&choices, 2), Some("b".to_owned()));
+        assert_eq!(collation_selection(&choices, 3), None);
+    }
+
+    #[test]
+    fn a_saved_collation_missing_from_the_server_list_is_kept_as_a_choice() {
+        let list = vec!["a".to_owned()];
+        assert_eq!(collation_choices(&list, Some("legacy")), ["legacy", "a"]);
+        assert_eq!(collation_choices(&list, Some("a")), ["a"]);
+        assert_eq!(collation_choices(&list, None), ["a"]);
     }
 }
