@@ -11,6 +11,14 @@ use crate::core_bridge::value_to_cell;
 use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
 use crate::source::{ResultSource, filter_in, find_in};
 
+pub fn saved_connections() -> Result<Vec<bookie_app_services::read_session::ConnectionSummary>, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .map_err(|error| error.to_string())?;
+    runtime.block_on(list_saved_connections())
+}
+
+#[derive(Clone, Debug)]
 pub enum Origin {
     Saved(String),
     File(std::path::PathBuf),

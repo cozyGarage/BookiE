@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bookie_gpui::live::{LiveSession, LiveTable, ROW_CAP};
+use bookie_gpui::live::{LiveSession, LiveTable, Origin, ROW_CAP};
 use bookie_gpui::shell::{Catalog, Tab};
 use bookie_gpui::source::Source;
 use gpui::{Context, Window};
@@ -23,6 +23,35 @@ impl GridView {
         self.run_edits.clear();
         self.active_run = 0;
         self.next_run_number = 1;
+    }
+
+    pub(super) fn connect(&mut self, origin: Origin, cx: &mut Context<Self>) {
+        self.status = "Connecting…".into();
+        self.begin_background(
+            cx,
+            move |_cancel| open_first_table(&origin),
+            |this, opened| match opened {
+                Ok(table) => this.connect_live(table),
+                Err(message) => this.status = message,
+            },
+        );
+    }
+
+    fn connect_live(&mut self, table: Arc<LiveTable>) {
+        self.source = table.clone();
+        self.table_source = table.clone();
+        self.edits.clear();
+        self.table_edits.clear();
+        self.compare = None;
+        self.cursor = Default::default();
+        self.tabs = bookie_gpui::shell::Tabs::default();
+        self.attach_live(table);
+        self.grid_is_query = false;
+        self.set_mode(Mode::All);
+        self.tabs.active = 1;
+        self.connection_open = true;
+        self.database_open = true;
+        self.status = "Connected".into();
     }
 
     pub(super) fn open_table_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -69,4 +98,10 @@ fn load(
 ) -> Result<(String, Source), String> {
     let table = session.load_table_controlled(name, ROW_CAP, cancellation)?;
     Ok((name.to_string(), Arc::new(table)))
+}
+
+fn open_first_table(origin: &Origin) -> Result<Arc<LiveTable>, String> {
+    let session = LiveSession::open(origin)?;
+    let first = session.tables.first().cloned().ok_or("this connection has no tables")?;
+    Ok(Arc::new(session.load_table(&first, ROW_CAP)?))
 }
