@@ -3,6 +3,85 @@ use gtk::glib;
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn full_value_edit_does_not_fetch_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(1),
+        bookie_core::partial_value(1000, "first"),
+    ]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(2),
+        bookie_core::partial_value(1000, "second"),
+    ]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, receiver) = relm4::channel();
+    let mut id_column = menu_test_column("id", "INTEGER");
+    id_column.primary_key = true;
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[id_column, menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::CheckButton::new();
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    assert!(menus.edit_full_value_action.is_enabled());
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.edit-full-value", None).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a rebound cell must not open or fetch a different row"
+    );
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(2),
+            bookie_core::partial_value(1000, "replacement"),
+        ])],
+    );
+    view.activate_action("cell.edit-full-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a replaced row must not be opened using the old key");
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(1),
+            bookie_core::partial_value(1000, "first"),
+        ])],
+    );
+    view.activate_action("cell.edit-full-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(
+        matches!(message, GridMsg::FetchCellValue { row_key, edit_row_position: Some(0), .. } if row_key == vec![Value::Int(1)])
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn delete_action_preserves_the_stored_row_selected_when_menu_opened() {
     gtk::init().unwrap();
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
