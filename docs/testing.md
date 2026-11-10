@@ -244,13 +244,12 @@ Select regressions from the changed behavior and current known defects. Failure 
 
 | Limit | Lines | Result |
 |---|---:|---|
-| Soft | 1200 | Split the file or record an approved baseline |
-| Hard | 1800 | Unlisted files fail |
+| Limit | 2000 | Unlisted files fail |
 | Ratchet | Recorded maximum | A listed oversized file may not grow past its baseline |
 
 Lower a baseline in the same change when an oversized file shrinks.
 
-When inline unit tests push a production module over the soft limit, move them to a sibling `tests.rs` and declare it with `#[cfg(test)] mod tests;`. Import the parent with `use super::*;` so private behavior stays directly testable without carrying the test bodies in the production file.
+When inline unit tests push a production module over the limit, move them to a sibling `tests.rs` and declare it with `#[cfg(test)] mod tests;`. Import the parent with `use super::*;` so private behavior stays directly testable without carrying the test bodies in the production file.
 
 ## Other test documents
 

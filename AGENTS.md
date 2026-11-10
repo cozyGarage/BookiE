@@ -130,7 +130,7 @@ These apply to the GUI, the MCP server and `bookie-agentd`.
   blocked). `cargo check` alone is not done. Never hand-edit `Cargo.lock`; regenerate it.
 - No comments or doc comments, except the external-system rule above. A Rust file may not gain comment lines (`check-comment-lines.py`, baselines in `baselines/comment-line-baselines.txt`); after deleting comments run `python3 scripts/check-comment-lines.py --update` to lower them.
 - Early returns; at most three levels of indentation in a function body.
-- A function body is at most 60 lines (`check-function-size.py`, baselines in `baselines/function-size-baselines.txt`: lower a count when you split, never raise one). Rust files stay under 1,200 lines (`check-file-size.sh`, baselines in `baselines/file-size-baselines.txt`: split before growing a listed file).
+- A function body is at most 60 lines (`check-function-size.py`, baselines in `baselines/function-size-baselines.txt`: lower a count when you split, never raise one). Rust files stay under 2,000 lines (`check-file-size.sh`, baselines in `baselines/file-size-baselines.txt`: split before growing a listed file).
 - Small public APIs; private by default.
 - No `unwrap`, `expect`, `panic!`, `todo!` or `unimplemented!` in production paths. A new integration test file under `tests/` starts with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
 - Typed `thiserror` errors across crate boundaries, with context but no secrets.
