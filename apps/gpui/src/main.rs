@@ -15,6 +15,7 @@ mod ui_theme;
 use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
 use bookie_gpui::cursor::Cursor;
 use bookie_gpui::keymap::Keymap;
+use bookie_gpui::font_settings;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
@@ -84,6 +85,7 @@ struct GridView {
     result_open: bool,
     resizing_split: bool,
     font: gpui::SharedString,
+    fonts: font_settings::FontSettings,
     font_names: Vec<String>,
     palette_fonts: bool,
     palette_address: Option<String>,
@@ -254,6 +256,7 @@ impl GridView {
             },
         );
         GridView {
+            fonts: font_settings::load(),
             table,
             _table_events: table_events,
             table_source: source.clone(),

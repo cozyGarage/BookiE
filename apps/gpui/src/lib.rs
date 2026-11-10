@@ -3,6 +3,7 @@ pub mod core_bridge;
 pub mod cursor;
 pub mod detail;
 pub mod edit;
+pub mod font_settings;
 pub mod keymap;
 pub mod live;
 pub mod messages;
