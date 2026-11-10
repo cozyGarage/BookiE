@@ -269,6 +269,11 @@ class LayerRunnerTests(unittest.TestCase):
         self.assertIn("package(=bookie-app)", gtk_app)
         self.assertNotIn("test-sandbox.sh", gtk_app)
 
+    def test_gpui_layer_runs_the_headless_workspace_tests(self):
+        step = runner.catalog()["gpui"]["steps"][0]
+        self.assertEqual(step["argv"], ["env", "-u", "DISPLAY", "-u", "WAYLAND_DISPLAY", "cargo", "test", "--manifest-path", "apps/gpui/Cargo.toml", "--locked"])
+        self.assertEqual(step["evidence"], "rust-tests")
+
     def test_driver_layer_timeout_fits_hosted_integration_job(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         integration = re.search(r"(?ms)^  integration:\n(.*?)(?=^  [a-z][a-z-]*:\n)", workflow)
