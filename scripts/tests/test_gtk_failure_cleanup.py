@@ -4,11 +4,11 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
-from unittest import TestCase, main
+import unittest
 from unittest.mock import patch
 
 
-class GtkFailureCleanupTests(TestCase):
+class GtkFailureCleanupTests(unittest.TestCase):
     def test_snapshot_failure_keeps_original_error_and_stops_process(self):
         source = Path(__file__).resolve().parents[2] / "apps/linux/app/tests/gtk_safety.py"
         tree = ast.parse(source.read_text())
@@ -43,4 +43,4 @@ class GtkFailureCleanupTests(TestCase):
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

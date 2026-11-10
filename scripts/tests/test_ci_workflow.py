@@ -260,7 +260,15 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("mongodb, oracle, duckdb]", driver)
+        workspace_driver_names = {
+            tomllib.loads(path.read_text())["package"]["name"].removeprefix("bookie-driver-")
+            for path in (ROOT / "crates/drivers").glob("*/Cargo.toml")
+        }
+        matrix = re.search(r"(?m)^        driver: \[(.+)\]$", driver).group(1)
+        forgejo_drivers = {name.strip() for name in matrix.split(",")}
+        local_integration = (ROOT / "scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1]
+        github_drivers = set(re.findall(r"-p bookie-driver-([a-z0-9-]+)", local_integration)) & workspace_driver_names
+        self.assertEqual(forgejo_drivers, github_drivers)
         self.assertIn("--test integration --test read_only --test missing_file", driver)
         image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
         self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
@@ -766,6 +774,21 @@ class CiWorkflowTests(unittest.TestCase):
         for name in checker.REQUIRED | {checker.SCHEDULED}:
             self.assertIn(f"      - {name}\n", section)
 
+    def test_forgejo_regression_gate_waits_for_every_workflow_job(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        jobs = workflow.split("jobs:\n", 1)[1]
+        job_names = [
+            name for name in re.findall(r"(?m)^  ([a-z][a-z0-9-]+):\n", jobs) if name != "regression-gate"
+        ]
+        section = jobs.split("  regression-gate:\n", 1)[1]
+
+        self.assertIn("if: always()", section)
+        self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
+        self.assertIn("python3 src/scripts/check-forgejo-ci-jobs.py", section)
+        for name in job_names:
+            with self.subTest(job=name):
+                self.assertIn(f"      - {name}\n", section)
+
     def test_b4_rollback_gate_runs_focused_mysql_and_postgres_tests_before_broad_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         focused = workflow.split("  b4-rollback:\n", 1)[1].split("  driver-tls:\n", 1)[0]
@@ -1197,6 +1220,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("scripts/build-deb.sh", producer)
         self.assertNotIn("scripts/test-deb-package.sh", workflow)
         self.assertIn("needs: [floor-build]", scenarios)
+        full_profile = "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        self.assertIn(f"if: {full_profile}", producer)
+        self.assertIn(f"if: {full_profile}", scenarios)
         self.assertIn("ci-gtk-artifact.py create --package", producer)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         self.assertIn("python3 scripts/run-test-layer.py distro-floor", scenarios)

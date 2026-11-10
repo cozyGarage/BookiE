@@ -11,6 +11,35 @@ BUILD_TREE = ROOT / "apps/linux/packaging/arch/src"
 
 
 class InventoryIgnoredTestsTests(unittest.TestCase):
+    def test_a_known_gpui_issue_is_reported_without_being_registered_for_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = root / "apps/gpui"
+            (app / "src").mkdir(parents=True)
+            (app / "Cargo.toml").write_text(
+                '[package]\nname = "bookie-gpui"\nversion = "0.1.0"\nedition = "2024"\n'
+            )
+            (app / "src/ui_tests.rs").write_text(
+                '#[test]\n#[ignore = "known issue: keyboard paging"]\nfn keyboard_paging() {}\n'
+            )
+            scripts = root / "scripts"
+            scripts.mkdir()
+            (scripts / "inventory-ignored-tests.py").write_text(SCRIPT.read_text())
+            (scripts / "isolated-tests.json").write_text("{}\n")
+            (root / "Cargo.toml").write_text('[workspace]\nmembers = ["apps/gpui"]\n')
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(["git", "-C", str(root), "add", "Cargo.toml", "apps", "scripts"], check=True)
+
+            result = subprocess.run(
+                [sys.executable, str(scripts / "inventory-ignored-tests.py")],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("| [keyboard_paging](../apps/gpui/src/ui_tests.rs) | GPUI |", result.stdout)
+
     def test_an_isolated_test_cannot_name_a_missing_workspace_package(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

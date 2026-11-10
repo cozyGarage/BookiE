@@ -144,6 +144,8 @@ for path in sorted(
             if name not in mapped:
                 raise RuntimeError(f"unmapped app-server test: {name}")
             tier, enable = "App server", "scripts/run-test-layer.py app-server"
+        elif relative.startswith("apps/gpui/") and "known issue" in reason.lower():
+            tier, enable = "GPUI", "Keep ignored until the known issue is resolved"
         elif "docker" in reason.lower() and relative.startswith("crates/ssh/"):
             targets = re.findall(r"--test\s+([\w-]+)", (root / "scripts/test-ssh.sh").read_text())
             if path.stem not in targets:
