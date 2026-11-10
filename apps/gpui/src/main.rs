@@ -592,6 +592,9 @@ impl GridView {
 
     fn close_tab(&mut self, index: usize) {
         let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
+        if closing_query && self.query_has_view_edits() && self.reject_view_edits() {
+            return;
+        }
         self.tabs.close(index);
         self.sync_grid_owner();
         if !closing_query {
@@ -614,6 +617,11 @@ impl GridView {
         self.next_run_number = 1;
     }
 
+    fn query_has_view_edits(&self) -> bool {
+        (self.grid_is_query && (self.editing.is_some() || !self.edits.is_empty()))
+            || self.run_edits.iter().any(|edits| !edits.is_empty())
+    }
+
     fn sync_grid_owner(&mut self) {
         self.tab_scroll.scroll_to_item(self.tabs.active);
         let query = match self.tabs.current() {
@@ -625,6 +633,18 @@ impl GridView {
             }
         };
         if query == self.grid_is_query {
+            return;
+        }
+        if self.editing.is_some() {
+            self.status = "Finish or discard the active cell edit using Commands before switching grids.".into();
+            if let Some(index) = self.tabs.items.iter().position(|tab| match (self.grid_is_query, tab) {
+                (true, Tab::Query) => true,
+                (false, Tab::Table(name)) => name == &self.catalog.grid_table,
+                _ => false,
+            }) {
+                self.tabs.active = index;
+                self.tab_scroll.scroll_to_item(index);
+            }
             return;
         }
         self.invalidate_background();
@@ -655,6 +675,10 @@ impl GridView {
         let Some(run) = self.runs.get(index).copied() else {
             return;
         };
+        if index != self.active_run && self.editing.is_some() {
+            self.status = "Finish or discard the active cell edit using Commands before switching results.".into();
+            return;
+        }
         self.invalidate_background();
         if let Some(previous) = self.run_edits.get_mut(self.active_run) {
             *previous = std::mem::take(&mut self.edits);
@@ -687,6 +711,11 @@ impl GridView {
 
     fn close_run(&mut self, index: usize) {
         if index >= self.runs.len() {
+            return;
+        }
+        let drops_edits = !self.run_edits[index].is_empty()
+            || (index == self.active_run && (self.editing.is_some() || !self.edits.is_empty()));
+        if drops_edits && self.reject_view_edits() {
             return;
         }
         self.runs.remove(index);
@@ -1324,7 +1353,6 @@ pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
 }
 
-/// A number is right-aligned; so is a NULL in a numeric column, so it lines up with its neighbours.
 fn right_aligned(numeric_column: bool, cell: &Cell) -> bool {
     numeric_cell(cell) || (numeric_column && matches!(cell, Cell::Null))
 }

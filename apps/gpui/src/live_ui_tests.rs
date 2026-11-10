@@ -503,6 +503,158 @@ fn a_late_connection_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn switching_tables_keeps_all_view_edits_until_the_user_discards_them(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&[
+        "CREATE TABLE alpha (id INTEGER, name TEXT)",
+        "INSERT INTO alpha VALUES (1, 'Ada')",
+        "CREATE TABLE beta (id INTEGER)",
+    ]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("table draft".into()));
+            view.table_edits
+                .insert((1, 1), bookie_gpui::model::Cell::Text("saved table draft".into()));
+            view.run_edits.push(Default::default());
+            view.run_edits[0].insert((2, 1), bookie_gpui::model::Cell::Text("result draft".into()));
+            view.open_table_named("beta", window, cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, "alpha");
+        assert_eq!(view.edits.len(), 1);
+        assert_eq!(view.table_edits.len(), 1);
+        assert_eq!(view.run_edits[0].len(), 1);
+        assert!(view.status.contains("Discard all view-only edits"));
+    });
+}
+
+#[gpui::test]
+fn a_late_table_load_does_not_discard_a_new_view_edit(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&[
+        "CREATE TABLE alpha (id INTEGER, name TEXT)",
+        "INSERT INTO alpha VALUES (1, 'Ada')",
+        "CREATE TABLE beta (id INTEGER)",
+    ]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_table_named("beta", window, cx);
+            view.edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("late table draft".into()));
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, "alpha");
+        assert_eq!(
+            view.edits.get(&(0, 1)),
+            Some(&bookie_gpui::model::Cell::Text("late table draft".into()))
+        );
+    });
+}
+
+#[gpui::test]
+fn a_failed_table_switch_keeps_the_current_table(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&[
+        "CREATE TABLE alpha (id INTEGER)",
+        "INSERT INTO alpha VALUES (1)",
+        "CREATE TABLE beta (id INTEGER)",
+    ]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named("missing", window, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, "alpha");
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("alpha".into()));
+        assert!(!view.status.is_empty());
+    });
+}
+
+#[gpui::test]
+fn cancelling_a_table_switch_keeps_the_current_table(cx: &mut TestAppContext) {
+    let fixture = sqlite_fixture(&[
+        "CREATE TABLE alpha (id INTEGER)",
+        "INSERT INTO alpha VALUES (1)",
+        "CREATE TABLE beta (id INTEGER)",
+    ]);
+    let (view, cx) = open(cx);
+    let origin = bookie_gpui::live::Origin::File(fixture.0.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_table_named("beta", window, cx);
+            view.operation_cancel.cancel();
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table, "alpha");
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("alpha".into()));
+    });
+}
+
+#[gpui::test]
+fn closing_a_query_tab_with_result_edits_requires_explicit_discard(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, _cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        view.add_run(None);
+        view.run_edits[view.active_run].insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
+        view.close_tab(2);
+    });
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.tabs
+                .items
+                .iter()
+                .any(|tab| matches!(tab, bookie_gpui::shell::Tab::Query))
+        );
+        assert!(view.run_edits.iter().any(|edits| !edits.is_empty()));
+        assert!(view.status.contains("Discard all view-only edits"));
+    });
+}
+
+#[gpui::test]
+fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, _cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        view.add_run(None);
+        view.edits
+            .insert((0, 1), bookie_gpui::model::Cell::Text("result draft".into()));
+        view.close_run(view.active_run);
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.runs.len(), 2);
+        assert_eq!(view.edits.len(), 1);
+        assert!(view.status.contains("Discard all view-only edits"));
+    });
+}
+
+#[gpui::test]
 fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: &mut TestAppContext) {
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);
