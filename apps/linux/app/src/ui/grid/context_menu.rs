@@ -713,6 +713,9 @@ fn go_to_reference_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -744,6 +747,9 @@ fn show_referencing_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -772,11 +778,7 @@ fn filter_by_value_action(
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
             let Some(view) = view.upgrade() else { return };
-            let Some(row_position) = slot.row_position else { return };
-            if POSITION_SLOT.get(&slot.widget) != Some(row_position)
-                || row_object_at(&view, row_position).as_ref() != slot.row.as_ref()
-                || slot.row.is_none()
-            {
+            if !menu_target_matches(&view, slot) {
                 return;
             }
             let value = match &local_result_view {
@@ -926,6 +928,15 @@ fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {
 
 fn position(slot: &CellContext) -> u32 {
     POSITION_SLOT.get(&slot.widget).unwrap_or(0)
+}
+
+fn menu_target_matches(view: &gtk::ColumnView, slot: &CellContext) -> bool {
+    let Some(position) = slot.row_position else {
+        return false;
+    };
+    slot.row.is_some()
+        && POSITION_SLOT.get(&slot.widget) == Some(position)
+        && row_object_at(view, position).as_ref() == slot.row.as_ref()
 }
 
 enum TextSeed {
