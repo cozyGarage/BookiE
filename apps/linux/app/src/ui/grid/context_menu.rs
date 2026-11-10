@@ -149,7 +149,11 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("copy-value")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let row = view.upgrade().and_then(|view| row_object_at(&view, position(slot)));
+                    let Some(view) = view.upgrade() else { return };
+                    if !menu_target_matches(&view, slot) {
+                        return;
+                    }
+                    let row = row_object_at(&view, position(slot));
                     if row.as_ref().is_some_and(|row| row.cell_is_partial(slot.col_index)) {
                         let (_, row_key) = cell_row_identity(&slot.widget);
                         if !row_key.is_empty() {
@@ -295,6 +299,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let row = row_object_at(&view, position(slot));
                 if let Some(value) = pending_cell_value(&slot.widget) {
                     let null_copy_text = matches!(&value, Value::Null)
@@ -341,6 +348,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let Some(row) = complete_row_at(&view, position(slot)) else {
                     sender.send(GridMsg::IncompleteRowData).ok();
                     return;
@@ -713,6 +723,9 @@ fn go_to_reference_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -744,6 +757,9 @@ fn show_referencing_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -772,11 +788,7 @@ fn filter_by_value_action(
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
             let Some(view) = view.upgrade() else { return };
-            let Some(row_position) = slot.row_position else { return };
-            if POSITION_SLOT.get(&slot.widget) != Some(row_position)
-                || row_object_at(&view, row_position).as_ref() != slot.row.as_ref()
-                || slot.row.is_none()
-            {
+            if !menu_target_matches(&view, slot) {
                 return;
             }
             let value = match &local_result_view {
@@ -926,6 +938,15 @@ fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {
 
 fn position(slot: &CellContext) -> u32 {
     POSITION_SLOT.get(&slot.widget).unwrap_or(0)
+}
+
+fn menu_target_matches(view: &gtk::ColumnView, slot: &CellContext) -> bool {
+    let Some(position) = slot.row_position else {
+        return false;
+    };
+    slot.row.is_some()
+        && POSITION_SLOT.get(&slot.widget) == Some(position)
+        && row_object_at(view, position).as_ref() == slot.row.as_ref()
 }
 
 enum TextSeed {
