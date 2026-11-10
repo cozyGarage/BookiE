@@ -46,6 +46,10 @@ impl SqlEditor {
             )));
             return None;
         }
+        self.dispatch_editable_grid_message(message, sender)
+    }
+
+    fn dispatch_editable_grid_message(&mut self, message: GridMsg, sender: &ComponentSender<Self>) -> Option<GridMsg> {
         match message {
             GridMsg::CellEdited {
                 row_position,
@@ -81,8 +85,12 @@ impl SqlEditor {
                 self.handle_result_duplicate_row(row_position, sender);
                 None
             }
-            GridMsg::DeleteRowAt { row_position, row_key } => {
-                self.handle_result_delete_row(row_position, row_key, sender);
+            GridMsg::DeleteRowAt {
+                row_position,
+                row_key,
+                draft_id,
+            } => {
+                self.handle_result_delete_row(row_position, row_key, draft_id, sender);
                 None
             }
             other => Some(other),
@@ -488,7 +496,16 @@ impl SqlEditor {
         }
     }
 
-    fn handle_result_delete_row(&mut self, row_position: u32, row_key: Vec<Value>, sender: &ComponentSender<Self>) {
+    fn handle_result_delete_row(
+        &mut self,
+        row_position: u32,
+        row_key: Vec<Value>,
+        draft_id: Option<u64>,
+        sender: &ComponentSender<Self>,
+    ) {
+        if self.result_row_object(row_position).and_then(|row| row.draft_id()) != draft_id {
+            return;
+        }
         if self.reject_stale_result_edit(row_position, &row_key, sender) {
             return;
         }
@@ -748,6 +765,7 @@ mod save_guard_tests {
             GridMsg::DeleteRowAt {
                 row_position: 0,
                 row_key: Vec::new(),
+                draft_id: None,
             },
             GridMsg::InsertRow,
             GridMsg::DuplicateRow { row_position: 0 },

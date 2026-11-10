@@ -414,11 +414,22 @@ pub(super) fn install_grid_context_menus(
     let delete_row_action = {
         let context = context.clone();
         let sender = sender.clone();
+        let view = column_view.downgrade();
         gio::ActionEntry::builder("delete-row")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
                     let (row_position, row_key) = cell_row_identity(&slot.widget);
-                    sender.send(GridMsg::DeleteRowAt { row_position, row_key }).ok();
+                    let draft_id = view
+                        .upgrade()
+                        .and_then(|view| row_object_at(&view, row_position))
+                        .and_then(|row| row.draft_id());
+                    sender
+                        .send(GridMsg::DeleteRowAt {
+                            row_position,
+                            row_key,
+                            draft_id,
+                        })
+                        .ok();
                 }
             })
             .build()

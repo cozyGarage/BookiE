@@ -22,12 +22,7 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             generation,
             cancel,
             reply,
-        } => BrowseTabInput::GridReplaceBatch {
-            report,
-            generation,
-            cancel,
-            reply,
-        },
+        } => replace_batch_input(report, generation, cancel, reply),
         GridMsg::CopyToClipboard(text) => BrowseTabInput::GridCopyToClipboard(text),
         GridMsg::FetchCellValue {
             col_index,
@@ -45,12 +40,16 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             row_position,
             col_index,
             row_key,
-        } => BrowseTabInput::GridSetCellNull {
+        } => set_null_input(row_position, col_index, row_key),
+        GridMsg::DeleteRowAt {
             row_position,
-            col_index,
             row_key,
+            draft_id,
+        } => BrowseTabInput::GridDeleteRowAt {
+            row_position,
+            row_key,
+            draft_id,
         },
-        GridMsg::DeleteRowAt { row_position, row_key } => BrowseTabInput::GridDeleteRowAt { row_position, row_key },
         GridMsg::InsertRow => BrowseTabInput::InsertRow,
         GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
         GridMsg::FilterByValue { column, value, exclude } => BrowseTabInput::FilterByValue { column, value, exclude },
@@ -61,6 +60,33 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
         GridMsg::HighlightRulesChanged => BrowseTabInput::HighlightRulesChanged,
+    }
+}
+
+fn set_null_input(row_position: u32, col_index: usize, row_key: Vec<bookie_core::Value>) -> BrowseTabInput {
+    BrowseTabInput::GridSetCellNull {
+        row_position,
+        col_index,
+        row_key,
+    }
+}
+
+fn replace_batch_input(
+    report: bookie_app_services::grid_replace::ReplaceReport,
+    generation: u64,
+    cancel: tokio_util::sync::CancellationToken,
+    reply: tokio::sync::oneshot::Sender<
+        Result<
+            bookie_app_services::grid_replace::ReplaceAcknowledgement,
+            bookie_app_services::grid_replace::ReplaceApplyError,
+        >,
+    >,
+) -> BrowseTabInput {
+    BrowseTabInput::GridReplaceBatch {
+        report,
+        generation,
+        cancel,
+        reply,
     }
 }
 
