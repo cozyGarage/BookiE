@@ -7,7 +7,6 @@ use crate::GridView;
 use bookie_gpui::preview::cell_preview;
 use bookie_gpui::source::Source;
 
-/// Maps the visible page's table rows to source rows; O(1) to build, so it is cheap every frame.
 #[derive(Default, PartialEq)]
 pub struct RowMap {
     base: u64,
@@ -65,7 +64,6 @@ impl TableDelegate for GridDelegate {
 }
 
 impl GridDelegate {
-    // Cells of one row render back to back, so one fetch per row serves all its columns.
     fn row_cell_text(&mut self, row_ix: usize, col_ix: usize) -> String {
         if self.cached.as_ref().is_none_or(|(row, _)| *row != row_ix) {
             let cells = match (&self.source, self.map.source_row(row_ix)) {

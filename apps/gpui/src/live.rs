@@ -335,7 +335,6 @@ fn column_meta(info: &ColumnInfo) -> ColumnMeta {
     }
 }
 
-/// Whether a declared column type holds numbers, judged from its name only.
 fn numeric_type(data_type: &str) -> bool {
     let lower = data_type.to_ascii_lowercase();
     ["int", "serial", "numeric", "decimal", "number", "float", "double", "real", "money"]
@@ -346,6 +345,10 @@ fn numeric_type(data_type: &str) -> bool {
 impl ResultSource for LiveTable {
     fn columns(&self) -> &[ColumnMeta] {
         &self.columns
+    }
+
+    fn is_partial(&self) -> bool {
+        self.truncated
     }
 
     fn origin(&self) -> String {

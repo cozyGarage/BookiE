@@ -22,7 +22,6 @@ impl GridView {
         }
     }
 
-    /// Moves the cursor to the next or previous page when an arrow leaves the current one.
     pub(super) fn cross_page_edge(&mut self, key: &str) -> bool {
         let Some(cursor) = self.cell_cursor else { return false };
         let rows = self.visible_count();

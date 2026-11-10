@@ -22,6 +22,10 @@ pub trait ResultSource: Send + Sync + 'static {
         "Synthetic data · no database connection".into()
     }
     fn total(&self) -> u64;
+    /// True when the source holds only part of what the query or table has.
+    fn is_partial(&self) -> bool {
+        false
+    }
     fn row(&self, index: u64) -> Vec<Cell>;
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str>;
     fn filter(&self, predicate: &Predicate, cancel: &CancellationToken) -> Result<Vec<u32>, &'static str>;

@@ -292,7 +292,7 @@ impl GridView {
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
-            runs: vec![Run { number: 1, rows: total }],
+            runs: vec![Run { number: 1, rows: total, elapsed_ms: None }],
             run_edits: vec![grid_edit::Edits::new()],
             run_sources: vec![None],
             sql_input,
@@ -553,13 +553,12 @@ impl GridView {
                 },
                 |this, (sql, elapsed, result)| match result {
                     Ok(table) => {
-                        this.messages.statement_ok(
-                            &sql,
-                            bookie_gpui::source::ResultSource::total(&table),
-                            table.truncated,
-                            elapsed,
-                        );
+                        let (rows, truncated) = (bookie_gpui::source::ResultSource::total(&table), table.truncated);
+                        this.messages.statement_ok(&sql, rows, truncated, elapsed);
                         this.add_run(Some(std::sync::Arc::new(table)));
+                        if let Some(run) = this.runs.last_mut() {
+                            run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                        }
                     }
                     Err(message) => {
                         this.messages.statement_failed(&sql, &message, elapsed);
@@ -1331,7 +1330,6 @@ fn display_cell(width: f32, numeric_column: bool, cell: &Cell, theme: Theme) -> 
     }
 }
 
-/// A number is right-aligned; so is a NULL in a numeric column, so it lines up with its neighbours.
 fn right_aligned(numeric_column: bool, cell: &Cell) -> bool {
     numeric_cell(cell) || (numeric_column && matches!(cell, Cell::Null))
 }
@@ -1344,6 +1342,13 @@ fn numeric_cell(cell: &Cell) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_capped_load_is_marked_with_a_plus_in_the_title() {
+        assert_eq!(render::progress_text("", 100_000, true, 20), "100,000+ rows · 20 pages");
+        assert_eq!(render::progress_text("", 40, false, 1), "40 rows");
+        assert_eq!(render::progress_text("label · ", 1_500, true, 1), "label · 1,500+ rows");
+    }
 
     #[test]
     fn only_numeric_cells_use_right_alignment() {

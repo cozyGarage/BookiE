@@ -103,6 +103,16 @@ fn grid_cell_view_bounds_long_text_and_keeps_full_value_formatting_available() {
 }
 
 #[test]
+fn copying_a_truncated_grid_cell_returns_the_full_value() {
+    let source = "a".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 10);
+    let value = Value::Text(source.clone());
+    let view = cell_view(&value, &metadata("text"));
+
+    assert!(view.truncated);
+    assert_eq!(value_to_copy_text(&value), source);
+}
+
+#[test]
 fn grid_cell_view_counts_remaining_bytes_after_a_unicode_character_limit() {
     let value = Value::Text("λ".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 3));
     let view = cell_view(&value, &metadata("text"));
