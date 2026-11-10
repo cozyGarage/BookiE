@@ -1,6 +1,29 @@
 use super::*;
 
 #[test]
+fn an_in_flight_page_is_discarded_when_no_rows_remain_visible() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let model = PagedModel::new(&[1], 1);
+    model.show(0, 1);
+    assert_eq!(model.next_request(), Some(0));
+    let visibility = model.visibility_callback(runtime.handle(), &spool, &[]);
+    visibility(0, false);
+    let context = glib::MainContext::default();
+    while context.iteration(false) {}
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: Vec::new(),
+        rows: vec![vec![bookie_core::Value::Int(10)]].into(),
+        truncated: false,
+    });
+    assert!(!model.install(0, page));
+    model.show(0, 1);
+    assert_eq!(model.next_request(), Some(0));
+}
+
+#[test]
 fn result_model_maps_global_positions_without_allocating_rows() {
     let model = PagedModel::new(&[2, 0, 1], 1);
     assert_eq!(model.n_items(), 3);

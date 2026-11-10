@@ -111,6 +111,7 @@ impl PagedModel {
                 let Some(model) = model.upgrade() else { return };
                 let rows = rows.borrow();
                 let Some((&first, &last)) = rows.first().zip(rows.last()) else {
+                    model.show(0, 0);
                     return;
                 };
                 model.show(first as usize, (last - first) as usize + 1);
