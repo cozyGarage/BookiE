@@ -11,6 +11,7 @@ mod render;
 mod text_input;
 mod ui_theme;
 
+use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
 use bookie_gpui::cursor::Cursor;
 use bookie_gpui::keymap::Keymap;
 use bookie_gpui::model::*;
@@ -318,23 +319,28 @@ impl GridView {
         self.status = self.selection.map(Selection::label).unwrap_or_default();
     }
 
+    fn selected_rows(&self, selection: Selection) -> Vec<Vec<Cell>> {
+        (selection.first()..=selection.last())
+            .map(|index| {
+                let source = self.source_row(index);
+                let mut row = self.source.row(source);
+                for (column, cell) in row.iter_mut().enumerate() {
+                    if let Some(edited) = self.edits.get(&(source, column)) {
+                        *cell = edited.clone();
+                    }
+                }
+                row
+            })
+            .collect()
+    }
+
     fn copy_selection(&mut self, with_headers: bool, cx: &mut Context<Self>) {
         let Some(selection) = self.selection else { return };
         if !selection.copyable() {
             self.status = selection.label();
             return;
         }
-        let rows = (selection.first()..=selection.last()).map(|index| {
-            let source = self.source_row(index);
-            let mut row = self.source.row(source);
-            for (column, cell) in row.iter_mut().enumerate() {
-                if let Some(edited) = self.edits.get(&(source, column)) {
-                    *cell = edited.clone();
-                }
-            }
-            row
-        });
-        let text = copy_tsv(rows, with_headers);
+        let text = copy_tsv(self.selected_rows(selection), with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
         self.status = format!(
@@ -342,6 +348,36 @@ impl GridView {
             selection.count(),
             if with_headers { " with headers" } else { "" }
         );
+    }
+
+    fn copy_selection_as(&mut self, format: CopyFormat, cx: &mut Context<Self>) {
+        let Some(selection) = self.selection else { return };
+        if !selection.copyable() {
+            self.status = selection.label();
+            return;
+        }
+        let rows = self.selected_rows(selection);
+        let driver_id = self
+            .live
+            .as_ref()
+            .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
+        let context = CopyContext {
+            columns: self.source.columns(),
+            driver_id: &driver_id,
+            table: &self.catalog.grid_table,
+            column: self.cell_cursor.map_or(0, |cursor| cursor.column),
+        };
+        match copy_format::render(format, &context, &rows) {
+            Ok(copied) => {
+                cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
+                let noun = if selection.count() == 1 { "row" } else { "rows" };
+                self.status = match copied.note {
+                    Some(note) => format!("Copied {} {noun} ({note})", selection.count()),
+                    None => format!("Copied {} {noun}", selection.count()),
+                };
+            }
+            Err(message) => self.status = message,
+        }
     }
 
     fn run_query(&mut self, cx: &mut Context<Self>) {
@@ -745,6 +781,23 @@ impl GridView {
                 true,
             ),
             action("copy", "Copy selected rows", self.selection.is_some()),
+            action("copy-csv", "Copy selected rows as CSV", self.selection.is_some()),
+            action("copy-json", "Copy selected rows as JSON", self.selection.is_some()),
+            action(
+                "copy-markdown",
+                "Copy selected rows as a Markdown table",
+                self.selection.is_some(),
+            ),
+            action(
+                "copy-in-list",
+                "Copy the active column as an IN list",
+                self.selection.is_some(),
+            ),
+            action(
+                "copy-insert",
+                "Copy selected rows as INSERT statements",
+                self.selection.is_some(),
+            ),
             action("clear-selection", "Clear row selection", self.selection.is_some()),
             action("edit", "Edit the active cell", self.cell_cursor.is_some()),
             action(
@@ -860,6 +913,11 @@ impl GridView {
                 self.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
             }
             "copy" => self.copy_selection(false, cx),
+            "copy-csv" => self.copy_selection_as(CopyFormat::Csv, cx),
+            "copy-json" => self.copy_selection_as(CopyFormat::Json, cx),
+            "copy-markdown" => self.copy_selection_as(CopyFormat::Markdown, cx),
+            "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
+            "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
             "clear-selection" => self.selection = None,
             "edit" => self.grid_key("enter", false, false, window, cx),
             "sidebar" => self.sidebar_open = !self.sidebar_open,
