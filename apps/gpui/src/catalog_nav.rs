@@ -89,11 +89,11 @@ impl GridView {
             || self.run_edits.iter().any(|edits| !edits.is_empty())
     }
 
-    fn reject_view_edits(&mut self) -> bool {
+    pub(super) fn reject_view_edits(&mut self) -> bool {
         if !self.has_view_edits() {
             return false;
         }
-        self.status = "Discard all view-only edits using Commands before connecting.".into();
+        self.status = "Discard all view-only edits using Commands before closing or switching.".into();
         true
     }
 
@@ -119,6 +119,10 @@ impl GridView {
             }
             return;
         };
+        if self.reject_view_edits() {
+            cx.notify();
+            return;
+        }
         self.status = format!("Loading {name}…");
         let wanted = name.to_string();
         self.begin_background(
@@ -132,6 +136,9 @@ impl GridView {
     }
 
     fn show_loaded_table(&mut self, name: String, table: Source) {
+        if self.reject_view_edits() {
+            return;
+        }
         self.catalog.grid_table = name.clone();
         self.source = table.clone();
         self.table_source = table;

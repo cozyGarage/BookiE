@@ -24,7 +24,7 @@ Ctrl+Shift+P opens a command palette (`src/palette.rs` and an overlay in `src/ma
 
 Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as the Tauri prototype (and so as `bookie_core::import::parse_cell`), without depending on any BookiE crate. Opening a value containing a newline is refused with a single-line editor notice, preserving its full value. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere. Copy includes the full pending values.
 
-Connection changes wait while view-only edits or a cell editor are open. **Commands → Discard all view-only edits** discards all such edits and allows the change.
+Connection and table changes are refused while view-only edits are pending. Closing a result or query tab with pending edits is also refused, and an open cell editor cannot be replaced by switching grids or results. **Commands → Discard all view-only edits** discards all such edits and allows the change.
 
 Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text. The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
 

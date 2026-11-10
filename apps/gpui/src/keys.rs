@@ -5,7 +5,6 @@ use gpui::{Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
 use crate::{GridView, Tab, palette_step};
 
 impl GridView {
-    /// Runs before key bindings, so the table's own arrow actions never see an edge key we handle.
     pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = event.keystroke.modifiers;
         let plain = !(modifiers.shift || modifiers.control || modifiers.alt);
