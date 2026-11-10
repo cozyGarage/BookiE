@@ -5,6 +5,9 @@ impl Render for GridView {
         if self.pager.total != self.dataset_count() {
             self.pager = Pager::new(self.dataset_count());
         }
+        if std::mem::take(&mut self.find_reset) {
+            self.find.update(cx, |find, cx| find.set_content("", cx));
+        }
         self.note_frame();
         self.pace_frame(window);
         let theme = Theme::current(cx);

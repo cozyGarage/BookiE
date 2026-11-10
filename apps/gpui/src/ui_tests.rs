@@ -1133,3 +1133,18 @@ fn the_palette_opens_the_settings_tab(cx: &mut TestAppContext) {
         assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Settings)
     });
 }
+
+#[gpui::test]
+fn a_search_typed_on_one_tab_is_not_left_in_the_find_box_of_the_next(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.find.update(cx, |find, cx| find.set_content("Sample 99999", cx))));
+    cx.run_until_parked();
+
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Query);
+        assert_eq!(view.find.read(cx).content(), "", "the Query result must not inherit the table's search");
+    });
+}
