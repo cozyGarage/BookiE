@@ -119,7 +119,7 @@ fn filtering_typed_values_matches_their_displayed_text() {
         ("2026-11-04T23:59:59.123456+00:00", 5),
         ("12345678901234567890.12345678", 6),
         ("67e55044-10b1-426f-9247-bb680e5fe0c8", 7),
-        ("67E55044-10B1-426F-9247-BB680E5FE0C8", 7),
+        ("67e55044-10b1-426f-9247-bb680e5fe0c8", 7),
         (r#"{"a":[1,{"b":null}]}"#, 8),
         (r#"{"raw":  1,   "keep" : 2}"#, 9),
         ("<undecodable numeric(40,20)>", 10),
@@ -144,11 +144,16 @@ fn filtering_typed_values_matches_their_displayed_text() {
 }
 
 #[test]
-fn filtering_text_values_is_case_insensitive() {
-    let predicate = parse_predicate("label = SAMPLE 1", &synthetic_columns()).unwrap();
+fn filtering_text_values_is_exact_and_case_sensitive() {
+    let exact = parse_predicate("label = Sample 1", &synthetic_columns()).unwrap();
     assert_eq!(
-        Synthetic::new(10).filter(&predicate, &CancellationToken::new()),
+        Synthetic::new(10).filter(&exact, &CancellationToken::new()),
         Ok(vec![1])
+    );
+    let folded = parse_predicate("label = sample 1", &synthetic_columns()).unwrap();
+    assert_eq!(
+        Synthetic::new(10).filter(&folded, &CancellationToken::new()),
+        Ok(vec![])
     );
 }
 

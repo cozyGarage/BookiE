@@ -1,4 +1,4 @@
-use crate::model::Cell;
+use crate::model::{Cell, CellText};
 
 pub const HEX_BYTES_PER_LINE: usize = 16;
 pub const MAX_HEX_BYTES: usize = 4096;
@@ -84,21 +84,16 @@ fn hex_detail(bytes: &[u8]) -> Detail {
 pub fn detail_of(cell: &Cell) -> Detail {
     match cell {
         Cell::Null => Detail::Null,
-        Cell::Exact(value) => match value.as_ref() {
-            bookie_core::Value::Null => Detail::Null,
-            bookie_core::Value::Bytes(bytes) => hex_detail(bytes),
-            bookie_core::Value::Json(value) => {
-                let (text, truncated) = crate::preview::bounded_json(value, MAX_PRETTY_BYTES, true);
-                if truncated {
-                    Detail::Text(format!("{text}…"))
-                } else {
-                    Detail::Json { pretty: text }
-                }
-            }
-            _ => Detail::Text(cell.display()),
-        },
         Cell::Bytes(bytes) => hex_detail(bytes),
-        Cell::Json(text) | Cell::JsonText(text) if text.len() <= MAX_PRETTY_BYTES => {
+        Cell::Json(value) => {
+            let (text, truncated) = crate::preview::bounded_json(value, MAX_PRETTY_BYTES, true);
+            if truncated {
+                Detail::Text(format!("{text}…"))
+            } else {
+                Detail::Json { pretty: text }
+            }
+        }
+        Cell::JsonText(text) if text.len() <= MAX_PRETTY_BYTES => {
             match serde_json::from_str::<serde_json::Value>(text)
                 .ok()
                 .and_then(|value| serde_json::to_string_pretty(&value).ok())
@@ -118,14 +113,14 @@ mod tests {
     #[test]
     fn retained_json_has_bounded_detail_and_keeps_its_value() {
         let value = bookie_core::Value::Json(Box::new(serde_json::json!({"text": "💾".repeat(100_000)})));
-        let cell = crate::core_bridge::value_to_cell(value.clone());
+        let cell = value.clone();
         let Detail::Text(text) = detail_of(&cell) else {
             panic!("large JSON is bounded")
         };
         assert!(text.len() <= MAX_PRETTY_BYTES + '…'.len_utf8());
         assert!(text.ends_with('…'));
-        assert_eq!(crate::core_bridge::cell_to_value(&cell), value);
-        let small = crate::core_bridge::value_to_cell(bookie_core::Value::Json(Box::new(serde_json::json!({"n": 1}))));
+        assert_eq!(cell, value);
+        let small = bookie_core::Value::Json(Box::new(serde_json::json!({"n": 1})));
         assert!(matches!(detail_of(&small), Detail::Json { .. }));
     }
 
@@ -200,7 +195,8 @@ mod tests {
 
     #[test]
     fn json_is_pretty_printed_and_invalid_json_stays_raw() {
-        let Detail::Json { pretty } = detail_of(&Cell::Json(r#"{"a":[1,{"b":null}]}"#.into())) else {
+        let Detail::Json { pretty } = detail_of(&Cell::Json(Box::new(serde_json::json!({"a": [1, {"b": null}]}))))
+        else {
             panic!("valid json is pretty printed");
         };
         assert!(pretty.contains("\n  \"a\": ["), "{pretty}");

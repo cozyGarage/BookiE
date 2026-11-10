@@ -8,28 +8,17 @@ pub const PAGE_ROWS: u64 = 5_000;
 pub const PAGE_SIZES: [u64; 4] = [500, 1_000, 5_000, 20_000];
 pub const TYPED_KINDS: u64 = 12;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Cell {
-    Null,
-    Bool(bool),
-    Int(i64),
-    Float(f64),
-    Text(String),
-    Bytes(Vec<u8>),
-    Date(String),
-    Time(String),
-    DateTime(String),
-    TimestampTz(String),
-    Decimal(String),
-    Uuid(String),
-    Json(String),
-    JsonText(String),
-    Undecodable(String),
-    Exact(std::sync::Arc<bookie_core::Value>),
+/// A cell is the core value: one type for the grid, the copy formats and the drivers.
+pub type Cell = bookie_core::Value;
+
+/// Display and kind helpers for a cell, kept out of `bookie-core` because they are view text.
+pub trait CellText {
+    fn kind(&self) -> &'static str;
+    fn display(&self) -> String;
 }
 
-impl Cell {
-    pub fn kind(&self) -> &'static str {
+impl CellText for Cell {
+    fn kind(&self) -> &'static str {
         match self {
             Cell::Null => "null",
             Cell::Bool(_) => "boolean",
@@ -46,27 +35,10 @@ impl Cell {
             Cell::Json(_) => "json",
             Cell::JsonText(_) => "json_text",
             Cell::Undecodable(_) => "undecodable",
-            Cell::Exact(value) => match value.as_ref() {
-                bookie_core::Value::Date(_) => "date",
-                bookie_core::Value::Time(_) => "time",
-                bookie_core::Value::DateTime(_) => "datetime",
-                bookie_core::Value::TimestampTz(_) => "timestamptz",
-                bookie_core::Value::Decimal(_) => "decimal",
-                bookie_core::Value::Uuid(_) => "uuid",
-                bookie_core::Value::Json(_) => "json",
-                bookie_core::Value::Null => "null",
-                bookie_core::Value::Bool(_) => "boolean",
-                bookie_core::Value::Int(_) => "integer",
-                bookie_core::Value::Float(_) => "float",
-                bookie_core::Value::Text(_) => "text",
-                bookie_core::Value::Bytes(_) => "bytes",
-                bookie_core::Value::JsonText(_) => "json_text",
-                bookie_core::Value::Undecodable(_) => "undecodable",
-            },
         }
     }
 
-    pub fn display(&self) -> String {
+    fn display(&self) -> String {
         match self {
             Cell::Null => "NULL".into(),
             Cell::Bool(value) => value.to_string(),
@@ -77,46 +49,34 @@ impl Cell {
                 format!("\\x{hex}")
             }
             Cell::Undecodable(type_name) => format!("<undecodable {type_name}>"),
-            Cell::Exact(value) => match value.as_ref() {
-                bookie_core::Value::Date(value) => value.to_string(),
-                bookie_core::Value::Time(value) => value.to_string(),
-                bookie_core::Value::DateTime(value) => value.to_string(),
-                bookie_core::Value::TimestampTz(value) => value.to_rfc3339(),
-                bookie_core::Value::Decimal(value) => value.to_string(),
-                bookie_core::Value::Uuid(value) => value.to_string(),
-                bookie_core::Value::Json(value) => value.to_string(),
-                bookie_core::Value::Null => "NULL".into(),
-                bookie_core::Value::Bool(value) => value.to_string(),
-                bookie_core::Value::Int(value) => value.to_string(),
-                bookie_core::Value::Float(value) => value.to_string(),
-                bookie_core::Value::Text(value) | bookie_core::Value::JsonText(value) => value.clone(),
-                bookie_core::Value::Bytes(value) => Cell::Bytes(value.clone()).display(),
-                bookie_core::Value::Undecodable(value) => format!("<undecodable {value}>"),
-            },
-            Cell::Text(value)
-            | Cell::Date(value)
-            | Cell::Time(value)
-            | Cell::DateTime(value)
-            | Cell::TimestampTz(value)
-            | Cell::Decimal(value)
-            | Cell::Uuid(value)
-            | Cell::Json(value)
-            | Cell::JsonText(value) => value.clone(),
+            Cell::Date(value) => value.to_string(),
+            Cell::Time(value) => value.to_string(),
+            Cell::DateTime(value) => value.to_string(),
+            Cell::TimestampTz(value) => value.to_rfc3339(),
+            Cell::Decimal(value) => value.to_string(),
+            Cell::Uuid(value) => value.to_string(),
+            Cell::Json(value) => value.to_string(),
+            Cell::JsonText(value) | Cell::Text(value) => value.clone(),
         }
     }
 }
 
 pub fn typed_of(index: u64) -> Cell {
+    fn literal<T: std::str::FromStr>(text: &str) -> T {
+        text.parse().unwrap_or_else(|_| panic!("synthetic literal {text}"))
+    }
     match index % TYPED_KINDS {
         0 => Cell::Float(0.1 + 0.2),
         1 => Cell::Bytes(vec![0xde, 0xad, 0xbe, 0xef]),
-        2 => Cell::Date("2026-11-04".into()),
-        3 => Cell::Time("23:59:59.123456".into()),
-        4 => Cell::DateTime("2026-11-04 23:59:59.123456".into()),
-        5 => Cell::TimestampTz("2026-11-04T23:59:59.123456+00:00".into()),
-        6 => Cell::Decimal("12345678901234567890.12345678".into()),
-        7 => Cell::Uuid("67e55044-10b1-426f-9247-bb680e5fe0c8".into()),
-        8 => Cell::Json(r#"{"a":[1,{"b":null}]}"#.into()),
+        2 => Cell::Date(literal("2026-11-04")),
+        3 => Cell::Time(literal("23:59:59.123456")),
+        4 => Cell::DateTime(literal("2026-11-04T23:59:59.123456")),
+        5 => Cell::TimestampTz(literal("2026-11-04T23:59:59.123456+00:00")),
+        6 => Cell::Decimal(literal("12345678901234567890.12345678")),
+        7 => Cell::Uuid(literal("67e55044-10b1-426f-9247-bb680e5fe0c8")),
+        8 => Cell::Json(Box::new(
+            serde_json::from_str(r#"{"a":[1,{"b":null}]}"#).unwrap_or_default(),
+        )),
         9 => Cell::JsonText("{\"raw\":  1,   \"keep\" : 2}".into()),
         10 => Cell::Undecodable("numeric(40,20)".into()),
         _ => Cell::Null,
@@ -180,20 +140,23 @@ pub struct ColumnMeta {
     pub name: String,
     pub width: f32,
     pub numeric: bool,
+    /// The declared type name, parsed the same way as an edit of this column.
+    pub data_type: String,
 }
 
 pub fn synthetic_columns() -> Vec<ColumnMeta> {
     [
-        ("value", 240.0, true),
-        ("label", 280.0, false),
-        ("state", 120.0, false),
-        ("typed", 320.0, false),
+        ("value", 240.0, true, "integer"),
+        ("label", 280.0, false, "text"),
+        ("state", 120.0, false, "boolean"),
+        ("typed", 320.0, false, "text"),
     ]
     .into_iter()
-    .map(|(name, width, numeric)| ColumnMeta {
+    .map(|(name, width, numeric, data_type)| ColumnMeta {
         name: name.into(),
         width,
         numeric,
+        data_type: data_type.into(),
     })
     .collect()
 }

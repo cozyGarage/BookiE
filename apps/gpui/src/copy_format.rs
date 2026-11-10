@@ -2,7 +2,6 @@ use bookie_core::export::{CsvOptions, render_csv, render_in_clause, render_json,
 use bookie_core::sql_literal::build_insert_literal;
 use bookie_core::{ColumnInfo, Value};
 
-use crate::core_bridge::cell_to_value;
 use crate::model::{Cell, ColumnMeta};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +27,7 @@ pub struct Copied {
 
 pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Cell>]) -> Result<Copied, String> {
     let infos = infos(context.columns);
-    let values: Vec<Vec<Value>> = rows.iter().map(|row| row.iter().map(cell_to_value).collect()).collect();
+    let values: Vec<Vec<Value>> = rows.iter().map(|row| row.to_vec()).collect();
     let plain = |text: String| Copied { text, note: None };
     match format {
         CopyFormat::Csv => Ok(plain(render_csv(&infos, &values, &CsvOptions::default()))),
@@ -89,6 +88,7 @@ mod tests {
                 name: name.into(),
                 width: 100.0,
                 numeric: false,
+                data_type: "text".into(),
             })
             .collect()
     }
