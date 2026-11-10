@@ -26,6 +26,8 @@ bookie-policy = { path = "../policy" }
 bookie-transport = { path = "../transport" }
 bookie-storage = { path = "../storage" }
 bookie-ssh = { path = "../ssh" }
+bookie-pg-sessions = { path = "../pg-sessions" }
+bookie-checks = { path = "../checks" }
 chrono.workspace = true
 thiserror.workspace = true
 serde.workspace = true
