@@ -477,3 +477,33 @@ fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppC
         assert_eq!(view.source.total(), 6);
     });
 }
+
+#[gpui::test]
+fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_sessions_query(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("sessions");
+    view.read_with(cx, |view, cx| {
+        assert!(view.palette_shown(cx).is_empty(), "SQLite has no pg_stat_activity");
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.show_sessions(window, cx)));
+    view.read_with(cx, |view, cx| {
+        assert_eq!(
+            view.sql_input.read(cx).value(),
+            bookie_app_services::pg_sessions::SESSIONS_SQL
+        );
+        assert!(matches!(view.tabs.current(), crate::Tab::Query));
+    });
+}

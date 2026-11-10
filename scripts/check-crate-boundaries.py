@@ -38,7 +38,7 @@ ALLOWED = {
     "bookie-transport": {"bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage"},
     "bookie-results": {"bookie-core"},
     "bookie-app-services": {
-        "bookie-core", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
+        "bookie-core", "bookie-checks", "bookie-pg-sessions", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
         "bookie-transport",
     },
     "bookie-mcp": {"bookie-core", "bookie-policy", "bookie-storage"},
