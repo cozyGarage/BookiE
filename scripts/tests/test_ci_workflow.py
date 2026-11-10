@@ -23,6 +23,96 @@ port_spec.loader.exec_module(port_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_shared_github_and_forgejo_tiers_use_the_layer_catalog(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for layer in ("app-server", "widgets", "keyring", "ui", "tls", "postgres-release"):
+            with self.subTest(layer=layer):
+                invocation = f"python3 scripts/run-test-layer.py {layer}"
+                self.assertIn(invocation, github)
+                self.assertIn(invocation, forgejo)
+
+    def test_forgejo_runs_the_shared_security_policy_layer(self):
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_security = (ROOT / ".github/workflows/linux-security.yml").read_text()
+        security_policy = re.search(r"(?ms)^  security-policy:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py security-policy", security_policy)
+        self.assertIn('run: python3 scripts/run-test-layer.py "$VALIDATION_LAYER"', github_security)
+
+    def test_both_test_builders_run_the_shared_no_default_features_layer(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_builder = re.search(r"(?ms)^  reusable-test-builds:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        forgejo_builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py no-default-features", github_builder)
+        self.assertIn("python3 scripts/run-test-layer.py no-default-features", forgejo_builder)
+
+    def test_gtk_server_layers_use_the_shared_catalog_on_both_providers(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        forgejo_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+        self.assertIn("server: [clickhouse, mongodb, postgres, mysql]", github_job)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', github_job)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
+        self.assertIn("Build Linux / postgres-release", layers["gtk-mysql-approval"]["hosted_gate"])
+        self.assertIn("lab-ci / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
+        for layer in ("gtk-clickhouse", "gtk-mongodb"):
+            with self.subTest(layer=layer):
+                self.assertIn("Build Linux / gtk-server", layers[layer]["hosted_gate"])
+                self.assertIn("lab-ci / gtk-server", layers[layer]["hosted_gate"])
+        for layer in ("gtk-postgres", "gtk-mysql"):
+            with self.subTest(layer=layer):
+                self.assertIn("Build Linux / gtk-server", layers[layer]["hosted_gate"])
+                self.assertIn("lab-ci / e2e", layers[layer]["hosted_gate"])
+        self.assertIn("gtk-server", checker.REQUIRED)
+        self.assertIn("actions/download-artifact@", github_job)
+        self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", github_job)
+        self.assertIn("python3 scripts/cleanup-testcontainers.py", github_job)
+        e2e = re.search(r"(?ms)^  e2e:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', e2e)
+        pg_dump = re.search(r"(?ms)^  pg-dump:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        self.assertIn("python3 scripts/run-test-layer.py pg-dump", pg_dump)
+
+    def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        preflight = (ROOT / "scripts/preflight.sh").read_text()
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+
+        self.assertIn("python3 scripts/run-test-layer.py quick", github)
+        self.assertIn('"$ROOT/scripts/test-sandbox.sh"', preflight)
+        self.assertEqual(layers["sandbox"]["steps"][0]["argv"], ["bash", "scripts/test-sandbox.sh"])
+        self.assertIn("python3 scripts/run-test-layer.py sandbox", forgejo)
+
+    def test_github_and_forgejo_driver_tiers_both_run_duckdb_fixture_targets(self):
+        local = (ROOT / "scripts/ci-local.sh").read_text()
+        integration = local.split("run_integration() {", 1)[1].split("run_release() {", 1)[0]
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn(
+            "-p bookie-driver-duckdb --test integration --test read_only --test missing_file",
+            " ".join(integration.replace("\\\n", " ").split()),
+        )
+        self.assertIn("driver: duckdb", driver)
+        self.assertIn("tests: --test integration --test read_only --test missing_file", driver)
+
+    def test_github_and_forgejo_run_the_same_change_contract_layer(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        unit = re.search(r"(?ms)^  unit:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py change-contracts", github)
+        self.assertIn("python3 scripts/run-test-layer.py change-contracts", unit)
+        self.assertIn('git merge-base HEAD origin/main', unit)
+        self.assertIn("github.event.before", unit)
+        self.assertIn('github.event_name }}" != "push"', unit)
+
     def test_forgejo_runs_gpui_model_and_interaction_tests(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
@@ -135,7 +225,7 @@ class CiWorkflowTests(unittest.TestCase):
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
         widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("test-gtk-widgets.sh", widgets)
+        self.assertIn("python3 scripts/run-test-layer.py widgets", widgets)
         self.assertNotRegex(widgets, r"(?m)^    (if|continue-on-error):")
 
     def test_default_test_jobs_wait_for_the_one_test_bundle_and_duckdb_runs_with_the_drivers(self):
@@ -561,11 +651,12 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_push_and_pull_request_require_every_regression_job(self):
         self.assertEqual(checker.MERGE_ONLY, set())
-        self.assertEqual(checker.PULL_REQUEST_ONLY, set())
+        self.assertEqual(checker.OPTIONAL_ON_PULL_REQUEST, {"distro-floor-scenarios"})
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         for name in checker.REQUIRED:
             results = success | {name: {"result": "skipped"}}
-            self.assertEqual(checker.assess(results, "pull_request")[0], [name], name)
+            expected_pr = [] if name in checker.OPTIONAL_ON_PULL_REQUEST else [name]
+            self.assertEqual(checker.assess(results, "pull_request")[0], expected_pr, name)
             self.assertEqual(checker.assess(results, "push")[0], [name], name)
         results = success | {"driver-tls": {"result": "skipped"}}
         self.assertEqual(checker.assess(results, "pull_request")[0], ["driver-tls"])
@@ -638,6 +729,12 @@ class CiWorkflowTests(unittest.TestCase):
         for event in ["schedule", "workflow_dispatch"]:
             self.assertEqual(checker.assess(results, event)[0], [checker.SCHEDULED])
 
+    def test_distro_floor_is_not_a_pull_request_gate(self):
+        results = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
+        results["distro-floor-scenarios"] = {"result": "skipped"}
+        self.assertEqual(checker.assess(results, "pull_request")[0], [])
+        self.assertIn("distro-floor-scenarios", checker.assess(results, "push")[0])
+
     def test_summary_depends_on_every_required_job_and_always_runs(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         section = workflow.split("  regression-gate:\n", 1)[1]
@@ -676,7 +773,9 @@ class CiWorkflowTests(unittest.TestCase):
         acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
         self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', acceptance)
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", acceptance)
-        self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
+        self.assertIn("python3 scripts/run-test-layer.py gtk-mysql-approval", acceptance)
+        integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        self.assertIn("python3 scripts/run-test-layer.py pg-dump", integration)
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -828,6 +927,7 @@ class CiWorkflowTests(unittest.TestCase):
                     "DISPLAY=:\"${display:-1234}\" exec \"$@\"\n"
                 ),
                 "python3": "printf 'simulated GTK initialization failure\\n' >&2\nexit 23\n",
+                "localedef": "exit 0\n",
                 "xdpyinfo": "printf '%s\\n' \"$*\" >> \"$XDPYINFO_LOG\"\nexit 1\n",
             }
             for name, contents in commands.items():
@@ -1026,6 +1126,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("needs: [floor-build]", scenarios)
         self.assertIn("ci-gtk-artifact.py create --package", producer)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
+        self.assertIn("python3 scripts/run-test-layer.py distro-floor", scenarios)
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
         self.assertIn("BASE=debian:testing", builder)
         self.assertIn("scripts/build-deb.sh", builder)
@@ -1071,10 +1172,10 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         self.assertIn('SHARD_GROUP: ${{ matrix.shard_group }}', scenarios)
         self.assertIn('for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do', scenarios)
-        self.assertIn('BOOKIE_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing', scenarios)
+        self.assertIn('BOOKIE_GTK_SHARD="${shard}/6" python3 scripts/run-test-layer.py distro-floor', scenarios)
         self.assertIn('scripts/ci-mcp-port.py "$((10 + shard))"', scenarios)
         self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
-        self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)
+        self.assertIn("python3 scripts/run-test-layer.py distro-floor", scenarios)
         for job in (builder, scenarios):
             self.assertIn("name: floor-package-${{ github.run_id }}-${{ github.sha }}", job)
 

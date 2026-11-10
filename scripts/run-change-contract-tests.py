@@ -150,6 +150,18 @@ def exact_test_evidence(output, test_name):
     return completed_tests(output, [test_name])
 
 
+def test_command(action, expected_test=None):
+    command = [
+        "bash", str(ROOT / "scripts/run-rust-tests.sh"), "--locked", "-p", action["package"], action["target"]
+    ]
+    if expected_test:
+        command.append(expected_test)
+    command.extend(["--", "--test-threads=1"])
+    if expected_test:
+        command.insert(-1, "--exact")
+    return command
+
+
 def execute(command, log_path, expected_test=None, timeout=900):
     print(f"  $ {' '.join(command)}", flush=True)
     try:
@@ -161,7 +173,7 @@ def execute(command, log_path, expected_test=None, timeout=900):
         print(output, end="" if output.endswith("\n") else "\n", flush=True)
         evidence = exact_test_evidence(output, expected_test) if expected_test else rust_test_evidence(output)
         if result.returncode != 0:
-            return {"status": "failed", "exit_code": result.returncode, "reason": "cargo test failed"}
+            return {"status": "failed", "exit_code": result.returncode, "reason": "Rust test command failed"}
         if not evidence:
             return {"status": "failed", "exit_code": 0, "reason": "required test execution evidence missing"}
         return {"status": "passed", "exit_code": 0}
@@ -170,7 +182,7 @@ def execute(command, log_path, expected_test=None, timeout=900):
         if isinstance(partial, bytes):
             partial = partial.decode(errors="replace")
         log_path.write_text(partial, encoding="utf-8")
-        return {"status": "timed_out", "reason": f"cargo test exceeded {timeout}s"}
+        return {"status": "timed_out", "reason": f"Rust test command exceeded {timeout}s"}
     except OSError as error:
         return {"status": "blocked", "reason": str(error)}
 
@@ -220,18 +232,9 @@ def main():
         report["actions"].append(package_result)
         commands = []
         if action["full_suite"]:
-            commands.append((
-                ["cargo", "test", "--locked", "-p", action["package"], action["target"], "--", "--test-threads=1"],
-                None,
-            ))
+            commands.append((test_command(action), None))
         for test_name in action["required_tests"]:
-            commands.append((
-                [
-                    "cargo", "test", "--locked", "-p", action["package"], action["target"], test_name,
-                    "--", "--exact", "--test-threads=1",
-                ],
-                test_name,
-            ))
+            commands.append((test_command(action, test_name), test_name))
         for test_index, (command, expected_test) in enumerate(commands, start=1):
             result = execute(command, report_dir / f"{package_index}-{test_index}.log", expected_test)
             package_result["tests"].append({"command": command, "expected_test": expected_test, **result})
