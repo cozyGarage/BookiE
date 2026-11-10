@@ -14,4 +14,4 @@ path = "src/lib.rs"
 tokio = { workspace = true, features = ["net", "time"] }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["net", "time", "macros", "rt"] }
+tokio = { workspace = true, features = ["net", "time", "macros", "rt", "test-util"] }

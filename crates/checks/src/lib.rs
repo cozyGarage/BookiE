@@ -11,8 +11,12 @@ pub enum Outcome {
 }
 
 pub async fn check_tcp(address: &str, limit: Duration) -> Outcome {
+    timed(TcpStream::connect(address), limit).await
+}
+
+async fn timed<T>(connect: impl Future<Output = std::io::Result<T>>, limit: Duration) -> Outcome {
     let started = Instant::now();
-    match timeout(limit, TcpStream::connect(address)).await {
+    match timeout(limit, connect).await {
         Ok(Ok(_)) => Outcome::Up {
             millis: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
         },
@@ -106,10 +110,15 @@ mod tests {
         assert!(!reason.is_empty());
     }
 
-    #[tokio::test]
-    async fn an_address_that_does_not_answer_is_down() {
-        let outcome = check_tcp("10.255.255.1:81", Duration::from_millis(50)).await;
-        assert!(matches!(outcome, Outcome::Down { .. }), "{outcome:?}");
+    #[tokio::test(start_paused = true)]
+    async fn a_connect_that_never_finishes_times_out_and_says_how_long_it_waited() {
+        let outcome = timed(std::future::pending::<std::io::Result<()>>(), Duration::from_millis(50)).await;
+        assert_eq!(
+            outcome,
+            Outcome::Down {
+                reason: "no answer within 50 ms".into()
+            }
+        );
     }
 
     #[test]
