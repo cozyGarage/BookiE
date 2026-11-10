@@ -1044,6 +1044,7 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
                 .map(|name| bookie_gpui::model::ColumnMeta {
                     name: name.into(),
                     width: 150.0,
+                    numeric: false,
                 })
                 .collect()
         })

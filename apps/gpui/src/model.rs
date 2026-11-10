@@ -179,14 +179,18 @@ pub fn column_text(index: u64, column: usize) -> Option<String> {
 pub struct ColumnMeta {
     pub name: String,
     pub width: f32,
+    /// Values in this column are numbers, so the column reads right-aligned,
+    /// NULLs and header included.
+    pub numeric: bool,
 }
 
 pub fn synthetic_columns() -> Vec<ColumnMeta> {
-    [("value", 240.0), ("label", 280.0), ("state", 120.0), ("typed", 320.0)]
+    [("value", 240.0, true), ("label", 280.0, false), ("state", 120.0, false), ("typed", 320.0, false)]
         .into_iter()
-        .map(|(name, width)| ColumnMeta {
+        .map(|(name, width, numeric)| ColumnMeta {
             name: name.into(),
             width,
+            numeric,
         })
         .collect()
 }
