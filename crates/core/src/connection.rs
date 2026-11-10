@@ -535,7 +535,10 @@ pub trait Connection: Send + Sync {
         sql: &str,
         control: &OperationControl,
     ) -> Result<(ExecResult, Option<crate::CommitToken>), (DriverError, Option<crate::CommitToken>)> {
-        self.execute_controlled(sql, control).await.map(|rows| (rows, None)).map_err(|error| (error, None))
+        self.execute_controlled(sql, control)
+            .await
+            .map(|rows| (rows, None))
+            .map_err(|error| (error, None))
     }
     async fn resolve_commit(&self, _token: &crate::CommitToken) -> Result<crate::CommitResolution, DriverError> {
         Ok(crate::CommitResolution::Unresolvable)
