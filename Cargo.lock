@@ -1408,6 +1408,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bookie-pg-sessions"
+version = "0.2.6"
+dependencies = [
+ "bookie-core",
+ "bookie-driver-postgres",
+ "secrecy",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
+]
+
+[[package]]
 name = "bookie-policy"
 version = "0.2.6"
 dependencies = [
