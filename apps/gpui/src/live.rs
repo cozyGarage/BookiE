@@ -348,6 +348,10 @@ impl ResultSource for LiveTable {
         &self.columns
     }
 
+    fn is_partial(&self) -> bool {
+        self.truncated
+    }
+
     fn origin(&self) -> String {
         let cap = if self.truncated {
             format!(" · {} rows loaded; result may be incomplete", self.rows.len())
