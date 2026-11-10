@@ -9,6 +9,7 @@ import re
 import shutil
 import tarfile
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import urllib.parse
@@ -142,6 +143,7 @@ def fetch(directory, revision, group, url):
         temporary = Path(temporary)
         archive = temporary / 'bundle.tar.gz'
         parts = manifest.get('chunks', [{'name': 'bundle.tar.gz', 'size': manifest['size'], 'sha256': manifest['sha256']}])
+        transfer_started = time.monotonic()
         with archive.open('wb') as output:
             for part in parts:
                 digest = hashlib.sha256()
@@ -158,18 +160,24 @@ def fetch(directory, revision, group, url):
                         raise ValueError('registry bundle chunk exceeds its declared size')
                 if digest.hexdigest() != part['sha256']:
                     raise ValueError('registry bundle chunk digest mismatch')
-        print('verifying bundle checksum', flush=True)
+        transfer_seconds = time.monotonic() - transfer_started
+        transfer_mib = manifest['size'] / 1024**2
+        transfer_rate = transfer_mib / transfer_seconds if transfer_seconds else 0
+        print(f"bundle receive/write: {transfer_mib:.1f} MiB in {transfer_seconds:.1f}s ({transfer_rate:.1f} MiB/s)", flush=True)
+        checksum_started = time.monotonic()
         if bundle.digest(archive) != manifest['sha256']:
             raise ValueError('registry bundle digest mismatch')
+        print(f"bundle checksum: {time.monotonic() - checksum_started:.1f}s", flush=True)
         staging = temporary / 'verified'
         staging.mkdir()
-        print('extracting test bundle', flush=True)
+        extract_started = time.monotonic()
         extract(archive, staging)
         if bundle.digest(staging / 'index.json') != manifest['index_sha256']:
             raise ValueError('registry bundle index digest mismatch')
         index = bundle.verify(staging, revision)
         if index['build_group'] != group:
             raise ValueError('registry bundle build group mismatch')
+        print(f"bundle extract/verify: {time.monotonic() - extract_started:.1f}s", flush=True)
         shutil.move(staging, directory)
         os.utime(directory, None)
     print('test bundle ready', flush=True)

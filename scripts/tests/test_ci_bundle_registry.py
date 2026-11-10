@@ -4,6 +4,7 @@ import io
 import json
 import os
 import platform
+from contextlib import redirect_stdout
 from unittest.mock import patch
 from pathlib import Path
 import tarfile
@@ -174,10 +175,14 @@ class RegistryExtractionTests(unittest.TestCase):
             self.assertEqual(requests[0], ('DELETE', 'bundle'))
             self.assertEqual(requests[-1], ('PUT', 'manifest.json'))
             destination = root / 'destination'
+            output = io.StringIO()
             with patch.object(registry.bundle, 'verify', return_value={'build_group': 'default'}), \
-                    patch.object(registry, 'request', side_effect=request):
+                    patch.object(registry, 'request', side_effect=request), redirect_stdout(output):
                 registry.fetch(destination, 'a' * 40, 'default', 'https://registry.example/bundle/')
             self.assertEqual((destination / 'program').read_bytes(), bytes(range(256)) * 8)
+            self.assertIn('bundle receive/write:', output.getvalue())
+            self.assertIn('bundle checksum:', output.getvalue())
+            self.assertIn('bundle extract/verify:', output.getvalue())
 
     def test_regular_payload_is_extracted(self):
         self.assertEqual(self.check_archive('tests/program'), b'test')
