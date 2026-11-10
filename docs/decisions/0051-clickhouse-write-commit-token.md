@@ -1,6 +1,6 @@
 # 0051: Writes carry a commit token so an unknown outcome can be resolved
 
-- **Status**: Proposed (2026-11-10)
+- **Status**: Accepted (2026-11-10)
 - **Date**: 2026-11-10
 
 ## Context
