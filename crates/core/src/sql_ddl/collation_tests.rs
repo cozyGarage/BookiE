@@ -96,3 +96,15 @@ fn engines_without_collation_support_here_ignore_it() {
         assert!(!statements[0].contains("COLLATE"), "{driver}: {statements:?}");
     }
 }
+
+#[test]
+fn changing_only_the_collation_counts_as_a_column_change() {
+    let mut column = collated("varchar(40)", Some("utf8mb4_general_ci"));
+    assert!(!column.differs_beyond_name());
+
+    column.collation = Some("utf8mb4_bin".into());
+    assert!(column.differs_beyond_name());
+
+    column.collation = None;
+    assert!(column.differs_beyond_name());
+}
