@@ -150,6 +150,10 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('--extract-to "$RUNNER_TEMP/bookie-gpui-extract"', job)
         self.assertNotIn("cargo test", job)
         self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all', builder)
+        for group in ("direct", "unit", "sandbox"):
+            with self.subTest(group=group):
+                self.assertIn(f"bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}", builder)
+                self.assertIn(f"path: reusable-builds/{group}/", builder)
         self.assertIn('path: reusable-builds/gpui/', builder)
         self.assertIn('RUSTC_WRAPPER: ""', job)
         self.assertIn('"gpui-tests"', (ROOT / "scripts/check-ci-jobs.py").read_text())
@@ -251,7 +255,10 @@ class CiWorkflowTests(unittest.TestCase):
     def test_default_test_jobs_wait_for_the_one_test_bundle_and_duckdb_runs_with_the_drivers(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         default_build = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" all', default_build)
+        self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" forgejo', default_build)
+        self.assertIn('test-bundles/direct" "${{ github.sha }}" direct', default_build)
+        self.assertIn('test-bundles/unit" "${{ github.sha }}" unit', default_build)
+        self.assertIn('test-bundles/sandbox" "${{ github.sha }}" sandbox', default_build)
         self.assertIn('"$GITHUB_WORKSPACE/test-bundles/gpui" "${{ github.sha }}" gpui', default_build)
         self.assertNotIn("duckdb-build", workflow)
         self.assertNotRegex(workflow, r"(?m)^  duckdb:\n")

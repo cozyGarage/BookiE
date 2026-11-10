@@ -32,17 +32,20 @@ def verify(bundle, revision, expected_group=None):
             raise ValueError('bundle file is missing or outside its directory')
         if path.stat().st_size != expected['size'] or digest(path) != expected['sha256']:
             raise ValueError('bundle file integrity mismatch')
+    archive_only = index.get('archive_only', False)
+    if type(archive_only) is not bool:
+        raise ValueError('test bundle contents are invalid')
     for entry in index['tests']:
-        if entry['path'] not in index['files']:
+        if not archive_only and entry['path'] not in index['files']:
             raise ValueError('unverified test executable')
     if any(path not in index['files'] for path in index.get('binaries', {}).values()):
         raise ValueError('unverified helper executable')
-    if (bundle / 'nextest.tar.zst').exists() and 'nextest.tar.zst' not in index['files']:
+    if (archive_only or (bundle / 'nextest.tar.zst').exists()) and 'nextest.tar.zst' not in index['files']:
         raise ValueError('unverified nextest archive')
     return index
 
 
-def create(bundle, messages, revision, group, archive=None):
+def create(bundle, messages, revision, group, archive=None, archive_only=False, kinds=None, package_names=None):
     if bundle.exists():
         raise ValueError('bundle destination already exists')
     metadata_command = ['cargo', 'metadata', '--locked', '--no-deps', '--format-version=1']
@@ -58,9 +61,9 @@ def create(bundle, messages, revision, group, archive=None):
     index = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
              'build_image': os.environ.get('BOOKIE_BUILD_RUNTIME_ID') or os.environ.get('BOOKIE_BUILD_IMAGE', ''),
              'architecture': platform.machine(), 'rust_version': subprocess.check_output(['rustc', '--version'], text=True).strip(),
-             'features': ['kerberos'] if group == 'default' else [],
+             'features': ['kerberos'] if group in {'default', 'direct', 'unit', 'sandbox'} else [],
              'application_source_commit': revision, 'test_suite_commit': revision, 'ci_recipe_commit': revision,
-             'tests': [], 'binaries': {},
+             'tests': [], 'binaries': {}, 'archive_only': archive_only,
              'package_directories': {}, 'files': {}}
     for line in messages.read_text().splitlines():
         message = json.loads(line)
@@ -69,14 +72,21 @@ def create(bundle, messages, revision, group, archive=None):
         package = packages[message['package_id']]
         target = message['target']
         name = package['name']
+        if package_names and name not in package_names:
+            continue
         index['package_directories'][name] = str(Path(package['manifest_path']).parent.relative_to(ROOT))
         source = Path(message['executable'])
-        destination = ('tests/' + name + '-' + source.name if message['profile']['test'] else 'bin/' + target['name'])
-        shutil.copy2(source, bundle / destination)
         if message['profile']['test']:
             kind = 'test' if 'test' in target['kind'] else 'bin' if 'bin' in target['kind'] else 'lib'
+            if kinds and kind not in kinds:
+                continue
+            destination = 'tests/' + name + '-' + source.name
+            if not archive_only:
+                shutil.copy2(source, bundle / destination)
             index['tests'].append({'package': name, 'kind': kind, 'name': target['name'], 'path': destination})
         else:
+            destination = 'bin/' + target['name']
+            shutil.copy2(source, bundle / destination)
             index['binaries'][target['name']] = destination
     if archive:
         shutil.copy2(archive, bundle / 'nextest.tar.zst')
@@ -95,16 +105,21 @@ def main():
     parser.add_argument('revision')
     parser.add_argument('--messages', type=Path)
     parser.add_argument('--archive', type=Path)
-    parser.add_argument('--group', choices=['default', 'gpui'], default='default')
-    parser.add_argument('--expected-group', choices=['default', 'gpui'])
+    parser.add_argument('--group', choices=['default', 'direct', 'unit', 'sandbox', 'gpui'], default='default')
+    parser.add_argument('--expected-group', choices=['default', 'direct', 'unit', 'sandbox', 'gpui'])
+    parser.add_argument('--archive-only', action='store_true')
+    parser.add_argument('--test-kind', action='append', choices=['lib', 'bin', 'test'])
+    parser.add_argument('--package', action='append')
     args = parser.parse_args()
     if args.operation == 'create':
         if not args.messages:
             parser.error('create requires --messages')
-        create(args.bundle, args.messages, args.revision, args.group, args.archive)
+        create(args.bundle, args.messages, args.revision, args.group, args.archive, args.archive_only,
+               set(args.test_kind or []), set(args.package or []))
     else:
         index = verify(args.bundle, args.revision, args.expected_group)
-        print(f"verified {len(index['tests'])} test executables for {args.revision} ({index['build_group']})")
+        contents = 'Nextest archive' if index.get('archive_only') else f"{len(index['tests'])} test executables"
+        print(f"verified {contents} for {args.revision} ({index['build_group']})")
 
 
 if __name__ == '__main__':

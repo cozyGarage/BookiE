@@ -16,6 +16,20 @@ SPEC.loader.exec_module(registry)
 
 
 class RegistryExtractionTests(unittest.TestCase):
+    def test_archive_only_bundle_verifies_without_duplicate_executables(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / 'nextest.tar.zst'
+            archive.write_bytes(b'nextest archive')
+            index = {'schema_version': 1, 'source_commit': 'a' * 40, 'build_group': 'unit',
+                     'architecture': platform.machine(), 'archive_only': True,
+                     'tests': [{'path': 'tests/not-copied', 'kind': 'lib'}], 'binaries': {},
+                     'files': {'nextest.tar.zst': {
+                         'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
+                         'size': archive.stat().st_size}}}
+            (root / 'index.json').write_text(json.dumps(index))
+            self.assertTrue(registry.bundle.verify(root, 'a' * 40, 'unit')['archive_only'])
+
     def test_bundle_verification_checks_the_requested_group(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

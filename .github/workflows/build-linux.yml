@@ -229,6 +229,27 @@ jobs:
           path: reusable-builds/default/
           if-no-files-found: error
           retention-days: 14
+      - name: Upload source-pinned direct test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-direct
+          path: reusable-builds/direct/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned unit archive
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-unit
+          path: reusable-builds/unit/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned sandbox archive
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-sandbox
+          path: reusable-builds/sandbox/
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload source-pinned GPUI bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:

@@ -244,7 +244,7 @@ def main():
     parser.add_argument('operation', choices=['publish', 'fetch', 'github-fetch'])
     parser.add_argument('directory', type=Path)
     parser.add_argument('revision')
-    parser.add_argument('group', choices=['default', 'gpui'])
+    parser.add_argument('group', choices=['default', 'direct', 'unit', 'sandbox', 'gpui'])
     args = parser.parse_args()
     if not re.fullmatch('[0-9a-f]{40}', args.revision):
         parser.error('a full source commit is required')

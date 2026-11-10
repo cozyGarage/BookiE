@@ -132,6 +132,14 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'unverified nextest archive'):
             runner.load_index(self.root)
 
+    def test_archive_only_bundle_cannot_be_used_for_direct_test_execution(self):
+        self.index['archive_only'] = True
+        self.index['files']['nextest.tar.zst'] = {'sha256': hashlib.sha256(b'archive').hexdigest(), 'size': 7}
+        (self.root / 'nextest.tar.zst').write_bytes(b'archive')
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        with self.assertRaisesRegex(ValueError, 'not direct test executables'):
+            runner.load_index(self.root)
+
     def test_missing_package_cannot_be_silently_skipped(self):
         with self.assertRaises(ValueError):
             runner.commands(self.root, ['-p', 'sample', '-p', 'missing', '--tests'])
