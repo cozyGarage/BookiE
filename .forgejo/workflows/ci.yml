@@ -496,6 +496,7 @@ jobs:
   floor-build:
     runs-on: build-host
     needs: [guards, clippy]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 45
     defaults:
       run:
@@ -578,7 +579,7 @@ jobs:
   distro-floor-scenarios:
     runs-on: any-host
     needs: [floor-build]
-    if: github.event_name != 'pull_request'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 90
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/floor-debian:testing
@@ -651,7 +652,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, duckdb]
+        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, cassandra, duckdb]
         include:
           - driver: duckdb
             tests: --test integration --test read_only --test missing_file
@@ -1299,4 +1300,59 @@ jobs:
             bash src/scripts/cleanup-ci-job.sh
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  regression-gate:
+    name: Forgejo regression gate
+    if: always()
+    needs:
+      - guards
+      - gpui-tests
+      - gtk-build
+      - clippy
+      - test-build
+      - unit
+      - sandbox
+      - widgets
+      - floor-build
+      - distro-floor-scenarios
+      - driver
+      - e2e
+      - security-policy
+      - consumers
+      - gtk
+      - pg-release
+      - pg-dump
+      - socket-ssh
+      - gtk-server
+      - driver-tls
+      - keyring
+      - supply-chain
+    runs-on: any-host
+    timeout-minutes: 5
+    steps:
+      - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Evaluate finalized job results
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: python3 src/scripts/check-forgejo-ci-jobs.py
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src
           fi

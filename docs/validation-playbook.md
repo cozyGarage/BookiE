@@ -216,6 +216,8 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/test_ci_workflow.py` in the same change.
 
+Forgejo branch pushes use the pull-request regression profile. The Debian floor package build and scenarios run only on `main`, scheduled runs and manual dispatches, matching the GitHub pull-request exclusion. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
+
 ### Pull request hygiene checks
 
 These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.
