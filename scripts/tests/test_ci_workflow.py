@@ -43,6 +43,19 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertEqual(layers["sandbox"]["steps"][0]["argv"], ["bash", "scripts/test-sandbox.sh"])
         self.assertIn("python3 scripts/run-test-layer.py sandbox", forgejo)
 
+    def test_github_and_forgejo_driver_tiers_both_run_duckdb_fixture_targets(self):
+        local = (ROOT / "scripts/ci-local.sh").read_text()
+        integration = local.split("run_integration() {", 1)[1].split("run_release() {", 1)[0]
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn(
+            "-p bookie-driver-duckdb --test integration --test read_only --test missing_file",
+            " ".join(integration.replace("\\\n", " ").split()),
+        )
+        self.assertIn("driver: duckdb", driver)
+        self.assertIn("tests: --test integration --test read_only --test missing_file", driver)
+
     def test_forgejo_runs_gpui_model_and_interaction_tests(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)

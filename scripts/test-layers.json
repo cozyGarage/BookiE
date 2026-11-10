@@ -132,7 +132,7 @@
       ]
     },
     "drivers": {
-      "purpose": "Six server drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
+      "purpose": "Database drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
       "hosted_gate": "Build Linux / integration",
       "steps": [
