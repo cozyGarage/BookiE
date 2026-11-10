@@ -1,6 +1,6 @@
 # 0045: TCP checks with history live in a UI-free crate
 
-- **Status**: Proposed (2026-11-10)
+- **Status**: Accepted (2026-11-10)
 - **Date**: 2026-11-10
 
 ## Context

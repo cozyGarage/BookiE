@@ -27,7 +27,7 @@
 //! the strip is small (typical filter <5 rules) and the cost is
 //! invisible vs. the round-trip query the user is about to fire.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use relm4::adw::prelude::*;
@@ -320,24 +320,49 @@ impl FilterStrip {
     }
 }
 
+#[derive(Clone)]
+struct StripState {
+    filters: Rc<RefCell<FilterSet>>,
+    columns: Rc<RefCell<Vec<ColumnInfo>>>,
+    // GTK emits `changed` and `selected` again when a rebuild sets widget values, so handlers return early while this is set.
+    suppress: Rc<Cell<bool>>,
+    rebuild: RebuilderSlot,
+}
+
+impl StripState {
+    fn new(initial: FilterSet, columns: Vec<ColumnInfo>) -> Self {
+        Self {
+            filters: Rc::new(RefCell::new(initial)),
+            columns: Rc::new(RefCell::new(columns.into_iter().filter(is_filterable).collect())),
+            suppress: Rc::new(Cell::new(false)),
+            rebuild: Rc::new(RefCell::new(None)),
+        }
+    }
+
+    fn rebuild_rules(&self) {
+        if let Some(rebuild) = self.rebuild.borrow().as_ref() {
+            rebuild();
+        }
+    }
+}
+
+struct ActionButtons {
+    clear: gtk::Button,
+    apply: gtk::Button,
+    close: gtk::Button,
+}
+
 pub fn build(
     columns: Vec<ColumnInfo>,
     initial: FilterSet,
     on_apply: Rc<dyn Fn(FilterSet)>,
     preset_context: Option<crate::ui::filter_presets::FilterPresetContext>,
 ) -> FilterStrip {
-    let state = Rc::new(RefCell::new(initial));
-    let columns: Rc<RefCell<Vec<ColumnInfo>>> =
-        Rc::new(RefCell::new(columns.into_iter().filter(is_filterable).collect()));
-
-    // Outer revealer — slides the strip into / out of view. Slide-down
-    // matches GtkSearchBar's reveal direction, so the strip reads as
-    // a transient editor descending from the toolbar.
+    let state = StripState::new(initial, columns);
     let revealer = gtk::Revealer::builder()
         .transition_type(gtk::RevealerTransitionType::SlideDown)
         .reveal_child(false)
         .build();
-
     let outer = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(0)
@@ -346,23 +371,32 @@ pub fn build(
     outer.add_css_class("inline-toolbar");
     revealer.set_child(Some(&outer));
 
-    // Top bar: title on the left, action buttons on the right. Inline
-    // (not an AdwHeaderBar) because the strip doesn't own a window
-    // chrome — it's a piece of toolbar inside the BrowseTab's
-    // ToolbarView.
-    let header = adw::WrapBox::builder()
-        .child_spacing(6)
-        .line_spacing(6)
-        .margin_top(8)
-        .margin_bottom(4)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
+    let match_revealer = build_match_controls(&state);
+    let buttons = build_action_buttons();
+    let (where_row, raw_entry) = build_where_row(&state, &buttons.apply);
+    let saved_filters = preset_context.map(|context| build_saved_filters_button(context, &state, &on_apply));
+    outer.append(&build_header(&where_row, &buttons, saved_filters));
+    let rules_expander = build_rules_section(&state, &match_revealer);
+    outer.append(&build_scroller(&rules_expander));
+    wire_strip_actions(&buttons, &revealer, &state, on_apply);
+    install_escape_close(&outer, &revealer);
+
+    FilterStrip {
+        widget: revealer,
+        state: state.filters,
+        columns: state.columns,
+        rebuild: state.rebuild,
+        raw_entry,
+        rules_expander,
+    }
+}
+
+fn build_match_controls(state: &StripState) -> gtk::Revealer {
     let match_label = gtk::Label::builder().label(crate::tr!("Match")).build();
     match_label.add_css_class("dim-label");
     let combinator_dropdown = gtk::DropDown::from_strings(&[&crate::tr!("all"), &crate::tr!("any")]);
     combinator_dropdown.set_valign(gtk::Align::Center);
-    combinator_dropdown.set_selected(match state.borrow().combinator {
+    combinator_dropdown.set_selected(match state.filters.borrow().combinator {
         Combinator::And => 0,
         Combinator::Or => 1,
     });
@@ -375,52 +409,34 @@ pub fn build(
     match_row_box.append(&match_label);
     match_row_box.append(&combinator_dropdown);
     match_row_box.append(&match_suffix);
-    let match_revealer = gtk::Revealer::builder()
-        .transition_type(gtk::RevealerTransitionType::None)
-        .reveal_child(state.borrow().rules.len() >= 2)
-        .child(&match_row_box)
-        .build();
-    let clear_btn = gtk::Button::with_label(&crate::tr!("Clear all"));
-    clear_btn.add_css_class("flat");
-    let apply_btn = gtk::Button::with_label(&crate::tr!("Apply"));
-    apply_btn.add_css_class("suggested-action");
-    let close_btn = gtk::Button::builder()
-        .icon_name("window-close-symbolic")
-        .tooltip_text(crate::tr!("Close (Esc)"))
-        .build();
-    close_btn.add_css_class("flat");
-    outer.append(&header);
-
-    let content = gtk::Box::builder()
-        .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
-        .margin_top(6)
-        .margin_bottom(8)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
-
-    let state_for_combinator = state.clone();
+    let filters = state.filters.clone();
     combinator_dropdown.connect_selected_notify(move |dd| {
-        state_for_combinator.borrow_mut().combinator = match dd.selected() {
+        filters.borrow_mut().combinator = match dd.selected() {
             1 => Combinator::Or,
             _ => Combinator::And,
         };
     });
+    gtk::Revealer::builder()
+        .transition_type(gtk::RevealerTransitionType::None)
+        .reveal_child(state.filters.borrow().rules.len() >= 2)
+        .child(&match_row_box)
+        .build()
+}
 
-    // Rebuild closure — captured by every input-changed callback.
-    // Drains the rules list, walks `state.rules`, builds a row per
-    // rule. Re-entrancy guard: a CHANGED signal fired while we're
-    // rebuilding (programmatic set_text on an EntryRow) would
-    // re-enter and double-update state. The suppress flag
-    // short-circuits during rebuild.
-    let suppress: Rc<std::cell::Cell<bool>> = Rc::new(std::cell::Cell::new(false));
-    let rebuild: RebuilderSlot = Rc::new(RefCell::new(None));
+fn build_action_buttons() -> ActionButtons {
+    let clear = gtk::Button::with_label(&crate::tr!("Clear all"));
+    clear.add_css_class("flat");
+    let apply = gtk::Button::with_label(&crate::tr!("Apply"));
+    apply.add_css_class("suggested-action");
+    let close = gtk::Button::builder()
+        .icon_name("window-close-symbolic")
+        .tooltip_text(crate::tr!("Close (Esc)"))
+        .build();
+    close.add_css_class("flat");
+    ActionButtons { clear, apply, close }
+}
 
-    // Raw SQL input — primary, always-visible. The strip is aimed
-    // at developers who already think in WHERE clauses; making them
-    // expand a section to type SQL would be backwards. Structured
-    // rules become the secondary affordance below.
+fn build_where_row(state: &StripState, apply_btn: &gtk::Button) -> (gtk::Box, gtk::Entry) {
     let where_label = gtk::Label::builder().label("WHERE").build();
     where_label.add_css_class("monospace");
     where_label.add_css_class("dim-label");
@@ -429,22 +445,17 @@ pub fn build(
         .hexpand(true)
         .build();
     raw_entry.add_css_class("monospace");
-    raw_entry.set_text(state.borrow().extra_sql.as_deref().unwrap_or(""));
-    let state_for_raw = state.clone();
-    let rebuild_for_raw = rebuild.clone();
+    raw_entry.set_text(state.filters.borrow().extra_sql.as_deref().unwrap_or(""));
+    let strip = state.clone();
     raw_entry.connect_changed(move |e| {
         let text = e.text().to_string();
         let trimmed = text.trim();
-        state_for_raw.borrow_mut().extra_sql = if trimmed.is_empty() { None } else { Some(text) };
-        // Re-evaluate the Match revealer — combinator visibility
-        // depends on whether raw + ≥1 rule are both present.
-        if let Some(f) = rebuild_for_raw.borrow().as_ref() {
-            f();
-        }
+        strip.filters.borrow_mut().extra_sql = if trimmed.is_empty() { None } else { Some(text) };
+        strip.rebuild_rules();
     });
-    let apply_btn_for_enter = apply_btn.clone();
+    let apply_btn = apply_btn.clone();
     raw_entry.connect_activate(move |_| {
-        apply_btn_for_enter.activate();
+        apply_btn.activate();
     });
     let where_row = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
@@ -453,51 +464,66 @@ pub fn build(
         .build();
     where_row.append(&where_label);
     where_row.append(&raw_entry);
+    (where_row, raw_entry)
+}
+
+fn build_saved_filters_button(
+    context: crate::ui::filter_presets::FilterPresetContext,
+    state: &StripState,
+    on_apply: &Rc<dyn Fn(FilterSet)>,
+) -> gtk::MenuButton {
+    let presets =
+        crate::ui::filter_presets::build(context, state.filters.clone(), state.columns.clone(), on_apply.clone());
+    let popover = gtk::Popover::new();
+    popover.set_child(Some(&presets.widget));
+    let saved = gtk::MenuButton::builder()
+        .label(crate::tr!("Saved filters"))
+        .popover(&popover)
+        .build();
+    saved.add_css_class("flat");
+    saved
+}
+
+fn build_header(where_row: &gtk::Box, buttons: &ActionButtons, saved_filters: Option<gtk::MenuButton>) -> adw::WrapBox {
+    let header = adw::WrapBox::builder()
+        .child_spacing(6)
+        .line_spacing(6)
+        .margin_top(8)
+        .margin_bottom(4)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
     let actions = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(6)
         .halign(gtk::Align::End)
         .build();
-    if let Some(context) = preset_context {
-        let presets = crate::ui::filter_presets::build(context, state.clone(), columns.clone(), on_apply.clone());
-        let popover = gtk::Popover::new();
-        popover.set_child(Some(&presets.widget));
-        let saved = gtk::MenuButton::builder()
-            .label(crate::tr!("Saved filters"))
-            .popover(&popover)
-            .build();
-        saved.add_css_class("flat");
+    if let Some(saved) = saved_filters {
         actions.append(&saved);
     }
-    actions.append(&clear_btn);
-    actions.append(&apply_btn);
-    actions.append(&close_btn);
-    header.append(&where_row);
+    actions.append(&buttons.clear);
+    actions.append(&buttons.apply);
+    actions.append(&buttons.close);
+    header.append(where_row);
     header.append(&actions);
+    header
+}
 
-    // Structured rules — secondary, collapsed by default. Power
-    // users who think in raw SQL never need to expand this; users
-    // building filters by clicking get a dropdown-driven editor
-    // when they reach for it. Pre-expanded only when the saved
-    // FilterSet already has rules from a previous session.
+fn build_rules_section(state: &StripState, match_revealer: &gtk::Revealer) -> gtk::Expander {
     let rules_expander = gtk::Expander::builder()
         .label(crate::tr!("Or use the rule editor"))
-        .expanded(!state.borrow().rules.is_empty())
+        .expanded(!state.filters.borrow().rules.is_empty())
         .build();
     let rules_body = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
         .spacing(8)
         .margin_top(8)
         .build();
-    rules_body.append(&match_revealer);
+    rules_body.append(match_revealer);
     rules_expander.set_child(Some(&rules_body));
-    content.append(&rules_expander);
-
     let rules_list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
     rules_list.add_css_class("boxed-list");
     rules_body.append(&rules_list);
-
-    // Inline "Add rule" button — small, left-aligned, flat.
     let add_rule_btn = gtk::Button::builder()
         .icon_name("list-add-symbolic")
         .label(crate::tr!("Add rule"))
@@ -506,102 +532,100 @@ pub fn build(
     add_rule_btn.add_css_class("flat");
     rules_body.append(&add_rule_btn);
 
-    {
-        let rules_list = rules_list.clone();
-        let state = state.clone();
-        let columns = columns.clone();
-        let suppress = suppress.clone();
-        let rebuild_inner = rebuild.clone();
-        let match_revealer = match_revealer.clone();
-        let closure: Rebuilder = Rc::new(move || {
-            suppress.set(true);
-            while let Some(child) = rules_list.first_child() {
-                rules_list.remove(&child);
-            }
-            let rules_snapshot = state.borrow().rules.clone();
-            for (i, rule) in rules_snapshot.iter().enumerate() {
-                let row = build_rule_row(
-                    i,
-                    rule,
-                    &columns,
-                    state.clone(),
-                    rebuild_inner.clone(),
-                    suppress.clone(),
-                );
-                rules_list.append(&row);
-            }
-            // Match dropdown is meaningful when at least two clauses
-            // need a combinator — that's ≥2 structured rules, or 1
-            // structured rule combined with raw SQL. Hide it
-            // otherwise so the user doesn't see a control that has
-            // no effect on the resulting WHERE.
-            let raw_present = !extra_is_blank(state.borrow().extra_sql.as_deref());
-            let needs_combinator = rules_snapshot.len() >= 2 || (!rules_snapshot.is_empty() && raw_present);
-            match_revealer.set_reveal_child(needs_combinator);
-            // Visually mute the entire rules list when empty so the
-            // strip reads as ready-for-input rather than already-
-            // populated.
-            rules_list.set_visible(!rules_snapshot.is_empty());
-            suppress.set(false);
-        });
-        *rebuild.borrow_mut() = Some(closure);
-    }
-    if let Some(f) = rebuild.borrow().as_ref() {
-        f();
-    }
+    install_rebuilder(state, &rules_list, match_revealer);
+    state.rebuild_rules();
+    connect_add_rule(state, &add_rule_btn);
+    rules_expander
+}
 
-    let state_for_add = state.clone();
-    let columns_for_add = columns.clone();
-    let rebuild_for_add = rebuild.clone();
+fn install_rebuilder(state: &StripState, rules_list: &gtk::ListBox, match_revealer: &gtk::Revealer) {
+    let strip = state.clone();
+    let rules_list = rules_list.clone();
+    let match_revealer = match_revealer.clone();
+    let closure: Rebuilder = Rc::new(move || {
+        strip.suppress.set(true);
+        while let Some(child) = rules_list.first_child() {
+            rules_list.remove(&child);
+        }
+        let rules_snapshot = strip.filters.borrow().rules.clone();
+        for (i, rule) in rules_snapshot.iter().enumerate() {
+            rules_list.append(&build_rule_row(i, rule, &strip));
+        }
+        let raw_present = !extra_is_blank(strip.filters.borrow().extra_sql.as_deref());
+        let needs_combinator = rules_snapshot.len() >= 2 || (!rules_snapshot.is_empty() && raw_present);
+        match_revealer.set_reveal_child(needs_combinator);
+        rules_list.set_visible(!rules_snapshot.is_empty());
+        strip.suppress.set(false);
+    });
+    *state.rebuild.borrow_mut() = Some(closure);
+}
+
+fn connect_add_rule(state: &StripState, add_rule_btn: &gtk::Button) {
+    let strip = state.clone();
     add_rule_btn.connect_clicked(move |_| {
-        let default_col = columns_for_add
+        let default_col = strip
+            .columns
             .borrow()
             .first()
             .map(|c| c.name.clone())
             .unwrap_or_default();
-        state_for_add.borrow_mut().rules.push(FilterRule {
+        strip.filters.borrow_mut().rules.push(FilterRule {
             column: default_col,
             op: FilterOp::Eq,
             value: Some(FilterValue::Single(String::new())),
         });
-        if let Some(f) = rebuild_for_add.borrow().as_ref() {
-            f();
-        }
+        strip.rebuild_rules();
     });
+}
 
-    let scroller = gtk::ScrolledWindow::builder()
+fn build_scroller(rules_expander: &gtk::Expander) -> gtk::ScrolledWindow {
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .margin_top(6)
+        .margin_bottom(8)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+    content.append(rules_expander);
+    gtk::ScrolledWindow::builder()
         .child(&content)
         .hscrollbar_policy(gtk::PolicyType::Never)
         .vexpand(false)
         .max_content_height(420)
         .propagate_natural_height(true)
         .hexpand(true)
-        .build();
-    outer.append(&scroller);
+        .build()
+}
 
+fn wire_strip_actions(
+    buttons: &ActionButtons,
+    revealer: &gtk::Revealer,
+    state: &StripState,
+    on_apply: Rc<dyn Fn(FilterSet)>,
+) {
     let revealer_for_close = revealer.clone();
-    close_btn.connect_clicked(move |_| {
+    buttons.close.connect_clicked(move |_| {
         revealer_for_close.set_reveal_child(false);
     });
 
     let revealer_for_clear = revealer.clone();
     let on_apply_for_clear = on_apply.clone();
-    clear_btn.connect_clicked(move |_| {
+    buttons.clear.connect_clicked(move |_| {
         on_apply_for_clear(FilterSet::default());
         revealer_for_clear.set_reveal_child(false);
     });
 
     let revealer_for_apply = revealer.clone();
-    let state_for_apply = state.clone();
-    apply_btn.connect_clicked(move |_| {
-        let snapshot = state_for_apply.borrow().clone();
+    let filters = state.filters.clone();
+    buttons.apply.connect_clicked(move |_| {
+        let snapshot = filters.borrow().clone();
         on_apply(snapshot);
         revealer_for_apply.set_reveal_child(false);
     });
+}
 
-    // Esc inside the strip collapses it without applying. Local
-    // scope so it doesn't compete with cell-editor / search-bar Esc
-    // handlers elsewhere in the BrowseTab.
+fn install_escape_close(outer: &gtk::Box, revealer: &gtk::Revealer) {
     let revealer_for_esc = revealer.clone();
     let esc_shortcut = gtk::Shortcut::builder()
         .trigger(&crate::ui::shortcut::parse("Escape"))
@@ -614,269 +638,232 @@ pub fn build(
     esc_controller.set_scope(gtk::ShortcutScope::Local);
     esc_controller.add_shortcut(esc_shortcut);
     outer.add_controller(esc_controller);
+}
 
-    FilterStrip {
-        widget: revealer,
-        state,
-        columns,
-        rebuild,
-        raw_entry,
-        rules_expander,
+fn fallback_column(name: &str) -> ColumnInfo {
+    ColumnInfo {
+        name: name.to_owned(),
+        data_type: "text".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
     }
 }
 
-fn build_rule_row(
-    index: usize,
-    rule: &FilterRule,
-    columns: &Rc<RefCell<Vec<ColumnInfo>>>,
-    state: Rc<RefCell<FilterSet>>,
-    rebuild: RebuilderSlot,
-    suppress: Rc<std::cell::Cell<bool>>,
-) -> adw::ActionRow {
-    let columns_snapshot = columns.borrow().clone();
-    let row = adw::ActionRow::builder().build();
+fn empty_value(shape: ValueShape) -> Option<FilterValue> {
+    match shape {
+        ValueShape::None => None,
+        ValueShape::Single => Some(FilterValue::Single(String::new())),
+        ValueShape::Pair => Some(FilterValue::Pair(String::new(), String::new())),
+        ValueShape::List => Some(FilterValue::List(Vec::new())),
+    }
+}
 
-    // Column dropdown (prefix).
-    let names: Vec<&str> = columns_snapshot.iter().map(|c| c.name.as_str()).collect();
-    let column_dd = gtk::DropDown::from_strings(&names);
-    column_dd.set_valign(gtk::Align::Center);
-    let initial_col_idx = columns_snapshot.iter().position(|c| c.name == rule.column).unwrap_or(0) as u32;
-    column_dd.set_selected(initial_col_idx);
+fn retarget_column(rule: &mut FilterRule, column: &ColumnInfo) {
+    let first = &operators_for(column)[0];
+    rule.column = column.name.clone();
+    rule.op = first.op;
+    rule.value = empty_value(first.shape);
+}
 
-    let state_for_col = state.clone();
-    let columns_for_col = columns.clone();
-    let rebuild_for_col = rebuild.clone();
-    let suppress_for_col = suppress.clone();
-    column_dd.connect_selected_notify(move |dd| {
-        if suppress_for_col.get() {
-            return;
-        }
-        let idx = dd.selected() as usize;
-        let cols = columns_for_col.borrow();
-        let Some(new_col) = cols.get(idx) else {
-            return;
-        };
-        if let Some(rule) = state_for_col.borrow_mut().rules.get_mut(index) {
-            rule.column = new_col.name.clone();
-            // Reset the operator to the first valid one for the new
-            // column type — text-only ops on a new int column would
-            // produce SQL the driver rejects at fetch time.
-            let ops = operators_for(new_col);
-            rule.op = ops[0].op;
-            rule.value = match ops[0].shape {
-                ValueShape::None => None,
-                ValueShape::Single => Some(FilterValue::Single(String::new())),
-                ValueShape::Pair => Some(FilterValue::Pair(String::new(), String::new())),
-                ValueShape::List => Some(FilterValue::List(Vec::new())),
-            };
-        }
-        drop(cols);
-        if let Some(f) = rebuild_for_col.borrow().as_ref() {
-            f();
-        }
-    });
-    row.add_prefix(&column_dd);
-
-    // Operator dropdown.
-    let col = columns_snapshot
-        .get(initial_col_idx as usize)
+fn retarget_operator(rule: &mut FilterRule, columns: &[ColumnInfo], operator_index: usize) {
+    let column = columns
+        .iter()
+        .find(|c| c.name == rule.column)
         .cloned()
-        .unwrap_or_else(|| ColumnInfo {
-            name: rule.column.clone(),
-            data_type: "text".into(),
-            nullable: true,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        });
-    let ops = operators_for(&col);
-    let op_labels: Vec<&str> = ops.iter().map(|e| e.label).collect();
-    let op_dd = gtk::DropDown::from_strings(&op_labels);
-    op_dd.set_valign(gtk::Align::Center);
-    let op_idx = ops.iter().position(|e| e.op == rule.op).unwrap_or(0) as u32;
-    op_dd.set_selected(op_idx);
+        .unwrap_or_else(|| fallback_column(&rule.column));
+    if let Some(entry) = operators_for(&column).get(operator_index) {
+        rule.op = entry.op;
+        rule.value = empty_value(entry.shape);
+    }
+}
 
-    let state_for_op = state.clone();
-    let columns_for_op = columns.clone();
-    let rebuild_for_op = rebuild.clone();
-    let suppress_for_op = suppress.clone();
-    op_dd.connect_selected_notify(move |dd| {
-        if suppress_for_op.get() {
-            return;
-        }
-        let new_idx = dd.selected() as usize;
-        let mut state_mut = state_for_op.borrow_mut();
-        let Some(rule) = state_mut.rules.get_mut(index) else {
-            return;
-        };
-        let col = columns_for_op
-            .borrow()
-            .iter()
-            .find(|c| c.name == rule.column)
-            .cloned()
-            .unwrap_or_else(|| ColumnInfo {
-                name: rule.column.clone(),
-                data_type: "text".into(),
-                nullable: true,
-                primary_key: false,
-                is_auto_increment: false,
-                default_value: None,
-                is_generated: false,
-                comment: None,
-                collation: None,
-                enum_type: None,
-                domain_type: None,
-            });
-        let ops = operators_for(&col);
-        if let Some(entry) = ops.get(new_idx) {
-            rule.op = entry.op;
-            rule.value = match entry.shape {
-                ValueShape::None => None,
-                ValueShape::Single => Some(FilterValue::Single(String::new())),
-                ValueShape::Pair => Some(FilterValue::Pair(String::new(), String::new())),
-                ValueShape::List => Some(FilterValue::List(Vec::new())),
-            };
-        }
-        drop(state_mut);
-        if let Some(f) = rebuild_for_op.borrow().as_ref() {
-            f();
-        }
-    });
-    row.add_suffix(&op_dd);
-
-    // Value widget(s) — shape depends on operator.
+fn build_rule_row(index: usize, rule: &FilterRule, state: &StripState) -> adw::ActionRow {
+    let columns = state.columns.borrow().clone();
+    let row = adw::ActionRow::builder().build();
+    let selected = columns.iter().position(|c| c.name == rule.column).unwrap_or(0);
+    row.add_prefix(&build_column_dropdown(index, &columns, selected, state));
+    let column = columns
+        .get(selected)
+        .cloned()
+        .unwrap_or_else(|| fallback_column(&rule.column));
+    let ops = operators_for(&column);
+    row.add_suffix(&build_operator_dropdown(index, rule, ops, state));
     let shape = ops
         .iter()
         .find(|e| e.op == rule.op)
         .map(|e| e.shape)
         .unwrap_or(ValueShape::Single);
     match shape {
-        ValueShape::None => {
-            // No input widget; the title carries enough meaning.
-        }
-        ValueShape::Single => {
-            let entry = gtk::Entry::builder()
-                .placeholder_text(crate::tr!("Value"))
-                .valign(gtk::Align::Center)
-                .hexpand(true)
-                .build();
-            entry.set_input_purpose(input_purpose_for(&col.data_type));
-            if let Some(FilterValue::Single(s)) = rule.value.as_ref() {
-                entry.set_text(s);
-            }
-            let state_for_value = state.clone();
-            let suppress_for_value = suppress.clone();
-            entry.connect_changed(move |e| {
-                if suppress_for_value.get() {
-                    return;
-                }
-                if let Some(rule) = state_for_value.borrow_mut().rules.get_mut(index) {
-                    rule.value = Some(FilterValue::Single(e.text().to_string()));
-                }
-            });
-            row.add_suffix(&entry);
-        }
-        ValueShape::Pair => {
-            let lo = gtk::Entry::builder()
-                .placeholder_text(crate::tr!("From"))
-                .valign(gtk::Align::Center)
-                .build();
-            let hi = gtk::Entry::builder()
-                .placeholder_text(crate::tr!("To"))
-                .valign(gtk::Align::Center)
-                .build();
-            lo.set_input_purpose(input_purpose_for(&col.data_type));
-            hi.set_input_purpose(input_purpose_for(&col.data_type));
-            if let Some(FilterValue::Pair(a, b)) = rule.value.as_ref() {
-                lo.set_text(a);
-                hi.set_text(b);
-            }
-            let state_for_lo = state.clone();
-            let suppress_for_lo = suppress.clone();
-            let hi_for_lo = hi.clone();
-            lo.connect_changed(move |e| {
-                if suppress_for_lo.get() {
-                    return;
-                }
-                if let Some(rule) = state_for_lo.borrow_mut().rules.get_mut(index) {
-                    rule.value = Some(FilterValue::Pair(e.text().to_string(), hi_for_lo.text().to_string()));
-                }
-            });
-            let state_for_hi = state.clone();
-            let suppress_for_hi = suppress.clone();
-            let lo_for_hi = lo.clone();
-            hi.connect_changed(move |e| {
-                if suppress_for_hi.get() {
-                    return;
-                }
-                if let Some(rule) = state_for_hi.borrow_mut().rules.get_mut(index) {
-                    rule.value = Some(FilterValue::Pair(lo_for_hi.text().to_string(), e.text().to_string()));
-                }
-            });
-            let pair_box = gtk::Box::builder()
-                .orientation(gtk::Orientation::Horizontal)
-                .spacing(6)
-                .build();
-            pair_box.append(&lo);
-            pair_box.append(&hi);
-            row.add_suffix(&pair_box);
-        }
-        ValueShape::List => {
-            let entry = gtk::Entry::builder()
-                .placeholder_text(crate::tr!("a, b, c"))
-                .valign(gtk::Align::Center)
-                .hexpand(true)
-                .build();
-            if let Some(FilterValue::List(items)) = rule.value.as_ref() {
-                entry.set_text(&items.join(", "));
-            }
-            let state_for_value = state.clone();
-            let suppress_for_value = suppress.clone();
-            entry.connect_changed(move |e| {
-                if suppress_for_value.get() {
-                    return;
-                }
-                if let Some(rule) = state_for_value.borrow_mut().rules.get_mut(index) {
-                    let items: Vec<String> = e
-                        .text()
-                        .split(',')
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
-                    rule.value = Some(FilterValue::List(items));
-                }
-            });
-            row.add_suffix(&entry);
-        }
+        ValueShape::None => {}
+        ValueShape::Single => row.add_suffix(&single_value_entry(index, rule, &column, state)),
+        ValueShape::Pair => row.add_suffix(&pair_value_entries(index, rule, &column, state)),
+        ValueShape::List => row.add_suffix(&list_value_entry(index, rule, state)),
     }
+    row.add_suffix(&build_remove_button(index, state));
+    row
+}
 
-    // Trash button — removes this rule.
+fn build_column_dropdown(index: usize, columns: &[ColumnInfo], selected: usize, state: &StripState) -> gtk::DropDown {
+    let names: Vec<&str> = columns.iter().map(|c| c.name.as_str()).collect();
+    let dropdown = gtk::DropDown::from_strings(&names);
+    dropdown.set_valign(gtk::Align::Center);
+    dropdown.set_selected(selected as u32);
+    let strip = state.clone();
+    dropdown.connect_selected_notify(move |dd| {
+        if strip.suppress.get() {
+            return;
+        }
+        let cols = strip.columns.borrow();
+        let Some(new_col) = cols.get(dd.selected() as usize) else {
+            return;
+        };
+        if let Some(rule) = strip.filters.borrow_mut().rules.get_mut(index) {
+            retarget_column(rule, new_col);
+        }
+        drop(cols);
+        strip.rebuild_rules();
+    });
+    dropdown
+}
+
+fn build_operator_dropdown(index: usize, rule: &FilterRule, ops: &[OpEntry], state: &StripState) -> gtk::DropDown {
+    let labels: Vec<&str> = ops.iter().map(|e| e.label).collect();
+    let dropdown = gtk::DropDown::from_strings(&labels);
+    dropdown.set_valign(gtk::Align::Center);
+    dropdown.set_selected(ops.iter().position(|e| e.op == rule.op).unwrap_or(0) as u32);
+    let strip = state.clone();
+    dropdown.connect_selected_notify(move |dd| {
+        if strip.suppress.get() {
+            return;
+        }
+        let mut filters = strip.filters.borrow_mut();
+        let Some(rule) = filters.rules.get_mut(index) else {
+            return;
+        };
+        retarget_operator(rule, &strip.columns.borrow(), dd.selected() as usize);
+        drop(filters);
+        strip.rebuild_rules();
+    });
+    dropdown
+}
+
+fn single_value_entry(index: usize, rule: &FilterRule, column: &ColumnInfo, state: &StripState) -> gtk::Entry {
+    let entry = gtk::Entry::builder()
+        .placeholder_text(crate::tr!("Value"))
+        .valign(gtk::Align::Center)
+        .hexpand(true)
+        .build();
+    entry.set_input_purpose(input_purpose_for(&column.data_type));
+    if let Some(FilterValue::Single(s)) = rule.value.as_ref() {
+        entry.set_text(s);
+    }
+    let strip = state.clone();
+    entry.connect_changed(move |e| {
+        if strip.suppress.get() {
+            return;
+        }
+        if let Some(rule) = strip.filters.borrow_mut().rules.get_mut(index) {
+            rule.value = Some(FilterValue::Single(e.text().to_string()));
+        }
+    });
+    entry
+}
+
+fn pair_value_entries(index: usize, rule: &FilterRule, column: &ColumnInfo, state: &StripState) -> gtk::Box {
+    let lo = gtk::Entry::builder()
+        .placeholder_text(crate::tr!("From"))
+        .valign(gtk::Align::Center)
+        .build();
+    let hi = gtk::Entry::builder()
+        .placeholder_text(crate::tr!("To"))
+        .valign(gtk::Align::Center)
+        .build();
+    lo.set_input_purpose(input_purpose_for(&column.data_type));
+    hi.set_input_purpose(input_purpose_for(&column.data_type));
+    if let Some(FilterValue::Pair(a, b)) = rule.value.as_ref() {
+        lo.set_text(a);
+        hi.set_text(b);
+    }
+    let strip = state.clone();
+    let hi_for_lo = hi.clone();
+    lo.connect_changed(move |e| {
+        if strip.suppress.get() {
+            return;
+        }
+        if let Some(rule) = strip.filters.borrow_mut().rules.get_mut(index) {
+            rule.value = Some(FilterValue::Pair(e.text().to_string(), hi_for_lo.text().to_string()));
+        }
+    });
+    let strip = state.clone();
+    let lo_for_hi = lo.clone();
+    hi.connect_changed(move |e| {
+        if strip.suppress.get() {
+            return;
+        }
+        if let Some(rule) = strip.filters.borrow_mut().rules.get_mut(index) {
+            rule.value = Some(FilterValue::Pair(lo_for_hi.text().to_string(), e.text().to_string()));
+        }
+    });
+    let pair_box = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(6)
+        .build();
+    pair_box.append(&lo);
+    pair_box.append(&hi);
+    pair_box
+}
+
+fn list_value_entry(index: usize, rule: &FilterRule, state: &StripState) -> gtk::Entry {
+    let entry = gtk::Entry::builder()
+        .placeholder_text(crate::tr!("a, b, c"))
+        .valign(gtk::Align::Center)
+        .hexpand(true)
+        .build();
+    if let Some(FilterValue::List(items)) = rule.value.as_ref() {
+        entry.set_text(&items.join(", "));
+    }
+    let strip = state.clone();
+    entry.connect_changed(move |e| {
+        if strip.suppress.get() {
+            return;
+        }
+        if let Some(rule) = strip.filters.borrow_mut().rules.get_mut(index) {
+            let items: Vec<String> = e
+                .text()
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            rule.value = Some(FilterValue::List(items));
+        }
+    });
+    entry
+}
+
+fn build_remove_button(index: usize, state: &StripState) -> gtk::Button {
     let remove = gtk::Button::builder()
         .icon_name("user-trash-symbolic")
         .tooltip_text(crate::tr!("Remove rule"))
         .valign(gtk::Align::Center)
         .build();
     remove.add_css_class("flat");
-    let state_for_remove = state.clone();
-    let rebuild_for_remove = rebuild.clone();
+    let strip = state.clone();
     remove.connect_clicked(move |_| {
-        let mut s = state_for_remove.borrow_mut();
-        if index < s.rules.len() {
-            s.rules.remove(index);
+        let mut filters = strip.filters.borrow_mut();
+        if index < filters.rules.len() {
+            filters.rules.remove(index);
         }
-        drop(s);
-        if let Some(f) = rebuild_for_remove.borrow().as_ref() {
-            f();
-        }
+        drop(filters);
+        strip.rebuild_rules();
     });
-    row.add_suffix(&remove);
-
-    row
+    remove
 }
 
 fn input_purpose_for(data_type: &str) -> gtk::InputPurpose {
@@ -902,7 +889,10 @@ fn input_purpose_for(data_type: &str) -> gtk::InputPurpose {
 mod tests {
     use std::rc::Rc;
 
-    use super::{ColumnInfo, FilterOp, FilterRule, FilterSet, FilterValue, build, operators_for};
+    use super::{
+        ColumnInfo, FilterOp, FilterRule, FilterSet, FilterValue, build, operators_for, retarget_column,
+        retarget_operator,
+    };
     use relm4::{gtk, gtk::prelude::*};
 
     fn column(data_type: &str) -> ColumnInfo {
@@ -934,6 +924,88 @@ mod tests {
             assert!(ops.iter().any(|entry| entry.op == FilterOp::Gt), "{data_type}");
             assert!(!ops.iter().any(|entry| entry.op == FilterOp::Contains), "{data_type}");
         }
+    }
+
+    fn named(name: &str, data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
+            ..column(data_type)
+        }
+    }
+
+    fn rule(column: &str, op: FilterOp, value: Option<FilterValue>) -> FilterRule {
+        FilterRule {
+            column: column.into(),
+            op,
+            value,
+        }
+    }
+
+    #[test]
+    fn moving_a_rule_to_another_column_restarts_it_at_that_columns_first_operator() {
+        let mut moved = rule(
+            "age",
+            FilterOp::Between,
+            Some(FilterValue::Pair("1".into(), "5".into())),
+        );
+
+        retarget_column(&mut moved, &named("name", "text"));
+
+        assert_eq!(moved.column, "name");
+        assert_eq!(moved.op, FilterOp::Eq);
+        assert_eq!(moved.value, Some(FilterValue::Single(String::new())));
+    }
+
+    #[test]
+    fn choosing_an_operator_gives_the_rule_an_empty_value_of_that_operators_shape() {
+        let text = [named("name", "text")];
+        let number = [named("age", "integer")];
+        let cases = [
+            (
+                &text[..],
+                "name",
+                2,
+                FilterOp::Contains,
+                Some(FilterValue::Single(String::new())),
+            ),
+            (&text[..], "name", 8, FilterOp::IsNull, None),
+            (&text[..], "name", 10, FilterOp::In, Some(FilterValue::List(Vec::new()))),
+            (
+                &number[..],
+                "age",
+                6,
+                FilterOp::Between,
+                Some(FilterValue::Pair(String::new(), String::new())),
+            ),
+        ];
+        for (columns, column, index, op, value) in cases {
+            let mut chosen = rule(column, FilterOp::Eq, Some(FilterValue::Single("old".into())));
+
+            retarget_operator(&mut chosen, columns, index);
+
+            assert_eq!(chosen.op, op, "operator {index} on {column}");
+            assert_eq!(chosen.value, value, "operator {index} on {column}");
+        }
+    }
+
+    #[test]
+    fn an_operator_index_past_the_list_leaves_the_rule_unchanged() {
+        let columns = [named("name", "text")];
+        let mut kept = rule("name", FilterOp::Contains, Some(FilterValue::Single("abc".into())));
+
+        retarget_operator(&mut kept, &columns, 99);
+
+        assert_eq!(kept.op, FilterOp::Contains);
+        assert_eq!(kept.value, Some(FilterValue::Single("abc".into())));
+    }
+
+    #[test]
+    fn a_rule_naming_a_column_that_is_gone_is_treated_as_text() {
+        let mut orphan = rule("ghost", FilterOp::Eq, Some(FilterValue::Single(String::new())));
+
+        retarget_operator(&mut orphan, &[], 2);
+
+        assert_eq!(orphan.op, FilterOp::Contains);
     }
 
     #[test]

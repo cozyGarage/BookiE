@@ -460,6 +460,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::grid_save_runs_through_policy_and_records_its_outcome"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::keyless_tab_refuses_to_stage_deletion_of_a_persisted_row"
     ],
     [

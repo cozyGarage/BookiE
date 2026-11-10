@@ -92,7 +92,8 @@ Other options and why they were rejected.
 | [0042](0042-dbx-visual-reference-for-gpui.md) | dbx is the visual reference for the GPUI experiment | Proposed | The GPUI experiment follows dbx's tokens, density and layout under its Apache-2.0 licence, without its branding; GTK stays libadwaita. |
 | [0043](0043-gpui-frontend-may-read-real-data-through-app-services.md) | The GPUI frontend may read real data through app-services | Accepted | Lift ADR 0028 and 0036 for reads only, through app-services and PolicyGuard, with typed values, Secret Service credentials and audit; writes and shipping need later decisions. |
 | [0044](0044-gpui-app-lives-under-apps.md) | The GPUI app lives under apps/ | Accepted | Move it from experiments/ to apps/gpui as bookie-gpui with the same dependency rule; moving it is not shipping it. |
-| [0045](0045-network-checks-crate.md) | TCP checks with history live in a UI-free crate | Proposed | `bookie-checks` holds `check_tcp` and a bounded `History` with a summary; HTTP checks, scheduling and persistence follow separately. |
+| [0045](0045-network-checks-crate.md) | TCP checks with history live in a UI-free crate | Accepted | `bookie-checks` holds `check_tcp` and a bounded `History` with a summary; HTTP checks, scheduling and persistence follow separately. |
+| [0046](0046-pg-sessions-crate.md) | PostgreSQL sessions and locks live in a UI-free crate | Accepted | `bookie-pg-sessions` lists sessions with waits and blocking pids and ranks blockers; reads only, terminating a backend is a separate decision. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 

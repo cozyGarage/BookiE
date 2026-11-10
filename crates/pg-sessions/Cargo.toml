@@ -1,0 +1,21 @@
+[package]
+name = "bookie-pg-sessions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "bookie_pg_sessions"
+path = "src/lib.rs"
+
+[dependencies]
+bookie-core = { path = "../core" }
+
+[dev-dependencies]
+bookie-driver-postgres = { path = "../drivers/postgres" }
+secrecy.workspace = true
+testcontainers.workspace = true
+testcontainers-modules = { workspace = true, features = ["postgres"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
