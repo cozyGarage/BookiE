@@ -6,6 +6,7 @@ mod parser_contract;
 
 mod activity;
 mod catalog;
+mod commit;
 mod connection;
 mod driver;
 mod error;
@@ -36,6 +37,7 @@ mod transaction;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
+pub use commit::{CommitResolution, CommitToken};
 pub use connection::{
     AttachedDatabase, AuthMode, CollationInfo, ConnectOptions, Connection, MAX_COLLATIONS, SocketOrigin, Transport,
     uri_host,

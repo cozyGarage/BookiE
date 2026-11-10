@@ -251,6 +251,7 @@ pub(super) fn install_window_lifecycle(
                             Ok(Ok(())) => {
                                 workspace_flushed_for_poll.set(true);
                                 workspace_flush_in_progress_for_poll.set(false);
+                                window_for_flush.set_sensitive(true);
                                 window_for_flush.close();
                                 glib::ControlFlow::Break
                             }

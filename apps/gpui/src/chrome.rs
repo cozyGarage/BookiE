@@ -16,7 +16,7 @@ const TOOLBAR_HEIGHT: f32 = 40.0;
 const TAB_HEIGHT: f32 = 32.0;
 const STATUS_HEIGHT: f32 = 24.0;
 
-fn ghost(id: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
+fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
         .flex()
@@ -357,8 +357,11 @@ impl GridView {
                 div()
                     .flex()
                     .gap_4()
-                    .child(stat("Connections", "1"))
-                    .child(stat("Connected", "1"))
+                    .child(stat("Connections", &self.connections.len().max(1).to_string()))
+                    .child(stat(
+                        "Connected",
+                        &usize::from(self.live.is_some() || self.connections.is_empty()).to_string(),
+                    ))
                     .child(stat("Database Types", "1")),
             )
             .child(
@@ -367,18 +370,38 @@ impl GridView {
                     .gap_4()
                     .child(
                         card(theme).flex_1().child(card_title("Quick Start", theme)).child(
-                            div().p_2().child(
-                                ghost(
-                                    "quick-open",
-                                    format!("{} → {}", self.catalog.connection, self.catalog.grid_table),
-                                    theme,
-                                )
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    let name = this.catalog.grid_table.clone();
-                                    this.open_table_named(&name, window, cx);
-                                    cx.notify();
-                                })),
-                            ),
+                            div()
+                                .p_2()
+                                .flex()
+                                .flex_col()
+                                .children(self.connections.iter().enumerate().map(|(index, saved)| {
+                                    let name = saved.name.clone();
+                                    ghost(
+                                        ("saved-connection", index),
+                                        format!("{} · {}", saved.name, saved.driver_id),
+                                        theme,
+                                    )
+                                    .on_click(cx.listener(
+                                        move |this, _, _, cx| {
+                                            this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
+                                            cx.notify();
+                                        },
+                                    ))
+                                }))
+                                .child(
+                                    ghost(
+                                        "quick-open",
+                                        format!("{} → {}", self.catalog.connection, self.catalog.grid_table),
+                                        theme,
+                                    )
+                                    .on_click(cx.listener(
+                                        |this, _, window, cx| {
+                                            let name = this.catalog.grid_table.clone();
+                                            this.open_table_named(&name, window, cx);
+                                            cx.notify();
+                                        },
+                                    )),
+                                ),
                         ),
                     )
                     .child(

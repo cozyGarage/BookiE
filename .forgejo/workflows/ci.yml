@@ -113,9 +113,12 @@ jobs:
       - name: GPUI model and simulated interaction tests
         run: |
           cd src
+          workspace_root="$(cd apps/gpui && pwd -P)"
+          test -r "$workspace_root/tests/fixtures/orders.sqlite"
+          mkdir -p "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" \
-            --workspace-remap "$GITHUB_WORKSPACE/src/apps/gpui" \
+            --workspace-remap "$workspace_root" \
             --extract-to "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}" --profile default --no-tests=fail
       - name: Finalize runner job
         if: always()
@@ -311,6 +314,10 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
+      - name: Install the GPUI linker dependency
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends libxkbcommon-x11-dev
       - name: Build the default test bundle
         run: |
           exec 9>>/target/.bookie-build-cache.lock
@@ -328,6 +335,11 @@ jobs:
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/gpui" "${{ github.sha }}" gpui
+      - name: Check the no-default-features layer
+        run: |
+          exec 9>>/target/.bookie-build-cache.lock
+          flock --exclusive 9
+          cd src && python3 scripts/run-test-layer.py no-default-features
       - name: Clean builder scratch
         if: always()
         run: |
@@ -384,6 +396,15 @@ jobs:
           mkdir -p "$CARGO_TARGET_DIR"
           export TMPDIR="$CARGO_TARGET_DIR"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
+      - name: Focused Data-lane change contracts
+        run: |
+          cd src
+          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.event_name }}" != "push" ]]; then
+            export BOOKIE_CHANGE_BASE="${{ github.event.before || 'HEAD^' }}"
+          else
+            export BOOKIE_CHANGE_BASE="$(git merge-base HEAD origin/main)"
+          fi
+          python3 scripts/run-test-layer.py change-contracts
 
       - name: Finalize runner job
         if: always()
@@ -424,7 +445,7 @@ jobs:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
           BOOKIE_NEXTEST_PROFILE: ci
         run: |
-          cd src && bash scripts/test-sandbox.sh
+          cd src && python3 scripts/run-test-layer.py sandbox
 
       - name: Finalize runner job
         if: always()
@@ -461,8 +482,7 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: GTK widget tests
-        run: |
-          cd src && bash scripts/test-gtk-widgets.sh
+        run: cd src && python3 scripts/run-test-layer.py widgets
 
       - name: Finalize runner job
         if: always()
@@ -607,7 +627,7 @@ jobs:
           cd src
           for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do
             python3 scripts/ci-mcp-port.py "$((10 + shard))"
-            BOOKIE_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing
+            BOOKIE_GTK_SHARD="${shard}/6" python3 scripts/run-test-layer.py distro-floor
           done
 
       - name: Finalize runner job
@@ -743,8 +763,44 @@ jobs:
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Real server end to end
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
         run: |
-          cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
+  security-policy:
+    runs-on: any-host
+    needs: [test-build]
+    timeout-minutes: 45
+    steps:
+      - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Obtain the source-pinned test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
+      - name: Security policy tests
+        run: cd src && python3 scripts/run-test-layer.py security-policy
 
       - name: Finalize runner job
         if: always()
@@ -796,8 +852,7 @@ jobs:
           bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_postgres -- --include-ignored --test-threads=1
           bash scripts/run-rust-tests.sh --locked -p bookie-policy --test session_mssql -- --include-ignored --test-threads=1
       - name: App server tests
-        run: |
-          cd src && python3 scripts/run-isolated-tests.py app-server
+        run: cd src && python3 scripts/run-test-layer.py app-server
 
       - name: Finalize runner job
         if: always()
@@ -862,7 +917,7 @@ jobs:
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.shard }}"
       - name: Installed GTK end-to-end suite, one third
         run: |
-          cd src && BOOKIE_GTK_SHARD=${{ matrix.shard }}/3 bash scripts/test-gtk-safety.sh
+          cd src && BOOKIE_GTK_SHARD="${{ matrix.shard }}/3" python3 scripts/run-test-layer.py ui
 
       - name: Finalize runner job
         if: always()
@@ -914,7 +969,7 @@ jobs:
       - name: PostgreSQL release fixture
         run: |
           mkdir -p "$TMPDIR"
-          cd src && ./scripts/test-postgres-release.sh
+          cd src && python3 scripts/run-test-layer.py postgres-release
 
       - name: Finalize runner job
         if: always()
@@ -963,7 +1018,7 @@ jobs:
       - name: Pre-pull pg_dump image
         run: bash src/scripts/prepull-test-images.sh pg-dump
       - name: pg_dump against PostgreSQL
-        run: cd src && ./scripts/test-pg-dump.sh
+        run: cd src && python3 scripts/run-test-layer.py pg-dump
 
       - name: Finalize runner job
         if: always()
@@ -1092,8 +1147,7 @@ jobs:
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK scenarios against a real server
-        run: |
-          cd src && bash scripts/test-gtk-${{ matrix.server }}.sh
+        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
       - name: Finalize runner job
         if: always()
         shell: bash
@@ -1140,8 +1194,7 @@ jobs:
       - name: Pre-pull fixture images
         run: bash src/scripts/prepull-test-images.sh driver-tls
       - name: Driver TLS fixtures
-        run: |
-          cd src && ./scripts/test-driver-tls.sh
+        run: cd src && python3 scripts/run-test-layer.py tls
 
       - name: Finalize runner job
         if: always()
@@ -1181,8 +1234,7 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" default
       - name: Secret Service tier
-        run: |
-          cd src && ./scripts/test-secret-service.sh
+        run: cd src && python3 scripts/run-test-layer.py keyring
 
       - name: Finalize runner job
         if: always()
