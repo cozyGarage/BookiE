@@ -102,9 +102,9 @@ def main():
         if result.returncode:
             return result.returncode
         summaries = re.findall(r'^test result: ok\. (\d+) passed; 0 failed;', result.stdout, re.MULTILINE)
-        if len(summaries) != 1:
+        if not summaries:
             raise ValueError('prebuilt test execution evidence missing')
-        passed += int(summaries[0])
+        passed += sum(map(int, summaries))
     if not passed:
         raise ValueError('no prebuilt tests executed')
     return 0
