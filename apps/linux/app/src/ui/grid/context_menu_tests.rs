@@ -3,6 +3,94 @@ use gtk::glib;
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn filter_menu_does_not_use_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(1),
+        Value::Text("first".into()),
+    ]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(2),
+        Value::Text("second".into()),
+    ]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, receiver) = relm4::channel();
+    let mut id = menu_test_column("id", "INTEGER");
+    id.primary_key = true;
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[id, menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: true,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::CheckButton::new();
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::FilterByValue { value: Value::Text(value), .. } if value == "first"));
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not filter using another row");
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(2),
+            Value::Text("replacement".into()),
+        ])],
+    );
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a replacement row must not inherit the old menu action"
+    );
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::<[Value]>::from([]));
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::FilterByValue { value: Value::Text(value), .. } if value == "replacement"));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(3),
+            Value::Text("new".into()),
+        ])],
+    );
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a keyless replacement row must not inherit the old menu action"
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn inline_edit_does_not_open_a_rebound_cell() {
     gtk::init().unwrap();
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
