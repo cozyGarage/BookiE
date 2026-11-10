@@ -1,4 +1,3 @@
-use std::ops::Range;
 use std::time::{Duration, Instant};
 
 mod assets;
@@ -19,15 +18,14 @@ use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui::preview::cell_preview;
 use bookie_gpui::selection::{Selection, copy_tsv};
 use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag};
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
 use gpui::{
-    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, MouseDownEvent,
-    ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size, uniform_list,
+    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
+    ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
+    size,
 };
 use gpui_kit::component::input::EditorState;
 use text_input::{InputEvent, TextInput};
@@ -35,7 +33,6 @@ use tokio_util::sync::CancellationToken;
 use ui_theme::ThemeExt;
 
 const ROW_HEIGHT: f32 = 26.0;
-const HEADER_HEIGHT: f32 = 28.0;
 pub const GUTTER_WIDTH: f32 = 56.0;
 
 enum Mode {
@@ -105,7 +102,7 @@ struct GridView {
     cursor: MatchCursor,
     find_capped: bool,
     operation_cancel: CancellationToken,
-    compare: Option<Diff>,
+    compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
     generation: u64,
@@ -244,10 +241,11 @@ impl GridView {
                 .row_header(false)
         });
         let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
-        let table_events = cx.subscribe(
+        let table_events = cx.subscribe_in(
             &table,
-            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
-                if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
+            window,
+            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
+                gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let cursor = bookie_gpui::cursor::Cursor {
                         row: *row,
                         column: *column,
@@ -257,6 +255,10 @@ impl GridView {
                     this.status = cursor.label(&names);
                     cx.notify();
                 }
+                gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
+                    this.edit_clicked_row(*row, window, cx);
+                }
+                _ => {}
             },
         );
         GridView {
@@ -290,7 +292,11 @@ impl GridView {
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
-            runs: vec![Run { number: 1, rows: total, elapsed_ms: None }],
+            runs: vec![Run {
+                number: 1,
+                rows: total,
+                elapsed_ms: None,
+            }],
             run_edits: vec![grid_edit::Edits::new()],
             run_sources: vec![None],
             sql_input,
@@ -860,7 +866,7 @@ impl GridView {
                 Ok(diff) => {
                     this.status.clear();
                     this.selection = None;
-                    this.compare = Some(diff);
+                    this.compare = Some(std::sync::Arc::new(diff));
                     this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
                 }
                 Err(message) => this.status = message.into(),
@@ -1316,14 +1322,7 @@ pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
 }
 
-fn display_cell(width: f32, numeric_column: bool, cell: &Cell, theme: Theme) -> Div {
-    let mut item = cell_div(width, cell_preview(cell));
-    if let Some(kind) = bookie_gpui::type_colors::type_kind(cell) {
-        item = item.text_color(rgb(bookie_gpui::type_colors::type_color(kind, theme.dark)));
-    }
-    if right_aligned(numeric_column, cell) { item.justify_end() } else { item }
-}
-
+/// A number is right-aligned; so is a NULL in a numeric column, so it lines up with its neighbours.
 fn right_aligned(numeric_column: bool, cell: &Cell) -> bool {
     numeric_cell(cell) || (numeric_column && matches!(cell, Cell::Null))
 }
@@ -1362,22 +1361,6 @@ mod tests {
         assert!(!right_aligned(false, &Cell::Null));
         assert!(!right_aligned(true, &Cell::Text("7".into())));
     }
-}
-
-fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
-    let background = if selected {
-        theme.active_row
-    } else if stripe {
-        theme.stripe
-    } else {
-        theme.background
-    };
-    div()
-        .flex()
-        .items_center()
-        .h(px(ROW_HEIGHT))
-        .w_full()
-        .bg(rgb(background))
 }
 
 fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
