@@ -62,6 +62,7 @@ pub struct DriverCapabilities {
     pub supports_local_socket_directory: bool,
     pub supports_client_tls_auth: bool,
     pub supports_strict_encryption: bool,
+    pub supports_sequence_restart: bool,
     pub supports_explicit_auto_increment_values: bool,
     pub supports_browse_filters: bool,
 }
@@ -100,6 +101,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_local_socket_directory: self.supports_local_socket_directory(),
             supports_client_tls_auth: self.supports_client_tls_auth(),
             supports_strict_encryption: self.supports_strict_encryption(),
+            supports_sequence_restart: self.supports_sequence_restart(),
             supports_explicit_auto_increment_values: self.supports_explicit_auto_increment_values(),
             supports_browse_filters: self.supports_browse_filters(),
         }
@@ -210,6 +212,10 @@ pub trait DatabaseDriver: Send + Sync {
     }
 
     fn supports_strict_encryption(&self) -> bool {
+        false
+    }
+
+    fn supports_sequence_restart(&self) -> bool {
         false
     }
 

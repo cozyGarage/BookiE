@@ -48,7 +48,10 @@ fn triggers_sql() -> String {
 
 fn sequences_sql() -> String {
     format!(
-        "SELECT n.nspname, c.relname, pg_catalog.format_type(s.seqtypid, NULL)
+        "SELECT n.nspname, c.relname,
+                pg_catalog.format_type(s.seqtypid, NULL) || ' · '
+                    || COALESCE('last value ' || pg_catalog.pg_sequence_last_value(s.seqrelid)::text, 'not used yet')
+                    || ' · step ' || s.seqincrement::text
          FROM pg_catalog.pg_sequence s
          JOIN pg_catalog.pg_class c ON c.oid = s.seqrelid
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace

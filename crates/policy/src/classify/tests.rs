@@ -186,6 +186,16 @@ fn broader_schema_and_privilege_changes_are_ddl() {
 }
 
 #[test]
+fn restarting_a_sequence_is_a_governed_write() {
+    let facts = classify("ALTER SEQUENCE \"public\".\"job_ids\" RESTART WITH 42", "postgres");
+    assert!(facts.writes(), "{facts:?}");
+    assert!(
+        facts.contains_ddl() || facts.class == StatementClass::Unparseable,
+        "{facts:?}"
+    );
+}
+
+#[test]
 fn mysql_delete() {
     let f = classify("DELETE FROM t WHERE id = 1", "mysql");
     assert_eq!(f.class, StatementClass::Delete);

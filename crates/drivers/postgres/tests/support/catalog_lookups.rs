@@ -175,3 +175,27 @@ async fn a_column_collation_is_read_and_survives_a_type_change() {
     assert_eq!(altered[0].data_type, "character varying(80)");
     assert_eq!(altered[0].collation.as_deref(), Some("C"));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_listed_sequence_shows_its_last_value_and_step() {
+    use bookie_core::CatalogObjectKind;
+
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE SEQUENCE shown_seq INCREMENT BY 5").await.unwrap();
+    let find = |objects: Vec<bookie_core::CatalogObject>| {
+        objects
+            .into_iter()
+            .find(|object| object.name == "shown_seq")
+            .and_then(|object| object.detail)
+            .unwrap()
+    };
+
+    let fresh = find(conn.list_objects(CatalogObjectKind::Sequence, None).await.unwrap());
+    assert!(fresh.contains("not used yet") && fresh.contains("step 5"), "{fresh}");
+
+    conn.execute("SELECT setval('shown_seq', 41)").await.unwrap();
+    let used = find(conn.list_objects(CatalogObjectKind::Sequence, None).await.unwrap());
+    assert!(used.contains("last value 41"), "{used}");
+}
