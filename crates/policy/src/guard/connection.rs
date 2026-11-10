@@ -370,7 +370,10 @@ impl Connection for PolicyGuard {
         sql: &str,
         control: &OperationControl,
     ) -> Result<(ExecResult, Option<bookie_core::CommitToken>), (DriverError, Option<bookie_core::CommitToken>)> {
-        let authorization = self.authorize(sql, false, Some(control)).await.map_err(|error| (error, None))?;
+        let authorization = self
+            .authorize(sql, false, Some(control))
+            .await
+            .map_err(|error| (error, None))?;
         let token = std::sync::Arc::new(std::sync::Mutex::new(None));
         let captured = token.clone();
         let result = self
