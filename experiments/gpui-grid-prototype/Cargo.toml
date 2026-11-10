@@ -10,7 +10,9 @@ publish = false
 [dependencies]
 bookie-core = { path = "../../crates/core" }
 bookie-results = { path = "../../crates/results" }
-tokio = { version = "1", default-features = false, features = ["rt"] }
+bookie-app-services = { path = "../../crates/app-services" }
+bookie-driver-registry = { path = "../../crates/registry" }
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "time"] }
 tokio-util = { version = "0.7", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 rust_decimal = { version = "1.43", default-features = false, features = ["std"] }
@@ -25,3 +27,10 @@ gpui-kit = "=0.9.0"
 [dev-dependencies]
 gpui = { package = "gpui-pre", version = "=0.3.11", features = ["test-support"] }
 gpui-kit = { version = "=0.9.0", features = ["test-support"] }
+
+[patch.crates-io]
+sqlx-mysql = { path = "../../vendor/sqlx-mysql" }
+sqlx-sqlite = { path = "../../vendor/sqlx-sqlite" }
+sqlx-postgres = { path = "../../vendor/sqlx-postgres" }
+mongodb = { path = "../../vendor/mongodb" }
+redis = { path = "../../vendor/redis" }

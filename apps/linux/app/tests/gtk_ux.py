@@ -1553,23 +1553,18 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
         session_toggle("Session")
 
-    def switching_connection_asks_before_rolling_back_an_open_session_transaction(database, base):
+    def opening_another_connection_keeps_the_original_transaction(database, base):
         ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
         time.sleep(0.5)
         ui.run_sql("BEGIN")
         ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
 
         ui.open_saved_connection(ui.CONNECTION_B_NAME)
-        ui.wait_for_node(name="Switch with an open session transaction?")
-        time.sleep(0.5)
-        ui.press_x11_key("Escape")
-        ui.wait_for_node(name="Switch with an open session transaction?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
+        ui.press_x11_key("Tab", ("Control_L",))
         ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} \u2014 BookiE")
         ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
-
-        ui.open_saved_connection(ui.CONNECTION_B_NAME)
-        ui.wait_for_node(name="Switch with an open session transaction?")
-        ui.invoke(ui.wait_for_node(name="Roll Back and Switch", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.press_x11_key("Tab", ("Control_L",))
         ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
 
     def closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back(database, base):
@@ -3099,7 +3094,7 @@ GLib.MainLoop().run()
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
-        switching_connection_asks_before_rolling_back_an_open_session_transaction,
+        opening_another_connection_keeps_the_original_transaction,
         closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,

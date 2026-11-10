@@ -70,7 +70,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 tempfile = "3"
 testcontainers = { version = "0.27", default-features = false, features = ["aws-lc-rs"] }
 testcontainers-modules = { version = "0.15", default-features = false, features = ["aws-lc-rs"] }
-oo7 = { version = "0.6", default-features = false, features = ["tokio", "native_crypto"] }
+oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
 relm4 = { version = "0.11", default-features = false, features = ["macros", "libadwaita"] }
 sqlparser = "0.63"
 toml = "1"

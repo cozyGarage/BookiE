@@ -303,7 +303,7 @@ impl GridView {
                         .columns()
                         .iter()
                         .zip(&row.cells)
-                        .map(|(column, cell)| display_cell(column.width, cell)),
+                        .map(|(column, cell)| display_cell(column.width, cell, theme)),
                 );
         }
         let dataset_index = self.base() + position as u64;

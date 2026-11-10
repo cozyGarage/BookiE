@@ -56,6 +56,14 @@ impl ReadSession {
         Self::open(saved, registry, Arc::new(DatabaseService::new())).await
     }
 
+    pub async fn open_file(path: &std::path::Path, registry: Arc<DriverRegistry>) -> Result<Self, OpenFailure> {
+        let file =
+            crate::open_request::classify_file(path).map_err(|error| OpenFailure::Other(format!("{error:?}")))?;
+        let mut saved = crate::open_request::file_connection(&file);
+        saved.read_only = true;
+        Self::open(saved, registry, Arc::new(DatabaseService::new())).await
+    }
+
     pub async fn open(
         saved: SavedConnection,
         registry: Arc<DriverRegistry>,
