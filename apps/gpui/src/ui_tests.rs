@@ -1200,3 +1200,18 @@ fn a_search_typed_on_one_tab_is_not_left_in_the_find_box_of_the_next(cx: &mut Te
         );
     });
 }
+
+#[gpui::test]
+fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.place_cursor(Some(Cursor { row: 0, column: 1 }));
+            view.edit_clicked_row(1, window, cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let editing = view.editing.as_ref().expect("the double-clicked row opens its editor");
+        assert_eq!((editing.row, editing.column), (1, 1));
+    });
+}

@@ -241,10 +241,11 @@ impl GridView {
                 .row_header(false)
         });
         let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
-        let table_events = cx.subscribe(
+        let table_events = cx.subscribe_in(
             &table,
-            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
-                if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
+            window,
+            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
+                gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
                     let cursor = bookie_gpui::cursor::Cursor {
                         row: *row,
                         column: *column,
@@ -254,6 +255,10 @@ impl GridView {
                     this.status = cursor.label(&names);
                     cx.notify();
                 }
+                gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
+                    this.edit_clicked_row(*row, window, cx);
+                }
+                _ => {}
             },
         );
         GridView {

@@ -79,4 +79,15 @@ impl GridView {
             .cloned()
             .unwrap_or_else(|| self.source.row(row).swap_remove(column))
     }
+
+    /// A double-click on a table row edits the active column of that row.
+    pub(crate) fn edit_clicked_row(&mut self, row: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if self.compare.is_some() || row >= self.visible_count() {
+            return;
+        }
+        let column = self.cell_cursor.map_or(0, |cursor| cursor.column);
+        let source = self.source_row(self.base() + row as u64);
+        self.cell_cursor = Some(bookie_gpui::cursor::Cursor { row, column });
+        self.start_edit(source, column, window, cx);
+    }
 }
