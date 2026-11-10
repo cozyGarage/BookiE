@@ -194,3 +194,33 @@ async fn a_missing_table_is_a_typed_query_failure() {
         "{failure:?}"
     );
 }
+
+#[tokio::test]
+async fn sql_runs_through_the_guard_and_a_write_is_refused_on_a_read_only_session() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let session = session(&path, Uuid::new_v4(), Arc::new(DatabaseService::new_isolated())).await;
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    let result = session
+        .run_query("SELECT id, name FROM items WHERE id >= 2 ORDER BY id", &control)
+        .await
+        .expect("select");
+    assert_eq!(result.rows.len(), 2);
+    assert_eq!(result.rows.iter().nth(1).map(|row| row[1].clone()), Some(Value::Null));
+
+    let refused = session.run_query("DELETE FROM items", &control).await.unwrap_err();
+    assert!(
+        matches!(
+            refused,
+            DriverFailurePresentation::ReadOnly | DriverFailurePresentation::PolicyDenied(_)
+        ),
+        "{refused:?}"
+    );
+    let still = session
+        .run_query("SELECT count(*) FROM items", &control)
+        .await
+        .expect("count");
+    assert_eq!(still.rows.iter().next().map(|row| row[0].clone()), Some(Value::Int(3)));
+}

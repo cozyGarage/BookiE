@@ -118,6 +118,23 @@ impl ReadSession {
     }
 }
 
+impl ReadSession {
+    pub async fn run_query(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverFailurePresentation> {
+        let guard = self
+            .database
+            .guard(self.id, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        guard
+            .query_controlled(sql, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+}
+
 impl Drop for ReadSession {
     fn drop(&mut self) {
         self.database.close_generation(self.id, self.generation);

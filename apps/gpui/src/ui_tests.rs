@@ -9,7 +9,7 @@ use crate::GridView;
 use crate::text_input;
 use crate::ui_theme::ThemeExt;
 
-fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
+pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| GridView::new(150_000, Instant::now(), window, cx));
     cx.update(|window, cx| {
@@ -685,7 +685,7 @@ fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             view.edits.insert((1, 1), Cell::Text("first".into()));
-            view.run_query();
+            view.add_run(None);
             view.edits.insert((1, 1), Cell::Text("second".into()));
             view.activate_run(0);
             assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
@@ -702,7 +702,7 @@ fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mu
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             view.edits.insert((1, 1), Cell::Text("first".into()));
-            view.run_query();
+            view.add_run(None);
             view.edits.insert((1, 1), Cell::Text("second".into()));
             view.close_run(0);
             assert_eq!(view.runs.len(), 1);
@@ -711,7 +711,7 @@ fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mu
             assert!(view.runs.is_empty());
             assert!(view.edits.is_empty());
             assert_eq!(view.dataset_count(), 0);
-            view.run_query();
+            view.add_run(None);
             assert_eq!(view.runs[0].number, 3);
             assert!(view.edits.is_empty());
         });
@@ -761,7 +761,7 @@ fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut Tes
             view.edits.insert((1, 1), Cell::Text("table edit".into()));
             view.tabs.open_query();
             view.sync_grid_owner();
-            view.run_query();
+            view.add_run(None);
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
             view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
             view.sync_grid_owner();
@@ -805,7 +805,7 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             view.edits.insert((1, 1), Cell::Text("query".into()));
-            view.run_query();
+            view.add_run(None);
             let index = view.tabs.active;
             view.close_tab(index);
             assert!(view.runs.is_empty());
@@ -814,7 +814,7 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
             view.tabs.open_query();
             view.sync_grid_owner();
             assert_eq!(view.dataset_count(), 0);
-            view.run_query();
+            view.add_run(None);
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
         })
     });
@@ -963,7 +963,7 @@ fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             for _ in 0..12 {
-                view.run_query();
+                view.add_run(None);
             }
             cx.notify();
         })
@@ -986,7 +986,7 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.edits.insert((1, 1), Cell::Text("first".into()));
-            view.run_query();
+            view.add_run(None);
             view.edits.insert((1, 1), Cell::Text("second".into()));
             view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
             view.close_run(1);
@@ -1004,7 +1004,7 @@ fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut Tes
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
-            view.run_query();
+            view.add_run(None);
         });
     });
     cx.run_until_parked();
@@ -1100,72 +1100,5 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
     view.read_with(cx, |view, _| {
         assert!(view.editing.is_none(), "a read-only source refuses edits");
         assert_eq!(view.status, "This cell cannot be edited");
-    });
-}
-
-#[gpui::test]
-fn f3_toggles_a_detail_panel_that_follows_the_active_cell(cx: &mut TestAppContext) {
-    let (view, cx) = open(cx);
-    cx.simulate_keystrokes("down right right right");
-    view.read_with(cx, |view, _| assert!(!view.detail_open));
-    cx.simulate_keystrokes("f3");
-    view.read_with(cx, |view, _| {
-        assert!(view.detail_open);
-        let (name, detail) = view.detail_target().expect("a cell is active");
-        assert_eq!(name, "typed");
-        let bookie_gpui::detail::Detail::Hex { lines, total, .. } = detail else {
-            panic!("row 1 holds bytes");
-        };
-        assert_eq!(total, 4);
-        assert_eq!(lines[0].hex, "de ad be ef");
-    });
-    cx.simulate_keystrokes("down");
-    view.read_with(cx, |view, _| {
-        let (_, detail) = view.detail_target().expect("still active");
-        assert!(matches!(detail, bookie_gpui::detail::Detail::Text(text) if text == "2026-11-04"));
-    });
-    cx.simulate_keystrokes("f3");
-    view.read_with(cx, |view, _| assert!(!view.detail_open));
-}
-
-#[gpui::test]
-fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
-    let (view, cx) = open(cx);
-    let keymap = bookie_gpui::keymap::Keymap::from_overrides(r#"{"toggle-sidebar":"alt-b"}"#).expect("keymap");
-    view.update(cx, |view, _| view.keymap = keymap);
-    let before = view.read_with(cx, |view, _| view.sidebar_open);
-    cx.simulate_keystrokes("ctrl-b");
-    view.read_with(cx, |view, _| {
-        assert_eq!(view.sidebar_open, before, "the old chord is free")
-    });
-    cx.simulate_keystrokes("alt-b");
-    view.read_with(cx, |view, _| assert_eq!(view.sidebar_open, !before));
-}
-
-#[gpui::test]
-fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut TestAppContext) {
-    use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
-    let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
-    cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| {
-        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
-        view.attach_live(table.clone());
-        view
-    });
-    view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "orders");
-        assert_eq!(view.catalog.tables, ["customers", "orders"]);
-        assert_eq!(view.source.total(), 6);
-    });
-    cx.update(|window, cx| view.update(cx, |view, cx| view.open_table_named("customers", window, cx)));
-    cx.executor().advance_clock(std::time::Duration::from_secs(1));
-    cx.run_until_parked();
-    view.read_with(cx, |view, _| {
-        assert_eq!(view.catalog.grid_table, "customers");
-        assert_eq!(view.source.total(), 2);
-        assert_eq!(view.source.columns().len(), 2);
-        assert_eq!(view.tabs.current(), &bookie_gpui::shell::Tab::Table("customers".into()));
-        assert!(view.status.is_empty(), "{}", view.status);
     });
 }

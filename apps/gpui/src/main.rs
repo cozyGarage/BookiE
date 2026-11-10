@@ -66,6 +66,8 @@ struct GridView {
     tab_scroll: ScrollHandle,
     runs: Vec<Run>,
     run_edits: Vec<grid_edit::Edits>,
+    run_sources: Vec<Option<Source>>,
+    sql_input: Entity<TextInput>,
     active_run: usize,
     run_scroll: ScrollHandle,
     next_run_number: usize,
@@ -178,6 +180,13 @@ impl GridView {
         font_names.sort();
         font_names.dedup();
         let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
+        let sql_input = cx.new(|cx| TextInput::new("SELECT … (one statement, Enter runs it)", cx));
+        cx.subscribe(&sql_input, |this, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Submit) {
+                this.run_query(cx);
+            }
+        })
+        .detach();
         cx.subscribe(&sidebar_search, |_, _, _: &InputEvent, cx| cx.notify())
             .detach();
         let palette_input = cx.new(|cx| TextInput::new("Type a command", cx));
@@ -222,6 +231,8 @@ impl GridView {
             tab_scroll: ScrollHandle::new(),
             runs: vec![Run { number: 1, rows: total }],
             run_edits: vec![grid_edit::Edits::new()],
+            run_sources: vec![None],
+            sql_input,
             active_run: 0,
             run_scroll: ScrollHandle::new(),
             next_run_number: 2,
@@ -331,10 +342,35 @@ impl GridView {
         );
     }
 
-    fn run_query(&mut self) {
-        let run = next_run(self.next_run_number);
+    fn run_query(&mut self, cx: &mut Context<Self>) {
+        if let Some(session) = self.live.clone() {
+            let sql = self.sql_input.read(cx).content().to_string();
+            if sql.trim().is_empty() {
+                self.status = "Type a statement first".into();
+                return;
+            }
+            self.status = "Running…".into();
+            self.begin_background(
+                cx,
+                move |_cancel| session.run_query(&sql, bookie_gpui::live::ROW_CAP),
+                |this, result| match result {
+                    Ok(table) => this.add_run(Some(std::sync::Arc::new(table))),
+                    Err(message) => this.status = message,
+                },
+            );
+            return;
+        }
+        self.add_run(None);
+    }
+
+    fn add_run(&mut self, source: Option<Source>) {
+        let mut run = next_run(self.next_run_number);
+        if let Some(source) = &source {
+            run.rows = source.total();
+        }
         self.next_run_number += 1;
         self.runs.push(run);
+        self.run_sources.push(source);
         self.run_edits.push(grid_edit::Edits::new());
         self.activate_run(self.runs.len() - 1);
     }
@@ -357,6 +393,7 @@ impl GridView {
             self.set_mode(Mode::All);
         }
         self.runs.clear();
+        self.run_sources.clear();
         self.run_edits.clear();
         self.active_run = 0;
         self.next_run_number = 1;
@@ -420,7 +457,12 @@ impl GridView {
         self.edits = std::mem::take(&mut self.run_edits[index]);
         self.editing = None;
         self.active_run = index;
-        self.source = std::sync::Arc::new(Synthetic::new(run.rows));
+        self.source = self
+            .run_sources
+            .get(index)
+            .cloned()
+            .flatten()
+            .unwrap_or_else(|| std::sync::Arc::new(Synthetic::new(run.rows)));
         self.compare = None;
         self.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
@@ -432,6 +474,7 @@ impl GridView {
             return;
         }
         self.runs.remove(index);
+        self.run_sources.remove(index);
         self.run_edits.remove(index);
         if index < self.active_run {
             self.active_run -= 1;
@@ -827,7 +870,7 @@ impl GridView {
                 self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
-            "run" => self.run_query(),
+            "run" => self.run_query(cx),
             "previous-run" => self.activate_run(self.active_run - 1),
             "next-run" => self.activate_run(self.active_run + 1),
             "close-run" => self.close_run(self.active_run),
@@ -1079,6 +1122,8 @@ fn main() {
         });
 }
 
+#[cfg(test)]
+mod live_ui_tests;
 #[cfg(test)]
 mod ui_tests;
 

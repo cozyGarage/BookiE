@@ -46,6 +46,20 @@ impl LiveSession {
         }))
     }
 
+    pub fn run_query(self: &Arc<Self>, sql: &str, max_rows: u64) -> Result<LiveTable, String> {
+        let session = self.session.as_ref().ok_or("the session is closed")?;
+        let (columns, rows, scan, truncated) = self.runtime.block_on(query_pages(session, sql, max_rows))?;
+        Ok(LiveTable {
+            session: self.clone(),
+            columns,
+            rows,
+            scan,
+            truncated,
+            table: "query".into(),
+            row_cap: max_rows,
+        })
+    }
+
     pub fn load_table(self: &Arc<Self>, table: &str, max_rows: u64) -> Result<LiveTable, String> {
         let session = self.session.as_ref().ok_or("the session is closed")?;
         let (columns, rows, scan, truncated) = self.runtime.block_on(read_pages(session, table, max_rows))?;
@@ -166,6 +180,43 @@ async fn read_pages(session: &ReadSession, table: &str, max_rows: u64) -> Result
     Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
 }
 
+async fn query_pages(session: &ReadSession, sql: &str, max_rows: u64) -> Result<Pages, String> {
+    let control = OperationControl::with_timeout(PAGE_TIMEOUT);
+    let result = session
+        .run_query(sql, &control)
+        .await
+        .map_err(|failure| format!("{failure:?}"))?;
+    let spool = StreamResultSpoolManager::from_environment()
+        .create()
+        .map_err(|error| error.to_string())?;
+    let infos: Vec<ColumnInfo> = result.columns.clone();
+    let all: Vec<Vec<bookie_core::Value>> = result.rows.iter().map(|row| row.to_vec()).collect();
+    let truncated = all.len() as u64 > max_rows;
+    let kept = &all[..all.len().min(usize::try_from(max_rows).unwrap_or(usize::MAX))];
+    let rows: Vec<Vec<Cell>> = kept
+        .iter()
+        .map(|row| row.iter().cloned().map(value_to_cell).collect())
+        .collect();
+    for (index, chunk) in kept.chunks(PAGE_ROWS as usize).enumerate() {
+        let page = bookie_core::QueryResult {
+            columns: infos.clone(),
+            rows: bookie_core::QueryRows::from_rows(chunk.to_vec()),
+            truncated: false,
+        };
+        spool
+            .append_page(index as u64, Arc::new(page))
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    let columns = infos.iter().map(column_meta).collect();
+    Ok((
+        columns,
+        rows,
+        ScanSource::new(spool, infos, kept.len() as u64),
+        truncated,
+    ))
+}
+
 fn find_table(tables: &[TableInfo], wanted: &str) -> Result<TableInfo, String> {
     tables
         .iter()
@@ -268,6 +319,24 @@ mod tests {
         assert_eq!((customers.total(), orders.total()), (2, 6));
         assert_eq!(customers.columns().len(), 2);
         assert_eq!(orders.columns().len(), 5);
+    }
+
+    #[test]
+    fn a_query_becomes_a_grid_source_with_its_own_columns_and_cap() {
+        let session = LiveSession::open(&fixture()).expect("open");
+        let result = session
+            .run_query("SELECT customer, total FROM orders WHERE paid = 1 ORDER BY id", 100)
+            .expect("query");
+        let names: Vec<&str> = result.columns().iter().map(|column| column.name.as_str()).collect();
+        assert_eq!(names, ["customer", "total"]);
+        assert_eq!(result.total(), 3);
+        assert_eq!(result.row(0)[0], Cell::Text("Ada".into()));
+        let cancel = CancellationToken::new();
+        assert_eq!(result.find("linus", 5, &cancel).expect("find").matches, vec![1]);
+        let capped = session.run_query("SELECT id FROM orders", 2).expect("capped");
+        assert_eq!((capped.total(), capped.truncated), (2, true));
+        assert!(session.run_query("DELETE FROM orders", 100).is_err());
+        assert!(session.run_query("SELECT nope FROM orders", 100).is_err());
     }
 
     #[test]
