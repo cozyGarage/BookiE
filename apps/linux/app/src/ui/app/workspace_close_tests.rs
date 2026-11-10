@@ -405,6 +405,7 @@ fn browse_grid_edit_save_reaches_guarded_connection_and_audit() {
             new_value: "changed".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         });
     }
     spin_until(|| {

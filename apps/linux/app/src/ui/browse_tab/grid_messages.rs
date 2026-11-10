@@ -10,13 +10,14 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             col_index,
             new_value,
             row_key,
-        } => cell_edited_input(row_position, col_index, new_value, None, row_key),
+        } => cell_edited_input(row_position, col_index, new_value, None, row_key, None),
         GridMsg::CellEditedValue {
             row_position,
             col_index,
             value,
             row_key,
-        } => cell_edited_input(row_position, col_index, String::new(), Some(value), row_key),
+            draft_id,
+        } => cell_edited_input(row_position, col_index, String::new(), Some(value), row_key, draft_id),
         GridMsg::ReplaceBatch {
             report,
             generation,
@@ -54,14 +55,16 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             draft_id,
         } => duplicate_row_input(row_position, row_key, draft_id),
         GridMsg::FilterByValue { column, value, exclude } => BrowseTabInput::FilterByValue { column, value, exclude },
-        GridMsg::FilterWholeResult { .. } => {
-            BrowseTabInput::ShowToast(crate::tr!("Whole-result filters apply to query results"))
-        }
+        GridMsg::FilterWholeResult { .. } => whole_result_unavailable(),
         GridMsg::ShowToast(message) => BrowseTabInput::ShowToast(message),
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
         GridMsg::HighlightRulesChanged => BrowseTabInput::HighlightRulesChanged,
     }
+}
+
+fn whole_result_unavailable() -> BrowseTabInput {
+    BrowseTabInput::ShowToast(crate::tr!("Whole-result filters apply to query results"))
 }
 
 fn delete_row_input(row_position: u32, row_key: Vec<bookie_core::Value>, draft_id: Option<u64>) -> BrowseTabInput {
@@ -119,6 +122,7 @@ fn cell_edited_input(
     new_value: String,
     value: Option<bookie_core::Value>,
     row_key: Vec<bookie_core::Value>,
+    draft_id: Option<u64>,
 ) -> BrowseTabInput {
     BrowseTabInput::GridCellEdited {
         row_position,
@@ -126,6 +130,7 @@ fn cell_edited_input(
         new_value,
         value,
         row_key,
+        draft_id,
     }
 }
 
