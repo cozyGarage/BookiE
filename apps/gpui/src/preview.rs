@@ -1,29 +1,12 @@
-use crate::model::Cell;
+use crate::model::{Cell, CellText};
 
 const MAX_CHARS: usize = 512;
 
 pub fn cell_preview(cell: &Cell) -> String {
     match cell {
-        Cell::Text(text)
-        | Cell::Json(text)
-        | Cell::JsonText(text)
-        | Cell::Date(text)
-        | Cell::Time(text)
-        | Cell::DateTime(text)
-        | Cell::TimestampTz(text)
-        | Cell::Decimal(text)
-        | Cell::Uuid(text) => text_preview(text),
-        Cell::Exact(value) => match value.as_ref() {
-            bookie_core::Value::Json(value) => json_preview(value),
-            bookie_core::Value::Text(value) | bookie_core::Value::JsonText(value) => text_preview(value),
-            bookie_core::Value::Undecodable(value) => format!("<undecodable {}>", text_preview(value)),
-            bookie_core::Value::Bytes(bytes) if bytes.len() > 16 => {
-                let sample = Cell::Bytes(bytes[..16].to_vec()).display();
-                format!("{sample}… ({} bytes total)", bytes.len())
-            }
-            _ => cell.display(),
-        },
-        Cell::Undecodable(name) => format!("<undecodable {}>", text_preview(name)),
+        Cell::Text(text) | Cell::JsonText(text) => text_preview(text),
+        Cell::Json(value) => json_preview(value),
+        Cell::Undecodable(value) => format!("<undecodable {}>", text_preview(value)),
         Cell::Bytes(bytes) if bytes.len() > 16 => {
             let sample = Cell::Bytes(bytes[..16].to_vec()).display();
             format!("{sample}… ({} bytes total)", bytes.len())
@@ -102,23 +85,20 @@ mod tests {
     #[test]
     fn real_json_is_shared_and_previewed_without_losing_its_value() {
         let value = bookie_core::Value::Json(Box::new(serde_json::json!({"text": "💾".repeat(100_000)})));
-        let cell = crate::core_bridge::value_to_cell(value.clone());
+        let cell = value.clone();
         let copy = cell.clone();
-        let (Cell::Exact(first), Cell::Exact(second)) = (&cell, &copy) else {
-            panic!("expected retained values");
-        };
-        assert!(std::sync::Arc::ptr_eq(first, second));
+        assert_eq!(copy, value);
         let preview = cell_preview(&cell);
         assert!(preview.len() <= MAX_CHARS + '…'.len_utf8());
         assert!(preview.ends_with('…'));
-        assert_eq!(crate::core_bridge::cell_to_value(&cell), value);
+        assert_eq!(cell, value);
     }
 
     #[test]
     fn real_json_preview_flattens_unicode_line_separators() {
-        let cell = crate::core_bridge::value_to_cell(bookie_core::Value::Json(Box::new(serde_json::json!({
+        let cell = bookie_core::Value::Json(Box::new(serde_json::json!({
             "text": "first\u{2028}second"
-        }))));
+        })));
         let shown = cell_preview(&cell);
         assert!(shown.contains('↵'));
         assert!(!shown.contains('\u{2028}'));
@@ -173,12 +153,6 @@ mod tests {
             assert!(shown.contains('…'));
             assert!(!shown.contains(['\n', '\r', '\t', '\0']));
             assert_eq!(cell.display(), value);
-            assert_eq!(
-                crate::core_bridge::cell_to_value(&crate::core_bridge::value_to_cell(
-                    crate::core_bridge::cell_to_value(&cell)
-                )),
-                crate::core_bridge::cell_to_value(&cell)
-            );
         }
     }
 }

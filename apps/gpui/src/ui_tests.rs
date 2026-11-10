@@ -28,7 +28,10 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
     cx.simulate_input("2026-02-03");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.edits.get(&(2, 3)), Some(&Cell::Date("2026-02-03".into())));
+        assert_eq!(
+            view.edits.get(&(2, 3)),
+            Some(&Cell::Date("2026-02-03".parse().unwrap()))
+        );
         assert!(view.editing.is_none());
         assert!(view.status.contains("edited in this view only"));
     });
@@ -1069,6 +1072,7 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
                     name: name.into(),
                     width: 150.0,
                     numeric: false,
+                    data_type: "text".into(),
                 })
                 .collect()
         })

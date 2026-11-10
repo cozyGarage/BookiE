@@ -7,7 +7,6 @@ use bookie_results::result_scan::ScanSource;
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use tokio_util::sync::CancellationToken;
 
-use crate::core_bridge::value_to_cell;
 use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
 use crate::source::{ResultSource, filter_in, find_in};
 
@@ -229,11 +228,7 @@ async fn read_pages(
         }
         let incomplete = bound_page(&mut page, &mut budget);
         let count = page.rows.len() as u64;
-        rows.extend(
-            page.rows
-                .iter()
-                .map(|row| row.iter().cloned().map(value_to_cell).collect()),
-        );
+        rows.extend(page.rows.iter().map(|row| row.to_vec()));
         spool
             .append_page(page_index, Arc::new(page))
             .await
@@ -284,10 +279,7 @@ async fn query_pages(
         all.truncate(admitted);
         truncated = true;
     }
-    let rows: Vec<Vec<Cell>> = all
-        .iter()
-        .map(|row| row.iter().cloned().map(value_to_cell).collect())
-        .collect();
+    let rows: Vec<Vec<Cell>> = all.iter().map(|row| row.to_vec()).collect();
     for (index, chunk) in all.chunks(PAGE_ROWS as usize).enumerate() {
         let page = QueryResult {
             columns: infos.clone(),
@@ -332,14 +324,17 @@ fn column_meta(info: &ColumnInfo) -> ColumnMeta {
         name: info.name.clone(),
         width,
         numeric: numeric_type(&info.data_type),
+        data_type: info.data_type.clone(),
     }
 }
 
 fn numeric_type(data_type: &str) -> bool {
     let lower = data_type.to_ascii_lowercase();
-    ["int", "serial", "numeric", "decimal", "number", "float", "double", "real", "money"]
-        .iter()
-        .any(|word| lower.contains(word))
+    [
+        "int", "serial", "numeric", "decimal", "number", "float", "double", "real", "money",
+    ]
+    .iter()
+    .any(|word| lower.contains(word))
 }
 
 impl ResultSource for LiveTable {
@@ -391,7 +386,15 @@ mod tests {
 
     #[test]
     fn declared_number_types_are_numeric_and_text_types_are_not() {
-        for numeric in ["INTEGER", "bigint", "NUMERIC(10,2)", "double precision", "BIGSERIAL", "REAL", "decimal"] {
+        for numeric in [
+            "INTEGER",
+            "bigint",
+            "NUMERIC(10,2)",
+            "double precision",
+            "BIGSERIAL",
+            "REAL",
+            "decimal",
+        ] {
             assert!(numeric_type(numeric), "{numeric}");
         }
         for other in ["TEXT", "varchar(20)", "timestamp", "uuid", "BLOB", ""] {

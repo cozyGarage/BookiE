@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bookie_gpui::edit::{is_editable, parse_edit};
-use bookie_gpui::model::Cell;
+use bookie_gpui::model::{Cell, CellText};
 use gpui::{Context, Focusable, Window};
 
 use crate::GridView;

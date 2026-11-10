@@ -8,9 +8,9 @@ use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use bookie_results::text_match::TextMatchOptions;
 use tokio_util::sync::CancellationToken;
 
-use crate::core_bridge::{cell_to_value, column_infos, value_to_cell};
+use crate::core_bridge::column_infos;
 use crate::model::{
-    Cell, ColumnMeta, Diff, FindResult, Op, PAGE_ROWS, Predicate, build_diff, row_at, synthetic_columns,
+    Cell, CellText, ColumnMeta, Diff, FindResult, Op, PAGE_ROWS, Predicate, build_diff, row_at, synthetic_columns,
 };
 
 pub trait ResultSource: Send + Sync + 'static {
@@ -82,9 +82,7 @@ fn spool_rows(total: u64, cancel: &CancellationToken) -> Result<ScanSource, &'st
             return Err("the operation was cancelled");
         }
         let end = (start + PAGE_ROWS).min(total);
-        let rows: Vec<Vec<Value>> = (start..end)
-            .map(|index| row_at(index).iter().map(cell_to_value).collect())
-            .collect();
+        let rows: Vec<Vec<Value>> = (start..end).map(row_at).collect();
         let page = QueryResult {
             columns: columns.clone(),
             rows: QueryRows::from_rows(rows),
@@ -98,29 +96,59 @@ fn spool_rows(total: u64, cancel: &CancellationToken) -> Result<ScanSource, &'st
     Ok(ScanSource::new(spool, columns, total))
 }
 
+/// Equals and NotEquals: typed and exact through `bookie-results` when the column's type is a known
+/// edit kind; otherwise the displayed text must match exactly (case-sensitive).
+enum Equality {
+    Typed(bookie_results::result_predicate::PreparedPredicate),
+    Displayed { column: usize, text: String, negate: bool },
+}
+
+fn equality(scan: &ScanSource, predicate: &Predicate) -> Result<Equality, &'static str> {
+    let negate = predicate.op == Op::NotEquals;
+    let kind = scan
+        .columns()
+        .get(predicate.column)
+        .map_or(String::new(), |column| column.data_type.to_lowercase());
+    match crate::core_bridge::parse_edit(&kind, &predicate.text) {
+        Ok(value) => {
+            let result = if negate {
+                ResultPredicate::NotEquals {
+                    column: predicate.column,
+                    value,
+                }
+            } else {
+                ResultPredicate::Equals {
+                    column: predicate.column,
+                    value,
+                }
+            };
+            result
+                .prepare(scan.columns().len())
+                .map(Equality::Typed)
+                .map_err(|_| "this filter cannot be applied exactly")
+        }
+        Err(_) => Ok(Equality::Displayed {
+            column: predicate.column,
+            text: predicate.text.clone(),
+            negate,
+        }),
+    }
+}
+
+fn displayed_equals(cells: &[Value], column: usize, text: &str, negate: bool) -> bool {
+    let equal = match cells.get(column) {
+        Some(Value::Null) | None => false,
+        Some(cell) => cell.display() == text,
+    };
+    equal != negate
+}
+
 fn contains(column: Option<usize>, needle: &str) -> ResultPredicate {
     ResultPredicate::Contains {
         scope: column.map_or(ColumnScope::Any, ColumnScope::Column),
         needle: needle.to_string(),
         options: TextMatchOptions::default(),
     }
-}
-
-fn display_equals(value: Option<&Value>, normalized_text: &str) -> Option<bool> {
-    let value = value?;
-    if matches!(value, Value::Null) {
-        return None;
-    }
-    if let Value::Text(value) | Value::JsonText(value) = value {
-        return Some(value.to_lowercase() == normalized_text);
-    }
-    let matches = match value {
-        Value::Bool(value) => value.to_string() == normalized_text,
-        Value::Int(value) => value.to_string() == normalized_text,
-        Value::Float(value) => value.to_string() == normalized_text,
-        _ => value_to_cell(value.clone()).display().to_lowercase() == normalized_text,
-    };
-    Some(matches)
 }
 
 impl ResultSource for Synthetic {
@@ -190,15 +218,17 @@ pub fn filter_in(
     cancel: &CancellationToken,
 ) -> Result<Vec<u32>, &'static str> {
     let column = predicate.column;
-    let normalized_text = predicate.text.to_lowercase();
-    let prepared = if predicate.op == Op::Contains {
-        Some(
+    let prepared = match predicate.op {
+        Op::Contains => Some(
             contains(Some(column), &predicate.text)
                 .prepare(scan.columns().len())
                 .map_err(|_| "this filter cannot be applied exactly")?,
-        )
-    } else {
-        None
+        ),
+        Op::Equals | Op::NotEquals => None,
+    };
+    let equality = match predicate.op {
+        Op::Equals | Op::NotEquals => Some(equality(scan, predicate)?),
+        Op::Contains => None,
     };
     let mut kept = Vec::new();
     let mut tally = bookie_results::result_predicate::CellTally::default();
@@ -208,8 +238,13 @@ pub fn filter_in(
                 Op::Contains => prepared
                     .as_ref()
                     .is_some_and(|prepared| prepared.matches(cells, &mut tally)),
-                Op::Equals => display_equals(cells.get(column), &normalized_text).unwrap_or(false),
-                Op::NotEquals => display_equals(cells.get(column), &normalized_text).is_none_or(|matches| !matches),
+                Op::Equals | Op::NotEquals => match equality.as_ref() {
+                    Some(Equality::Typed(prepared)) => prepared.matches(cells, &mut tally),
+                    Some(Equality::Displayed { column, text, negate }) => {
+                        displayed_equals(cells, *column, text, *negate)
+                    }
+                    None => false,
+                },
             };
             if matches {
                 kept.push((index as u64 * PAGE_ROWS + row as u64) as u32);
@@ -251,8 +286,14 @@ mod tests {
     }
 
     #[test]
-    fn display_equality_keeps_unicode_case_insensitive_matching() {
-        let value = Value::Text("Ä".into());
-        assert_eq!(display_equals(Some(&value), &"ä".to_lowercase()), Some(true));
+    fn equality_is_exact_and_typed_where_the_type_is_known() {
+        let columns = crate::model::synthetic_columns();
+        let exact = crate::model::parse_predicate("label = Sample 1", &columns).unwrap();
+        let folded = crate::model::parse_predicate("label = sample 1", &columns).unwrap();
+        let source = Synthetic::new(10);
+        assert_eq!(source.filter(&exact, &CancellationToken::new()), Ok(vec![1]));
+        assert_eq!(source.filter(&folded, &CancellationToken::new()), Ok(vec![]));
+        let bad = crate::model::parse_predicate("value = many", &columns).unwrap();
+        assert_eq!(source.filter(&bad, &CancellationToken::new()), Ok(vec![]));
     }
 }
