@@ -366,6 +366,10 @@ impl GridView {
 
     fn copy_selection_as(&mut self, format: CopyFormat, cx: &mut Context<Self>) {
         let Some(selection) = self.selection else { return };
+        if format == CopyFormat::Insert && (self.grid_is_query || self.catalog.tables.is_empty()) {
+            self.status = "Copy as INSERT is available for table rows only.".into();
+            return;
+        }
         if !selection.copyable() {
             self.status = selection.label();
             return;
@@ -829,7 +833,7 @@ impl GridView {
             action(
                 "copy-insert",
                 "Copy selected rows as INSERT statements",
-                self.selection.is_some(),
+                self.selection.is_some() && !self.grid_is_query && !self.catalog.tables.is_empty(),
             ),
             action("clear-selection", "Clear row selection", self.selection.is_some()),
             action("edit", "Edit the active cell", self.cell_cursor.is_some()),

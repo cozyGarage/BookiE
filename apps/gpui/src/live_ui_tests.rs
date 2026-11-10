@@ -130,6 +130,50 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
 }
 
 #[gpui::test]
+fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut TestAppContext) {
+    let origin = bookie_gpui::live::Origin::File(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"),
+    );
+    let table = std::sync::Arc::new(bookie_gpui::live::LiveTable::load(&origin, "orders", 100).expect("load"));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input.update(cx, |input, cx| {
+                input.set_value("SELECT customer FROM orders", window, cx)
+            });
+            view.run_query(cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("unchanged".into()));
+        view.update(cx, |view, cx| {
+            view.click_row(0, false);
+            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::Insert, cx);
+        });
+    });
+    let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(clipboard.as_deref(), Some("unchanged"));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert!(
+            !view
+                .palette_actions()
+                .iter()
+                .any(|action| action.id == "copy-insert" && action.enabled)
+        );
+    });
+}
+
+#[gpui::test]
 fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
@@ -312,6 +356,24 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
     view.read_with(cx, |view, _| {
         assert_eq!(view.source.total(), 1);
         assert_eq!(view.source.row(0)[0], bookie_gpui::model::Cell::Int(1));
+    });
+    cx.update(|_, cx| {
+        cx.write_to_clipboard(gpui::ClipboardItem::new_string("unchanged".into()));
+        view.update(cx, |view, cx| {
+            view.click_row(0, false);
+            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::Insert, cx);
+        });
+    });
+    let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(clipboard.as_deref(), Some("unchanged"));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.status, "Copy as INSERT is available for table rows only.");
+        assert!(
+            !view
+                .palette_actions()
+                .iter()
+                .any(|action| action.id == "copy-insert" && action.enabled)
+        );
     });
 }
 
