@@ -185,8 +185,11 @@ impl GridView {
         font_names.sort();
         font_names.dedup();
         let sidebar_search = cx.new(|cx| TextInput::new("Search tables", cx));
-        let sql_input =
-            cx.new(|cx| EditorState::new(window, cx).placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)"));
+        let sql_input = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("sql")
+                .placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)")
+        });
         cx.subscribe(
             &sql_input,
             |this, _, event: &gpui_kit::component::input::InputEvent, cx| {
