@@ -12,6 +12,31 @@ pub fn parse_address(text: &str) -> Option<String> {
     (valid_host && port.parse::<u16>().is_ok_and(|port| port > 0)).then(|| text.to_string())
 }
 
+pub fn kafka_topics(broker: &str) -> Result<String, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| error.to_string())?;
+    let topics = runtime
+        .block_on(bookie_app_services::kafka_browser::list_topics(&[broker.to_string()]))
+        .map_err(|error| error.to_string())?;
+    if topics.is_empty() {
+        return Ok(format!("{broker} · no topics"));
+    }
+    let names: Vec<String> = topics
+        .iter()
+        .map(|topic| {
+            let retained: i64 = topic.partitions.iter().map(|p| p.retained()).sum();
+            format!(
+                "{} ({} partitions, {retained} records)",
+                topic.name,
+                topic.partitions.len()
+            )
+        })
+        .collect();
+    Ok(format!("{broker} · {}", names.join(" · ")))
+}
+
 pub fn run_check(address: &str) -> Outcome {
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
     match runtime {
@@ -82,5 +107,14 @@ mod tests {
         assert!(matches!(run_check(&address), Outcome::Up { .. }));
         drop(listener);
         assert!(matches!(run_check(&address), Outcome::Down { .. }));
+    }
+}
+
+#[cfg(test)]
+mod kafka_tests {
+    #[test]
+    fn a_broker_nobody_listens_on_is_reported_not_hung() {
+        let error = super::kafka_topics("127.0.0.1:1").unwrap_err();
+        assert!(error.contains("cannot reach the brokers"), "{error}");
     }
 }
