@@ -1,6 +1,6 @@
 # 0049: Frontends talk to app-services through typed commands and events
 
-- **Status**: Proposed (2026-11-10)
+- **Status**: Accepted (2026-11-10)
 - **Date**: 2026-11-10
 
 ## Context
