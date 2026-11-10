@@ -5,6 +5,7 @@ pub const DEFAULT_ROWS: u64 = 1_000_000;
 pub const MAX_FIND_MATCHES: usize = 10_000;
 pub const MAX_DIFF_ROWS: usize = 200;
 pub const PAGE_ROWS: u64 = 5_000;
+pub const PAGE_SIZES: [u64; 4] = [500, 1_000, 5_000, 20_000];
 pub const TYPED_KINDS: u64 = 12;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -321,19 +322,30 @@ pub fn build_diff(total: u64, keyed: bool, cancel: &CancellationToken) -> Result
 pub struct Pager {
     pub total: u64,
     pub page: u64,
+    pub rows: u64,
+    /// Load more: the window grows from the first row instead of moving to the next page.
+    pub append: bool,
 }
 
 impl Pager {
     pub fn new(total: u64) -> Self {
-        Pager { total, page: 0 }
+        Pager {
+            total,
+            page: 0,
+            rows: PAGE_ROWS,
+            append: false,
+        }
     }
 
     pub fn pages(&self) -> u64 {
-        self.total.div_ceil(PAGE_ROWS).max(1)
+        self.total.div_ceil(self.rows).max(1)
     }
 
+    /// Load-more windows always start at row one, so going back is a no-op there.
     pub fn first(&mut self) {
-        self.page = 0;
+        if !self.append {
+            self.page = 0;
+        }
     }
 
     pub fn last(&mut self) {
@@ -345,19 +357,44 @@ impl Pager {
     }
 
     pub fn previous(&mut self) {
-        self.page = self.page.saturating_sub(1);
+        if !self.append {
+            self.page = self.page.saturating_sub(1);
+        }
     }
 
-    pub fn range(&self) -> (u64, u64) {
+    /// Dataset rows in view as `[start, end)`.
+    pub fn window(&self) -> (u64, u64) {
         if self.total == 0 {
             return (0, 0);
         }
-        let start = self.page * PAGE_ROWS;
-        (start + 1, (start + PAGE_ROWS).min(self.total))
+        let end = ((self.page + 1) * self.rows).min(self.total);
+        if self.append {
+            (0, end)
+        } else {
+            (self.page * self.rows, end)
+        }
+    }
+
+    pub fn range(&self) -> (u64, u64) {
+        let (start, end) = self.window();
+        if self.total == 0 { (0, 0) } else { (start + 1, end) }
     }
 
     pub fn contains_row(&mut self, row: u64) {
-        self.page = (row / PAGE_ROWS).min(self.pages() - 1);
+        self.page = (row / self.rows).min(self.pages() - 1);
+    }
+
+    /// Keeps the page size and load mode, returns to the first page.
+    pub fn with_total(self, total: u64) -> Self {
+        Pager { total, page: 0, ..self }
+    }
+
+    /// Changes the page size and keeps the first row in view.
+    pub fn resized(self, rows: u64) -> Self {
+        let first_row = self.page * self.rows;
+        let mut next = Pager { rows, page: 0, ..self };
+        next.page = (first_row / rows).min(next.pages() - 1);
+        next
     }
 }
 
