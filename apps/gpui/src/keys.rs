@@ -52,7 +52,7 @@ impl GridView {
                 self.sync_grid_owner();
                 window.focus(&self.focus, cx);
             }
-            Command::RunQuery if matches!(self.tabs.current(), Tab::Query) => self.run_query(),
+            Command::RunQuery if matches!(self.tabs.current(), Tab::Query) => self.run_query(cx),
             Command::RunQuery => {}
             Command::ToggleDetail => self.toggle_detail(),
         }

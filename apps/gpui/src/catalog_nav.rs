@@ -18,6 +18,11 @@ impl GridView {
         };
         self.tabs.items[1] = Tab::Table(self.catalog.grid_table.clone());
         self.live = Some(session);
+        self.runs.clear();
+        self.run_sources.clear();
+        self.run_edits.clear();
+        self.active_run = 0;
+        self.next_run_number = 1;
     }
 
     pub(super) fn open_table_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
