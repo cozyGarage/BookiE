@@ -824,6 +824,56 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("display_alive=unavailable", result.stderr)
             self.assertIn("-display :", xdpyinfo_log.read_text())
 
+    def test_widget_wrapper_generates_missing_locale_in_its_private_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            locale_log = directory / "locale.log"
+            localedef_log = directory / "localedef.log"
+            for name, contents in {
+                "dbus-run-session": "while [ \"$1\" != -- ]; do shift; done\nshift\nexec \"$@\"\n",
+                "xvfb-run": (
+                    "while [ $# -gt 0 ]; do\n"
+                    "  case \"$1\" in\n"
+                    "    -e|-s|--server-num) shift 2 ;;\n"
+                    "    --server-num=*) shift ;;\n"
+                    "    --auto-servernum) shift ;;\n"
+                    "    *) break ;;\n"
+                    "  esac\n"
+                    "done\n"
+                    "DISPLAY=:1234 exec \"$@\"\n"
+                ),
+                "localedef": "printf '%s\\n' \"$*\" > \"$LOCALEDEF_LOG\"\nmkdir -p \"${6%/*}\"\n",
+                "python3": (
+                    "if [ \"$1\" = -c ]; then exit 1; fi\n"
+                    "printf '%s\\n%s\\n' \"$LOCPATH\" \"$XDG_RUNTIME_DIR\" > \"$LOCALE_LOG\"\n"
+                ),
+            }.items():
+                executable = binaries / name
+                executable.write_text("#!/bin/sh\n" + contents)
+                executable.chmod(0o755)
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{binaries}{os.pathsep}{environment['PATH']}",
+                    "LOCALE_LOG": str(locale_log),
+                    "LOCALEDEF_LOG": str(localedef_log),
+                }
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-gtk-widgets.sh")],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            locale_path, runtime_path = locale_log.read_text().splitlines()
+            self.assertEqual(Path(locale_path).parent, Path(runtime_path).parent)
+            self.assertTrue(localedef_log.read_text().endswith(f" {locale_path}/en_US.UTF-8\n"))
+
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
         default_scenarios = next(
