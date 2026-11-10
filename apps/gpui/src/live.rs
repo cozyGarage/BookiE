@@ -85,6 +85,24 @@ impl LiveSession {
         })
     }
 
+    pub fn sample_pubsub(
+        &self,
+        patterns: &[String],
+        max_messages: usize,
+        window: Duration,
+        cancellation: &CancellationToken,
+    ) -> Result<drivers_registry::PubSubSample, String> {
+        let session = self.session.as_ref().ok_or("the session is closed")?;
+        let registry = drivers_registry::default_registry();
+        let deadline = tokio::time::Instant::now() + window + Duration::from_secs(15);
+        let control = OperationControl::new(cancellation.clone(), Some(deadline));
+        self.runtime
+            .block_on(session.with_subscription(&registry, &control, |options| {
+                drivers_registry::sample_pubsub(options, patterns, max_messages, window)
+            }))
+            .map_err(|failure| format!("{failure:?}"))
+    }
+
     pub fn load_table(self: &Arc<Self>, table: &str, max_rows: u64) -> Result<LiveTable, String> {
         self.load_table_controlled(table, max_rows, &CancellationToken::new())
     }
