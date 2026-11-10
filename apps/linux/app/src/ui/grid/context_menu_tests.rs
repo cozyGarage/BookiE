@@ -3,6 +3,99 @@ use gtk::glib;
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn inline_edit_does_not_open_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(1),
+        Value::Text("first".into()),
+    ]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(2),
+        Value::Text("second".into()),
+    ]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, _receiver) = relm4::channel();
+    let mut id_column = menu_test_column("id", "INTEGER");
+    id_column.primary_key = true;
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[id_column, menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = crate::ui::cell_editor::CellEditor::new();
+    cell.set_inline_editable(true);
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(cell.is_editing(), "the original cell remains editable");
+    cell.stop_editing(false);
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(
+        !cell.is_editing(),
+        "a rebound cell must not start editing a different row"
+    );
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(2),
+            Value::Text("replacement".into()),
+        ])],
+    );
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(
+        !cell.is_editing(),
+        "a replacement row must not inherit the old menu action"
+    );
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new_draft(
+            17,
+            vec![Value::Null, Value::Text("draft".into())],
+        )],
+    );
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::<[Value]>::from([]));
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(cell.is_editing(), "the original draft remains editable");
+    cell.stop_editing(false);
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new_draft(
+            18,
+            vec![Value::Null, Value::Text("replacement".into())],
+        )],
+    );
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(
+        !cell.is_editing(),
+        "a replacement draft must not inherit the old menu action"
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn full_value_edit_does_not_fetch_a_rebound_cell() {
     gtk::init().unwrap();
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
