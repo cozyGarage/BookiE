@@ -62,6 +62,7 @@ struct GridView {
     edits: grid_edit::Edits,
     table_edits: grid_edit::Edits,
     grid_is_query: bool,
+    find_reset: bool,
     cell_cursor: Option<Cursor>,
     viewport_rows: usize,
     palette_input: Entity<TextInput>,
@@ -275,6 +276,7 @@ impl GridView {
             edits: Default::default(),
             table_edits: Default::default(),
             grid_is_query: false,
+            find_reset: false,
             cell_cursor: None,
             viewport_rows: 10,
             palette_input,
@@ -622,6 +624,7 @@ impl GridView {
         self.editing = None;
         self.compare = None;
         self.cursor = MatchCursor::default();
+        self.find_reset = true;
         if query {
             self.table_edits = std::mem::take(&mut self.edits);
             if let Some(run) = self.runs.get(self.active_run).copied() {
