@@ -75,11 +75,15 @@ pub(super) fn install_grid_context_menus(
     let edit_action = gio::SimpleAction::new("edit", None);
     {
         let context = context.clone();
+        let view = column_view.downgrade();
+        let columns = columns.clone();
         edit_action.connect_activate(move |_, _| {
             if let Some(slot) = context.snapshot().as_ref()
-                && let Ok(label) = slot.widget.clone().downcast::<crate::ui::cell_editor::CellEditor>()
+                && let Some(view) = view.upgrade()
+                && full_value_target(&view, slot, &columns).is_some()
+                && let Some(label) = slot.widget.downcast_ref::<crate::ui::cell_editor::CellEditor>()
             {
-                enter_edit_mode(&label);
+                enter_edit_mode(label);
             }
         });
     }

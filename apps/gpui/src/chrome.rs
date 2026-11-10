@@ -50,11 +50,19 @@ fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<D
 fn import_menu(theme: Theme) -> Div {
     let item = |label: &'static str| div().px_3().py_1().text_color(rgb(theme.foreground)).child(label);
     div()
+        .absolute()
+        .top(px(40.0))
+        .left(px(8.0))
+        .w(px(220.0))
         .flex()
         .flex_col()
         .py_1()
-        .border_b_1()
+        .rounded(px(theme.radius))
+        .border_1()
         .border_color(rgb(theme.border))
+        .bg(rgb(theme.background))
+        .shadow_lg()
+        .occlude()
         .child(item("Import DBX Config"))
         .child(item("Import Navicat NCX"))
         .child(item("Import DBeaver"))
@@ -94,6 +102,7 @@ fn window_button(id: &'static str, glyph: &'static str, theme: Theme) -> Statefu
 fn ghost_icon(id: &'static str, name: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
     div()
         .id(id)
+        .group(id)
         .flex()
         .items_center()
         .gap_1()
@@ -104,7 +113,12 @@ fn ghost_icon(id: &'static str, name: &'static str, label: impl Into<String>, th
         .text_color(rgb(theme.foreground))
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(icon(name, theme.muted_foreground))
-        .child(label.into())
+        .child(
+            div()
+                .invisible()
+                .group_hover(id, |style| style.visible())
+                .child(label.into()),
+        )
 }
 
 fn card(theme: Theme) -> Div {
@@ -169,12 +183,6 @@ impl GridView {
             .child(
                 ghost_icon("palette", "command", "Commands", theme)
                     .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
-            )
-            .child(
-                ghost_icon("sidebar-toggle", "panel-left", "Sidebar", theme).on_click(cx.listener(|this, _, _, cx| {
-                    this.sidebar_open = !this.sidebar_open;
-                    cx.notify();
-                })),
             )
             .child(
                 ghost_icon(

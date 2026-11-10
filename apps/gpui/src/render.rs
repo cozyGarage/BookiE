@@ -205,8 +205,9 @@ impl Render for GridView {
             .flex_col()
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
-            .text_size(px(13.0))
+            .text_size(px(self.fonts.ui_size))
             .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
+            .when(!self.fonts.ui_family.is_empty(), |root| root.font_family(self.fonts.ui_family.clone()))
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
