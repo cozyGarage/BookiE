@@ -16,10 +16,12 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def verify(bundle, revision):
+def verify(bundle, revision, expected_group=None):
     index = json.loads((bundle / 'index.json').read_text())
     if index.get('schema_version') != 1 or index.get('source_commit') != revision:
         raise ValueError('test bundle identity mismatch')
+    if expected_group and index.get('build_group') != expected_group:
+        raise ValueError('test bundle build group mismatch')
     if index.get('architecture') != platform.machine():
         raise ValueError('test bundle architecture mismatch')
     if not index.get('tests') or not index.get('files'):
@@ -43,7 +45,10 @@ def verify(bundle, revision):
 def create(bundle, messages, revision, group, archive=None):
     if bundle.exists():
         raise ValueError('bundle destination already exists')
-    metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--locked', '--no-deps', '--format-version=1'], cwd=ROOT))
+    metadata_command = ['cargo', 'metadata', '--locked', '--no-deps', '--format-version=1']
+    if group == 'gpui':
+        metadata_command.extend(['--manifest-path', str(ROOT / 'apps/gpui/Cargo.toml')])
+    metadata = json.loads(subprocess.check_output(metadata_command, cwd=ROOT))
     packages = {package['id']: package for package in metadata['packages']}
     bundle.mkdir(parents=True)
     (bundle / 'tests').mkdir()
@@ -53,7 +58,7 @@ def create(bundle, messages, revision, group, archive=None):
     index = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
              'build_image': os.environ.get('BOOKIE_BUILD_RUNTIME_ID') or os.environ.get('BOOKIE_BUILD_IMAGE', ''),
              'architecture': platform.machine(), 'rust_version': subprocess.check_output(['rustc', '--version'], text=True).strip(),
-             'features': ['kerberos'],
+             'features': ['kerberos'] if group == 'default' else [],
              'application_source_commit': revision, 'test_suite_commit': revision, 'ci_recipe_commit': revision,
              'tests': [], 'binaries': {},
              'package_directories': {}, 'files': {}}
@@ -90,14 +95,15 @@ def main():
     parser.add_argument('revision')
     parser.add_argument('--messages', type=Path)
     parser.add_argument('--archive', type=Path)
-    parser.add_argument('--group', choices=['default'], default='default')
+    parser.add_argument('--group', choices=['default', 'gpui'], default='default')
+    parser.add_argument('--expected-group', choices=['default', 'gpui'])
     args = parser.parse_args()
     if args.operation == 'create':
         if not args.messages:
             parser.error('create requires --messages')
         create(args.bundle, args.messages, args.revision, args.group, args.archive)
     else:
-        index = verify(args.bundle, args.revision)
+        index = verify(args.bundle, args.revision, args.expected_group)
         print(f"verified {len(index['tests'])} test executables for {args.revision} ({index['build_group']})")
 
 
