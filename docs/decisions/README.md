@@ -94,6 +94,7 @@ Other options and why they were rejected.
 | [0044](0044-gpui-app-lives-under-apps.md) | The GPUI app lives under apps/ | Accepted | Move it from experiments/ to apps/gpui as bookie-gpui with the same dependency rule; moving it is not shipping it. |
 | [0045](0045-network-checks-crate.md) | TCP checks with history live in a UI-free crate | Accepted | `bookie-checks` holds `check_tcp` and a bounded `History` with a summary; HTTP checks, scheduling and persistence follow separately. |
 | [0046](0046-pg-sessions-crate.md) | PostgreSQL sessions and locks live in a UI-free crate | Accepted | `bookie-pg-sessions` lists sessions with waits and blocking pids and ranks blockers; reads only, terminating a backend is a separate decision. |
+| [0047](0047-redis-pubsub-sample.md) | Redis pub/sub is read as a bounded sample | Proposed | `sample_pubsub` subscribes by pattern and returns after N messages or a time window; a continuous monitor, streams and LISTEN/NOTIFY are separate. |
 
 Three records use "snapshot" for different things: ADR 0011 a read-only snapshot session, ADR 0014 the read snapshot a full export holds, and ADR 0015 a saved copy of a database.
 
