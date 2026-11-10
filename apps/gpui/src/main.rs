@@ -84,6 +84,7 @@ struct GridView {
     font_names: Vec<String>,
     palette_fonts: bool,
     palette_address: Option<String>,
+    palette_pattern: Option<String>,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     sidebar_open: bool,
     sidebar_width: f32,
@@ -213,7 +214,13 @@ impl GridView {
             |this, _, event: &InputEvent, window, cx| match event {
                 InputEvent::Changed => {
                     this.palette_index = 0;
-                    this.palette_address = bookie_gpui::net_check::parse_address(this.palette_input.read(cx).content());
+                    let typed = this.palette_input.read(cx).content().to_string();
+                    this.palette_address = bookie_gpui::net_check::parse_address(&typed);
+                    this.palette_pattern = this
+                        .live
+                        .as_ref()
+                        .filter(|live| live.driver_id == "redis")
+                        .and_then(|_| bookie_gpui::pubsub_view::parse_pattern(&typed));
                     cx.notify();
                 }
                 InputEvent::Submit => this.run_palette(window, cx),
@@ -264,6 +271,7 @@ impl GridView {
             font_names,
             palette_fonts: false,
             palette_address: None,
+            palette_pattern: None,
             check_histories: Vec::new(),
             sidebar_open: true,
             sidebar_width: 260.0,
@@ -397,6 +405,37 @@ impl GridView {
             }
             Err(message) => self.status = message,
         }
+    }
+
+    fn sample_pubsub(&mut self, pattern: String, cx: &mut Context<Self>) {
+        let Some(live) = self.live.clone() else {
+            return;
+        };
+        self.status = format!(
+            "Listening to {pattern} for {} s…",
+            bookie_gpui::pubsub_view::SAMPLE_SECONDS
+        );
+        let target = pattern.clone();
+        self.begin_background(
+            cx,
+            move |cancel| {
+                live.sample_pubsub(
+                    std::slice::from_ref(&target),
+                    bookie_gpui::pubsub_view::SAMPLE_MESSAGES,
+                    Duration::from_secs(bookie_gpui::pubsub_view::SAMPLE_SECONDS),
+                    &cancel,
+                )
+            },
+            move |this, outcome| {
+                let lines = bookie_gpui::pubsub_view::describe(&pattern, outcome);
+                if let Some((_, headline)) = lines.first() {
+                    this.status = headline.clone();
+                }
+                for (kind, text) in lines {
+                    this.messages.push(kind, text);
+                }
+            },
+        );
     }
 
     fn check_tcp(&mut self, address: String, cx: &mut Context<Self>) {
@@ -811,6 +850,11 @@ impl GridView {
             label: format!("Check TCP port {address}"),
             enabled: true,
         });
+        let listen = self.palette_pattern.as_ref().map(|pattern| Action {
+            id: "sample-pubsub",
+            label: format!("Listen to Redis channels {pattern}"),
+            enabled: true,
+        });
         let action = |id, label: &str, enabled| Action {
             id,
             label: label.to_string(),
@@ -818,6 +862,7 @@ impl GridView {
         };
         check
             .into_iter()
+            .chain(listen)
             .chain(vec![
                 action("first", "Go to first page", paged),
                 action("previous", "Go to previous page", paged && self.pager.page > 0),
@@ -958,6 +1003,7 @@ impl GridView {
         };
         let id = actions[index].id;
         let check_address = self.palette_address.clone();
+        let listen_pattern = self.palette_pattern.clone();
         if id == "font" {
             self.palette_fonts = true;
             self.palette_index = 0;
@@ -995,6 +1041,11 @@ impl GridView {
             "copy-in-list" => self.copy_selection_as(CopyFormat::InList, cx),
             "copy-insert" => self.copy_selection_as(CopyFormat::Insert, cx),
             "sessions" => self.show_sessions(window, cx),
+            "sample-pubsub" => {
+                if let Some(pattern) = listen_pattern {
+                    self.sample_pubsub(pattern, cx);
+                }
+            }
             "check-tcp" => {
                 if let Some(address) = check_address {
                     self.check_tcp(address, cx);

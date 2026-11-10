@@ -13,6 +13,7 @@ members = [
     "crates/ssh",
     "crates/checks",
     "crates/pg-sessions",
+    "crates/kafka-browser",
     "crates/dump",
     "crates/storage",
     "crates/transport",

@@ -169,3 +169,174 @@ fn force_dismissing_connection_deletion_does_not_abort() {
             .any(|entry| entry.id == saved.id && entry.name == saved.name)
     );
 }
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn browse_save_dispatch_executes_and_audits_a_guarded_transaction() {
+    use crate::services::change_tracker::StatementSource;
+    use bookie_core::Value;
+
+    adw::init().unwrap();
+    gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
+    relm4::main_application()
+        .register(None::<&gtk4::gio::Cancellable>)
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let controller = launch(directory.path());
+    controller.widget().present();
+    controller.emit(AppMsg::OpenConnect);
+    spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
+    let prepared = prepared_sqlite_connection(false, None);
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _entered = runtime.enter();
+    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    spin_until(|| controller.model().window_connection().is_some());
+    let connection = controller.model().window_connection().unwrap();
+    runtime
+        .block_on(connection.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)"))
+        .unwrap();
+    let tab_id = uuid::Uuid::new_v4();
+    let save_id = uuid::Uuid::new_v4();
+    controller.emit(AppMsg::ExecuteBrowseTransaction {
+        tab_id,
+        save_id,
+        statements: vec![(
+            "INSERT INTO notes (id, title) VALUES (?, ?)".into(),
+            vec![Value::Int(1), Value::Text("saved".into())],
+        )],
+        sources: vec![StatementSource::Insert { draft_id: 1 }],
+    });
+    spin_until(|| {
+        runtime
+            .block_on(connection.query("SELECT title FROM notes WHERE id = 1"))
+            .is_ok_and(|result| result.rows == vec![vec![Value::Text("saved".into())]])
+    });
+    spin_until(|| controller.model().in_flight_saves.get() == 0);
+    let journal = controller.model().database.audit_journal_path_for_test();
+    let contents = std::fs::read_to_string(journal).unwrap();
+    let events: Vec<serde_json::Value> = contents
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert!(events.iter().any(|record| {
+        let event = &record["event"];
+        event["operation_class"] == "mutation" && event["phase"] == "outcome" && event["terminal_status"] == "succeeded"
+    }));
+}
+
+fn prepared_sqlite_connection(
+    read_only: bool,
+    path: Option<&std::path::Path>,
+) -> crate::services::connection_service::PreparedConnection {
+    use crate::services::database_service::{ConnectionMetadata, ReconnectParams};
+    use bookie_core::{ConnectOptions, DatabaseDriver, Environment};
+
+    let driver: Arc<dyn DatabaseDriver> = Arc::new(drivers_sqlite::SqliteDriver);
+    let options = ConnectOptions {
+        database: path.map_or_else(|| ":memory:".into(), |path| path.to_string_lossy().into_owned()),
+        ..Default::default()
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let connection = runtime.block_on(driver.connect(options.clone())).unwrap();
+    if read_only {
+        runtime
+            .block_on(connection.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)"))
+            .unwrap();
+    }
+    let id = uuid::Uuid::new_v4();
+    crate::services::connection_service::PreparedConnection::new(
+        Vec::new(),
+        Vec::new(),
+        "sqlite".into(),
+        ConnectionMetadata {
+            id,
+            name: "switch target".into(),
+            driver_id: "sqlite".into(),
+            environment: Environment::Local,
+            read_only,
+            server_version: None,
+            query_timeout_secs: None,
+        },
+        connection.into(),
+        None,
+        ReconnectParams {
+            driver,
+            opts: options,
+            ssh: None,
+            environment: bookie_transport::SshEnvironment::builtin(bookie_ssh::UnknownHostKey::Learn),
+        },
+    )
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn browse_save_dispatch_on_read_only_connection_is_denied_and_audited() {
+    use crate::services::change_tracker::StatementSource;
+    use bookie_core::Value;
+
+    adw::init().unwrap();
+    gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
+    relm4::main_application()
+        .register(None::<&gtk4::gio::Cancellable>)
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let controller = launch(directory.path());
+    controller.widget().present();
+    controller.emit(AppMsg::OpenConnect);
+    spin_until(|| controller.model().switch.transition == super::super::ConnectionTransition::Connecting);
+    std::fs::File::create(directory.path().join("notes.sqlite")).unwrap();
+    let prepared = prepared_sqlite_connection(true, Some(&directory.path().join("notes.sqlite")));
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _entered = runtime.enter();
+    controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
+    spin_until(|| controller.model().window_connection().is_some());
+    let connection = controller.model().window_connection().unwrap();
+    let tab_id = uuid::Uuid::new_v4();
+    let save_id = uuid::Uuid::new_v4();
+    controller.emit(AppMsg::ExecuteBrowseTransaction {
+        tab_id,
+        save_id,
+        statements: vec![(
+            "INSERT INTO notes (id, title) VALUES (?, ?)".into(),
+            vec![Value::Int(1), Value::Text("blocked".into())],
+        )],
+        sources: vec![StatementSource::Insert { draft_id: 1 }],
+    });
+    let journal = controller.model().database.audit_journal_path_for_test();
+    spin_until(|| {
+        std::fs::read_to_string(&journal).is_ok_and(|contents| {
+            contents.lines().any(|line| {
+                serde_json::from_str::<serde_json::Value>(line).is_ok_and(|record| {
+                    let event = &record["event"];
+                    event["operation_class"] == "mutation"
+                        && event["phase"] == "outcome"
+                        && event["terminal_status"] == "denied"
+                })
+            })
+        })
+    });
+    spin_until(|| controller.model().in_flight_saves.get() == 0);
+    let rows = runtime
+        .block_on(connection.query("SELECT title FROM notes WHERE id = 1"))
+        .unwrap()
+        .rows;
+    assert!(rows.is_empty());
+    let contents = std::fs::read_to_string(journal).unwrap();
+    let events: Vec<serde_json::Value> = contents
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert!(events.iter().any(|record| {
+        let event = &record["event"];
+        event["operation_class"] == "mutation" && event["phase"] == "outcome" && event["terminal_status"] == "denied"
+    }));
+}

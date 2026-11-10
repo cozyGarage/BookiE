@@ -390,3 +390,18 @@ fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut Test
     });
     drop(listener);
 }
+
+#[gpui::test]
+fn the_redis_listen_command_is_not_offered_on_other_engines(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("news.*");
+    view.read_with(cx, |view, cx| {
+        let labels: Vec<String> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| view.palette_actions()[index].label.clone())
+            .collect();
+        assert!(labels.iter().all(|label| !label.contains("Redis")), "{labels:?}");
+    });
+}

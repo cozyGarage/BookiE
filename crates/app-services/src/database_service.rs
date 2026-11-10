@@ -41,6 +41,22 @@ pub struct ConnectionMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionOverview {
+    pub name: String,
+    pub driver_id: String,
+    pub environment: Environment,
+    pub health: ConnectionHealth,
+    pub tunnel: TunnelState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TunnelState {
+    Direct,
+    Open,
+    Closed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConnectionHealth {
     Healthy,
     Reconnecting { attempt: u32 },
@@ -556,6 +572,32 @@ impl DatabaseService {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut out: Vec<_> = entries.values().map(|e| e.metadata.clone()).collect();
+        out.sort_by_key(|connection| connection.name.to_lowercase());
+        out
+    }
+
+    pub fn connection_overview(&self) -> Vec<ConnectionOverview> {
+        let entries = self
+            .connections
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut out: Vec<_> = entries
+            .values()
+            .map(|entry| {
+                let inner = entry.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                ConnectionOverview {
+                    name: entry.metadata.name.clone(),
+                    driver_id: entry.metadata.driver_id.clone(),
+                    environment: entry.metadata.environment,
+                    health: inner.health.clone(),
+                    tunnel: match &inner.tunnel {
+                        None => TunnelState::Direct,
+                        Some(tunnel) if tunnel.is_closed() => TunnelState::Closed,
+                        Some(_) => TunnelState::Open,
+                    },
+                }
+            })
+            .collect();
         out.sort_by_key(|connection| connection.name.to_lowercase());
         out
     }

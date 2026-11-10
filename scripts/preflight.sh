@@ -28,6 +28,7 @@ CRATES=(
   bookie-results
   bookie-ssh
   bookie-checks
+  bookie-kafka-browser
   bookie-pg-sessions
   bookie-dump
   bookie-mcp

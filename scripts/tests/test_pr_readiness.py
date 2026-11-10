@@ -31,6 +31,7 @@ class PullRequestReadinessTests(unittest.TestCase):
             "workflow-lint": ("linux-ci-contracts.yml", "  workflow-lint:"),
             "workflow-security": ("linux-ci-contracts.yml", "  workflow-security:"),
             "harness": ("linux-ci-contracts.yml", "  harness:"),
+            "unused-dependencies": ("linux-ci-contracts.yml", "  unused-dependencies:"),
         }
 
         for context, (filename, marker) in sources.items():
@@ -56,6 +57,25 @@ class PullRequestReadinessTests(unittest.TestCase):
             }.issubset(required)
         )
         self.assertNotIn("harness", required)
+
+    def test_a_manifest_change_requires_the_unused_dependency_check(self):
+        for path in ["crates/agentd/Cargo.toml", "Cargo.lock", "apps/gpui/Cargo.lock", "Cargo.toml"]:
+            with self.subTest(path=path):
+                required = readiness.required_contexts([path])
+
+                self.assertIn("unused-dependencies", required)
+
+    def test_a_source_only_change_does_not_require_the_unused_dependency_check(self):
+        required = readiness.required_contexts(["crates/core/src/query.rs"])
+
+        self.assertNotIn("unused-dependencies", required)
+
+    def test_the_contracts_workflow_runs_when_a_manifest_changes(self):
+        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        triggers = workflow.split("concurrency:")[0]
+
+        self.assertEqual(triggers.count('"**/Cargo.toml"'), 2, "push and pull_request")
+        self.assertEqual(triggers.count('"Cargo.lock"'), 2, "push and pull_request")
 
     def test_docs_only_changes_require_contract_checks_without_build_checks(self):
         required = readiness.required_contexts(["docs/testing.md", "README.md"])

@@ -10,6 +10,7 @@ pub mod model;
 pub mod net_check;
 pub mod palette;
 pub mod preview;
+pub mod pubsub_view;
 pub mod selection;
 pub mod shell;
 pub mod source;

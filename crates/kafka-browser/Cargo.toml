@@ -1,0 +1,22 @@
+[package]
+name = "bookie-kafka-browser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "bookie_kafka_browser"
+path = "src/lib.rs"
+
+[dependencies]
+rskafka = { version = "0.6", default-features = false, features = ["compression-gzip", "compression-lz4", "compression-snappy"] }
+tokio = { workspace = true, features = ["time"] }
+
+[dev-dependencies]
+chrono.workspace = true
+rskafka = { version = "0.6", default-features = false, features = ["compression-gzip", "compression-lz4", "compression-snappy"] }
+testcontainers.workspace = true
+testcontainers-modules = { workspace = true, features = ["kafka"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
