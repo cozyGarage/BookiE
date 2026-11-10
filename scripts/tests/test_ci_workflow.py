@@ -120,6 +120,10 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("needs: [test-build]", job)
         self.assertIn('prepare-test-bundle.sh "${{ github.sha }}" gpui', job)
         self.assertIn('nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst"', job)
+        self.assertIn('mkdir -p "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
+        self.assertIn('workspace_root="$(cd apps/gpui && pwd -P)"', job)
+        self.assertIn('test -r "$workspace_root/tests/fixtures/orders.sqlite"', job)
+        self.assertIn('--workspace-remap "$workspace_root"', job)
         self.assertIn('--extract-to "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
         self.assertNotIn("cargo test", job)
         self.assertIn('rm -rf -- "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
@@ -133,6 +137,10 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui", job)
         self.assertIn("--expected-group gpui", job)
         self.assertIn("nextest run --archive-file", job)
+        self.assertIn('mkdir -p "$RUNNER_TEMP/bookie-gpui-extract"', job)
+        self.assertIn('workspace_root="$(cd apps/gpui && pwd -P)"', job)
+        self.assertIn('test -r "$workspace_root/tests/fixtures/orders.sqlite"', job)
+        self.assertIn('--workspace-remap "$workspace_root"', job)
         self.assertIn('--extract-to "$RUNNER_TEMP/bookie-gpui-extract"', job)
         self.assertNotIn("cargo test", job)
         self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all', builder)
@@ -152,9 +160,15 @@ class CiWorkflowTests(unittest.TestCase):
     def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
         self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
+        self.assertIn('--message-format=json-render-diagnostics', build)
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         gtk_build = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)
+
+    def test_forgejo_gpui_test_builder_installs_linker_dependency(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("apt-get install -y --no-install-recommends libxkbcommon-x11-dev", job)
 
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()

@@ -48,7 +48,8 @@ fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
 #[gpui::test]
 fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let origin = Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"));
     let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {
@@ -76,7 +77,8 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
 #[gpui::test]
 fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+    let origin = Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"));
     let table = std::sync::Arc::new(LiveTable::load(&origin, "orders", 100).expect("load"));
     cx.update(text_input::bind_keys);
     let (view, cx) = cx.add_window_view(|window, cx| {

@@ -439,7 +439,8 @@ mod tests {
     }
 
     fn fixture() -> Origin {
-        Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"))
+        let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
+        Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"))
     }
 
     #[test]
