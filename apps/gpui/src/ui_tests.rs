@@ -442,7 +442,7 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.set_mode(crate::Mode::Filtered {
-                kept: vec![10, 20],
+                kept: std::sync::Arc::new(vec![10, 20]),
                 label: "filtered".into(),
             });
             view.edits.insert((20, 1), Cell::Text(value.into()));
@@ -670,7 +670,7 @@ fn selecting_the_active_result_keeps_its_filter_and_selection(cx: &mut TestAppCo
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             view.set_mode(crate::Mode::Filtered {
-                kept: vec![2, 4],
+                kept: std::sync::Arc::new(vec![2, 4]),
                 label: "filtered".into(),
             });
             view.click_row(1, false);
@@ -917,7 +917,7 @@ fn a_match_in_filtered_rows_uses_its_filtered_position_for_paging(cx: &mut TestA
         view.update(cx, |view, _| {
             let kept: Vec<u32> = (0..6_000).map(|row| row * 20).collect();
             view.set_mode(crate::Mode::Filtered {
-                kept,
+                kept: std::sync::Arc::new(kept),
                 label: "filtered".into(),
             });
             view.cursor.set(vec![20_000]);
@@ -943,7 +943,7 @@ fn searching_after_filter_selects_the_matching_filtered_row(cx: &mut TestAppCont
         view.update(cx, |view, cx| {
             let kept: Vec<u32> = (0..6_000).map(|row| row * 20).collect();
             view.set_mode(crate::Mode::Filtered {
-                kept,
+                kept: std::sync::Arc::new(kept),
                 label: "filtered".into(),
             });
             window.focus(&view.find.read(cx).focus_handle_for_tests(), cx);

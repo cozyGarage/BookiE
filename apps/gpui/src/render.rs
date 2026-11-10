@@ -183,8 +183,8 @@ impl Render for GridView {
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
-            .children(self.compare.is_some().then(|| header))
-            .children(self.compare.is_some().then(|| list))
+            .children(self.compare.is_some().then_some(header))
+            .children(self.compare.is_some().then_some(list))
             .children(self.compare.is_none().then(|| self.data_table()))
             .children(self.detail_panel(theme));
         let content = match self.tabs.current().clone() {
@@ -207,7 +207,9 @@ impl Render for GridView {
             .text_color(rgb(theme.foreground))
             .text_size(px(self.fonts.ui_size))
             .when(!self.font.is_empty(), |root| root.font_family(self.font.clone()))
-            .when(!self.fonts.ui_family.is_empty(), |root| root.font_family(self.fonts.ui_family.clone()))
+            .when(!self.fonts.ui_family.is_empty(), |root| {
+                root.font_family(self.fonts.ui_family.clone())
+            })
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
