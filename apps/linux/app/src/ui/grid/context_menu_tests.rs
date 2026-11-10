@@ -48,6 +48,10 @@ fn reference_menu_does_not_navigate_from_a_rebound_cell() {
     let received =
         runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
     assert!(received.is_err(), "a stale menu must not copy another row");
+    view.activate_action("cell.show-row-json", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not show another row");
     view.activate_action("cell.show-referencing-rows", None).unwrap();
     let received =
         runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });

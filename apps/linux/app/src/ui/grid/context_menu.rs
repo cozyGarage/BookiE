@@ -348,6 +348,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let Some(row) = complete_row_at(&view, position(slot)) else {
                     sender.send(GridMsg::IncompleteRowData).ok();
                     return;
