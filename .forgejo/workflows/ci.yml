@@ -375,7 +375,9 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: |
           cd src
-          for group in direct consumers driver-core driver-analytics driver-extended drivers pg-release socket-ssh driver-tls keyring unit sandbox gpui; do
+          mapfile -t publish_groups < <(python3 -c 'import json; print(*json.load(open("scripts/ci-test-bundle-groups.json"))["providers"]["forgejo"], sep="\n")')
+          publish_groups+=(unit sandbox gpui)
+          for group in "${publish_groups[@]}"; do
             python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
           done
       - name: Remove expired test bundles

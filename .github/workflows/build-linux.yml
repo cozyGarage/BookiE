@@ -206,7 +206,7 @@ jobs:
       - name: Build versioned executable test bundles
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all
+          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" github
       - name: Check the no-default-features layer
         run: python3 scripts/run-test-layer.py no-default-features
       - name: Upload source-pinned direct test bundle
@@ -228,55 +228,6 @@ jobs:
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-drivers
           path: reusable-builds/drivers/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned core driver test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core
-          path: reusable-builds/driver-core/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned analytics driver test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-analytics
-          path: reusable-builds/driver-analytics/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned extended driver test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-extended
-          path: reusable-builds/driver-extended/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned PostgreSQL release test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-pg-release
-          path: reusable-builds/pg-release/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned socket and SSH test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-socket-ssh
-          path: reusable-builds/socket-ssh/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned TLS test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls
-          path: reusable-builds/driver-tls/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned keyring test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-keyring
-          path: reusable-builds/keyring/
           if-no-files-found: error
           retention-days: 14
       - name: Upload source-pinned unit archive

@@ -42,5 +42,9 @@
       "lib": ["bookie-storage", "bookie-transport"],
       "test": ["bookie-agentd"]
     }
+  },
+  "providers": {
+    "github": ["direct", "consumers", "drivers"],
+    "forgejo": ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]
   }
 }
