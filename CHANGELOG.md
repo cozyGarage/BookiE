@@ -23,7 +23,7 @@
 
 ### Fixed
 
-- A cancelled or timed-out terminal approval in bookie-agentd no longer lets a second prompt start while the first is still reading, and a request waiting for the terminal is denied when it is cancelled or has waited two minutes. (#2938)
+- A cancelled or timed-out terminal approval in bookie-agentd no longer lets a second prompt start while the first is still reading, and a request waiting for the terminal is denied when it is cancelled or has waited two minutes. (#2938, #2941)
 - Result pages finishing after their rows disappear no longer remain unnecessarily loaded. (#2751)
 - A delayed row delete no longer discards a different unsaved draft after the grid changes. (#2755)
 - A grid menu no longer redirects a row delete to another row if the cell changes while the menu is open. (#2756)
