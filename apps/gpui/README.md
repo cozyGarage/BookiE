@@ -44,7 +44,7 @@ Visible cell text is limited to 512 Unicode characters before layout. Line break
 
 ## Renderer boundary
 
-The formatter tests check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
+The formatter tests expand the [large-cell inputs](testdata/large-cells.json). They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
 
 The planned modularisation puts application logic in app-services and leaves the application as a renderer. This prototype already splits that way, so it shows what a renderer would need. The library half (`src/lib.rs`) has no `gpui` import and is tested without a display:
 
