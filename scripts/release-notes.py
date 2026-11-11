@@ -157,7 +157,7 @@ def cut(text, version, date):
     if UNRELEASED not in text:
         raise SystemExit("CHANGELOG.md has no Unreleased section")
     text = text.replace(UNRELEASED, f"{UNRELEASED}\n\n## [{version}] - {date}", 1)
-    text = re.sub(r"(?m)^\[Unreleased\]: .*$", f"[Unreleased]: {REPO}/compare/linux-v{version}...linux", text)
+    text = re.sub(r"(?m)^\[Unreleased\]: .*$", f"[Unreleased]: {REPO}/compare/linux-v{version}...main", text)
     version_link = f"[{version}]: {REPO}/releases/tag/linux-v{version}"
     version_link_pattern = rf"(?m)^\[{re.escape(version)}\]: .*$"
     if re.search(version_link_pattern, text):
