@@ -1,6 +1,8 @@
 use bookie_core::TableInfo;
 use relm4::adw;
 use relm4::gtk::prelude::*;
+use relm4::{ComponentSender, gtk};
+use std::time::{Duration, Instant};
 
 use super::App;
 use super::init_sidebar::refresh_visible;
@@ -76,7 +78,8 @@ impl App {
         sidebar_follows_connection(&self.split_view, &self.sidebar_toggle, connected);
     }
 
-    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
+    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo], sender: ComponentSender<App>) {
+        self.cancel_sidebar_population();
         self.sidebar_tables = tables.to_vec();
         let mut nodes = build_nodes(tables, &self.sidebar_views);
         let catalog_kinds = self
@@ -85,32 +88,18 @@ impl App {
             .and_then(|id| self.registry.get(id))
             .map_or(&[][..], |driver| driver.capabilities().catalog_object_kinds);
         crate::services::sidebar_tree::append_catalog_entries_with(&mut nodes, catalog_kinds, &self.sidebar_catalog);
-        let schema_filter_enabled = self.current_driver_id.as_deref() == Some("postgres");
-        let driver_id = self.current_driver_id.as_deref().unwrap_or_default();
+        self.sidebar_population_schema_filter = self.current_driver_id.as_deref() == Some("postgres");
+        self.sidebar_population_driver_id = self.current_driver_id.clone().unwrap_or_default();
         let timeout =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
-        let source =
+        self.sidebar_population_source =
             crate::ui::sidebar_columns::ColumnSource::capture(self.connection_id, self.database.clone(), timeout);
-        let row_construction_started = std::time::Instant::now();
-        let mut guard = self.sidebar_factory.guard();
-        guard.clear();
-        for node in &nodes {
-            guard.push_back(row_for(
-                node,
-                &self.sidebar_collapsed.borrow(),
-                !self.table_search.text().trim().is_empty(),
-                schema_filter_enabled,
-                driver_id,
-                source.clone(),
-            ));
-        }
-        drop(guard);
-        tracing::debug!(
-            sidebar_nodes = nodes.len(),
-            row_construction_ms = row_construction_started.elapsed().as_secs_f64() * 1000.0,
-            "sidebar rows constructed"
-        );
+        self.sidebar_population_elapsed = Duration::ZERO;
         *self.sidebar_nodes.borrow_mut() = nodes;
+        self.sidebar_factory.guard().clear();
+        self.sidebar_population = Some(super::sidebar_population::SidebarPopulation::new(
+            self.sidebar_nodes.borrow().len(),
+        ));
         refresh_visible(
             &self.sidebar_nodes,
             &self.sidebar_collapsed,
@@ -118,17 +107,106 @@ impl App {
             &self.table_search.text(),
             &self.sidebar_hidden_schemas,
         );
-        self.sidebar_factory.widget().invalidate_filter();
-        self.schema_filter_button.set_visible(schema_filter_enabled);
+        self.schema_filter_button
+            .set_visible(self.sidebar_population_schema_filter);
         self.sync_sidebar_fold_button();
+        let generation = self.sidebar_population_generation;
+        self.continue_sidebar_population(generation, sender);
+    }
+
+    pub(super) fn cancel_sidebar_population(&mut self) {
+        self.sidebar_population_generation = self.sidebar_population_generation.wrapping_add(1);
+        self.sidebar_population = None;
+        self.sidebar_population_source = None;
+        self.sidebar_pending_focus = None;
+    }
+
+    pub(super) fn continue_sidebar_population(&mut self, generation: u64, sender: ComponentSender<App>) {
+        if generation != self.sidebar_population_generation {
+            return;
+        }
+        let Some(range) = self
+            .sidebar_population
+            .as_mut()
+            .and_then(|population| population.next_batch())
+        else {
+            return self.finish_sidebar_population();
+        };
+        self.append_sidebar_batch(range);
+        self.apply_pending_sidebar_focus();
+        let has_remaining = self
+            .sidebar_population
+            .as_ref()
+            .is_some_and(super::sidebar_population::SidebarPopulation::has_remaining);
+        if has_remaining {
+            gtk::glib::timeout_add_local_once(Duration::from_millis(1), move || {
+                sender.input(super::AppMsg::ContinueSidebarPopulation(generation));
+            });
+            return;
+        }
+        self.finish_sidebar_population();
+    }
+
+    fn append_sidebar_batch(&mut self, range: std::ops::Range<usize>) {
+        let started = Instant::now();
+        let nodes = self.sidebar_nodes.borrow();
+        let collapsed = self.sidebar_collapsed.borrow();
+        let searching = !self.table_search.text().trim().is_empty();
+        let driver_id = &self.sidebar_population_driver_id;
+        let schema_filter_enabled = self.sidebar_population_schema_filter;
+        let source = self.sidebar_population_source.clone();
+        let mut guard = self.sidebar_factory.guard();
+        for index in range {
+            let Some(node) = nodes.get(index) else {
+                continue;
+            };
+            guard.push_back(row_for(
+                node,
+                &collapsed,
+                searching,
+                schema_filter_enabled,
+                driver_id,
+                source.clone(),
+            ));
+        }
+        drop(guard);
+        self.sidebar_population_elapsed += started.elapsed();
+    }
+
+    fn finish_sidebar_population(&mut self) {
+        self.sidebar_population = None;
+        self.sidebar_population_source = None;
+        tracing::debug!(
+            sidebar_nodes = self.sidebar_nodes.borrow().len(),
+            row_construction_ms = self.sidebar_population_elapsed.as_secs_f64() * 1000.0,
+            "sidebar rows constructed"
+        );
         self.sync_sidebar_selection();
+    }
+
+    fn apply_pending_sidebar_focus(&mut self) {
+        let Some(index) = self.sidebar_pending_focus else {
+            return;
+        };
+        let Some(row) = self.sidebar_factory.widget().row_at_index(index as i32) else {
+            return;
+        };
+        self.sidebar_pending_focus = None;
+        self.sidebar_factory.widget().select_row(Some(&row));
+        row.grab_focus();
     }
 
     pub(super) fn sync_sidebar_expansion(&self) {
         use crate::services::sidebar_tree::NodeKind;
         let searching = !self.table_search.text().trim().is_empty();
         let collapsed = self.sidebar_collapsed.borrow();
-        for (index, node) in self.sidebar_nodes.borrow().iter().enumerate() {
+        for (index, node) in self
+            .sidebar_nodes
+            .borrow()
+            .iter()
+            .take(self.sidebar_factory.len())
+            .enumerate()
+        {
             if matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)) {
                 self.sidebar_factory.send(
                     index,
@@ -145,7 +223,7 @@ impl App {
         self.sidebar_collapsed.borrow_mut().toggle(key);
         let collapsed = self.sidebar_collapsed.borrow().is_collapsed(key);
         let row = self.sidebar_nodes.borrow().iter().position(|node| node.key == key);
-        if let Some(row) = row {
+        if let Some(row) = row.filter(|index| *index < self.sidebar_factory.len()) {
             self.sidebar_factory.send(row, SidebarRowMsg::SetCollapsed(collapsed));
         }
         refresh_visible(
@@ -178,6 +256,7 @@ impl App {
             self.sidebar_nodes
                 .borrow()
                 .iter()
+                .take(self.sidebar_factory.len())
                 .enumerate()
                 .filter(|(_, node)| matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)))
                 .map(|(index, node)| (index, collapsed.is_collapsed(&node.key)))
@@ -282,11 +361,14 @@ impl App {
         }
     }
 
-    fn focus_sidebar_row(&self, index: usize) {
+    fn focus_sidebar_row(&mut self, index: usize) {
         let listbox = self.sidebar_factory.widget();
         if let Some(row) = listbox.row_at_index(index as i32) {
             listbox.select_row(Some(&row));
             row.grab_focus();
+            self.sidebar_pending_focus = None;
+        } else if self.sidebar_population.is_some() {
+            self.sidebar_pending_focus = Some(index);
         }
     }
 
