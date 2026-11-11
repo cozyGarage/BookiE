@@ -42,6 +42,32 @@ class ReleaseNotesTests(unittest.TestCase):
             self.assertEqual(len(errors), 1, message)
             self.assertIn("Added, Changed, Deprecated, Removed, Fixed, Security", errors[0], message)
 
+    def test_fragments_group_by_category_and_reject_bad_names_and_bodies(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text("docs")
+            (root / "a.fixed.md").write_text("Export keeps NULLs\n")
+            (root / "b.added.md").write_text("Pager\n")
+            grouped, errors = release_notes.read_fragments(root)
+            self.assertEqual(errors, [])
+            self.assertEqual(release_notes.render_fragments(grouped), "### Added\n\n- Pager\n\n### Fixed\n\n- Export keeps NULLs\n")
+            for name, body in (("c.improved.md", "x"), ("d.Fixed.md", "x"), ("e.txt", "x"), ("f.fixed.md", ""), ("g.fixed.md", "one\ntwo")):
+                (root / name).write_text(body)
+            self.assertEqual(len(release_notes.read_fragments(root)[1]), 5)
+
+    def test_releasing_fragments_adds_a_version_section_and_refuses_none(self):
+        text = "## [Unreleased]\n\n## [0.2.0] - 2026-10-01\n\n[Unreleased]: old\n"
+        grouped = {category: [] for category in release_notes.CATEGORIES}
+        with self.assertRaises(SystemExit):
+            release_notes.cut_fragments(text, "0.3.0", "2026-11-12", grouped)
+        grouped["Fixed"].append("Export keeps NULLs")
+
+        result = release_notes.cut_fragments(text, "0.3.0", "2026-11-12", grouped)
+
+        self.assertIn("## [0.3.0] - 2026-11-12\n\n### Fixed\n\n- Export keeps NULLs\n", result)
+        self.assertEqual(release_notes.section(result, "0.3.0"), "### Fixed\n\n- Export keeps NULLs\n")
+
     def test_trailers_pattern_finds_only_note_lines(self):
         body = "## Change\nText\n\nRelease-Note: Fixed: A\nRelease-Note: Added: B\n\n- [ ] Validation"
 
