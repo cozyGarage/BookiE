@@ -126,16 +126,6 @@ impl App {
                 keep_sender.input(AppMsg::WorkspaceTabsChanged);
             }
         });
-        let rename_tab_action = gio::SimpleAction::new("rename", None);
-        let rename_target = menu_target.clone();
-        let rename_view = tab_view.clone();
-        let rename_sender = sender.clone();
-        rename_tab_action.connect_activate(move |_, _| {
-            let page = rename_target.borrow().clone();
-            if let Some(page) = page {
-                rename_workspace_tab(&rename_view, &page, &rename_sender);
-            }
-        });
         let keep_tab_action_setup = keep_tab_action.clone();
         let keep_tabs_setup = self.workspace_tabs.clone();
         tab_view.connect_setup_menu(move |_view, page| {
@@ -148,7 +138,10 @@ impl App {
         });
         let action_group = gio::SimpleActionGroup::new();
         action_group.add_action(&keep_tab_action);
-        action_group.add_action(&rename_tab_action);
+        let mark_sender = sender.clone();
+        super::tab_title::add_mark_actions(&action_group, menu_target.clone(), &tab_view, move || {
+            mark_sender.input(AppMsg::WorkspaceTabsChanged)
+        });
         let sender_for_bulk_close = sender.clone();
         add_bulk_close_actions(&action_group, menu_target, move |message| {
             sender_for_bulk_close.input(message);
