@@ -21,6 +21,8 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 - [ ] Separator and header-row detection are right for a comma file, a semicolon file, and a file with no header.
 - [ ] The preview grid matches the file.
+- [ ] On a large CSV, changing encoding or delimiter leaves the dialog responsive while the preview refreshes; Import stays disabled until the current settings finish previewing.
+- [ ] An unreadable encoding shows a preview error and keeps Import disabled; choosing a valid encoding refreshes the preview and enables Import again.
 - [ ] Column mapping is prefilled sensibly and can be changed.
 - [ ] For an existing table, remember a mapping, reorder the CSV headers, restore it, and confirm values still target the named columns; added destination columns remain on Skip.
 - [ ] Duplicate CSV headers are distinguishable, and a saved mapping refuses to restore if its selected header or destination column is missing or ambiguous.
