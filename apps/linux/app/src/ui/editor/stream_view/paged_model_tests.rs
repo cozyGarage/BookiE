@@ -561,7 +561,7 @@ fn realized_grid_rows_load_their_spooled_values() {
         .and_then(|pages| pages.get(0))
         .cloned()
         .unwrap();
-    let released = std::sync::Arc::downgrade(&loaded);
+    let released = std::sync::Arc::downgrade(&loaded.0);
     drop(loaded);
     stack.set_visible_child_name("other");
     wait_for_condition(|| !view.is_mapped());

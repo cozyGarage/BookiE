@@ -9,6 +9,7 @@ pub mod result_scan;
 #[cfg(test)]
 mod result_test_support;
 pub mod sidebar_tree;
+pub mod stream_page_budget;
 pub mod stream_page_index;
 pub mod stream_page_window;
 pub mod stream_result_spool;

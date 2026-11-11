@@ -144,6 +144,7 @@ pub(in crate::ui::editor) fn stream_page_container(
         .and_then(|position| result.pages.get(position))
         .and_then(std::sync::Weak::upgrade);
     if let Some(page) = resident {
+        result.resident_pages.protect(page_index);
         container.add_css_class("tp-stream-page-ram-resident");
         let grid = build_stream_page_widget(
             &page,
@@ -155,7 +156,10 @@ pub(in crate::ui::editor) fn stream_page_container(
             offers_whole_result_filter(result),
         );
         let title = stream_page_label(result, page_index as usize);
-        release_stream_page_on_unmap(&container, &grid, title);
+        let resident_pages = result.resident_pages.clone();
+        release_stream_page_on_unmap(&container, &grid, title, move || {
+            resident_pages.unprotect(page_index);
+        });
         container.append(&grid);
     } else {
         container.append(&stream_page_placeholder(result, page_index));
@@ -163,21 +167,42 @@ pub(in crate::ui::editor) fn stream_page_container(
     container
 }
 
-pub(in crate::ui::editor) fn release_stream_page_on_unmap(container: &gtk::Box, grid: &gtk::Widget, title: String) {
+pub(in crate::ui::editor) fn release_stream_page_on_unmap(
+    container: &gtk::Box,
+    grid: &gtk::Widget,
+    title: String,
+    on_release: impl Fn() + 'static,
+) {
+    let released = std::rc::Rc::new(std::cell::Cell::new(false));
+    let release = std::rc::Rc::new(move || {
+        if !released.replace(true) {
+            on_release();
+        }
+    });
     let weak_grid = grid.downgrade();
     let weak_container = container.downgrade();
+    let unmap_release = release.clone();
     grid.connect_unmap(move |_| {
         let weak_grid = weak_grid.clone();
         let weak_container = weak_container.clone();
         let title = title.clone();
+        let release = unmap_release.clone();
         gtk::glib::idle_add_local_once(move || {
-            let (Some(grid), Some(container)) = (weak_grid.upgrade(), weak_container.upgrade()) else {
+            let Some(grid) = weak_grid.upgrade() else {
+                release();
                 return;
             };
-            if grid.is_mapped() || container.first_child().as_ref() != Some(&grid) {
+            if grid.is_mapped() {
                 return;
             }
-            replace_stream_page_content(&container, &stream_page_placeholder_with_title(title));
+            let Some(container) = weak_container.upgrade() else {
+                release();
+                return;
+            };
+            if container.first_child().as_ref() == Some(&grid) {
+                replace_stream_page_content(&container, &stream_page_placeholder_with_title(title));
+            }
+            release();
             if let Some(pages) = container.parent().and_downcast::<gtk::Stack>()
                 && pages.is_mapped()
                 && pages
@@ -189,6 +214,7 @@ pub(in crate::ui::editor) fn release_stream_page_on_unmap(container: &gtk::Box, 
             }
         });
     });
+    grid.connect_destroy(move |_| release());
 }
 
 pub(in crate::ui::editor) fn replace_stream_page_content(container: &gtk::Box, page: &gtk::Widget) {

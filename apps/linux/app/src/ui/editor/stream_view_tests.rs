@@ -110,6 +110,7 @@ fn page_load_request(
         identity,
         spool,
         columns,
+        ..
     })) = receiver.recv_sync()
     else {
         panic!("page visibility did not request the saved page");
@@ -880,8 +881,20 @@ fn retrying_a_failed_page_reads_the_retained_spool_and_renders_its_rows() {
     holder.append(&pages);
     let window = gtk::Window::builder().child(&holder).build();
     window.present();
+    let reservation = result
+        .resident_pages
+        .reserve(bookie_results::stream_page_budget::MAX_RETAINED_STREAM_PAGE_BYTES)
+        .unwrap();
     install_page_loader(&pages, &result, outcome.identity, &sender);
 
+    let blocked = container
+        .first_child()
+        .unwrap()
+        .downcast::<relm4::adw::StatusPage>()
+        .unwrap();
+    let retry = blocked.child().unwrap().downcast::<gtk::Button>().unwrap();
+    drop(reservation);
+    retry.emit_clicked();
     complete_page_load_result(&runtime, &holder, &grid_sender, page_load_request(&receiver));
     let placeholder = container
         .first_child()
