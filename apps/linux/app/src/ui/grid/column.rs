@@ -34,6 +34,15 @@ pub(super) fn header_column(column: &ColumnInfo, schema: Option<&ColumnInfo>) ->
     header
 }
 
+/// Numbers, and NULLs in a numeric column, line up on the right so their digits share one edge.
+pub(super) fn right_aligned_column(column: &ColumnInfo) -> bool {
+    use bookie_core::FilterValueKind;
+    matches!(
+        bookie_core::filter_value_kind(column),
+        FilterValueKind::Int | FilterValueKind::Float | FilterValueKind::Decimal
+    )
+}
+
 /// Starting width of a column in pixels: by its type, grown for a long name, and never below `min`
 /// (wide tables use a minimum so their columns stay readable).
 pub(super) fn default_column_width_px(info: &ColumnInfo, min: Option<i32>) -> i32 {
@@ -616,6 +625,7 @@ fn bind_readonly_label(
     highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     label.set_text(text);
+    label.set_xalign(if right_aligned_column(binding.column) { 1.0 } else { 0.0 });
     apply_cell_tooltip(label.upcast_ref(), text, is_null, truncated);
     set_class(label.upcast_ref(), "dim-label", is_null);
     apply_cell_state(label.upcast_ref(), &binding.pending_classes);
@@ -783,5 +793,35 @@ mod default_width_tests {
         assert!(default_column_width_px(&info("x", "boolean"), None) >= 80);
         assert!(default_column_width_px(&info(&"z".repeat(200), "text"), None) <= 360);
         assert_eq!(default_column_width_px(&info("id", "integer"), Some(300)), 300);
+    }
+}
+
+#[cfg(test)]
+mod numeric_alignment_tests {
+    use super::*;
+
+    fn column(data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: "n".into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn integer_and_decimal_columns_align_right_and_text_does_not() {
+        assert!(right_aligned_column(&column("integer")));
+        assert!(right_aligned_column(&column("NUMERIC(10,2)")));
+        assert!(right_aligned_column(&column("double precision")));
+        assert!(!right_aligned_column(&column("text")));
+        assert!(!right_aligned_column(&column("varchar(20)")));
     }
 }
