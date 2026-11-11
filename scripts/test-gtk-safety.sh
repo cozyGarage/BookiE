@@ -51,6 +51,7 @@ if [[ "${BOOKIE_GTK_DBUS_ACTIVE:-0}" != "1" ]]; then
 fi
 
 export GDK_BACKEND=x11
+export GDK_DEBUG=no-portals
 export GSK_RENDERER=cairo
 export GTK_A11Y=atspi
 unset NO_AT_BRIDGE

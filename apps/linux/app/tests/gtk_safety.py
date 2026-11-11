@@ -2542,6 +2542,9 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
 
     open_saved_connection(CONNECTION_NAME)
     wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    table_tab = wait_for_node(name="safety_items · Safety SQLite", role=pyatspi.ROLE_PAGE_TAB)
+    tab_bounds = table_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(tab_bounds.x + tab_bounds.width // 2, tab_bounds.y + tab_bounds.height // 2, button=1)
     wait_for_node_containing("Rows 1 – 5")
 
 
