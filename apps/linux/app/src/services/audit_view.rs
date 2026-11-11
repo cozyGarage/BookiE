@@ -18,6 +18,8 @@ pub fn approval_label(approval: AuditApprovalOutcome) -> String {
     match approval {
         AuditApprovalOutcome::NotRequired => bookie_app_services::tr!("no approval needed"),
         AuditApprovalOutcome::Approved => bookie_app_services::tr!("approved"),
+        AuditApprovalOutcome::ApprovedAndRemembered => bookie_app_services::tr!("approved and remembered"),
+        AuditApprovalOutcome::ApprovedByGrant => bookie_app_services::tr!("approved by a remembered approval"),
         AuditApprovalOutcome::Denied => bookie_app_services::tr!("denied"),
         AuditApprovalOutcome::Cancelled => bookie_app_services::tr!("approval cancelled"),
         AuditApprovalOutcome::TimedOut => bookie_app_services::tr!("approval timed out"),

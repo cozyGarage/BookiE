@@ -484,3 +484,58 @@ async fn a_lost_outcome_fails_the_operation_and_disables_governed_writes() {
     assert_eq!(ran.load(Ordering::SeqCst), 1);
     assert!(audit_state.governed_writes_disabled());
 }
+
+#[tokio::test]
+async fn a_denied_cell_expression_never_reaches_the_driver_and_is_audited() {
+    use bookie_core::sql_dialect::{ColumnReset, build_keyed_column_reset};
+    let columns = [column("id", true), column("note", false)];
+    let (sql, _) = build_keyed_column_reset(
+        "postgres",
+        None,
+        "items",
+        &columns,
+        1,
+        &ColumnReset::Expression("pg_read_file('/etc/passwd')".into()),
+        &[bookie_core::Value::Int(1)],
+    )
+    .expect("statement");
+    let executes = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(crate::approval::DenyApprovalSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard.execute(&sql).await.expect_err("the expression must be refused");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+    let events = audit.events.lock().expect("audit events");
+    assert_eq!(
+        events.last().expect("terminal").terminal_status,
+        AuditTerminalStatus::Denied
+    );
+}
+
+fn column(name: &str, primary_key: bool) -> bookie_core::ColumnInfo {
+    bookie_core::ColumnInfo {
+        name: name.into(),
+        data_type: "text".into(),
+        nullable: !primary_key,
+        primary_key,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }
+}

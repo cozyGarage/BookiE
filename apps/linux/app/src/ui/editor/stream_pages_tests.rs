@@ -104,6 +104,57 @@ fn retained_snapshot_keeps_page_budget_until_its_last_owner_closes() {
 }
 
 #[test]
+fn completed_result_snapshots_release_spool_only_after_the_last_owner_closes() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    let result = page(&["id"], &[7]);
+    runtime.block_on(spool.append_page(0, result.clone())).unwrap();
+    let mut cache = StreamPageCache::default();
+    cache.append(0, result).unwrap();
+    let snapshot = cache.snapshot_with_spool(StreamTerminal::Complete, None, 1, Some(spool));
+    let pin = snapshot.clone();
+    assert!(manager.reserved_bytes() > 0);
+    drop(cache);
+    drop(snapshot);
+    assert!(manager.reserved_bytes() > 0);
+    drop(pin);
+    assert_eq!(manager.reserved_bytes(), 0);
+}
+
+#[test]
+fn an_open_export_retains_the_spool_after_its_result_closes() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    let result = page(&["id"], &[7]);
+    runtime.block_on(spool.append_page(0, result.clone())).unwrap();
+    let mut cache = StreamPageCache::default();
+    cache.append(0, result).unwrap();
+    let query = crate::ui::export_dialog::StreamExportQuery {
+        driver_id: "postgres".into(),
+        suggested_name: "items".into(),
+    };
+    let snapshot = cache.snapshot_with_spool(StreamTerminal::Complete, Some(query), 1, Some(spool));
+    let export = snapshot.export.clone().unwrap();
+    drop(snapshot);
+    drop(cache);
+    assert!(manager.reserved_bytes() > 0);
+    let loaded = runtime
+        .block_on(export.spool.as_ref().unwrap().load_page(0, export.columns.clone()))
+        .unwrap();
+    assert_eq!(loaded.rows[0][0], Value::Int(7));
+    drop(export);
+    assert_eq!(manager.reserved_bytes(), 0);
+}
+
+#[test]
 fn spools_from_one_manager_share_the_page_budget() {
     let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
     let first = manager.create().expect("first spool");

@@ -41,6 +41,8 @@ pub enum CompareError {
     TooManyRows,
     #[error("the saved result could not be read")]
     Source,
+    #[error("there is not enough page memory to compare right now")]
+    PageMemoryBusy,
 }
 
 impl From<ScanError> for CompareError {
@@ -50,6 +52,7 @@ impl From<ScanError> for CompareError {
             ScanError::Incomplete => Self::IncompleteInput,
             ScanError::TooManyRows => Self::TooManyRows,
             ScanError::Spool(_) => Self::Source,
+            ScanError::PageBudget => Self::PageMemoryBusy,
         }
     }
 }

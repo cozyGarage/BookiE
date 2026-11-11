@@ -15,6 +15,10 @@ class ReleaseNotesTests(unittest.TestCase):
         result = release_notes.cut(text, "0.3.0", "2026-10-21")
 
         self.assertIn("[0.3.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.3.0", result)
+        self.assertIn(
+            "[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.3.0...main",
+            result,
+        )
 
     def test_parse_accepts_notes_and_none(self):
         self.assertEqual(release_notes.parse_notes("fix\n\nRelease-Note: Fixed: Export keeps NULLs")[0], [("Fixed", "Export keeps NULLs")])

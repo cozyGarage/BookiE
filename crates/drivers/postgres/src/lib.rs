@@ -353,6 +353,8 @@ impl Connection for PgConnection {
                   OR (n.nspname = $2 AND t.relname = $1))
                AND a.attnum > 0
                AND NOT a.attisdropped
+               AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+               AND pg_catalog.has_column_privilege(t.oid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
              ORDER BY a.attnum",
         )
         .bind(table)
@@ -557,6 +559,8 @@ impl Connection for PgConnection {
             JOIN pg_catalog.pg_class i ON i.oid = ix.indexrelid
             WHERE (($2::text IS NULL AND t.relname = $1 AND pg_catalog.pg_table_is_visible(t.oid))
                  OR (n.nspname = $2 AND t.relname = $1))
+              AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(t.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
             ORDER BY i.relname",
         )
         .bind(table)
@@ -634,6 +638,10 @@ impl Connection for PgConnection {
             WHERE c.contype = 'f'
               AND (($2::text IS NULL AND t.relname = $1 AND pg_catalog.pg_table_is_visible(t.oid))
                  OR (n.nspname = $2 AND t.relname = $1))
+              AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(t.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+              AND pg_catalog.has_schema_privilege(fn_ns.oid, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(fn_class.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
             GROUP BY c.conname, fn_class.relname, fn_ns.nspname, c.confdeltype, c.confupdtype
             ORDER BY c.conname",
         )
