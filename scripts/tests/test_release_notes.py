@@ -29,6 +29,19 @@ class ReleaseNotesTests(unittest.TestCase):
         for message in ("no trailer", "Release-Note: Fix: x", "Release-Note: Fixed:", "Release-Note: none\nRelease-Note: Added: x"):
             self.assertTrue(release_notes.parse_notes(message)[1], message)
 
+    def test_parse_names_the_allowed_categories_for_each_malformed_shape(self):
+        shapes = (
+            "Release-Note: Improved: x",
+            "Release-Note: none.",
+            "Release-Note: Fixedx",
+            "Release-Note: <Added|Changed|Fixed>: <what the user sees>",
+            "Release-Note: Export keeps NULLs",
+        )
+        for message in shapes:
+            errors = release_notes.parse_notes(message)[1]
+            self.assertEqual(len(errors), 1, message)
+            self.assertIn("Added, Changed, Deprecated, Removed, Fixed, Security", errors[0], message)
+
     def test_trailers_pattern_finds_only_note_lines(self):
         body = "## Change\nText\n\nRelease-Note: Fixed: A\nRelease-Note: Added: B\n\n- [ ] Validation"
 
