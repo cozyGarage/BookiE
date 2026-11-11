@@ -14,6 +14,10 @@ impl Render for GridView {
         if std::mem::take(&mut self.find_reset) {
             self.find.update(cx, |find, cx| find.set_content("", cx));
         }
+        if std::mem::take(&mut self.focus_editor) {
+            let editor = self.sql_input.read(cx).focus_handle(cx);
+            window.focus(&editor, cx);
+        }
         self.note_frame();
         self.pace_frame(window);
         let theme = Theme::current(cx);
