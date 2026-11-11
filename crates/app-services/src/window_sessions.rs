@@ -9,6 +9,7 @@ mod save_prompt;
 
 pub use open_sessions::{
     OPEN_SESSIONS_VERSION, OpenSessionsLoad, OpenSessionsRecord, parse_open_sessions, restore_window_keys,
+    startup_restore_keys,
 };
 pub use save_prompt::WindowSavePrompt;
 

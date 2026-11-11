@@ -31,6 +31,8 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Two connections to the same endpoint stay separate after reconnecting to each.
 - [ ] For MongoDB, the connect dialog shows Authentication database; save `admin` for a user defined there while Database is `appdb`, reconnect, and confirm connections with different authentication databases stay separate.
 - [ ] On PostgreSQL, right-click a schema and hide it. Confirm its tables and views disappear, search cannot reveal them, the filter menu can restore one or all schemas, and each connection retains its own hidden-schema list after reconnecting.
+- [ ] Open two saved connections in one window, select a tab of the first one, and quit. Start BookiE: both connections reopen in the same window with their tabs, and the connection that was in front is in front again. Stop one of the two database servers, quit and start again: the reachable connection reopens and the other reports Connection failed in the same window.
+- [ ] With two connections open, disconnect both and quit. Start BookiE: the welcome page appears and nothing reconnects.
 
 ## Long-query notice
 
