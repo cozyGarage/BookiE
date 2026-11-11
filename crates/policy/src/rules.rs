@@ -195,6 +195,14 @@ fn evaluate_categorical_decisions(
         });
     }
 
+    if effects.contains(Effects::LINKED_SERVER) {
+        decisions.push(Decision::RequireApproval {
+            rule: "linked_server_approval".into(),
+            reason: "this statement reaches another server through a linked server".into(),
+            preview: Some(table_preview(facts)),
+        });
+    }
+
     if !effects.writes() && !effects.contains(Effects::HOST_OR_FILE_ACCESS) {
         decisions.push(Decision::Allow {
             rule: "read_allow".into(),
