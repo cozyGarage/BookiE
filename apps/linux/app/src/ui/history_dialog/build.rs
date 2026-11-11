@@ -318,3 +318,18 @@ pub(super) fn selection_bar(sender: &ComponentSender<HistoryDialog>) -> Selectio
         .build();
     SelectionBar { revealer, label }
 }
+
+pub(super) fn assemble(
+    root: &gtk::Box,
+    toolbar: &adw::ToolbarView,
+    header: &adw::HeaderBar,
+    inner: &gtk::Box,
+    selection_bar: &gtk::Revealer,
+    sender: &ComponentSender<HistoryDialog>,
+) {
+    toolbar.add_bottom_bar(selection_bar);
+    toolbar.add_top_bar(header);
+    toolbar.set_content(Some(inner));
+    root.append(toolbar);
+    root.insert_action_group("history", Some(&action_group(sender)));
+}
