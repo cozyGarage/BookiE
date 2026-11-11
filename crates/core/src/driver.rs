@@ -65,6 +65,7 @@ pub struct DriverCapabilities {
     pub supports_sequence_restart: bool,
     pub supports_explicit_auto_increment_values: bool,
     pub supports_browse_filters: bool,
+    pub supports_table_default_collation: bool,
 }
 
 #[async_trait]
@@ -104,6 +105,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_sequence_restart: self.supports_sequence_restart(),
             supports_explicit_auto_increment_values: self.supports_explicit_auto_increment_values(),
             supports_browse_filters: self.supports_browse_filters(),
+            supports_table_default_collation: self.supports_table_default_collation(),
         }
     }
 
@@ -182,6 +184,10 @@ pub trait DatabaseDriver: Send + Sync {
 
     fn supports_browse_filters(&self) -> bool {
         true
+    }
+
+    fn supports_table_default_collation(&self) -> bool {
+        false
     }
 
     fn catalog_object_kinds(&self) -> &'static [crate::CatalogObjectKind] {

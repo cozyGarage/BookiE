@@ -876,6 +876,7 @@ impl App {
                             .collect(),
                         indexes,
                         fks,
+                        default_collation: None,
                     };
                     match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {

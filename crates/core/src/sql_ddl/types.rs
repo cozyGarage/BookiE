@@ -27,6 +27,9 @@ pub enum BuildDdlError {
     #[error("collation name is not safe to use: {0}")]
     UnsafeCollation(String),
 
+    #[error("this engine has no table-level default collation")]
+    TableCollationUnsupported,
+
     #[error("a partial index cannot be recreated from its catalog description")]
     PartialIndex,
 
@@ -408,6 +411,7 @@ pub enum StructureOp {
         columns: Vec<DraftColumn>,
         indexes: Vec<IndexInfo>,
         fks: Vec<ForeignKeyInfo>,
+        default_collation: Option<String>,
     },
     RenameTable {
         schema: Option<String>,
