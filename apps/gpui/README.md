@@ -2,7 +2,7 @@
 
 The GPUI frontend for BookiE, built with `gpui-pre` 0.3.11. By default it shows a synthetic result grid, the same one as `experiments/tauri-grid-prototype`, so the two can be compared. With `BOOKIE_PROTOTYPE_FILE` (a SQLite or DuckDB file) or `BOOKIE_PROTOTYPE_CONNECTION` (a saved connection name or id) plus `BOOKIE_PROTOTYPE_TABLE` it reads a real table, read-only, through `bookie-app-services` ([ADR 0043](../../docs/decisions/0043-gpui-frontend-may-read-real-data-through-app-services.md)). It is **not shipped**: no package or release includes it, and the GTK application stays the product ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)). Its location is [ADR 0044](../../docs/decisions/0044-gpui-app-lives-under-apps.md).
 
-It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on `bookie-core` for typed values and `bookie-results` for bounded scanning and text search. Equality filters keep the prototype's case-insensitive displayed-text behavior in the experiment adapter; they do not weaken typed equality in shared result consumers.
+It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on `bookie-core` for typed values and `bookie-results` for bounded scanning and text search. Equality filters are typed and exact through `bookie-results` when the column's declared type is a known edit kind (core's filter classifier decides); other columns compare the displayed text exactly and case-sensitively. A text filter such as `label = Sample 1` therefore matches only that exact case.
 
 ## Scope
 
@@ -18,15 +18,15 @@ The window (`src/main.rs`) has:
 
 Find, the filter row and the cell editor use `src/text_input.rs`, a single-line input ported from GPUI's own `examples/input.rs` (Apache-2.0, comments removed). It has a caret, mouse and Shift selection, Ctrl+A/C/X/V, Home/End, grapheme-aware deletion and the IME hooks (`EntityInputHandler`). These fields are single line. The Query tab uses a separate multiline SQL editor.
 
-The grid has a keyboard cell cursor (`src/cursor.rs`). Click a cell or focus the grid, then the arrow keys move one cell, Page Up and Page Down a screenful, Home and End to the row ends and Ctrl+Home and Ctrl+End to the corners. Moving past the last row of a page continues on the next page. Space selects the cursor row, Shift+Up and Shift+Down extend the selection, and Enter or F2 edits the cell. The active row and column are tinted, the active cell has a blue outline, and the status line names it. Numeric values and row numbers align to the right, following the DBX grid's numeric layout.
+The grid has a keyboard cell cursor (the `grid_cursor` module of `bookie-results`). Click a cell or focus the grid, then the arrow keys move one cell, Page Up and Page Down a screenful, Home and End to the row ends and Ctrl+Home and Ctrl+End to the corners. Moving past the last row of a page continues on the next page. Space selects the cursor row, Shift+Up and Shift+Down extend the selection, and Enter or F2 edits the cell. The active row and column are tinted, the active cell has a blue outline, and the status line names it. Numeric values and row numbers align to the right, following the DBX grid's numeric layout.
 
 Ctrl+Shift+P opens a command palette (`src/palette.rs` and an overlay in `src/main.rs`), as in Zed: type letters of a command, Up and Down choose, Enter runs, Escape closes. It lists page navigation, Find, Filter, Clear filter, Compare, the paged and continuous modes, Copy, Clear selection and Edit the active cell, and hides commands that do not apply. It reuses the same `TextInput` as Find, so it also checks that component's keyboard and IME handling in a second place.
 
-Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as the Tauri prototype (and so as `bookie_core::import::parse_cell`), without depending on any BookiE crate. Opening a value containing a newline is refused with a single-line editor notice, preserving its full value. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere. Copy includes the full pending values.
+Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as the Tauri prototype (and so as `bookie_core::import::parse_cell`), through `bookie-core`'s cell parser. Opening a value containing a newline is refused with a single-line editor notice, preserving its full value. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere. Copy includes the full pending values.
 
 Connection and table changes are refused while view-only edits are pending. Closing a result or query tab with pending edits is also refused, and an open cell editor cannot be replaced by switching grids or results. **Commands → Discard all view-only edits** discards all such edits and allows the change.
 
-Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text. The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
+Rows can be selected with a click, extended with Shift+click, and copied with Ctrl+C (Ctrl+Shift+C adds the header row) through the GPUI clipboard as tab-separated text (`bookie-app-services::result_copy`). The quoting follows the core export rules and is covered by unit tests; copy is limited to 5,000 rows. Writing to the real system clipboard was not verified, because a headless run cannot read it back.
 
 Copy as INSERT is available for table rows. Catalog, tabs and generated SQL retain the selected table's schema and name as separate identifiers, including names containing dots or quotes. Query results do not infer an INSERT target from the previously browsed table.
 
@@ -51,9 +51,9 @@ The planned modularisation puts application logic in app-services and leaves the
 | Module | Holds | Would become |
 |---|---|---|
 | `model` | rows, Find, filter, compare, pager | a result service |
-| `selection` | row selection and tab-separated copy | result clipboard |
+| `selection` | row selection | result selection |
 | `edit` | typed cell validation | value editing |
-| `cursor` | active-cell movement rules | grid view-model |
+| `cursor` | moved to `bookie-results` (`grid_cursor`, `result_page`) | done |
 | `palette` | command matching and ordering | command registry |
 | `shell` | sidebar tree and tab model | workspace view-model |
 | `theme` | colour and size tokens | design tokens (CSS variables for a web renderer too) |
@@ -100,7 +100,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 ## Limits
 
 - The default source is synthetic. A saved connection can also be opened from the Home page. An empty catalog opens a query tab on the live connection. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only, capped at 100,000 rows and subject to the shared decoded-byte and cell budgets. The status marks results that may be incomplete. Pages are separate reads, not a consistent snapshot; concurrent changes can affect the rows shown.
-- Driver-shaped temporal, decimal, UUID and JSON values retain their original `bookie_core::Value` through the cell bridge. Synthetic edits still use the prototype's local cell representation. Tests cover typed round trips and bounded JSON previews.
+- Cells are `bookie_core::Value` throughout (`Cell` is a type alias), so driver values and synthetic values use the same type. Tests cover typed round trips and bounded JSON previews.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - Cell editing uses a single-line field; values containing newlines cannot be edited there.
 - It measures one machine with one GPU driver; it does not establish performance on other hardware.
