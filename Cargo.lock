@@ -1441,7 +1441,6 @@ version = "0.2.7"
 dependencies = [
  "chrono",
  "rskafka",
- "testcontainers",
  "testcontainers-modules",
  "tokio",
 ]
