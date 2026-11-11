@@ -397,6 +397,7 @@ jobs:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           cargo build --profile ci --locked -p bookie-app --bin bookie-app
+          mkdir -p target/gtk-safety/schemas
           python3 scripts/ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety "$BOOKIE_SOURCE_COMMIT"
       - name: Upload GTK safety binary
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
