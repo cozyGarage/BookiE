@@ -527,15 +527,18 @@ def application_memory_kib():
 def application_sidebar_row_construction():
     process = owned_application().process
     stderr = process.stderr
-    position = stderr.tell()
-    stderr.seek(0)
-    output = stderr.read()
-    stderr.seek(position)
-    matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
-    if not matches:
-        raise AssertionError("the app did not report sidebar row construction timing")
-    count, elapsed = matches[-1]
-    return int(count), float(elapsed)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        position = stderr.tell()
+        stderr.seek(0)
+        output = stderr.read()
+        stderr.seek(position)
+        matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
+        if matches:
+            count, elapsed = matches[-1]
+            return int(count), float(elapsed)
+        time.sleep(POLL_SECONDS)
+    raise AssertionError("the app did not finish sidebar row construction")
 
 
 def wait_for_database_count(path, expected, timeout=WAIT_SECONDS):
@@ -1726,6 +1729,7 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
     wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
+    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
     catalog_ready = time.monotonic()
     search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
     if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
@@ -1736,7 +1740,6 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_node_showing(target, True, timeout=120)
     filter_ready = time.monotonic()
     after = application_memory_kib()
-    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
     profile = {
         "scenario": "postgres_sidebar_catalog_profile",
         "source_commit": os.environ.get("BOOKIE_GTK_SOURCE_COMMIT"),
