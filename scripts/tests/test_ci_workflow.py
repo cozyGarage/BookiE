@@ -61,6 +61,7 @@ class CiWorkflowTests(unittest.TestCase):
              "pg-release", "socket-ssh", "driver-tls", "keyring"},
         )
         self.assertTrue({"bookie-app", "bookie-mcp", "bookie-policy"} <= set(bundle_groups["consumers"]["lib"] + bundle_groups["consumers"]["test"]))
+        self.assertIn("bookie-app", bundle_groups["consumers"]["test"])
         for group in ("driver-core", "driver-analytics", "driver-extended"):
             self.assertTrue(bundle_groups[group]["test"])
 

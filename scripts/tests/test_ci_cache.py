@@ -174,7 +174,7 @@ class CiCacheTests(unittest.TestCase):
         helper = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(helper)
 
-        for group in ('default', 'duckdb', 'direct', 'unit', 'sandbox', 'gpui'):
+        for group in helper.BUNDLE_GROUPS:
             with self.subTest(group=group), tempfile.TemporaryDirectory() as temporary:
                 bundle_root = Path(temporary) / 'bundles'
                 bundle_root.mkdir()
