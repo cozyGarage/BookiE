@@ -20,6 +20,24 @@ use bulk_close::{add_bulk_close_actions, bulk_close_menu_model};
 mod closed_tab;
 use closed_tab::describe_closed_tab;
 
+fn focus_after_tab_close(tab_view: &adw::TabView, workspace_outer_stack: &gtk::Stack) {
+    let focused = tab_view
+        .selected_page()
+        .map(|page| page.child())
+        .is_some_and(|child| child.child_focus(gtk::DirectionType::TabForward));
+    if !focused {
+        let stack = workspace_outer_stack.downgrade();
+        glib::idle_add_local_once(move || {
+            if let Some(stack) = stack.upgrade()
+                && let Some(empty_page) = stack.child_by_name("empty")
+                && stack.visible_child_name().as_deref() == Some("empty")
+            {
+                empty_page.child_focus(gtk::DirectionType::TabForward);
+            }
+        });
+    }
+}
+
 impl App {
     /// Builds the unified AdwTabOverview tree once per connection.
     /// Idempotent via `workspace_root_added`.
@@ -687,6 +705,7 @@ impl App {
         if self.workspace_tabs.borrow().is_empty() {
             self.workspace_outer_stack.set_visible_child_name("empty");
         }
+        focus_after_tab_close(tab_view, &self.workspace_outer_stack);
         self.refresh_schema_index();
         self.refresh_window_title();
     }
