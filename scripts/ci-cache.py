@@ -13,7 +13,7 @@ import time
 
 
 DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:default|duckdb)\Z')
+BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:default|duckdb|direct|unit|sandbox|gpui)\Z')
 DEFAULT_MIN_FREE_GIB = 30
 
 
