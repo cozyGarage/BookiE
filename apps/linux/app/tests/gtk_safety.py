@@ -536,7 +536,8 @@ def application_sidebar_row_construction():
         matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
         if matches:
             count, elapsed = matches[-1]
-            return int(count), float(elapsed)
+            stalls = [int(value) for value in re.findall(r"UI thread stalled.*?stall_ms=(\d+)", output)]
+            return int(count), float(elapsed), len(stalls), max(stalls, default=0)
         time.sleep(POLL_SECONDS)
     raise AssertionError("the app did not finish sidebar row construction")
 
@@ -1729,7 +1730,7 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
     wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
-    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
+    sidebar_nodes, row_construction_ms, ui_stall_count, ui_stall_max_ms = application_sidebar_row_construction()
     catalog_ready = time.monotonic()
     search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
     if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
@@ -1750,6 +1751,8 @@ def postgres_sidebar_catalog_profile(_database, base):
         "search_filter_ms": (filter_ready - filter_started) * 1000,
         "sidebar_nodes": sidebar_nodes,
         "row_construction_ms": row_construction_ms,
+        "ui_stall_count": ui_stall_count,
+        "ui_stall_max_ms": ui_stall_max_ms,
         "memory_before_kib": before,
         "memory_after_kib": after,
     }
@@ -1759,6 +1762,7 @@ def postgres_sidebar_catalog_profile(_database, base):
 
 
 postgres_sidebar_catalog_profile.environment = "local"
+postgres_sidebar_catalog_profile.environment_overrides = {"BOOKIE_UI_STALL_MS": "16"}
 
 
 def press_x11_text(text):
