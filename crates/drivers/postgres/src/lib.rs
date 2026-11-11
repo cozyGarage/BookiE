@@ -9,9 +9,9 @@ use sqlx::{Connection as SqlxConnection, Pool, Postgres, Row};
 use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
     CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, CommitResolution, CommitToken, ConnectOptions,
-    Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo,
-    MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo, Transport, Value, check_pre_dispatch,
-    run_controlled_setup, run_server_cancellable,
+    Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult, ForeignKeyInfo,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo,
+    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod array;
@@ -39,6 +39,14 @@ pub struct PgDriver;
 
 #[async_trait]
 impl DatabaseDriver for PgDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            special_numeric_literals: true,
+            extended_calendar_temporals: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn id(&self) -> &'static str {
         "postgres"
     }

@@ -1,37 +1,121 @@
 //! GTK-side entry points for value parsing. The parser lives in `bookie_app_services::value_input`; these
-//! wrappers take the driver's enum input style and MongoDB Decimal128 canonicalisation from the registry.
+//! wrappers take the driver's enum input style and MongoDB Decimal128 canonicalisation through capabilities.
 
 pub(super) use bookie_app_services::value_input::*;
 
 use bookie_core::{ColumnInfo, EnumInputStyle, Value};
 
-/// The hooks for one driver, from the driver registry.
-pub(crate) fn hooks_for(driver_id: &str) -> ParseHooks {
-    ParseHooks {
-        enum_input_style: registered_enum_input_style(driver_id),
-        canonical_decimal128: mongodb_canonical_decimal128,
+fn input_error_message(error: ValueInputError) -> String {
+    use ValueInputError as Error;
+    match error {
+        Error::FieldRequired => bookie_app_services::tr!("Field is required"),
+        Error::InvalidEnumMetadata => bookie_app_services::tr!("Could not safely read ENUM or SET members"),
+        Error::UndeclaredEnumMember => bookie_app_services::tr!("Value is not a declared ENUM or SET member"),
+        Error::InvalidBoolean => bookie_app_services::tr!("Invalid boolean. Use true/false, yes/no, or 1/0."),
+        Error::InvalidInteger => bookie_app_services::tr!("Invalid integer"),
+        Error::InvalidNumber => bookie_app_services::tr!("Invalid number"),
+        Error::InvalidDecimal => bookie_app_services::tr!("Invalid decimal"),
+        Error::InvalidUuid => bookie_app_services::tr!("Invalid UUID. Expected 8-4-4-4-12 hex digits."),
+        Error::InvalidJson(error) => bookie_app_services::tr!("Invalid JSON: {error}").replace("{error}", &error),
+        Error::InvalidTimestamp => {
+            bookie_app_services::tr!("Invalid timestamp. Use ISO 8601, e.g. 2024-01-15T14:30:00Z.")
+        }
+        Error::InvalidTimestampWithTimeZone => bookie_app_services::tr!("Invalid timestamp with time zone."),
+        Error::InvalidDateTime => bookie_app_services::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS."),
+        Error::InvalidDateAndTime => bookie_app_services::tr!("Invalid date and time."),
+        Error::InvalidDate => bookie_app_services::tr!("Invalid date. Use YYYY-MM-DD."),
+        Error::InvalidTime => bookie_app_services::tr!("Invalid time. Use HH:MM:SS."),
+        Error::InvalidSqlServerDateTimeOffsetColumnScale => {
+            bookie_app_services::tr!("Invalid SQL Server datetimeoffset column scale")
+        }
+        Error::InvalidSqlServerDateTimeOffset => bookie_app_services::tr!("Invalid SQL Server datetimeoffset"),
+        Error::SqlServerDateTimeOffsetOutOfRange => {
+            bookie_app_services::tr!("SQL Server datetimeoffset value exceeds the column precision or offset range")
+        }
+        Error::MySqlSpatialValueNotEditable => {
+            bookie_app_services::tr!("MySQL spatial values cannot be edited losslessly")
+        }
+        Error::MySqlIntegerOutOfRange => {
+            bookie_app_services::tr!("Integer is outside the supported MySQL column range")
+        }
+        Error::MongoInt32OutOfRange => {
+            bookie_app_services::tr!("Integer is outside the supported MongoDB Int32 range")
+        }
+        Error::MongoDatePrecision => bookie_app_services::tr!("MongoDB BSON dates support millisecond precision only"),
+        Error::DuckDbTimestampTzPrecision => {
+            bookie_app_services::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only")
+        }
+        Error::DuckDbTemporalPrecision { kind } => {
+            bookie_app_services::tr!("DuckDB {kind} precision cannot represent this value exactly")
+                .replace("{kind}", kind)
+        }
+        Error::BitWidthOutOfRange => bookie_app_services::tr!("Integer is outside the supported BIT range"),
     }
 }
 
-fn mongodb_canonical_decimal128(text: &str) -> Option<String> {
-    drivers_mongodb::canonical_decimal128_text(text).ok()
+#[cfg(test)]
+pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Value, String> {
+    bookie_app_services::value_input::parse_input_for_column(text, col).map_err(input_error_message)
 }
 
-fn registered_enum_input_style(driver_id: &str) -> EnumInputStyle {
+#[cfg(test)]
+pub(super) fn parse_input_for_driver_with_style(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+) -> Result<Value, String> {
+    bookie_app_services::value_input::parse_input_for_driver_with_style(text, col, hooks).map_err(input_error_message)
+}
+
+#[cfg(test)]
+pub(super) fn parse_input_for_grid_cell_with_style(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+    current_value: Option<&Value>,
+) -> Result<Value, String> {
+    bookie_app_services::value_input::parse_input_for_grid_cell_with_style(text, col, hooks, current_value)
+        .map_err(input_error_message)
+}
+
+pub(super) fn parse_grid_cell_input_with_style(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+    current_value: Option<&Value>,
+) -> Result<Value, String> {
+    bookie_app_services::value_input::parse_grid_cell_input_with_style(text, col, hooks, current_value)
+        .map_err(input_error_message)
+}
+
+pub(super) fn parse_pasted_cell_with_style(
+    text: Option<&str>,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+    current_value: Option<&Value>,
+) -> Result<Value, String> {
+    bookie_app_services::value_input::parse_pasted_cell_with_style(text, col, hooks, current_value)
+        .map_err(input_error_message)
+}
+
+/// The hooks for one driver, from the driver registry.
+/// The hooks for one driver, from the driver registry.
+pub(crate) fn hooks_for(driver_id: &str) -> ParseHooks {
     use std::sync::OnceLock;
 
     static REGISTRY: OnceLock<bookie_core::DriverRegistry> = OnceLock::new();
-    REGISTRY
-        .get_or_init(crate::build_registry)
-        .get(driver_id)
-        .map_or(EnumInputStyle::RawValue, |driver| {
-            driver.capabilities().enum_input_style
-        })
+    REGISTRY.get_or_init(crate::build_registry).get(driver_id).map_or_else(
+        || ParseHooks::without_driver(EnumInputStyle::RawValue),
+        |driver| ParseHooks {
+            enum_input_style: driver.capabilities().enum_input_style,
+            capabilities: driver.value_input_capabilities(),
+        },
+    )
 }
 
 #[cfg(test)]
 pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
-    parse_input_for_driver_with_style(text, col, driver_id, &hooks_for(driver_id))
+    parse_input_for_driver_with_style(text, col, &hooks_for(driver_id))
 }
 
 #[cfg(test)]
@@ -41,7 +125,7 @@ pub(super) fn parse_input_for_grid_cell(
     driver_id: &str,
     current_value: Option<&Value>,
 ) -> Result<Value, String> {
-    parse_input_for_grid_cell_with_style(text, col, driver_id, &hooks_for(driver_id), current_value)
+    parse_input_for_grid_cell_with_style(text, col, &hooks_for(driver_id), current_value)
 }
 
 pub(in crate::ui) fn parse_grid_cell_input(
@@ -50,7 +134,7 @@ pub(in crate::ui) fn parse_grid_cell_input(
     driver_id: &str,
     current_value: Option<&Value>,
 ) -> Result<Value, String> {
-    parse_grid_cell_input_with_style(text, col, driver_id, &hooks_for(driver_id), current_value)
+    parse_grid_cell_input_with_style(text, col, &hooks_for(driver_id), current_value)
 }
 
 #[cfg(test)]
@@ -60,7 +144,7 @@ pub(super) fn parse_pasted_cell(
     driver_id: &str,
     current_value: Option<&Value>,
 ) -> Result<Value, String> {
-    parse_pasted_cell_with_style(text, col, driver_id, &hooks_for(driver_id), current_value)
+    parse_pasted_cell_with_style(text, col, &hooks_for(driver_id), current_value)
 }
 
 #[cfg(test)]

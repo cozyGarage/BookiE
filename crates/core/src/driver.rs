@@ -34,6 +34,23 @@ pub enum EnumInputStyle {
     SqlQuotedLabel,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DriverValueInputCapabilities {
+    pub integer_range_validation: bool,
+    pub spatial_edit_requires_native_value: bool,
+    pub numeric_affinity_input: bool,
+    pub heterogeneous_cell_values: bool,
+    pub datetimeoffset_input: bool,
+    pub special_numeric_literals: bool,
+    pub extended_calendar_temporals: bool,
+    pub typed_integer_widths: bool,
+    pub canonical_decimal_input: Option<fn(&str) -> Option<String>>,
+    pub millisecond_date_precision: bool,
+    pub extended_calendar_dates: bool,
+    pub timestamp_with_timezone: bool,
+    pub temporal_fraction_precision: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DataModel {
     #[default]
@@ -107,6 +124,10 @@ pub trait DatabaseDriver: Send + Sync {
             supports_browse_filters: self.supports_browse_filters(),
             supports_table_default_collation: self.supports_table_default_collation(),
         }
+    }
+
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities::default()
     }
 
     fn maturity(&self) -> DriverMaturity {
