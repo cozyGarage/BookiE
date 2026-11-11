@@ -36,6 +36,8 @@ SQL_EDITOR = {
     "Tables sidebar": "tab-stop",
     "Run options": "tab-stop",
     "Show columns": "tab-stop",
+    "Show columns safety_items Open safety_items": "tab-stop (Enter on the sidebar row)",
+    "Tables": "tab-stop (Enter on the sidebar row)",
     "Results": "shortcut: Ctrl+J",
     "Errors": "tab-stop",
     "Maximize results": "tab-stop",

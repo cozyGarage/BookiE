@@ -5,7 +5,7 @@
 
 ## Context
 
-The sidebar is one `GtkListBox` fed by a Relm4 factory. Schema and Views headers are list headers, and each header belongs to the first row below it. Hiding rows with the list filter therefore hides the header and its controls, so groups cannot be collapsed. Routines, sequences, types and the other catalog objects are reachable only through the Catalog dialog, and the dialog is a flat list per kind.
+Before this decision, the sidebar used one `GtkListBox` fed by a Relm4 factory. Schema and Views headers were list headers, and each header belonged to the first row below it. Hiding rows with the list filter therefore hid the header and its controls, so groups could not be collapsed. Routines, sequences, types and the other catalog objects were reachable only through the Catalog dialog, and the dialog was a flat list per kind.
 
 ## Decision
 
@@ -20,7 +20,7 @@ Replace the list with a `GtkListView` over a `GtkTreeListModel`.
 
 ## Alternatives considered
 
-- **Keep the `GtkListBox` and hide rows with the list filter.** Rejected as the target. A header belongs to the first row below it, so filtering hides the header and its controls and groups cannot collapse. The current `GtkListBox` implementation does not provide collapsible groups.
+- **Keep the previous `GtkListBox` and hide rows with the list filter.** Rejected as the target. A header belongs to the first row below it, so filtering hides the header and its controls and groups cannot collapse. That implementation does not provide collapsible groups.
 - **Leave catalog objects only in the Catalog dialog.** Rejected. A flat list per kind makes Routines, Sequences and Types unreachable in context.
 - **A generic docking or panel framework.** Not adopted. Add one only when concrete behaviours need it. The existing editor split supports the identified results and error panel work; a generic framework is not required for it.
 

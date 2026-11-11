@@ -310,6 +310,21 @@
     [
       "bookie-app",
       "--lib",
+      "ui::sidebar_tree_model::tests::large_catalog_domain_nodes_do_not_become_list_rows_until_their_groups_expand"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::sidebar_tree_model::tests::gtk_list_view_realizes_a_bounded_fraction_of_a_large_expanded_table_group"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::sidebar_tree_model::tests::tree_model_keeps_catalog_nodes_under_their_schema_without_flattening_children"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::structure::confirmation_tests::force_dismissing_a_table_confirmation_does_not_run_its_action"
     ],
     [
