@@ -1245,6 +1245,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::hiding_a_streamed_result_releases_its_grid_and_reloads_from_the_spool"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable"
     ],
     [

@@ -148,6 +148,37 @@ fn complete_page_load_result(
     );
 }
 
+fn complete_page_load_with_probe(
+    runtime: &tokio::runtime::Runtime,
+    holder: &gtk::Box,
+    grid_sender: &relm4::Sender<GridMsg>,
+    request: (
+        u64,
+        u64,
+        StatementIdentity,
+        bookie_app_services::stream_result_spool::StreamResultSpool,
+        Vec<ColumnInfo>,
+    ),
+) -> std::sync::Weak<QueryResult> {
+    let (generation, index, identity, spool, columns) = request;
+    let page = runtime.block_on(spool.load_page(index, columns)).unwrap();
+    let weak = Arc::downgrade(&page);
+    complete_page_load(
+        PageLoadContext {
+            holder,
+            generation,
+            index,
+            identity,
+            grid_sender,
+            connection_id: None,
+            database: Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+            settings_store: LocalResultSettingsStore::default(),
+        },
+        Ok(page),
+    );
+    weak
+}
+
 #[test]
 #[ignore = "requires an isolated GTK display"]
 fn a_new_stream_page_is_appended_without_rebuilding_the_pages_already_shown() {
@@ -448,6 +479,75 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
     assert!(resident_pages.get(0).is_none());
     assert!(resident_pages.get(1).is_none());
     assert!(resident_pages.get(2).is_some());
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn hiding_a_streamed_result_releases_its_grid_and_reloads_from_the_spool() {
+    relm4::adw::init().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let page = page(&[42]);
+    let columns = page.columns.clone();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    runtime.block_on(spool.append_page(0, page)).unwrap();
+    let (mut outcome, mut result) = streamed(&[0], Vec::new(), 1);
+    result.generation = 42;
+    result.terminal = StreamTerminal::Complete;
+    result.columns = columns;
+    result.spool = Some(spool);
+    outcome.kind = StatementOutcomeKind::Streamed(Box::new(result.clone()));
+    let grid_sender = relm4::channel::<GridMsg>().0;
+    let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    super::super::outcomes::render_outcomes(
+        &holder,
+        &[outcome.clone()],
+        &grid_sender,
+        None,
+        Arc::new(crate::services::database_service::DatabaseService::new_isolated()),
+        LocalResultSettingsStore::default(),
+        None,
+    );
+    let root = holder.clone().upcast::<gtk::Widget>();
+    let pages = named::<gtk::Stack>(&root, &completed_page_stack_name(42)).unwrap();
+    let (sender, receiver) = relm4::channel::<crate::ui::editor::SqlEditorInput>();
+    let workspace = gtk::Stack::builder().transition_duration(0).build();
+    workspace.add_named(&holder, Some("results"));
+    workspace.add_named(&gtk::Box::new(gtk::Orientation::Vertical, 0), Some("other"));
+    let window = gtk::Window::builder().child(&workspace).build();
+    window.present();
+    install_page_loader(&pages, &result, outcome.identity, &sender);
+    let weak_page = complete_page_load_with_probe(&runtime, &holder, &grid_sender, page_load_request(&receiver));
+    let grid = wait_for_grid(&holder.clone().upcast());
+    let page_container = pages.visible_child().unwrap();
+    let page_content = page_container.first_child().unwrap();
+    let weak_grid = page_content.downgrade();
+    drop(page_content);
+    drop(grid);
+
+    workspace.set_visible_child_name("other");
+    while gtk::glib::MainContext::default().iteration(false) {}
+
+    assert!(
+        !weak_grid.upgrade().is_some_and(|grid| grid.is_mapped()),
+        "hidden result grid stayed mapped"
+    );
+    assert!(weak_page.upgrade().is_none());
+    assert!(weak_grid.upgrade().is_none());
+    workspace.set_visible_child_name("results");
+    while gtk::glib::MainContext::default().iteration(false) {}
+    let _ = complete_page_load_with_probe(&runtime, &holder, &grid_sender, page_load_request(&receiver));
+    let restored = wait_for_grid(&holder.clone().upcast());
+    let row = restored
+        .model()
+        .unwrap()
+        .item(0)
+        .unwrap()
+        .downcast::<crate::ui::row_object::RowObject>()
+        .unwrap();
+    assert_eq!(row.complete_cells(), Some(vec![Value::Int(42)]));
     window.destroy();
 }
 #[test]
