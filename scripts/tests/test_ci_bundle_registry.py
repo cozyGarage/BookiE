@@ -180,7 +180,9 @@ class RegistryExtractionTests(unittest.TestCase):
                     patch.object(registry, 'request', side_effect=request), redirect_stdout(output):
                 registry.fetch(destination, 'a' * 40, 'default', 'https://registry.example/bundle/')
             self.assertEqual((destination / 'program').read_bytes(), bytes(range(256)) * 8)
-            self.assertIn('bundle receive/write:', output.getvalue())
+            self.assertIn('bundle response reads:', output.getvalue())
+            self.assertIn('local write calls:', output.getvalue())
+            self.assertIn('bundle receive/write total:', output.getvalue())
             self.assertIn('bundle checksum:', output.getvalue())
             self.assertIn('bundle extract/verify:', output.getvalue())
 
