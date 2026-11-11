@@ -27,8 +27,11 @@ pub(super) fn notify_if_unattended(widget: &impl IsA<gtk::Widget>, elapsed: Dura
     application.send_notification(Some("query-finished"), &notification);
 }
 
+/// The status label keeps a fixed width and ellipsises long text, so a new status ("done in 414 ms",
+/// "cancelled") does not move the Run button beside it.
 pub(super) fn fit_status(status: &gtk::Label) {
-    status.set_hexpand(true);
+    status.set_width_chars(18);
+    status.set_max_width_chars(18);
     status.set_xalign(1.0);
     status.set_ellipsize(gtk::pango::EllipsizeMode::End);
     status.connect_label_notify(|status| status.set_tooltip_text(Some(&status.label())));

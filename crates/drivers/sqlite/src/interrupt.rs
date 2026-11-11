@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 use bookie_core::DriverError;
-use libsqlite3_sys::{sqlite3, sqlite3_interrupt};
+use libsqlite3_sys::{sqlite3, sqlite3_get_autocommit, sqlite3_interrupt};
 use sqlx::Sqlite;
 use sqlx::pool::PoolConnection;
 
@@ -62,4 +62,13 @@ impl Drop for InterruptHandle {
     fn drop(&mut self) {
         self.state.store(RETIRED, Ordering::Release);
     }
+}
+
+pub(crate) async fn in_autocommit_mode(connection: &mut PoolConnection<Sqlite>) -> Result<bool, DriverError> {
+    let mut handle = connection
+        .lock_handle()
+        .await
+        .map_err(|error| DriverError::Internal(format!("sqlite connection is unusable: {error}")))?;
+    let database = handle.as_raw_handle();
+    Ok(unsafe { sqlite3_get_autocommit(database.as_ptr()) } != 0)
 }
