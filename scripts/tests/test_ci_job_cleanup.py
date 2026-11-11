@@ -276,7 +276,10 @@ class CiJobCleanupTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertFalse(job_tmp.exists())
+            self.assertFalse(
+                job_tmp.exists(),
+                f"cleanup output: {result.stdout}\ncleanup errors: {result.stderr}\nrm calls: {calls.read_text(encoding='utf-8')}",
+            )
             rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
             self.assertIn(["-rf", "--", "/var/cache/ci/tmp/bookie-driver-123-2-core"], rm_calls)
 

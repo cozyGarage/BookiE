@@ -345,7 +345,7 @@ class CiCacheTests(unittest.TestCase):
             status = Path(f'/proc/{int(child_pid.read_text())}/stat')
             try:
                 process_state = status.read_text().split()[2]
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
                 process_state = 'Z'
             self.assertEqual(process_state, 'Z')
         finally:
