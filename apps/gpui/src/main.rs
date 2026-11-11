@@ -12,7 +12,7 @@ mod text_input;
 mod ui_theme;
 
 use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
-use bookie_gpui::cursor::Cursor;
+use bookie_results::grid_cursor::Cursor;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
@@ -249,7 +249,7 @@ impl GridView {
             window,
             |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
-                    let cursor = bookie_gpui::cursor::Cursor {
+                    let cursor = bookie_results::grid_cursor::Cursor {
                         row: *row,
                         column: *column,
                     };

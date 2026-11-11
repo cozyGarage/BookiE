@@ -239,19 +239,19 @@ fn compare_labels(diff: &Diff, row: usize, numeric: &[bool]) -> Vec<(String, boo
         .collect()
 }
 
-pub fn table_cell(cursor: Option<bookie_gpui::cursor::Cursor>) -> Option<(usize, usize)> {
+pub fn table_cell(cursor: Option<bookie_results::grid_cursor::Cursor>) -> Option<(usize, usize)> {
     cursor.map(|cursor| (cursor.row, cursor.column))
 }
 
 #[cfg(test)]
-pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_gpui::cursor::Cursor> {
-    cell.map(|(row, column)| bookie_gpui::cursor::Cursor { row, column })
+pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_results::grid_cursor::Cursor> {
+    cell.map(|(row, column)| bookie_results::grid_cursor::Cursor { row, column })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bookie_gpui::cursor::Cursor;
+    use bookie_results::grid_cursor::Cursor;
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
 

@@ -3,7 +3,7 @@ use std::time::Instant;
 use bookie_gpui::model::Cell;
 use gpui::{TestAppContext, VisualTestContext};
 
-use bookie_gpui::cursor::Cursor;
+use bookie_results::grid_cursor::Cursor;
 
 use crate::GridView;
 use crate::text_input;
