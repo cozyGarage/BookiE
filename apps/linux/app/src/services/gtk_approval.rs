@@ -18,7 +18,6 @@ const DENY_RESPONSE: &str = "deny";
 const APPROVE_ONCE_RESPONSE: &str = "once";
 const APPROVE_REMEMBER_RESPONSE: &str = "remember";
 const APPROVE_REMEMBER_LABEL: &str = "Approve and don't ask again";
-const MAX_RESPONSE_LABEL_CHARS: usize = 30;
 const CLOSE_RESPONSE: &str = DENY_RESPONSE;
 
 /// The window that actually owns the triggering connection wins over
@@ -315,7 +314,7 @@ mod tests {
 
     #[test]
     fn the_remember_label_is_short_enough_not_to_be_ellipsized() {
-        assert!(APPROVE_REMEMBER_LABEL.chars().count() <= MAX_RESPONSE_LABEL_CHARS);
+        assert!(APPROVE_REMEMBER_LABEL.chars().count() <= 30);
     }
 
     #[test]
