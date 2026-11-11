@@ -146,6 +146,7 @@ async fn closing_a_connection_removes_only_its_grants() {
     rig.guard.execute(WRITE).await.expect("write");
     let other = ApprovalGrant {
         connection_id: Uuid::new_v4(),
+        connection_name: "other".into(),
         rule: "other".into(),
         principal: Principal::human_gui(),
     };

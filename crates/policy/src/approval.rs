@@ -61,6 +61,7 @@ impl ApprovalSink for DenyApprovalSink {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApprovalGrant {
     pub connection_id: Uuid,
+    pub connection_name: String,
     pub rule: String,
     pub principal: Principal,
 }
@@ -105,6 +106,7 @@ impl ApprovalGrants {
 fn grant_for(req: &ApprovalRequest) -> ApprovalGrant {
     ApprovalGrant {
         connection_id: req.connection_id,
+        connection_name: req.connection_name.clone(),
         rule: req.rule.clone(),
         principal: req.principal.clone(),
     }
