@@ -852,6 +852,24 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertEqual(checker.assess(results, "pull_request")[0], [])
         self.assertIn("distro-floor-scenarios", checker.assess(results, "push")[0])
 
+    def test_distro_floor_profiles_match_between_github_and_forgejo(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(
+            r"(?ms)^  distro-floor-scenarios:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", github
+        ).group(1)
+        forgejo_jobs = re.search(
+            r"(?ms)^  floor-build:\n(.*?)(?=^  driver:\n|\Z)", forgejo
+        ).group(1)
+        full_profile = (
+            "github.ref == 'refs/heads/main' || github.event_name == 'schedule' "
+            "|| github.event_name == 'workflow_dispatch'"
+        )
+
+        self.assertIn("if: github.event_name != 'pull_request'", github_job)
+        self.assertEqual(forgejo_jobs.count(f"if: {full_profile}"), 2)
+        self.assertEqual(checker.OPTIONAL_ON_PULL_REQUEST, {"distro-floor-scenarios"})
+
     def test_summary_depends_on_every_required_job_and_always_runs(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         section = workflow.split("  regression-gate:\n", 1)[1]
