@@ -13,7 +13,7 @@ pub fn derive_tab_label(query: &str) -> String {
         }
         return cleaned;
     }
-    crate::tr!("Empty query")
+    bookie_app_services::tr!("Empty query")
 }
 
 pub(crate) fn apply_editor_scheme(view: &sourceview5::View) {

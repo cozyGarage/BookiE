@@ -28,7 +28,7 @@ impl App {
             return;
         }
         self.set_row_op_in_flight(false);
-        let msg = warning.unwrap_or_else(|| crate::tr!("Saved"));
+        let msg = warning.unwrap_or_else(|| bookie_app_services::tr!("Saved"));
         let toast = crate::ui::plain_text::toast(&msg);
         toast.set_timeout(4);
         self.toast_overlay.add_toast(toast);

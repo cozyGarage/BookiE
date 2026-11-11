@@ -45,7 +45,7 @@ impl App {
         };
         let toast = crate::ui::plain_text::toast(&body);
         toast.set_timeout(0);
-        toast.set_button_label(Some(&crate::tr!("Cancel")));
+        toast.set_button_label(Some(&bookie_app_services::tr!("Cancel")));
         let cancel_sender = sender.clone();
         toast.connect_button_clicked(move |_| cancel_sender.input(AppMsg::CancelConnect));
         self.toast_overlay.add_toast(toast.clone());
@@ -75,7 +75,7 @@ impl App {
         // GNOME HIG dismiss-only alert: "Close" reads cleaner than "OK"
         // (which implies acknowledgement of an action the user took)
         // and matches GNOME Settings' info-alert convention.
-        dialog.add_response("close", &crate::tr!("Close"));
+        dialog.add_response("close", &bookie_app_services::tr!("Close"));
         dialog.set_default_response(Some("close"));
         dialog.set_close_response("close");
         dialog.present(Some(&self.window));
@@ -87,7 +87,7 @@ impl App {
             return;
         }
         let Some(history) = self.history.clone() else {
-            self.show_toast(&crate::tr!("Query history is unavailable"));
+            self.show_toast(&bookie_app_services::tr!("Query history is unavailable"));
             return;
         };
         let panel = HistoryDialog::builder()
@@ -119,33 +119,33 @@ impl App {
 
     pub(super) fn on_show_about(&self) {
         let dialog = adw::AboutDialog::builder()
-            .application_name(crate::tr!("BookiE"))
+            .application_name(bookie_app_services::tr!("BookiE"))
             .application_icon(crate::config::APP_ID)
-            .developer_name(crate::tr!("BookiE contributors"))
+            .developer_name(bookie_app_services::tr!("BookiE contributors"))
             .version(env!("CARGO_PKG_VERSION"))
             .website("https://github.com/cozyGarage/BookiE")
             .issue_url("https://github.com/cozyGarage/BookiE/issues")
             .support_url("https://github.com/cozyGarage/BookiE/discussions")
-            .copyright(crate::tr!("© 2025–2026 BookiE contributors"))
+            .copyright(bookie_app_services::tr!("© 2025–2026 BookiE contributors"))
             .license_type(gtk::License::Agpl30)
-            .comments(crate::tr!(
+            .comments(bookie_app_services::tr!(
                 "A native Linux database client built with GTK4 + libadwaita."
             ))
             .build();
         dialog.set_developers(ABOUT_DEVELOPERS);
-        dialog.set_translator_credits(&crate::tr!("translator-credits"));
+        dialog.set_translator_credits(&bookie_app_services::tr!("translator-credits"));
         crate::ui::leak_probe::track("about", &dialog);
         dialog.present(Some(&self.window));
     }
 
     pub(super) fn on_explain_active_query(&self) {
         let Some(id) = self.selected_workspace_tab_id() else {
-            self.show_toast(&crate::tr!("Open an SQL editor tab to explain a query."));
+            self.show_toast(&bookie_app_services::tr!("Open an SQL editor tab to explain a query."));
             return;
         };
         let tabs = self.workspace_tabs.borrow();
         let Some(super::WorkspaceTab::Editor(slot)) = tabs.get(&id) else {
-            self.show_toast(&crate::tr!("Open an SQL editor tab to explain a query."));
+            self.show_toast(&bookie_app_services::tr!("Open an SQL editor tab to explain a query."));
             return;
         };
         let sql = slot.query.clone();

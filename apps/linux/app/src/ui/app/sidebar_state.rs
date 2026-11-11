@@ -204,9 +204,9 @@ impl App {
             .borrow()
             .is_all_collapsed(&self.sidebar_nodes.borrow());
         let (icon, label) = if all_collapsed {
-            ("go-down-symbolic", crate::tr!("Expand all"))
+            ("go-down-symbolic", bookie_app_services::tr!("Expand all"))
         } else {
-            ("go-up-symbolic", crate::tr!("Collapse all"))
+            ("go-up-symbolic", bookie_app_services::tr!("Collapse all"))
         };
         self.sidebar_fold_button.set_icon_name(icon);
         self.sidebar_fold_button.set_tooltip_text(Some(&label));
@@ -237,7 +237,7 @@ impl App {
 
     pub(super) fn on_reveal_in_sidebar(&mut self) {
         let Some((schema, table)) = self.selected_browse_slot_table() else {
-            self.show_toast(&crate::tr!("Open a table to reveal it in the sidebar."));
+            self.show_toast(&bookie_app_services::tr!("Open a table to reveal it in the sidebar."));
             return;
         };
         let plan = reveal_target(
@@ -250,11 +250,11 @@ impl App {
         );
         match plan {
             Reveal::Missing => self.show_toast(
-                &crate::tr!("{table} is not in the sidebar. Refresh the connection if it is new.")
+                &bookie_app_services::tr!("{table} is not in the sidebar. Refresh the connection if it is new.")
                     .replace("{table}", &table),
             ),
             Reveal::HiddenBySchemaFilter => self.show_toast(
-                &crate::tr!("The schema of {table} is hidden. Show it from the schema filter.")
+                &bookie_app_services::tr!("The schema of {table} is hidden. Show it from the schema filter.")
                     .replace("{table}", &table),
             ),
             Reveal::Show {
@@ -345,7 +345,7 @@ impl App {
             self.schema_filter_list.remove(&child);
         }
         let heading = relm4::gtk::Label::builder()
-            .label(crate::tr!("Hidden schemas"))
+            .label(bookie_app_services::tr!("Hidden schemas"))
             .xalign(0.0)
             .build();
         self.schema_filter_list.append(&heading);
@@ -353,18 +353,18 @@ impl App {
         hidden.sort();
         if hidden.is_empty() {
             let empty = relm4::gtk::Label::builder()
-                .label(crate::tr!("No schemas are hidden"))
+                .label(bookie_app_services::tr!("No schemas are hidden"))
                 .xalign(0.0)
                 .build();
             self.schema_filter_list.append(&empty);
             return;
         }
         let sender_for_all = sender.clone();
-        let show_all = relm4::gtk::Button::with_label(&crate::tr!("Show all schemas"));
+        let show_all = relm4::gtk::Button::with_label(&bookie_app_services::tr!("Show all schemas"));
         show_all.connect_clicked(move |_| sender_for_all.input(super::AppMsg::ShowAllSidebarSchemas));
         self.schema_filter_list.append(&show_all);
         for schema in hidden {
-            let label = crate::tr!("Show {schema}").replace("{schema}", &schema);
+            let label = bookie_app_services::tr!("Show {schema}").replace("{schema}", &schema);
             let button = relm4::gtk::Button::with_label(&label);
             let sender_for_schema = sender.clone();
             button.connect_clicked(move |_| sender_for_schema.input(super::AppMsg::ShowSidebarSchema(schema.clone())));
@@ -389,14 +389,14 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
     use crate::services::sidebar_tree::{GroupKind, NodeKind};
     match &node.kind {
         NodeKind::Schema => node.schema.clone().unwrap_or_default(),
-        NodeKind::Group(GroupKind::Tables) => crate::tr!("Tables").to_string(),
-        NodeKind::Group(GroupKind::Views) => crate::tr!("Views").to_string(),
-        NodeKind::Group(GroupKind::Catalog) => crate::tr!("Catalog").to_string(),
+        NodeKind::Group(GroupKind::Tables) => bookie_app_services::tr!("Tables").to_string(),
+        NodeKind::Group(GroupKind::Views) => bookie_app_services::tr!("Views").to_string(),
+        NodeKind::Group(GroupKind::Catalog) => bookie_app_services::tr!("Catalog").to_string(),
         NodeKind::Catalog(kind) | NodeKind::CatalogLoaded(kind) => crate::ui::catalog_dialog::kind_label(*kind),
         NodeKind::CatalogObject { schema, name, .. } => schema
             .as_deref()
             .map_or_else(|| name.clone(), |schema| format!("{schema}.{name}")),
-        NodeKind::CatalogMore(_) => crate::tr!("Show all in Catalog…").to_string(),
+        NodeKind::CatalogMore(_) => bookie_app_services::tr!("Show all in Catalog…").to_string(),
         NodeKind::Table { name, .. } | NodeKind::View { name, .. } => name.clone(),
     }
 }
@@ -579,8 +579,8 @@ mod sidebar_label_tests {
             .find(|node| node.kind == NodeKind::Group(GroupKind::Views))
             .expect("view group exists");
 
-        assert_eq!(sidebar_group_label(table_group), crate::tr!("Tables").to_string());
-        assert_eq!(sidebar_group_label(view_group), crate::tr!("Views").to_string());
+        assert_eq!(sidebar_group_label(table_group), bookie_app_services::tr!("Tables").to_string());
+        assert_eq!(sidebar_group_label(view_group), bookie_app_services::tr!("Views").to_string());
     }
 
     #[test]
@@ -597,12 +597,12 @@ mod sidebar_label_tests {
             .find(|node| node.kind == NodeKind::Catalog(bookie_core::CatalogObjectKind::Role))
             .unwrap();
 
-        assert_eq!(sidebar_group_label(group), crate::tr!("Catalog").to_string());
+        assert_eq!(sidebar_group_label(group), bookie_app_services::tr!("Catalog").to_string());
         let init = row_for(entry, &Default::default(), false, false, "postgres", None);
         assert_eq!(init.kind, SidebarObjectKind::Catalog);
         let group_init = init.group.unwrap();
         assert!(group_init.entry);
-        assert_eq!(group_init.label, crate::tr!("Roles").to_string());
+        assert_eq!(group_init.label, bookie_app_services::tr!("Roles").to_string());
     }
 
     #[test]

@@ -59,7 +59,7 @@ fn hex_dump(bytes: &[u8]) -> String {
     }
     if shown.len() < bytes.len() {
         out.push_str(
-            &crate::tr!("Showing the first {shown} of {total} bytes.")
+            &bookie_app_services::tr!("Showing the first {shown} of {total} bytes.")
                 .replace("{shown}", &shown.len().to_string())
                 .replace("{total}", &bytes.len().to_string()),
         );
@@ -82,7 +82,7 @@ fn json_preview(value: &serde_json::Value) -> String {
     let mut preview = PreviewWriter::default();
     let serialized = serde_json::to_writer_pretty(&mut preview, value);
     if serialized.is_err() && !preview.truncated {
-        return crate::tr!("This JSON value could not be previewed.");
+        return bookie_app_services::tr!("This JSON value could not be previewed.");
     }
     let end = std::str::from_utf8(&preview.bytes).map_or_else(|error| error.valid_up_to(), |_| preview.bytes.len());
     let text = String::from_utf8_lossy(&preview.bytes[..end]).into_owned();
@@ -93,13 +93,13 @@ fn json_preview(value: &serde_json::Value) -> String {
 }
 
 fn truncation_note(shown: usize, total: usize) -> String {
-    crate::tr!("Showing the first {shown} of {total} bytes. Copy value copies the whole value.")
+    bookie_app_services::tr!("Showing the first {shown} of {total} bytes. Copy value copies the whole value.")
         .replace("{shown}", &shown.to_string())
         .replace("{total}", &total.to_string())
 }
 
 fn json_truncation_note(shown: usize) -> String {
-    crate::tr!("Showing the first {shown} bytes. Copy value copies the whole value.")
+    bookie_app_services::tr!("Showing the first {shown} bytes. Copy value copies the whole value.")
         .replace("{shown}", &shown.to_string())
 }
 
@@ -199,7 +199,7 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
     }
     content.append(&scroller);
 
-    let copy = gtk::Button::with_label(&crate::tr!("Copy value"));
+    let copy = gtk::Button::with_label(&bookie_app_services::tr!("Copy value"));
     copy.add_css_class("suggested-action");
     copy.connect_clicked(move |button| {
         let text = null_copy_text
@@ -416,7 +416,7 @@ mod tests {
         present(&window, "payload", Value::Text(value.clone()), None);
         let dialogs = window.observe_children().n_items();
         assert!(dialogs >= 1);
-        let copy = button_named(window.upcast_ref(), &crate::tr!("Copy value")).unwrap();
+        let copy = button_named(window.upcast_ref(), &bookie_app_services::tr!("Copy value")).unwrap();
         copy.emit_clicked();
         let received = gtk::glib::MainContext::default()
             .block_on(window.clipboard().read_text_future())

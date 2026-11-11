@@ -26,11 +26,11 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
     let popover = gtk::Popover::builder().child(&content).build();
     let menu = gtk::MenuButton::builder()
         .icon_name("insert-text-symbolic")
-        .tooltip_text(crate::tr!("Insert a saved SQL snippet"))
+        .tooltip_text(bookie_app_services::tr!("Insert a saved SQL snippet"))
         .popover(&popover)
         .build();
     menu.add_css_class("flat");
-    menu.update_property(&[gtk::accessible::Property::Label(&crate::tr!("SQL snippets"))]);
+    menu.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("SQL snippets"))]);
     popover.connect_show({
         let (sender, content, popover) = (sender.clone(), content, popover.downgrade());
         move |_| fill(&content, &sender, &popover)
@@ -43,7 +43,7 @@ fn fill(content: &gtk::Box, sender: &ComponentSender<SqlEditor>, popover: &gtk::
         content.remove(&child);
     }
     let Some(store) = store() else {
-        content.append(&gtk::Label::new(Some(&crate::tr!(
+        content.append(&gtk::Label::new(Some(&bookie_app_services::tr!(
             "Snippets cannot be saved on this system."
         ))));
         return;
@@ -51,7 +51,7 @@ fn fill(content: &gtk::Box, sender: &ComponentSender<SqlEditor>, popover: &gtk::
     for snippet in store.list() {
         content.append(&snippet_row(&snippet, &store, sender, popover));
     }
-    let new = gtk::Button::with_label(&crate::tr!("New snippet…"));
+    let new = gtk::Button::with_label(&bookie_app_services::tr!("New snippet…"));
     new.add_css_class("flat");
     new.connect_clicked({
         let (store, popover) = (store, popover.clone());
@@ -83,7 +83,7 @@ fn snippet_row(
             sender.input(SqlEditorInput::InsertSnippet(body.clone()));
         }
     });
-    let edit = icon_button("document-edit-symbolic", &crate::tr!("Edit snippet"));
+    let edit = icon_button("document-edit-symbolic", &bookie_app_services::tr!("Edit snippet"));
     edit.connect_clicked({
         let (snippet, store, popover) = (snippet.clone(), store.clone(), popover.clone());
         move |button| {
@@ -91,7 +91,7 @@ fn snippet_row(
             present_editor(button, &store, Some(&snippet));
         }
     });
-    let delete = icon_button("user-trash-symbolic", &crate::tr!("Delete snippet"));
+    let delete = icon_button("user-trash-symbolic", &bookie_app_services::tr!("Delete snippet"));
     delete.connect_clicked({
         let (name, store, popover) = (snippet.name.clone(), store.clone(), popover.clone());
         move |button| {
@@ -123,7 +123,7 @@ fn close(popover: &gtk::glib::WeakRef<gtk::Popover>) {
 
 fn present_editor(parent: &gtk::Button, store: &SnippetStore, existing: Option<&Snippet>) {
     let name = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("Name"))
+        .placeholder_text(bookie_app_services::tr!("Name"))
         .text(existing.map_or("", |snippet| snippet.name.as_str()))
         .build();
     let body = gtk::TextView::builder()
@@ -143,7 +143,7 @@ fn present_editor(parent: &gtk::Button, store: &SnippetStore, existing: Option<&
     form.append(&scroller);
     form.append(
         &gtk::Label::builder()
-            .label(crate::tr!(
+            .label(bookie_app_services::tr!(
                 "Put $0 where the cursor should land. Write $$ for a literal $."
             ))
             .css_classes(["dim-label"])
@@ -152,11 +152,11 @@ fn present_editor(parent: &gtk::Button, store: &SnippetStore, existing: Option<&
             .build(),
     );
     let dialog = adw::AlertDialog::builder()
-        .heading(crate::tr!("SQL snippet"))
+        .heading(bookie_app_services::tr!("SQL snippet"))
         .extra_child(&form)
         .build();
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
-    dialog.add_response("save", &crate::tr!("Save"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+    dialog.add_response("save", &bookie_app_services::tr!("Save"));
     dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");
@@ -182,8 +182,8 @@ fn save_snippet(store: &SnippetStore, old_name: Option<&str>, name: &str, body: 
 }
 
 fn present_error(parent: &gtk::Button, message: &str) {
-    let alert = adw::AlertDialog::new(Some(&crate::tr!("Snippet not saved")), Some(message));
-    alert.add_response("close", &crate::tr!("Close"));
+    let alert = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Snippet not saved")), Some(message));
+    alert.add_response("close", &bookie_app_services::tr!("Close"));
     alert.present(Some(parent));
 }
 

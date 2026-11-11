@@ -101,7 +101,7 @@ pub(super) fn read_sql_text(path: &std::path::Path, max_bytes: u64) -> Result<St
 
 pub(super) fn export_name_for_query(query: &str) -> String {
     if query.trim().is_empty() {
-        return crate::tr!("query-results");
+        return bookie_app_services::tr!("query-results");
     }
     let label = super::derive_tab_label(query);
     let mut slug = String::new();
@@ -114,7 +114,7 @@ pub(super) fn export_name_for_query(query: &str) -> String {
     }
     let slug = slug.trim_matches('-');
     if slug.is_empty() {
-        crate::tr!("query-results")
+        bookie_app_services::tr!("query-results")
     } else {
         slug.to_string()
     }

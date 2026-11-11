@@ -106,7 +106,7 @@ impl Component for HistoryDialog {
     fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let toolbar = adw::ToolbarView::new();
         let header = adw::HeaderBar::builder().show_end_title_buttons(false).build();
-        header.set_title_widget(Some(&adw::WindowTitle::new(&crate::tr!("Query History"), "")));
+        header.set_title_widget(Some(&adw::WindowTitle::new(&bookie_app_services::tr!("Query History"), "")));
         header.pack_end(&build::close_button(&sender));
 
         let connections = init.database.all_connections();
@@ -257,15 +257,15 @@ impl Component for HistoryDialog {
                 }
                 let dialog = adw::AlertDialog::new(None, None);
                 dialog.set_heading(Some(&if n == 1 {
-                    crate::tr!("Delete this query?")
+                    bookie_app_services::tr!("Delete this query?")
                 } else {
-                    crate::tr!("Delete {n} queries?").replace("{n}", &n.to_string())
+                    bookie_app_services::tr!("Delete {n} queries?").replace("{n}", &n.to_string())
                 }));
-                dialog.set_body(&crate::tr!(
+                dialog.set_body(&bookie_app_services::tr!(
                     "Selected entries will be permanently removed from history, including any pinned ones."
                 ));
-                dialog.add_response("cancel", &crate::tr!("Cancel"));
-                dialog.add_response("delete", &crate::tr!("Delete"));
+                dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+                dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
                 dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
                 dialog.set_default_response(Some("cancel"));
                 dialog.set_close_response("cancel");
@@ -296,13 +296,13 @@ impl Component for HistoryDialog {
 
             HistoryDialogInput::ClearAllRequested => {
                 let dialog = adw::AlertDialog::new(
-                    Some(&crate::tr!("Clear all query history?")),
-                    Some(&crate::tr!(
+                    Some(&bookie_app_services::tr!("Clear all query history?")),
+                    Some(&bookie_app_services::tr!(
                         "This permanently deletes every saved query, including pinned ones."
                     )),
                 );
-                dialog.add_response("cancel", &crate::tr!("Cancel"));
-                dialog.add_response("clear", &crate::tr!("Clear"));
+                dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+                dialog.add_response("clear", &bookie_app_services::tr!("Clear"));
                 dialog.set_response_appearance("clear", adw::ResponseAppearance::Destructive);
                 dialog.set_default_response(Some("cancel"));
                 dialog.set_close_response("cancel");
@@ -495,13 +495,13 @@ impl HistoryDialog {
             self.pinned_group.set_visible(false);
             self.list_group.set_visible(false);
             if self.has_narrowing_search() || self.has_narrowing_filter() {
-                self.status_page.set_title(&crate::tr!("No matches"));
+                self.status_page.set_title(&bookie_app_services::tr!("No matches"));
                 self.status_page
-                    .set_description(Some(&crate::tr!("Try a different search term or change the filters.")));
+                    .set_description(Some(&bookie_app_services::tr!("Try a different search term or change the filters.")));
                 self.status_page.set_icon_name(Some("system-search-symbolic"));
             } else {
-                self.status_page.set_title(&crate::tr!("No queries yet"));
-                self.status_page.set_description(Some(&crate::tr!(
+                self.status_page.set_title(&bookie_app_services::tr!("No queries yet"));
+                self.status_page.set_description(Some(&bookie_app_services::tr!(
                     "Run a query in the SQL editor and it will appear here."
                 )));
                 self.status_page.set_icon_name(Some("document-open-recent-symbolic"));
@@ -576,9 +576,9 @@ impl HistoryDialog {
             .icon_name("view-pin-symbolic")
             .valign(gtk::Align::Center)
             .tooltip_text(if entry.pinned {
-                crate::tr!("Unpin")
+                bookie_app_services::tr!("Unpin")
             } else {
-                crate::tr!("Pin")
+                bookie_app_services::tr!("Pin")
             })
             .build();
         pin_btn.add_css_class("flat");
@@ -593,7 +593,7 @@ impl HistoryDialog {
         let delete_btn = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
             .valign(gtk::Align::Center)
-            .tooltip_text(crate::tr!("Delete"))
+            .tooltip_text(bookie_app_services::tr!("Delete"))
             .build();
         delete_btn.add_css_class("flat");
         delete_btn.add_css_class("destructive-action");
@@ -606,22 +606,22 @@ impl HistoryDialog {
 
         let menu = gio::Menu::new();
         let nav_section = gio::Menu::new();
-        nav_section.append(Some(&crate::tr!("Open in new tab")), Some("history-row.open"));
-        nav_section.append(Some(&crate::tr!("Replace current tab")), Some("history-row.replace"));
+        nav_section.append(Some(&bookie_app_services::tr!("Open in new tab")), Some("history-row.open"));
+        nav_section.append(Some(&bookie_app_services::tr!("Replace current tab")), Some("history-row.replace"));
         menu.append_section(None, &nav_section);
         let util_section = gio::Menu::new();
         util_section.append(
             Some(&if entry.pinned {
-                crate::tr!("Unpin")
+                bookie_app_services::tr!("Unpin")
             } else {
-                crate::tr!("Pin")
+                bookie_app_services::tr!("Pin")
             }),
             Some("history-row.pin"),
         );
-        util_section.append(Some(&crate::tr!("Copy SQL")), Some("history-row.copy"));
+        util_section.append(Some(&bookie_app_services::tr!("Copy SQL")), Some("history-row.copy"));
         menu.append_section(None, &util_section);
         let danger_section = gio::Menu::new();
-        danger_section.append(Some(&crate::tr!("Delete")), Some("history-row.delete"));
+        danger_section.append(Some(&bookie_app_services::tr!("Delete")), Some("history-row.delete"));
         menu.append_section(None, &danger_section);
 
         let popover_menu = gtk::PopoverMenu::from_model(Some(&menu));
@@ -692,7 +692,7 @@ impl HistoryDialog {
             return;
         }
         self.selection_label
-            .set_label(&crate::trn!("{n} selected", "{n} selected", n).replace("{n}", &n.to_string()));
+            .set_label(&bookie_app_services::trn!("{n} selected", "{n} selected", n).replace("{n}", &n.to_string()));
         self.selection_bar.set_reveal_child(true);
     }
 
@@ -758,7 +758,7 @@ fn preview_title(query: &str) -> String {
     if collected.chars().count() < first_line.chars().count() {
         format!("{collected}…")
     } else if collected.is_empty() {
-        crate::tr!("Empty query")
+        bookie_app_services::tr!("Empty query")
     } else {
         collected
     }
@@ -771,7 +771,7 @@ fn format_subtitle(entry: &Entry) -> String {
         parts.push(format!("{d} ms"));
     }
     if entry.cancelled {
-        parts.push(crate::tr!("cancelled"));
+        parts.push(bookie_app_services::tr!("cancelled"));
     } else if let Some(err) = &entry.error {
         let trimmed: String = err.chars().take(48).collect();
         parts.push(if trimmed.chars().count() < err.chars().count() {
@@ -780,7 +780,7 @@ fn format_subtitle(entry: &Entry) -> String {
             trimmed
         });
     } else if let Some(rows) = entry.rows_affected {
-        parts.push(crate::tr!("{n} row(s)").replace("{n}", &rows.to_string()));
+        parts.push(bookie_app_services::tr!("{n} row(s)").replace("{n}", &rows.to_string()));
     }
     parts.join(" · ")
 }
@@ -790,16 +790,16 @@ fn format_relative_time(when: SystemTime) -> String {
     let diff = now.duration_since(when).unwrap_or_default();
     let secs = diff.as_secs();
     if secs < 60 {
-        crate::tr!("just now")
+        bookie_app_services::tr!("just now")
     } else if secs < 3600 {
         let n = secs / 60;
-        crate::tr!("{n} min ago").replace("{n}", &n.to_string())
+        bookie_app_services::tr!("{n} min ago").replace("{n}", &n.to_string())
     } else if secs < 86_400 {
         let n = secs / 3600;
-        crate::tr!("{n} h ago").replace("{n}", &n.to_string())
+        bookie_app_services::tr!("{n} h ago").replace("{n}", &n.to_string())
     } else if secs < 30 * 86_400 {
         let n = secs / 86_400;
-        crate::tr!("{n} d ago").replace("{n}", &n.to_string())
+        bookie_app_services::tr!("{n} d ago").replace("{n}", &n.to_string())
     } else {
         let dt = chrono::DateTime::<chrono::Local>::from(when);
         dt.format("%Y-%m-%d").to_string()

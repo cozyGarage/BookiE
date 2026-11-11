@@ -3,7 +3,7 @@ use std::time::Instant;
 use bookie_gpui::model::Cell;
 use gpui::{TestAppContext, VisualTestContext};
 
-use bookie_gpui::cursor::Cursor;
+use bookie_results::grid_cursor::Cursor;
 
 use crate::GridView;
 use crate::text_input;
@@ -28,7 +28,10 @@ fn a_valid_edit_is_applied_to_the_typed_cell_and_marked(cx: &mut TestAppContext)
     cx.simulate_input("2026-02-03");
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.edits.get(&(2, 3)), Some(&Cell::Date("2026-02-03".into())));
+        assert_eq!(
+            view.edits.get(&(2, 3)),
+            Some(&Cell::Date("2026-02-03".parse().unwrap()))
+        );
         assert!(view.editing.is_none());
         assert!(view.status.contains("edited in this view only"));
     });
@@ -56,7 +59,8 @@ fn opening_a_query_reveals_its_tab_in_an_overflowing_workspace(cx: &mut TestAppC
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             for index in 0..15 {
-                view.tabs.open_table(&format!("table_{index}"));
+                view.tabs
+                    .open_table(&bookie_gpui::shell::table_info(&format!("table_{index}")));
             }
             cx.notify();
         });
@@ -200,7 +204,6 @@ fn an_arrow_past_the_page_edge_takes_the_neighbouring_page(cx: &mut TestAppConte
 }
 
 #[gpui::test]
-#[ignore = "known issue: simulate_keystrokes does not reach the capture handler after ctrl-end; cross_page_edge is unit-tested (docs/known-issues)"]
 fn the_cursor_crosses_to_the_next_page_and_back(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-end");
@@ -447,7 +450,13 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     view.update(cx, |view, cx| {
         view.edits.insert((1, 1), Cell::Text(full.clone()));
         requests.store(0, Ordering::Relaxed);
-        let _ = view.row_at_position(1, cx);
+        view.sync_table(cx);
+        view.table.update(cx, |table, _| {
+            let delegate = table.delegate_mut();
+            let edited = delegate.label_of(1, 1).0;
+            assert_eq!(edited, bookie_gpui::preview::cell_preview(&Cell::Text(full.clone())));
+            assert_ne!(edited, delegate.label_of(1, 0).0);
+        });
         assert_eq!(requests.load(Ordering::Relaxed), 1);
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
@@ -472,7 +481,8 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
     let actual = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
     let mut row = bookie_gpui::model::row_at(20);
     row[1] = Cell::Text(value.into());
-    let expected = bookie_gpui::selection::copy_tsv([row], false);
+    let columns = bookie_gpui::core_bridge::column_infos_for(&bookie_gpui::model::synthetic_columns());
+    let expected = bookie_app_services::result_copy::tsv(&columns, vec![row], false);
     assert_eq!(actual.as_deref(), Some(expected.as_str()));
 }
 
@@ -500,7 +510,8 @@ fn rendering_oversized_pending_cells_keeps_exact_binary_json_and_edit_text(cx: &
     let bytes = vec![0xab; 1_000_000];
     let json = format!("{{\"raw\":  \"{}\"}}", "x".repeat(1_000_000));
     view.update(cx, |view, cx| {
-        view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+        view.tabs
+            .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
         view.edits.insert((0, 1), Cell::Text(text.clone()));
         view.edits.insert((0, 3), Cell::Bytes(bytes.clone()));
         view.edits.insert((1, 3), Cell::JsonText(json.clone()));
@@ -615,7 +626,7 @@ impl bookie_gpui::source::ResultSource for Tiny {
         keyed: bool,
         cancel: &tokio_util::sync::CancellationToken,
     ) -> Result<bookie_gpui::model::Diff, &'static str> {
-        bookie_gpui::model::build_diff(3, keyed, cancel)
+        bookie_gpui::source::ResultSource::compare(&bookie_gpui::source::Synthetic::new(3), keyed, cancel)
     }
 }
 
@@ -718,6 +729,52 @@ fn switching_runs_preserves_each_runs_edits(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn switching_grid_tabs_keeps_an_active_cell_editor_open(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.start_edit(0, 1, window, cx);
+            view.editor
+                .update(cx, |editor, cx| editor.set_content("cell draft", cx));
+            view.tabs.open_query();
+            view.sync_grid_owner();
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        assert!(!view.grid_is_query);
+        assert_eq!(
+            view.tabs.current(),
+            &bookie_gpui::shell::Tab::Table(bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE))
+        );
+        assert!(view.editing.is_some());
+        assert_eq!(view.editor.read(cx).content(), "cell draft");
+    });
+}
+
+#[gpui::test]
+fn switching_results_keeps_an_active_cell_editor_open(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.add_run(None);
+            view.add_run(None);
+            view.start_edit(0, 1, window, cx);
+            view.editor
+                .update(cx, |editor, cx| editor.set_content("result draft", cx));
+            let active_run = view.active_run;
+            view.select_run(0);
+            assert_eq!(view.active_run, active_run);
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        assert!(view.editing.is_some());
+        assert_eq!(view.editor.read(cx).content(), "result draft");
+    });
+}
+
+#[gpui::test]
 fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t");
@@ -727,8 +784,13 @@ fn closing_runs_releases_edits_and_allows_a_new_run_after_the_last_close(cx: &mu
             view.add_run(None);
             view.edits.insert((1, 1), Cell::Text("second".into()));
             view.close_run(0);
-            assert_eq!(view.runs.len(), 1);
+            assert_eq!(view.runs.len(), 2);
             assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
+            assert!(view.status.contains("Discard all view-only edits"));
+            view.discard_view_edits();
+            view.close_run(0);
+            assert_eq!(view.runs.len(), 1);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
             view.close_run(0);
             assert!(view.runs.is_empty());
             assert!(view.edits.is_empty());
@@ -765,7 +827,8 @@ fn closing_the_last_query_result_keeps_the_synthetic_table_available(cx: &mut Te
         view.update(cx, |view, _| {
             view.close_run(0);
             assert_eq!(view.dataset_count(), 0);
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             assert_eq!(view.dataset_count(), 150_000);
         });
     });
@@ -778,14 +841,16 @@ fn a_new_run_after_closing_all_results_does_not_inherit_table_edits(cx: &mut Tes
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             view.close_run(0);
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             view.edits.insert((1, 1), Cell::Text("table edit".into()));
             view.tabs.open_query();
             view.sync_grid_owner();
             view.add_run(None);
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             assert_eq!(view.cell_at(1, 1), Cell::Text("table edit".into()));
         });
@@ -805,7 +870,8 @@ fn switching_between_table_and_existing_query_keeps_both_edits(cx: &mut TestAppC
         view.update(cx, |view, _| {
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
             view.edits.insert((1, 1), Cell::Text("query".into()));
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
             view.tabs.open_query();
@@ -826,7 +892,6 @@ fn closing_query_tab_releases_its_runs_and_keeps_table_edits(cx: &mut TestAppCon
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("query".into()));
             view.add_run(None);
             let index = view.tabs.active;
             view.close_tab(index);
@@ -853,9 +918,9 @@ fn closing_an_inactive_query_tab_preserves_the_table(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("query".into()));
             let query = view.tabs.active;
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             view.close_tab(query);
             assert!(view.runs.is_empty());
@@ -875,12 +940,12 @@ fn closing_query_from_home_restores_the_table_owner(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.edits.insert((1, 1), Cell::Text("query".into()));
             let query = view.tabs.active;
             view.tabs.open_home();
             view.sync_grid_owner();
             view.close_tab(query);
-            view.tabs.open_table(bookie_gpui::shell::DATA_TABLE);
+            view.tabs
+                .open_table(&bookie_gpui::shell::table_info(bookie_gpui::shell::DATA_TABLE));
             view.sync_grid_owner();
             assert!(view.runs.is_empty());
             assert_eq!(view.cell_at(1, 1), Cell::Text("table".into()));
@@ -1007,13 +1072,17 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.edits.insert((1, 1), Cell::Text("first".into()));
             view.add_run(None);
             view.edits.insert((1, 1), Cell::Text("second".into()));
             view.begin_background(cx, |_| (), |view, ()| view.status = "stale result".into());
             view.close_run(1);
+            assert_eq!(view.runs.len(), 2);
+            assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
+            assert!(view.status.contains("Discard all view-only edits"));
+            view.discard_view_edits();
+            view.close_run(1);
             assert_eq!(view.active_run, 0);
-            assert_eq!(view.cell_at(1, 1), Cell::Text("first".into()));
+            assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
         });
     });
     cx.run_until_parked();
@@ -1127,16 +1196,21 @@ fn a_source_with_other_columns_sets_the_cursor_range_the_labels_and_read_only_ed
 }
 
 #[gpui::test]
-fn clicking_a_cell_gives_the_grid_the_keyboard_so_the_arrows_move_from_it(cx: &mut TestAppContext) {
+fn a_table_cell_selection_sets_the_cursor_and_the_arrows_move_from_it(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    let find = view.read_with(cx, |view, cx| view.find.read(cx).focus_handle_for_tests());
-    cx.update(|window, cx| window.focus(&find, cx));
-
-    cx.update(|window, cx| view.update(cx, |view, cx| view.click_cell(2, 2, 1, 1, window, cx)));
-    cx.simulate_keystrokes("down");
-
+    let table = view.read_with(cx, |view, _| view.table.clone());
+    cx.update(|_, cx| {
+        table.update(cx, |_, cx| {
+            cx.emit(gpui_kit::component::table::TableEvent::SelectCell(2, 1))
+        });
+    });
+    cx.run_until_parked();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.cell_cursor, Some(Cursor { row: 3, column: 1 }));
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 2, column: 1 }))
+    });
+    cx.simulate_keystrokes("down");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_cursor, Some(Cursor { row: 3, column: 1 }))
     });
 }
 
@@ -1188,5 +1262,20 @@ fn a_search_typed_on_one_tab_is_not_left_in_the_find_box_of_the_next(cx: &mut Te
             "",
             "the Query result must not inherit the table's search"
         );
+    });
+}
+
+#[gpui::test]
+fn a_double_click_on_a_table_row_opens_the_active_column_for_editing(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.place_cursor(Some(Cursor { row: 0, column: 1 }));
+            view.edit_clicked_row(1, window, cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let editing = view.editing.as_ref().expect("the double-clicked row opens its editor");
+        assert_eq!((editing.row, editing.column), (1, 1));
     });
 }

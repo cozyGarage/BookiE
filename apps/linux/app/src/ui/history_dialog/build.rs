@@ -22,8 +22,8 @@ pub(super) struct SelectionBar {
 
 pub(super) fn close_button(sender: &ComponentSender<HistoryDialog>) -> gtk::Button {
     let button = gtk::Button::builder()
-        .label(crate::tr!("Close history"))
-        .tooltip_text(crate::tr!("Close history"))
+        .label(bookie_app_services::tr!("Close history"))
+        .tooltip_text(bookie_app_services::tr!("Close history"))
         .build();
     let close_sender = sender.clone();
     button.connect_clicked(move |_| {
@@ -41,36 +41,36 @@ fn combo_row(title: String, options: &[String]) -> adw::ComboRow {
 }
 
 fn filter_rows(connections: &[ConnectionMetadata]) -> FilterRows {
-    let connection_names: Vec<String> = std::iter::once(crate::tr!("All connections"))
+    let connection_names: Vec<String> = std::iter::once(bookie_app_services::tr!("All connections"))
         .chain(connections.iter().map(|m| m.name.clone()))
         .collect();
     FilterRows {
-        connection: combo_row(crate::tr!("Connection"), &connection_names),
+        connection: combo_row(bookie_app_services::tr!("Connection"), &connection_names),
         status: combo_row(
-            crate::tr!("Status"),
+            bookie_app_services::tr!("Status"),
             &[
-                crate::tr!("Any"),
-                crate::tr!("Successful"),
-                crate::tr!("Failed"),
-                crate::tr!("Cancelled"),
+                bookie_app_services::tr!("Any"),
+                bookie_app_services::tr!("Successful"),
+                bookie_app_services::tr!("Failed"),
+                bookie_app_services::tr!("Cancelled"),
             ],
         ),
         window: combo_row(
-            crate::tr!("Time window"),
+            bookie_app_services::tr!("Time window"),
             &[
-                crate::tr!("Any time"),
-                crate::tr!("Last 24 hours"),
-                crate::tr!("Last 7 days"),
-                crate::tr!("Last 30 days"),
+                bookie_app_services::tr!("Any time"),
+                bookie_app_services::tr!("Last 24 hours"),
+                bookie_app_services::tr!("Last 7 days"),
+                bookie_app_services::tr!("Last 30 days"),
             ],
         ),
         source: combo_row(
-            crate::tr!("Ran from"),
+            bookie_app_services::tr!("Ran from"),
             &[
-                crate::tr!("Anywhere"),
-                crate::tr!("SQL editor"),
-                crate::tr!("Table structure"),
-                crate::tr!("Row edits"),
+                bookie_app_services::tr!("Anywhere"),
+                bookie_app_services::tr!("SQL editor"),
+                bookie_app_services::tr!("Table structure"),
+                bookie_app_services::tr!("Row edits"),
             ],
         ),
     }
@@ -78,7 +78,7 @@ fn filter_rows(connections: &[ConnectionMetadata]) -> FilterRows {
 
 fn reset_button(rows: &FilterRows) -> gtk::Button {
     let button = gtk::Button::builder()
-        .label(crate::tr!("Reset"))
+        .label(bookie_app_services::tr!("Reset"))
         .halign(gtk::Align::End)
         .margin_top(6)
         .build();
@@ -97,16 +97,15 @@ fn reset_button(rows: &FilterRows) -> gtk::Button {
     button
 }
 
-/// The header's Filter button with its popover of four combo rows and a Reset button.
 pub(super) fn filter_button(
     connections: &[ConnectionMetadata],
     sender: &ComponentSender<HistoryDialog>,
 ) -> (gtk::MenuButton, FilterRows) {
     let popover = gtk::Popover::new();
     let button = gtk::MenuButton::builder()
-        .label(crate::tr!("Filter"))
+        .label(bookie_app_services::tr!("Filter"))
         .always_show_arrow(true)
-        .tooltip_text(crate::tr!("Filter history"))
+        .tooltip_text(bookie_app_services::tr!("Filter history"))
         .popover(&popover)
         .build();
     keep_inside_window(&popover, &button);
@@ -114,9 +113,6 @@ pub(super) fn filter_button(
     let rows = filter_rows(connections);
     let reset = reset_button(&rows);
 
-    // Native popover content: a single AdwPreferencesGroup of AdwComboRow
-    // filters, with Reset in the group's header-suffix slot so no wrapper Box
-    // is needed for layout.
     let group = adw::PreferencesGroup::new();
     group.add(&rows.connection);
     group.add(&rows.status);
@@ -134,8 +130,8 @@ pub(super) fn filter_button(
 
 pub(super) fn select_button(sender: &ComponentSender<HistoryDialog>) -> gtk::ToggleButton {
     let button = gtk::ToggleButton::builder()
-        .label(crate::tr!("Select"))
-        .tooltip_text(crate::tr!("Toggle multi-select"))
+        .label(bookie_app_services::tr!("Select"))
+        .tooltip_text(bookie_app_services::tr!("Toggle multi-select"))
         .build();
     let s_select = sender.clone();
     button.connect_toggled(move |btn| {
@@ -147,15 +143,21 @@ pub(super) fn select_button(sender: &ComponentSender<HistoryDialog>) -> gtk::Tog
 pub(super) fn more_actions_button() -> gtk::MenuButton {
     let menu = gio::Menu::new();
     let storage_section = gio::Menu::new();
-    storage_section.append(Some(&crate::tr!("Show storage location")), Some("history.show-storage"));
+    storage_section.append(
+        Some(&bookie_app_services::tr!("Show storage location")),
+        Some("history.show-storage"),
+    );
     menu.append_section(None, &storage_section);
     let danger_section = gio::Menu::new();
-    danger_section.append(Some(&crate::tr!("Clear all history…")), Some("history.clear-all"));
+    danger_section.append(
+        Some(&bookie_app_services::tr!("Clear all history…")),
+        Some("history.clear-all"),
+    );
     menu.append_section(None, &danger_section);
     gtk::MenuButton::builder()
         .icon_name("view-more-symbolic")
         .menu_model(&menu)
-        .tooltip_text(crate::tr!("More actions"))
+        .tooltip_text(bookie_app_services::tr!("More actions"))
         .build()
 }
 
@@ -182,12 +184,9 @@ pub(super) fn action_group(sender: &ComponentSender<HistoryDialog>) -> gio::Simp
     group
 }
 
-/// The search entry in its bar, plus the header toggle that shows the bar.
-pub(super) fn search(
-    sender: &ComponentSender<HistoryDialog>,
-) -> (gtk::SearchEntry, gtk::SearchBar, gtk::ToggleButton) {
+pub(super) fn search(sender: &ComponentSender<HistoryDialog>) -> (gtk::SearchEntry, gtk::SearchBar, gtk::ToggleButton) {
     let entry = gtk::SearchEntry::builder()
-        .placeholder_text(crate::tr!("Search queries…"))
+        .placeholder_text(bookie_app_services::tr!("Search queries…"))
         .hexpand(true)
         .build();
     let s = sender.clone();
@@ -202,7 +201,7 @@ pub(super) fn search(
 
     let toggle = gtk::ToggleButton::builder()
         .icon_name("system-search-symbolic")
-        .tooltip_text(crate::tr!("Search"))
+        .tooltip_text(bookie_app_services::tr!("Search"))
         .build();
     let bar_for_toggle = bar.clone();
     toggle.connect_toggled(move |btn| {
@@ -221,8 +220,6 @@ fn boxed_list() -> gtk::ListBox {
     listbox
 }
 
-/// Each section is an AdwPreferencesGroup with a boxed-list ListBox; the
-/// group's visibility is toggled instead of separate Label + ListBox.
 fn section(title: String) -> (adw::PreferencesGroup, gtk::ListBox) {
     let listbox = boxed_list();
     let group = adw::PreferencesGroup::builder().title(title).visible(false).build();
@@ -231,8 +228,8 @@ fn section(title: String) -> (adw::PreferencesGroup, gtk::ListBox) {
 }
 
 pub(super) fn list_area() -> ListArea {
-    let (pinned_group, pinned_listbox) = section(crate::tr!("Pinned"));
-    let (list_group, listbox) = section(crate::tr!("All queries"));
+    let (pinned_group, pinned_listbox) = section(bookie_app_services::tr!("Pinned"));
+    let (list_group, listbox) = section(bookie_app_services::tr!("All queries"));
 
     let list_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Vertical)
@@ -259,15 +256,20 @@ pub(super) fn list_area() -> ListArea {
     }
 }
 
-/// The stack that shows the list, or the empty-state page before any query ran.
 pub(super) fn content_stack(scroll: &gtk::ScrolledWindow) -> (gtk::Stack, adw::StatusPage) {
     let status_page = adw::StatusPage::builder()
         .icon_name("document-open-recent-symbolic")
-        .title(crate::tr!("No queries yet"))
-        .description(crate::tr!("Run a query in the SQL editor and it will appear here."))
+        .title(bookie_app_services::tr!("No queries yet"))
+        .description(bookie_app_services::tr!(
+            "Run a query in the SQL editor and it will appear here."
+        ))
         .vexpand(true)
         .build();
-    let stack = gtk::Stack::builder().vhomogeneous(false).vexpand(true).margin_top(12).build();
+    let stack = gtk::Stack::builder()
+        .vhomogeneous(false)
+        .vexpand(true)
+        .margin_top(12)
+        .build();
     stack.add_named(scroll, Some("list"));
     stack.add_named(&status_page, Some("empty"));
     (stack, status_page)
@@ -278,15 +280,21 @@ pub(super) fn selection_bar(sender: &ComponentSender<HistoryDialog>) -> Selectio
     label.add_css_class("dim-label");
 
     let export_menu = gio::Menu::new();
-    export_menu.append(Some(&crate::tr!("Export as SQL")), Some("history.export-sql"));
-    export_menu.append(Some(&crate::tr!("Export as CSV")), Some("history.export-csv"));
+    export_menu.append(
+        Some(&bookie_app_services::tr!("Export as SQL")),
+        Some("history.export-sql"),
+    );
+    export_menu.append(
+        Some(&bookie_app_services::tr!("Export as CSV")),
+        Some("history.export-csv"),
+    );
     let export_button = gtk::MenuButton::builder()
-        .label(crate::tr!("Export"))
+        .label(bookie_app_services::tr!("Export"))
         .always_show_arrow(true)
         .menu_model(&export_menu)
         .build();
 
-    let delete_button = gtk::Button::builder().label(crate::tr!("Delete")).build();
+    let delete_button = gtk::Button::builder().label(bookie_app_services::tr!("Delete")).build();
     delete_button.add_css_class("destructive-action");
     let s_del_bar = sender.clone();
     delete_button.connect_clicked(move |_| s_del_bar.input(HistoryDialogInput::DeleteSelected));

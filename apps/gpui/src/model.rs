@@ -1,35 +1,20 @@
-use tokio_util::sync::CancellationToken;
-
 pub const ALLOWED_ROWS: [u64; 3] = [150_000, 500_000, 1_000_000];
 pub const DEFAULT_ROWS: u64 = 1_000_000;
 pub const MAX_FIND_MATCHES: usize = 10_000;
 pub const MAX_DIFF_ROWS: usize = 200;
-pub const PAGE_ROWS: u64 = 5_000;
-pub const PAGE_SIZES: [u64; 4] = [500, 1_000, 5_000, 20_000];
+pub const PAGE_ROWS: u64 = bookie_results::result_page::DEFAULT_PAGE_ROWS;
+pub const PAGE_SIZES: [u64; 4] = bookie_results::result_page::PAGE_SIZES;
 pub const TYPED_KINDS: u64 = 12;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Cell {
-    Null,
-    Bool(bool),
-    Int(i64),
-    Float(f64),
-    Text(String),
-    Bytes(Vec<u8>),
-    Date(String),
-    Time(String),
-    DateTime(String),
-    TimestampTz(String),
-    Decimal(String),
-    Uuid(String),
-    Json(String),
-    JsonText(String),
-    Undecodable(String),
-    Exact(std::sync::Arc<bookie_core::Value>),
+pub type Cell = bookie_core::Value;
+
+pub trait CellText {
+    fn kind(&self) -> &'static str;
+    fn display(&self) -> String;
 }
 
-impl Cell {
-    pub fn kind(&self) -> &'static str {
+impl CellText for Cell {
+    fn kind(&self) -> &'static str {
         match self {
             Cell::Null => "null",
             Cell::Bool(_) => "boolean",
@@ -46,27 +31,10 @@ impl Cell {
             Cell::Json(_) => "json",
             Cell::JsonText(_) => "json_text",
             Cell::Undecodable(_) => "undecodable",
-            Cell::Exact(value) => match value.as_ref() {
-                bookie_core::Value::Date(_) => "date",
-                bookie_core::Value::Time(_) => "time",
-                bookie_core::Value::DateTime(_) => "datetime",
-                bookie_core::Value::TimestampTz(_) => "timestamptz",
-                bookie_core::Value::Decimal(_) => "decimal",
-                bookie_core::Value::Uuid(_) => "uuid",
-                bookie_core::Value::Json(_) => "json",
-                bookie_core::Value::Null => "null",
-                bookie_core::Value::Bool(_) => "boolean",
-                bookie_core::Value::Int(_) => "integer",
-                bookie_core::Value::Float(_) => "float",
-                bookie_core::Value::Text(_) => "text",
-                bookie_core::Value::Bytes(_) => "bytes",
-                bookie_core::Value::JsonText(_) => "json_text",
-                bookie_core::Value::Undecodable(_) => "undecodable",
-            },
         }
     }
 
-    pub fn display(&self) -> String {
+    fn display(&self) -> String {
         match self {
             Cell::Null => "NULL".into(),
             Cell::Bool(value) => value.to_string(),
@@ -77,32 +45,22 @@ impl Cell {
                 format!("\\x{hex}")
             }
             Cell::Undecodable(type_name) => format!("<undecodable {type_name}>"),
-            Cell::Exact(value) => match value.as_ref() {
-                bookie_core::Value::Date(value) => value.to_string(),
-                bookie_core::Value::Time(value) => value.to_string(),
-                bookie_core::Value::DateTime(value) => value.to_string(),
-                bookie_core::Value::TimestampTz(value) => value.to_rfc3339(),
-                bookie_core::Value::Decimal(value) => value.to_string(),
-                bookie_core::Value::Uuid(value) => value.to_string(),
-                bookie_core::Value::Json(value) => value.to_string(),
-                bookie_core::Value::Null => "NULL".into(),
-                bookie_core::Value::Bool(value) => value.to_string(),
-                bookie_core::Value::Int(value) => value.to_string(),
-                bookie_core::Value::Float(value) => value.to_string(),
-                bookie_core::Value::Text(value) | bookie_core::Value::JsonText(value) => value.clone(),
-                bookie_core::Value::Bytes(value) => Cell::Bytes(value.clone()).display(),
-                bookie_core::Value::Undecodable(value) => format!("<undecodable {value}>"),
-            },
-            Cell::Text(value)
-            | Cell::Date(value)
-            | Cell::Time(value)
-            | Cell::DateTime(value)
-            | Cell::TimestampTz(value)
-            | Cell::Decimal(value)
-            | Cell::Uuid(value)
-            | Cell::Json(value)
-            | Cell::JsonText(value) => value.clone(),
+            Cell::Date(value) => value.to_string(),
+            Cell::Time(value) => value.to_string(),
+            Cell::DateTime(value) => value.to_string(),
+            Cell::TimestampTz(value) => value.to_rfc3339(),
+            Cell::Decimal(value) => value.to_string(),
+            Cell::Uuid(value) => value.to_string(),
+            Cell::Json(value) => value.to_string(),
+            Cell::JsonText(value) | Cell::Text(value) => value.clone(),
         }
+    }
+}
+
+fn literal<T: std::str::FromStr>(text: &str, type_name: &str, convert: impl FnOnce(T) -> Cell) -> Cell {
+    match text.parse() {
+        Ok(value) => convert(value),
+        Err(_) => Cell::Undecodable(type_name.into()),
     }
 }
 
@@ -110,16 +68,28 @@ pub fn typed_of(index: u64) -> Cell {
     match index % TYPED_KINDS {
         0 => Cell::Float(0.1 + 0.2),
         1 => Cell::Bytes(vec![0xde, 0xad, 0xbe, 0xef]),
-        2 => Cell::Date("2026-11-04".into()),
-        3 => Cell::Time("23:59:59.123456".into()),
-        4 => Cell::DateTime("2026-11-04 23:59:59.123456".into()),
-        5 => Cell::TimestampTz("2026-11-04T23:59:59.123456+00:00".into()),
-        6 => Cell::Decimal("12345678901234567890.12345678".into()),
-        7 => Cell::Uuid("67e55044-10b1-426f-9247-bb680e5fe0c8".into()),
-        8 => Cell::Json(r#"{"a":[1,{"b":null}]}"#.into()),
+        2 => literal("2026-11-04", "date", Cell::Date),
+        3 => literal("23:59:59.123456", "time", Cell::Time),
+        4 => literal("2026-11-04T23:59:59.123456", "datetime", Cell::DateTime),
+        5 => literal("2026-11-04T23:59:59.123456+00:00", "timestamptz", Cell::TimestampTz),
+        6 => literal("12345678901234567890.12345678", "decimal", Cell::Decimal),
+        7 => literal("67e55044-10b1-426f-9247-bb680e5fe0c8", "uuid", Cell::Uuid),
+        8 => Cell::Json(Box::new(
+            serde_json::from_str(r#"{"a":[1,{"b":null}]}"#).unwrap_or_default(),
+        )),
         9 => Cell::JsonText("{\"raw\":  1,   \"keep\" : 2}".into()),
         10 => Cell::Undecodable("numeric(40,20)".into()),
         _ => Cell::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cell, literal};
+
+    #[test]
+    fn invalid_synthetic_literal_is_displayed_as_undecodable() {
+        assert_eq!(literal("invalid", "date", Cell::Date), Cell::Undecodable("date".into()));
     }
 }
 
@@ -183,14 +153,19 @@ pub struct ColumnMeta {
 }
 
 pub fn synthetic_columns() -> Vec<ColumnMeta> {
-    [("value", 240.0, true), ("label", 280.0, false), ("state", 120.0, false), ("typed", 320.0, false)]
-        .into_iter()
-        .map(|(name, width, numeric)| ColumnMeta {
-            name: name.into(),
-            width,
-            numeric,
-        })
-        .collect()
+    [
+        ("value", 240.0, true),
+        ("label", 280.0, false),
+        ("state", 120.0, false),
+        ("typed", 320.0, false),
+    ]
+    .into_iter()
+    .map(|(name, width, numeric)| ColumnMeta {
+        name: name.into(),
+        width,
+        numeric,
+    })
+    .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -251,6 +226,7 @@ pub struct DiffSummary {
     pub added: u64,
     pub removed: u64,
     pub changed: u64,
+    pub unknown: u64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -274,161 +250,12 @@ fn right_state(index: u64) -> &'static str {
     }
 }
 
-pub fn build_diff(total: u64, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
-    if cancel.is_cancelled() {
-        return Err("comparison cancelled");
-    }
-    let mut summary = DiffSummary {
-        keyed,
-        ..DiffSummary::default()
-    };
-    let mut rows: Vec<DiffRow> = Vec::new();
-    let mut capped = false;
-    for index in 0..total {
-        if index.is_multiple_of(1_024) && cancel.is_cancelled() {
-            return Err("comparison cancelled");
-        }
-        let mut produced: Vec<(&'static str, Vec<Cell>)> = Vec::new();
-        let original = label_of(index);
-        let edited = format!("{original} (edited)");
-        match right_state(index) {
-            "same" => summary.equal += 1,
-            "dropped" => {
-                summary.removed += 1;
-                produced.push(("Removed", cells_of(index, &original)));
-            }
-            _ if keyed => {
-                summary.changed += 1;
-                produced.push(("Before", cells_of(index, &original)));
-                produced.push(("After", cells_of(index, &edited)));
-            }
-            _ => {
-                summary.removed += 1;
-                summary.added += 1;
-                produced.push(("Removed", cells_of(index, &original)));
-                produced.push(("Added", cells_of(index, &edited)));
-            }
-        }
-        for (change, cells) in produced {
-            if rows.len() < MAX_DIFF_ROWS {
-                rows.push(DiffRow { change, cells });
-            } else {
-                capped = true;
-            }
-        }
-    }
-    Ok(Diff { summary, rows, capped })
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Pager {
-    pub total: u64,
-    pub page: u64,
-    pub rows: u64,
-    pub append: bool,
-}
-
-impl Pager {
-    pub fn new(total: u64) -> Self {
-        Pager {
-            total,
-            page: 0,
-            rows: PAGE_ROWS,
-            append: false,
-        }
-    }
-
-    pub fn pages(&self) -> u64 {
-        self.total.div_ceil(self.rows).max(1)
-    }
-
-    pub fn first(&mut self) {
-        if !self.append {
-            self.page = 0;
-        }
-    }
-
-    pub fn last(&mut self) {
-        self.page = self.pages() - 1;
-    }
-
-    pub fn next(&mut self) {
-        self.page = (self.page + 1).min(self.pages() - 1);
-    }
-
-    pub fn previous(&mut self) {
-        if !self.append {
-            self.page = self.page.saturating_sub(1);
-        }
-    }
-
-    pub fn window(&self) -> (u64, u64) {
-        if self.total == 0 {
-            return (0, 0);
-        }
-        let end = ((self.page + 1) * self.rows).min(self.total);
-        if self.append {
-            (0, end)
-        } else {
-            (self.page * self.rows, end)
-        }
-    }
-
-    pub fn range(&self) -> (u64, u64) {
-        let (start, end) = self.window();
-        if self.total == 0 { (0, 0) } else { (start + 1, end) }
-    }
-
-    pub fn contains_row(&mut self, row: u64) {
-        self.page = (row / self.rows).min(self.pages() - 1);
-    }
-
-    pub fn with_total(self, total: u64) -> Self {
-        Pager { total, page: 0, ..self }
-    }
-
-    pub fn resized(self, rows: u64) -> Self {
-        let first_row = self.page * self.rows;
-        let mut next = Pager { rows, page: 0, ..self };
-        next.page = (first_row / rows).min(next.pages() - 1);
-        next
+pub fn right_row(index: u64) -> Option<Vec<Cell>> {
+    match right_state(index) {
+        "dropped" => None,
+        "edited" => Some(cells_of(index, &format!("{} (edited)", label_of(index)))),
+        _ => Some(row_at(index)),
     }
 }
 
-#[derive(Debug, Default)]
-pub struct MatchCursor {
-    pub matches: Vec<u64>,
-    pub current: Option<usize>,
-}
-
-impl MatchCursor {
-    pub fn set(&mut self, matches: Vec<u64>) {
-        self.matches = matches;
-        self.current = None;
-    }
-
-    pub fn step(&mut self, forward: bool) -> Option<u64> {
-        let count = self.matches.len();
-        if count == 0 {
-            return None;
-        }
-        let next = match (self.current, forward) {
-            (None, true) => 0,
-            (None, false) => count - 1,
-            (Some(index), true) => (index + 1) % count,
-            (Some(index), false) => (index + count - 1) % count,
-        };
-        self.current = Some(next);
-        self.matches.get(next).copied()
-    }
-
-    pub fn status(&self, capped: bool) -> String {
-        let count = self.matches.len();
-        if count == 0 {
-            return "No match".into();
-        }
-        let shown = self.current.map_or(0, |index| index + 1);
-        let more = if capped { "+" } else { "" };
-        format!("Match {shown} of {count}{more}")
-    }
-}
+pub use bookie_results::result_page::{MatchCursor, Pager};

@@ -1,4 +1,3 @@
-use std::ops::Range;
 use std::time::{Duration, Instant};
 
 mod assets;
@@ -12,22 +11,24 @@ mod render;
 mod text_input;
 mod ui_theme;
 
-use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
-use bookie_gpui::cursor::Cursor;
+use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
+use bookie_gpui::core_bridge::column_infos_for;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui::preview::cell_preview;
-use bookie_gpui::selection::{Selection, copy_tsv};
-use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag};
+use bookie_gpui::selection::Selection;
+use bookie_gpui::shell::{
+    Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag, table_label,
+};
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
+use bookie_results::grid_cursor::Cursor;
 use gpui::{
-    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, MouseDownEvent,
-    ScrollHandle, ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div,
-    prelude::*, px, rgb, size, uniform_list,
+    App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
+    ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
+    size,
 };
 use gpui_kit::component::input::EditorState;
 use text_input::{InputEvent, TextInput};
@@ -35,7 +36,6 @@ use tokio_util::sync::CancellationToken;
 use ui_theme::ThemeExt;
 
 const ROW_HEIGHT: f32 = 26.0;
-const HEADER_HEIGHT: f32 = 28.0;
 pub const GUTTER_WIDTH: f32 = 56.0;
 
 enum Mode {
@@ -49,6 +49,8 @@ enum Mode {
 struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
+    keystroke_hook: Option<gpui::Subscription>,
+    focus_editor: bool,
     source: Source,
     table_source: Source,
     mode: Mode,
@@ -105,7 +107,7 @@ struct GridView {
     cursor: MatchCursor,
     find_capped: bool,
     operation_cancel: CancellationToken,
-    compare: Option<Diff>,
+    compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
     generation: u64,
@@ -244,11 +246,12 @@ impl GridView {
                 .row_header(false)
         });
         let table_focus = gpui::Focusable::focus_handle(table.read(cx), cx);
-        let table_events = cx.subscribe(
+        let table_events = cx.subscribe_in(
             &table,
-            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, cx| {
-                if let gpui_kit::component::table::TableEvent::SelectCell(row, column) = event {
-                    let cursor = bookie_gpui::cursor::Cursor {
+            window,
+            |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
+                gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
+                    let cursor = bookie_results::grid_cursor::Cursor {
                         row: *row,
                         column: *column,
                     };
@@ -257,12 +260,18 @@ impl GridView {
                     this.status = cursor.label(&names);
                     cx.notify();
                 }
+                gpui_kit::component::table::TableEvent::DoubleClickedRow(row) => {
+                    this.edit_clicked_row(*row, window, cx);
+                }
+                _ => {}
             },
         );
         GridView {
             fonts: font_settings::load(),
             table,
             _table_events: table_events,
+            keystroke_hook: None,
+            focus_editor: false,
             table_source: source.clone(),
             source,
             mode: Mode::All,
@@ -290,7 +299,11 @@ impl GridView {
             dark_mode: Theme::current(cx).dark,
             tabs: Tabs::default(),
             tab_scroll: ScrollHandle::new(),
-            runs: vec![Run { number: 1, rows: total, elapsed_ms: None }],
+            runs: vec![Run {
+                number: 1,
+                rows: total,
+                elapsed_ms: None,
+            }],
             run_edits: vec![grid_edit::Edits::new()],
             run_sources: vec![None],
             sql_input,
@@ -403,7 +416,8 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let text = copy_tsv(self.selected_rows(selection), with_headers);
+        let columns = column_infos_for(self.source.columns());
+        let text = result_copy::tsv(&columns, self.selected_rows(selection), with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
         self.status = format!(
@@ -428,13 +442,14 @@ impl GridView {
             .live
             .as_ref()
             .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
+        let columns = column_infos_for(self.source.columns());
         let context = CopyContext {
-            columns: self.source.columns(),
+            columns: &columns,
             driver_id: &driver_id,
-            table: &self.catalog.grid_table,
+            target: (!self.grid_is_query).then(|| self.catalog.grid_table.clone()),
             column: self.cell_cursor.map_or(0, |cursor| cursor.column),
         };
-        match copy_format::render(format, &context, &rows) {
+        match result_copy::render(format, &context, &rows) {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -584,6 +599,9 @@ impl GridView {
 
     fn close_tab(&mut self, index: usize) {
         let closing_query = matches!(self.tabs.items.get(index), Some(Tab::Query));
+        if closing_query && self.query_has_view_edits() && self.reject_view_edits() {
+            return;
+        }
         self.tabs.close(index);
         self.sync_grid_owner();
         if !closing_query {
@@ -606,6 +624,11 @@ impl GridView {
         self.next_run_number = 1;
     }
 
+    fn query_has_view_edits(&self) -> bool {
+        (self.grid_is_query && (self.editing.is_some() || !self.edits.is_empty()))
+            || self.run_edits.iter().any(|edits| !edits.is_empty())
+    }
+
     fn sync_grid_owner(&mut self) {
         self.tab_scroll.scroll_to_item(self.tabs.active);
         let query = match self.tabs.current() {
@@ -617,6 +640,18 @@ impl GridView {
             }
         };
         if query == self.grid_is_query {
+            return;
+        }
+        if self.editing.is_some() {
+            self.status = "Finish or discard the active cell edit using Commands before switching grids.".into();
+            if let Some(index) = self.tabs.items.iter().position(|tab| match (self.grid_is_query, tab) {
+                (true, Tab::Query) => true,
+                (false, Tab::Table(name)) => name == &self.catalog.grid_table,
+                _ => false,
+            }) {
+                self.tabs.active = index;
+                self.tab_scroll.scroll_to_item(index);
+            }
             return;
         }
         self.invalidate_background();
@@ -647,6 +682,10 @@ impl GridView {
         let Some(run) = self.runs.get(index).copied() else {
             return;
         };
+        if index != self.active_run && self.editing.is_some() {
+            self.status = "Finish or discard the active cell edit using Commands before switching results.".into();
+            return;
+        }
         self.invalidate_background();
         if let Some(previous) = self.run_edits.get_mut(self.active_run) {
             *previous = std::mem::take(&mut self.edits);
@@ -679,6 +718,11 @@ impl GridView {
 
     fn close_run(&mut self, index: usize) {
         if index >= self.runs.len() {
+            return;
+        }
+        let drops_edits = !self.run_edits[index].is_empty()
+            || (index == self.active_run && (self.editing.is_some() || !self.edits.is_empty()));
+        if drops_edits && self.reject_view_edits() {
             return;
         }
         self.runs.remove(index);
@@ -860,7 +904,7 @@ impl GridView {
                 Ok(diff) => {
                     this.status.clear();
                     this.selection = None;
-                    this.compare = Some(diff);
+                    this.compare = Some(std::sync::Arc::new(diff));
                     this.scroll.scroll_to_item_strict(0, ScrollStrategy::Top);
                 }
                 Err(message) => this.status = message.into(),
@@ -1042,7 +1086,7 @@ impl GridView {
                 action("settings", "Open settings", true),
                 action(
                     "table",
-                    &format!("Open {}", self.catalog.grid_table),
+                    &format!("Open {}", table_label(&self.catalog.grid_table)),
                     !self.catalog.tables.is_empty(),
                 ),
                 action(
@@ -1316,14 +1360,6 @@ pub fn cell_div(width: f32, text: String) -> Div {
     flex_cell(width).child(text)
 }
 
-fn display_cell(width: f32, numeric_column: bool, cell: &Cell, theme: Theme) -> Div {
-    let mut item = cell_div(width, cell_preview(cell));
-    if let Some(kind) = bookie_gpui::type_colors::type_kind(cell) {
-        item = item.text_color(rgb(bookie_gpui::type_colors::type_color(kind, theme.dark)));
-    }
-    if right_aligned(numeric_column, cell) { item.justify_end() } else { item }
-}
-
 fn right_aligned(numeric_column: bool, cell: &Cell) -> bool {
     numeric_cell(cell) || (numeric_column && matches!(cell, Cell::Null))
 }
@@ -1338,13 +1374,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_capped_load_is_marked_with_a_plus_in_the_title() {
+        assert_eq!(render::progress_text("", 100_000, true, 20), "100,000+ rows · 20 pages");
+        assert_eq!(render::progress_text("", 40, false, 1), "40 rows");
+        assert_eq!(render::progress_text("label · ", 1_500, true, 1), "label · 1,500+ rows");
+    }
+
+    #[test]
     fn only_numeric_cells_use_right_alignment() {
         assert!(numeric_cell(&Cell::Int(7)));
         assert!(numeric_cell(&Cell::Float(7.5)));
-        assert!(numeric_cell(&Cell::Decimal("7.50".into())));
-        assert!(numeric_cell(&bookie_gpui::core_bridge::value_to_cell(
-            bookie_core::Value::Decimal("7.50".parse().unwrap())
-        )));
+        assert!(numeric_cell(&Cell::Decimal("7.50".parse().unwrap())));
+        assert!(numeric_cell(&bookie_core::Value::Decimal("7.50".parse().unwrap())));
         assert!(!numeric_cell(&Cell::Text("7".into())));
         assert!(!numeric_cell(&Cell::Null));
     }
@@ -1355,22 +1396,6 @@ mod tests {
         assert!(!right_aligned(false, &Cell::Null));
         assert!(!right_aligned(true, &Cell::Text("7".into())));
     }
-}
-
-fn row_div(stripe: bool, selected: bool, theme: Theme) -> Div {
-    let background = if selected {
-        theme.active_row
-    } else if stripe {
-        theme.stripe
-    } else {
-        theme.background
-    };
-    div()
-        .flex()
-        .items_center()
-        .h(px(ROW_HEIGHT))
-        .w_full()
-        .bg(rgb(background))
 }
 
 fn open_requested_start_tab(view: &Entity<GridView>, name: &str, cx: &mut App) {
@@ -1461,7 +1486,7 @@ fn load_keymap() -> Keymap {
 }
 
 fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
-    use bookie_gpui::live::{LiveTable, Origin};
+    use bookie_gpui::live::{LiveSession, Origin};
     let table = std::env::var("BOOKIE_PROTOTYPE_TABLE").ok()?;
     let origin = match (
         std::env::var("BOOKIE_PROTOTYPE_FILE").ok(),
@@ -1471,7 +1496,22 @@ fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
         (None, Some(connection)) => Origin::Saved(connection),
         (None, None) => return None,
     };
-    match LiveTable::load(&origin, &table, bookie_gpui::live::ROW_CAP) {
+    let session = match LiveSession::open(&origin) {
+        Ok(session) => session,
+        Err(error) => {
+            eprintln!("could not open live source: {error}");
+            std::process::exit(2);
+        }
+    };
+    let Some(target) = session
+        .tables
+        .iter()
+        .find(|candidate| candidate.name == table || table_label(candidate) == table)
+    else {
+        eprintln!("could not find table {table}");
+        std::process::exit(2);
+    };
+    match session.load_table(target, bookie_gpui::live::ROW_CAP) {
         Ok(live) => Some(std::sync::Arc::new(live)),
         Err(error) => {
             eprintln!("could not read {table}: {error}");

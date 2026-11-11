@@ -441,10 +441,10 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
         .has_frame(true)
         .build();
 
-    let save_button = gtk::Button::with_label(&crate::tr!("Save"));
+    let save_button = gtk::Button::with_label(&bookie_app_services::tr!("Save"));
     save_button.add_css_class("suggested-action");
 
-    let cancel_button = gtk::Button::with_label(&crate::tr!("Cancel"));
+    let cancel_button = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
 
     let button_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)

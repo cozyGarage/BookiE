@@ -21,7 +21,7 @@ pub(crate) fn suggested_bundle_name(today: &str) -> String {
 
 pub(crate) fn bundle_file_filter() -> gtk::FileFilter {
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&crate::tr!("Connection bundles")));
+    filter.set_name(Some(&bookie_app_services::tr!("Connection bundles")));
     filter.add_suffix(BUNDLE_EXTENSION);
     filter.add_mime_type(BUNDLE_MIME_TYPE);
     filter
@@ -45,20 +45,20 @@ fn boxed_list() -> gtk::ListBox {
 /// user is deciding whether to let it happen.
 pub(crate) fn disposition_title(item: &ImportItem) -> String {
     match item.disposition {
-        ImportDisposition::New => crate::tr!("Add"),
-        ImportDisposition::UpdateInPlace => crate::tr!("Update"),
-        ImportDisposition::Remapped => crate::tr!("Add as a new connection"),
+        ImportDisposition::New => bookie_app_services::tr!("Add"),
+        ImportDisposition::UpdateInPlace => bookie_app_services::tr!("Update"),
+        ImportDisposition::Remapped => bookie_app_services::tr!("Add as a new connection"),
     }
 }
 
 pub(crate) fn disposition_detail(item: &ImportItem) -> String {
     match item.disposition {
-        ImportDisposition::New => crate::tr!("Not on this device yet."),
+        ImportDisposition::New => bookie_app_services::tr!("Not on this device yet."),
         ImportDisposition::UpdateInPlace => {
-            crate::tr!("Updates the matching connection. Read-only, environment and TLS are never relaxed.")
+            bookie_app_services::tr!("Updates the matching connection. Read-only, environment and TLS are never relaxed.")
         }
         ImportDisposition::Remapped => {
-            crate::tr!("A different server already uses this entry's identifier here, so the import keeps both.")
+            bookie_app_services::tr!("A different server already uses this entry's identifier here, so the import keeps both.")
         }
     }
 }
@@ -67,9 +67,9 @@ pub(crate) fn disposition_detail(item: &ImportItem) -> String {
 /// so plainly, because the user has to know which half landed.
 pub(crate) fn import_outcome_message(imported: usize, planned: usize) -> String {
     if imported == planned {
-        return crate::tr!("Imported {n} connections.").replace("{n}", &imported.to_string());
+        return bookie_app_services::tr!("Imported {n} connections.").replace("{n}", &imported.to_string());
     }
-    crate::tr!("Imported {n} of {total} connections, then stopped.")
+    bookie_app_services::tr!("Imported {n} of {total} connections, then stopped.")
         .replace("{n}", &imported.to_string())
         .replace("{total}", &planned.to_string())
 }

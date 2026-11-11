@@ -34,6 +34,37 @@ pub(super) fn header_column(column: &ColumnInfo, schema: Option<&ColumnInfo>) ->
     header
 }
 
+/// Numbers, and NULLs in a numeric column, line up on the right so their digits share one edge.
+pub(super) fn right_aligned_column(column: &ColumnInfo) -> bool {
+    use bookie_core::FilterValueKind;
+    matches!(
+        bookie_core::filter_value_kind(column),
+        FilterValueKind::Int | FilterValueKind::Float | FilterValueKind::Decimal
+    )
+}
+
+/// Starting width of a column in pixels: by its type, grown for a long name, and never below `min`
+/// (wide tables use a minimum so their columns stay readable).
+pub(super) fn default_column_width_px(info: &ColumnInfo, min: Option<i32>) -> i32 {
+    use bookie_core::FilterValueKind;
+    let by_type = match bookie_core::filter_value_kind(info) {
+        FilterValueKind::Bool => 80,
+        FilterValueKind::Int | FilterValueKind::Float | FilterValueKind::Decimal => 120,
+        FilterValueKind::Date => 110,
+        FilterValueKind::Time => 100,
+        FilterValueKind::DateTime => 170,
+        FilterValueKind::TimestampTz => 200,
+        FilterValueKind::Uuid => 280,
+        FilterValueKind::Json | FilterValueKind::Bytes => 220,
+        FilterValueKind::Text => 200,
+    };
+    let by_name = i32::try_from(info.name.chars().count())
+        .unwrap_or(i32::MAX)
+        .saturating_mul(8)
+        + 32;
+    by_type.max(by_name).clamp(80, 360).max(min.unwrap_or(0))
+}
+
 fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
     let mut title = info.name.clone();
     if info.primary_key {
@@ -42,42 +73,49 @@ fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
     if is_foreign_key {
         title.push_str(" \u{1F517}");
     }
-    if !info.data_type.is_empty() {
+    if let Some(data_type) = shown_type(info) {
         title.push('\n');
-        title.push_str(&info.data_type);
+        title.push_str(data_type);
     }
     title
+}
+
+/// The declared type to show, or `None` when there is none. An expression column (for example
+/// `count(*)`) has no declared type; some engines report the word NULL, which is not a type.
+fn shown_type(info: &ColumnInfo) -> Option<&str> {
+    let data_type = info.data_type.trim();
+    (!data_type.is_empty() && !data_type.eq_ignore_ascii_case("NULL")).then_some(data_type)
 }
 
 fn header_details(info: &ColumnInfo, foreign_key: bool, sort_enabled: bool) -> gtk4::gio::Menu {
     let details = gtk4::gio::Menu::new();
     for text in [
-        crate::tr!("Column: {name}").replace("{name}", &info.name),
-        crate::tr!("Type: {type}").replace("{type}", &info.data_type),
+        bookie_app_services::tr!("Column: {name}").replace("{name}", &info.name),
+        bookie_app_services::tr!("Type: {type}").replace("{type}", shown_type(info).unwrap_or("\u{2014}")),
         if info.nullable {
-            crate::tr!("NULL allowed")
+            bookie_app_services::tr!("NULL allowed")
         } else {
-            crate::tr!("NULL not allowed")
+            bookie_app_services::tr!("NULL not allowed")
         },
     ] {
         details.append(Some(&text), None);
     }
     if info.primary_key {
-        details.append(Some(&crate::tr!("Primary key")), None);
+        details.append(Some(&bookie_app_services::tr!("Primary key")), None);
     }
     if foreign_key {
-        details.append(Some(&crate::tr!("Foreign key")), None);
+        details.append(Some(&bookie_app_services::tr!("Foreign key")), None);
     }
     if let Some(comment) = info.comment.as_deref().filter(|comment| !comment.trim().is_empty()) {
         let text: String = comment.chars().take(1024).collect();
         details.append(Some(&text), None);
     }
     let menu = gtk4::gio::Menu::new();
-    menu.append_section(Some(&crate::tr!("Column details")), &details);
+    menu.append_section(Some(&bookie_app_services::tr!("Column details")), &details);
     if sort_enabled {
         let sort_actions = gtk4::gio::Menu::new();
-        sort_actions.append(Some(&crate::tr!("Clear sort")), Some("grid.clear-sort"));
-        menu.append_section(Some(&crate::tr!("Sort")), &sort_actions);
+        sort_actions.append(Some(&bookie_app_services::tr!("Clear sort")), Some("grid.clear-sort"));
+        menu.append_section(Some(&bookie_app_services::tr!("Sort")), &sort_actions);
     }
     menu
 }
@@ -245,6 +283,10 @@ pub(super) fn build_column(
         let dummy = gtk4::CustomSorter::new(|_, _| gtk4::Ordering::Equal);
         column.set_sorter(Some(&dummy));
     }
+    // Every column but the last has a fixed width from its type and name; the last one takes the
+    // remaining space of the view, so the grid is neither crowded nor left with a blank area.
+    let is_last = idx + 1 == display_columns.len();
+    let default_width = (!is_last).then(|| default_column_width_px(info, default_min_width));
     if let Some(id) = connection_id {
         if let Some(saved) = column_widths
             .as_ref()
@@ -252,8 +294,8 @@ pub(super) fn build_column(
         {
             column.set_expand(false);
             column.set_fixed_width(saved);
-        } else if let Some(min) = default_min_width {
-            column.set_fixed_width(min);
+        } else if let Some(width) = default_width {
+            column.set_fixed_width(width);
         }
         let column_name = info.name.clone();
         let column_widths = column_widths.clone();
@@ -269,8 +311,8 @@ pub(super) fn build_column(
                 tracing::warn!(%error, "column width was not saved");
             }
         });
-    } else if let Some(min) = default_min_width {
-        column.set_fixed_width(min);
+    } else if let Some(width) = default_width {
+        column.set_fixed_width(width);
     }
     column.connect_fixed_width_notify(|column| column.set_expand(column.fixed_width() < 0));
     (column, edit_trigger)
@@ -298,7 +340,7 @@ fn bind_row_cell(
     } = bound;
     if !row.cell_is_loaded(index) && !row.cell_is_partial(index) {
         if let Some(label) = item.child().and_downcast::<gtk4::Label>() {
-            label.set_text(&crate::tr!("Loading…"));
+            label.set_text(&bookie_app_services::tr!("Loading…"));
             POSITION_SLOT.set(&label, item.position());
         }
         return;
@@ -353,7 +395,8 @@ fn row_key_is_ambiguous(context: &TabGridContext, key: Option<&crate::services::
 }
 
 fn mark_ambiguous_key(child: &gtk4::Widget, ambiguous: bool) {
-    let reason = crate::tr!("Another loaded row has the same key, so this row cannot be edited on its own.");
+    let reason =
+        bookie_app_services::tr!("Another loaded row has the same key, so this row cannot be edited on its own.");
     if ambiguous {
         child.set_tooltip_text(Some(&reason));
     } else if child.tooltip_text().is_some_and(|tooltip| tooltip == reason) {
@@ -582,6 +625,7 @@ fn bind_readonly_label(
     highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     label.set_text(text);
+    label.set_xalign(if right_aligned_column(binding.column) { 1.0 } else { 0.0 });
     apply_cell_tooltip(label.upcast_ref(), text, is_null, truncated);
     set_class(label.upcast_ref(), "dim-label", is_null);
     apply_cell_state(label.upcast_ref(), &binding.pending_classes);
@@ -615,18 +659,18 @@ fn clear_pending_classes(widget: &gtk4::Widget) {
 
 fn pending_description(classes: &[&str]) -> Option<String> {
     if classes.contains(&"tp-row-pending-delete") {
-        return Some(crate::tr!("Pending deletion").to_string());
+        return Some(bookie_app_services::tr!("Pending deletion").to_string());
     }
     if classes.contains(&"tp-row-pending-insert") {
-        return Some(crate::tr!("New row").to_string());
+        return Some(bookie_app_services::tr!("New row").to_string());
     }
     classes
         .contains(&"tp-cell-modified")
-        .then(|| crate::tr!("Modified").to_string())
+        .then(|| bookie_app_services::tr!("Modified").to_string())
         .or_else(|| {
             classes
                 .contains(&"tp-cell-changed")
-                .then(|| crate::tr!("Changed").to_string())
+                .then(|| bookie_app_services::tr!("Changed").to_string())
         })
 }
 
@@ -642,7 +686,7 @@ fn apply_cell_tooltip(widget: &gtk4::Widget, text: &str, is_null: bool, truncate
     if is_null || text.chars().take(TOOLTIP_MIN_CHARS + 1).count() <= TOOLTIP_MIN_CHARS {
         widget.set_tooltip_text(None);
     } else if truncated {
-        widget.set_tooltip_text(Some(&crate::tr!(
+        widget.set_tooltip_text(Some(&bookie_app_services::tr!(
             "This cell is truncated. Choose View Value to see the full value."
         )));
     } else {
@@ -684,5 +728,100 @@ mod metadata_presentation_tests {
             domain_type: None,
         };
         assert_eq!(column_header_title(&info, false), "value\npublic.MixedCaseType");
+    }
+}
+
+#[cfg(test)]
+mod expression_column_tests {
+    use super::*;
+
+    fn info(data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: "count(*)".into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn an_expression_column_shows_no_type_label_even_when_the_engine_reports_null() {
+        assert_eq!(column_header_title(&info("NULL"), false), "count(*)");
+        assert_eq!(column_header_title(&info(""), false), "count(*)");
+        assert_eq!(column_header_title(&info("integer"), false), "count(*)\ninteger");
+        assert_eq!(shown_type(&info("null")), None);
+    }
+}
+
+#[cfg(test)]
+mod default_width_tests {
+    use super::*;
+
+    fn info(name: &str, data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn widths_follow_the_type_then_the_name_and_respect_the_minimum() {
+        assert!(
+            default_column_width_px(&info("ok", "boolean"), None) < default_column_width_px(&info("ok", "text"), None)
+        );
+        assert!(
+            default_column_width_px(&info("ok", "integer"), None) < default_column_width_px(&info("ok", "uuid"), None)
+        );
+        let long = default_column_width_px(&info("a_very_long_column_name_here", "integer"), None);
+        assert!(long > default_column_width_px(&info("id", "integer"), None));
+        assert!(default_column_width_px(&info("x", "boolean"), None) >= 80);
+        assert!(default_column_width_px(&info(&"z".repeat(200), "text"), None) <= 360);
+        assert_eq!(default_column_width_px(&info("id", "integer"), Some(300)), 300);
+    }
+}
+
+#[cfg(test)]
+mod numeric_alignment_tests {
+    use super::*;
+
+    fn column(data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: "n".into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn integer_and_decimal_columns_align_right_and_text_does_not() {
+        assert!(right_aligned_column(&column("integer")));
+        assert!(right_aligned_column(&column("NUMERIC(10,2)")));
+        assert!(right_aligned_column(&column("double precision")));
+        assert!(!right_aligned_column(&column("text")));
+        assert!(!right_aligned_column(&column("varchar(20)")));
     }
 }

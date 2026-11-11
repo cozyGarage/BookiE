@@ -1028,7 +1028,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-agentd"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1054,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-app"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-channel",
  "async-trait",
@@ -1071,6 +1071,7 @@ dependencies = [
  "bookie-driver-sqlite",
  "bookie-mcp",
  "bookie-policy",
+ "bookie-results",
  "bookie-ssh",
  "bookie-storage",
  "bookie-transport",
@@ -1105,7 +1106,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-app-services"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1124,6 +1125,7 @@ dependencies = [
  "bookie-storage",
  "bookie-transport",
  "chrono",
+ "gettext-rs",
  "rust_decimal",
  "secrecy",
  "serde",
@@ -1143,7 +1145,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-avro-container"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "apache-avro",
  "serde_json",
@@ -1151,14 +1153,14 @@ dependencies = [
 
 [[package]]
 name = "bookie-checks"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "bookie-core"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "calamine",
@@ -1183,7 +1185,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-cassandra"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1199,7 +1201,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-clickhouse"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1227,7 +1229,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-duckdb"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1241,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-mongodb"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1262,7 +1264,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-mssql"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1285,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-mysql"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1309,7 +1311,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-oracle"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1323,7 +1325,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-postgres"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1349,7 +1351,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-redis"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1364,7 +1366,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-registry"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "bookie-core",
  "bookie-driver-cassandra",
@@ -1381,7 +1383,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-sqlite"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-app-services",
@@ -1402,7 +1404,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-driver-tls-tests"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "bookie-core",
  "bookie-driver-clickhouse",
@@ -1419,7 +1421,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-dump"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "bookie-core",
  "secrecy",
@@ -1435,7 +1437,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-kafka-browser"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "chrono",
  "rskafka",
@@ -1446,7 +1448,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-mcp"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "axum",
@@ -1476,7 +1478,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-pg-sessions"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "bookie-core",
  "bookie-driver-postgres",
@@ -1488,7 +1490,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-policy"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1518,7 +1520,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-release-tests"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",
@@ -1537,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-results"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "aes-gcm",
  "bookie-core",
@@ -1560,7 +1562,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-ssh"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "libc",
@@ -1578,7 +1580,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-storage"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "argon2",
  "async-trait",
@@ -1606,7 +1608,7 @@ dependencies = [
 
 [[package]]
 name = "bookie-transport"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "async-trait",
  "bookie-core",

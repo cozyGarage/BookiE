@@ -15,7 +15,7 @@ pub(crate) struct CancellableDialog {
 impl CancellableDialog {
     pub(crate) fn present(parent: &adw::ApplicationWindow, title: &str, body: &[&gtk::Widget]) -> Self {
         let cancel = CancellationToken::new();
-        let stop = gtk::Button::with_label(&crate::tr!("Cancel"));
+        let stop = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
         let content = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(12)

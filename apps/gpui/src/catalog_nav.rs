@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use bookie_core::TableInfo;
 use bookie_gpui::live::{LiveSession, LiveTable, Origin, ROW_CAP};
 use bookie_gpui::model::{Cell, ColumnMeta, Diff, FindResult, Predicate};
-use bookie_gpui::shell::{Catalog, Tab};
+use bookie_gpui::shell::{Catalog, Tab, table_info, table_label};
 use bookie_gpui::source::{ResultSource, Source};
 use gpui::{Context, Window};
 use tokio_util::sync::CancellationToken;
@@ -12,17 +13,20 @@ use crate::{GridView, Mode};
 impl GridView {
     pub(super) fn attach_live(&mut self, table: Arc<LiveTable>) {
         let session = table.session().clone();
-        let table_name = table.table_name().to_string();
-        self.tabs.items[1] = Tab::Table(table_name.clone());
-        self.attach_session(session, table_name);
+        let Some(identity) = table.table_info().cloned() else {
+            self.status = "The loaded result has no table identity.".into();
+            return;
+        };
+        self.tabs.items[1] = Tab::Table(identity.clone());
+        self.attach_session(session, identity);
     }
 
-    fn attach_session(&mut self, session: Arc<LiveSession>, table_name: String) {
+    fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
         self.catalog = Catalog {
             connection: format!("{} · {}", session.driver_id, session.label),
             database: session.label.clone(),
             tables: session.tables.clone(),
-            grid_table: table_name,
+            grid_table: table,
         };
         self.live = Some(session);
         self.runs.clear();
@@ -71,7 +75,7 @@ impl GridView {
                 self.table_source = source;
                 self.tabs.items.truncate(1);
                 self.tabs.open_query();
-                self.attach_session(session, String::new());
+                self.attach_session(session, table_info(""));
                 self.grid_is_query = true;
             }
         }
@@ -89,11 +93,11 @@ impl GridView {
             || self.run_edits.iter().any(|edits| !edits.is_empty())
     }
 
-    fn reject_view_edits(&mut self) -> bool {
+    pub(super) fn reject_view_edits(&mut self) -> bool {
         if !self.has_view_edits() {
             return false;
         }
-        self.status = "Discard all view-only edits using Commands before connecting.".into();
+        self.status = "Discard all view-only edits using Commands before closing or switching.".into();
         true
     }
 
@@ -107,20 +111,24 @@ impl GridView {
         self.status = "Discarded all view-only edits.".into();
     }
 
-    pub(super) fn open_table_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn open_table_named(&mut self, table: &TableInfo, window: &mut Window, cx: &mut Context<Self>) {
         if self.catalog.tables.is_empty() {
             return;
         }
-        let Some(session) = self.live.clone().filter(|_| name != self.catalog.grid_table) else {
-            self.tabs.open_table(name);
+        let Some(session) = self.live.clone().filter(|_| table != &self.catalog.grid_table) else {
+            self.tabs.open_table(table);
             self.sync_grid_owner();
             if self.tabs.shows_grid_for(&self.catalog.grid_table) {
                 window.focus(&self.focus, cx);
             }
             return;
         };
-        self.status = format!("Loading {name}…");
-        let wanted = name.to_string();
+        if self.reject_view_edits() {
+            cx.notify();
+            return;
+        }
+        self.status = format!("Loading {}…", table_label(table));
+        let wanted = table.clone();
         self.begin_background(
             cx,
             move |cancel| load(&session, &wanted, &cancel),
@@ -131,8 +139,11 @@ impl GridView {
         );
     }
 
-    fn show_loaded_table(&mut self, name: String, table: Source) {
-        self.catalog.grid_table = name.clone();
+    fn show_loaded_table(&mut self, identity: TableInfo, table: Source) {
+        if self.reject_view_edits() {
+            return;
+        }
+        self.catalog.grid_table = identity.clone();
         self.source = table.clone();
         self.table_source = table;
         self.edits.clear();
@@ -140,7 +151,7 @@ impl GridView {
         self.compare = None;
         self.cursor = Default::default();
         self.set_mode(Mode::All);
-        self.tabs.open_table(&name);
+        self.tabs.open_table(&identity);
         self.grid_is_query = false;
         self.sync_grid_owner();
         self.status.clear();
@@ -149,11 +160,11 @@ impl GridView {
 
 fn load(
     session: &Arc<LiveSession>,
-    name: &str,
+    table: &TableInfo,
     cancellation: &tokio_util::sync::CancellationToken,
-) -> Result<(String, Source), String> {
-    let table = session.load_table_controlled(name, ROW_CAP, cancellation)?;
-    Ok((name.to_string(), Arc::new(table)))
+) -> Result<(TableInfo, Source), String> {
+    let loaded = session.load_table_controlled(table, ROW_CAP, cancellation)?;
+    Ok((table.clone(), Arc::new(loaded)))
 }
 
 enum Opened {

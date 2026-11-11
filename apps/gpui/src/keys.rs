@@ -1,11 +1,11 @@
-use bookie_gpui::cursor::{Cursor, move_cursor};
 use bookie_gpui::keymap::{Chord, Command};
-use gpui::{Context, Focusable, KeyDownEvent, Window};
+use bookie_results::grid_cursor::{Cursor, move_cursor};
+use gpui::{Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
 
 use crate::{GridView, Tab, palette_step};
 
 impl GridView {
-    pub(super) fn capture_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = event.keystroke.modifiers;
         let plain = !(modifiers.shift || modifiers.control || modifiers.alt);
         let ready = self.focus.is_focused(window)
@@ -99,7 +99,11 @@ impl GridView {
             Command::NewQuery => {
                 self.tabs.open_query();
                 self.sync_grid_owner();
-                window.focus(&self.focus, cx);
+                if self.live.is_some() {
+                    self.focus_editor = true;
+                } else {
+                    window.focus(&self.focus, cx);
+                }
             }
             Command::RunQuery if matches!(self.tabs.current(), Tab::Query) => self.run_query(cx),
             Command::RunQuery => {}

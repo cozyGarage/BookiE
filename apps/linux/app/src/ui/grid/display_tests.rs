@@ -19,7 +19,7 @@ fn metadata(data_type: &str) -> ColumnInfo {
 
 #[test]
 fn display_text_primitive_variants() {
-    assert_eq!(value_to_display_text(&Value::Null), "NULL");
+    assert_eq!(value_to_display_text(&Value::Null), "<NULL>");
     assert_eq!(value_to_display_text(&Value::Bool(true)), "true");
     assert_eq!(value_to_display_text(&Value::Int(42)), "42");
     assert_eq!(value_to_display_text(&Value::Text("hello".into())), "hello");
@@ -100,6 +100,16 @@ fn grid_cell_view_bounds_long_text_and_keeps_full_value_formatting_available() {
             _ => std::ptr::null(),
         }
     ));
+}
+
+#[test]
+fn copying_a_truncated_grid_cell_returns_the_full_value() {
+    let source = "a".repeat(GRID_CELL_DISPLAY_MAX_CHARS + 10);
+    let value = Value::Text(source.clone());
+    let view = cell_view(&value, &metadata("text"));
+
+    assert!(view.truncated);
+    assert_eq!(value_to_copy_text(&value), source);
 }
 
 #[test]
@@ -263,7 +273,7 @@ fn cell_view_keeps_null_distinct_from_text_and_obeys_column_editability() {
     assert!(null.is_null);
     assert!(null.inline_editable);
     assert_eq!(null.text_for_bind(true), "<NULL>");
-    assert_eq!(null.text_for_bind(false), "NULL");
+    assert_eq!(null.text_for_bind(false), "<NULL>");
     let text_value = Value::Text("NULL".into());
     let text_null = cell_view(&text_value, &text_column);
     assert!(!text_null.is_null);

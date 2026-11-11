@@ -33,15 +33,15 @@ pub(super) fn build_index_row(index: usize, idx: &IndexInfo, sender: ComponentSe
         .build();
 
     if idx.unique {
-        row.add_suffix(&index_badge(&crate::tr!("UNIQUE"), "dim-label"));
+        row.add_suffix(&index_badge(&bookie_app_services::tr!("UNIQUE"), "dim-label"));
     }
     if idx.primary {
-        row.add_suffix(&index_badge(&crate::tr!("PRIMARY"), "accent"));
+        row.add_suffix(&index_badge(&bookie_app_services::tr!("PRIMARY"), "accent"));
     }
 
     let remove_button = gtk::Button::builder()
         .icon_name("user-trash-symbolic")
-        .tooltip_text(crate::tr!("Remove index"))
+        .tooltip_text(bookie_app_services::tr!("Remove index"))
         .valign(gtk::Align::Center)
         .build();
     remove_button.add_css_class("flat");
@@ -49,7 +49,7 @@ pub(super) fn build_index_row(index: usize, idx: &IndexInfo, sender: ComponentSe
     // column constraint and removing it breaks the table.
     if idx.primary {
         remove_button.set_sensitive(false);
-        remove_button.set_tooltip_text(Some(&crate::tr!(
+        remove_button.set_tooltip_text(Some(&bookie_app_services::tr!(
             "Primary-key index can't be dropped here; clear the PK on the column."
         )));
     }

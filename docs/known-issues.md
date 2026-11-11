@@ -18,6 +18,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | UI-53 | [#2630](https://github.com/cozyGarage/BookiE/issues/2630) | UX |
 | UI-57 | [#2662](https://github.com/cozyGarage/BookiE/issues/2662) | UX |
 | UI-58 | [#2673](https://github.com/cozyGarage/BookiE/issues/2673) | UX |
+| UI-60 | [#2725](https://github.com/cozyGarage/BookiE/issues/2725) | UX |
 | PEER-4 | [#1026](https://github.com/cozyGarage/BookiE/issues/1026) | UX |
 | PEER-7 | [#1029](https://github.com/cozyGarage/BookiE/issues/1029) | UX |
 | PEER-8 | [#1030](https://github.com/cozyGarage/BookiE/issues/1030) | Data |

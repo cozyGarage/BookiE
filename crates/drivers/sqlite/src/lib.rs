@@ -428,6 +428,28 @@ impl Connection for SqliteConnection {
         transaction::execute_in_transaction_checked(&self.pool, statements, expect_one).await
     }
 
+    async fn execute_in_transaction_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        let mut connection = acquire_controlled(&self.pool, control).await?;
+        let handle = InterruptHandle::of(&mut connection).await?;
+        let result = run_server_cancellable(
+            transaction::execute_in_transaction_on(&mut connection, statements, &|| {
+                control.cancellation_token().is_cancelled()
+            }),
+            request_interrupt(&handle),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+        drop(handle);
+        let result = settle_stopped_transaction(&mut connection, result).await;
+        release_connection(connection, &result).await;
+        result
+    }
+
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
         // SQLite catalog access is via PRAGMAs — they're scoped to the
         // current database file (no schema parameter needed). For each
@@ -1148,13 +1170,40 @@ async fn request_interrupt(handle: &InterruptHandle) -> Result<(), DriverError> 
 /// reports the extended result code, so both the plain code and an
 /// extended code in the same family have to be accepted.
 fn confirms_cancellation(error: &DriverError) -> bool {
-    let DriverError::Query { message, sqlstate, .. } = error else {
-        return false;
-    };
-    if sqlstate.as_deref() == Some("9") {
-        return true;
+    match error {
+        DriverError::Transaction { source, .. } => confirms_cancellation(source),
+        DriverError::Cancelled => true,
+        DriverError::Query { message, sqlstate, .. } => {
+            sqlstate.as_deref() == Some("9") || message.to_lowercase().contains("interrupted")
+        }
+        _ => false,
     }
-    message.to_lowercase().contains("interrupted")
+}
+
+async fn settle_stopped_transaction<T>(
+    connection: &mut PoolConnection<Sqlite>,
+    result: Result<T, DriverError>,
+) -> Result<T, DriverError> {
+    let Err(error) = &result else {
+        return result;
+    };
+    let rollback_raced_the_stop = matches!(
+        error,
+        DriverError::OperationOutcomeUnknown { source }
+            if matches!(
+                source.as_ref(),
+                DriverError::TransactionRollbackFailed { source, .. }
+                    if matches!(source.as_ref(), DriverError::Cancelled)
+            )
+    );
+    if matches!(error, DriverError::OperationOutcomeUnknown { .. }) && !rollback_raced_the_stop {
+        return result;
+    }
+    let _ = sqlx::query("ROLLBACK").execute(&mut **connection).await;
+    if rollback_raced_the_stop && matches!(interrupt::in_autocommit_mode(connection).await, Ok(true)) {
+        return Err(DriverError::Cancelled);
+    }
+    result
 }
 
 async fn release_connection<T>(connection: PoolConnection<Sqlite>, result: &Result<T, DriverError>) {

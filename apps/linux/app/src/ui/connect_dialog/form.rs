@@ -66,9 +66,9 @@ impl super::ConnectDialog {
         self.database_file_picker.set_visible(self.form.file_based);
         self.auth_source.set_visible(driver.id() == "mongodb");
         self.database.set_title(&if self.form.file_based {
-            crate::tr!("File path")
+            bookie_app_services::tr!("File path")
         } else {
-            crate::tr!("Database")
+            bookie_app_services::tr!("Database")
         });
     }
 }
@@ -95,8 +95,8 @@ fn apply_values(
 
 pub(super) fn test_result_text(result: &Result<usize, String>) -> String {
     match result {
-        Ok(tables) => crate::tr!("Connection ok · {n} table(s) visible").replace("{n}", &tables.to_string()),
-        Err(error) => crate::tr!("Test failed: {error}").replace("{error}", error),
+        Ok(tables) => bookie_app_services::tr!("Connection ok · {n} table(s) visible").replace("{n}", &tables.to_string()),
+        Err(error) => bookie_app_services::tr!("Test failed: {error}").replace("{error}", error),
     }
 }
 

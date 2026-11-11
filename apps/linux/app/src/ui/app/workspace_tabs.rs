@@ -20,6 +20,24 @@ use bulk_close::{add_bulk_close_actions, bulk_close_menu_model};
 mod closed_tab;
 use closed_tab::describe_closed_tab;
 
+fn focus_after_tab_close(tab_view: &adw::TabView, workspace_outer_stack: &gtk::Stack) {
+    let focused = tab_view
+        .selected_page()
+        .map(|page| page.child())
+        .is_some_and(|child| child.child_focus(gtk::DirectionType::TabForward));
+    if !focused {
+        let stack = workspace_outer_stack.downgrade();
+        glib::idle_add_local_once(move || {
+            if let Some(stack) = stack.upgrade()
+                && let Some(empty_page) = stack.child_by_name("empty")
+                && stack.visible_child_name().as_deref() == Some("empty")
+            {
+                empty_page.child_focus(gtk::DirectionType::TabForward);
+            }
+        });
+    }
+}
+
 impl App {
     /// Builds the unified AdwTabOverview tree once per connection.
     /// Idempotent via `workspace_root_added`.
@@ -50,7 +68,7 @@ impl App {
         let overview_button = adw::TabButton::builder()
             .view(&tab_view)
             .action_name("overview.open")
-            .tooltip_text(crate::tr!("View open tabs"))
+            .tooltip_text(bookie_app_services::tr!("View open tabs"))
             .valign(gtk::Align::Center)
             .build();
         // Hide the overview button until there are at least 2 tabs —
@@ -68,7 +86,7 @@ impl App {
         // Browse tabs come from sidebar clicks.
         let new_query_button = gtk::Button::builder()
             .icon_name("tab-new-symbolic")
-            .tooltip_text(crate::tr!("New query (Ctrl+E)"))
+            .tooltip_text(bookie_app_services::tr!("New query (Ctrl+E)"))
             .valign(gtk::Align::Center)
             .build();
         new_query_button.add_css_class("flat");
@@ -314,7 +332,7 @@ impl App {
                 });
 
         let page = tab_view.append(controller.widget());
-        page.set_title(&crate::tr!("New Table"));
+        page.set_title(&bookie_app_services::tr!("New Table"));
         write_workspace_tab_id(&page, tab_id);
 
         let slot = super::StructureTabSlot {
@@ -357,12 +375,7 @@ impl App {
         };
         let tab_id = Uuid::new_v4();
         let driver_id = self.driver_id().to_string();
-        let enum_input_style = self
-            .registry
-            .get(&driver_id)
-            .map_or(bookie_core::EnumInputStyle::RawValue, |driver| {
-                driver.capabilities().enum_input_style
-            });
+        let parse_hooks = crate::ui::browse_tab::hooks_for(&driver_id);
         let browse_filters = self
             .registry
             .get(&driver_id)
@@ -376,7 +389,7 @@ impl App {
             schema: schema.clone(),
             table: table.clone(),
             driver_id,
-            enum_input_style,
+            parse_hooks,
             browse_filters,
             connection_id,
             read_only,
@@ -413,7 +426,7 @@ impl App {
                 },
                 BrowseTabOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
                 BrowseTabOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
-                    title: crate::tr!("Row as JSON"),
+                    title: bookie_app_services::tr!("Row as JSON"),
                     body,
                 },
                 BrowseTabOutput::ExportResults { result, name, filtered } => AppMsg::ExportResults {
@@ -446,7 +459,7 @@ impl App {
         }
         if preview {
             page.set_indicator_icon(Some(&gio::ThemedIcon::new("document-open-recent-symbolic")));
-            page.set_indicator_tooltip(&crate::tr!("Preview tab. Use the tab menu to keep it open."));
+            page.set_indicator_tooltip(&bookie_app_services::tr!("Preview tab. Use the tab menu to keep it open."));
         }
         write_workspace_tab_id(&page, tab_id);
 
@@ -692,6 +705,7 @@ impl App {
         if self.workspace_tabs.borrow().is_empty() {
             self.workspace_outer_stack.set_visible_child_name("empty");
         }
+        focus_after_tab_close(tab_view, &self.workspace_outer_stack);
         self.refresh_schema_index();
         self.refresh_window_title();
     }
@@ -852,7 +866,7 @@ impl App {
             return;
         }
         let label = if query.trim().is_empty() {
-            crate::tr!("Empty query")
+            bookie_app_services::tr!("Empty query")
         } else {
             derive_tab_label(&query)
         };
@@ -870,7 +884,7 @@ impl App {
 
     pub(super) fn on_editor_tab_query_changed(&self, id: Uuid, query: String) {
         let label = if query.trim().is_empty() {
-            crate::tr!("Empty query")
+            bookie_app_services::tr!("Empty query")
         } else {
             derive_tab_label(&query)
         };
@@ -928,16 +942,16 @@ pub(super) fn qualified_browse_tab_label(schemas_count: usize, schema: Option<&s
 
 pub(super) fn structure_tab_title(schemas_count: usize, schema: Option<&str>, table: &str) -> String {
     let title = qualified_browse_tab_label(schemas_count, schema, table);
-    format!("{title} · {}", crate::tr!("Structure"))
+    format!("{title} · {}", bookie_app_services::tr!("Structure"))
 }
 
 fn default_editor_tab_label(n: usize) -> String {
-    crate::tr!("Query {n}").replace("{n}", &n.to_string())
+    bookie_app_services::tr!("Query {n}").replace("{n}", &n.to_string())
 }
 
 fn omitted_tabs_notice(count: u32) -> Option<String> {
     (count > 0).then(|| {
-        crate::tr!("Table tabs not restored: {n}. At most 32 tabs per connection are kept.")
+        bookie_app_services::tr!("Table tabs not restored: {n}. At most 32 tabs per connection are kept.")
             .replace("{n}", &count.to_string())
     })
 }
@@ -991,7 +1005,7 @@ impl App {
             // shortcut from feeling broken when the user hits it
             // before having closed anything (or after a reconnect
             // wiped the stack).
-            self.show_toast(&crate::tr!("No recently closed tab"));
+            self.show_toast(&bookie_app_services::tr!("No recently closed tab"));
             return;
         };
         match descriptor {
@@ -1075,7 +1089,7 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
         SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
         SqlEditorOutput::ShowToast(message) => AppMsg::ShowToast(message),
         SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
-            title: crate::tr!("Row as JSON"),
+            title: bookie_app_services::tr!("Row as JSON"),
             body,
         },
         SqlEditorOutput::ExportResults { result, name } => AppMsg::ExportResults {

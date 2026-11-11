@@ -1,13 +1,22 @@
 use super::*;
-use bookie_gpui::model::ColumnMeta;
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.keystroke_hook.is_none() {
+            let view = cx.entity();
+            self.keystroke_hook = Some(cx.intercept_keystrokes(move |event, window, cx| {
+                view.update(cx, |this, cx| this.intercept_key(event, window, cx));
+            }));
+        }
         if self.pager.total != self.dataset_count() {
             self.pager = self.pager.with_total(self.dataset_count());
         }
         if std::mem::take(&mut self.find_reset) {
             self.find.update(cx, |find, cx| find.set_content("", cx));
+        }
+        if std::mem::take(&mut self.focus_editor) {
+            let editor = self.sql_input.read(cx).focus_handle(cx);
+            window.focus(&editor, cx);
         }
         self.note_frame();
         self.pace_frame(window);
@@ -18,12 +27,12 @@ impl Render for GridView {
             Mode::Filtered { label, .. } => format!("{label} · "),
             Mode::All => String::new(),
         };
-        let pages = self.pager.pages();
-        let progress = if pages > 1 {
-            format!("{title}{} rows · {pages} pages", thousands(self.dataset_count()))
-        } else {
-            format!("{title}{} rows", thousands(self.dataset_count()))
-        };
+        let progress = progress_text(
+            &title,
+            self.dataset_count(),
+            self.source.is_partial(),
+            self.pager.pages(),
+        );
         let range_label = if self.dataset_count() == 0 {
             "Rows 0".to_string()
         } else if self.continuous {
@@ -33,6 +42,7 @@ impl Render for GridView {
         };
         let strip = div()
             .flex()
+            .flex_wrap()
             .items_center()
             .gap_1()
             .px_2()
@@ -150,6 +160,11 @@ impl Render for GridView {
                     thousands(s.removed)
                 )
             };
+            let summary = if s.unknown > 0 {
+                format!("{summary} · Unknown {}", thousands(s.unknown))
+            } else {
+                summary
+            };
             let capped = if diff.capped {
                 format!(" · first {MAX_DIFF_ROWS} differences shown")
             } else {
@@ -175,32 +190,6 @@ impl Render for GridView {
                     })),
                 )
         });
-        let header = row_div(false, false, theme)
-            .h(px(HEADER_HEIGHT))
-            .bg(rgb(theme.muted))
-            .border_b_1()
-            .border_color(rgb(theme.border))
-            .font_weight(gpui::FontWeight::SEMIBOLD)
-            .text_color(rgb(theme.muted_foreground))
-            .child(fixed_cell(GUTTER_WIDTH, "#".into()))
-            .children(
-                self.source
-                    .columns()
-                    .iter()
-                    .enumerate()
-                    .map(|(index, column)| header_cell(self.cell_cursor, index, column, theme)),
-            );
-        let list = uniform_list(
-            "rows",
-            self.visible_count(),
-            cx.processor(|this, range: Range<usize>, _window, cx| {
-                range
-                    .map(|index| this.row_at_position(index, cx))
-                    .collect::<Vec<Stateful<Div>>>()
-            }),
-        )
-        .track_scroll(&self.scroll)
-        .flex_1();
         let palette = self.palette_open.then(|| self.palette_overlay(cx));
         self.sync_table(cx);
         let grid = div()
@@ -211,16 +200,14 @@ impl Render for GridView {
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
-            .children(self.compare.is_some().then_some(header))
-            .children(self.compare.is_some().then_some(list))
-            .children(self.compare.is_none().then(|| self.data_table()))
+            .child(self.data_table())
             .children(self.detail_panel(theme));
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
             Tab::Query => self.query_page(theme, grid, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
-            Tab::Table(name) => self.placeholder_page(&name, theme),
+            Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };
         let sidebar = self.sidebar_open.then(|| self.sidebar(theme, cx));
         let toolbar = self.toolbar(theme, cx);
@@ -239,7 +226,6 @@ impl Render for GridView {
                 root.font_family(self.fonts.ui_family.clone())
             })
             .track_focus(&self.focus)
-            .capture_key_down(cx.listener(Self::capture_key))
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(|this, event: &gpui::MouseMoveEvent, window, cx| {
                 if this.resizing_sidebar {
@@ -276,12 +262,13 @@ impl Render for GridView {
     }
 }
 
-fn header_cell(cursor: Option<Cursor>, index: usize, column: &ColumnMeta, theme: Theme) -> Div {
-    let cell = cell_div(column.width, column.name.clone());
-    let cell = if column.numeric { cell.justify_end() } else { cell };
-    match super::grid_edit::cursor_column_background(cursor, index, theme) {
-        Some(background) => cell.bg(rgb(background)),
-        None => cell,
+pub(crate) fn progress_text(title: &str, rows: u64, partial: bool, pages: u64) -> String {
+    let more = if partial { "+" } else { "" };
+    let count = thousands(rows);
+    if pages > 1 {
+        format!("{title}{count}{more} rows · {pages} pages")
+    } else {
+        format!("{title}{count}{more} rows")
     }
 }
 
@@ -321,51 +308,5 @@ impl GridView {
                 .children(list)
                 .children(empty),
         )
-    }
-
-    pub(super) fn row_at_position(&self, position: usize, cx: &mut Context<Self>) -> Stateful<Div> {
-        let theme = Theme::current(cx);
-        if let Some(diff) = &self.compare {
-            let Some(row) = diff.rows.get(position) else {
-                return row_div(false, false, theme).id(position);
-            };
-            return row_div(position % 2 == 1, false, theme)
-                .id(position)
-                .child(fixed_cell(70.0, row.change.to_string()))
-                .children(
-                    self.source
-                        .columns()
-                        .iter()
-                        .zip(&row.cells)
-                        .map(|(column, cell)| display_cell(column.width, column.numeric, cell, theme)),
-                );
-        }
-        let dataset_index = self.base() + position as u64;
-        let source = self.source_row(dataset_index);
-        let cells = self.source.row(source);
-        let selected = self
-            .selection
-            .is_some_and(|selection| selection.contains(dataset_index));
-        let highlighted = selected || super::grid_edit::cursor_row(self.cell_cursor, position);
-        row_div(position % 2 == 1, highlighted, theme)
-            .id(position)
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
-                    this.click_row(dataset_index, event.modifiers.shift);
-                    cx.notify();
-                }),
-            )
-            .child(
-                fixed_cell(GUTTER_WIDTH, (dataset_index + 1).to_string())
-                    .justify_end()
-                    .text_color(rgb(theme.muted_foreground)),
-            )
-            .children(
-                cells
-                    .iter()
-                    .enumerate()
-                    .map(|(column, cell)| self.data_cell(source, column, position, cell, cx)),
-            )
     }
 }

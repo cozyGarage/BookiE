@@ -31,22 +31,23 @@ pub fn set_date_format(format: DateFormatPref) {
 
 pub fn editable_null_sentinel() -> String {
     match NULL_DISPLAY.get() {
-        NullDisplayPref::Standard => crate::tr!("<NULL>"),
+        NullDisplayPref::Standard => bookie_app_services::tr!("<NULL>"),
         NullDisplayPref::Symbol => "\u{2205}".to_owned(),
-        NullDisplayPref::Parenthesized => crate::tr!("(null)"),
+        NullDisplayPref::Parenthesized => bookie_app_services::tr!("(null)"),
     }
 }
 
 pub(crate) fn readonly_null_sentinel() -> String {
+    // One presentation for a NULL: the same text as an editable cell, so a query result and a table agree.
     match NULL_DISPLAY.get() {
-        NullDisplayPref::Standard => crate::tr!("NULL"),
+        NullDisplayPref::Standard => bookie_app_services::tr!("<NULL>"),
         NullDisplayPref::Symbol => "\u{2205}".to_owned(),
-        NullDisplayPref::Parenthesized => crate::tr!("(null)"),
+        NullDisplayPref::Parenthesized => bookie_app_services::tr!("(null)"),
     }
 }
 
 pub(crate) fn auto_filled_sentinel() -> String {
-    crate::tr!("(auto)")
+    bookie_app_services::tr!("(auto)")
 }
 
 #[derive(Debug, Clone)]
@@ -177,7 +178,7 @@ fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
         Value::Uuid(u) => u.to_string(),
         Value::Json(j) => cap(&j.to_string()),
         Value::JsonText(j) => cap(j),
-        Value::Undecodable(_) if value.is_missing_field() => crate::tr!("(missing)"),
+        Value::Undecodable(_) if value.is_missing_field() => bookie_app_services::tr!("(missing)"),
         Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
     }
 }
@@ -291,10 +292,10 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
 pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
     let total = match preview.byte_count {
         crate::ui::row_object::PreviewByteCount::Exact(bytes) => {
-            crate::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
+            bookie_app_services::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
         }
         crate::ui::row_object::PreviewByteCount::MoreThan(bytes) => {
-            crate::tr!("More than {n} bytes total").replace("{n}", &bytes.to_string())
+            bookie_app_services::tr!("More than {n} bytes total").replace("{n}", &bytes.to_string())
         }
     };
     match &preview.value {
