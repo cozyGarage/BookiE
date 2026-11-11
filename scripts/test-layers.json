@@ -558,7 +558,7 @@
     "packaging-contracts": {
       "purpose": "Candidate archive and Debian package validator regressions, not installation acceptance",
       "prerequisites": "Python 3; Git; tar; dpkg-deb",
-      "hosted_gate": "Linux CI contracts / harness",
+      "hosted_gate": "Linux CI contracts / harness; lab-ci / guards",
       "steps": [
         {
           "argv": [

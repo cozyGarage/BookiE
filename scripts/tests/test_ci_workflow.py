@@ -68,6 +68,18 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn(invocation, github)
                 self.assertIn(invocation, forgejo)
 
+    def test_packaging_contracts_run_in_both_hosted_gates(self):
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        harness = (ROOT / "scripts/test-harness.sh").read_text()
+
+        self.assertEqual(layers["packaging-contracts"]["hosted_gate"],
+                         "Linux CI contracts / harness; lab-ci / guards")
+        self.assertIn("bash scripts/test-harness.sh", guards)
+        self.assertIn("python3 scripts/tests/test_arch_candidate.py", harness)
+        self.assertIn("python3 scripts/tests/test_deb_package.py", harness)
+
     def test_forgejo_runs_the_shared_security_policy_layer(self):
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         github_security = (ROOT / ".github/workflows/linux-security.yml").read_text()
