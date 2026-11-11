@@ -128,6 +128,8 @@ jobs:
         with:
           ref: ${{ needs.pin-revision.outputs.revision }}
           persist-credentials: false
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -373,6 +375,11 @@ jobs:
           find "$RUNNER_TEMP/bookie-direct-bundle/tests" "$RUNNER_TEMP/bookie-direct-bundle/bin" -type f -exec chmod u+x {} +
           printf 'BOOKIE_UNIT_BUNDLE=%s/bookie-unit-bundle\nBOOKIE_DIRECT_BUNDLE=%s/bookie-direct-bundle\nBOOKIE_REQUIRE_PREBUILT=1\nBOOKIE_SOURCE_COMMIT=%s\nBOOKIE_NEXTEST_PROFILE=ci\nGSETTINGS_SCHEMA_DIR=%s/bookie-unit-bundle/schemas\n' \
             "$RUNNER_TEMP" "$RUNNER_TEMP" "$BOOKIE_SOURCE_COMMIT" "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Fetch pull request base for changed-path tests
+        if: github.event_name == 'pull_request'
+        env:
+          BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: git fetch --no-tags --depth=1 origin "$BOOKIE_CHANGE_BASE"
       - name: Focused tests for changed Data-lane value paths
         env:
           BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
