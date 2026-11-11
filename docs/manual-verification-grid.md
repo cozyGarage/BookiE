@@ -140,6 +140,7 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 ## Result headers, selection statistics, error copy and connection strip
 
 - [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the exact engine type spelling beneath it, in light and dark.
+- [ ] In Browse and SQL result grids, text headers align left with their cells and numeric headers align right with numeric values; verify this with active sort indicators and after moving or hiding a column.
 - [ ] Select several rows of a numeric column: the selection badge popover lists the column's count, sum, average, min and max, and Copy summary copies them. A text column is not listed.
 - [ ] Run a failing statement in the editor: Copy error places the exact error text on the clipboard.
 
