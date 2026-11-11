@@ -11,7 +11,7 @@ use bookie_core::{
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
-use super::load_structure_metadata;
+use super::{load_collations, load_structure_metadata};
 
 #[derive(Default)]
 struct Calls {
@@ -292,4 +292,46 @@ async fn a_failing_collation_catalog_does_not_block_the_structure() {
     .unwrap();
 
     assert!(metadata.collations.is_empty());
+}
+
+#[tokio::test]
+async fn a_new_table_loads_the_server_collations_without_any_table() {
+    let calls = Arc::new(Calls::default());
+    calls.collation_mode.store(1, Ordering::SeqCst);
+    let connection = MetadataConnection(Arc::clone(&calls));
+
+    let collations = load_collations(&connection, &control(&calls)).await.unwrap();
+
+    assert_eq!(collations.len(), 1);
+    assert_eq!(collations[0].name, "utf8mb4_bin");
+    assert_eq!(calls.indexes.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.foreign_keys.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn a_collation_list_that_fails_or_is_unsupported_is_empty_not_an_error() {
+    for mode in [0, 2] {
+        let calls = Arc::new(Calls::default());
+        calls.collation_mode.store(mode, Ordering::SeqCst);
+        let connection = MetadataConnection(Arc::clone(&calls));
+
+        let collations = load_collations(&connection, &control(&calls)).await.unwrap();
+
+        assert!(collations.is_empty(), "mode {mode}");
+    }
+}
+
+#[tokio::test]
+async fn an_expired_deadline_refuses_before_the_collation_list_is_requested() {
+    let calls = Arc::new(Calls::default());
+    calls.collation_mode.store(1, Ordering::SeqCst);
+    let connection = MetadataConnection(Arc::clone(&calls));
+    let expired = OperationControl::new(
+        CancellationToken::new(),
+        Some(Instant::now() - std::time::Duration::from_secs(1)),
+    );
+
+    let result = load_collations(&connection, &expired).await;
+
+    assert!(matches!(result, Err(DriverError::TimedOut)));
 }

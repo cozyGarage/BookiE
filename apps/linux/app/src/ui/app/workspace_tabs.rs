@@ -312,24 +312,7 @@ impl App {
         let controller =
             crate::ui::structure_tab::StructureTab::builder()
                 .launch(init)
-                .forward(sender.input_sender(), move |out| match out {
-                    crate::ui::structure_tab::StructureTabOutput::DirtyChanged(dirty) => {
-                        AppMsg::StructureTabDirtyChanged(tab_id, dirty)
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::FetchStructure => {
-                        AppMsg::FetchStructureData { tab_id }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ExecuteTransaction { statements } => {
-                        AppMsg::ExecuteStructureTransaction { tab_id, statements }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::DropTableRequested { schema, table } => {
-                        AppMsg::DropTablePrompt { schema, table }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ShowToast(msg) => AppMsg::ShowToast(msg),
-                    crate::ui::structure_tab::StructureTabOutput::ShowAlert { title, body } => {
-                        AppMsg::ShowAlert { title, body }
-                    }
-                });
+                .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
 
         let page = tab_view.append(controller.widget());
         page.set_title(&bookie_app_services::tr!("New Table"));
@@ -511,24 +494,7 @@ impl App {
         let controller =
             crate::ui::structure_tab::StructureTab::builder()
                 .launch(init)
-                .forward(sender.input_sender(), move |out| match out {
-                    crate::ui::structure_tab::StructureTabOutput::DirtyChanged(dirty) => {
-                        AppMsg::StructureTabDirtyChanged(tab_id, dirty)
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::FetchStructure => {
-                        AppMsg::FetchStructureData { tab_id }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ExecuteTransaction { statements } => {
-                        AppMsg::ExecuteStructureTransaction { tab_id, statements }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::DropTableRequested { schema, table } => {
-                        AppMsg::DropTablePrompt { schema, table }
-                    }
-                    crate::ui::structure_tab::StructureTabOutput::ShowToast(msg) => AppMsg::ShowToast(msg),
-                    crate::ui::structure_tab::StructureTabOutput::ShowAlert { title, body } => {
-                        AppMsg::ShowAlert { title, body }
-                    }
-                });
+                .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
 
         let page = tab_view.append(controller.widget());
         let title = structure_tab_title(self.sidebar_schemas_distinct(), schema.as_deref(), &table);
@@ -1098,6 +1064,19 @@ fn editor_output(tab_id: Uuid, output: SqlEditorOutput) -> AppMsg {
             scope: crate::ui::export_dialog::ExportScope::QueryResult,
         },
         SqlEditorOutput::ExportStreamedResults(request) => AppMsg::ExportStreamedResults(request),
+    }
+}
+
+fn structure_output_message(tab_id: Uuid, output: crate::ui::structure_tab::StructureTabOutput) -> AppMsg {
+    use crate::ui::structure_tab::StructureTabOutput as Output;
+    match output {
+        Output::DirtyChanged(dirty) => AppMsg::StructureTabDirtyChanged(tab_id, dirty),
+        Output::FetchStructure => AppMsg::FetchStructureData { tab_id },
+        Output::FetchCollations => AppMsg::FetchCollations { tab_id },
+        Output::ExecuteTransaction { statements } => AppMsg::ExecuteStructureTransaction { tab_id, statements },
+        Output::DropTableRequested { schema, table } => AppMsg::DropTablePrompt { schema, table },
+        Output::ShowToast(message) => AppMsg::ShowToast(message),
+        Output::ShowAlert { title, body } => AppMsg::ShowAlert { title, body },
     }
 }
 
