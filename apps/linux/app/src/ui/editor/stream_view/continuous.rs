@@ -54,7 +54,12 @@ pub(in crate::ui::editor) fn install(
         }
         let request = generation.get().wrapping_add(1);
         generation.set(request);
-        let model = PagedModel::new(&counts, columns.len());
+        let model = PagedModel::with_budget(
+            &counts,
+            columns.len(),
+            bookie_core::MAX_QUERY_RESULT_BYTES,
+            spool.page_budget(),
+        );
         start_view(
             &container,
             model,

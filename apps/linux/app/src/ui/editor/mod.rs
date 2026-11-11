@@ -1069,15 +1069,19 @@ impl SqlEditor {
                                     sequence,
                                     page,
                                     spooled,
+                                    lease,
                                 } => {
                                     let (accepted, delivered) = tokio::sync::oneshot::channel();
-                                    sender.input(SqlEditorInput::Stream(streaming::Input::Page {
-                                        generation,
-                                        sequence,
-                                        page,
-                                        spooled,
-                                        accepted,
-                                    }));
+                                    sender.input(SqlEditorInput::Stream(streaming::Input::Page(
+                                        streaming::StreamPageUpdate {
+                                            generation,
+                                            sequence,
+                                            page,
+                                            spooled,
+                                            lease,
+                                            accepted,
+                                        },
+                                    )));
                                     delivered.await.unwrap_or(false)
                                 }
                             }

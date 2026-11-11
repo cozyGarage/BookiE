@@ -81,6 +81,12 @@ impl<T> PageWindow<T> {
         }
     }
 
+    pub fn defer(&mut self, page: u64) {
+        if self.pending.remove(&page) && self.wanted.contains(&page) {
+            self.deferred.insert(page);
+        }
+    }
+
     pub fn retry(&mut self, page: u64) {
         self.failed.remove(&page);
         self.deferred.remove(&page);
@@ -217,5 +223,17 @@ mod tests {
         window.show(&[2, 3]);
         window.show(&[1]);
         assert_eq!(window.next_request(), Some(1));
+    }
+
+    #[test]
+    fn deferred_visible_page_can_be_retried_after_capacity_is_released() {
+        let mut window = PageWindow::<()>::new(100, 2);
+        window.show(&[4]);
+        assert_eq!(window.next_request(), Some(4));
+        window.defer(4);
+        assert!(window.has_deferred());
+        assert_eq!(window.next_request(), None);
+        window.retry_visible();
+        assert_eq!(window.next_request(), Some(4));
     }
 }
