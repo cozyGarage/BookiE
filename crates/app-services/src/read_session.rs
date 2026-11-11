@@ -92,12 +92,13 @@ impl ReadSession {
     }
 
     pub async fn open_controlled(
-        saved: SavedConnection,
+        mut saved: SavedConnection,
         registry: Arc<DriverRegistry>,
         database: Arc<DatabaseService>,
         cancellation: CancellationToken,
     ) -> Result<Self, OpenFailure> {
         check_open_cancellation(&cancellation)?;
+        saved.read_only = true;
         let prepared = open_saved(
             registry,
             saved,
@@ -161,7 +162,7 @@ impl ReadSession {
     ) -> Result<QueryResult, DriverFailurePresentation> {
         let guard = self
             .database
-            .guard(self.id, Principal::human_gui())
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)?;
         guard
             .query_controlled(sql, control)
@@ -183,7 +184,7 @@ impl ReadSession {
     {
         let guard = self
             .database
-            .guard(self.id, Principal::human_gui())
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)?;
         let saved = bookie_storage::load_connections()
             .await
