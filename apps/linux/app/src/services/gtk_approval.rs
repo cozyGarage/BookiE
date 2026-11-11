@@ -306,9 +306,9 @@ mod tests {
         assert!(dialog.has_response(DENY_RESPONSE));
         assert!(dialog.has_response(APPROVE_ONCE_RESPONSE));
         assert!(dialog.has_response(APPROVE_REMEMBER_RESPONSE));
-        assert!(
-            !build_approval_dialog("Approve write: db", "body", &scroll, false).has_response(APPROVE_REMEMBER_RESPONSE)
-        );
+        let other = relm4::gtk::ScrolledWindow::new();
+        let without = build_approval_dialog("Approve write: db", "body", &other, false);
+        assert!(!without.has_response(APPROVE_REMEMBER_RESPONSE));
     }
 
     #[test]
