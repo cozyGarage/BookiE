@@ -351,3 +351,86 @@ async fn a_late_terminal_answer_cannot_approve_the_next_request() {
         ApprovalOutcome::Deny
     );
 }
+
+async fn hold_the_terminal(
+    for_millis: u64,
+) -> (
+    tokio::task::JoinHandle<ApprovalOutcome>,
+    tokio::sync::oneshot::Receiver<()>,
+) {
+    let (held, wait_held) = tokio::sync::oneshot::channel();
+    let holder = tokio::spawn(terminal_approval(move |_| {
+        let _ = held.send(());
+        std::thread::sleep(std::time::Duration::from_millis(for_millis));
+        ApprovalOutcome::Deny
+    }));
+    (holder, wait_held)
+}
+
+#[tokio::test]
+async fn a_request_that_cannot_get_the_terminal_in_time_is_denied_without_asking() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+
+    let (holder, wait_held) = hold_the_terminal(600).await;
+    tokio::time::timeout(Duration::from_secs(10), wait_held)
+        .await
+        .unwrap()
+        .unwrap();
+    let ran = std::sync::Arc::new(AtomicBool::new(false));
+    let saw = ran.clone();
+    let started = Instant::now();
+    let outcome = terminal_approval_within(Duration::from_millis(60), move |_| {
+        saw.store(true, Ordering::Release);
+        ApprovalOutcome::AllowOnce
+    })
+    .await;
+    assert_eq!(outcome, ApprovalOutcome::Deny);
+    assert!(
+        started.elapsed() < Duration::from_millis(500),
+        "{:?}",
+        started.elapsed()
+    );
+    assert!(!ran.load(Ordering::Acquire));
+    assert_eq!(holder.await.unwrap(), ApprovalOutcome::Deny);
+}
+
+#[tokio::test]
+async fn a_cancelled_request_is_denied_while_still_queued_and_frees_its_place() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+
+    let (holder, wait_held) = hold_the_terminal(600).await;
+    tokio::time::timeout(Duration::from_secs(10), wait_held)
+        .await
+        .unwrap()
+        .unwrap();
+    let ran = std::sync::Arc::new(AtomicBool::new(false));
+    let saw = ran.clone();
+    let queued = terminal_approval(move |_| {
+        saw.store(true, Ordering::Release);
+        ApprovalOutcome::AllowOnce
+    });
+    let started = Instant::now();
+    let outcome = deny_when_cancelled(tokio::time::sleep(Duration::from_millis(60)), queued).await;
+    assert_eq!(outcome, ApprovalOutcome::Deny);
+    assert!(
+        started.elapsed() < Duration::from_millis(500),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(holder.await.unwrap(), ApprovalOutcome::Deny);
+    let next = terminal_approval(|_| ApprovalOutcome::AllowOnce).await;
+    assert_eq!(
+        next,
+        ApprovalOutcome::AllowOnce,
+        "the cancelled request did not keep the terminal"
+    );
+    assert!(!ran.load(Ordering::Acquire));
+}
+
+#[tokio::test]
+async fn an_approval_that_finishes_before_cancellation_keeps_its_answer() {
+    let outcome = deny_when_cancelled(std::future::pending(), async { ApprovalOutcome::AllowOnce }).await;
+    assert_eq!(outcome, ApprovalOutcome::AllowOnce);
+}
