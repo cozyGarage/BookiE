@@ -32,6 +32,13 @@ bundle_spec.loader.exec_module(bundle_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_workflow_omits_unsupported_permissions_block(self):
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+
+        self.assertNotIn("\npermissions:\n", forgejo)
+        self.assertIn("\npermissions:\n  contents: read\n", github)
+
     def test_forgejo_gate_event_profile_matches_github_build_linux(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
