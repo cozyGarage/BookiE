@@ -316,6 +316,7 @@ mod tests {
 
     #[test]
     fn the_remember_label_is_short_enough_not_to_be_ellipsized() {
+        const MAX_RESPONSE_LABEL_CHARS: usize = 30;
         assert!(APPROVE_REMEMBER_LABEL.chars().count() <= MAX_RESPONSE_LABEL_CHARS);
     }
 

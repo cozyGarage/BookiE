@@ -265,6 +265,12 @@ impl Tools {
                 self.cursor.borrow_mut().end_search(generation);
                 self.set_status(&bookie_app_services::tr!("Invalid regular expression"));
             }
+            Err(FindError::Scan(ScanError::PageBudget)) => {
+                self.cursor.borrow_mut().end_search(generation);
+                self.set_status(&bookie_app_services::tr!(
+                    "Other results are using the page memory; close one and try again"
+                ));
+            }
             Err(_) => {
                 self.cursor.borrow_mut().end_search(generation);
                 self.set_status(&bookie_app_services::tr!("The search could not finish"));

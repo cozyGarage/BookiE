@@ -152,3 +152,80 @@ fn spool_stored_bytes_are_reported_and_shared_with_the_manager() {
     drop(spool);
     assert_eq!(manager.reserved_bytes(), 0);
 }
+
+#[test]
+fn a_scan_is_refused_when_the_shared_page_budget_is_exhausted() {
+    let source = source_of(vec![numbered(0, 2), numbered(2, 2)]);
+    let budget = source.spool().page_budget();
+    let hold = budget.reserve(budget.limit_bytes()).unwrap();
+
+    let error = scan_pages(&source, &CancellationToken::new(), &ScanProgress::default(), |_, _| {
+        panic!("a refused scan must not decode a page")
+    })
+    .unwrap_err();
+
+    assert_eq!(error, ScanError::PageBudget);
+    drop(hold);
+    assert_eq!(budget.used_bytes(), 0);
+    let end = scan_pages(&source, &CancellationToken::new(), &ScanProgress::default(), |_, _| {
+        Ok(ControlFlow::Continue(()))
+    })
+    .unwrap();
+    assert_eq!(end, ScanEnd::Finished);
+}
+
+#[test]
+fn a_page_is_held_in_the_budget_only_while_it_is_visited() {
+    let source = source_of(vec![numbered(0, 3), numbered(3, 3)]);
+    let budget = source.spool().page_budget();
+    let mut held = Vec::new();
+
+    scan_pages(
+        &source,
+        &CancellationToken::new(),
+        &ScanProgress::default(),
+        |_, page| {
+            held.push((budget.used_bytes(), page.estimated_row_bytes(), budget.used_pages()));
+            Ok(ControlFlow::Continue(()))
+        },
+    )
+    .unwrap();
+
+    assert_eq!(held.len(), 2);
+    for (used, estimate, pages) in held {
+        assert_eq!(used, estimate, "the reservation is resized to the decoded page");
+        assert_eq!(pages, 1);
+    }
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_pages(), 0);
+}
+
+#[test]
+fn stop_cancellation_and_visitor_failure_release_the_reservation() {
+    let source = source_of(vec![numbered(0, 2), numbered(2, 2)]);
+    let budget = source.spool().page_budget();
+
+    scan_pages(&source, &CancellationToken::new(), &ScanProgress::default(), |_, _| {
+        Ok(ControlFlow::Break(()))
+    })
+    .unwrap();
+    assert_eq!(budget.used_bytes(), 0, "stop");
+
+    let cancel = CancellationToken::new();
+    let _ = scan_pages(&source, &cancel, &ScanProgress::default(), |_, _| {
+        cancel.cancel();
+        Ok(ControlFlow::Continue(()))
+    });
+    assert_eq!(budget.used_bytes(), 0, "cancellation");
+
+    let _ = scan_pages(&source, &CancellationToken::new(), &ScanProgress::default(), |_, _| {
+        Err(ScanError::TooManyRows)
+    });
+    assert_eq!(budget.used_bytes(), 0, "visitor failure");
+}
+
+#[test]
+fn a_comparison_names_the_page_memory_refusal_instead_of_a_source_failure() {
+    use crate::result_compare::CompareError;
+    assert_eq!(CompareError::from(ScanError::PageBudget), CompareError::PageMemoryBusy);
+}
