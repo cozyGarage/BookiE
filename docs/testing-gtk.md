@@ -10,7 +10,9 @@ Run the installed safety suite with:
 ./scripts/test-gtk-safety.sh
 ```
 
-The script builds `bookie-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a fixture SQLite database. A scenario may mark its saved fixture connection as production to test policy prompts; it never opens a user's saved connection or production database. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the X11/GTK portal path; they do not replace installed Wayland package testing.
+The script builds `bookie-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a fixture SQLite database. A scenario may mark its saved fixture connection as production to test policy prompts; it never opens a user's saved connection or production database. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the GTK chooser on X11; they do not replace installed Wayland package testing.
+
+The Xvfb runner sets `GDK_DEBUG=no-portals`. Its isolated GNOME portal backend exposes settings but no file chooser, so the harness uses GTK's chooser in tests instead of depending on the host desktop's portal implementation.
 
 The suite reports every failed scenario and exits non-zero. Read the first failure first because later scenarios may be affected by shared fixture state.
 

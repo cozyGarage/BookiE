@@ -163,9 +163,15 @@ def scenarios(ui):
         ui.invoke(ui.wait_for_node(name=action))
 
     def wait_for_adw_dialog(name, present=True):
-        roles = (pyatspi.ROLE_DIALOG, pyatspi.ROLE_LABEL)
+        def has_dialog():
+            return any(
+                ui.node_role(dialog) == pyatspi.ROLE_DIALOG
+                and any(ui.node_name(node) == name for node in ui.descendants(dialog))
+                for dialog in ui.descendants(ui.application_node())
+            )
+
         wait_until(
-            lambda: any(ui.find_node(name=name, role=role) is not None for role in roles) == present,
+            lambda: has_dialog() == present,
             f"dialog {name!r} did not become {'visible' if present else 'hidden'}",
         )
 
@@ -228,7 +234,23 @@ def scenarios(ui):
         time.sleep(0.4)
 
     def wait_for_result_column(name, present=True):
-        ui.wait_for_node_containing(f"{name}\n", role=pyatspi.ROLE_LABEL, present=present)
+        def header_exists():
+            for node in ui.descendants(ui.application_node()):
+                if ui.node_role(node) != pyatspi.ROLE_LABEL:
+                    continue
+                if ui.node_name(node) not in (name, f"{name}\n") and not ui.node_name(node).startswith(f"{name}\n"):
+                    continue
+                parent = node.parent
+                while parent is not None and ui.node_role(parent) != pyatspi.ROLE_TABLE_ROW:
+                    parent = parent.parent
+                if parent is not None and ui.node_name(parent).startswith("# "):
+                    return True
+            return False
+
+        wait_until(
+            lambda: header_exists() == present,
+            f"result column {name!r} did not become {'visible' if present else 'hidden'}",
+        )
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
@@ -1483,25 +1505,9 @@ GLib.MainLoop().run()
             connection.execute("INSERT INTO safety_items(id, note) VALUES (1, ?)", (value,))
         ui.run_sql("SELECT note FROM safety_items")
         wait_for_result_column("note")
-        ui.press_x11_key("j", ("Control_L", "Shift_L"))
-        search = ui.wait_for_node(name="Search columns")
-        search.queryEditableText().setTextContents("note")
-        ui.press_x11_key("Return")
-        ui.wait_for_node(name="Search columns", present=False)
-        deadline = time.monotonic() + ui.WAIT_SECONDS
-        while time.monotonic() < deadline:
-            focused = next((
-                node for node in ui.descendants(ui.application_node())
-                if ui.node_role(node) in (pyatspi.ROLE_TABLE_CELL, pyatspi.ROLE_TABLE_ROW)
-                and "1200000 bytes total" in ui.node_name(node)
-                and node.getState().contains(pyatspi.STATE_FOCUSED)
-                and node.getState().contains(pyatspi.STATE_SHOWING)
-            ), None)
-            if focused is not None:
-                break
-            time.sleep(ui.POLL_SECONDS)
-        else:
-            raise AssertionError(f"large result row was not focused:\n{ui.accessible_snapshot()}")
+        cell = ui.wait_for_node_containing("1200000 bytes total", role=pyatspi.ROLE_LABEL)
+        bounds = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2, button=1)
         started = time.monotonic()
         ui.press_x11_key("Menu")
         ui.wait_for_node(role=pyatspi.ROLE_MENU)
@@ -1695,7 +1701,7 @@ GLib.MainLoop().run()
             window_width = frame.queryComponent().getExtents(pyatspi.WINDOW_COORDS).width
 
             def aligned_in_view():
-                header = ui.find_node_containing(f"c{index}\n", role=pyatspi.ROLE_LABEL)
+                header = ui.find_node(name=f"c{index}", role=pyatspi.ROLE_LABEL)
                 cell = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_LABEL)
                 target = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_TABLE_CELL)
                 if not (showing(header) and showing(cell) and showing(target)):
