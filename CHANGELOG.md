@@ -4,6 +4,12 @@
 
 ## [0.2.7] - 2026-11-11
 
+### Changed
+
+- On SQL Server, a query that reaches another server through a linked server name (four-part names) now asks for approval first. (#2859)
+- GTK grid: columns start at widths that suit their type, and the last column fills the view. (#2848)
+- The result grid right-aligns numeric columns, with their NULLs. (#2846)
+
 ### Fixed
 
 - Result pages finishing after their rows disappear no longer remain unnecessarily loaded. (#2751)
@@ -18,6 +24,15 @@
 - Cell menu actions no longer use a different row after the grid changes. (#2786)
 - Large JSON cell previews avoid scanning the full value. (#2798)
 - The AppImage now uses libadwaita's own styling, with proper spacing and text hierarchy in dialogs and Preferences. (#2807)
+- Closing an edited table keeps keyboard focus in the workspace. (#2851)
+- Confirming an edit on a cell that holds an empty string or empty binary value no longer turns it into NULL. (#2843)
+- Contains, Starts with and Ends with filters on Oracle now treat percent signs, underscores and backslashes as literal text. (#2847)
+- Cancelling a CSV import into SQLite while a batch is running now records a cancelled import with the rows already written and no longer blocks later writes on the connection. (#2853)
+- In a narrow window, picking a table closes the sidebar. (#2854)
+- The result grid and query results show NULL the same way, and expression columns no longer show a type label. (#2842)
+- The SQL editor's status text keeps a fixed width, so the Run button no longer moves when a statement finishes. (#2857)
+- The Arch package now declares the OpenSSL 4 libraries it links against. (#2855)
+- A server that never answers the version request no longer holds a connection attempt open in the connect dialog. (#2860)
 
 ## [0.2.6] - 2026-11-10
 
