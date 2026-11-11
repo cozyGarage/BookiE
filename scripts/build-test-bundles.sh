@@ -12,7 +12,7 @@ requested_group=${2:-default}
 case "$requested_group" in
   default) groups=(default) ;;
   gpui) groups=(gpui) ;;
-  all|forgejo) groups=() ;;
+  all|forgejo|github) groups=() ;;
   *) printf 'Unknown test bundle group: %s\n' "$requested_group" >&2; exit 2 ;;
 esac
 mkdir -p "$output"
@@ -20,11 +20,11 @@ output=$(realpath "$output")
 export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-8}
 export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"
 nextest="$(bash scripts/ensure-nextest.sh)"
-build_forgejo_bundles() {
+build_provider_bundles() {
   local config="$ROOT/scripts/ci-test-bundle-groups.json"
   sandbox_packages=(
     bookie-core bookie-policy bookie-storage bookie-transport bookie-app-services bookie-results
-    bookie-ssh bookie-dump bookie-mcp bookie-agentd bookie-driver-sqlite
+    bookie-ssh bookie-dump bookie-mcp bookie-agentd bookie-driver-sqlite bookie-driver-redis
   )
   package_args=()
   for package in "${sandbox_packages[@]}"; do package_args+=(-p "$package"); done
@@ -34,13 +34,18 @@ build_forgejo_bundles() {
   if [[ ! -f "$build_messages" ]]; then
     cargo test --locked --workspace --lib --bins --tests --no-run --message-format=json-render-diagnostics > "$build_messages"
   fi
-  while IFS= read -r group; do
+  if [[ "$requested_group" == all ]]; then
+    mapfile -t selected_groups < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["groups"], sep="\n")' "$config")
+  else
+    mapfile -t selected_groups < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["providers"][sys.argv[2]], sep="\n")' "$config" "$requested_group")
+  fi
+  for group in "${selected_groups[@]}"; do
     local args=(--messages "$build_messages" --group "$group")
     while IFS= read -r package_kind; do args+=(--package-kind "$package_kind"); done < <(
       python3 -c 'import json,sys; group=json.load(open(sys.argv[1]))["groups"][sys.argv[2]]; print(*(f"{package}:{kind}" for kind,packages in group.items() for package in packages), sep="\n")' "$config" "$group"
     )
     python3 scripts/ci-test-bundle.py create "$output/$group" "$revision" "${args[@]}"
-  done < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["groups"], sep="\n")' "$config")
+  done
   "$nextest" nextest archive --locked --workspace --lib --bins --archive-file "$output/unit-nextest.tar.zst"
   python3 scripts/ci-test-bundle.py create "$output/unit" "$revision" --messages "$build_messages" \
     --group unit --archive "$output/unit-nextest.tar.zst" --archive-only --test-kind lib --test-kind bin
@@ -69,4 +74,6 @@ for group in "${groups[@]}"; do
   python3 scripts/ci-test-bundle.py create "$output/$group" "$revision" --messages "$output/$group-build.jsonl" \
     --group "$group" --archive "$output/$group-nextest.tar.zst" "${args[@]}"
 done
-if [[ "$requested_group" == forgejo || "$requested_group" == all ]]; then build_forgejo_bundles; fi
+if [[ "$requested_group" == forgejo || "$requested_group" == github || "$requested_group" == all ]]; then
+  build_provider_bundles
+fi

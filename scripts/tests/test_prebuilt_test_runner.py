@@ -54,6 +54,18 @@ class PrebuiltTestRunnerTests(unittest.TestCase):
              self.assertRaisesRegex(ValueError, 'no prebuilt tests executed'):
             runner.main()
 
+    def test_invocation_matches_executable_paths_through_symlinked_temp_directories(self):
+        self.index['package_directories']['sample'] = '.'
+        (self.root / 'index.json').write_text(json.dumps(self.index))
+        alias = self.root.with_name(f'{self.root.name}-alias')
+        alias.symlink_to(self.root, target_is_directory=True)
+        command = [str(alias / self.binary.name)]
+        result = subprocess.CompletedProcess(command, 0, 'test result: ok. 1 passed; 0 failed;\n')
+        with patch.object(runner, 'ROOT', self.root), patch.object(runner, 'commands', return_value=[command]), \
+             patch.object(runner.subprocess, 'run', return_value=result), \
+             patch.dict(os.environ, {'BOOKIE_TEST_BUNDLE': str(self.root)}):
+            self.assertEqual(runner.main(), 0)
+
     def test_nested_libtest_output_keeps_the_outer_test_run_valid(self):
         self.index['package_directories']['sample'] = '.'
         (self.root / 'index.json').write_text(json.dumps(self.index))

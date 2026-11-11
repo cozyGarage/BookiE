@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: bookie-ci-${{ github.ref }}
+  group: build-linux-${{ github.event_name }}-${{ github.ref }}-auto
   cancel-in-progress: false
 
 defaults:
@@ -21,9 +21,6 @@ env:
   SCCACHE_DIR: /var/cache/ci/sccache
   SCCACHE_CACHE_SIZE: 40G
 
-permissions:
-  contents: read
-
 jobs:
   coverage:
     runs-on: any-host
@@ -32,20 +29,20 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-coverage
       RUSTC_WRAPPER: ""
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Coverage tools
         run: |
           rustup component add llvm-tools-preview
@@ -80,20 +77,20 @@ jobs:
       matrix:
         driver: [postgres, mysql, sqlite, mongodb, redis, clickhouse]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Docker Hub login
         run: bash src/scripts/docker-hub-login.sh
       - name: Coverage tools
@@ -148,20 +145,20 @@ jobs:
           - {label: transport, package: bookie-transport, shard: 0/1}
           - {label: app-services, package: bookie-app-services, shard: 0/1}
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Mutation tool
         run: |
           command -v cargo-mutants >/dev/null || cargo install --locked cargo-mutants --version ^27
@@ -204,20 +201,20 @@ jobs:
       matrix:
         run: [1, 2, 3]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.run }}"
       - name: Five retry-free installed GTK attempts
@@ -249,20 +246,20 @@ jobs:
     if: ${{ !cancelled() }}
     timeout-minutes: 120
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Build the Arch package in a container and upgrade from the released one
         run: |
           cd src && bash scripts/test-arch-package-container.sh
@@ -283,20 +280,20 @@ jobs:
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/nightly-values
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ github.token }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          path: src
       - name: Shared value contracts across drivers, GTK and DuckDB
         run: |
           cd src && python3 scripts/run-test-layer.py values

@@ -27,6 +27,7 @@ on:
           every job in the run tests the same tree.
         required: false
         default: ""
+        type: string
 
 permissions:
   contents: read
@@ -50,33 +51,15 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'main') || github.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
       - name: Pin the tested revision once
         id: pin
         env:
-          REQUESTED_REF: ${{ inputs.ref }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          revision="$(git rev-parse HEAD)"
-          echo "tree under test: $revision"
-          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$REQUESTED_REF" ]]; then
-            case "$REQUESTED_REF" in
-              refs/pull/*|pull/*)
-                echo "workflow_dispatch cannot pin a pull request ref" >&2
-                exit 1
-                ;;
-            esac
-            git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
-            if ! git branch -r --contains "$revision" | grep -qE 'origin/' \
-              && ! git tag --contains "$revision" | grep -q .; then
-              echo "pinned revision must be on an origin branch or tag" >&2
-              exit 1
-            fi
-          fi
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          CI_REQUESTED_REF: ${{ inputs.ref }}
+          CI_EVENT_NAME: ${{ github.event_name }}
+        run: python3 scripts/check-ci-revision.py
 
   ensure-ci-gtk-image:
     name: Ensure CI debian-testing GTK image
@@ -223,7 +206,7 @@ jobs:
       - name: Build versioned executable test bundles
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all
+          bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" github
       - name: Check the no-default-features layer
         run: python3 scripts/run-test-layer.py no-default-features
       - name: Upload source-pinned direct test bundle
@@ -245,55 +228,6 @@ jobs:
         with:
           name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-drivers
           path: reusable-builds/drivers/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned core driver test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core
-          path: reusable-builds/driver-core/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned analytics driver test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-analytics
-          path: reusable-builds/driver-analytics/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned extended driver test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-extended
-          path: reusable-builds/driver-extended/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned PostgreSQL release test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-pg-release
-          path: reusable-builds/pg-release/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned socket and SSH test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-socket-ssh
-          path: reusable-builds/socket-ssh/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned TLS test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls
-          path: reusable-builds/driver-tls/
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload source-pinned keyring test bundle
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
-        with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-keyring
-          path: reusable-builds/keyring/
           if-no-files-found: error
           retention-days: 14
       - name: Upload source-pinned unit archive
@@ -388,7 +322,7 @@ jobs:
         with:
           ref: ${{ needs.pin-revision.outputs.revision }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:

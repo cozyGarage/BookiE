@@ -103,6 +103,7 @@ def create(binary, output, expected_sha, *, package=False):
             raise ValueError("Build artifact output contains an unexpected file")
     schema_digest = None
     if not package:
+        schemas.mkdir(exist_ok=True)
         subprocess.run(
             ["glib-compile-schemas", "--strict", "--targetdir", str(schemas), str(ROOT / "apps/linux/data")],
             check=True,
