@@ -135,6 +135,36 @@ def find_node(name=None, role=None):
     return None
 
 
+def sidebar_control_nodes(node):
+    yield node
+    if node_role(node) in (pyatspi.ROLE_LIST, pyatspi.ROLE_LIST_ITEM, pyatspi.ROLE_TABLE, pyatspi.ROLE_TREE):
+        return
+    try:
+        children = list(node)
+    except Exception:
+        return
+    for child in children:
+        yield from sidebar_control_nodes(child)
+
+
+def find_sidebar_control(name, role):
+    for application in desktop_applications():
+        for node in sidebar_control_nodes(application):
+            if node_name(node) == name and role_matches(node, role):
+                return node
+    return None
+
+
+def wait_for_sidebar_control(name, role):
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        node = find_sidebar_control(name, role)
+        if node is not None:
+            return node
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"expected sidebar control {name!r} to appear:\n{accessible_snapshot()}")
+
+
 def find_within(root, name=None, role=None):
     for node in descendants(root):
         if name is not None and node_name(node) != name:
@@ -1732,10 +1762,10 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
     sidebar_nodes, row_construction_ms, ui_stall_count, ui_stall_max_ms = application_sidebar_row_construction()
     catalog_ready = time.monotonic()
-    search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
+    search_toggle = wait_for_sidebar_control("Search tables", pyatspi.ROLE_TOGGLE_BUTTON)
     if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
         invoke(search_toggle)
-    search = wait_for_node(name="Search tables", role=pyatspi.ROLE_ENTRY)
+    search = wait_for_sidebar_control("Search tables", pyatspi.ROLE_ENTRY)
     filter_started = time.monotonic()
     search.queryEditableText().setTextContents(target)
     wait_for_node_showing(target, True, timeout=120)
