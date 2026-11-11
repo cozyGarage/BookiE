@@ -65,6 +65,7 @@ In a focused result grid, **Ctrl+Shift+J** opens **Jump to Column** and **Ctrl+A
 ### Editor controls
 
 - **Open editor**: Press `Ctrl+E` or `Ctrl+T` to open a SQL tab.
+- **Name and tag tabs**: Use the tab context menu or `F2` to name a tab. Saved tags appear in the workspace tab overview and can be searched from Open Quickly (`Ctrl+P`).
 - **Split editor**: Click **Split** in the toolbar to edit side-by-side with shared carets and independent scroll.
 - **Code folding**: Press `Ctrl+Shift+[` inside any block to fold it; `Ctrl+Shift+]` or the gutter markers unfold blocks.
 - **Line bookmarks**: Press `Ctrl+F2` to bookmark or clear the current line. Press `Ctrl+Shift+Down` or `Ctrl+Shift+Up` to jump between bookmarks in this editor. The bookmark toolbar menu can clear every bookmark in the buffer.
