@@ -44,13 +44,14 @@ fn large_utf8_csv() -> Vec<u8> {
 fn import_format_controls_release_their_source_bytes() {
     adw::init().unwrap();
     let request = request();
+    let start_button = gtk::Button::new();
     let state = Rc::new(State {
         file: FileOptions::new(&request),
         columns: ColumnSection::new(&request),
         skip_rejected: adw::SwitchRow::new(),
         request,
         preview_status: gtk::Label::new(None),
-        start_button: gtk::Button::new(),
+        start_button: start_button.downgrade(),
         preview_queue: std::cell::RefCell::new(super::preview_queue::PreviewQueue::default()),
         ready_generation: std::cell::Cell::new(None),
         auto_detect_encoding: std::cell::Cell::new(true),

@@ -99,7 +99,7 @@ pub(crate) fn present(
         columns,
         skip_rejected,
         preview_status,
-        start_button: start_button.clone(),
+        start_button: start_button.downgrade(),
         preview_queue: std::cell::RefCell::new(preview_queue::PreviewQueue::default()),
         ready_generation: std::cell::Cell::new(None),
         auto_detect_encoding: std::cell::Cell::new(true),
@@ -134,7 +134,7 @@ struct State {
     columns: ColumnSection,
     skip_rejected: adw::SwitchRow,
     preview_status: gtk::Label,
-    start_button: gtk::Button,
+    start_button: gtk::glib::WeakRef<gtk::Button>,
     preview_queue: std::cell::RefCell<preview_queue::PreviewQueue>,
     ready_generation: std::cell::Cell<Option<u64>>,
     auto_detect_encoding: std::cell::Cell<bool>,
@@ -148,7 +148,7 @@ impl State {
         }
         let options = self.file.options();
         self.ready_generation.set(None);
-        self.start_button.set_sensitive(false);
+        self.set_start_sensitive(false);
         self.preview_status
             .set_text(&bookie_app_services::tr!("Preparing CSV preview…"));
         self.preview_status.remove_css_class("error");
@@ -163,6 +163,12 @@ impl State {
     fn close_preview(&self) {
         self.preview_queue.borrow_mut().close();
         self.ready_generation.set(None);
+    }
+
+    fn set_start_sensitive(&self, sensitive: bool) {
+        if let Some(start_button) = self.start_button.upgrade() {
+            start_button.set_sensitive(sensitive);
+        }
     }
 
     /// The user's answer, or nothing when a name they typed cannot be an
@@ -264,7 +270,7 @@ impl State {
         self.preview_status
             .set_text(&bookie_app_services::tr!("CSV preview ready."));
         self.preview_status.remove_css_class("dim-label");
-        self.start_button.set_sensitive(self.columns.resolve().is_some());
+        self.set_start_sensitive(self.columns.resolve().is_some());
     }
 
     fn show_preview_error(&self) {
@@ -273,7 +279,7 @@ impl State {
         ));
         self.preview_status.remove_css_class("dim-label");
         self.preview_status.add_css_class("error");
-        self.start_button.set_sensitive(false);
+        self.set_start_sensitive(false);
     }
 }
 
