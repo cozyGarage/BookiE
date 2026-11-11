@@ -174,7 +174,10 @@ impl App {
             items.push(QuickItem {
                 target: QuickTarget::Tab(id),
                 title: page.title().to_string(),
-                subtitle: bookie_app_services::tr!("Open tab"),
+                subtitle: super::tab_title::tab_subtitle(
+                    &bookie_app_services::tr!("Open tab"),
+                    &super::tab_title::read_tab_mark(&page),
+                ),
             });
         }
         items

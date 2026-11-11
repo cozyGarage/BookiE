@@ -54,6 +54,8 @@ pub(super) fn apply_tab_mark(page: &adw::TabPage, mark: TabMark) {
     if let Some(automatic) = read_automatic_title(page) {
         page.set_title(&displayed_title(&mark, &automatic));
     }
+    let keywords = mark.tags().join(" ");
+    page.set_keyword(&keywords);
     page.set_icon(
         mark.color()
             .map(color_dot)
@@ -123,7 +125,10 @@ fn color_dot(color: TabColor) -> gdk::Texture {
 
 pub(super) fn mark_menu() -> gio::Menu {
     let menu = gio::Menu::new();
-    menu.append(Some(&bookie_app_services::tr!("Rename\u{2026}")), Some("tab.rename"));
+    menu.append(
+        Some(&bookie_app_services::tr!("Name and tags\u{2026}")),
+        Some("tab.rename"),
+    );
     let colours = gio::Menu::new();
     for color in TabColor::ALL {
         colours.append(Some(&color_label(color)), Some(&format!("tab.color::{}", color.id())));
@@ -163,6 +168,17 @@ pub(super) fn add_mark_actions(
     group.add_action(&colour);
 }
 
+pub(super) fn tab_subtitle(base: &str, mark: &TabMark) -> String {
+    if mark.tags().is_empty() {
+        return base.to_owned();
+    }
+    format!("{base} · {}", mark.tags().join(", "))
+}
+
+fn split_tags(text: &str) -> impl Iterator<Item = &str> {
+    text.split([',', ';'])
+}
+
 pub(super) fn present_rename_dialog(
     parent: &impl IsA<gtk::Widget>,
     page: &adw::TabPage,
@@ -173,13 +189,24 @@ pub(super) fn present_rename_dialog(
         .text(read_tab_mark(page).name().unwrap_or(""))
         .placeholder_text(read_automatic_title(page).unwrap_or_default())
         .build();
+    let tags_entry = gtk::Entry::builder()
+        .activates_default(true)
+        .text(read_tab_mark(page).tags().join(", "))
+        .placeholder_text(bookie_app_services::tr!("Tags, separated by commas"))
+        .build();
+    let fields = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .build();
+    fields.append(&entry);
+    fields.append(&tags_entry);
     let dialog = adw::AlertDialog::new(
-        Some(&bookie_app_services::tr!("Rename tab")),
+        Some(&bookie_app_services::tr!("Name and tags")),
         Some(&bookie_app_services::tr!(
             "Leave the name empty to use the automatic title."
         )),
     );
-    dialog.set_extra_child(Some(&entry));
+    dialog.set_extra_child(Some(&fields));
     dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
     dialog.add_response("rename", &bookie_app_services::tr!("Rename"));
     dialog.set_response_appearance("rename", adw::ResponseAppearance::Suggested);
@@ -190,7 +217,9 @@ pub(super) fn present_rename_dialog(
         if response != "rename" {
             return;
         }
-        let renamed = read_tab_mark(&page).with_name(entry.text().as_str());
+        let renamed = read_tab_mark(&page)
+            .with_name(entry.text().as_str())
+            .with_tags(split_tags(tags_entry.text().as_str()));
         apply_tab_mark(&page, renamed);
         on_renamed(&page);
     });
@@ -207,6 +236,25 @@ mod tests {
         assert_eq!(displayed_title(&named, "SELECT 1"), "Orders audit");
         assert_eq!(displayed_title(&named, "• SELECT 1"), "• Orders audit");
         assert_eq!(displayed_title(&TabMark::default(), "• SELECT 1"), "• SELECT 1");
+    }
+
+    #[test]
+    fn tags_show_in_the_open_tab_subtitle_and_open_quickly_finds_them() {
+        let plain = TabMark::default();
+        let tagged = TabMark::default().with_tags(["audit", "q4"]);
+        assert_eq!(tab_subtitle("Open tab", &plain), "Open tab");
+        assert_eq!(tab_subtitle("Open tab", &tagged), "Open tab · audit, q4");
+        assert_eq!(split_tags("audit, q4;  ").collect::<Vec<_>>(), ["audit", " q4", "  "]);
+        let item = bookie_app_services::quick_switcher::QuickItem {
+            target: bookie_app_services::quick_switcher::QuickTarget::Tab(uuid::Uuid::new_v4()),
+            title: "SELECT 1".into(),
+            subtitle: tab_subtitle("Open tab", &tagged),
+        };
+        assert_eq!(
+            bookie_app_services::quick_switcher::filter(std::slice::from_ref(&item), "q4").len(),
+            1
+        );
+        assert!(bookie_app_services::quick_switcher::filter(&[item], "zzz").is_empty());
     }
 
     #[test]
@@ -261,5 +309,10 @@ mod tests {
 
         apply_tab_mark(&page, read_tab_mark(&page).with_name("  "));
         assert_eq!(page.title().as_str(), "• SELECT 2");
+
+        apply_tab_mark(&page, read_tab_mark(&page).with_tags(["audit", "q4"]));
+        assert_eq!(page.keyword().as_deref(), Some("audit q4"));
+        apply_tab_mark(&page, read_tab_mark(&page).with_tags([]));
+        assert!(page.keyword().is_none_or(|keyword| keyword.is_empty()));
     }
 }
