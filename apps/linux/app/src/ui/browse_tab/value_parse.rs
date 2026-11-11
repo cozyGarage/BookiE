@@ -213,6 +213,21 @@ fn parse_mssql_datetimeoffset_input(
     ))
 }
 
+fn unchanged_empty_value(col: Option<&ColumnInfo>, current_value: Option<&Value>) -> Option<Value> {
+    match current_value? {
+        Value::Text(text)
+            if text.is_empty()
+                && col.is_some_and(|column| {
+                    column.enum_type.is_none() && is_character_type(&column.data_type.to_ascii_lowercase())
+                }) =>
+        {
+            Some(Value::Text(String::new()))
+        }
+        Value::Bytes(bytes) if bytes.is_empty() => Some(Value::Bytes(Vec::new())),
+        _ => None,
+    }
+}
+
 pub(super) fn parse_input_for_grid_cell_with_style(
     text: &str,
     col: Option<&ColumnInfo>,
@@ -220,6 +235,11 @@ pub(super) fn parse_input_for_grid_cell_with_style(
     enum_input_style: EnumInputStyle,
     current_value: Option<&Value>,
 ) -> Result<Value, String> {
+    if text.is_empty()
+        && let Some(unchanged) = unchanged_empty_value(col, current_value)
+    {
+        return Ok(unchanged);
+    }
     if text.is_empty()
         && driver_id == "sqlite"
         && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
@@ -891,6 +911,10 @@ mod tests;
 #[cfg(test)]
 #[path = "../../../tests/support/sqlite_any_contract.rs"]
 mod sqlite_any_contract;
+
+#[cfg(test)]
+#[path = "../../../tests/support/empty_text_contract.rs"]
+mod empty_text_contract;
 
 #[cfg(test)]
 #[path = "../../../tests/support/duckdb_enum_contract.rs"]
