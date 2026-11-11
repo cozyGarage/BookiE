@@ -61,6 +61,8 @@ sed -i '/^export GTK_THEME=/d' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
 for module in "$APPDIR"/usr/lib/gtk-4.0/*/immodules/*.so; do
   patchelf --set-rpath '$ORIGIN/../../..' "$module"
 done
+APPIMAGE_GLIBC_FLOOR="$(tr -d '[:space:]' < "$ROOT/scripts/appimage-glibc-floor.txt")"
+python3 "$ROOT/scripts/check-appimage-glibc-floor.py" "$APPDIR" --max "$APPIMAGE_GLIBC_FLOOR"
 "$TOOLS/linuxdeploy-x86_64.AppImage" --appdir "$APPDIR" --output appimage
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
 echo "Wrote $OUT/$OUTPUT"
