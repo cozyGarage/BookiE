@@ -250,7 +250,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
                 "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n"
                 "target = sys.argv[-1]\n"
-                "if not target.startswith('/var/cache/ci/tmp/'):\n"
+                "if target != '/var/cache/ci/tmp/bookie-driver-123-2-core':\n"
                 "    subprocess.run(['/usr/bin/rm', *sys.argv[1:]], check=True)\n",
                 encoding="utf-8",
             )
