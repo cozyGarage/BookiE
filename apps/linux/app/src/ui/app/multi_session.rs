@@ -153,7 +153,7 @@ impl App {
                 .and_then(|id| self.database.metadata(id))
                 .map(|metadata| metadata.name);
             let title = connection_aware_tab_title(&base, connection_name.as_deref(), name_with_connection);
-            page.set_title(&title);
+            super::tab_title::set_tab_title(page, &title);
         }
     }
 
