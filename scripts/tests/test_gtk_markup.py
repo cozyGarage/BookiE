@@ -17,6 +17,14 @@ class GtkMarkupTests(unittest.TestCase):
         source = 'page.set_description(Some(&escape_markup(message)));'
         self.assertEqual(CHECKER.source_violations(Path("page.rs"), source), [])
 
+    def test_qualified_translation_macro_is_allowed_for_plain_text(self):
+        source = (
+            'adw::ActionRow::builder().title(bookie_app_services::tr!("Name"))'
+            '.subtitle("fixed").build();'
+            'page.set_description(Some(&bookie_app_services::tr!("Description")));'
+        )
+        self.assertEqual(CHECKER.source_violations(Path("page.rs"), source), [])
+
     def test_unprotected_description_is_reported(self):
         source = 'page.set_description(Some(&message));'
         self.assertEqual(len(CHECKER.source_violations(Path("page.rs"), source)), 1)
