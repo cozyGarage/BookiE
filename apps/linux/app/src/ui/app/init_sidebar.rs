@@ -35,6 +35,17 @@ pub(super) struct SidebarParts {
     pub(super) hidden_schemas: Rc<RefCell<HashSet<String>>>,
 }
 
+#[derive(Clone)]
+struct SidebarBinding {
+    row_factories: RowFactories,
+    expansion_handlers: ExpansionHandlers,
+    nodes: Rc<RefCell<Vec<TreeNode>>>,
+    collapsed: Rc<RefCell<CollapseState>>,
+    render_context: Rc<RefCell<SidebarRenderContext>>,
+    search: gtk::SearchEntry,
+    sender: ComponentSender<App>,
+}
+
 pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>) -> SidebarParts {
     let nodes = Rc::new(RefCell::new(Vec::<TreeNode>::new()));
     let collapsed = Rc::new(RefCell::new(CollapseState::default()));
@@ -47,15 +58,16 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
     selection.set_can_unselect(true);
     let row_factories = Rc::new(RefCell::new(HashMap::new()));
     let expansion_handlers = Rc::new(RefCell::new(HashMap::new()));
-    let factory = build_list_item_factory(
-        sender,
-        &row_factories,
-        &expansion_handlers,
-        &nodes,
-        &collapsed,
-        &render_context,
-        &widgets.table_search,
-    );
+    let binding = SidebarBinding {
+        row_factories: row_factories.clone(),
+        expansion_handlers: expansion_handlers.clone(),
+        nodes: nodes.clone(),
+        collapsed: collapsed.clone(),
+        render_context: render_context.clone(),
+        search: widgets.table_search.clone(),
+        sender: sender.clone(),
+    };
+    let factory = build_list_item_factory(&binding);
     let list = gtk::ListView::new(Some(selection.clone()), Some(factory));
     list.add_css_class("navigation-sidebar");
     list.set_single_click_activate(true);
@@ -84,28 +96,11 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
     }
 }
 
-fn build_list_item_factory(
-    sender: &ComponentSender<App>,
-    row_factories: &RowFactories,
-    expansion_handlers: &ExpansionHandlers,
-    nodes: &Rc<RefCell<Vec<TreeNode>>>,
-    collapsed: &Rc<RefCell<CollapseState>>,
-    render_context: &Rc<RefCell<SidebarRenderContext>>,
-    search: &gtk::SearchEntry,
-) -> gtk::SignalListItemFactory {
+fn build_list_item_factory(binding: &SidebarBinding) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
-    connect_setup(&factory, sender, row_factories);
-    connect_bind(
-        &factory,
-        row_factories,
-        &expansion_handlers,
-        nodes,
-        collapsed,
-        render_context,
-        search,
-        sender,
-    );
-    connect_unbind(&factory, row_factories, &expansion_handlers);
+    connect_setup(&factory, &binding.sender, &binding.row_factories);
+    connect_bind(&factory, binding);
+    connect_unbind(&factory, binding);
     factory
 }
 
@@ -133,47 +128,14 @@ fn connect_setup(factory: &gtk::SignalListItemFactory, sender: &ComponentSender<
     });
 }
 
-fn connect_bind(
-    factory: &gtk::SignalListItemFactory,
-    row_factories: &RowFactories,
-    expansion_handlers: &ExpansionHandlers,
-    nodes: &Rc<RefCell<Vec<TreeNode>>>,
-    collapsed: &Rc<RefCell<CollapseState>>,
-    render_context: &Rc<RefCell<SidebarRenderContext>>,
-    search: &gtk::SearchEntry,
-    sender: &ComponentSender<App>,
-) {
-    let row_factories = row_factories.clone();
-    let expansion_handlers = expansion_handlers.clone();
-    let nodes = nodes.clone();
-    let collapsed = collapsed.clone();
-    let render_context = render_context.clone();
-    let search = search.clone();
-    let sender = sender.clone();
+fn connect_bind(factory: &gtk::SignalListItemFactory, binding: &SidebarBinding) {
+    let binding = binding.clone();
     factory.connect_bind(move |_, object| {
-        bind_list_item(
-            object,
-            &row_factories,
-            &expansion_handlers,
-            &nodes,
-            &collapsed,
-            &render_context,
-            &search,
-            &sender,
-        );
+        bind_list_item(object, &binding);
     });
 }
 
-fn bind_list_item(
-    object: &gtk::glib::Object,
-    row_factories: &RowFactories,
-    expansion_handlers: &ExpansionHandlers,
-    nodes: &Rc<RefCell<Vec<TreeNode>>>,
-    collapsed: &Rc<RefCell<CollapseState>>,
-    render_context: &Rc<RefCell<SidebarRenderContext>>,
-    search: &gtk::SearchEntry,
-    sender: &ComponentSender<App>,
-) {
+fn bind_list_item(object: &gtk::glib::Object, binding: &SidebarBinding) {
     let Some(item) = object.downcast_ref::<gtk::ListItem>() else {
         return;
     };
@@ -186,58 +148,40 @@ fn bind_list_item(
     let Some(index) = SidebarTreeModel::node_index(&tree_row) else {
         return;
     };
-    let Some(node) = nodes.borrow().get(index).cloned() else {
+    let Some(node) = binding.nodes.borrow().get(index).cloned() else {
         return;
     };
     expander.set_list_row(Some(&tree_row));
-    let context = render_context.borrow();
+    let context = binding.render_context.borrow();
     let init = super::sidebar_state::row_for(
         &node,
-        &collapsed.borrow(),
-        !search.text().trim().is_empty(),
+        &binding.collapsed.borrow(),
+        !binding.search.text().trim().is_empty(),
         context.schema_filter_enabled,
         &context.driver_id,
         context.column_source.clone(),
     );
-    if let Some(factory) = row_factories.borrow_mut().get_mut(item) {
+    if let Some(factory) = binding.row_factories.borrow_mut().get_mut(item) {
         let mut guard = factory.guard();
         guard.clear();
         guard.push_back(init);
     }
-    bind_expansion(
-        item,
-        &tree_row,
-        &node,
-        collapsed,
-        search,
-        sender,
-        row_factories,
-        expansion_handlers,
-    );
+    bind_expansion(item, &tree_row, &node, binding);
 }
 
-fn bind_expansion(
-    item: &gtk::ListItem,
-    row: &gtk::TreeListRow,
-    node: &TreeNode,
-    collapsed: &Rc<RefCell<CollapseState>>,
-    search: &gtk::SearchEntry,
-    sender: &ComponentSender<App>,
-    row_factories: &RowFactories,
-    expansion_handlers: &ExpansionHandlers,
-) {
+fn bind_expansion(item: &gtk::ListItem, row: &gtk::TreeListRow, node: &TreeNode, binding: &SidebarBinding) {
     if !is_expandable(node) {
         return;
     }
-    if let Some((previous_row, handler)) = expansion_handlers.borrow_mut().remove(item) {
+    if let Some((previous_row, handler)) = binding.expansion_handlers.borrow_mut().remove(item) {
         previous_row.disconnect(handler);
     }
     let key = node.key.clone();
     let kind = node.kind.clone();
-    let searching = !search.text().trim().is_empty();
-    let collapsed_state = collapsed.clone();
-    let sender = sender.clone();
-    let row_factories = row_factories.clone();
+    let searching = !binding.search.text().trim().is_empty();
+    let collapsed_state = binding.collapsed.clone();
+    let sender = binding.sender.clone();
+    let row_factories = binding.row_factories.clone();
     let item_for_callback = item.clone();
     let handler = row.connect_expanded_notify(move |row| {
         if let Some(factory) = row_factories.borrow().get(&item_for_callback) {
@@ -265,14 +209,15 @@ fn bind_expansion(
             });
         }
     });
-    expansion_handlers
+    binding
+        .expansion_handlers
         .borrow_mut()
         .insert(item.clone(), (row.clone(), handler));
-    let searching = !search.text().trim().is_empty();
+    let searching = !binding.search.text().trim().is_empty();
     let expanded = match &node.kind {
         NodeKind::Catalog(_) => false,
         _ if searching => true,
-        _ => !collapsed.borrow().is_collapsed(&node.key),
+        _ => !binding.collapsed.borrow().is_collapsed(&node.key),
     };
     if row.is_expanded() != expanded {
         set_expansion_after_bind(item, row, expanded);
@@ -293,13 +238,9 @@ fn set_expansion_after_bind(item: &gtk::ListItem, row: &gtk::TreeListRow, expand
     });
 }
 
-fn connect_unbind(
-    factory: &gtk::SignalListItemFactory,
-    row_factories: &RowFactories,
-    expansion_handlers: &ExpansionHandlers,
-) {
-    let row_factories = row_factories.clone();
-    let expansion_handlers = expansion_handlers.clone();
+fn connect_unbind(factory: &gtk::SignalListItemFactory, binding: &SidebarBinding) {
+    let row_factories = binding.row_factories.clone();
+    let expansion_handlers = binding.expansion_handlers.clone();
     factory.connect_unbind(move |_, object| {
         let Some(item) = object.downcast_ref::<gtk::ListItem>() else {
             return;
