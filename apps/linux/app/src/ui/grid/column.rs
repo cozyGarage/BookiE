@@ -34,6 +34,37 @@ pub(super) fn header_column(column: &ColumnInfo, schema: Option<&ColumnInfo>) ->
     header
 }
 
+/// Numbers, and NULLs in a numeric column, line up on the right so their digits share one edge.
+pub(super) fn right_aligned_column(column: &ColumnInfo) -> bool {
+    use bookie_core::FilterValueKind;
+    matches!(
+        bookie_core::filter_value_kind(column),
+        FilterValueKind::Int | FilterValueKind::Float | FilterValueKind::Decimal
+    )
+}
+
+/// Starting width of a column in pixels: by its type, grown for a long name, and never below `min`
+/// (wide tables use a minimum so their columns stay readable).
+pub(super) fn default_column_width_px(info: &ColumnInfo, min: Option<i32>) -> i32 {
+    use bookie_core::FilterValueKind;
+    let by_type = match bookie_core::filter_value_kind(info) {
+        FilterValueKind::Bool => 80,
+        FilterValueKind::Int | FilterValueKind::Float | FilterValueKind::Decimal => 120,
+        FilterValueKind::Date => 110,
+        FilterValueKind::Time => 100,
+        FilterValueKind::DateTime => 170,
+        FilterValueKind::TimestampTz => 200,
+        FilterValueKind::Uuid => 280,
+        FilterValueKind::Json | FilterValueKind::Bytes => 220,
+        FilterValueKind::Text => 200,
+    };
+    let by_name = i32::try_from(info.name.chars().count())
+        .unwrap_or(i32::MAX)
+        .saturating_mul(8)
+        + 32;
+    by_type.max(by_name).clamp(80, 360).max(min.unwrap_or(0))
+}
+
 fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
     let mut title = info.name.clone();
     if info.primary_key {
@@ -252,6 +283,10 @@ pub(super) fn build_column(
         let dummy = gtk4::CustomSorter::new(|_, _| gtk4::Ordering::Equal);
         column.set_sorter(Some(&dummy));
     }
+    // Every column but the last has a fixed width from its type and name; the last one takes the
+    // remaining space of the view, so the grid is neither crowded nor left with a blank area.
+    let is_last = idx + 1 == display_columns.len();
+    let default_width = (!is_last).then(|| default_column_width_px(info, default_min_width));
     if let Some(id) = connection_id {
         if let Some(saved) = column_widths
             .as_ref()
@@ -259,8 +294,8 @@ pub(super) fn build_column(
         {
             column.set_expand(false);
             column.set_fixed_width(saved);
-        } else if let Some(min) = default_min_width {
-            column.set_fixed_width(min);
+        } else if let Some(width) = default_width {
+            column.set_fixed_width(width);
         }
         let column_name = info.name.clone();
         let column_widths = column_widths.clone();
@@ -276,8 +311,8 @@ pub(super) fn build_column(
                 tracing::warn!(%error, "column width was not saved");
             }
         });
-    } else if let Some(min) = default_min_width {
-        column.set_fixed_width(min);
+    } else if let Some(width) = default_width {
+        column.set_fixed_width(width);
     }
     column.connect_fixed_width_notify(|column| column.set_expand(column.fixed_width() < 0));
     (column, edit_trigger)
@@ -580,15 +615,6 @@ fn bind_bool_cell(
     ROW_KEY_SLOT.set(checkbox, binding.pk_values);
 }
 
-/// Numbers, and NULLs in a numeric column, line up on the right so their digits share one edge.
-pub(super) fn right_aligned_column(column: &ColumnInfo) -> bool {
-    use bookie_core::FilterValueKind;
-    matches!(
-        bookie_core::filter_value_kind(column),
-        FilterValueKind::Int | FilterValueKind::Float | FilterValueKind::Decimal
-    )
-}
-
 fn bind_readonly_label(
     label: &gtk4::Label,
     position: u32,
@@ -731,6 +757,42 @@ mod expression_column_tests {
         assert_eq!(column_header_title(&info(""), false), "count(*)");
         assert_eq!(column_header_title(&info("integer"), false), "count(*)\ninteger");
         assert_eq!(shown_type(&info("null")), None);
+    }
+}
+
+#[cfg(test)]
+mod default_width_tests {
+    use super::*;
+
+    fn info(name: &str, data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn widths_follow_the_type_then_the_name_and_respect_the_minimum() {
+        assert!(
+            default_column_width_px(&info("ok", "boolean"), None) < default_column_width_px(&info("ok", "text"), None)
+        );
+        assert!(
+            default_column_width_px(&info("ok", "integer"), None) < default_column_width_px(&info("ok", "uuid"), None)
+        );
+        let long = default_column_width_px(&info("a_very_long_column_name_here", "integer"), None);
+        assert!(long > default_column_width_px(&info("id", "integer"), None));
+        assert!(default_column_width_px(&info("x", "boolean"), None) >= 80);
+        assert!(default_column_width_px(&info(&"z".repeat(200), "text"), None) <= 360);
+        assert_eq!(default_column_width_px(&info("id", "integer"), Some(300)), 300);
     }
 }
 

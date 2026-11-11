@@ -465,6 +465,16 @@ fn text_literals_escape_quotes_and_backslashes() {
 }
 
 #[test]
+fn a_trailing_backslash_or_a_quote_after_one_cannot_close_the_literal() {
+    assert_eq!(literal(&Value::Text("x\\".into())).unwrap(), "'x\\\\'");
+    assert_eq!(literal(&Value::Text("\\'".into())).unwrap(), "'\\\\\\''");
+    assert_eq!(
+        literal(&Value::Text("'; DROP TABLE t; --".into())).unwrap(),
+        "'\\'; DROP TABLE t; --'"
+    );
+}
+
+#[test]
 fn non_finite_floats_use_clickhouse_spellings() {
     assert_eq!(literal(&Value::Float(f64::NAN)).unwrap(), "nan");
     assert_eq!(literal(&Value::Float(f64::INFINITY)).unwrap(), "inf");
