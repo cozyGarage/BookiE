@@ -1,8 +1,9 @@
-use bookie_core::export::{CsvOptions, render_csv, render_in_clause, render_json, render_markdown};
-use bookie_core::sql_literal::build_insert_literal;
-use bookie_core::{ColumnInfo, TableInfo, Value};
+//! Copying result rows: the formats the grid offers (CSV, JSON, Markdown, SQL IN list, INSERT) and
+//! the tab-separated text used for a plain copy. Shared by every frontend; no GUI types here.
 
-use crate::model::{Cell, ColumnMeta};
+use bookie_core::export::{CsvOptions, render_csv, render_in_clause, render_json, render_markdown, render_tsv};
+use bookie_core::sql_literal::build_insert_literal;
+use bookie_core::{ColumnInfo, QueryRows, TableInfo, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CopyFormat {
@@ -14,7 +15,7 @@ pub enum CopyFormat {
 }
 
 pub struct CopyContext<'a> {
-    pub columns: &'a [ColumnMeta],
+    pub columns: &'a [ColumnInfo],
     pub driver_id: &'a str,
     pub target: Option<TableInfo>,
     pub column: usize,
@@ -25,14 +26,14 @@ pub struct Copied {
     pub note: Option<String>,
 }
 
-pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Cell>]) -> Result<Copied, String> {
-    let infos = infos(context.columns);
-    let values: Vec<Vec<Value>> = rows.iter().map(|row| row.to_vec()).collect();
+pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Value>]) -> Result<Copied, String> {
+    let infos = context.columns;
+    let values = QueryRows::from_rows(rows.to_vec());
     let plain = |text: String| Copied { text, note: None };
     match format {
-        CopyFormat::Csv => Ok(plain(render_csv(&infos, &values, &CsvOptions::default()))),
-        CopyFormat::Json => Ok(plain(render_json(&infos, &values))),
-        CopyFormat::Markdown => Ok(plain(render_markdown(&infos, &values))),
+        CopyFormat::Csv => Ok(plain(render_csv(infos, &values, &CsvOptions::default()))),
+        CopyFormat::Json => Ok(plain(render_json(infos, &values))),
+        CopyFormat::Markdown => Ok(plain(render_markdown(infos, &values))),
         CopyFormat::InList => {
             let list = render_in_clause(context.driver_id, &values, context.column);
             if list.sql.is_empty() {
@@ -46,7 +47,7 @@ pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Cell>])
             let statements: Result<Vec<String>, String> = values
                 .iter()
                 .map(|row| {
-                    build_insert_literal(context.driver_id, target.schema.as_deref(), &target.name, &infos, row)
+                    build_insert_literal(context.driver_id, target.schema.as_deref(), &target.name, infos, row)
                         .map_err(|error| format!("{error:?}"))
                 })
                 .collect();
@@ -55,11 +56,22 @@ pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Cell>])
     }
 }
 
-fn infos(columns: &[ColumnMeta]) -> Vec<ColumnInfo> {
-    columns
-        .iter()
-        .map(|column| ColumnInfo {
-            name: column.name.clone(),
+/// Tab-separated text for the given columns; headers are the column names when asked for.
+pub fn tsv(columns: &[ColumnInfo], rows: Vec<Vec<Value>>, with_headers: bool) -> String {
+    render_tsv(columns, &QueryRows::from_rows(rows), with_headers)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn columns() -> Vec<ColumnInfo> {
+        ["id", "name"].into_iter().map(info).collect()
+    }
+
+    fn info(name: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: name.into(),
             data_type: String::new(),
             nullable: true,
             primary_key: false,
@@ -70,34 +82,17 @@ fn infos(columns: &[ColumnMeta]) -> Vec<ColumnInfo> {
             collation: None,
             enum_type: None,
             domain_type: None,
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn columns() -> Vec<ColumnMeta> {
-        ["id", "name"]
-            .into_iter()
-            .map(|name| ColumnMeta {
-                name: name.into(),
-                width: 100.0,
-                numeric: false,
-                data_type: "text".into(),
-            })
-            .collect()
+        }
     }
 
-    fn rows() -> Vec<Vec<Cell>> {
+    fn rows() -> Vec<Vec<Value>> {
         vec![
-            vec![Cell::Int(1), Cell::Text("O'Brien, Pat".into())],
-            vec![Cell::Int(2), Cell::Null],
+            vec![Value::Int(1), Value::Text("O'Brien, Pat".into())],
+            vec![Value::Int(2), Value::Null],
         ]
     }
 
-    fn context(columns: &[ColumnMeta]) -> CopyContext<'_> {
+    fn context(columns: &[ColumnInfo]) -> CopyContext<'_> {
         CopyContext {
             columns,
             driver_id: "postgres",
@@ -220,7 +215,7 @@ mod tests {
         let copied = render(CopyFormat::InList, &context(&columns), &rows()).unwrap();
         assert_eq!(copied.text, "('O''Brien, Pat')");
         assert_eq!(copied.note.as_deref(), Some("1 values left out"));
-        let none = vec![vec![Cell::Int(1), Cell::Null]];
+        let none = vec![vec![Value::Int(1), Value::Null]];
         assert!(render(CopyFormat::InList, &context(&columns), &none).is_err());
     }
 

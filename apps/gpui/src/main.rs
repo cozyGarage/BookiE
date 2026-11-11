@@ -11,19 +11,20 @@ mod render;
 mod text_input;
 mod ui_theme;
 
-use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
-use bookie_results::grid_cursor::Cursor;
+use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
+use bookie_gpui::core_bridge::column_infos_for;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui::selection::{Selection, copy_tsv};
+use bookie_gpui::selection::Selection;
 use bookie_gpui::shell::{
     Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag, table_label,
 };
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
+use bookie_results::grid_cursor::Cursor;
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
     ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
@@ -413,7 +414,8 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let text = copy_tsv(self.selected_rows(selection), with_headers);
+        let columns = column_infos_for(self.source.columns());
+        let text = result_copy::tsv(&columns, self.selected_rows(selection), with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
         self.status = format!(
@@ -438,13 +440,14 @@ impl GridView {
             .live
             .as_ref()
             .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
+        let columns = column_infos_for(self.source.columns());
         let context = CopyContext {
-            columns: self.source.columns(),
+            columns: &columns,
             driver_id: &driver_id,
             target: (!self.grid_is_query).then(|| self.catalog.grid_table.clone()),
             column: self.cell_cursor.map_or(0, |cursor| cursor.column),
         };
-        match copy_format::render(format, &context, &rows) {
+        match result_copy::render(format, &context, &rows) {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if selection.count() == 1 { "row" } else { "rows" };
