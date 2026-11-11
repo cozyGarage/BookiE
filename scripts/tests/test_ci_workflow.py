@@ -98,8 +98,8 @@ class CiWorkflowTests(unittest.TestCase):
                     self.assertIn("fetch-depth: 0", pin_job)
                 else:
                     self.assertIn("uses: actions/checkout@", pin_job)
-                    self.assertIn("ref: ${{ inputs.ref || github.sha }}", pin_job)
                     self.assertIn("fetch-depth: 0", pin_job)
+                self.assertIn("ref: ${{ github.sha }}", pin_job)
                 for index, heading in enumerate(headings):
                     if heading.group(1) == "pin-revision":
                         continue
@@ -124,6 +124,9 @@ class CiWorkflowTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(source), "add", "source.txt"], check=True)
             subprocess.run(["git", "-C", str(source), "commit", "-m", "test revision"], check=True, capture_output=True)
             subprocess.run(["git", "-C", str(source), "tag", "v1"], check=True)
+            (source / "source.txt").write_text("newer revision\n")
+            subprocess.run(["git", "-C", str(source), "add", "source.txt"], check=True)
+            subprocess.run(["git", "-C", str(source), "commit", "-m", "newer revision"], check=True, capture_output=True)
             subprocess.run(["git", "-C", str(source), "remote", "add", "origin", str(remote)], check=True)
             subprocess.run(["git", "-C", str(source), "push", "--all", "origin"], check=True, capture_output=True)
             subprocess.run(["git", "-C", str(source), "push", "--tags", "origin"], check=True, capture_output=True)
@@ -152,7 +155,14 @@ class CiWorkflowTests(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(output.read_text(), f"revision={revision}\n")
+            tagged_revision = subprocess.run(
+                ["git", "-C", str(clone), "rev-parse", "v1"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertNotEqual(revision, tagged_revision)
+            self.assertEqual(output.read_text(), f"revision={tagged_revision}\n")
             environment["CI_REQUESTED_REF"] = "refs/pull/12/head"
             rejected = subprocess.run(
                 [sys.executable, str(ROOT / "scripts/check-ci-revision.py")],

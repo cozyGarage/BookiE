@@ -15,6 +15,7 @@ def main():
     if event == "workflow_dispatch" and requested_ref:
         if requested_ref.startswith(("refs/pull/", "pull/")):
             raise SystemExit("workflow_dispatch cannot pin a pull request ref")
+        revision = git("rev-parse", "--verify", "--end-of-options", f"{requested_ref}^{{commit}}")
         branches = git("branch", "-r", "--contains", revision)
         tags = git("tag", "--contains", revision)
         if not any(line.strip().startswith("origin/") for line in branches.splitlines()) and not tags:
