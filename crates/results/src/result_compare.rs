@@ -39,8 +39,6 @@ pub enum CompareError {
     DuplicateKey,
     #[error("a result has more rows than a comparison can read")]
     TooManyRows,
-    #[error("the shared result memory budget is full")]
-    BudgetExceeded,
     #[error("the saved result could not be read")]
     Source,
     #[error("there is not enough page memory to compare right now")]
@@ -53,7 +51,6 @@ impl From<ScanError> for CompareError {
             ScanError::Cancelled => Self::Cancelled,
             ScanError::Incomplete => Self::IncompleteInput,
             ScanError::TooManyRows => Self::TooManyRows,
-            ScanError::BudgetExceeded => Self::BudgetExceeded,
             ScanError::Spool(_) => Self::Source,
             ScanError::PageBudget => Self::PageMemoryBusy,
         }

@@ -268,8 +268,6 @@ impl ApprovalSink for GtkApprovalSink {
 mod tests {
     use super::*;
 
-    const MAX_RESPONSE_LABEL_CHARS: usize = 30;
-
     #[test]
     fn approval_body_omits_empty_table_preview_but_keeps_meaningful_previews() {
         let mut req = ApprovalRequest {

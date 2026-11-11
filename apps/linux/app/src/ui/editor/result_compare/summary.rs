@@ -96,9 +96,6 @@ pub(super) fn failure_message(error: &CompareError) -> String {
             bookie_app_services::tr!("A key value appears more than once; choose a unique key")
         }
         CompareError::TooManyRows => bookie_app_services::tr!("The results are too large to compare"),
-        CompareError::BudgetExceeded => {
-            bookie_app_services::tr!("Not enough memory to compare these results; close other large results and retry")
-        }
         CompareError::Source => bookie_app_services::tr!("A saved result could not be read"),
         CompareError::PageMemoryBusy => {
             bookie_app_services::tr!("Other results are using the page memory; close one and try again")
