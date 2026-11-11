@@ -92,6 +92,8 @@ fn build_sql_messages_have_actionable_advice() {
     let mismatch = build_sql_message(&BuildSqlError::LengthMismatch { expected: 3, got: 2 });
     assert!(mismatch.contains("expected 3"));
     assert!(mismatch.contains("got 2"));
+    assert!(build_sql_message(&BuildSqlError::DefaultUnsupported("sqlite".into())).contains("sqlite"));
+    assert!(build_sql_message(&BuildSqlError::EmptyExpression).contains("expression"));
 }
 
 #[test]

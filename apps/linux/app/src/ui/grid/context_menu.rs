@@ -687,38 +687,21 @@ fn build_copy_as_menu(insert_copy: bool) -> gio::Menu {
     copy_as
 }
 
-fn build_menu(
-    editable: bool,
-    row_operations: bool,
-    insert_copy: bool,
-    filterable: bool,
-    local_result: bool,
-) -> gio::Menu {
-    let menu = gio::Menu::new();
-    if editable {
-        let section = gio::Menu::new();
-        let item = gio::MenuItem::new(Some(&bookie_app_services::tr!("Edit cell")), Some("cell.edit"));
-        item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
-        section.append_item(&item);
-        let full_value = gio::MenuItem::new(
-            Some(&bookie_app_services::tr!("Edit Full Value…")),
-            Some("cell.edit-full-value"),
-        );
-        full_value.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
-        section.append_item(&full_value);
-        menu.append_section(None, &section);
-    }
-    let copy = gio::Menu::new();
-    copy.append(Some(&bookie_app_services::tr!("Copy value")), Some("cell.copy-value"));
-    copy.append_submenu(
-        Some(&bookie_app_services::tr!("Copy as")),
-        &build_copy_as_menu(insert_copy),
+fn edit_section() -> gio::Menu {
+    let section = gio::Menu::new();
+    let item = gio::MenuItem::new(Some(&bookie_app_services::tr!("Edit cell")), Some("cell.edit"));
+    item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    section.append_item(&item);
+    let full_value = gio::MenuItem::new(
+        Some(&bookie_app_services::tr!("Edit Full Value…")),
+        Some("cell.edit-full-value"),
     );
-    copy.append(
-        Some(&bookie_app_services::tr!("Copy column name")),
-        Some("cell.copy-column-name"),
-    );
-    menu.append_section(None, &copy);
+    full_value.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    section.append_item(&full_value);
+    section
+}
+
+fn display_section(filterable: bool, local_result: bool) -> gio::Menu {
     let display = gio::Menu::new();
     if filterable || local_result {
         display.append(
@@ -745,7 +728,32 @@ fn build_menu(
         Some(&bookie_app_services::tr!("Show Row as JSON")),
         Some("cell.show-row-json"),
     );
-    menu.append_section(None, &display);
+    display
+}
+
+fn build_menu(
+    editable: bool,
+    row_operations: bool,
+    insert_copy: bool,
+    filterable: bool,
+    local_result: bool,
+) -> gio::Menu {
+    let menu = gio::Menu::new();
+    if editable {
+        menu.append_section(None, &edit_section());
+    }
+    let copy = gio::Menu::new();
+    copy.append(Some(&bookie_app_services::tr!("Copy value")), Some("cell.copy-value"));
+    copy.append_submenu(
+        Some(&bookie_app_services::tr!("Copy as")),
+        &build_copy_as_menu(insert_copy),
+    );
+    copy.append(
+        Some(&bookie_app_services::tr!("Copy column name")),
+        Some("cell.copy-column-name"),
+    );
+    menu.append_section(None, &copy);
+    menu.append_section(None, &display_section(filterable, local_result));
     let actions = gio::Menu::new();
     let export_label = if local_result {
         bookie_app_services::tr!("Export Visible Rows…")
