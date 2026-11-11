@@ -926,6 +926,25 @@ fn a_double_precision_column_and_other_drivers_are_left_alone() {
         .unwrap()
         .unwrap();
     assert!(!mysql.contains("::real"), "{mysql}");
+    let (_, duckdb_double) = build_filter_where("duckdb", &[col("v", "DOUBLE")], &set)
+        .unwrap()
+        .unwrap();
+    assert_eq!(duckdb_double, vec![Value::Float(0.1)]);
+}
+
+#[test]
+fn a_duckdb_float_filter_binds_the_single_precision_value() {
+    for data_type in ["FLOAT", "FLOAT4", "REAL"] {
+        let set = FilterSet {
+            rules: vec![rule("v", FilterOp::Eq, Some(FilterValue::Single("0.1".into())))],
+            ..Default::default()
+        };
+        let (_, params) = build_filter_where("duckdb", &[col("v", data_type)], &set)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(params, vec![Value::Float(f64::from(0.1_f32))], "{data_type}");
+    }
 }
 
 #[test]
