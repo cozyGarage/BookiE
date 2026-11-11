@@ -38,6 +38,7 @@ impl Render for GridView {
         };
         let strip = div()
             .flex()
+            .flex_wrap()
             .items_center()
             .gap_1()
             .px_2()
