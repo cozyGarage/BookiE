@@ -1,7 +1,12 @@
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use bookie_app_services::tab_mark::TabMark;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use relm4::gtk::{gdk, gio, glib};
+
+use bookie_app_services::tab_mark::{TabColor, TabMark};
 
 const DIRTY_PREFIX: &str = "• ";
 
@@ -49,9 +54,113 @@ pub(super) fn apply_tab_mark(page: &adw::TabPage, mark: TabMark) {
     if let Some(automatic) = read_automatic_title(page) {
         page.set_title(&displayed_title(&mark, &automatic));
     }
+    page.set_icon(
+        mark.color()
+            .map(color_dot)
+            .as_ref()
+            .map(|dot| dot.upcast_ref::<gio::Icon>()),
+    );
     unsafe {
         page.set_qdata(mark_quark(), mark);
     }
+}
+
+fn color_rgb(color: TabColor) -> [u8; 3] {
+    match color {
+        TabColor::Red => [0xe0, 0x1b, 0x24],
+        TabColor::Orange => [0xff, 0x78, 0x00],
+        TabColor::Yellow => [0xf5, 0xc2, 0x11],
+        TabColor::Green => [0x33, 0xd1, 0x7a],
+        TabColor::Teal => [0x2e, 0xc4, 0xb6],
+        TabColor::Blue => [0x35, 0x84, 0xe4],
+        TabColor::Purple => [0x91, 0x41, 0xac],
+        TabColor::Pink => [0xe8, 0x6f, 0xa3],
+    }
+}
+
+fn color_label(color: TabColor) -> String {
+    match color {
+        TabColor::Red => bookie_app_services::tr!("Red"),
+        TabColor::Orange => bookie_app_services::tr!("Orange"),
+        TabColor::Yellow => bookie_app_services::tr!("Yellow"),
+        TabColor::Green => bookie_app_services::tr!("Green"),
+        TabColor::Teal => bookie_app_services::tr!("Teal"),
+        TabColor::Blue => bookie_app_services::tr!("Blue"),
+        TabColor::Purple => bookie_app_services::tr!("Purple"),
+        TabColor::Pink => bookie_app_services::tr!("Pink"),
+    }
+}
+
+const DOT_SIZE: i32 = 32;
+
+fn dot_pixels(rgb: [u8; 3]) -> Vec<u8> {
+    let centre = (DOT_SIZE as f32 - 1.0) / 2.0;
+    let radius = DOT_SIZE as f32 * 0.34;
+    let mut pixels = Vec::with_capacity((DOT_SIZE * DOT_SIZE * 4) as usize);
+    for y in 0..DOT_SIZE {
+        for x in 0..DOT_SIZE {
+            let distance = ((x as f32 - centre).powi(2) + (y as f32 - centre).powi(2)).sqrt();
+            let coverage = (radius + 0.5 - distance).clamp(0.0, 1.0);
+            for channel in rgb {
+                pixels.push((f32::from(channel) * coverage).round() as u8);
+            }
+            pixels.push((255.0 * coverage).round() as u8);
+        }
+    }
+    pixels
+}
+
+fn color_dot(color: TabColor) -> gdk::Texture {
+    gdk::MemoryTexture::new(
+        DOT_SIZE,
+        DOT_SIZE,
+        gdk::MemoryFormat::R8g8b8a8Premultiplied,
+        &glib::Bytes::from_owned(dot_pixels(color_rgb(color))),
+        (DOT_SIZE * 4) as usize,
+    )
+    .upcast()
+}
+
+pub(super) fn mark_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append(Some(&bookie_app_services::tr!("Rename\u{2026}")), Some("tab.rename"));
+    let colours = gio::Menu::new();
+    for color in TabColor::ALL {
+        colours.append(Some(&color_label(color)), Some(&format!("tab.color::{}", color.id())));
+    }
+    colours.append(Some(&bookie_app_services::tr!("No colour")), Some("tab.color::none"));
+    menu.append_submenu(Some(&bookie_app_services::tr!("Colour mark")), &colours);
+    menu
+}
+
+pub(super) fn add_mark_actions(
+    group: &gio::SimpleActionGroup,
+    menu_target: Rc<RefCell<Option<adw::TabPage>>>,
+    view: &adw::TabView,
+    on_changed: impl Fn() + Clone + 'static,
+) {
+    let rename = gio::SimpleAction::new("rename", None);
+    let (target, parent, changed) = (menu_target.clone(), view.clone(), on_changed.clone());
+    rename.connect_activate(move |_, _| {
+        let page = target.borrow().clone();
+        if let Some(page) = page {
+            let changed = changed.clone();
+            present_rename_dialog(&parent, &page, move |_| changed());
+        }
+    });
+    group.add_action(&rename);
+
+    let colour = gio::SimpleAction::new("color", Some(glib::VariantTy::STRING));
+    colour.connect_activate(move |_, value| {
+        let page = menu_target.borrow().clone();
+        let id = value.and_then(|value| value.str().map(str::to_owned));
+        if let (Some(page), Some(id)) = (page, id) {
+            let color = TabColor::ALL.into_iter().find(|color| color.id() == id);
+            apply_tab_mark(&page, read_tab_mark(&page).with_color(color));
+            on_changed();
+        }
+    });
+    group.add_action(&colour);
 }
 
 pub(super) fn present_rename_dialog(
@@ -98,6 +207,40 @@ mod tests {
         assert_eq!(displayed_title(&named, "SELECT 1"), "Orders audit");
         assert_eq!(displayed_title(&named, "• SELECT 1"), "• Orders audit");
         assert_eq!(displayed_title(&TabMark::default(), "• SELECT 1"), "• SELECT 1");
+    }
+
+    #[test]
+    fn the_colour_dot_is_opaque_in_the_middle_and_clear_at_the_corners() {
+        let pixels = dot_pixels([0x33, 0x84, 0xe4]);
+        let at = |x: i32, y: i32| {
+            let start = ((y * DOT_SIZE + x) * 4) as usize;
+            &pixels[start..start + 4]
+        };
+        assert_eq!(at(DOT_SIZE / 2, DOT_SIZE / 2), [0x33, 0x84, 0xe4, 255]);
+        assert_eq!(at(0, 0)[3], 0);
+        assert_eq!(pixels.len(), (DOT_SIZE * DOT_SIZE * 4) as usize);
+    }
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn the_colour_mark_shows_as_the_tab_icon_and_clears_with_no_colour() {
+        relm4::adw::init().unwrap();
+        let view = adw::TabView::new();
+        let page = view.append(&gtk::Box::new(gtk::Orientation::Vertical, 0));
+        let group = gio::SimpleActionGroup::new();
+        let target = Rc::new(RefCell::new(Some(page.clone())));
+        let changed = Rc::new(std::cell::Cell::new(0));
+        let seen = changed.clone();
+        add_mark_actions(&group, target, &view, move || seen.set(seen.get() + 1));
+        assert!(page.icon().is_none());
+
+        group.activate_action("color", Some(&"teal".to_variant()));
+        assert!(page.icon().is_some());
+        assert_eq!(read_tab_mark(&page).color(), Some(TabColor::Teal));
+        group.activate_action("color", Some(&"none".to_variant()));
+        assert!(page.icon().is_none());
+        assert_eq!(read_tab_mark(&page).color(), None);
+        assert_eq!(changed.get(), 2);
     }
 
     #[test]
