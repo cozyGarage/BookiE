@@ -108,7 +108,8 @@ class CiWorkflowTests(unittest.TestCase):
                     self.assertRegex(block, r"(?m)(^    needs:.*pin-revision|^      - pin-revision$)")
                     self.assertNotIn("${{ github.sha }}", block)
         self.assertIn("${{ needs.pin-revision.outputs.revision }}", workflows[".forgejo/workflows/ci.yml"])
-        self.assertIn('config.get("providers", {}).get("forgejo", config["groups"])', workflows[".forgejo/workflows/ci.yml"])
+        self.assertIn('fallback = ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]', workflows[".forgejo/workflows/ci.yml"])
+        self.assertIn('config.get("providers", {}).get("forgejo", fallback)', workflows[".forgejo/workflows/ci.yml"])
 
     def test_ci_revision_validator_records_a_tag_and_refuses_pull_refs(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -459,7 +460,7 @@ class CiWorkflowTests(unittest.TestCase):
             set(providers["github"]) | {"unit", "sandbox", "gpui"},
         )
         self.assertIn("mapfile -t publish_groups", forgejo_builder)
-        self.assertIn('config.get("providers", {}).get("forgejo", config["groups"])', forgejo_builder)
+        self.assertIn('config.get("providers", {}).get("forgejo", fallback)', forgejo_builder)
 
     def test_github_gtk_test_job_uses_a_shallow_checkout(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -566,7 +567,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" forgejo', default_build)
         bundle_config = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())
         self.assertIn('mapfile -t publish_groups < <(python3 -c', default_build)
-        self.assertIn('config.get("providers", {}).get("forgejo", config["groups"])', default_build)
+        self.assertIn('config.get("providers", {}).get("forgejo", fallback)', default_build)
         self.assertEqual(set(bundle_config["providers"]["forgejo"]) | {"unit", "sandbox", "gpui"},
                          {"direct", "consumers", "driver-core", "driver-analytics", "driver-extended",
                           "pg-release", "socket-ssh", "driver-tls", "keyring", "unit", "sandbox", "gpui"})

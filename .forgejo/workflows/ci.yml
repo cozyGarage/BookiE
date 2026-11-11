@@ -375,7 +375,7 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: |
           cd src
-          mapfile -t publish_groups < <(python3 -c 'import json; config=json.load(open("scripts/ci-test-bundle-groups.json")); print(*(config.get("providers", {}).get("forgejo", config["groups"])), sep="\n")')
+          mapfile -t publish_groups < <(python3 -c 'import json; config=json.load(open("scripts/ci-test-bundle-groups.json")); fallback = ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]; print(*(config.get("providers", {}).get("forgejo", fallback)), sep="\n")')
           publish_groups+=(unit sandbox gpui)
           for group in "${publish_groups[@]}"; do
             python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ needs.pin-revision.outputs.revision }}" "$group"
