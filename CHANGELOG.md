@@ -4,11 +4,20 @@
 
 ## [0.2.7] - 2026-11-11
 
+### Added
+
+- The New Table tab now lets you pick each column's collation from the server's list, on engines that provide one. (#2862)
+- The New Table tab on MySQL and MariaDB can now set the table's default collation from the server's list. (#2865)
+
 ### Changed
 
 - On SQL Server, a query that reaches another server through a linked server name (four-part names) now asks for approval first. (#2859)
 - GTK grid: columns start at widths that suit their type, and the last column fills the view. (#2848)
 - The result grid right-aligns numeric columns, with their NULLs. (#2846)
+- GPUI retains live query results in a compact row store to reduce duplicate decoded-result memory. (#2844)
+- Large database sidebars remain responsive while the full catalog loads in batches. (#2871)
+- The AppImage requires glibc 2.43 or newer. (#2875)
+- Grid column headers align with their cell values. (#2874)
 
 ### Fixed
 
@@ -33,6 +42,10 @@
 - The SQL editor's status text keeps a fixed width, so the Run button no longer moves when a statement finishes. (#2857)
 - The Arch package now declares the OpenSSL 4 libraries it links against. (#2855)
 - A server that never answers the version request no longer holds a connection attempt open in the connect dialog. (#2860)
+- The column collation picker now works on MariaDB servers that list a collation without a character set. (#2864)
+- Inactive streamed result views release loaded pages and restore them from the saved result when shown again. (#2867)
+- CSV preview updates no longer block the import dialog on large files. (#2878)
+- Connection names render as plain text in history filters. (#2880)
 
 ## [0.2.6] - 2026-11-10
 
