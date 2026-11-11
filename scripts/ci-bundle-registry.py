@@ -19,6 +19,9 @@ MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
 UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
 PROGRESS_INTERVAL_SECONDS = 10
+BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(
+    json.loads((Path(__file__).parent / 'ci-test-bundle-groups.json').read_text())['groups']
+)
 SPEC = importlib.util.spec_from_file_location('bundle', Path(__file__).with_name('ci-test-bundle.py'))
 bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
@@ -280,7 +283,7 @@ def main():
     parser.add_argument('operation', choices=['publish', 'fetch', 'github-fetch'])
     parser.add_argument('directory', type=Path)
     parser.add_argument('revision')
-    parser.add_argument('group', choices=['default', 'direct', 'unit', 'sandbox', 'gpui'])
+    parser.add_argument('group', choices=sorted(BUNDLE_GROUPS))
     args = parser.parse_args()
     if not re.fullmatch('[0-9a-f]{40}', args.revision):
         parser.error('a full source commit is required')

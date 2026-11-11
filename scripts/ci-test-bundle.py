@@ -9,6 +9,9 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(
+    json.loads((ROOT / 'scripts/ci-test-bundle-groups.json').read_text())['groups']
+)
 
 
 def digest(path):
@@ -66,7 +69,7 @@ def create(bundle, messages, revision, group, archive=None, archive_only=False, 
     index = {'schema_version': 1, 'source_commit': revision, 'build_group': group,
              'build_image': os.environ.get('BOOKIE_BUILD_RUNTIME_ID') or os.environ.get('BOOKIE_BUILD_IMAGE', ''),
              'architecture': platform.machine(), 'rust_version': subprocess.check_output(['rustc', '--version'], text=True).strip(),
-             'features': ['kerberos'] if group in {'default', 'direct', 'unit', 'sandbox'} else [],
+             'features': ['kerberos'] if group != 'gpui' else [],
              'application_source_commit': revision, 'test_suite_commit': revision, 'ci_recipe_commit': revision,
              'tests': [], 'binaries': {}, 'archive_only': archive_only,
              'package_directories': {}, 'files': {}}
@@ -110,8 +113,8 @@ def main():
     parser.add_argument('revision')
     parser.add_argument('--messages', type=Path)
     parser.add_argument('--archive', type=Path)
-    parser.add_argument('--group', choices=['default', 'direct', 'unit', 'sandbox', 'gpui'], default='default')
-    parser.add_argument('--expected-group', choices=['default', 'direct', 'unit', 'sandbox', 'gpui'])
+    parser.add_argument('--group', choices=sorted(BUNDLE_GROUPS), default='default')
+    parser.add_argument('--expected-group', choices=sorted(BUNDLE_GROUPS))
     parser.add_argument('--archive-only', action='store_true')
     parser.add_argument('--test-kind', action='append', choices=['lib', 'bin', 'test'])
     parser.add_argument('--package', action='append')

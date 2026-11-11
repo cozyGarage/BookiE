@@ -323,28 +323,15 @@ jobs:
           exec 9>>/target/.bookie-build-cache.lock
           flock --exclusive 9
           cd src && bash scripts/build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" forgejo
-      - name: Publish the direct test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/direct" "${{ github.sha }}" direct
-      - name: Publish the unit test bundle
+      - name: Publish source-pinned test bundles
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/unit" "${{ github.sha }}" unit
-      - name: Publish the sandbox test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/sandbox" "${{ github.sha }}" sandbox
-      - name: Publish the GPUI test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: cd src && python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/gpui" "${{ github.sha }}" gpui
+        run: |
+          cd src
+          for group in direct consumers driver-core driver-analytics driver-extended drivers pg-release socket-ssh driver-tls keyring unit sandbox gpui; do
+            python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ github.sha }}" "$group"
+          done
       - name: Check the no-default-features layer
         run: |
           exec 9>>/target/.bookie-build-cache.lock
@@ -683,7 +670,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" "driver-${{ matrix.driver }}"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -795,7 +782,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" consumers
       - name: Security policy tests
         run: cd src && python3 scripts/run-test-layer.py security-policy
 
@@ -835,7 +822,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" consumers
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -947,7 +934,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" pg-release
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -999,7 +986,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" socket-ssh
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -1121,7 +1108,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" driver-tls
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -1168,7 +1155,7 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
+        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" keyring
       - name: Secret Service tier
         run: cd src && python3 scripts/run-test-layer.py keyring
 

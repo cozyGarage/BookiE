@@ -233,6 +233,69 @@ jobs:
           path: reusable-builds/direct/
           if-no-files-found: error
           retention-days: 14
+      - name: Upload source-pinned consumer test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-consumers
+          path: reusable-builds/consumers/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned driver test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-drivers
+          path: reusable-builds/drivers/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned core driver test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core
+          path: reusable-builds/driver-core/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned analytics driver test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-analytics
+          path: reusable-builds/driver-analytics/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned extended driver test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-extended
+          path: reusable-builds/driver-extended/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned PostgreSQL release test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-pg-release
+          path: reusable-builds/pg-release/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned socket and SSH test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-socket-ssh
+          path: reusable-builds/socket-ssh/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned TLS test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls
+          path: reusable-builds/driver-tls/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned keyring test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-keyring
+          path: reusable-builds/keyring/
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload source-pinned unit archive
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -648,15 +711,15 @@ jobs:
           echo "tree under test: $(git rev-parse HEAD)"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-direct
-          path: ${{ runner.temp }}/bookie-direct-bundle
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-drivers
+          path: ${{ runner.temp }}/bookie-drivers-bundle
       - name: Verify the test bundle
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
-          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-direct-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group direct
-          find "$RUNNER_TEMP/bookie-direct-bundle/tests" "$RUNNER_TEMP/bookie-direct-bundle/bin" -type f -exec chmod u+x {} +
+          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-drivers-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group drivers
+          find "$RUNNER_TEMP/bookie-drivers-bundle/tests" "$RUNNER_TEMP/bookie-drivers-bundle/bin" -type f -exec chmod u+x {} +
       - name: Driver, socket and SSH integration
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
@@ -679,7 +742,7 @@ jobs:
             --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory \
             --env GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
             --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
-            --env BOOKIE_TEST_BUNDLE="$RUNNER_TEMP/bookie-direct-bundle" \
+            --env BOOKIE_TEST_BUNDLE="$RUNNER_TEMP/bookie-drivers-bundle" \
             --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
             "$BOOKIE_BUILD_IMAGE" bash -euo pipefail -c 'python3 scripts/run-test-layer.py drivers && python3 scripts/run-test-layer.py pg-dump'
 

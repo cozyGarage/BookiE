@@ -12,8 +12,7 @@ requested_group=${2:-default}
 case "$requested_group" in
   default) groups=(default) ;;
   gpui) groups=(gpui) ;;
-  all) groups=() ;;
-  forgejo) groups=() ;;
+  all|forgejo) groups=() ;;
   *) printf 'Unknown test bundle group: %s\n' "$requested_group" >&2; exit 2 ;;
 esac
 mkdir -p "$output"
@@ -22,6 +21,7 @@ export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-8}
 export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"
 nextest="$(bash scripts/ensure-nextest.sh)"
 build_forgejo_bundles() {
+  local config="$ROOT/scripts/ci-test-bundle-groups.json"
   sandbox_packages=(
     bookie-core bookie-policy bookie-storage bookie-transport bookie-app-services bookie-results
     bookie-ssh bookie-dump bookie-mcp bookie-agentd bookie-driver-sqlite
@@ -34,9 +34,13 @@ build_forgejo_bundles() {
   if [[ ! -f "$build_messages" ]]; then
     cargo test --locked --workspace --lib --bins --tests --no-run --message-format=json-render-diagnostics > "$build_messages"
   fi
-  python3 scripts/ci-test-bundle.py create "$output/direct" "$revision" --messages "$build_messages" \
-    --group direct --test-kind test \
-    --package-kind bookie-app:lib --package-kind bookie-storage:lib --package-kind bookie-transport:lib
+  while IFS= read -r group; do
+    local args=(--messages "$build_messages" --group "$group")
+    while IFS= read -r package_kind; do args+=(--package-kind "$package_kind"); done < <(
+      python3 -c 'import json,sys; group=json.load(open(sys.argv[1]))["groups"][sys.argv[2]]; print(*(f"{package}:{kind}" for kind,packages in group.items() for package in packages), sep="\n")' "$config" "$group"
+    )
+    python3 scripts/ci-test-bundle.py create "$output/$group" "$revision" "${args[@]}"
+  done < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["groups"], sep="\n")' "$config")
   "$nextest" nextest archive --locked --workspace --lib --bins --archive-file "$output/unit-nextest.tar.zst"
   python3 scripts/ci-test-bundle.py create "$output/unit" "$revision" --messages "$build_messages" \
     --group unit --archive "$output/unit-nextest.tar.zst" --archive-only --test-kind lib --test-kind bin

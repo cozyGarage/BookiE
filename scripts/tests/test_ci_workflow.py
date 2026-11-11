@@ -26,15 +26,43 @@ bundle_spec.loader.exec_module(bundle_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
-    def test_direct_bundle_selection_keeps_integration_and_required_isolated_library_tests(self):
-        kinds = {"test"}
-        package_kinds = {("bookie-app", "lib"), ("bookie-storage", "lib"), ("bookie-transport", "lib")}
+    def test_test_bundle_groups_cover_their_consumers_without_copying_every_test_binary(self):
+        bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        metadata = json.loads(subprocess.check_output(
+            ["cargo", "metadata", "--no-deps", "--format-version=1"], cwd=ROOT, text=True
+        ))
+        packages = {package["name"]: package for package in metadata["packages"]}
+        for group, selections in bundle_groups.items():
+            with self.subTest(group=group):
+                self.assertIn(group, bundle_helper.BUNDLE_GROUPS)
+                for kind, names in selections.items():
+                    for name in names:
+                        self.assertTrue(
+                            any(target["test"] and kind in target["kind"]
+                                for target in packages[name]["targets"]),
+                            f"{group} has no testable {name}:{kind} target",
+                        )
+        direct = {(package, kind) for kind, packages in bundle_groups["direct"].items() for package in packages}
 
-        self.assertTrue(bundle_helper.target_selected("bookie-driver-postgres", "test", kinds, package_kinds))
-        self.assertTrue(bundle_helper.target_selected("bookie-app", "lib", kinds, package_kinds))
-        self.assertTrue(bundle_helper.target_selected("bookie-storage", "lib", kinds, package_kinds))
-        self.assertFalse(bundle_helper.target_selected("bookie-core", "lib", kinds, package_kinds))
-        self.assertFalse(bundle_helper.target_selected("bookie-app", "bin", kinds, package_kinds))
+        self.assertEqual(
+            {package for package, kind in direct if kind == "lib"},
+            {"bookie-app", "bookie-app-services", "bookie-core", "bookie-driver-clickhouse", "bookie-driver-sqlite", "bookie-policy"},
+        )
+        self.assertEqual(
+            {package for package, kind in direct if kind == "test"},
+            {"bookie-app", "bookie-core", "bookie-driver-postgres", "bookie-driver-sqlite", "bookie-policy"},
+        )
+        self.assertEqual(bundle_groups["direct"]["bin"], ["bookie-app"])
+        self.assertTrue(bundle_helper.target_selected("bookie-app", "lib", set(), direct))
+        self.assertFalse(bundle_helper.target_selected("bookie-driver-duckdb", "test", set(), direct))
+        self.assertEqual(
+            set(bundle_groups),
+            {"direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "drivers",
+             "pg-release", "socket-ssh", "driver-tls", "keyring"},
+        )
+        self.assertTrue({"bookie-app", "bookie-mcp", "bookie-policy"} <= set(bundle_groups["consumers"]["lib"] + bundle_groups["consumers"]["test"]))
+        for group in ("driver-core", "driver-analytics", "driver-extended"):
+            self.assertTrue(bundle_groups[group]["test"])
 
     def test_forgejo_workflow_and_actionlint_config_changes_run_contract_checks(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
@@ -187,10 +215,15 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_jobs_fetch_the_bundle_group_they_execute(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         for name, group in (("unit", "unit"), ("sandbox", "sandbox"), ("gpui-tests", "gpui"),
-                            ("widgets", "direct"), ("driver", "direct"), ("consumers", "direct")):
+                            ("widgets", "direct"), ("security-policy", "consumers"),
+                            ("consumers", "consumers"), ("pg-release", "pg-release"),
+                            ("socket-ssh", "socket-ssh"), ("driver-tls", "driver-tls"),
+                            ("keyring", "keyring")):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn(f'prepare-test-bundle.sh "${{{{ github.sha }}}}" {group}', job)
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn('prepare-test-bundle.sh "${{ github.sha }}" "driver-${{ matrix.driver }}"', driver)
 
     def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -314,10 +347,10 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         default_build = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" forgejo', default_build)
-        self.assertIn('test-bundles/direct" "${{ github.sha }}" direct', default_build)
-        self.assertIn('test-bundles/unit" "${{ github.sha }}" unit', default_build)
-        self.assertIn('test-bundles/sandbox" "${{ github.sha }}" sandbox', default_build)
-        self.assertIn('"$GITHUB_WORKSPACE/test-bundles/gpui" "${{ github.sha }}" gpui', default_build)
+        publish_groups = re.search(r"for group in ([^;]+);", default_build).group(1).split()
+        groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertEqual(set(publish_groups), set(groups) | {"unit", "sandbox", "gpui"})
+        self.assertIn('"$GITHUB_WORKSPACE/test-bundles/$group" "${{ github.sha }}" "$group"', default_build)
         self.assertNotIn("duckdb-build", workflow)
         self.assertNotRegex(workflow, r"(?m)^  duckdb:\n")
         for name in ("unit", "sandbox", "widgets", "driver", "consumers"):
@@ -345,7 +378,7 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_github_jobs_fetch_the_bundle_groups_they_execute(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        expected = {"preflight": ("unit", "sandbox"), "fast": ("unit", "direct"), "integration": ("direct",)}
+        expected = {"preflight": ("unit", "sandbox"), "fast": ("unit", "direct"), "integration": ("drivers",)}
         for name, groups in expected.items():
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
@@ -365,10 +398,20 @@ class CiWorkflowTests(unittest.TestCase):
         preflight_script = (ROOT / "scripts/preflight.sh").read_text()
         sandbox_script = (ROOT / "scripts/test-sandbox.sh").read_text()
         builder = (ROOT / "scripts/build-test-bundles.sh").read_text()
-        self.assertIn("--group direct --test-kind test", builder)
-        for package in ("bookie-app:lib", "bookie-storage:lib", "bookie-transport:lib"):
-            with self.subTest(package=package):
-                self.assertIn(f"--package-kind {package}", builder)
+        self.assertIn("--package-kind", builder)
+        self.assertIn("ci-test-bundle-groups.json", builder)
+        bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertIn("bookie-core", bundle_groups["direct"]["lib"])
+        self.assertIn("bookie-mcp", bundle_groups["consumers"]["lib"])
+        builder_workflow = re.search(
+            r"(?ms)^  reusable-test-builds:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)",
+            (ROOT / ".github/workflows/build-linux.yml").read_text(),
+        ).group(1)
+        uploaded_groups = re.findall(
+            r"name: bookie-tests-\$\{\{ needs\.pin-revision\.outputs\.revision \}\}-([a-z-]+)",
+            builder_workflow,
+        )
+        self.assertEqual(set(uploaded_groups), set(bundle_groups) | {"unit", "sandbox", "gpui"})
         self.assertIn('BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', preflight_script)
         self.assertIn('BOOKIE_SANDBOX_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', sandbox_script)
         self.assertIn("--workspace-remap", preflight_script)
