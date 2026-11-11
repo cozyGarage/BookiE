@@ -70,6 +70,12 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.7" type="stable" date="2026-11-11">
+      <description><p>Release after 0.2.6: grid menus no longer act on a different row after the grid changes, large JSON cell previews no longer scan the whole value, result pages that finish late no longer stay in memory, and the AppImage uses libadwaita's own styling.</p></description>
+    </release>
+    <release version="0.2.6" type="stable" date="2026-11-10">
+      <description><p>Release after 0.2.5: several connections open in one window; nested folders for saved connections; multi-key sort, Find and Replace in result grids; editable results from a single table; a highlight rules editor; creating and dropping databases and schemas; a fixed local port for SSH tunnels; SQL Server strict TDS 8.0 encryption; a column collation picker; PostgreSQL sequence values; image previews in View Value; experimental read-only Oracle and Cassandra drivers; plus fixes for restricted PostgreSQL roles, dialog crashes and cancelled connection attempts.</p></description>
+    </release>
     <release version="0.2.5" type="stable" date="2026-11-04">
       <description><p>Patch after 0.2.4: Connection import reads DBeaver, DataGrip and Another Redis Desktop Manager exports as drafts without passwords; copy a row as a WHERE clause; WITH-clause and derived-table completion; SQL snippets; a starter JOIN from foreign keys; CSV import that skips rejected rows and lists them; quit confirmation while an import, backup or export runs; ER diagrams copy as Mermaid or DBML; DBeaver folders imported as connection groups; SSH tunnels refuse weak algorithms and MySQL refuses an unencrypted RSA password exchange; and fixes for MCP and DuckDB access, SSH tunnel timeouts and stale browse saves. Releases no longer include a Debian package or a Flatpak bundle; use the Arch package or the AppImage.</p></description>
     </release>

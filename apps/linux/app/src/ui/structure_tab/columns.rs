@@ -121,15 +121,15 @@ fn format_column_subtitle(col: &DraftColumn) -> String {
         parts.push(col.data_type.clone());
     }
     parts.push(if col.nullable {
-        crate::tr!("nullable")
+        bookie_app_services::tr!("nullable")
     } else {
-        crate::tr!("NOT NULL")
+        bookie_app_services::tr!("NOT NULL")
     });
     if col.primary_key {
-        parts.push(crate::tr!("Primary key"));
+        parts.push(bookie_app_services::tr!("Primary key"));
     }
     if col.auto_increment {
-        parts.push(crate::tr!("auto-increment"));
+        parts.push(bookie_app_services::tr!("auto-increment"));
     }
     parts.join(" · ")
 }
@@ -178,11 +178,17 @@ fn bind_expander_arrow(row: &adw::ExpanderRow) {
 /// `rebuild_columns_view` to silence the `changed` / `toggled`
 /// emissions GTK fires while initial values are stamped onto the
 /// freshly-built widgets.
+#[derive(Clone, Copy)]
+pub(super) struct ColumnEditing<'a> {
+    pub comment_capability: ColumnCommentCapability,
+    pub collations: &'a [String],
+}
+
 pub(super) fn build_column_expander_row(
     index: usize,
     col: &DraftColumn,
     driver_id: &str,
-    column_comment_capability: ColumnCommentCapability,
+    editing: ColumnEditing<'_>,
     sender: ComponentSender<StructureTab>,
     suppress_emit: Rc<Cell<bool>>,
     popover_registry: Rc<RefCell<Vec<gtk::Popover>>>,
@@ -201,7 +207,7 @@ pub(super) fn build_column_expander_row(
     // remains visible whether the row is expanded or collapsed.
     let remove_button = gtk::Button::builder()
         .icon_name("user-trash-symbolic")
-        .tooltip_text(crate::tr!("Remove column"))
+        .tooltip_text(bookie_app_services::tr!("Remove column"))
         .valign(gtk::Align::Center)
         .build();
     remove_button.add_css_class("flat");
@@ -214,7 +220,7 @@ pub(super) fn build_column_expander_row(
 
     // Name (AdwEntryRow). The expander's title mirrors this entry
     // live so the collapsed header always reflects the user's input.
-    let name_row = adw::EntryRow::builder().title(crate::tr!("Name")).build();
+    let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
     name_row.set_text(&col.name);
     name_row.set_widget_name(&format!("col-name-{index}"));
     let sender_for_name = sender.clone();
@@ -237,11 +243,13 @@ pub(super) fn build_column_expander_row(
     // curated `driver_types()` suggestions; free-text input remains the
     // primary path so custom types like `decimal(10,2)` or Postgres
     // `enum` literals work without enumeration.
-    let type_row = adw::EntryRow::builder().title(crate::tr!("Type")).build();
+    let type_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Type")).build();
     type_row.set_text(&col.data_type);
     if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
         type_row.set_sensitive(false);
-        type_row.set_tooltip_text(Some(&crate::tr!("Type changes aren't supported by SQLite.")));
+        type_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+            "Type changes aren't supported by SQLite."
+        )));
     }
     let sender_for_type = sender.clone();
     let suppress_for_type = suppress_emit.clone();
@@ -263,12 +271,14 @@ pub(super) fn build_column_expander_row(
 
     // Nullable (AdwSwitchRow).
     let nullable_row = adw::SwitchRow::builder()
-        .title(crate::tr!("Nullable"))
+        .title(bookie_app_services::tr!("Nullable"))
         .active(col.nullable)
         .build();
     if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
         nullable_row.set_sensitive(false);
-        nullable_row.set_tooltip_text(Some(&crate::tr!("Nullability changes aren't supported by SQLite.")));
+        nullable_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+            "Nullability changes aren't supported by SQLite."
+        )));
     }
     let sender_for_null = sender.clone();
     let suppress_for_null = suppress_emit.clone();
@@ -284,11 +294,15 @@ pub(super) fn build_column_expander_row(
     row.add_row(&nullable_row);
 
     // Default value (AdwEntryRow). Empty input means no DEFAULT clause.
-    let default_row = adw::EntryRow::builder().title(crate::tr!("Default value")).build();
+    let default_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Default value"))
+        .build();
     default_row.set_text(col.default_value.as_deref().unwrap_or(""));
     if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
         default_row.set_sensitive(false);
-        default_row.set_tooltip_text(Some(&crate::tr!("Default changes aren't supported by SQLite.")));
+        default_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+            "Default changes aren't supported by SQLite."
+        )));
     }
     let sender_for_default = sender.clone();
     let suppress_for_default = suppress_emit.clone();
@@ -307,7 +321,7 @@ pub(super) fn build_column_expander_row(
 
     // Primary key (AdwSwitchRow).
     let pk_row = adw::SwitchRow::builder()
-        .title(crate::tr!("Primary key"))
+        .title(bookie_app_services::tr!("Primary key"))
         .active(col.primary_key)
         .build();
     let sender_for_pk = sender.clone();
@@ -328,8 +342,8 @@ pub(super) fn build_column_expander_row(
     // (MySQL rejects AUTO_INCREMENT on non-PK; Postgres SERIAL
     // implies PK).
     let auto_row = adw::SwitchRow::builder()
-        .title(crate::tr!("Auto increment"))
-        .subtitle(crate::tr!("MySQL AUTO_INCREMENT / Postgres SERIAL"))
+        .title(bookie_app_services::tr!("Auto increment"))
+        .subtitle(bookie_app_services::tr!("MySQL AUTO_INCREMENT / Postgres SERIAL"))
         .active(col.auto_increment)
         .build();
     auto_row.set_sensitive(col.primary_key);
@@ -350,9 +364,72 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&auto_row);
 
-    add_comment_row(&row, index, col, column_comment_capability, sender, suppress_emit);
+    add_collation_row(
+        &row,
+        index,
+        col,
+        editing.collations,
+        sender.clone(),
+        suppress_emit.clone(),
+    );
+    add_comment_row(&row, index, col, editing.comment_capability, sender, suppress_emit);
 
     row
+}
+
+pub(super) fn collation_choices(collations: &[String], current: Option<&str>) -> Vec<String> {
+    let mut choices = collations.to_vec();
+    if let Some(current) = current
+        && !choices.iter().any(|name| name == current)
+    {
+        choices.insert(0, current.to_owned());
+    }
+    choices
+}
+
+pub(super) fn collation_selection(choices: &[String], selected: u32) -> Option<String> {
+    let index = (selected as usize).checked_sub(1)?;
+    choices.get(index).cloned()
+}
+
+fn add_collation_row(
+    row: &adw::ExpanderRow,
+    index: usize,
+    col: &DraftColumn,
+    collations: &[String],
+    sender: ComponentSender<StructureTab>,
+    suppress_emit: Rc<Cell<bool>>,
+) {
+    if collations.is_empty() {
+        return;
+    }
+    let choices = collation_choices(collations, col.collation.as_deref());
+    let default_label = bookie_app_services::tr!("Server default");
+    let labels: Vec<&str> = std::iter::once(default_label.as_str())
+        .chain(choices.iter().map(String::as_str))
+        .collect();
+    let combo = adw::ComboRow::builder()
+        .title(bookie_app_services::tr!("Collation"))
+        .model(&gtk::StringList::new(&labels))
+        .enable_search(true)
+        .build();
+    combo.set_widget_name(&format!("col-collation-{index}"));
+    let selected = col
+        .collation
+        .as_deref()
+        .and_then(|current| choices.iter().position(|name| name == current))
+        .map_or(0, |position| position as u32 + 1);
+    combo.set_selected(selected);
+    combo.connect_selected_notify(move |combo| {
+        if suppress_emit.get() {
+            return;
+        }
+        sender.input(StructureTabInput::ColumnEdited {
+            index,
+            field: ColumnField::Collation(collation_selection(&choices, combo.selected())),
+        });
+    });
+    row.add_row(&combo);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -377,12 +454,14 @@ fn configure_comment_row(row: &adw::EntryRow, capability: ColumnCommentCapabilit
         CommentEditability::Unsupported => {
             row.set_visible(false);
             row.set_sensitive(false);
-            row.set_tooltip_text(Some(&crate::tr!("This database has no column comments.")));
+            row.set_tooltip_text(Some(&bookie_app_services::tr!("This database has no column comments.")));
         }
         CommentEditability::CreateOnly => {
             row.set_visible(true);
             row.set_sensitive(false);
-            row.set_tooltip_text(Some(&crate::tr!("This driver only supports comments on new columns.")));
+            row.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "This driver only supports comments on new columns."
+            )));
         }
         CommentEditability::Editable => {
             row.set_visible(true);
@@ -404,7 +483,9 @@ fn add_comment_row(
     sender: ComponentSender<StructureTab>,
     suppress_emit: Rc<Cell<bool>>,
 ) {
-    let comment_row = adw::EntryRow::builder().title(crate::tr!("Comment")).build();
+    let comment_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Comment"))
+        .build();
     comment_row.set_text(col.comment.as_deref().unwrap_or(""));
     comment_row.set_widget_name(&format!("col-comment-{index}"));
     configure_comment_row(&comment_row, column_comment_capability, col.original.is_some());
@@ -471,7 +552,7 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
 
     let button = gtk::MenuButton::builder()
         .icon_name("pan-down-symbolic")
-        .tooltip_text(crate::tr!("Suggested types"))
+        .tooltip_text(bookie_app_services::tr!("Suggested types"))
         .valign(gtk::Align::Center)
         .build();
     button.add_css_class("flat");
@@ -489,6 +570,7 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
 mod tests {
     use super::{CommentEditability, comment_editability, configure_comment_row};
     use super::{bind_expander_arrow, expander_arrow};
+    use super::{collation_choices, collation_selection};
     use bookie_core::sql_ddl::ColumnCommentCapability;
     use relm4::adw::prelude::*;
     use relm4::{adw, gtk};
@@ -594,5 +676,22 @@ mod tests {
                 "{capability:?}, existing: {is_existing}"
             );
         }
+    }
+
+    #[test]
+    fn the_first_collation_entry_means_the_server_default() {
+        let choices = vec!["a".to_owned(), "b".to_owned()];
+        assert_eq!(collation_selection(&choices, 0), None);
+        assert_eq!(collation_selection(&choices, 1), Some("a".to_owned()));
+        assert_eq!(collation_selection(&choices, 2), Some("b".to_owned()));
+        assert_eq!(collation_selection(&choices, 3), None);
+    }
+
+    #[test]
+    fn a_saved_collation_missing_from_the_server_list_is_kept_as_a_choice() {
+        let list = vec!["a".to_owned()];
+        assert_eq!(collation_choices(&list, Some("legacy")), ["legacy", "a"]);
+        assert_eq!(collation_choices(&list, Some("a")), ["a"]);
+        assert_eq!(collation_choices(&list, None), ["a"]);
     }
 }

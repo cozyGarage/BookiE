@@ -87,6 +87,81 @@ async fn dangerous_effects_ask_for_approval_without_running_a_blast_radius_query
     }));
 }
 
+fn mssql_guard(principal: Principal, approval: Arc<dyn ApprovalSink>, queries: Arc<AtomicUsize>) -> PolicyGuard {
+    let mut guard_context = context(
+        principal,
+        Environment::Local,
+        PolicyConfig::default(),
+        approval,
+        Arc::new(SequenceAuditSink::new(vec![])),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "mssql".into();
+    PolicyGuard::new(query_counting_connection(queries), guard_context)
+}
+
+#[tokio::test]
+async fn a_linked_server_read_asks_for_approval_for_a_human_and_for_an_agent_before_it_runs() {
+    for principal in [
+        Principal::human_gui(),
+        Principal::Agent {
+            token: "token".into(),
+            client: None,
+            model: None,
+        },
+    ] {
+        let queries = Arc::new(AtomicUsize::new(0));
+        let approvals = Arc::new(AtomicUsize::new(0));
+        let guard = mssql_guard(
+            principal.clone(),
+            Arc::new(CountingApprovalSink {
+                calls: approvals.clone(),
+            }),
+            queries.clone(),
+        );
+
+        guard
+            .query("SELECT * FROM linked.db.dbo.t")
+            .await
+            .expect("the mocked approval sink approves the linked-server read");
+
+        assert_eq!(approvals.load(Ordering::SeqCst), 1, "{principal:?}");
+        assert_eq!(queries.load(Ordering::SeqCst), 1, "{principal:?}");
+    }
+}
+
+#[tokio::test]
+async fn a_refused_linked_server_read_never_reaches_the_driver() {
+    let queries = Arc::new(AtomicUsize::new(0));
+    let guard = mssql_guard(Principal::human_gui(), Arc::new(DenyApprovalSink), queries.clone());
+
+    let error = guard
+        .query("SELECT * FROM linked.db.dbo.t")
+        .await
+        .expect_err("a denied approval must stop the read");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(queries.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn a_read_of_a_local_sql_server_table_does_not_ask_for_approval() {
+    let queries = Arc::new(AtomicUsize::new(0));
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let guard = mssql_guard(
+        Principal::human_gui(),
+        Arc::new(CountingApprovalSink {
+            calls: approvals.clone(),
+        }),
+        queries.clone(),
+    );
+
+    guard.query("SELECT * FROM db.dbo.t").await.expect("an ordinary read");
+
+    assert_eq!(approvals.load(Ordering::SeqCst), 0);
+    assert_eq!(queries.load(Ordering::SeqCst), 1);
+}
+
 #[tokio::test]
 async fn oracle_stored_function_is_denied_before_driver_dispatch_without_approval() {
     let queries = Arc::new(AtomicUsize::new(0));
@@ -582,6 +657,54 @@ async fn list_databases_is_a_governed_read_with_its_own_audit_record() {
 }
 
 #[tokio::test]
+async fn list_collations_is_a_governed_read_with_its_own_audit_record() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard
+        .list_collations()
+        .await
+        .expect_err("the stub driver lists no collations");
+    assert!(matches!(error, DriverError::Unsupported(_)), "{error}");
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let controlled_error = guard
+        .list_collations_controlled(&control)
+        .await
+        .expect_err("the stub driver still lists no collations through the controlled path");
+    assert!(
+        matches!(controlled_error, DriverError::Unsupported(_)),
+        "{controlled_error}"
+    );
+
+    let events = audit.events.lock().expect("event lock");
+    let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST COLLATIONS"));
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.decision_rule == "metadata_read" && event.sql_hash == expected_hash)
+            .count(),
+        2,
+        "plain and controlled collation listings must both be audited"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|event| event.decision_rule == "metadata_read" && event.sql_hash == expected_hash),
+        "list_collations must write a metadata audit record"
+    );
+}
+
+#[tokio::test]
 async fn list_objects_reports_an_unsupported_kind_and_audits_the_read_with_its_target() {
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
     let guard = PolicyGuard::new(
@@ -882,4 +1005,139 @@ async fn an_approved_controlled_write_never_cancels_the_callers_token() {
 
     assert_eq!(executes.load(Ordering::SeqCst), 2);
     assert!(!control.cancellation_token().is_cancelled());
+}
+
+struct StalledVersionConn(Arc<Notify>);
+
+#[async_trait]
+impl Connection for StalledVersionConn {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn server_version(&self) -> Result<Option<String>, DriverError> {
+        self.0.notify_one();
+        std::future::pending().await
+    }
+
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn ping(&self) -> Result<(), DriverError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
+fn stalled_version_guard(audit: Arc<SequenceAuditSink>, state: Arc<AuditState>) -> (PolicyGuard, Arc<Notify>) {
+    let dispatched = Arc::new(Notify::new());
+    let guard = PolicyGuard::new(
+        Arc::new(StalledVersionConn(dispatched.clone())),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit,
+            state,
+        ),
+    );
+    (guard, dispatched)
+}
+
+fn last_terminal_status(audit: &SequenceAuditSink) -> Option<AuditTerminalStatus> {
+    audit
+        .events
+        .lock()
+        .expect("audit events")
+        .iter()
+        .rev()
+        .find(|event| event.phase == AuditRecordPhase::Outcome)
+        .map(|event| event.terminal_status)
+}
+
+#[tokio::test]
+async fn cancelling_a_version_request_records_a_terminal_unknown_outcome_and_keeps_writes_enabled() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let state = Arc::new(AuditState::new());
+    let (guard, dispatched) = stalled_version_guard(audit.clone(), state.clone());
+    let token = tokio_util::sync::CancellationToken::new();
+    let control = OperationControl::new(
+        token.clone(),
+        Some(tokio::time::Instant::now() + Duration::from_secs(30)),
+    );
+    tokio::spawn(async move {
+        dispatched.notified().await;
+        token.cancel();
+    });
+
+    let result = guard.server_version_controlled(&control).await;
+
+    assert!(
+        matches!(&result, Err(DriverError::OperationOutcomeUnknown { source }) if matches!(**source, DriverError::Cancelled)),
+        "{result:?}"
+    );
+    assert_eq!(last_terminal_status(&audit), Some(AuditTerminalStatus::Unknown));
+    assert!(
+        !state.governed_writes_disabled(),
+        "an interrupted read must not disable writes"
+    );
+}
+
+#[tokio::test]
+async fn a_version_request_past_its_deadline_records_a_terminal_outcome() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let (guard, _dispatched) = stalled_version_guard(audit.clone(), Arc::new(AuditState::new()));
+    let control = OperationControl::new(
+        tokio_util::sync::CancellationToken::new(),
+        Some(tokio::time::Instant::now() + Duration::from_millis(100)),
+    );
+
+    let result = tokio::time::timeout(Duration::from_secs(5), guard.server_version_controlled(&control))
+        .await
+        .expect("the deadline must end the version request");
+
+    assert!(
+        matches!(&result, Err(DriverError::OperationOutcomeUnknown { source }) if matches!(**source, DriverError::TimedOut)),
+        "{result:?}"
+    );
+    assert_eq!(last_terminal_status(&audit), Some(AuditTerminalStatus::Unknown));
+}
+
+#[tokio::test]
+async fn an_already_cancelled_control_refuses_the_version_request_before_it_is_audited_or_sent() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let (guard, _dispatched) = stalled_version_guard(audit.clone(), Arc::new(AuditState::new()));
+    let token = tokio_util::sync::CancellationToken::new();
+    token.cancel();
+    let control = OperationControl::new(token, None);
+
+    let result = guard.server_version_controlled(&control).await;
+
+    assert!(matches!(result, Err(DriverError::Cancelled)), "{result:?}");
+    assert!(audit.events.lock().expect("audit events").is_empty());
 }

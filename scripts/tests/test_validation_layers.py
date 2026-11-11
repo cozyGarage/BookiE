@@ -225,11 +225,12 @@ class LayerRunnerTests(unittest.TestCase):
         self.assertIn("value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision", result.stdout)
         self.assertIn("App server", result.stdout)
 
-    def test_linux_workflows_are_all_registered_for_lint(self):
-        workflows = ROOT / ".github/workflows"
-        expected = {f".github/workflows/{path.name}" for path in workflows.glob("*linux*.yml")}
-        expected.add(".github/workflows/gtk-soak.yml")
-        expected.add(".github/workflows/release.yml")
+    def test_hosted_workflows_are_all_registered_for_lint(self):
+        github = ROOT / ".github/workflows"
+        forgejo = ROOT / ".forgejo/workflows"
+        expected = {f".github/workflows/{path.name}" for path in github.glob("*linux*.yml")}
+        expected.update({".github/workflows/gtk-soak.yml", ".github/workflows/release.yml"})
+        expected.update(f".forgejo/workflows/{path.name}" for path in forgejo.glob("*.yml"))
         selected = set(runner.catalog()["workflow-lint"]["steps"][0]["argv"][1:])
         self.assertEqual(selected, expected)
 
@@ -257,6 +258,34 @@ class LayerRunnerTests(unittest.TestCase):
         for script in ["preflight.sh", "ci-local.sh"]:
             self.assertIn("scripts/test-harness.sh", (ROOT / "scripts" / script).read_text())
 
+    def test_security_policy_layer_uses_prebuilt_test_wrapper(self):
+        layer = runner.catalog()["security-policy"]
+
+        self.assertEqual(
+            layer["steps"][0]["argv"],
+            [
+                "bash",
+                "scripts/run-rust-tests.sh",
+                "--locked",
+                "-p",
+                "bookie-policy",
+                "-p",
+                "bookie-mcp",
+                "--lib",
+                "--tests",
+            ],
+        )
+
+    def test_no_default_features_layer_is_in_both_hosted_gates(self):
+        layer = runner.catalog()["no-default-features"]
+
+        self.assertIn("Build Linux / reusable-test-builds", layer["hosted_gate"])
+        self.assertIn("lab-ci / test-build", layer["hosted_gate"])
+        self.assertEqual(
+            layer["steps"][0]["argv"],
+            ["cargo", "check", "--workspace", "--all-targets", "--locked", "--no-default-features"],
+        )
+
     def test_gtk_app_layer_targets_only_the_app_unit_and_lint_checks(self):
         layer = runner.catalog()["gtk-app"]
         self.assertEqual(layer["steps"][0]["argv"], ["bash", "scripts/ci-local.sh", "gtk-app"])
@@ -264,8 +293,15 @@ class LayerRunnerTests(unittest.TestCase):
         gtk_app = script.split("run_gtk_app() {", 1)[1].split("run_integration()", 1)[0]
         self.assertIn("cargo clippy --locked -p bookie-app --all-targets", gtk_app)
         self.assertIn("nextest run --locked -p bookie-app --lib --bins", gtk_app)
-        self.assertNotIn("--workspace", gtk_app)
+        self.assertIn('--archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst"', gtk_app)
+        self.assertIn("BOOKIE_REQUIRE_PREBUILT", gtk_app)
+        self.assertIn("package(=bookie-app)", gtk_app)
         self.assertNotIn("test-sandbox.sh", gtk_app)
+
+    def test_gpui_layer_runs_the_headless_workspace_tests(self):
+        step = runner.catalog()["gpui"]["steps"][0]
+        self.assertEqual(step["argv"], ["env", "-u", "DISPLAY", "-u", "WAYLAND_DISPLAY", "cargo", "test", "--manifest-path", "apps/gpui/Cargo.toml", "--locked"])
+        self.assertEqual(step["evidence"], "rust-tests")
 
     def test_driver_layer_timeout_fits_hosted_integration_job(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

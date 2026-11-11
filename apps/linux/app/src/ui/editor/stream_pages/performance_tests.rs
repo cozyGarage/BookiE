@@ -11,6 +11,16 @@ fn byte_page(bytes: usize) -> Arc<QueryResult> {
     Arc::new(result)
 }
 
+fn json_page(bytes: usize) -> Arc<QueryResult> {
+    let mut result = page(&["payload"], &[]).as_ref().clone();
+    result.columns[0].data_type = "JSONB".into();
+    result.rows = vec![vec![Value::Json(Box::new(serde_json::json!({
+        "payload": "x".repeat(bytes)
+    })))]]
+    .into();
+    Arc::new(result)
+}
+
 #[test]
 fn sustained_small_streams_keep_all_pages_within_the_byte_budget() {
     let mut cache = StreamPageCache::default();
@@ -115,6 +125,34 @@ fn independent_pinned_streams_release_pages_and_keep_spools_until_unpin() {
 }
 
 #[test]
+fn pin_eviction_and_unpin_release_unspooled_result_pages() {
+    let mut pins = PinnedResults::default();
+    let mut pages = Vec::new();
+
+    for index in 0..=super::super::pinned::MAX_PINNED {
+        let mut cache = StreamPageCache::default();
+        let result = page(&["id"], &[i64::try_from(index).unwrap()]);
+        pages.push(Arc::downgrade(&result));
+        cache.append(0, result).unwrap();
+        let outcome = StatementOutcome {
+            identity: StatementIdentity::default(),
+            sql_preview: "SELECT id FROM items".into(),
+            sql: "SELECT id FROM items".into(),
+            elapsed_ms: 0,
+            kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
+            pinned: false,
+        };
+        drop(cache);
+        pins.add_pin(outcome);
+    }
+
+    assert!(pages[0].upgrade().is_none());
+    assert!(pages[1..].iter().all(|page| page.upgrade().is_some()));
+    assert!(pins.unpin_all().is_empty());
+    assert!(pages.iter().all(|page| page.upgrade().is_none()));
+}
+
+#[test]
 fn completed_spooled_snapshots_release_resident_pages_and_reload_from_the_spool() {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
@@ -188,6 +226,25 @@ fn exactly_sixty_four_mib_is_retained_and_the_next_row_evicts_an_old_page() {
     cache.append(2, byte_page(1)).unwrap();
     assert_eq!(cache.first_page(), 1);
     assert_eq!(cache.pages().len(), 2);
+}
+
+#[test]
+fn large_json_pages_obey_the_byte_budget_and_release_evicted_payloads() {
+    let mut cache = StreamPageCache::default();
+    let mut refs = Vec::new();
+    for index in 0..3 {
+        let result = json_page(24 * 1024 * 1024);
+        refs.push(Arc::downgrade(&result));
+        cache.append(index, result).unwrap();
+    }
+
+    assert!(cache.retained_bytes <= bookie_core::MAX_QUERY_RESULT_BYTES);
+    assert_eq!(cache.pages().len(), 2);
+    assert!(refs[0].upgrade().is_none());
+    assert!(refs[1..].iter().all(|page| page.upgrade().is_some()));
+
+    drop(cache);
+    assert!(refs.iter().all(|page| page.upgrade().is_none()));
 }
 
 #[test]
@@ -281,4 +338,47 @@ fn independent_active_streams_release_their_own_pages() {
     drop(snapshots);
     drop(caches);
     assert!(pages.iter().all(|page| page.upgrade().is_none()));
+}
+
+#[test]
+fn completed_stream_export_keeps_spool_after_result_and_pin_are_dropped() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    let mut cache = StreamPageCache::default();
+    let result = byte_page(64 * 1024);
+    let weak = Arc::downgrade(&result);
+    runtime.block_on(spool.append_page(0, result.clone())).unwrap();
+    cache.append(0, result).unwrap();
+    let snapshot = cache.snapshot_with_spool(
+        StreamTerminal::Complete,
+        Some(crate::ui::export_dialog::StreamExportQuery {
+            driver_id: "postgres".into(),
+            suggested_name: "result".into(),
+        }),
+        0,
+        Some(spool.clone()),
+    );
+    let export = snapshot.export.clone().expect("complete stream can be exported");
+    let outcome = StatementOutcome {
+        identity: StatementIdentity::default(),
+        sql_preview: "SELECT payload".into(),
+        sql: "SELECT payload".into(),
+        elapsed_ms: 0,
+        kind: StatementOutcomeKind::Streamed(Box::new(snapshot)),
+        pinned: false,
+    };
+    let mut pins = PinnedResults::default();
+    pins.add_pin(outcome);
+    drop(spool);
+    drop(cache);
+    drop(pins);
+    assert!(weak.upgrade().is_none());
+    assert!(manager.reserved_bytes() > 0);
+    let restored = runtime
+        .block_on(export.spool.as_ref().unwrap().load_page(0, export.columns.clone()))
+        .unwrap();
+    assert_eq!(restored.rows[0][0], Value::Bytes(vec![7; 64 * 1024]));
+    drop(export);
+    assert_eq!(manager.reserved_bytes(), 0);
 }

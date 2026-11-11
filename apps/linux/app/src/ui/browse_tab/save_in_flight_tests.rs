@@ -1,6 +1,8 @@
 use super::{BrowsePageRequest, BrowseTab, BrowseTabInit, BrowseTabInput, BrowseTabOutput};
 use bookie_core::{ColumnInfo, QueryResult, Value};
-use relm4::gtk::prelude::{ButtonExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt};
+use relm4::gtk::prelude::{
+    ButtonExt, GtkWindowExt, SelectionModelExt, ShortcutActionExt, ShortcutTriggerExt, WidgetExt,
+};
 use relm4::gtk::{gio::prelude::ListModelExt, glib::prelude::Cast};
 use relm4::{Component, ComponentController, Controller};
 use std::sync::mpsc::Receiver;
@@ -43,6 +45,15 @@ fn launch(tab_id: Uuid) -> (relm4::Controller<BrowseTab>, Receiver<BrowseTabOutp
 }
 
 pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
+    launch_for_driver(id, read_only, "postgres", Some("public"))
+}
+
+fn launch_for_driver(
+    id: Uuid,
+    read_only: bool,
+    driver_id: &str,
+    schema: Option<&str>,
+) -> (Controller<BrowseTab>, Receiver<BrowseTabOutput>) {
     let (output_sender, output_receiver) = relm4::channel::<BrowseTabOutput>();
     let (observed_sender, observed) = std::sync::mpsc::channel();
     relm4::spawn_local(async move {
@@ -56,10 +67,12 @@ pub(super) fn launch_with_read_only(id: Uuid, read_only: bool) -> (Controller<Br
         .launch(BrowseTabInit {
             change_trackers: Default::default(),
             tab_id: id,
-            schema: Some("public".into()),
+            schema: schema.map(str::to_owned),
             table: "notes".into(),
-            driver_id: "postgres".into(),
-            enum_input_style: bookie_core::EnumInputStyle::RawValue,
+            driver_id: driver_id.into(),
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(
+                bookie_core::EnumInputStyle::RawValue,
+            ),
             browse_filters: true,
             connection_id: None,
             read_only,
@@ -93,7 +106,11 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
     controller.model().insert_button.emit_clicked();
     controller
         .sender()
-        .send(BrowseTabInput::DuplicateRow { row_position: 0 })
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
         .unwrap();
     assert!(activate_shortcut(&controller, "Delete"));
     assert!(activate_shortcut(&controller, "<Primary>n"));
@@ -105,6 +122,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
             new_value: "changed".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -113,6 +131,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -120,6 +139,15 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .send(BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(2)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -155,7 +183,11 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
     controller
         .model()
         .grid_sender
-        .send(crate::ui::grid::GridMsg::DuplicateRow { row_position: 0 })
+        .send(crate::ui::grid::GridMsg::DuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
         .unwrap();
     controller
         .model()
@@ -163,6 +195,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .send(crate::ui::grid::GridMsg::DeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -172,6 +205,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -195,7 +229,7 @@ fn read_only_tab_rejects_mutations_from_toolbar_context_actions_and_bulk_selecti
         .iter()
         .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
         .count();
-    assert_eq!(refused, 14, "every read-only database mutation must be refused");
+    assert_eq!(refused, 15, "every read-only database mutation must be refused");
     assert!(
         outputs
             .iter()
@@ -407,6 +441,7 @@ fn keyless_tab_rejects_inline_edits_and_insert_actions() {
             new_value: "changed".into(),
             value: None,
             row_key: Vec::new(),
+            draft_id: None,
         })
         .unwrap();
     controller.sender().send(BrowseTabInput::InsertRow).unwrap();
@@ -475,12 +510,21 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
     let snapshot = controller.model().capture_paste_snapshot();
     controller
         .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(2)],
+            draft_id: None,
+        })
+        .unwrap();
+    controller
+        .sender()
         .send(BrowseTabInput::GridCellEdited {
             row_position: 0,
             col_index: 1,
             new_value: "stale edit".into(),
             value: None,
             row_key: vec![Value::Int(2)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -489,6 +533,7 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(2)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -496,6 +541,7 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
         .send(BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(2)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -525,10 +571,24 @@ fn stale_row_edit_null_delete_and_paste_messages_do_not_mutate_the_rebound_row()
             .iter()
             .filter(|output| matches!(output, BrowseTabOutput::ShowToast(_)))
             .count(),
-        4,
+        5,
         "each stale entry point reports that the row identity changed"
     );
     assert_eq!(row.cell_value(1), Value::Text("a".into()));
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(pending(&controller), 1);
+    assert_eq!(
+        controller.model().row_object_at(0).unwrap().cell_value(1),
+        Value::Text("a".into())
+    );
     controller.detach_runtime();
 }
 
@@ -547,6 +607,7 @@ fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
             new_value: "forged value".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -555,6 +616,7 @@ fn generated_column_edit_and_null_messages_do_not_stage_mutations() {
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     let outputs = pump(&observed);
@@ -596,6 +658,7 @@ fn undecodable_cell_edit_and_null_messages_do_not_stage_mutations() {
             new_value: "forged value".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     controller
@@ -604,6 +667,7 @@ fn undecodable_cell_edit_and_null_messages_do_not_stage_mutations() {
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     let outputs = pump(&observed);
@@ -794,6 +858,7 @@ pub(super) fn edit(controller: &relm4::Controller<BrowseTab>, col_index: usize, 
             new_value: new_value.into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
 }
@@ -914,7 +979,11 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
         BrowseTabInput::Redo,
         BrowseTabInput::DiscardAll,
         BrowseTabInput::InsertRow,
-        BrowseTabInput::DuplicateRow { row_position: 0 },
+        BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: vec![Value::Int(1)],
+            draft_id: None,
+        },
         BrowseTabInput::DeleteSelectedRow,
         BrowseTabInput::GridCellEdited {
             row_position: 0,
@@ -922,15 +991,18 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
             new_value: "during save".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         },
         BrowseTabInput::GridSetCellNull {
             row_position: 0,
             col_index: 1,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         },
         BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         },
         BrowseTabInput::Paste(super::paste::PasteAnchor {
             row: 0,
@@ -985,6 +1057,118 @@ fn draft_mutation_routes_are_ignored_during_a_save() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn keyboard_set_null_targets_the_focused_draft() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
+    );
+    let window = relm4::gtk::Window::builder()
+        .child(controller.widget())
+        .default_width(800)
+        .default_height(500)
+        .build();
+    window.present();
+    pump(&observed);
+    let view = controller.model().current_column_view.clone().unwrap();
+    let column = (0..view.columns().n_items())
+        .find_map(|index| {
+            let column = view
+                .columns()
+                .item(index)?
+                .downcast::<relm4::gtk::ColumnViewColumn>()
+                .ok()?;
+            (column.id().as_deref() == Some("1")).then_some(column)
+        })
+        .unwrap();
+    view.scroll_to(0, Some(&column), relm4::gtk::ListScrollFlags::FOCUS, None);
+    pump(&observed);
+    assert_eq!(
+        crate::ui::grid::focused_cell_identity(&view).map(|(row, col, _)| (row, col)),
+        Some((0, 1))
+    );
+    assert!(activate_shortcut(&controller, "<Primary><Shift>n"));
+    pump(&observed);
+    assert_eq!(controller.model().row_object_at(0).unwrap().cell_value(1), Value::Null);
+    window.destroy();
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn stale_set_null_does_not_modify_a_replacement_draft() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("first".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    let first_id = controller.model().row_object_at(0).unwrap().draft_id();
+    add_draft_row(
+        &controller,
+        vec![Value::Int(4), Value::Text("second".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    controller
+        .sender()
+        .send(BrowseTabInput::GridSetCellNull {
+            row_position: 0,
+            col_index: 1,
+            row_key: Vec::new(),
+            draft_id: first_id,
+        })
+        .unwrap();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("stale full value".into()),
+            row_key: Vec::new(),
+            draft_id: first_id,
+        })
+        .unwrap();
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDuplicateRow {
+            row_position: 0,
+            row_key: Vec::new(),
+            draft_id: first_id,
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(pending(&controller), 2);
+    assert_eq!(
+        controller.model().row_object_at(0).unwrap().cell_value(1),
+        Value::Text("second".into())
+    );
+    let current_id = controller.model().row_object_at(0).unwrap().draft_id();
+    controller
+        .model()
+        .grid_sender
+        .send(crate::ui::grid::GridMsg::CellEditedValue {
+            row_position: 0,
+            col_index: 1,
+            value: Value::Text("accepted".into()),
+            row_key: Vec::new(),
+            draft_id: current_id,
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(
+        controller.model().row_object_at(0).unwrap().cell_value(1),
+        Value::Text("accepted".into())
+    );
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
@@ -995,12 +1179,14 @@ fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
         vec![Value::Int(3), Value::Text("draft".into()), Value::Text("body".into())],
     );
     pump(&observed);
+    let draft_id = controller.model().row_object_at(0).unwrap().draft_id();
     controller
         .sender()
         .send(BrowseTabInput::GridSetCellNull {
             row_position: 0,
             col_index: 1,
             row_key: Vec::new(),
+            draft_id,
         })
         .unwrap();
     let outputs = pump(&observed);
@@ -1030,6 +1216,36 @@ fn the_cell_menu_sets_a_draft_cell_to_null_in_the_draft() {
 
 #[test]
 #[ignore = "requires isolated GTK display"]
+fn stale_row_menu_delete_does_not_discard_a_new_draft() {
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch(Uuid::new_v4());
+    load_two_rows(&controller, &observed);
+    add_draft_row(
+        &controller,
+        vec![Value::Int(3), Value::Text("first".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    let first_id = controller.model().row_object_at(0).unwrap().draft_id().unwrap();
+    add_draft_row(
+        &controller,
+        vec![Value::Int(4), Value::Text("second".into()), Value::Text("body".into())],
+    );
+    pump(&observed);
+    controller
+        .sender()
+        .send(BrowseTabInput::GridDeleteRowAt {
+            row_position: 0,
+            row_key: Vec::new(),
+            draft_id: Some(first_id),
+        })
+        .unwrap();
+    pump(&observed);
+    assert_eq!(pending(&controller), 2, "a stale action must preserve both drafts");
+    controller.detach_runtime();
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
 fn the_row_menu_deletes_a_draft_row_by_discarding_it() {
     relm4::gtk::init().unwrap();
     let tab_id = Uuid::new_v4();
@@ -1041,11 +1257,13 @@ fn the_row_menu_deletes_a_draft_row_by_discarding_it() {
     );
     pump(&observed);
     assert_eq!(pending(&controller), 1);
+    let draft_id = controller.model().row_object_at(0).unwrap().draft_id();
     controller
         .sender()
         .send(BrowseTabInput::GridDeleteRowAt {
             row_position: 0,
             row_key: Vec::new(),
+            draft_id,
         })
         .unwrap();
     let outputs = pump(&observed);
@@ -1128,6 +1346,7 @@ fn copy_as_insert_reads_the_live_row_under_a_prepended_draft_with_its_unsaved_ed
             new_value: "edited".into(),
             value: None,
             row_key: vec![Value::Int(1)],
+            draft_id: None,
         })
         .unwrap();
     pump(&observed);
@@ -1172,3 +1391,106 @@ fn undoing_a_second_edit_keeps_the_persisted_original_for_later_edits_and_the_sa
 
 #[path = "bulk_cancel_tests.rs"]
 mod bulk_cancel_tests;
+
+#[derive(Default)]
+struct GridSaveAudit(std::sync::Mutex<Vec<bookie_policy::AuditEvent>>);
+
+#[async_trait::async_trait]
+impl bookie_policy::AuditSink for GridSaveAudit {
+    async fn record(&self, event: bookie_policy::AuditEvent) -> Result<(), bookie_policy::AuditError> {
+        self.0.lock().unwrap().push(event);
+        Ok(())
+    }
+}
+
+#[test]
+#[ignore = "requires isolated GTK display"]
+fn grid_save_runs_through_policy_and_records_its_outcome() {
+    use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, OperationControl};
+    use bookie_policy::{
+        AuditOperationClass, AuditRecordPhase, AuditState, AuditTerminalStatus, AutoApproveSink, GuardContext,
+        PolicyConfig, PolicyGuard, Principal,
+    };
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    relm4::gtk::init().unwrap();
+    let (mut controller, observed) = launch_for_driver(Uuid::new_v4(), false, "sqlite", None);
+    load_two_rows(&controller, &observed);
+    edit(&controller, 1, "changed");
+    pump(&observed);
+    controller.sender().send(BrowseTabInput::CommitSave).unwrap();
+    let outputs = pump(&observed);
+    let statements = outputs
+        .iter()
+        .find_map(|output| match output {
+            BrowseTabOutput::ExecuteTransaction { statements, .. } => Some(statements.clone()),
+            _ => None,
+        })
+        .expect("grid save emits its transaction");
+    controller.detach_runtime();
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        let raw: Arc<dyn Connection> = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .into();
+        raw.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT, body TEXT)")
+            .await
+            .unwrap();
+        raw.execute("INSERT INTO notes VALUES (1, 'a', 'b')").await.unwrap();
+        for read_only in [true, false] {
+            let audit = Arc::new(GridSaveAudit::default());
+            let guard = PolicyGuard::new(
+                raw.clone(),
+                GuardContext {
+                    connection_id: Uuid::new_v4(),
+                    connection_name: "grid test".into(),
+                    driver_id: "sqlite".into(),
+                    environment: Environment::Local,
+                    read_only,
+                    principal: Principal::human_gui(),
+                    policy: Arc::new(PolicyConfig::default()),
+                    approval: Arc::new(AutoApproveSink),
+                    audit: audit.clone(),
+                    audit_state: Arc::new(AuditState::new()),
+                },
+            );
+            let control = OperationControl::with_timeout(Duration::from_secs(5));
+            let result = guard
+                .execute_in_transaction_checked_controlled(&statements, &[0], &control)
+                .await;
+            if read_only {
+                assert!(matches!(result, Err(bookie_core::DriverError::PolicyDenied(_))));
+            } else {
+                result.unwrap();
+            }
+            let rows = guard.query("SELECT title FROM notes WHERE id = 1").await.unwrap().rows;
+            let expected = if read_only { "a" } else { "changed" };
+            assert_eq!(rows, vec![vec![Value::Text(expected.into())]]);
+            let status = if read_only {
+                AuditTerminalStatus::Denied
+            } else {
+                AuditTerminalStatus::Succeeded
+            };
+            assert!(
+                audit
+                    .0
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|event| event.phase == AuditRecordPhase::Outcome
+                        && event.operation_class == AuditOperationClass::Mutation
+                        && event.terminal_status == status)
+            );
+        }
+    });
+}

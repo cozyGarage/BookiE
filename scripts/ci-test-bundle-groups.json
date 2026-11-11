@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "groups": {
+    "direct": {
+      "bin": ["bookie-app"],
+      "lib": ["bookie-app", "bookie-app-services", "bookie-core", "bookie-driver-clickhouse", "bookie-driver-sqlite", "bookie-policy"],
+      "test": ["bookie-app", "bookie-core", "bookie-driver-postgres", "bookie-driver-sqlite", "bookie-policy"]
+    },
+    "consumers": {
+      "lib": ["bookie-app", "bookie-mcp", "bookie-policy"],
+      "test": ["bookie-app", "bookie-mcp", "bookie-policy"]
+    },
+    "driver-core": {
+      "test": ["bookie-driver-mssql", "bookie-driver-mysql", "bookie-driver-postgres"]
+    },
+    "driver-analytics": {
+      "test": ["bookie-driver-clickhouse", "bookie-driver-mongodb", "bookie-driver-redis"]
+    },
+    "driver-extended": {
+      "test": ["bookie-driver-cassandra", "bookie-driver-duckdb", "bookie-driver-oracle"]
+    },
+    "drivers": {
+      "test": [
+        "bookie-driver-cassandra", "bookie-driver-clickhouse", "bookie-driver-duckdb",
+        "bookie-driver-mssql", "bookie-driver-mongodb", "bookie-driver-mysql",
+        "bookie-driver-oracle", "bookie-driver-postgres", "bookie-driver-redis",
+        "bookie-dump", "bookie-app-services"
+      ]
+    },
+    "pg-release": {
+      "lib": ["bookie-release-tests"],
+      "test": ["bookie-agentd", "bookie-release-tests"]
+    },
+    "socket-ssh": {
+      "test": ["bookie-agentd", "bookie-driver-postgres", "bookie-ssh"]
+    },
+    "driver-tls": {
+      "lib": ["bookie-driver-tls-tests"],
+      "test": ["bookie-driver-tls-tests"]
+    },
+    "keyring": {
+      "lib": ["bookie-storage", "bookie-transport"],
+      "test": ["bookie-agentd"]
+    }
+  }
+}

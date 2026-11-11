@@ -31,14 +31,16 @@ tokio-util = { workspace = true, features = ["compat"] }
 [dev-dependencies]
 bookie-app-services = { path = "../../app-services" }
 secrecy.workspace = true
+tempfile.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mssql_server"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 uuid.workspace = true
 
-# The shared exact-grid test is included by path and imports this crate.
+# The shared exact-grid test is included by path and imports bookie-app-services; the shared conformance suite is
+# included by path and imports tempfile.
 [package.metadata.cargo-shear]
-ignored = ["bookie-app-services"]
+ignored = ["bookie-app-services", "tempfile"]
 
 [lints]
 workspace = true

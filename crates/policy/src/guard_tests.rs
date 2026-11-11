@@ -638,5 +638,7 @@ mod masking;
 mod operation_receipt;
 #[path = "guard_tests_outcomes.rs"]
 mod outcomes;
+#[path = "guard_tests_remembered.rs"]
+mod remembered_tests;
 #[path = "guard_tests_session.rs"]
 mod session;

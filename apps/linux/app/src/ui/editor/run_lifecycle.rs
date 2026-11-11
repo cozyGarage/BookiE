@@ -101,8 +101,9 @@ impl SqlEditor {
             .root()
             .and_then(|root| root.downcast::<gtk::Window>().ok())
         else {
-            self.status
-                .set_label(&crate::tr!("Cannot ask for parameter values without a window"));
+            self.status.set_label(&bookie_app_services::tr!(
+                "Cannot ask for parameter values without a window"
+            ));
             return;
         };
         crate::ui::parameters_dialog::present(&window, &names, move |values| {

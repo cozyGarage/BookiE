@@ -138,6 +138,10 @@ fn analyze_statement_inner(
     } else {
         effects
     };
+    let effects = effects.union_if(
+        Effects::LINKED_SERVER,
+        crate::linked_server::names_a_linked_server_table(driver_id, &statements),
+    );
     let facts = crate::select_writes::with_locking_backstop(
         classify_statements(&statements, effects, contains_administrative_call),
         trimmed,

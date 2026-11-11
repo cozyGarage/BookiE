@@ -6,6 +6,7 @@ use crate::services::catalog::CatalogOrigin;
 
 impl App {
     pub(super) fn reset_sidebar_catalog(&mut self) {
+        self.cancel_sidebar_population();
         self.sidebar_catalog.clear();
         let fresh = tokio_util::sync::CancellationToken::new();
         self.sidebar_catalog_cancel.replace(fresh).cancel();
@@ -47,17 +48,18 @@ impl App {
         origin: &CatalogOrigin,
         kind: CatalogObjectKind,
         result: Result<Vec<CatalogObject>, String>,
+        sender: ComponentSender<Self>,
     ) {
         if !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
         match result {
             Ok(objects) if objects.is_empty() => {
-                self.show_toast(&crate::tr!("Nothing of this kind was found."));
+                self.show_toast(&bookie_app_services::tr!("Nothing of this kind was found."));
             }
             Ok(objects) => {
                 self.sidebar_catalog.insert(kind, objects);
-                self.repopulate_sidebar(&self.sidebar_tables.clone());
+                self.repopulate_sidebar(&self.sidebar_tables.clone(), sender);
             }
             Err(message) => self.show_toast(&message),
         }

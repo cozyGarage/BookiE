@@ -24,9 +24,9 @@ use shell::{
 use update::{parse_browse_page_select, parse_keyed_delete, parse_keyed_update, parse_keyed_value_select};
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DataModel, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
-    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, QueryRows,
-    TableInfo, Value,
+    ColumnInfo, ConnectOptions, Connection, DataModel, DatabaseDriver, DriverError, DriverMaturity,
+    DriverValueInputCapabilities, ExecResult, MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS,
+    QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
 };
 
 pub struct MongodbDriver;
@@ -41,6 +41,15 @@ pub fn canonical_decimal128_text(text: &str) -> Result<String, DriverError> {
 
 #[async_trait]
 impl DatabaseDriver for MongodbDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            typed_integer_widths: true,
+            canonical_decimal_input: Some(|text| canonical_decimal128_text(text).ok()),
+            millisecond_date_precision: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn supports_database_listing(&self) -> bool {
         true
     }

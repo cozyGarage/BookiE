@@ -167,19 +167,21 @@ pub(super) fn paste_plan(
     let width = grid.iter().map(Vec::len).max().unwrap_or(0);
     let height = grid.len();
     if height == 0 || width == 0 {
-        return Err(crate::tr!("The clipboard has no text to paste"));
+        return Err(bookie_app_services::tr!("The clipboard has no text to paste"));
     }
     if height.saturating_mul(width) > MAX_PASTE_CELLS {
-        return Err(crate::tr!("That is too many cells to paste at once"));
+        return Err(bookie_app_services::tr!("That is too many cells to paste at once"));
     }
     if (anchor_row as usize).saturating_add(height) > loaded_rows as usize {
-        return Err(crate::tr!("The pasted rows run past the last loaded row"));
+        return Err(bookie_app_services::tr!("The pasted rows run past the last loaded row"));
     }
     let Some(start) = displayed.iter().position(|col| *col == anchor_col) else {
-        return Err(crate::tr!("The column you clicked is hidden, so nothing was pasted"));
+        return Err(bookie_app_services::tr!(
+            "The column you clicked is hidden, so nothing was pasted"
+        ));
     };
     if start.saturating_add(width) > displayed.len() {
-        return Err(crate::tr!("The pasted columns run past the last column"));
+        return Err(bookie_app_services::tr!("The pasted columns run past the last column"));
     }
     let mut cells = Vec::with_capacity(height * width);
     for (r, line) in grid.iter().enumerate() {
@@ -222,7 +224,7 @@ impl BrowseTab {
             displayed,
         } = anchor;
         if !self.row_position_still_holds(row, &row_key) {
-            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+            let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                 "The rows changed since you clicked the cell, so nothing was pasted"
             )));
             return;
@@ -235,7 +237,7 @@ impl BrowseTab {
         glib::spawn_future_local(async move {
             if let Ok(Some(text)) = clipboard.read_text_future().await {
                 if !paste_size_allowed(text.len()) {
-                    let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                    let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                         "Clipboard text is too large to paste; nothing was pasted"
                     )));
                     return;
@@ -261,25 +263,20 @@ impl BrowseTab {
         let name = column.map(|column| column.name.as_str()).unwrap_or_default();
         if !allowed {
             return Err(
-                crate::tr!("{column} on row {row} can't be edited, so nothing was pasted")
+                bookie_app_services::tr!("{column} on row {row} can't be edited, so nothing was pasted")
                     .replace("{column}", name)
                     .replace("{row}", &(cell.row + 1).to_string()),
             );
         }
         let current = row.as_ref().map(|row| row.cell_value(cell.col));
-        parse_pasted_cell_with_style(
-            cell.text.as_deref(),
-            column,
-            &self.driver_id,
-            self.enum_input_style,
-            current.as_ref(),
+        parse_pasted_cell_with_style(cell.text.as_deref(), column, &self.parse_hooks, current.as_ref()).map_err(
+            |message| {
+                bookie_app_services::tr!("{column} on row {row}: {message}. Nothing was pasted.")
+                    .replace("{column}", name)
+                    .replace("{row}", &(cell.row + 1).to_string())
+                    .replace("{message}", &message)
+            },
         )
-        .map_err(|message| {
-            crate::tr!("{column} on row {row}: {message}. Nothing was pasted.")
-                .replace("{column}", name)
-                .replace("{row}", &(cell.row + 1).to_string())
-                .replace("{message}", &message)
-        })
     }
 
     pub(super) fn handle_paste_text(&mut self, input: PasteTextInput, sender: ComponentSender<Self>) {
@@ -293,7 +290,7 @@ impl BrowseTab {
         } = input;
         if snapshot.page_request_id != self.page_requests.current_id() || !self.row_position_still_holds(row, &row_key)
         {
-            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+            let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                 "The rows changed since you clicked the cell, so nothing was pasted"
             )));
             return;
@@ -311,7 +308,7 @@ impl BrowseTab {
         if !snapshot.matches(self.page_requests.current_id(), &target_rows, |position| {
             self.paste_row_key_at(position)
         }) {
-            let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+            let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                 "That row moved while you were editing. The change was not applied."
             )));
             return;

@@ -45,6 +45,9 @@ pub enum DriverError {
     #[error("operation outcome is unknown after interruption: {source}")]
     OperationOutcomeUnknown { source: Box<DriverError> },
 
+    #[error("the connection was lost while committing")]
+    CommitUnconfirmed(crate::CommitToken),
+
     #[error("integrated authentication failed: {0}")]
     IntegratedAuth(String),
 

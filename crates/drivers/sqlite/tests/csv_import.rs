@@ -448,6 +448,73 @@ async fn a_cancelled_import_leaves_the_batches_that_already_committed_and_no_mor
 }
 
 #[tokio::test]
+async fn a_stop_while_a_batch_is_running_ends_the_import_as_cancelled_and_keeps_writes_enabled() {
+    let fixture = fixture().await;
+    fixture
+        .guard
+        .execute_controlled("CREATE TABLE people (id INTEGER, name TEXT)", &control())
+        .await
+        .expect("create");
+    let columns = vec![column("id", "INTEGER"), column("name", "TEXT")];
+    let mut csv = String::from("id,name\n");
+    for id in 1..=200_000 {
+        csv.push_str(&format!("{id},n{id}\n"));
+    }
+    let plan = plan_for("people", &columns, csv.as_bytes());
+    let mut scope = begin(&fixture.guard, "people", &plan).await;
+    let token = CancellationToken::new();
+    let stopper = token.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        stopper.cancel();
+    });
+
+    let mut outcome = None;
+    for rows in plan.batches(200_000) {
+        let batch = BulkBatch {
+            schema: None,
+            table: "people",
+            statement: &plan.statement,
+            rows,
+        };
+        outcome = Some(
+            fixture
+                .guard
+                .execute_bulk_batch(&mut scope, batch, &control_with(token.clone()))
+                .await,
+        );
+    }
+    let stop = outcome
+        .expect("one batch")
+        .expect_err("the stop lands while the batch is running");
+    let committed = fixture
+        .guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Cancelled)
+        .await
+        .expect("finish");
+
+    assert!(matches!(stop, DriverError::Cancelled), "{stop:?}");
+    assert_eq!(committed, 0);
+    assert_eq!(
+        rows_in(&fixture.guard, "SELECT count(*) FROM people").await,
+        vec![vec![Value::Int(0)]]
+    );
+    assert_eq!(
+        fixture.audit.import_outcomes(),
+        vec![(AuditTerminalStatus::Cancelled, Some(0))]
+    );
+    fixture
+        .guard
+        .execute_controlled("INSERT INTO people (id, name) VALUES (1, 'ada')", &control())
+        .await
+        .expect("a confirmed stop must not disable later writes");
+    assert_eq!(
+        rows_in(&fixture.guard, "SELECT count(*) FROM people").await,
+        vec![vec![Value::Int(1)]]
+    );
+}
+
+#[tokio::test]
 async fn a_scope_cannot_be_spent_on_another_table_of_the_same_database() {
     let fixture = fixture().await;
     for table in ["people", "salaries"] {

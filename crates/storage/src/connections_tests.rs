@@ -28,6 +28,7 @@ pub(super) fn sample_connection() -> SavedConnection {
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
+        tls_strict_encryption: false,
     }
 }
 
@@ -392,12 +393,37 @@ fn the_agent_flag_is_written_only_when_set_so_older_builds_still_read_the_file()
         client: SshClient::Builtin,
         agent: false,
         agent_identity: None,
+        local_port: None,
     };
     assert!(!serde_json::to_string(&ssh).unwrap().contains("agent"));
     ssh.agent = true;
     let text = serde_json::to_string(&ssh).unwrap();
     assert!(text.contains("\"agent\":true"), "{text}");
     assert!(serde_json::from_str::<SavedSshConfig>(&text).unwrap().agent);
+}
+
+#[test]
+fn the_local_port_is_written_only_when_set_and_survives_a_round_trip() {
+    let mut ssh = SavedSshConfig {
+        hop_id: Uuid::new_v4(),
+        credential_revision: 0,
+        host: "bastion".into(),
+        port: 22,
+        username: "deploy".into(),
+        auth: SavedSshAuth::Password,
+        jump: None,
+        client: SshClient::Builtin,
+        agent: false,
+        agent_identity: None,
+        local_port: None,
+    };
+    assert!(!serde_json::to_string(&ssh).unwrap().contains("local_port"));
+    ssh.local_port = Some(15432);
+    let text = serde_json::to_string(&ssh).unwrap();
+    assert_eq!(
+        serde_json::from_str::<SavedSshConfig>(&text).unwrap().local_port,
+        Some(15432)
+    );
 }
 
 #[tokio::test]
@@ -484,6 +510,7 @@ async fn ssh_config_round_trips() {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     });
     save_to(&path, &[conn.clone()]).await.unwrap();
     let loaded = load_from(&path).await.unwrap();
@@ -516,10 +543,12 @@ async fn ssh_jump_chain_round_trips() {
             client: Default::default(),
             agent: false,
             agent_identity: None,
+            local_port: None,
         })),
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     });
     save_to(&path, &[conn.clone()]).await.unwrap();
     let loaded = load_from(&path).await.unwrap();
@@ -589,6 +618,7 @@ async fn the_known_field_list_covers_every_serialized_key() {
     connection.socket_dir = Some(PathBuf::from("/run/postgresql"));
     connection.socket_path = Some(PathBuf::from("/run/mysqld/mysqld.sock"));
     connection.tls_root_cert = Some(PathBuf::from("/etc/ca.crt"));
+    connection.tls_strict_encryption = true;
     connection.last_opened_at = Some(Utc::now());
     connection.connect_timeout_secs = Some(5);
     connection.query_timeout_secs = Some(30);
@@ -605,6 +635,7 @@ async fn the_known_field_list_covers_every_serialized_key() {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     });
     let value = serde_json::to_value(&connection).unwrap();
     let keys: Vec<&String> = value.as_object().unwrap().keys().collect();

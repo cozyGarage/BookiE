@@ -101,7 +101,7 @@ impl App {
     }
 
     pub(super) fn on_connection_organization_rejected(&self) {
-        self.show_toast(&crate::tr!(
+        self.show_toast(&bookie_app_services::tr!(
             "A group or tag is too long, or the group path is too deep. Keep each name under 64 characters and at most 8 levels."
         ));
     }
@@ -113,21 +113,23 @@ impl App {
     pub(super) fn present_connection_url_dialog(&self, sender: ComponentSender<Self>, launched: Option<&str>) {
         let (title, body) = if launched.is_some() {
             (
-                crate::tr!("Connect from URL"),
-                crate::tr!(
+                bookie_app_services::tr!("Connect from URL"),
+                bookie_app_services::tr!(
                     "BookiE was started with this connection URL. Check it, then import and connect. A password in the URL is stored in the system keyring, never in the connection file."
                 ),
             )
         } else {
             (
-                crate::tr!("Import from URL"),
-                crate::tr!(
+                bookie_app_services::tr!("Import from URL"),
+                bookie_app_services::tr!(
                     "Paste a connection URL such as postgres://user@host:5432/database. A password in the URL is stored in the system keyring, never in the connection file."
                 ),
             )
         };
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-        let url_row = adw::EntryRow::builder().title(crate::tr!("Connection URL")).build();
+        let url_row = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Connection URL"))
+            .build();
         if let Some(url) = launched {
             url_row.set_text(url);
         }
@@ -137,12 +139,12 @@ impl App {
             .build();
         list.append(&url_row);
         dialog.set_extra_child(Some(&list));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
         let connect = launched.is_some();
         let import_label = if connect {
-            crate::tr!("Import and Connect")
+            bookie_app_services::tr!("Import and Connect")
         } else {
-            crate::tr!("Import")
+            bookie_app_services::tr!("Import")
         };
         dialog.add_response("import", &import_label);
         dialog.set_response_appearance("import", adw::ResponseAppearance::Suggested);
@@ -167,7 +169,7 @@ impl App {
             Ok(parsed) => parsed,
             Err(error) => {
                 tracing::warn!(error = %error, "rejected imported connection URL");
-                self.show_toast(&crate::tr!(
+                self.show_toast(&bookie_app_services::tr!(
                     "That is not a connection URL BookiE can read. Use a form like postgres://user@host:5432/database."
                 ));
                 return;
@@ -210,26 +212,26 @@ impl App {
     }
 
     pub(super) fn on_import_connection_url_succeeded(&self, name: String) {
-        self.show_toast(&crate::tr!("Imported “{name}”.").replace("{name}", &name));
+        self.show_toast(&bookie_app_services::tr!("Imported “{name}”.").replace("{name}", &name));
     }
 
     pub(super) fn on_import_connection_url_failed(&self) {
-        self.show_toast(&crate::tr!("The imported connection could not be saved."));
+        self.show_toast(&bookie_app_services::tr!("The imported connection could not be saved."));
     }
 }
 
 fn organize_dialog(name: &str) -> adw::AlertDialog {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("Group and tags")),
+        Some(&bookie_app_services::tr!("Group and tags")),
         Some(
-            &crate::tr!(
+            &bookie_app_services::tr!(
                 "Move “{name}” into a group. Use Parent / Child for nested folders; leave the group blank to ungroup."
             )
             .replace("{name}", name),
         ),
     );
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
-    dialog.add_response("save", &crate::tr!("Save"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+    dialog.add_response("save", &bookie_app_services::tr!("Save"));
     dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some("save"));
     dialog.set_close_response("cancel");
@@ -241,11 +243,13 @@ fn organize_dialog_fields(
     current: &ConnectionOrganization,
     existing_paths: &[String],
 ) -> (adw::EntryRow, adw::EntryRow, Rc<Cell<u32>>) {
-    let group_row = adw::EntryRow::builder().title(crate::tr!("Group path")).build();
+    let group_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Group path"))
+        .build();
     group_row.set_text(current.group.as_deref().unwrap_or_default());
     let path_row = existing_group_path_row(&group_row, existing_paths);
     let tags_row = adw::EntryRow::builder()
-        .title(crate::tr!("Tags, separated by commas"))
+        .title(bookie_app_services::tr!("Tags, separated by commas"))
         .build();
     tags_row.set_text(&current.tags.join(", "));
     let (color_row, selected_color) = color_chooser(color_choice_index(current.color.as_deref()));
@@ -294,8 +298,10 @@ fn existing_group_path_row(group_row: &adw::EntryRow, paths: &[String]) -> Optio
         group_row.set_text(value.string().as_str());
     });
     let row = adw::ActionRow::builder()
-        .title(crate::tr!("Existing group"))
-        .subtitle(crate::tr!("Choose a folder, then edit the path to nest further"))
+        .title(bookie_app_services::tr!("Existing group"))
+        .subtitle(bookie_app_services::tr!(
+            "Choose a folder, then edit the path to nest further"
+        ))
         .build();
     row.add_suffix(&dropdown);
     row.set_activatable_widget(Some(&dropdown));
@@ -325,7 +331,9 @@ fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
     popover.set_child(Some(&choices));
     button.set_popover(Some(&popover));
 
-    let row = adw::ActionRow::builder().title(crate::tr!("Colour")).build();
+    let row = adw::ActionRow::builder()
+        .title(bookie_app_services::tr!("Colour"))
+        .build();
     row.add_suffix(&button);
     (row, selected)
 }
@@ -399,7 +407,9 @@ fn persist_connection_organization(mutation: OrganizationMutation, sender: Compo
                     Ok(index) => sender_clone.input(AppMsg::ConnectionOrganizationLoaded(index)),
                     Err(error) => {
                         tracing::warn!(error = %error, "connection organization mutation failed");
-                        sender_clone.input(AppMsg::ShowToast(crate::tr!("This connection could not be updated.")));
+                        sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
+                            "This connection could not be updated."
+                        )));
                     }
                 }
             })
@@ -416,21 +426,21 @@ fn secret(password: &secrecy::SecretString) -> &str {
 /// palette is closed, so the row index maps back to a palette entry
 /// without any free-form colour string reaching storage.
 fn color_choice_labels() -> Vec<String> {
-    let mut labels = vec![crate::tr!("No colour")];
+    let mut labels = vec![bookie_app_services::tr!("No colour")];
     labels.extend(CONNECTION_COLORS.iter().map(|name| color_choice_label(name)));
     labels
 }
 
 fn color_choice_label(color: &str) -> String {
     match color {
-        "blue" => crate::tr!("Blue"),
-        "teal" => crate::tr!("Teal"),
-        "green" => crate::tr!("Green"),
-        "yellow" => crate::tr!("Yellow"),
-        "orange" => crate::tr!("Orange"),
-        "red" => crate::tr!("Red"),
-        "purple" => crate::tr!("Purple"),
-        "brown" => crate::tr!("Brown"),
+        "blue" => bookie_app_services::tr!("Blue"),
+        "teal" => bookie_app_services::tr!("Teal"),
+        "green" => bookie_app_services::tr!("Green"),
+        "yellow" => bookie_app_services::tr!("Yellow"),
+        "orange" => bookie_app_services::tr!("Orange"),
+        "red" => bookie_app_services::tr!("Red"),
+        "purple" => bookie_app_services::tr!("Purple"),
+        "brown" => bookie_app_services::tr!("Brown"),
         _ => color.to_owned(),
     }
 }
@@ -515,15 +525,15 @@ mod tests {
         assert_eq!(
             color_choice_labels(),
             vec![
-                crate::tr!("No colour"),
-                crate::tr!("Blue"),
-                crate::tr!("Teal"),
-                crate::tr!("Green"),
-                crate::tr!("Yellow"),
-                crate::tr!("Orange"),
-                crate::tr!("Red"),
-                crate::tr!("Purple"),
-                crate::tr!("Brown"),
+                bookie_app_services::tr!("No colour"),
+                bookie_app_services::tr!("Blue"),
+                bookie_app_services::tr!("Teal"),
+                bookie_app_services::tr!("Green"),
+                bookie_app_services::tr!("Yellow"),
+                bookie_app_services::tr!("Orange"),
+                bookie_app_services::tr!("Red"),
+                bookie_app_services::tr!("Purple"),
+                bookie_app_services::tr!("Brown"),
             ]
         );
     }

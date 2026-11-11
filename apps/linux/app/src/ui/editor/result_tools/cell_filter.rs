@@ -74,17 +74,19 @@ impl SqlEditor {
             return;
         };
         let Some(source) = self.streamed_result_for(identity) else {
-            self.status.set_label(&crate::tr!("This result is no longer available"));
+            self.status
+                .set_label(&bookie_app_services::tr!("This result is no longer available"));
             return;
         };
         let Some((predicate, label)) = cell_predicate(&source.columns, column, value, exclude) else {
-            self.status
-                .set_label(&crate::tr!("Values of this type can't be used as a filter"));
+            self.status.set_label(&bookie_app_services::tr!(
+                "Values of this type can't be used as a filter"
+            ));
             return;
         };
         if running(identity) {
             self.status
-                .set_label(&crate::tr!("A filter is already running on this result"));
+                .set_label(&bookie_app_services::tr!("A filter is already running on this result"));
             return;
         }
         let ticket = Arc::new(FilterTicket::default());

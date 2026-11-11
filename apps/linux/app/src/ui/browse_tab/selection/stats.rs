@@ -156,13 +156,15 @@ pub(in crate::ui::browse_tab) fn tooltip(stats: &[ColumnStats]) -> String {
     stats
         .iter()
         .map(|s| {
-            crate::tr!("{column}: count {count}, min {minimum}, max {maximum}, sum {sum}, average {average}")
-                .replace("{column}", &s.column)
-                .replace("{count}", &s.count.to_string())
-                .replace("{minimum}", &s.minimum)
-                .replace("{maximum}", &s.maximum)
-                .replace("{sum}", &s.sum)
-                .replace("{average}", &s.average)
+            bookie_app_services::tr!(
+                "{column}: count {count}, min {minimum}, max {maximum}, sum {sum}, average {average}"
+            )
+            .replace("{column}", &s.column)
+            .replace("{count}", &s.count.to_string())
+            .replace("{minimum}", &s.minimum)
+            .replace("{maximum}", &s.maximum)
+            .replace("{sum}", &s.sum)
+            .replace("{average}", &s.average)
         })
         .collect::<Vec<_>>()
         .join("\n")

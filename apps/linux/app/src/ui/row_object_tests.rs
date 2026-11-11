@@ -5,18 +5,27 @@ use gtk4::prelude::ListModelExt;
 use std::sync::Arc;
 
 #[test]
-fn json_preview_writer_stops_after_one_byte_past_its_sample() {
+fn json_preview_writer_stops_at_its_byte_budget() {
     let mut writer = JsonPreviewWriter {
         prefix: Vec::with_capacity(PREVIEW_BYTES),
-        byte_count: 0,
+        byte_limit: PREVIEW_BYTES,
         exceeded: false,
     };
     let chunk = vec![b'x'; PREVIEW_BYTES * 8];
     assert!(std::io::Write::write_all(&mut writer, &chunk).is_err());
-    assert_eq!(writer.byte_count, PREVIEW_BYTES + 1);
+    assert_eq!(writer.prefix.len(), PREVIEW_BYTES);
     assert!(writer.exceeded);
     assert_eq!(writer.prefix, vec![b'x'; PREVIEW_BYTES]);
     assert_eq!(writer.prefix.capacity(), PREVIEW_BYTES);
+}
+
+#[test]
+fn json_string_input_is_clipped_at_a_utf8_boundary_before_serializing() {
+    let text = "éééétail";
+    let (prefix, truncated) = bounded_json_string_prefix(text, 7);
+    assert!(truncated);
+    assert_eq!(prefix, "ééé");
+    assert_eq!(&text[prefix.len()..], "étail");
 }
 
 #[test]

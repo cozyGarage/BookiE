@@ -88,8 +88,8 @@ impl SavedQueriesDialog {
         let Some(existing) = self.saved.iter().find(|candidate| candidate.id == id) else {
             return;
         };
-        let dialog = adw::AlertDialog::new(Some(&crate::tr!("Rename saved query")), None);
-        let entry = adw::EntryRow::builder().title(crate::tr!("Name")).build();
+        let dialog = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Rename saved query")), None);
+        let entry = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
         entry.set_text(&existing.name);
         let list = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
@@ -97,8 +97,8 @@ impl SavedQueriesDialog {
             .build();
         list.append(&entry);
         dialog.set_extra_child(Some(&list));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("rename", &crate::tr!("Rename"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("rename", &bookie_app_services::tr!("Rename"));
         dialog.set_response_appearance("rename", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("rename"));
         dialog.set_close_response("cancel");
@@ -116,10 +116,11 @@ impl SavedQueriesDialog {
         let Some(existing) = self.saved.iter().find(|candidate| candidate.id == id) else {
             return;
         };
-        let body = crate::tr!("\"{name}\" will be removed from your saved queries.").replace("{name}", &existing.name);
-        let dialog = adw::AlertDialog::new(Some(&crate::tr!("Delete saved query?")), Some(&body));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("delete", &crate::tr!("Delete"));
+        let body = bookie_app_services::tr!("\"{name}\" will be removed from your saved queries.")
+            .replace("{name}", &existing.name);
+        let dialog = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Delete saved query?")), Some(&body));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
         dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
         dialog.set_close_response("cancel");
         let sender = sender.clone();
@@ -150,13 +151,14 @@ impl SavedQueriesDialog {
     fn show_empty(&self, searching: bool) {
         self.stack.set_visible_child_name("empty");
         if searching {
-            self.status_page.set_title(&crate::tr!("No matches"));
+            self.status_page.set_title(&bookie_app_services::tr!("No matches"));
             self.status_page
-                .set_description(Some(&crate::tr!("Try a different search term.")));
+                .set_description(Some(&bookie_app_services::tr!("Try a different search term.")));
             return;
         }
-        self.status_page.set_title(&crate::tr!("No saved queries yet"));
-        self.status_page.set_description(Some(&crate::tr!(
+        self.status_page
+            .set_title(&bookie_app_services::tr!("No saved queries yet"));
+        self.status_page.set_description(Some(&bookie_app_services::tr!(
             "Press Ctrl+D in the SQL editor to save the query you are writing."
         )));
     }
@@ -197,13 +199,13 @@ fn build_row(saved: &SavedQuery, sender: &ComponentSender<SavedQueriesDialog>) -
         .build();
     row.add_suffix(&row_button(
         "document-edit-symbolic",
-        &crate::tr!("Rename"),
+        &bookie_app_services::tr!("Rename"),
         SavedQueriesInput::AskRename(saved.id),
         sender,
     ));
     let delete = row_button(
         "user-trash-symbolic",
-        &crate::tr!("Delete"),
+        &bookie_app_services::tr!("Delete"),
         SavedQueriesInput::AskDelete(saved.id),
         sender,
     );
@@ -251,7 +253,7 @@ impl Component for SavedQueriesDialog {
 
     fn init_root() -> Self::Root {
         adw::Dialog::builder()
-            .title(crate::tr!("Saved Queries"))
+            .title(bookie_app_services::tr!("Saved Queries"))
             .content_width(620)
             .content_height(600)
             .build()
@@ -263,7 +265,7 @@ impl Component for SavedQueriesDialog {
         toolbar.add_top_bar(&header);
 
         let search = gtk::SearchEntry::builder()
-            .placeholder_text(crate::tr!("Search saved queries"))
+            .placeholder_text(bookie_app_services::tr!("Search saved queries"))
             .margin_top(12)
             .margin_bottom(6)
             .margin_start(12)
@@ -343,7 +345,8 @@ impl Component for SavedQueriesDialog {
             }
             SavedQueriesCmd::Failed(error) => {
                 tracing::warn!(error = %error, "saved queries update failed");
-                self.status_page.set_title(&crate::tr!("Saved queries are unavailable"));
+                self.status_page
+                    .set_title(&bookie_app_services::tr!("Saved queries are unavailable"));
                 self.stack.set_visible_child_name("empty");
             }
         }

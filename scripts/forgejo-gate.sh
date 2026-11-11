@@ -20,9 +20,9 @@ api_get() {
 }
 
 docs_only() {
-  git fetch --quiet "$remote" linux || return 1
+  git fetch --quiet "$remote" main || return 1
   local changed
-  changed="$(git diff --name-only "$remote/linux...$sha")"
+  changed="$(git diff --name-only "$remote/main...$sha")"
   [ -n "$changed" ] && [ -z "$(printf '%s\n' "$changed" | grep -vE '(\.md$|^docs/)')" ]
 }
 if docs_only; then

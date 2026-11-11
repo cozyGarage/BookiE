@@ -39,6 +39,7 @@ pub struct ConnectDialog {
     tls_row: adw::ActionRow,
     tls_mode: AccessibleChoice,
     tls_root_cert: adw::EntryRow,
+    tls_strict: adw::SwitchRow,
     tls_client_cert: adw::EntryRow,
     tls_client_key: adw::EntryRow,
     read_only: adw::SwitchRow,
@@ -74,8 +75,8 @@ struct DriverEntry {
 
 fn auth_mode_label(mode: AuthMode) -> String {
     match mode {
-        AuthMode::Password => crate::tr!("Password"),
-        AuthMode::Kerberos => crate::tr!("Windows (Kerberos)"),
+        AuthMode::Password => bookie_app_services::tr!("Password"),
+        AuthMode::Kerberos => bookie_app_services::tr!("Windows (Kerberos)"),
     }
 }
 
@@ -166,7 +167,7 @@ impl Component for ConnectDialog {
 
     view! {
         adw::Dialog {
-            set_title: &crate::tr!("Connect"),
+            set_title: &bookie_app_services::tr!("Connect"),
             set_content_width: 580,
             set_content_height: 720,
             connect_closed => ConnectDialogInput::Closed,
@@ -199,7 +200,7 @@ impl Component for ConnectDialog {
         drivers.sort_by(|a, b| a.display_name.cmp(&b.display_name));
 
         let names: Vec<String> = drivers.iter().map(|d| d.display_name.clone()).collect();
-        let (driver_row, driver_combo) = choice_row(crate::tr!("Driver"), None, names);
+        let (driver_row, driver_combo) = choice_row(bookie_app_services::tr!("Driver"), None, names);
         driver_combo.set_selected(default_driver_row(&drivers));
         let sender_for_combo = sender.clone();
         driver_combo.connect_selected_notify(move |selected| {
@@ -207,8 +208,10 @@ impl Component for ConnectDialog {
         });
 
         let (endpoint_row, endpoint_combo) = choice_row(
-            crate::tr!("Endpoint"),
-            Some(crate::tr!("Connect over the network or a local Unix socket")),
+            bookie_app_services::tr!("Endpoint"),
+            Some(bookie_app_services::tr!(
+                "Connect over the network or a local Unix socket"
+            )),
             vec!["Network".to_string(), "Unix socket".to_string()],
         );
         let sender_for_endpoint = sender.clone();
@@ -216,60 +219,82 @@ impl Component for ConnectDialog {
             sender_for_endpoint.input(ConnectDialogInput::EndpointChanged);
         });
 
-        let name = adw::EntryRow::builder().title(crate::tr!("Name (optional)")).build();
+        let name = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Name (optional)"))
+            .build();
         let host = adw::EntryRow::builder()
-            .title(crate::tr!("Host"))
+            .title(bookie_app_services::tr!("Host"))
             .text("localhost")
             .build();
-        let port_row = adw::ActionRow::builder().title(crate::tr!("Port")).build();
+        let port_row = adw::ActionRow::builder()
+            .title(bookie_app_services::tr!("Port"))
+            .build();
         let port = controls::port_input();
         controls::center_in_row(&port);
-        port.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Port"))]);
+        port.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Port"))]);
         port_row.add_suffix(&port);
         port_row.set_activatable_widget(Some(&port));
         let sender_for_port = sender.clone();
         port.connect_value_notify(move |_| sender_for_port.input(ConnectDialogInput::InputChanged));
         let socket_dir = adw::EntryRow::builder()
-            .title(crate::tr!("Socket directory"))
+            .title(bookie_app_services::tr!("Socket directory"))
             .text("/run/postgresql")
             .build();
         let resolved_socket = adw::ActionRow::builder()
             .use_markup(false)
-            .title(crate::tr!("Resolved socket"))
+            .title(bookie_app_services::tr!("Resolved socket"))
             .build();
-        let database = adw::EntryRow::builder().title(crate::tr!("Database")).build();
+        let database = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Database"))
+            .build();
         let database_file_picker = browse::attach_database_file_picker(&database);
         database_file_picker.set_visible(false);
         let auth_source = auth_source::row();
-        let username = adw::EntryRow::builder().title(crate::tr!("Username")).build();
-        let password = adw::PasswordEntryRow::builder().title(crate::tr!("Password")).build();
+        let username = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Username"))
+            .build();
+        let password = adw::PasswordEntryRow::builder()
+            .title(bookie_app_services::tr!("Password"))
+            .build();
         let tls_choices = TlsMode::ALL.iter().map(|mode| mode.label().to_string()).collect();
         let (tls_row, tls_mode) = choice_row(
-            crate::tr!("TLS"),
-            Some(crate::tr!("How the client encrypts and verifies the server")),
+            bookie_app_services::tr!("TLS"),
+            Some(bookie_app_services::tr!(
+                "How the client encrypts and verifies the server"
+            )),
             tls_choices,
         );
         tls_mode.set_selected(TlsMode::VerifyFull.index());
         let tls_root_cert = adw::EntryRow::builder()
-            .title(crate::tr!("Certificate authority"))
+            .title(bookie_app_services::tr!("Certificate authority"))
             .build();
         browse::attach_certificate_picker(&tls_root_cert);
-        let tls_client_cert = adw::EntryRow::builder().title(crate::tr!("Client certificate")).build();
+        let tls_strict = adw::SwitchRow::builder()
+            .title(bookie_app_services::tr!("Strict encryption (TDS 8.0)"))
+            .subtitle(bookie_app_services::tr!(
+                "Encrypt before any SQL Server handshake; the connection fails if the server cannot"
+            ))
+            .build();
+        let tls_client_cert = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Client certificate"))
+            .build();
         browse::attach_client_certificate_picker(&tls_client_cert);
-        let tls_client_key = adw::EntryRow::builder().title(crate::tr!("Client private key")).build();
+        let tls_client_key = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Client private key"))
+            .build();
         browse::attach_client_key_picker(&tls_client_key);
         let sender_for_tls = sender.clone();
         tls_mode.connect_selected_notify(move |_| {
             sender_for_tls.input(ConnectDialogInput::TlsModeChanged);
         });
         let read_only = adw::SwitchRow::builder()
-            .title(crate::tr!("Read-only mode"))
-            .subtitle(crate::tr!("Block writes at the policy layer"))
+            .title(bookie_app_services::tr!("Read-only mode"))
+            .subtitle(bookie_app_services::tr!("Block writes at the policy layer"))
             .active(false)
             .build();
         let (environment_row, environment) = choice_row(
-            crate::tr!("Environment"),
-            Some(crate::tr!("Drives agent and approval defaults")),
+            bookie_app_services::tr!("Environment"),
+            Some(bookie_app_services::tr!("Drives agent and approval defaults")),
             ["Local", "Dev", "Staging", "Prod"].map(String::from).to_vec(),
         );
 
@@ -297,7 +322,9 @@ impl Component for ConnectDialog {
         // Semantic preferences groups: Connection / Authentication /
         // Options / SSH. AdwPreferencesPage renders them with the
         // standard Adwaita section spacing & headers.
-        let connection_group = adw::PreferencesGroup::builder().title(crate::tr!("Connection")).build();
+        let connection_group = adw::PreferencesGroup::builder()
+            .title(bookie_app_services::tr!("Connection"))
+            .build();
         connection_group.add(&driver_row);
         connection_group.add(&name);
         connection_group.add(&endpoint_row);
@@ -309,22 +336,25 @@ impl Component for ConnectDialog {
         connection_group.add(&auth_source);
 
         let auth_labels: Vec<String> = AUTH_MODE_ROWS.iter().map(|mode| auth_mode_label(*mode)).collect();
-        let (auth_row, auth_combo) = choice_row(crate::tr!("Method"), None, auth_labels);
+        let (auth_row, auth_combo) = choice_row(bookie_app_services::tr!("Method"), None, auth_labels);
         let sender_for_auth_mode = sender.clone();
         auth_combo.connect_selected_notify(move |_| {
             sender_for_auth_mode.input(ConnectDialogInput::AuthModeChanged);
         });
 
         let auth_group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("Authentication"))
+            .title(bookie_app_services::tr!("Authentication"))
             .build();
         auth_group.add(&auth_row);
         auth_group.add(&username);
         auth_group.add(&password);
 
-        let options_group = adw::PreferencesGroup::builder().title(crate::tr!("Options")).build();
+        let options_group = adw::PreferencesGroup::builder()
+            .title(bookie_app_services::tr!("Options"))
+            .build();
         options_group.add(&tls_row);
         options_group.add(&tls_root_cert);
+        options_group.add(&tls_strict);
         options_group.add(&tls_client_cert);
         options_group.add(&tls_client_key);
         options_group.add(&read_only);
@@ -333,13 +363,15 @@ impl Component for ConnectDialog {
         options_group.add(&query_timeout_row);
         options_group.add(&environment_row);
 
-        let test_button = gtk::Button::builder().label(crate::tr!("Test")).build();
+        let test_button = gtk::Button::builder().label(bookie_app_services::tr!("Test")).build();
         let sender_for_test = sender.clone();
         test_button.connect_clicked(move |_| {
             sender_for_test.input(ConnectDialogInput::TestConnection);
         });
 
-        let submit = gtk::Button::builder().label(crate::tr!("Connect")).build();
+        let submit = gtk::Button::builder()
+            .label(bookie_app_services::tr!("Connect"))
+            .build();
         submit.add_css_class("suggested-action");
         let sender_for_submit = sender.clone();
         submit.connect_clicked(move |_| {
@@ -348,8 +380,8 @@ impl Component for ConnectDialog {
 
         let initial_title = drivers
             .get(default_driver_row(&drivers) as usize)
-            .map(|driver| crate::tr!("Connect to {name}").replace("{name}", &driver.display_name))
-            .unwrap_or_else(|| crate::tr!("Connect"));
+            .map(|driver| bookie_app_services::tr!("Connect to {name}").replace("{name}", &driver.display_name))
+            .unwrap_or_else(|| bookie_app_services::tr!("Connect"));
         let header_title = gtk::Label::new(Some(&initial_title));
         header_title.set_valign(gtk::Align::Center);
         header_title.set_ellipsize(gtk::pango::EllipsizeMode::End);
@@ -396,6 +428,7 @@ impl Component for ConnectDialog {
             tls_row,
             tls_mode,
             tls_root_cert,
+            tls_strict,
             tls_client_cert,
             tls_client_key,
             read_only,
@@ -476,7 +509,7 @@ impl Component for ConnectDialog {
                 let idx = self.driver_combo.selected() as usize;
                 let Some(entry) = self.drivers.get(idx).cloned() else {
                     self.set_busy(BusyKind::None);
-                    self.show_toast(&crate::tr!("No driver selected"));
+                    self.show_toast(&bookie_app_services::tr!("No driver selected"));
                     return;
                 };
 
@@ -484,7 +517,9 @@ impl Component for ConnectDialog {
                     Some(d) => d,
                     None => {
                         self.set_busy(BusyKind::None);
-                        self.show_toast(&crate::tr!("Driver {id} not registered").replace("{id}", &entry.id));
+                        self.show_toast(
+                            &bookie_app_services::tr!("Driver {id} not registered").replace("{id}", &entry.id),
+                        );
                         return;
                     }
                 };
@@ -560,12 +595,12 @@ impl Component for ConnectDialog {
                 let idx = self.driver_combo.selected() as usize;
                 let Some(entry) = self.drivers.get(idx).cloned() else {
                     self.set_busy(BusyKind::None);
-                    self.show_toast(&crate::tr!("No driver selected"));
+                    self.show_toast(&bookie_app_services::tr!("No driver selected"));
                     return;
                 };
                 let Some(driver) = self.registry.get(&entry.id) else {
                     self.set_busy(BusyKind::None);
-                    self.show_toast(&crate::tr!("Driver {id} not registered").replace("{id}", &entry.id));
+                    self.show_toast(&bookie_app_services::tr!("Driver {id} not registered").replace("{id}", &entry.id));
                     return;
                 };
                 let opts = self.collect_options(driver.as_ref());
@@ -695,7 +730,7 @@ impl Component for ConnectDialog {
         self.set_busy(BusyKind::None);
         self.connect_cancel = None;
         match msg {
-            ConnectDialogCmd::Cancelled => self.show_toast(&crate::tr!("Connection cancelled.")),
+            ConnectDialogCmd::Cancelled => self.show_toast(&bookie_app_services::tr!("Connection cancelled.")),
             ConnectDialogCmd::Result(Ok(prepared)) => {
                 tracing::info!(driver = %prepared.driver_id, table_count = prepared.tables.len(), "connection prepared");
                 let _ = sender.output(ConnectDialogOutput::Prepared(prepared));
@@ -723,7 +758,7 @@ impl ConnectDialog {
             self.apply_driver_form_visibility(driver.as_ref());
         }
         self.refresh_driver_maturity_subtitle();
-        let title = crate::tr!("Connect to {name}").replace("{name}", &entry.display_name);
+        let title = bookie_app_services::tr!("Connect to {name}").replace("{name}", &entry.display_name);
         root.set_title(&title);
         self.header_title.set_text(&title);
         self.refresh_validity();
@@ -807,8 +842,21 @@ impl ConnectDialog {
             root_cert: self.selected_root_cert(mode),
             client_cert: selected_path(&self.tls_client_cert),
             client_key: selected_path(&self.tls_client_key),
+            strict_encryption: self.tls_strict.is_visible() && self.tls_strict.is_active(),
             ..Default::default()
         }
+    }
+
+    fn strict_encryption_offered(&self) -> bool {
+        let supported = self
+            .drivers
+            .get(self.driver_combo.selected() as usize)
+            .and_then(|entry| self.registry.get(&entry.id))
+            .is_some_and(|driver| driver.capabilities().supports_strict_encryption);
+        supported
+            && !self.form.file_based
+            && !self.uses_local_socket()
+            && !matches!(self.selected_tls_mode(), TlsMode::Disabled | TlsMode::Prefer)
     }
 
     fn selected_root_cert(&self, mode: TlsMode) -> Option<std::path::PathBuf> {
@@ -824,6 +872,7 @@ impl ConnectDialog {
     }
 
     fn apply_tls_visibility(&self) {
+        self.tls_strict.set_visible(self.strict_encryption_offered());
         self.tls_root_cert.set_visible(
             !self.form.file_based && !self.uses_local_socket() && self.selected_tls_mode().verifies_cert(),
         );
@@ -857,9 +906,10 @@ impl ConnectDialog {
         if socket {
             self.tls_mode.set_selected(TlsMode::Disabled.index());
             self.ssh.expander.set_enable_expansion(false);
-            self.password.set_title(&crate::tr!("Password (optional)"));
+            self.password
+                .set_title(&bookie_app_services::tr!("Password (optional)"));
         } else {
-            self.password.set_title(&crate::tr!("Password"));
+            self.password.set_title(&bookie_app_services::tr!("Password"));
         }
         self.auth_row.set_visible(self.form.shows_method());
         let credentials = self.form.shows_credentials();
@@ -879,7 +929,9 @@ impl ConnectDialog {
         let idx = self.driver_combo.selected() as usize;
         let subtitle = match self.drivers.get(idx).map(|d| d.maturity) {
             Some(DriverMaturity::Experimental) => {
-                crate::tr!("Experimental: connect and browse work; some writes and transactions are limited")
+                bookie_app_services::tr!(
+                    "Experimental: connect and browse work; some writes and transactions are limited"
+                )
             }
             _ => String::new(),
         };
@@ -903,16 +955,16 @@ impl ConnectDialog {
         self.test_button.set_sensitive(!busy);
         match kind {
             BusyKind::None => {
-                self.submit.set_label(&crate::tr!("Connect"));
-                self.test_button.set_label(&crate::tr!("Test"));
+                self.submit.set_label(&bookie_app_services::tr!("Connect"));
+                self.test_button.set_label(&bookie_app_services::tr!("Test"));
             }
             BusyKind::Connecting => {
-                self.submit.set_label(&crate::tr!("Cancel"));
-                self.test_button.set_label(&crate::tr!("Test"));
+                self.submit.set_label(&bookie_app_services::tr!("Cancel"));
+                self.test_button.set_label(&bookie_app_services::tr!("Test"));
             }
             BusyKind::Testing => {
-                self.submit.set_label(&crate::tr!("Connect"));
-                self.test_button.set_label(&crate::tr!("Testing…"));
+                self.submit.set_label(&bookie_app_services::tr!("Connect"));
+                self.test_button.set_label(&bookie_app_services::tr!("Testing…"));
             }
         }
     }
@@ -1039,6 +1091,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         query_timeout_secs,
         auth_source: opts_clone.auth_source.clone(),
         attached_databases: opts.attached_databases.clone(),
+        tls_strict_encryption: opts_clone.tls.strict_encryption,
     };
 
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;

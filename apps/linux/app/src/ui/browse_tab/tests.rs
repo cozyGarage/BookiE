@@ -91,6 +91,10 @@ fn every_registered_driver_profile_matches_its_declared_static_behavior() {
         );
         assert_matches_declaration!(capabilities.supports_client_tls_auth, driver.supports_client_tls_auth());
         assert_matches_declaration!(
+            capabilities.supports_strict_encryption,
+            driver.supports_strict_encryption()
+        );
+        assert_matches_declaration!(
             capabilities.supports_explicit_auto_increment_values,
             driver.supports_explicit_auto_increment_values()
         );
@@ -270,7 +274,7 @@ fn browse_page_fetch_waits_until_the_new_columns_are_applied() {
             schema: Some("public".into()),
             table: "customers".into(),
             driver_id: "postgres".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: false,
@@ -339,7 +343,7 @@ fn deep_previous_page_uses_the_first_row_as_its_reverse_keyset_anchor() {
             schema: Some("public".into()),
             table: "items".into(),
             driver_id: "postgres".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: false,
@@ -415,7 +419,7 @@ fn browse_next_page_is_disabled_when_known_total_matches_page_end() {
             schema: Some("main".into()),
             table: "items".into(),
             driver_id: "sqlite".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: false,
@@ -1134,7 +1138,7 @@ fn a_closed_browse_tab_releases_its_root_widget() {
             schema: Some("public".into()),
             table: "customers".into(),
             driver_id: "postgres".into(),
-            enum_input_style: EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only: true,

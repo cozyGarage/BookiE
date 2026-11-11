@@ -212,8 +212,8 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "cancel_button"]
                         gtk::Button {
-                            set_label: &crate::tr!("Cancel"),
-                            set_tooltip_text: Some(crate::tr!("Cancel running query (Esc)").as_str()),
+                            set_label: &bookie_app_services::tr!("Cancel"),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Cancel running query (Esc)").as_str()),
                             set_visible: false,
                             add_css_class: "flat",
                             connect_clicked => SqlEditorInput::Cancel,
@@ -227,15 +227,15 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "warnings_button"]
                         append = &gtk::MenuButton {
-                            set_label: &crate::tr!("SQL warnings"),
-                            set_tooltip_text: Some(crate::tr!("Character suggestions; SQL is not changed").as_str()),
+                            set_label: &bookie_app_services::tr!("SQL warnings"),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Character suggestions; SQL is not changed").as_str()),
                             set_visible: false,
                         },
 
                         #[name = "pin_button"]
                         append = &gtk::Button {
-                            set_label: &crate::tr!("Pin results"),
-                            set_tooltip_text: Some(crate::tr!("Keep these results above the results of the next run").as_str()),
+                            set_label: &bookie_app_services::tr!("Pin results"),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Keep these results above the results of the next run").as_str()),
                             set_sensitive: false,
                             add_css_class: "flat",
                             connect_clicked => SqlEditorInput::TogglePin,
@@ -243,8 +243,8 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "compare_button"]
                         append = &gtk::Button {
-                            set_label: &crate::tr!("Compare…"),
-                            set_tooltip_text: Some(crate::tr!("Compare two results row by row").as_str()),
+                            set_label: &bookie_app_services::tr!("Compare…"),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Compare two results row by row").as_str()),
                             set_sensitive: false,
                             add_css_class: "flat",
                             connect_clicked => SqlEditorInput::OpenCompare,
@@ -252,16 +252,16 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "explain_button"]
                         append = &gtk::Button {
-                            set_label: &crate::tr!("Explain"),
-                            set_tooltip_text: Some(crate::tr!("Explain query plan").as_str()),
+                            set_label: &bookie_app_services::tr!("Explain"),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Explain query plan").as_str()),
                             add_css_class: "flat",
                             connect_clicked => SqlEditorInput::Explain,
                         },
 
                         #[name = "split_button"]
                         append = &gtk::ToggleButton {
-                            set_label: &crate::tr!("Split"),
-                            set_tooltip_text: Some(crate::tr!("Show or hide a second SQL editor pane").as_str()),
+                            set_label: &bookie_app_services::tr!("Split"),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Show or hide a second SQL editor pane").as_str()),
                             add_css_class: "flat",
                             connect_toggled[sender] => move |button| {
                                 sender.input(SqlEditorInput::SplitToggled(button.is_active()));
@@ -274,9 +274,9 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "session_button"]
                         append = &gtk::ToggleButton {
-                            set_label: &crate::tr!("Session"),
+                            set_label: &bookie_app_services::tr!("Session"),
                             set_can_shrink: true,
-                            set_tooltip_text: Some(crate::tr!("Run this tab on its own connection, so settings, temporary tables and transactions carry over between runs").as_str()),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Run this tab on its own connection, so settings, temporary tables and transactions carry over between runs").as_str()),
                             add_css_class: "flat",
                             connect_toggled[sender] => move |button| {
                                 sender.input(SqlEditorInput::SessionToggled(button.is_active()));
@@ -285,8 +285,8 @@ impl SimpleComponent for SqlEditor {
 
                         #[name = "run_button"]
                         append = &gtk::Button {
-                            set_label: &crate::tr!("Run"),
-                            set_tooltip_text: Some(crate::tr!("Run query (Ctrl+Return)").as_str()),
+                            set_label: &bookie_app_services::tr!("Run"),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Run query (Ctrl+Return)").as_str()),
                             add_css_class: "suggested-action",
                             connect_clicked => SqlEditorInput::Run,
                         },
@@ -294,7 +294,7 @@ impl SimpleComponent for SqlEditor {
                         #[name = "run_options"]
                         append = &gtk::MenuButton {
                             set_icon_name: "pan-down-symbolic",
-                            set_tooltip_text: Some(crate::tr!("Run options").as_str()),
+                            set_tooltip_text: Some(bookie_app_services::tr!("Run options").as_str()),
                         },
                     },
                 },
@@ -305,7 +305,7 @@ impl SimpleComponent for SqlEditor {
                         set_halign: gtk::Align::End,
                         set_margin_end: 8,
                         set_margin_bottom: 8,
-                        set_tooltip_text: Some(crate::tr!("Runs the same query again. The saved query timeout does not change.").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Runs the same query again. The saved query timeout does not change.").as_str()),
                         add_css_class: "flat",
                         connect_clicked => SqlEditorInput::RunWithLongerTimeout,
                     },
@@ -365,7 +365,7 @@ impl SimpleComponent for SqlEditor {
         let initial_query_error = open_file::validate_sql_text(&initial_text).err();
         let saved_draft_blocked = initial_query_error.is_some();
         let initial_text = if initial_query_error.is_some() {
-            crate::tr!(
+            bookie_app_services::tr!(
                 "This saved SQL draft is too large to display safely. Press Ctrl+Shift+S to save the full draft before replacing it."
             )
         } else {
@@ -387,7 +387,7 @@ impl SimpleComponent for SqlEditor {
             split_view.secondary_view().set_editable(false);
             widgets.status.set_label(&format!(
                 "{error} {}",
-                crate::tr!("Press Ctrl+Shift+S to save the full draft before replacing it.")
+                bookie_app_services::tr!("Press Ctrl+Shift+S to save the full draft before replacing it.")
             ));
         }
         let known_lexing = session_lexing::KnownLexing::default();
@@ -592,7 +592,7 @@ impl SimpleComponent for SqlEditor {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         if self.saved_draft_blocked && draft_guard::blocks_execution(&msg) {
-            self.status.set_label(&crate::tr!(
+            self.status.set_label(&bookie_app_services::tr!(
                 "Replace the saved SQL draft before running or explaining SQL."
             ));
             return;
@@ -693,7 +693,7 @@ impl SimpleComponent for SqlEditor {
                 let sql = text_to_run(&self.source_view.buffer());
                 let trimmed = sql.trim().to_string();
                 if trimmed.is_empty() {
-                    self.status.set_label(&crate::tr!("empty query"));
+                    self.status.set_label(&bookie_app_services::tr!("empty query"));
                     return;
                 }
                 let buffer = self.source_view.buffer();
@@ -854,10 +854,10 @@ impl SimpleComponent for SqlEditor {
                     return;
                 }
                 self.cancel_token = None;
-                self.status.set_label(&crate::tr!("cancelled"));
+                self.status.set_label(&bookie_app_services::tr!("cancelled"));
                 let cancelled_page = adw::StatusPage::builder()
-                    .title(crate::tr!("Query cancelled"))
-                    .description(crate::tr!("The running query was stopped."))
+                    .title(bookie_app_services::tr!("Query cancelled"))
+                    .description(bookie_app_services::tr!("The running query was stopped."))
                     .icon_name("process-stop-symbolic")
                     .vexpand(true)
                     .build();
@@ -873,17 +873,18 @@ impl SimpleComponent for SqlEditor {
                     .map(|duration| duration.as_millis() as i64)
                     .unwrap_or(0);
                 let secs_str = secs.to_string();
-                let reason = crate::tr!("Query exceeded the {n}s query timeout.").replace("{n}", &secs_str);
+                let reason =
+                    bookie_app_services::tr!("Query exceeded the {n}s query timeout.").replace("{n}", &secs_str);
                 let timed_out_sql = context.sql.clone();
                 self.record_history(context, elapsed, None, Outcome::Error(reason.clone()));
                 if !terminal.replace_ui {
                     return;
                 }
                 self.cancel_token = None;
-                self.status.set_label(&crate::tr!("timed out"));
+                self.status.set_label(&bookie_app_services::tr!("timed out"));
                 self.offer_longer_timeout(secs, timed_out_sql);
                 let page = adw::StatusPage::builder()
-                    .title(crate::tr!("Query timed out"))
+                    .title(bookie_app_services::tr!("Query timed out"))
                     .description(crate::ui::plain_text::escape_markup(&reason))
                     .icon_name("dialog-warning-symbolic")
                     .vexpand(true)
@@ -934,8 +935,9 @@ impl SimpleComponent for SqlEditor {
                 }
                 let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
                 let Some(grammar) = statement_cursor::grammar_for(&driver_id) else {
-                    self.status
-                        .set_label(&crate::tr!("Formatting is unavailable for this connection"));
+                    self.status.set_label(&bookie_app_services::tr!(
+                        "Formatting is unavailable for this connection"
+                    ));
                     return;
                 };
                 let settings = self.lexing(&driver_id).settings_for(grammar);
@@ -960,17 +962,18 @@ impl SqlEditor {
         sender: ComponentSender<Self>,
     ) {
         if !self.can_start_run() || self.session_ending() {
-            self.status.set_label(&crate::tr!("Waiting for session to finish"));
+            self.status
+                .set_label(&bookie_app_services::tr!("Waiting for session to finish"));
             return;
         }
         let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);
         let Some(guard) = origin.as_ref().and_then(|origin| origin.guard(&self.database)) else {
-            self.status.set_label(&crate::tr!("no active connection"));
+            self.status.set_label(&bookie_app_services::tr!("no active connection"));
             return;
         };
         let conn: std::sync::Arc<dyn bookie_core::Connection> = guard.clone();
         let Some(metadata) = self.metadata() else {
-            self.status.set_label(&crate::tr!("no active connection"));
+            self.status.set_label(&bookie_app_services::tr!("no active connection"));
             return;
         };
         let Some(generation) = self.run_generation.try_start_new() else {
@@ -986,7 +989,7 @@ impl SqlEditor {
         self.cancel_token = Some(token.clone());
 
         self.set_running(true, conn.supports_server_cancellation(), &sender);
-        self.status.set_label(&crate::tr!("Running…"));
+        self.status.set_label(&bookie_app_services::tr!("Running…"));
         dim_previous_results(self.results_surface());
         self.streaming = None;
         self.clear_run_marks();
@@ -1066,15 +1069,19 @@ impl SqlEditor {
                                     sequence,
                                     page,
                                     spooled,
+                                    lease,
                                 } => {
                                     let (accepted, delivered) = tokio::sync::oneshot::channel();
-                                    sender.input(SqlEditorInput::Stream(streaming::Input::Page {
-                                        generation,
-                                        sequence,
-                                        page,
-                                        spooled,
-                                        accepted,
-                                    }));
+                                    sender.input(SqlEditorInput::Stream(streaming::Input::Page(
+                                        streaming::StreamPageUpdate {
+                                            generation,
+                                            sequence,
+                                            page,
+                                            spooled,
+                                            lease,
+                                            accepted,
+                                        },
+                                    )));
                                     delivered.await.unwrap_or(false)
                                 }
                             }

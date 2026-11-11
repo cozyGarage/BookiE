@@ -1,6 +1,4 @@
 mod continuous;
-mod page_index;
-mod page_window;
 mod paged_model;
 pub(super) use continuous::install as install_continuous;
 mod header;
@@ -213,6 +211,7 @@ pub(super) fn install_page_loader(
         };
         handle_visible_child_change(pages, &context, &previous_index);
     });
+    pages.connect_map(|pages| pages.notify("visible-child"));
 }
 
 struct VisiblePageLoadContext<'a> {
@@ -243,25 +242,42 @@ fn handle_visible_child_change(
 }
 
 fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext<'_>) {
-    let Some(container) = pages.visible_child() else {
-        return;
-    };
-    let Some(placeholder) = container.first_child() else {
-        return;
-    };
-    if !placeholder.has_css_class("tp-stream-page-placeholder") || placeholder.has_css_class("tp-stream-page-loading") {
-        return;
-    }
-    let Some(index) = page_index_from_name(&container, context.generation) else {
+    let Some((placeholder, index)) = visible_page_placeholder(pages, context) else {
         return;
     };
     placeholder.add_css_class("tp-stream-page-loading");
     if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
         status.set_child(gtk::Widget::NONE);
     }
-    if let Some(page) = context.resident_pages.get(index) {
+    if restore_resident_page(context, &placeholder, index) {
+        return;
+    }
+    let Some(spool) = context.spool.cloned() else {
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-            status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
+            status.set_title(&bookie_app_services::tr!("This result page is no longer available"));
+        }
+        placeholder.remove_css_class("tp-stream-page-loading");
+        return;
+    };
+    request_spooled_page(context, &placeholder, index, spool);
+}
+
+fn visible_page_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext<'_>) -> Option<(gtk::Widget, u64)> {
+    let container = pages.visible_child()?;
+    let placeholder = container.first_child()?;
+    if !placeholder.has_css_class("tp-stream-page-placeholder") || placeholder.has_css_class("tp-stream-page-loading") {
+        return None;
+    }
+    let index = page_index_from_name(&container, context.generation)?;
+    Some((placeholder, index))
+}
+
+fn restore_resident_page(context: &VisiblePageLoadContext<'_>, placeholder: &gtk::Widget, index: u64) -> bool {
+    if let Some((page, lease)) = context.resident_pages.get_with_lease(index) {
+        if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
+            status.set_description(Some(&bookie_app_services::tr!(
+                "Restoring this result page from memory…"
+            )));
         }
         let _ = context
             .sender
@@ -270,18 +286,39 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
                 index,
                 identity: context.identity,
                 result: Ok(page),
+                resident_pages: context.resident_pages.clone(),
+                lease: Some(lease),
             }));
-        return;
+        return true;
     }
-    let Some(spool) = context.spool.cloned() else {
-        if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-            status.set_title(&crate::tr!("This result page is no longer available"));
+    false
+}
+
+fn request_spooled_page(
+    context: &VisiblePageLoadContext<'_>,
+    placeholder: &gtk::Widget,
+    index: u64,
+    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+) {
+    let Some(lease) = context.resident_pages.reserve(bookie_core::MAX_QUERY_RESULT_BYTES) else {
+        if let Some(container) = placeholder.parent().and_downcast::<gtk::Box>() {
+            show_page_load_error(
+                &container,
+                placeholder,
+                bookie_app_services::tr!(
+                    "The result memory budget is full. Close or scroll away from other large results, then retry."
+                )
+                .to_string(),
+            );
+        } else {
+            placeholder.remove_css_class("tp-stream-page-loading");
         }
-        placeholder.remove_css_class("tp-stream-page-loading");
         return;
     };
     if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-        status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
+        status.set_description(Some(&bookie_app_services::tr!(
+            "Loading this page from temporary storage…"
+        )));
     }
     let _ = context
         .sender
@@ -291,6 +328,8 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
             identity: context.identity,
             spool,
             columns: context.columns.to_vec(),
+            resident_pages: context.resident_pages.clone(),
+            lease,
         }));
 }
 
@@ -330,19 +369,19 @@ pub(super) struct PageLoadContext<'a> {
     pub(super) settings_store: LocalResultSettingsStore,
 }
 
+#[cfg(test)]
 pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Arc<QueryResult>, String>) {
-    let PageLoadContext {
-        holder,
-        generation,
-        index,
-        identity,
-        grid_sender,
-        connection_id,
-        database,
-        settings_store,
-    } = context;
-    let root = holder.clone().upcast::<gtk::Widget>();
-    let Some(container) = named::<gtk::Box>(&root, &page_widget_name(generation, index)) else {
+    complete_page_load_retained(context, result, super::stream_pages::ResidentPageStore::default(), None);
+}
+
+pub(super) fn complete_page_load_retained(
+    context: PageLoadContext<'_>,
+    result: Result<Arc<QueryResult>, String>,
+    resident_pages: super::stream_pages::ResidentPageStore,
+    lease: Option<bookie_results::stream_page_budget::StreamPageLease>,
+) {
+    let root = context.holder.clone().upcast::<gtk::Widget>();
+    let Some(container) = named::<gtk::Box>(&root, &page_widget_name(context.generation, context.index)) else {
         return;
     };
     let Some(current) = container.first_child() else {
@@ -352,36 +391,67 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
         return;
     }
     match result {
-        Ok(page) => {
-            let widget = build_stream_page_widget(
-                &page,
-                grid_sender,
-                connection_id,
-                database,
-                settings_store,
-                super::outcomes::streamed_view_key(identity, generation, index as usize),
-                named::<gtk::Widget>(&root, "tp-result-find-entry").is_some(),
-            );
-            replace_stream_page_content(&container, &widget);
-        }
-        Err(message) => {
-            if let Some(status) = current.downcast_ref::<relm4::adw::StatusPage>() {
-                status.set_title(&crate::tr!("Could not load this result page"));
-                status.set_description(Some(&crate::ui::plain_text::escape_markup(&message)));
-                if let Some(pages) = container.parent().and_downcast::<gtk::Stack>() {
-                    let retry = gtk::Button::with_label(&crate::tr!("Retry loading page"));
-                    let pages = pages.downgrade();
-                    retry.connect_clicked(move |_| {
-                        if let Some(pages) = pages.upgrade() {
-                            pages.notify("visible-child");
-                        }
-                    });
-                    status.set_child(Some(&retry));
+        Ok(page) => show_loaded_page(context, &root, &container, &current, page, resident_pages, lease),
+        Err(message) => show_page_load_error(&container, &current, message),
+    }
+}
+
+fn show_loaded_page(
+    context: PageLoadContext<'_>,
+    root: &gtk::Widget,
+    container: &gtk::Box,
+    current: &gtk::Widget,
+    page: Arc<QueryResult>,
+    resident_pages: super::stream_pages::ResidentPageStore,
+    lease: Option<bookie_results::stream_page_budget::StreamPageLease>,
+) {
+    let Some(lease) = lease.or_else(|| resident_pages.retain(&page)) else {
+        show_page_load_error(
+            container,
+            current,
+            bookie_app_services::tr!("The result memory budget is full.").to_string(),
+        );
+        return;
+    };
+    let page = resident_pages.insert(context.index, page, lease, false);
+    let widget = build_stream_page_widget(
+        &page,
+        context.grid_sender,
+        context.connection_id,
+        context.database,
+        context.settings_store,
+        super::outcomes::streamed_view_key(context.identity, context.generation, context.index as usize),
+        named::<gtk::Widget>(root, "tp-result-find-entry").is_some(),
+    );
+    let title = container
+        .parent()
+        .and_downcast::<gtk::Stack>()
+        .map(|pages| pages.page(container).title().unwrap_or_default().to_string())
+        .unwrap_or_default();
+    resident_pages.protect(context.index);
+    let pages = resident_pages.clone();
+    super::outcomes::stream_result_view::release_stream_page_on_unmap(container, &widget, title, move || {
+        pages.unprotect(context.index)
+    });
+    replace_stream_page_content(container, &widget);
+}
+
+fn show_page_load_error(container: &gtk::Box, current: &gtk::Widget, message: String) {
+    if let Some(status) = current.downcast_ref::<relm4::adw::StatusPage>() {
+        status.set_title(&bookie_app_services::tr!("Could not load this result page"));
+        status.set_description(Some(&crate::ui::plain_text::escape_markup(&message)));
+        if let Some(pages) = container.parent().and_downcast::<gtk::Stack>() {
+            let retry = gtk::Button::with_label(&bookie_app_services::tr!("Retry loading page"));
+            let pages = pages.downgrade();
+            retry.connect_clicked(move |_| {
+                if let Some(pages) = pages.upgrade() {
+                    pages.notify("visible-child");
                 }
-            }
-            current.remove_css_class("tp-stream-page-loading");
+            });
+            status.set_child(Some(&retry));
         }
     }
+    current.remove_css_class("tp-stream-page-loading");
 }
 
 #[cfg(test)]

@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::cell::Cell;
-use std::io::{self, Write};
 use std::marker::PhantomData;
 use std::sync::OnceLock;
 
@@ -32,22 +31,22 @@ pub fn set_date_format(format: DateFormatPref) {
 
 pub fn editable_null_sentinel() -> String {
     match NULL_DISPLAY.get() {
-        NullDisplayPref::Standard => crate::tr!("<NULL>"),
+        NullDisplayPref::Standard => bookie_app_services::tr!("<NULL>"),
         NullDisplayPref::Symbol => "\u{2205}".to_owned(),
-        NullDisplayPref::Parenthesized => crate::tr!("(null)"),
+        NullDisplayPref::Parenthesized => bookie_app_services::tr!("(null)"),
     }
 }
 
 pub(crate) fn readonly_null_sentinel() -> String {
     match NULL_DISPLAY.get() {
-        NullDisplayPref::Standard => crate::tr!("NULL"),
+        NullDisplayPref::Standard => bookie_app_services::tr!("<NULL>"),
         NullDisplayPref::Symbol => "\u{2205}".to_owned(),
-        NullDisplayPref::Parenthesized => crate::tr!("(null)"),
+        NullDisplayPref::Parenthesized => bookie_app_services::tr!("(null)"),
     }
 }
 
 pub(crate) fn auto_filled_sentinel() -> String {
-    crate::tr!("(auto)")
+    bookie_app_services::tr!("(auto)")
 }
 
 #[derive(Debug, Clone)]
@@ -178,7 +177,7 @@ fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
         Value::Uuid(u) => u.to_string(),
         Value::Json(j) => cap(&j.to_string()),
         Value::JsonText(j) => cap(j),
-        Value::Undecodable(_) if value.is_missing_field() => crate::tr!("(missing)"),
+        Value::Undecodable(_) if value.is_missing_field() => bookie_app_services::tr!("(missing)"),
         Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
     }
 }
@@ -250,10 +249,8 @@ fn json_to_display_text_with_limits(
     char_limit: usize,
     bound_complete: bool,
 ) -> (Cow<'static, str>, bool) {
-    let mut writer = BoundedJsonWriter::new(byte_limit);
-    let result = serde_json::to_writer(&mut writer, value);
-    let byte_budget_exceeded = result.is_err();
-    let (text, truncated) = json_prefix_for_display(writer.into_display(), byte_budget_exceeded, char_limit);
+    let (text, byte_budget_exceeded) = crate::ui::row_object::bounded_json_prefix(value, byte_limit);
+    let (text, truncated) = json_prefix_for_display(text, byte_budget_exceeded, char_limit);
     if truncated {
         (Cow::Owned(text), true)
     } else if bound_complete {
@@ -275,41 +272,6 @@ fn json_prefix_for_display(mut text: String, byte_budget_exceeded: bool, char_li
     (format!("{text}…"), true)
 }
 
-struct BoundedJsonWriter {
-    bytes: Vec<u8>,
-    limit: usize,
-}
-
-impl BoundedJsonWriter {
-    fn new(limit: usize) -> Self {
-        Self {
-            bytes: Vec::new(),
-            limit,
-        }
-    }
-
-    fn into_display(self) -> String {
-        let end = match std::str::from_utf8(&self.bytes) {
-            Ok(_) => self.bytes.len(),
-            Err(error) => error.valid_up_to(),
-        };
-        String::from_utf8_lossy(&self.bytes[..end]).into_owned()
-    }
-}
-
-impl Write for BoundedJsonWriter {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let remaining = self.limit.saturating_sub(self.bytes.len());
-        let written = remaining.min(bytes.len());
-        self.bytes.extend_from_slice(&bytes[..written]);
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
 pub(crate) fn value_to_search_text(value: &Value) -> Cow<'_, str> {
     match value {
         Value::Text(text) | Value::JsonText(text) => Cow::Borrowed(text),
@@ -329,10 +291,10 @@ pub(crate) fn preview_to_display_text(preview: &crate::ui::row_object::CellPrevi
 pub(super) fn preview_display_text(preview: &crate::ui::row_object::CellPreview, text_limit: usize) -> String {
     let total = match preview.byte_count {
         crate::ui::row_object::PreviewByteCount::Exact(bytes) => {
-            crate::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
+            bookie_app_services::tr!("{n} bytes total").replace("{n}", &bytes.to_string())
         }
         crate::ui::row_object::PreviewByteCount::MoreThan(bytes) => {
-            crate::tr!("More than {n} bytes total").replace("{n}", &bytes.to_string())
+            bookie_app_services::tr!("More than {n} bytes total").replace("{n}", &bytes.to_string())
         }
     };
     match &preview.value {
@@ -536,6 +498,20 @@ pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, us
     let column = COLUMN_SLOT.get(&focused)?;
     let row_key = ROW_KEY_SLOT.cloned(&focused).map_or_else(Vec::new, |key| key.to_vec());
     Some((position, column, row_key))
+}
+
+pub(crate) fn focused_cell_draft_id(widget: &impl IsA<gtk4::Widget>, position: u32) -> Option<u64> {
+    let window = widget.root()?.dynamic_cast::<gtk4::Window>().ok()?;
+    let focused = gtk4::prelude::GtkWindowExt::focus(&window)?;
+    let view = focused
+        .ancestor(gtk4::ColumnView::static_type())?
+        .downcast::<gtk4::ColumnView>()
+        .ok()?;
+    view.model()?
+        .item(position)?
+        .downcast::<crate::ui::row_object::RowObject>()
+        .ok()?
+        .draft_id()
 }
 
 pub(crate) fn focused_row_position(view: &gtk4::ColumnView) -> Option<u32> {

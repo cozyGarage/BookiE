@@ -16,6 +16,8 @@ static APPROVAL_DIALOG: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
 
 const DENY_RESPONSE: &str = "deny";
 const APPROVE_ONCE_RESPONSE: &str = "once";
+const APPROVE_REMEMBER_RESPONSE: &str = "remember";
+const APPROVE_REMEMBER_LABEL: &str = "Approve and don't ask again";
 const CLOSE_RESPONSE: &str = DENY_RESPONSE;
 
 /// The window that actually owns the triggering connection wins over
@@ -31,16 +33,18 @@ fn preferred_approval_window<T>(
 }
 
 fn outcome_for_response(response: &str) -> ApprovalOutcome {
-    if response == APPROVE_ONCE_RESPONSE {
-        return ApprovalOutcome::AllowOnce;
+    match response {
+        APPROVE_ONCE_RESPONSE => ApprovalOutcome::AllowOnce,
+        APPROVE_REMEMBER_RESPONSE => ApprovalOutcome::AllowAndRemember,
+        _ => ApprovalOutcome::Deny,
     }
-    ApprovalOutcome::Deny
 }
 
 fn build_approval_dialog(
     heading: &str,
     body: &str,
     extra_child: &impl relm4::gtk::prelude::IsA<relm4::gtk::Widget>,
+    can_remember: bool,
 ) -> relm4::adw::AlertDialog {
     use relm4::adw::prelude::*;
     let dialog = relm4::adw::AlertDialog::builder()
@@ -50,6 +54,9 @@ fn build_approval_dialog(
         .build();
     dialog.add_response(DENY_RESPONSE, "Deny");
     dialog.add_response(APPROVE_ONCE_RESPONSE, "Approve once");
+    if can_remember {
+        dialog.add_response(APPROVE_REMEMBER_RESPONSE, APPROVE_REMEMBER_LABEL);
+    }
     dialog.set_response_appearance(DENY_RESPONSE, relm4::adw::ResponseAppearance::Destructive);
     dialog.set_response_appearance(APPROVE_ONCE_RESPONSE, relm4::adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some(DENY_RESPONSE));
@@ -127,6 +134,7 @@ impl ApprovalSink for GtkApprovalSink {
         let tx = Arc::new(Mutex::new(Some(tx)));
         let permit = Arc::new(Mutex::new(Some(permit)));
 
+        let can_remember = req.environment != bookie_core::Environment::Prod;
         let heading = format!("Approve write: {}", req.connection_name);
         let body = approval_body(&req);
 
@@ -167,7 +175,7 @@ impl ApprovalSink for GtkApprovalSink {
                 .max_content_height(360)
                 .child(&sql_view)
                 .build();
-            let dialog = build_approval_dialog(&heading_c, &body_c, &sql_scroll);
+            let dialog = build_approval_dialog(&heading_c, &body_c, &sql_scroll, can_remember);
 
             let timer = Arc::new(Mutex::new(None::<glib::SourceId>));
             let timer_response = timer.clone();
@@ -292,12 +300,30 @@ mod tests {
         use relm4::adw::prelude::*;
         relm4::adw::init().unwrap();
         let scroll = relm4::gtk::ScrolledWindow::new();
-        let dialog = build_approval_dialog("Approve write: db", "body", &scroll);
+        let dialog = build_approval_dialog("Approve write: db", "body", &scroll, true);
         assert_eq!(dialog.default_response().as_deref(), Some(DENY_RESPONSE));
         assert_eq!(dialog.close_response().as_str(), DENY_RESPONSE);
         assert_ne!(DENY_RESPONSE, APPROVE_ONCE_RESPONSE);
         assert!(dialog.has_response(DENY_RESPONSE));
         assert!(dialog.has_response(APPROVE_ONCE_RESPONSE));
+        assert!(dialog.has_response(APPROVE_REMEMBER_RESPONSE));
+        let other = relm4::gtk::ScrolledWindow::new();
+        let without = build_approval_dialog("Approve write: db", "body", &other, false);
+        assert!(!without.has_response(APPROVE_REMEMBER_RESPONSE));
+    }
+
+    #[test]
+    fn the_remember_label_is_short_enough_not_to_be_ellipsized() {
+        const MAX_RESPONSE_LABEL_CHARS: usize = 30;
+        assert!(APPROVE_REMEMBER_LABEL.chars().count() <= MAX_RESPONSE_LABEL_CHARS);
+    }
+
+    #[test]
+    fn remember_response_allows_and_remembers() {
+        assert_eq!(
+            outcome_for_response(APPROVE_REMEMBER_RESPONSE),
+            ApprovalOutcome::AllowAndRemember
+        );
     }
 
     #[test]

@@ -5,13 +5,112 @@ pub(crate) fn read_only_statement(sql: &str) -> Option<String> {
     if !first.eq_ignore_ascii_case("select") && !first.eq_ignore_ascii_case("with") {
         return None;
     }
-    let upper = body.to_ascii_uppercase();
-    let locks = upper
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .windows(2)
-        .any(|pair| pair == ["FOR", "UPDATE"]);
-    (!locks).then(|| body.to_string())
+    let words = code_words(body);
+    let locks = words.windows(2).any(|pair| pair == ["FOR", "UPDATE"]);
+    (!locks && !words.iter().any(|word| word == UNTERMINATED)).then(|| body.to_string())
+}
+
+const UNTERMINATED: &str = "<UNTERMINATED>";
+
+struct Scanner {
+    chars: Vec<char>,
+    at: usize,
+    words: Vec<String>,
+}
+
+impl Scanner {
+    fn peek(&self, offset: usize) -> Option<char> {
+        self.chars.get(self.at + offset).copied()
+    }
+
+    fn skip_until(&mut self, ends: impl Fn(&Self) -> bool, width: usize) {
+        while self.at < self.chars.len() && !ends(self) {
+            self.at += 1;
+        }
+        if self.at >= self.chars.len() {
+            self.words.push(UNTERMINATED.into());
+        }
+        self.at += width;
+    }
+
+    fn line_comment(&mut self) {
+        while self.at < self.chars.len() && self.chars[self.at] != '\n' {
+            self.at += 1;
+        }
+    }
+
+    fn block_comment(&mut self) {
+        self.at += 2;
+        self.skip_until(|scan| scan.peek(0) == Some('*') && scan.peek(1) == Some('/'), 2);
+    }
+
+    fn alternative_quote(&mut self) {
+        let closing = match self.peek(2).unwrap_or('\'') {
+            '[' => ']',
+            '(' => ')',
+            '{' => '}',
+            '<' => '>',
+            other => other,
+        };
+        self.at += 3;
+        self.skip_until(|scan| scan.peek(0) == Some(closing) && scan.peek(1) == Some('\''), 2);
+        self.words.push("'".into());
+    }
+
+    fn quoted(&mut self, quote: char) {
+        self.at += 1;
+        while self.at < self.chars.len() {
+            if self.chars[self.at] == quote {
+                if self.peek(1) == Some(quote) {
+                    self.at += 2;
+                    continue;
+                }
+                break;
+            }
+            self.at += 1;
+        }
+        if self.at >= self.chars.len() {
+            self.words.push(UNTERMINATED.into());
+        }
+        self.at += 1;
+        self.words.push(quote.to_string());
+    }
+}
+
+fn code_words(sql: &str) -> Vec<String> {
+    let mut scan = Scanner {
+        chars: sql.chars().collect(),
+        at: 0,
+        words: Vec::new(),
+    };
+    let mut word = String::new();
+    while let Some(current) = scan.peek(0) {
+        let next = scan.peek(1);
+        let skipped = (current == '-' && next == Some('-'))
+            || (current == '/' && next == Some('*'))
+            || (matches!(current, 'q' | 'Q') && next == Some('\'') && word.is_empty())
+            || current == '\''
+            || current == '"';
+        if !skipped && (current.is_alphanumeric() || matches!(current, '_' | '$' | '#')) {
+            word.push(current);
+            scan.at += 1;
+            continue;
+        }
+        if !word.is_empty() {
+            scan.words.push(std::mem::take(&mut word).to_ascii_uppercase());
+        }
+        match (current, next) {
+            ('-', Some('-')) => scan.line_comment(),
+            ('/', Some('*')) => scan.block_comment(),
+            ('q' | 'Q', Some('\'')) => scan.alternative_quote(),
+            ('\'' | '"', _) => scan.quoted(current),
+            _ => scan.at += 1,
+        }
+    }
+    if !word.is_empty() {
+        scan.words.push(word.to_ascii_uppercase());
+    }
+    scan.words
 }
 
 fn strip_leading_comments(sql: &str) -> &str {
@@ -86,8 +185,41 @@ mod tests {
     }
 
     #[test]
-    fn a_column_called_for_update_text_in_a_string_is_still_refused_conservatively() {
+    fn a_real_locking_clause_is_refused_after_a_string_literal() {
         assert_eq!(read_only_statement("select 'x' from dual for update"), None);
+    }
+
+    #[test]
+    fn comments_between_for_and_update_do_not_hide_the_locking_clause() {
+        for sql in [
+            "select * from t for/* c */update",
+            "select * from t for/**/update",
+            "select * from t for -- note\n update",
+            "select * from t FOR /* a */ /* b */ UPDATE NOWAIT",
+            "select * from t for\n--x\n/*y*/\tupdate of a",
+            "select * from t for/* unterminated update",
+            "select 'unterminated for update from t",
+            "select q'[unterminated from t",
+            "with c as (select 1 a from dual) select * from c for/*x*/update",
+        ] {
+            assert_eq!(read_only_statement(sql), None, "{sql}");
+        }
+    }
+
+    #[test]
+    fn quoted_text_and_unrelated_comments_are_not_a_locking_clause() {
+        for sql in [
+            "select 'for update' from dual",
+            "select \"for update\" from t",
+            "select 'it''s for update' from t",
+            "select q'[for update]' from dual",
+            "select a /* for update */ from t",
+            "select a from t -- for update",
+            "select a as \"for\", b as \"update\" from t",
+            "select forupdate, update_count from t",
+        ] {
+            assert_eq!(read_only_statement(sql).as_deref(), Some(sql.trim_end()), "{sql}");
+        }
     }
 
     #[test]

@@ -33,6 +33,7 @@ This page describes user-visible behavior and limits in the current source. Curr
 - **Database attachment paths can be skipped if missing, and errors applying existing paths are not surfaced** ([#1993](https://github.com/cozyGarage/BookiE/issues/1993)).
 - **Local socket endpoint differences:** PostgreSQL selects a socket directory plus port; MySQL and MariaDB select the full socket-file path. Local sockets reject TLS and SSH and never fall back to TCP. Connection URLs use `?socket=/path/to/mysqld.sock` for MySQL/MariaDB or `?host=/socket/directory` for PostgreSQL, with an empty host or `localhost` and no other option.
 - **SQL Server query cancellation is disabled.** An interrupted operation may have an unknown outcome, so its connection or session is retired ([#850](https://github.com/cozyGarage/BookiE/issues/850)).
+- **The SQL Server driver does not refuse writes on a read-only connection by itself.** SQL Server has no per-connection read-only mode, so the driver sends a write it is given; only the policy guard (every GUI, agent and MCP path goes through it) refuses it. The shared driver conformance suite records this as the one case SQL Server skips.
 - **DuckDB read-only flat files** require Linux and a writable directory on the same filesystem as the input file. The driver pins the selected file through a private link. Read-only in-memory connections are refused.
 
 ## Interface
@@ -52,3 +53,12 @@ This page describes user-visible behavior and limits in the current source. Curr
 ## Operation outcomes
 
 - **PostgreSQL transaction outcome can remain unknown after session loss.** A disconnected session cannot confirm whether its transaction committed. BookiE records an unknown outcome and blocks governed writes for that connection. A fresh session can run reads and end its read-only snapshot with ROLLBACK. Commits and other governed writes stay blocked until the outcome is reconciled. The app has no in-app reconciliation action ([#947](https://github.com/cozyGarage/BookiE/issues/947)).
+
+## GPUI prototype (`apps/gpui`) after the DataTable change
+
+- **Keyboard page crossing:** the grid's rows are drawn by gpui-component's DataTable, which moves within the loaded page. Moving past the page edge with the keyboard does not load the next page yet; `the_cursor_crosses_to_the_next_page_and_back` is ignored until it does ([#2673](https://github.com/cozyGarage/BookiE/issues/2673) covers the bounded loader).
+- **Cell selection:** a cell is always selected while rows are shown (the top-left cell at first), so the cursor is always visible.
+- **Range selection:** Shift+arrow extends the table's row range; the grid's own selection count does not follow it yet.
+- **Typed values:** the table snapshot holds display text for the visible page. Copy still reads typed values from the source ([#2662](https://github.com/cozyGarage/BookiE/issues/2662)).
+- **Sidebar:** the narrow header label clips; the regex, locate and show-active-only controls are placeholders; the import menu entries do nothing yet.
+- **Settings:** one switch (Dark theme); the palette opens the page.

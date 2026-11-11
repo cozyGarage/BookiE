@@ -527,15 +527,19 @@ def application_memory_kib():
 def application_sidebar_row_construction():
     process = owned_application().process
     stderr = process.stderr
-    position = stderr.tell()
-    stderr.seek(0)
-    output = stderr.read()
-    stderr.seek(position)
-    matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
-    if not matches:
-        raise AssertionError("the app did not report sidebar row construction timing")
-    count, elapsed = matches[-1]
-    return int(count), float(elapsed)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        position = stderr.tell()
+        stderr.seek(0)
+        output = stderr.read()
+        stderr.seek(position)
+        matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
+        if matches:
+            count, elapsed = matches[-1]
+            stalls = [int(value) for value in re.findall(r"UI thread stalled.*?stall_ms=(\d+)", output)]
+            return int(count), float(elapsed), len(stalls), max(stalls, default=0)
+        time.sleep(POLL_SECONDS)
+    raise AssertionError("the app did not finish sidebar row construction")
 
 
 def wait_for_database_count(path, expected, timeout=WAIT_SECONDS):
@@ -1049,7 +1053,8 @@ def stop_application(process):
 
 def open_editor():
     invoke_named_action_within(CONNECTION_NAME, "Open connection")
-    invoke(wait_for_node(name="Open SQL editor"))
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 
 
@@ -1097,16 +1102,25 @@ def run_scenario(binary, scenario):
         artifact_dir = None
         if os.environ.get("BOOKIE_GTK_ARTIFACT_DIR"):
             artifact_dir = Path(os.environ["BOOKIE_GTK_ARTIFACT_DIR"])
-            artifact_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                artifact_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as error:
+                artifact_dir = None
+                stderr += f"\nFailure artifact directory unavailable: {error}\n"
+                if failure is None:
+                    failure = error
         if failure is not None and artifact_dir is not None:
-            (artifact_dir / f"{scenario.__name__}-accessibility.txt").write_text(
-                accessible_snapshot(), encoding="utf-8"
-            )
-            if shutil.which("scrot"):
-                subprocess.run(
-                    ["scrot", str(artifact_dir / f"{scenario.__name__}.png")],
-                    check=False,
+            try:
+                (artifact_dir / f"{scenario.__name__}-accessibility.txt").write_text(
+                    accessible_snapshot(), encoding="utf-8"
                 )
+                if shutil.which("scrot"):
+                    subprocess.run(
+                        ["scrot", str(artifact_dir / f"{scenario.__name__}.png")],
+                        check=False,
+                    )
+            except Exception as error:
+                stderr += f"\nFailure artifact collection failed: {error}\n"
         if process is not None:
             try:
                 stderr += stop_application(process)
@@ -1117,11 +1131,16 @@ def run_scenario(binary, scenario):
         if failure is None and "does not have a minimum size" in stderr:
             failure = AssertionError(f"a window with breakpoints has no minimum size:\n{stderr}")
         if artifact_dir is not None:
-            (artifact_dir / f"{scenario.__name__}-stderr.txt").write_text(stderr, encoding="utf-8")
-            (artifact_dir / f"{scenario.__name__}-result.json").write_text(json.dumps({
-                "scenario": scenario.__name__, "status": "passed" if failure is None else "failed",
-                "error": str(failure) if failure is not None else None,
-            }) + "\n", encoding="utf-8")
+            try:
+                (artifact_dir / f"{scenario.__name__}-stderr.txt").write_text(stderr, encoding="utf-8")
+                (artifact_dir / f"{scenario.__name__}-result.json").write_text(json.dumps({
+                    "scenario": scenario.__name__, "status": "passed" if failure is None else "failed",
+                    "error": str(failure) if failure is not None else None,
+                }) + "\n", encoding="utf-8")
+            except OSError as error:
+                stderr += f"\nFailure artifact write failed: {error}\n"
+                if failure is None:
+                    failure = error
         shutil.rmtree(base, ignore_errors=True)
     if failure is not None:
         raise AssertionError(f"{failure}\napplication stderr:\n{stderr}") from failure
@@ -1250,7 +1269,7 @@ def mysql_unparseable_routine_dialog_denial_preserves_database(database, _base):
     container = os.environ["BOOKIE_GTK_MYSQL_CONTAINER"]
     open_saved_connection(MYSQL_CONNECTION_NAME)
     wait_for_frame_containing(f"{MYSQL_CONNECTION_NAME} — BookiE")
-    invoke(wait_for_node(name="Open SQL editor"))
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 
     denied_name = "bookie_gtk_unparseable_denied"
@@ -1711,6 +1730,7 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
     wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
+    sidebar_nodes, row_construction_ms, ui_stall_count, ui_stall_max_ms = application_sidebar_row_construction()
     catalog_ready = time.monotonic()
     search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
     if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
@@ -1721,7 +1741,6 @@ def postgres_sidebar_catalog_profile(_database, base):
     wait_for_node_showing(target, True, timeout=120)
     filter_ready = time.monotonic()
     after = application_memory_kib()
-    sidebar_nodes, row_construction_ms = application_sidebar_row_construction()
     profile = {
         "scenario": "postgres_sidebar_catalog_profile",
         "source_commit": os.environ.get("BOOKIE_GTK_SOURCE_COMMIT"),
@@ -1732,6 +1751,8 @@ def postgres_sidebar_catalog_profile(_database, base):
         "search_filter_ms": (filter_ready - filter_started) * 1000,
         "sidebar_nodes": sidebar_nodes,
         "row_construction_ms": row_construction_ms,
+        "ui_stall_count": ui_stall_count,
+        "ui_stall_max_ms": ui_stall_max_ms,
         "memory_before_kib": before,
         "memory_after_kib": after,
     }
@@ -1741,6 +1762,7 @@ def postgres_sidebar_catalog_profile(_database, base):
 
 
 postgres_sidebar_catalog_profile.environment = "local"
+postgres_sidebar_catalog_profile.environment_overrides = {"BOOKIE_UI_STALL_MS": "16"}
 
 
 def press_x11_text(text):
@@ -1833,7 +1855,7 @@ def successful_switch_keeps_database_ownership(database, base):
 
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_node(name=f"{CONNECTION_B_NAME} — BookiE", role=pyatspi.ROLE_FRAME)
-    invoke(wait_for_node(name="Open SQL editor"))
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("CREATE TABLE ownership_new (id INTEGER PRIMARY KEY); INSERT INTO safety_items(id) VALUES (22)")
 
@@ -1880,7 +1902,7 @@ def failed_switch_preserves_the_old_workspace(database, _base):
 failed_switch_preserves_the_old_workspace.environment = "local"
 
 
-def running_query_is_cancelled_before_switch(database, base):
+def running_query_stays_with_its_connection_until_cancelled(database, base):
     run_sql(
         "WITH RECURSIVE counter(value) AS "
         "(VALUES(0) UNION ALL SELECT value + 1 FROM counter WHERE value < 1000000000) "
@@ -1888,10 +1910,14 @@ def running_query_is_cancelled_before_switch(database, base):
     )
     wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON)
     open_saved_connection(CONNECTION_B_NAME)
-    invoke(wait_for_node(name="Cancel queries and switch", role=pyatspi.ROLE_PUSH_BUTTON))
-
     wait_for_node(name=f"{CONNECTION_B_NAME} — BookiE", role=pyatspi.ROLE_FRAME)
-    invoke(wait_for_node(name="Open SQL editor"))
+    press_x11_key("Tab", ("Control_L",))
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    invoke(wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+    press_x11_key("Tab", ("Control_L",))
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("INSERT INTO safety_items(id) VALUES (44)")
     database_b = base / "safety-b.sqlite"
@@ -1900,7 +1926,7 @@ def running_query_is_cancelled_before_switch(database, base):
     assert database_ids(database_b) == [44]
 
 
-running_query_is_cancelled_before_switch.environment = "local"
+running_query_stays_with_its_connection_until_cancelled.environment = "local"
 
 
 def current_page_csv_export_is_pk_ordered(database, base):
@@ -2040,6 +2066,56 @@ restart_restores_active_editor_and_connection.environment = "local"
 restart_restores_active_editor_and_connection.needs_restart = True
 
 
+def first_keyboard_input_after_restore_targets_selected_editor(database, _base, restart):
+    queries = ["SELECT 1;", "SELECT 2;", "SELECT 3;"]
+
+    def seed_editor_tabs(environment):
+        path = Path(environment["XDG_CONFIG_HOME"]) / storage_dir_name() / "workspace_state.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "connections": {
+                        "d4f5e246-c40a-4a30-90f2-39e93e94d920": {
+                            "tabs": [
+                                {"kind": "editor", "query": query, "draft_id": None} for query in queries
+                            ],
+                            "active_idx": 1,
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    restart(before_start=seed_editor_tabs, restored=True)
+    window = wait_for_frame_containing(" — BookiE")
+    wait_within(window, name="SELECT 2;", role=pyatspi.ROLE_PAGE_TAB)
+    wait_within(window, name="SELECT 3;", role=pyatspi.ROLE_PAGE_TAB)
+    wait_within(window, name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+    press_x11_key("x")
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        editor_values = [
+            node.queryText().getText(0, -1)
+            for node in descendants(window)
+            if node_role(node) == pyatspi.ROLE_TEXT
+        ]
+        if any("x" in value for value in editor_values):
+            break
+        time.sleep(POLL_SECONDS)
+    assert any("x" in value for value in editor_values), "keyboard input did not reach an editor"
+    assert any("x" in value and "SELECT 2;" in value for value in editor_values), (
+        f"first keyboard input after restore missed the selected editor: {editor_values}"
+    )
+    assert all("x" not in value for value in editor_values if "SELECT 1;" in value or "SELECT 3;" in value), (
+        f"first keyboard input after restore reached a background editor: {editor_values}"
+    )
+
+
+first_keyboard_input_after_restore_targets_selected_editor.environment = "local"
+first_keyboard_input_after_restore_targets_selected_editor.needs_restart = True
+
+
 def restart_with_a_deleted_connection_opens_the_welcome_list(database, base, restart):
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
@@ -2120,40 +2196,31 @@ a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.environ
 a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile.needs_restart = True
 
 
-def pending_edits_gate_a_connection_switch(database, base):
+def pending_edits_survive_opening_another_connection(database, base):
     invoke_named_action_within("safety_items", "Open safety_items")
     wait_for_node(name="No rows on this page")
     invoke(wait_for_node(name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="1 unsaved change")
 
     open_saved_connection(CONNECTION_B_NAME)
-    wait_for_node(name="Save changes before switching?")
-    invoke(wait_for_node(name="Stay", role=pyatspi.ROLE_PUSH_BUTTON))
-    wait_for_node(name="Save changes before switching?", present=False)
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    press_x11_key("Tab", ("Control_L",))
     wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
-    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE", present=False)
     wait_for_node(name="1 unsaved change")
     assert_database_count_stable(database, 0)
-
-    open_saved_connection(CONNECTION_B_NAME)
-    wait_for_node(name="Save changes before switching?")
-    invoke(wait_for_node(name="Discard and switch", role=pyatspi.ROLE_PUSH_BUTTON))
+    press_x11_key("Tab", ("Control_L",))
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
-    wait_for_node(name="1 unsaved change", present=False)
-    assert database_ids(database) == [], (
-        f"a discarded pending row reached the old database: {database_ids(database)}"
-    )
 
-    invoke(wait_for_node(name="Open SQL editor"))
+    invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("INSERT INTO safety_items(id) VALUES (55)")
     database_b = base / "safety-b.sqlite"
     wait_for_database_count(database_b, 1)
     assert database_ids(database_b) == [55]
-    assert database_ids(database) == [], "the old connection stayed writable after the switch"
+    assert database_ids(database) == [], "the pending row reached the original database"
 
 
-pending_edits_gate_a_connection_switch.environment = "local"
+pending_edits_survive_opening_another_connection.environment = "local"
 
 
 def preview_sql_shows_the_pending_statement_without_saving(database, _base):
@@ -2185,7 +2252,7 @@ def preview_sql_shows_the_pending_statement_without_saving(database, _base):
 preview_sql_shows_the_pending_statement_without_saving.environment = "local"
 
 
-def a_browse_tab_reads_the_new_connection_after_a_switch(database, base):
+def browse_tabs_read_their_own_connections(database, base):
     database_b = base / "safety-b.sqlite"
     with sqlite3.connect(database) as connection:
         connection.executemany(
@@ -2205,13 +2272,13 @@ def a_browse_tab_reads_the_new_connection_after_a_switch(database, base):
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     wait_for_node_containing("Rows 1 – 7", present=False)
 
-    invoke_named_action_within("safety_items", "Open safety_items")
+    open_table_in_new_tab("safety_items")
     wait_for_node_containing("Rows 1 – 3")
     assert database_ids(database) == list(range(1, 8)), "the old database changed after the switch"
     assert database_ids(database_b) == [1, 2, 3]
 
 
-a_browse_tab_reads_the_new_connection_after_a_switch.environment = "local"
+browse_tabs_read_their_own_connections.environment = "local"
 
 
 def two_windows_hold_two_connections(database, base):
@@ -2532,6 +2599,9 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
 
     open_saved_connection(CONNECTION_NAME)
     wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    table_tab = wait_for_node(name="safety_items · Safety SQLite", role=pyatspi.ROLE_PAGE_TAB)
+    tab_bounds = table_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(tab_bounds.x + tab_bounds.width // 2, tab_bounds.y + tab_bounds.height // 2, button=1)
     wait_for_node_containing("Rows 1 – 5")
 
 
@@ -2728,7 +2798,7 @@ def imported_socket_urls_connect_to_mysql(_database, base):
         assert record is not None, f"{scheme} socket connection was not saved"
         open_saved_connection(record["name"])
         wait_for_frame_containing(f'{record["name"]} — BookiE')
-        invoke(wait_for_node(name="Open SQL editor"))
+        invoke_accessible_action("win.open-editor")
         wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         run_sql("SELECT 42 AS socket_probe")
         wait_for_node(name="42", role=pyatspi.ROLE_TABLE_CELL)
@@ -2992,13 +3062,14 @@ def main():
         successful_switch_keeps_database_ownership,
         history_panel_refreshes_after_queries_run_while_closed,
         failed_switch_preserves_the_old_workspace,
-        running_query_is_cancelled_before_switch,
+        running_query_stays_with_its_connection_until_cancelled,
         current_page_csv_export_is_pk_ordered,
         current_page_json_export_preserves_values,
         restart_restores_active_editor_and_connection,
-        pending_edits_gate_a_connection_switch,
+        first_keyboard_input_after_restore_targets_selected_editor,
+        pending_edits_survive_opening_another_connection,
         preview_sql_shows_the_pending_statement_without_saving,
-        a_browse_tab_reads_the_new_connection_after_a_switch,
+        browse_tabs_read_their_own_connections,
         two_windows_hold_two_connections,
         switched_connection_keeps_workspace_tabs_after_debounce,
         replacing_a_preview_tab_removes_the_old_page,

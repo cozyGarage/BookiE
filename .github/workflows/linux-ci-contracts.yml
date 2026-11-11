@@ -3,10 +3,10 @@ name: Linux CI contracts
 on:
   push:
     branches: [main]
-    paths: [".github/workflows/**", ".github/actions/**", "scripts/**", "apps/linux/packaging/**", "docs/**", "**.md"]
+    paths: [".github/workflows/**", ".forgejo/workflows/**", ".github/actionlint.yaml", ".github/actions/**", "scripts/**", "apps/linux/packaging/**", "docs/**", "**.md", "**/Cargo.toml", "Cargo.lock"]
   pull_request:
     branches: [main]
-    paths: [".github/workflows/**", ".github/actions/**", "scripts/**", "apps/linux/packaging/**", "docs/**", "**.md"]
+    paths: [".github/workflows/**", ".forgejo/workflows/**", ".github/actionlint.yaml", ".github/actions/**", "scripts/**", "apps/linux/packaging/**", "docs/**", "**.md", "**/Cargo.toml", "Cargo.lock"]
   workflow_dispatch:
 
 permissions:
@@ -62,7 +62,7 @@ jobs:
       - name: Audit the workflows for injection, permission and credential risks
         # Offline, so the verdict depends on these files alone. Low-confidence
         # findings are left out to keep the check free of false positives.
-        run: zizmor --offline --format=github --min-severity=medium --min-confidence=medium .github/workflows
+        run: zizmor --offline --format=github --min-severity=medium --min-confidence=medium .github/workflows/*.yml .forgejo/workflows/*.yml
   unused-dependencies:
     runs-on: ubuntu-24.04
     timeout-minutes: 10

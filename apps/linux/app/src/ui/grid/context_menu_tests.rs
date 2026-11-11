@@ -3,6 +3,491 @@ use gtk::glib;
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn reference_menu_does_not_navigate_from_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![Value::Int(1)]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![Value::Int(2)]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, receiver) = relm4::channel();
+    let mut id = menu_test_column("id", "INTEGER");
+    id.primary_key = true;
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[id],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: ["id".to_string()].into_iter().collect(),
+            has_inbound_foreign_keys: true,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::CheckButton::new();
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 0);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    view.activate_action("cell.go-to-reference", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::GoToReference { row, .. } if row[0].1 == Value::Int(1)));
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.go-to-reference", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not navigate using another row");
+    view.activate_action("cell.copy-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not copy another row");
+    view.activate_action("cell.show-row-json", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not show another row");
+    view.activate_action("cell.show-referencing-rows", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a stale menu must not find references using another row"
+    );
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    rows.splice(0, 1, &[crate::ui::row_object::RowObject::new(vec![Value::Int(2)])]);
+    view.activate_action("cell.go-to-reference", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a replacement row must not inherit the old menu action"
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn filter_menu_does_not_use_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(1),
+        Value::Text("first".into()),
+    ]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(2),
+        Value::Text("second".into()),
+    ]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, receiver) = relm4::channel();
+    let mut id = menu_test_column("id", "INTEGER");
+    id.primary_key = true;
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[id, menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: true,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::CheckButton::new();
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::FilterByValue { value: Value::Text(value), .. } if value == "first"));
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not filter using another row");
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(2),
+            Value::Text("replacement".into()),
+        ])],
+    );
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a replacement row must not inherit the old menu action"
+    );
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::<[Value]>::from([]));
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::FilterByValue { value: Value::Text(value), .. } if value == "replacement"));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(3),
+            Value::Text("new".into()),
+        ])],
+    );
+    view.activate_action("cell.filter-by-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a keyless replacement row must not inherit the old menu action"
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn inline_edit_does_not_open_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(1),
+        Value::Text("first".into()),
+    ]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(2),
+        Value::Text("second".into()),
+    ]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, _receiver) = relm4::channel();
+    let mut id_column = menu_test_column("id", "INTEGER");
+    id_column.primary_key = true;
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[id_column, menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = crate::ui::cell_editor::CellEditor::new();
+    cell.set_inline_editable(true);
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(cell.is_editing(), "the original cell remains editable");
+    cell.stop_editing(false);
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(
+        !cell.is_editing(),
+        "a rebound cell must not start editing a different row"
+    );
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(2),
+            Value::Text("replacement".into()),
+        ])],
+    );
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(
+        !cell.is_editing(),
+        "a replacement row must not inherit the old menu action"
+    );
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new_draft(
+            17,
+            vec![Value::Null, Value::Text("draft".into())],
+        )],
+    );
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::<[Value]>::from([]));
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(cell.is_editing(), "the original draft remains editable");
+    cell.stop_editing(false);
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new_draft(
+            18,
+            vec![Value::Null, Value::Text("replacement".into())],
+        )],
+    );
+    view.activate_action("cell.edit", None).unwrap();
+    assert!(
+        !cell.is_editing(),
+        "a replacement draft must not inherit the old menu action"
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn full_value_edit_does_not_fetch_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(1),
+        bookie_core::partial_value(1000, "first"),
+    ]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![
+        Value::Int(2),
+        bookie_core::partial_value(1000, "second"),
+    ]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, receiver) = relm4::channel();
+    let mut id_column = menu_test_column("id", "INTEGER");
+    id_column.primary_key = true;
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[id_column, menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::CheckButton::new();
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    assert!(menus.edit_full_value_action.is_enabled());
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.edit-full-value", None).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(
+        received.is_err(),
+        "a rebound cell must not open or fetch a different row"
+    );
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(2),
+            bookie_core::partial_value(1000, "replacement"),
+        ])],
+    );
+    view.activate_action("cell.edit-full-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a replaced row must not be opened using the old key");
+    rows.splice(
+        0,
+        1,
+        &[crate::ui::row_object::RowObject::new(vec![
+            Value::Int(1),
+            bookie_core::partial_value(1000, "first"),
+        ])],
+    );
+    view.activate_action("cell.edit-full-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(
+        matches!(message, GridMsg::FetchCellValue { row_key, edit_row_position: Some(0), .. } if row_key == vec![Value::Int(1)])
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn view_value_does_not_fetch_a_rebound_cell() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    for id in [1, 2] {
+        let row = crate::ui::row_object::RowObject::new(vec![Value::Int(id), Value::Text("x".repeat(12000))]);
+        row.preview_values_from_result();
+        rows.append(&row);
+    }
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    let (sender, receiver) = relm4::channel();
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[menu_test_column("id", "INTEGER"), menu_test_column("value", "TEXT")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::CheckButton::new();
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 1);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    view.activate_action("cell.view-value", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::FetchCellValue { row_key, .. } if row_key == vec![Value::Int(1)]));
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.view-value", None).unwrap();
+    let received =
+        runtime.block_on(async { tokio::time::timeout(std::time::Duration::from_millis(30), receiver.recv()).await });
+    assert!(received.is_err(), "a stale menu must not fetch another row");
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn delete_action_preserves_the_stored_row_selected_when_menu_opened() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new(vec![Value::Int(1)]));
+    rows.append(&crate::ui::row_object::RowObject::new(vec![Value::Int(2)]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows))));
+    let (sender, receiver) = relm4::channel();
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[menu_test_column("id", "INTEGER")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::Label::new(None);
+    POSITION_SLOT.set(&cell, 0);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(1)]));
+    super::super::display::COLUMN_SLOT.set(&cell, 0);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    POSITION_SLOT.set(&cell, 1);
+    ROW_KEY_SLOT.set(&cell, std::sync::Arc::from([Value::Int(2)]));
+    view.activate_action("cell.delete-row", None).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(
+        matches!(message, GridMsg::DeleteRowAt { row_position: 0, row_key, draft_id: None } if row_key == vec![Value::Int(1)])
+    );
+    view.activate_action("cell.set-null", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::SetCellNull { row_position: 0, row_key, .. } if row_key == vec![Value::Int(1)]));
+    view.activate_action("cell.set-default", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::ResetCell(request)
+        if request.row_position == 0 && request.row_key == vec![Value::Int(1)] && request.reset == Some(ColumnReset::Default)));
+    view.activate_action("cell.set-expression", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::ResetCell(request) if request.reset.is_none()));
+    view.activate_action("cell.duplicate-row", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(
+        matches!(message, GridMsg::DuplicateRow { row_position: 0, row_key, draft_id: None } if row_key == vec![Value::Int(1)])
+    );
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn delete_action_carries_the_selected_draft_identity() {
+    gtk::init().unwrap();
+    let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();
+    rows.append(&crate::ui::row_object::RowObject::new_draft(17, vec![Value::Int(1)]));
+    let view = gtk::ColumnView::new(Some(gtk::MultiSelection::new(Some(rows.clone()))));
+    let (sender, receiver) = relm4::channel();
+    let menus = install_grid_context_menus(
+        &view,
+        sender,
+        &[menu_test_column("id", "INTEGER")],
+        false,
+        "sqlite".into(),
+        GridMenuOptions {
+            filterable: false,
+            row_mutations_allowed: true,
+            foreign_key_columns: Default::default(),
+            has_inbound_foreign_keys: false,
+            local_result_view: None,
+            whole_result_filter: false,
+            snapshot_export: false,
+        },
+    );
+    let cell = gtk::Label::new(None);
+    POSITION_SLOT.set(&cell, 0);
+    super::super::display::COLUMN_SLOT.set(&cell, 0);
+    let options = cell_menu_options(&menus, cell.upcast_ref()).unwrap();
+    prepare_cell_menu(&menus, &view, cell.upcast_ref(), &options);
+    rows.insert(0, &crate::ui::row_object::RowObject::new_draft(18, vec![Value::Int(2)]));
+    view.activate_action("cell.delete-row", None).unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(
+        message,
+        GridMsg::DeleteRowAt {
+            row_position: 0,
+            draft_id: Some(17),
+            ..
+        }
+    ));
+    view.activate_action("cell.set-null", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(
+        message,
+        GridMsg::SetCellNull {
+            row_position: 0,
+            draft_id: Some(17),
+            ..
+        }
+    ));
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn source_lookup_supports_alternate_models_and_refuses_unloaded_cells() {
     gtk::init().unwrap();
     let rows = gio::ListStore::new::<crate::ui::row_object::RowObject>();

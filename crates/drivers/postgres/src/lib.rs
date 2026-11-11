@@ -8,14 +8,15 @@ use sqlx::{Connection as SqlxConnection, Pool, Postgres, Row};
 
 use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
-    CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, ConnectOptions, Connection, DatabaseDriver,
-    DriverError, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl,
-    QualifiedTypeName, QueryResult, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable,
+    CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, CommitResolution, CommitToken, ConnectOptions,
+    Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult, ForeignKeyInfo,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo,
+    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod array;
 mod catalog;
+mod commit_resolution;
 mod decode;
 mod numeric;
 mod params;
@@ -38,6 +39,14 @@ pub struct PgDriver;
 
 #[async_trait]
 impl DatabaseDriver for PgDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            special_numeric_literals: true,
+            extended_calendar_temporals: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn id(&self) -> &'static str {
         "postgres"
     }
@@ -91,6 +100,10 @@ impl DatabaseDriver for PgDriver {
     }
 
     fn supports_local_socket_directory(&self) -> bool {
+        true
+    }
+
+    fn supports_sequence_restart(&self) -> bool {
         true
     }
 
@@ -166,6 +179,30 @@ struct PgConnection {
 
 #[async_trait]
 impl Connection for PgConnection {
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT collname::text,
+                    CASE WHEN collencoding = -1 THEN '' ELSE pg_encoding_to_char(collencoding) END,
+                    collname = 'default'
+             FROM pg_collation
+             WHERE collencoding IN (-1, pg_char_to_encoding(pg_encoding_to_char((SELECT encoding FROM pg_database WHERE datname = current_database()))))
+             ORDER BY collname
+             LIMIT $1",
+        )
+        .bind(bookie_core::MAX_COLLATIONS as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| bookie_core::CollationInfo {
+                name: row.get(0),
+                charset: row.get(1),
+                is_default: row.get(2),
+            })
+            .collect())
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
             "SELECT datname FROM pg_database
@@ -316,6 +353,8 @@ impl Connection for PgConnection {
                   OR (n.nspname = $2 AND t.relname = $1))
                AND a.attnum > 0
                AND NOT a.attisdropped
+               AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+               AND pg_catalog.has_column_privilege(t.oid, a.attnum, 'SELECT,INSERT,UPDATE,REFERENCES')
              ORDER BY a.attnum",
         )
         .bind(table)
@@ -520,6 +559,8 @@ impl Connection for PgConnection {
             JOIN pg_catalog.pg_class i ON i.oid = ix.indexrelid
             WHERE (($2::text IS NULL AND t.relname = $1 AND pg_catalog.pg_table_is_visible(t.oid))
                  OR (n.nspname = $2 AND t.relname = $1))
+              AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(t.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
             ORDER BY i.relname",
         )
         .bind(table)
@@ -597,6 +638,10 @@ impl Connection for PgConnection {
             WHERE c.contype = 'f'
               AND (($2::text IS NULL AND t.relname = $1 AND pg_catalog.pg_table_is_visible(t.oid))
                  OR (n.nspname = $2 AND t.relname = $1))
+              AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(t.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
+              AND pg_catalog.has_schema_privilege(fn_ns.oid, 'USAGE')
+              AND pg_catalog.has_any_column_privilege(fn_class.oid, 'SELECT,INSERT,UPDATE,REFERENCES')
             GROUP BY c.conname, fn_class.relname, fn_ns.nspname, c.confdeltype, c.confupdtype
             ORDER BY c.conname",
         )
@@ -672,6 +717,10 @@ impl Connection for PgConnection {
 
     fn supports_server_cancellation(&self) -> bool {
         true
+    }
+
+    async fn resolve_commit(&self, token: &CommitToken) -> Result<CommitResolution, DriverError> {
+        commit_resolution::resolve(&self.pool, token).await
     }
 
     async fn ping(&self) -> Result<(), DriverError> {

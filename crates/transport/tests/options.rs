@@ -32,6 +32,7 @@ fn saved(tls_mode: Option<TlsMode>, use_tls: bool) -> SavedConnection {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 
@@ -50,6 +51,7 @@ fn hop(host: &str, port: u16, username: &str, jump: Option<SavedSshConfig>) -> S
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     }
 }
 

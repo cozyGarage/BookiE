@@ -208,7 +208,7 @@ fn build_shell() -> (
     gtk::Label,
 ) {
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Highlight Rules"))
+        .title(bookie_app_services::tr!("Highlight Rules"))
         .content_width(640)
         .content_height(520)
         .build();
@@ -216,8 +216,8 @@ fn build_shell() -> (
         .show_start_title_buttons(false)
         .show_end_title_buttons(false)
         .build();
-    let cancel = gtk::Button::with_label(&crate::tr!("Cancel"));
-    let apply = gtk::Button::with_label(&crate::tr!("Apply"));
+    let cancel = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
+    let apply = gtk::Button::with_label(&bookie_app_services::tr!("Apply"));
     apply.add_css_class("suggested-action");
     header.pack_start(&cancel);
     header.pack_end(&apply);
@@ -226,12 +226,14 @@ fn build_shell() -> (
         .css_classes(["boxed-list"])
         .build();
     let add = gtk::Button::builder()
-        .label(crate::tr!("Add rule"))
+        .label(bookie_app_services::tr!("Add rule"))
         .halign(gtk::Align::Start)
         .build();
     add.add_css_class("flat");
     let description = gtk::Label::builder()
-        .label(crate::tr!("LIKE patterns are limited to 4 KiB (4,096 bytes)."))
+        .label(bookie_app_services::tr!(
+            "LIKE patterns are limited to 4 KiB (4,096 bytes)."
+        ))
         .halign(gtk::Align::Start)
         .wrap(true)
         .build();
@@ -323,7 +325,7 @@ fn wire_apply(
 ) {
     let dialog = dialog.downgrade();
     if validate_highlight_pattern_lengths(&HighlightRuleSet::default(), &original).is_err() {
-        status.set_text(&crate::tr!(
+        status.set_text(&bookie_app_services::tr!(
             "An existing LIKE pattern exceeds 4 KiB (4,096 bytes) and is not applied. Edit or remove it."
         ));
         status.add_css_class("warning");
@@ -332,7 +334,9 @@ fn wire_apply(
     apply.connect_clicked(move |_| {
         let set = normalize_highlight_rules(&state.borrow().rules);
         if validate_highlight_pattern_lengths(&original, &set).is_err() {
-            status.set_text(&crate::tr!("New LIKE patterns must be 4 KiB (4,096 bytes) or less."));
+            status.set_text(&bookie_app_services::tr!(
+                "New LIKE patterns must be 4 KiB (4,096 bytes) or less."
+            ));
             status.remove_css_class("warning");
             status.add_css_class("error");
             status.set_visible(true);
@@ -473,7 +477,7 @@ fn single_value_entry(
     suppress: Rc<Cell<bool>>,
 ) -> gtk::Entry {
     let entry = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("Value"))
+        .placeholder_text(bookie_app_services::tr!("Value"))
         .valign(gtk::Align::Center)
         .hexpand(true)
         .build();
@@ -498,11 +502,11 @@ fn pair_value_box(
     suppress: Rc<Cell<bool>>,
 ) -> gtk::Box {
     let lo = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("From"))
+        .placeholder_text(bookie_app_services::tr!("From"))
         .valign(gtk::Align::Center)
         .build();
     let hi = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("To"))
+        .placeholder_text(bookie_app_services::tr!("To"))
         .valign(gtk::Align::Center)
         .build();
     if let Some(FilterValue::Pair(a, b)) = rule.value.as_ref() {
@@ -546,7 +550,7 @@ fn list_value_entry(
     suppress: Rc<Cell<bool>>,
 ) -> gtk::Entry {
     let entry = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("a, b, c"))
+        .placeholder_text(bookie_app_services::tr!("a, b, c"))
         .valign(gtk::Align::Center)
         .hexpand(true)
         .build();
@@ -603,7 +607,7 @@ fn target_dropdown(
     state: Rc<RefCell<HighlightRuleSet>>,
     suppress: Rc<Cell<bool>>,
 ) -> gtk::DropDown {
-    let dropdown = gtk::DropDown::from_strings(&[&crate::tr!("Cell"), &crate::tr!("Row")]);
+    let dropdown = gtk::DropDown::from_strings(&[&bookie_app_services::tr!("Cell"), &bookie_app_services::tr!("Row")]);
     dropdown.set_valign(gtk::Align::Center);
     dropdown.set_selected(match rule.target {
         HighlightTarget::Cell => 0,
@@ -627,7 +631,7 @@ fn target_dropdown(
 fn remove_button(index: usize, state: Rc<RefCell<HighlightRuleSet>>, rebuild: Rebuild) -> gtk::Button {
     let button = gtk::Button::builder()
         .icon_name("user-trash-symbolic")
-        .tooltip_text(crate::tr!("Remove rule"))
+        .tooltip_text(bookie_app_services::tr!("Remove rule"))
         .valign(gtk::Align::Center)
         .build();
     button.add_css_class("flat");

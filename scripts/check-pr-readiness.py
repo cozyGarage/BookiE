@@ -20,6 +20,8 @@ REQUIRED_CODE_CHECKS = (
     "Security (supply-chain)",
 )
 REQUIRED_CONTRACT_CHECKS = ("harness", "workflow-lint", "workflow-security")
+REQUIRED_MANIFEST_CHECKS = ("unused-dependencies",)
+MANIFEST_FILES = ("Cargo.toml", "Cargo.lock")
 REQUIRED_ALWAYS = ("pr-title", "release-note")
 CONTRACT_PREFIXES = (".github/workflows/", ".github/actions/", "scripts/", "apps/linux/packaging/", "docs/")
 HEAD_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -36,11 +38,15 @@ class TransientGitHubError(ReadinessError):
 def required_contexts(paths):
     required = set(REQUIRED_ALWAYS)
     code_change = any(not path.startswith("docs/") and not path.endswith(".md") for path in paths)
+    if paths and all(path.startswith("docs/") or path.endswith(".md") for path in paths):
+        return sorted(required | {"harness"})
     contract_change = any(path.startswith(CONTRACT_PREFIXES) or path.endswith(".md") for path in paths)
     if code_change:
         required.update(REQUIRED_CODE_CHECKS)
     if contract_change:
         required.update(REQUIRED_CONTRACT_CHECKS)
+    if any(path.endswith(MANIFEST_FILES) for path in paths):
+        required.update(REQUIRED_MANIFEST_CHECKS)
     return sorted(required)
 
 

@@ -70,20 +70,24 @@ pub(in crate::ui::editor) fn present(
         .child(&content)
         .build();
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Compare results"))
+        .title(bookie_app_services::tr!("Compare results"))
         .content_width(520)
         .content_height(520)
         .child(&scroller)
         .build();
     let form = Rc::new(Form {
         dialog: dialog.downgrade(),
-        left: dropdown(&labels, 0, &crate::tr!("Left result")),
-        right: dropdown(&labels, u32::from(labels.len() > 1), &crate::tr!("Right result")),
+        left: dropdown(&labels, 0, &bookie_app_services::tr!("Left result")),
+        right: dropdown(
+            &labels,
+            u32::from(labels.len() > 1),
+            &bookie_app_services::tr!("Right result"),
+        ),
         keys: gtk::ListBox::new(),
         note: note(String::new()),
         progress: note(String::new()),
-        compare: gtk::Button::with_label(&crate::tr!("Compare")),
-        cancel: gtk::Button::with_label(&crate::tr!("Cancel")),
+        compare: gtk::Button::with_label(&bookie_app_services::tr!("Compare")),
+        cancel: gtk::Button::with_label(&bookie_app_services::tr!("Cancel")),
         candidates,
         ticket: RefCell::new(None),
         sender,
@@ -95,15 +99,18 @@ pub(in crate::ui::editor) fn present(
 }
 
 fn assemble(form: &Rc<Form>, content: &gtk::Box) {
-    content.append(&labelled(&crate::tr!("Left result"), &form.left));
-    content.append(&labelled(&crate::tr!("Right result"), &form.right));
+    content.append(&labelled(&bookie_app_services::tr!("Left result"), &form.left));
+    content.append(&labelled(&bookie_app_services::tr!("Right result"), &form.right));
     form.keys.set_selection_mode(gtk::SelectionMode::None);
     form.keys.add_css_class("boxed-list");
-    content.append(&labelled(&crate::tr!("Key columns (optional)"), &form.keys));
-    content.append(&note(crate::tr!(
+    content.append(&labelled(
+        &bookie_app_services::tr!("Key columns (optional)"),
+        &form.keys,
+    ));
+    content.append(&note(bookie_app_services::tr!(
         "Without a key, whole rows are compared and row order is ignored. With a key, changed rows are shown as Before and After."
     )));
-    content.append(&note(crate::tr!(
+    content.append(&note(bookie_app_services::tr!(
         "This compares the saved results only and records an entry in the audit journal. Values hidden by policy masking compare as the text shown."
     )));
     content.append(&form.note);
@@ -209,7 +216,8 @@ fn cancel_running(form: &Form) -> bool {
 
 fn start(form: &Rc<Form>) {
     if form.left.selected() == form.right.selected() {
-        form.note.set_label(&crate::tr!("Choose two different results"));
+        form.note
+            .set_label(&bookie_app_services::tr!("Choose two different results"));
         return;
     }
     let Some(request) = build_request(form) else { return };
@@ -223,7 +231,7 @@ fn start(form: &Rc<Form>) {
         widget.set_sensitive(false);
     }
     form.compare.set_sensitive(false);
-    form.progress.set_label(&crate::tr!("Comparing…"));
+    form.progress.set_label(&bookie_app_services::tr!("Comparing…"));
     let _ = form.sender.send(SqlEditorInput::CompareResults(Box::new(request)));
     let weak = Rc::downgrade(form);
     gtk::glib::timeout_add_local(std::time::Duration::from_millis(150), move || match weak.upgrade() {
@@ -260,6 +268,6 @@ fn poll(form: &Rc<Form>) -> gtk::glib::ControlFlow {
     }
     let rows = crate::ui::count_format::format_thousands(u128::from(ticket.progress().rows_done()));
     form.progress
-        .set_label(&crate::tr!("Comparing… {rows} rows read").replace("{rows}", &rows));
+        .set_label(&bookie_app_services::tr!("Comparing… {rows} rows read").replace("{rows}", &rows));
     gtk::glib::ControlFlow::Continue
 }

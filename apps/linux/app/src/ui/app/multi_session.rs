@@ -105,7 +105,7 @@ impl App {
         if let Some(catalog) = catalog {
             self.sidebar_views = catalog.views;
             self.reset_sidebar_catalog();
-            self.repopulate_sidebar(&catalog.tables);
+            self.repopulate_sidebar(&catalog.tables, sender.clone());
             self.rebuild_schema_filter_popover(&sender);
             self.refresh_schema_index();
         }
@@ -153,7 +153,7 @@ impl App {
                 .and_then(|id| self.database.metadata(id))
                 .map(|metadata| metadata.name);
             let title = connection_aware_tab_title(&base, connection_name.as_deref(), name_with_connection);
-            page.set_title(&title);
+            super::tab_title::set_tab_title(page, &title);
         }
     }
 
@@ -188,12 +188,17 @@ impl App {
         true
     }
 
-    pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
-        let closed_tabs = self.multi.sessions.disconnect(connection_id);
+    pub(super) fn release_connection_resources(&mut self, connection_id: Uuid) {
         self.multi.guards.remove(connection_id);
         self.multi.catalogs.remove(&connection_id);
         self.database.close(connection_id);
+        crate::services::approval_grants::shared().revoke_connection(connection_id);
         crate::services::window_registry::unregister(connection_id);
+    }
+
+    pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
+        let closed_tabs = self.multi.sessions.disconnect(connection_id);
+        self.release_connection_resources(connection_id);
         for tab_id in closed_tabs {
             sender.input(AppMsg::FinishCloseWorkspaceTab(tab_id));
         }

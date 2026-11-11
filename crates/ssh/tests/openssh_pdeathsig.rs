@@ -74,6 +74,7 @@ fn run_harness(dir: PathBuf) -> ! {
         destination: SshDestination::new("bastion", None, None).unwrap(),
         jump_hosts: Vec::new(),
         auth: OpenSshAuth::Agent,
+        local_port: None,
     };
     let runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.spawn(async move {

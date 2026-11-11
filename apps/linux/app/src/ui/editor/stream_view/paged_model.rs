@@ -3,9 +3,14 @@ use gtk4::subclass::prelude::*;
 use gtk4::{gio, glib};
 use std::cell::{Cell, RefCell};
 
-use super::page_index::PageIndex;
-use super::page_window::PageWindow;
 use crate::ui::row_object::RowObject;
+use bookie_results::stream_page_index::PageIndex;
+use bookie_results::stream_page_window::PageWindow;
+
+type RetainedPage = (
+    std::sync::Arc<bookie_core::QueryResult>,
+    bookie_results::stream_page_budget::StreamPageLease,
+);
 
 mod imp {
     use super::*;
@@ -14,7 +19,11 @@ mod imp {
     pub struct PagedModel {
         pub(super) index: RefCell<PageIndex>,
         pub(super) width: Cell<usize>,
-        pub(super) pages: RefCell<Option<PageWindow<std::sync::Arc<bookie_core::QueryResult>>>>,
+        pub(super) byte_limit: Cell<usize>,
+        pub(super) suspended: Cell<bool>,
+        pub(super) selection_snapshot: RefCell<Option<gtk4::Bitset>>,
+        pub(super) pages: RefCell<Option<PageWindow<RetainedPage>>>,
+        pub(super) page_budget: RefCell<bookie_results::stream_page_budget::StreamPageBudget>,
         pub(super) selection: glib::WeakRef<gtk4::MultiSelection>,
         pub(super) view: glib::WeakRef<gtk4::ColumnView>,
         pub(super) status: glib::WeakRef<gtk4::Label>,
@@ -35,16 +44,22 @@ mod imp {
         }
 
         fn n_items(&self) -> u32 {
+            if self.suspended.get() {
+                return 0;
+            }
             u32::try_from(self.index.borrow().len()).unwrap_or(u32::MAX)
         }
 
         fn item(&self, position: u32) -> Option<glib::Object> {
+            if self.suspended.get() {
+                return None;
+            }
             let (page, offset) = self.index.borrow().row(position as usize)?;
             let pages = self.pages.borrow();
             let row = pages
                 .as_ref()
                 .and_then(|pages| pages.get(page))
-                .and_then(|result| RowObject::from_shared(result, offset, None));
+                .and_then(|(result, _lease)| RowObject::from_shared(result, offset, None));
             Some(row.unwrap_or_else(|| RowObject::unloaded(self.width.get())).upcast())
         }
     }
@@ -55,15 +70,38 @@ glib::wrapper! {
 }
 
 impl PagedModel {
+    #[cfg(test)]
     pub(super) fn new(counts: &[usize], width: usize) -> Self {
-        Self::with_limit(counts, width, bookie_core::MAX_QUERY_RESULT_BYTES)
+        Self::with_budget(
+            counts,
+            width,
+            bookie_core::MAX_QUERY_RESULT_BYTES,
+            bookie_results::stream_page_budget::StreamPageBudget::default(),
+        )
     }
 
+    #[cfg(test)]
     fn with_limit(counts: &[usize], width: usize, limit: usize) -> Self {
+        Self::with_budget(
+            counts,
+            width,
+            limit,
+            bookie_results::stream_page_budget::StreamPageBudget::default(),
+        )
+    }
+
+    pub(super) fn with_budget(
+        counts: &[usize],
+        width: usize,
+        limit: usize,
+        page_budget: bookie_results::stream_page_budget::StreamPageBudget,
+    ) -> Self {
         let model: Self = glib::Object::new();
         *model.imp().index.borrow_mut() = PageIndex::new(counts);
         model.imp().width.set(width);
+        model.imp().byte_limit.set(limit);
         *model.imp().pages.borrow_mut() = Some(PageWindow::new(limit, 2));
+        *model.imp().page_budget.borrow_mut() = page_budget;
         model
     }
 
@@ -111,6 +149,7 @@ impl PagedModel {
                 let Some(model) = model.upgrade() else { return };
                 let rows = rows.borrow();
                 let Some((&first, &last)) = rows.first().zip(rows.last()) else {
+                    model.show(0, 0);
                     return;
                 };
                 model.show(first as usize, (last - first) as usize + 1);
@@ -126,11 +165,30 @@ impl PagedModel {
         columns: &[bookie_core::ColumnInfo],
     ) {
         while let Some(index) = self.next_request() {
+            let Some(mut lease) = self
+                .imp()
+                .page_budget
+                .borrow()
+                .reserve(bookie_core::MAX_QUERY_RESULT_BYTES)
+            else {
+                if let Some(window) = self.imp().pages.borrow_mut().as_mut() {
+                    window.defer(index);
+                }
+                self.sync_status();
+                continue;
+            };
             let (send, receive) = async_channel::bounded(1);
             let worker_spool = spool.clone();
             let worker_columns = columns.to_vec();
+            let worker_lease = lease.clone();
             runtime.spawn(async move {
-                let _ = send.send(worker_spool.load_page(index, worker_columns).await).await;
+                let _ = send
+                    .send(
+                        worker_spool
+                            .load_page_retained(index, worker_columns, worker_lease)
+                            .await,
+                    )
+                    .await;
             });
             let model = self.downgrade();
             let runtime = runtime.clone();
@@ -141,7 +199,14 @@ impl PagedModel {
                 let Some(model) = model.upgrade() else { return };
                 match result {
                     Ok(Ok(page)) => {
-                        model.install(index, page);
+                        if lease.resize_page(&page) {
+                            model.install_with_lease(index, page, lease);
+                        } else {
+                            if let Some(window) = model.imp().pages.borrow_mut().as_mut() {
+                                window.defer(index);
+                            }
+                            model.show_failure();
+                        }
                     }
                     _ => {
                         if let Some(window) = model.imp().pages.borrow_mut().as_mut() {
@@ -155,7 +220,24 @@ impl PagedModel {
         }
     }
 
+    #[cfg(test)]
     fn install(&self, index: u64, page: std::sync::Arc<bookie_core::QueryResult>) -> bool {
+        let Some(lease) = self.imp().page_budget.borrow().retain(&page) else {
+            if let Some(window) = self.imp().pages.borrow_mut().as_mut() {
+                window.defer(index);
+            }
+            self.show_failure();
+            return false;
+        };
+        self.install_with_lease(index, page, lease)
+    }
+
+    fn install_with_lease(
+        &self,
+        index: u64,
+        page: std::sync::Arc<bookie_core::QueryResult>,
+        lease: bookie_results::stream_page_budget::StreamPageLease,
+    ) -> bool {
         let Some((start, count)) = self.imp().index.borrow().page_range(index) else {
             return false;
         };
@@ -168,7 +250,7 @@ impl PagedModel {
         }
         let size = page.estimated_row_bytes();
         let evicted = match self.imp().pages.borrow_mut().as_mut() {
-            Some(pages) => match pages.loaded(index, page, size) {
+            Some(pages) => match pages.loaded(index, (page, lease), size) {
                 Some(evicted) => evicted,
                 None => return false,
             },
@@ -220,6 +302,60 @@ impl PagedModel {
     pub(super) fn attach_selection(&self, selection: &gtk4::MultiSelection, view: &gtk4::ColumnView) {
         self.imp().selection.set(Some(selection));
         self.imp().view.set(Some(view));
+        view.connect_unmap({
+            let model = self.downgrade();
+            move |_| {
+                if let Some(model) = model.upgrade() {
+                    model.release_pages();
+                }
+            }
+        });
+        view.connect_map({
+            let model = self.downgrade();
+            move |_| {
+                let model = model.clone();
+                glib::idle_add_local_once(move || {
+                    if let Some(model) = model.upgrade() {
+                        model.restore_rows();
+                    }
+                });
+            }
+        });
+    }
+
+    fn release_pages(&self) {
+        let rows = self.n_items() as usize;
+        if rows == 0 {
+            return;
+        }
+        *self.imp().selection_snapshot.borrow_mut() = self
+            .imp()
+            .selection
+            .upgrade()
+            .map(|selection| selection.selection().copy());
+        self.imp().suspended.set(true);
+        let limit = self.imp().byte_limit.get();
+        let Some(pages) = self.imp().pages.replace(Some(PageWindow::new(limit, 2))) else {
+            return;
+        };
+        drop(pages);
+        self.items_changed(0, rows as u32, 0);
+        self.sync_status();
+    }
+
+    fn restore_rows(&self) {
+        if !self.imp().suspended.replace(false) {
+            return;
+        }
+        let rows = self.n_items();
+        self.items_changed(0, 0, rows);
+        let (Some(selection), Some(snapshot)) = (
+            self.imp().selection.upgrade(),
+            self.imp().selection_snapshot.borrow_mut().take(),
+        ) else {
+            return;
+        };
+        selection.set_selection(&snapshot, &gtk4::Bitset::new_range(0, rows));
     }
 
     pub(super) fn attach_status(&self, status: &gtk4::Label) {
@@ -237,9 +373,9 @@ impl PagedModel {
         let pages = self.imp().pages.borrow();
         let Some(pages) = pages.as_ref() else { return };
         let message = if pages.has_failed() {
-            crate::tr!("A saved result page could not be loaded. Retry or use the page view.")
+            bookie_app_services::tr!("A saved result page could not be loaded. Retry or use the page view.")
         } else if pages.has_deferred() {
-            crate::tr!("Some visible pages exceed the memory limit. Use the page view to see all rows.")
+            bookie_app_services::tr!("Some visible pages exceed the memory limit. Use the page view to see all rows.")
         } else {
             String::new()
         };

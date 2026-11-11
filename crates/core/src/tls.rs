@@ -69,6 +69,8 @@ pub struct TlsConfig {
     /// Planned as a lowercase hex SHA-256 pin, like SSH known_hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pinned_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub strict_encryption: bool,
 }
 
 impl TlsConfig {

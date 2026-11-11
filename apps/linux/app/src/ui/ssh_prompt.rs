@@ -53,31 +53,31 @@ fn question_for(prompt: &AskpassPrompt) -> Option<Question> {
             algorithm,
             fingerprint,
         } => (
-            crate::tr!("Trust this SSH host?"),
-            crate::tr!(
+            bookie_app_services::tr!("Trust this SSH host?"),
+            bookie_app_services::tr!(
                 "This computer has not connected to {host} before. Its {algorithm} key fingerprint is {fingerprint}. Compare it with the fingerprint your server administrator gave you before trusting it."
             )
             .replace("{host}", host)
             .replace("{algorithm}", algorithm)
             .replace("{fingerprint}", fingerprint),
-            crate::tr!("Trust"),
+            bookie_app_services::tr!("Trust"),
             Reply::Confirm,
         ),
-        AskpassPrompt::Confirmation { text } => (crate::tr!("Confirm SSH request"), text.clone(), crate::tr!("Allow"), Reply::Confirm),
+        AskpassPrompt::Confirmation { text } => (bookie_app_services::tr!("Confirm SSH request"), text.clone(), bookie_app_services::tr!("Allow"), Reply::Confirm),
         AskpassPrompt::Password { user_host } => (
-            crate::tr!("SSH password"),
-            crate::tr!("Enter the password for {account}.").replace("{account}", user_host),
-            crate::tr!("Connect"),
+            bookie_app_services::tr!("SSH password"),
+            bookie_app_services::tr!("Enter the password for {account}.").replace("{account}", user_host),
+            bookie_app_services::tr!("Connect"),
             Reply::Secret,
         ),
         AskpassPrompt::Passphrase { key_path } => (
-            crate::tr!("SSH key passphrase"),
-            crate::tr!("Enter the passphrase for {key}.").replace("{key}", key_path),
-            crate::tr!("Unlock"),
+            bookie_app_services::tr!("SSH key passphrase"),
+            bookie_app_services::tr!("Enter the passphrase for {key}.").replace("{key}", key_path),
+            bookie_app_services::tr!("Unlock"),
             Reply::Secret,
         ),
         AskpassPrompt::KeyboardInteractive { text } | AskpassPrompt::Other { text } => {
-            (crate::tr!("SSH server question"), text.clone(), crate::tr!("Send"), Reply::Secret)
+            (bookie_app_services::tr!("SSH server question"), text.clone(), bookie_app_services::tr!("Send"), Reply::Secret)
         }
         AskpassPrompt::Notification { .. } => return None,
     };
@@ -102,7 +102,7 @@ fn ask(
         cancel.cancelled().await;
         close_dialog_once(&dialog_for_cancel, &open_for_cancel);
     });
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
     dialog.add_response("accept", &question.accept);
     dialog.set_default_response(Some(if question.reply == Reply::Secret {
         "accept"

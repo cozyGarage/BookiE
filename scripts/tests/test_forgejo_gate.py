@@ -85,6 +85,12 @@ def gate(tasks, initial_status='failure'):
 
 
 class ForgejoGateTests(unittest.TestCase):
+    def test_docs_only_gate_uses_the_forgejo_main_branch(self):
+        script = (ROOT / "scripts/forgejo-gate.sh").read_text()
+        self.assertIn('git fetch --quiet "$remote" main', script)
+        self.assertIn('git diff --name-only "$remote/main...$sha"', script)
+        self.assertNotIn('"$remote" linux', script)
+
     def test_run_list_requests_use_first_page(self):
         script = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('"$api/actions/runs?page=1&limit=1"', script)

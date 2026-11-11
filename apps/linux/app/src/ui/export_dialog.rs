@@ -176,17 +176,16 @@ fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String 
         Some(PagedExport {
             mode: PagedExportMode::StoredQuery,
             ..
-        }) => crate::tr!("All rows from this completed query result"),
+        }) => bookie_app_services::tr!("All rows from this completed query result"),
         Some(PagedExport {
             total_rows: Some(total),
             ..
-        }) => crate::tr!("All {n} rows, read page by page; changes made meanwhile may be missed")
+        }) => bookie_app_services::tr!("All {n} rows, read page by page; changes made meanwhile may be missed")
             .replace("{n}", &total.to_string()),
-        Some(_) => crate::tr!("All rows, read page by page; changes made meanwhile may be missed"),
-        None if result.truncated => {
-            crate::tr!("{n} loaded rows (result truncated)").replace("{n}", &result.rows.len().to_string())
-        }
-        None => crate::tr!("{n} loaded rows").replace("{n}", &result.rows.len().to_string()),
+        Some(_) => bookie_app_services::tr!("All rows, read page by page; changes made meanwhile may be missed"),
+        None if result.truncated => bookie_app_services::tr!("{n} loaded rows (result truncated)")
+            .replace("{n}", &result.rows.len().to_string()),
+        None => bookie_app_services::tr!("{n} loaded rows").replace("{n}", &result.rows.len().to_string()),
     }
 }
 
@@ -208,9 +207,11 @@ fn selected_format(formats: &[ExportFormat], index: u32) -> ExportFormat {
 fn build_sql_group(suggested_name: &str) -> (adw::PreferencesGroup, adw::EntryRow) {
     let (schema, table) = insert_target(suggested_name);
     let group = adw::PreferencesGroup::builder()
-        .title(crate::tr!("SQL options"))
+        .title(bookie_app_services::tr!("SQL options"))
         .build();
-    let target = adw::EntryRow::builder().title(crate::tr!("Table name")).build();
+    let target = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Table name"))
+        .build();
     target.set_text(&match schema {
         Some(schema) => format!("{schema}.{table}"),
         None => table,
@@ -270,10 +271,10 @@ pub(crate) fn present_with_format(
         .is_some_and(|paged| paged.mode == PagedExportMode::FullTable)
     {
         let alert = adw::AlertDialog::builder()
-            .heading(crate::tr!("Full-table export unavailable"))
+            .heading(bookie_app_services::tr!("Full-table export unavailable"))
             .body(file::snapshot_refusal_message())
             .build();
-        alert.add_response("close", &crate::tr!("Close"));
+        alert.add_response("close", &bookie_app_services::tr!("Close"));
         alert.set_default_response(Some("close"));
         alert.set_close_response("close");
         alert.present(Some(parent));
@@ -305,12 +306,14 @@ fn present_export(
 
     let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref());
     page.add(&scope_group);
-    let format_group = adw::PreferencesGroup::builder().title(crate::tr!("Format")).build();
+    let format_group = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Format"))
+        .build();
     let formats = available_formats(&driver_id, paged.as_ref());
     let labels: Vec<&str> = formats.iter().map(|format| format.label()).collect();
     let format_row = adw::ComboRow::builder()
         .use_markup(false)
-        .title(crate::tr!("Format"))
+        .title(bookie_app_services::tr!("Format"))
         .subtitle(format_subtitle(&result, paged.as_ref()))
         .model(&gtk::StringList::new(&labels))
         .build();
@@ -319,25 +322,25 @@ fn present_export(
     page.add(&format_group);
 
     let csv_group = adw::PreferencesGroup::builder()
-        .title(crate::tr!("CSV options"))
+        .title(bookie_app_services::tr!("CSV options"))
         .build();
     let include_header = adw::SwitchRow::builder()
-        .title(crate::tr!("Include column names"))
-        .subtitle(crate::tr!("Write column names in the first row"))
+        .title(bookie_app_services::tr!("Include column names"))
+        .subtitle(bookie_app_services::tr!("Write column names in the first row"))
         .build();
     include_header.set_active(preferences.load().csv_include_header);
     csv_group.add(&include_header);
     let safe_csv = adw::SwitchRow::builder()
-        .title(crate::tr!("Spreadsheet-safe text"))
-        .subtitle(crate::tr!(
+        .title(bookie_app_services::tr!("Spreadsheet-safe text"))
+        .subtitle(bookie_app_services::tr!(
             "Prefix formula-like text with an apostrophe for spreadsheet safety. Turn off for lossless re-import."
         ))
         .active(true)
         .build();
     csv_group.add(&safe_csv);
     let spare_numbers = adw::SwitchRow::builder()
-        .title(crate::tr!("Keep plain numbers as they are"))
-        .subtitle(crate::tr!(
+        .title(bookie_app_services::tr!("Keep plain numbers as they are"))
+        .subtitle(bookie_app_services::tr!(
             "Do not prefix text like -5 or +1.5 with an apostrophe, so it re-imports into numeric columns. Other formula-like text is still prefixed."
         ))
         .build();
@@ -347,7 +350,7 @@ fn present_export(
         .build();
     csv_group.add(&spare_numbers);
     let null_marker_row = adw::EntryRow::builder()
-        .title(crate::tr!("Text that means NULL"))
+        .title(bookie_app_services::tr!("Text that means NULL"))
         .build();
     null_marker_row.set_text(&null_marker);
     null_marker_row.set_editable(false);
@@ -375,7 +378,9 @@ fn present_export(
         sql_group_for_format.set_visible(format == ExportFormat::Sql);
     });
 
-    let reset_button = gtk::Button::builder().label(crate::tr!("Reset to Defaults")).build();
+    let reset_button = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Reset to Defaults"))
+        .build();
     reset_button.add_css_class("flat");
     let include_header_for_reset = include_header.clone();
     let safe_csv_for_reset = safe_csv.clone();
@@ -386,7 +391,9 @@ fn present_export(
         spare_numbers_for_reset.set_active(false);
     });
 
-    let export_button = gtk::Button::builder().label(crate::tr!("Export\u{2026}")).build();
+    let export_button = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Export\u{2026}"))
+        .build();
     export_button.add_css_class("suggested-action");
     if let Some(choice) = scope_choice.as_ref() {
         let export_button = export_button.downgrade();
@@ -414,7 +421,7 @@ fn present_export(
     toolbar.add_bottom_bar(&footer);
 
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Export Results"))
+        .title(bookie_app_services::tr!("Export Results"))
         .content_width(480)
         .child(&toolbar)
         .build();
@@ -469,6 +476,18 @@ struct SaveRequest {
     sql_target: String,
 }
 
+fn export_filters(format: ExportFormat) -> (gtk::FileFilter, gio::ListStore) {
+    let filter = gtk::FileFilter::new();
+    filter.set_name(Some(
+        &bookie_app_services::tr!("{format} files").replace("{format}", format.label()),
+    ));
+    filter.add_mime_type(format.mime_type());
+    filter.add_suffix(format.extension());
+    let filters = gio::ListStore::new::<gtk::FileFilter>();
+    filters.append(&filter);
+    (filter, filters)
+}
+
 fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::ToastOverlay, request: SaveRequest) {
     let SaveRequest {
         format,
@@ -482,14 +501,9 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         null_marker,
         sql_target,
     } = request;
-    let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&crate::tr!("{format} files").replace("{format}", format.label())));
-    filter.add_mime_type(format.mime_type());
-    filter.add_suffix(format.extension());
-    let filters = gio::ListStore::new::<gtk::FileFilter>();
-    filters.append(&filter);
+    let (filter, filters) = export_filters(format);
     let file_dialog = gtk::FileDialog::builder()
-        .title(crate::tr!("Export Results"))
+        .title(bookie_app_services::tr!("Export Results"))
         .modal(true)
         .initial_name(suggested_file_name(&suggested_name, format))
         .default_filter(&filter)
@@ -550,14 +564,14 @@ fn show_export_error(
     error: &bookie_core::export::ExportError,
 ) {
     let alert = adw::AlertDialog::new(
-        Some(&crate::tr!("Couldn't export")),
+        Some(&bookie_app_services::tr!("Couldn't export")),
         Some(
-            &crate::tr!("Writing {path} failed: {error}")
+            &bookie_app_services::tr!("Writing {path} failed: {error}")
                 .replace("{path}", &path.display().to_string())
                 .replace("{error}", &error.to_string()),
         ),
     );
-    alert.add_response("close", &crate::tr!("Close"));
+    alert.add_response("close", &bookie_app_services::tr!("Close"));
     alert.set_default_response(Some("close"));
     alert.set_close_response("close");
     alert.present(Some(parent));

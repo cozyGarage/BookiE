@@ -59,14 +59,14 @@ impl App {
         let tab_label = raw_title.strip_prefix("• ").unwrap_or(&raw_title).to_string();
         let dialog = adw::AlertDialog::new(None, None);
         dialog.set_heading(Some(
-            &crate::tr!("Save changes to “{name}”?").replace("{name}", &tab_label),
+            &bookie_app_services::tr!("Save changes to “{name}”?").replace("{name}", &tab_label),
         ));
-        dialog.set_body(&crate::tr!(
+        dialog.set_body(&bookie_app_services::tr!(
             "Unsaved changes will be permanently lost if you discard them."
         ));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("discard", &crate::tr!("Discard"));
-        dialog.add_response("save", &crate::tr!("Save"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("discard", &bookie_app_services::tr!("Discard"));
+        dialog.add_response("save", &bookie_app_services::tr!("Save"));
         dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
         dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("save"));
@@ -162,7 +162,7 @@ impl App {
         }
 
         let dialog = adw::AlertDialog::new(Some(heading), Some(body));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
         dialog.add_response("confirm", accept_label);
         dialog.set_response_appearance("confirm", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
@@ -184,9 +184,9 @@ impl App {
         if !self.confirm_session_teardown(
             sender.clone(),
             SessionTeardownAction::WindowClose,
-            &crate::tr!("Close with open session transactions?"),
-            &crate::tr!("Open transactions will be rolled back before the window closes."),
-            &crate::tr!("Roll Back and Close"),
+            &bookie_app_services::tr!("Close with open session transactions?"),
+            &bookie_app_services::tr!("Open transactions will be rolled back before the window closes."),
+            &bookie_app_services::tr!("Roll Back and Close"),
         ) {
             self.prepare_editor_sessions(SessionTeardownAction::WindowClose, sender);
         }
@@ -272,11 +272,13 @@ impl App {
             _ => return false,
         };
         let dialog = adw::AlertDialog::new(
-            Some(&crate::tr!("Close with an open transaction?")),
-            Some(&crate::tr!("The transaction is rolled back when the tab closes.")),
+            Some(&bookie_app_services::tr!("Close with an open transaction?")),
+            Some(&bookie_app_services::tr!(
+                "The transaction is rolled back when the tab closes."
+            )),
         );
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("close", &crate::tr!("Roll Back and Close"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("close", &bookie_app_services::tr!("Roll Back and Close"));
         dialog.set_response_appearance("close", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");

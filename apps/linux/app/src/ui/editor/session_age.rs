@@ -26,14 +26,14 @@ impl TransactionClock {
 
     pub(super) fn label_at(&self, now: Instant) -> String {
         match self.0.since.get() {
-            None => crate::tr!("Session"),
+            None => bookie_app_services::tr!("Session"),
             Some(since) => open_label(now.saturating_duration_since(since)),
         }
     }
 
     pub(super) fn reset(&self, button: &gtk::ToggleButton) {
         self.0.since.set(None);
-        button.set_label(&crate::tr!("Session"));
+        button.set_label(&bookie_app_services::tr!("Session"));
     }
 
     fn claim_timer(&self) -> bool {
@@ -60,7 +60,7 @@ impl TransactionClock {
 fn open_label(open_for: Duration) -> String {
     let minutes = open_for.as_secs() / 60;
     if minutes == 0 {
-        return crate::tr!("Session · transaction open");
+        return bookie_app_services::tr!("Session · transaction open");
     }
     let age = if minutes < 60 {
         minute_label(minutes)
@@ -73,15 +73,15 @@ fn open_label(open_for: Duration) -> String {
             format!("{hours} {}", minute_label(remainder))
         }
     };
-    format!("{} · {age}", crate::tr!("Session · transaction open"))
+    format!("{} · {age}", bookie_app_services::tr!("Session · transaction open"))
 }
 
 fn minute_label(count: u64) -> String {
-    crate::trn!("{n} minute", "{n} minutes", count).replace("{n}", &count.to_string())
+    bookie_app_services::trn!("{n} minute", "{n} minutes", count).replace("{n}", &count.to_string())
 }
 
 fn hour_label(count: u64) -> String {
-    crate::trn!("{n} hour", "{n} hours", count).replace("{n}", &count.to_string())
+    bookie_app_services::trn!("{n} hour", "{n} hours", count).replace("{n}", &count.to_string())
 }
 
 #[cfg(test)]

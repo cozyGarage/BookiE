@@ -226,6 +226,7 @@ pub(super) struct EditContext {
     pub(super) row_position: u32,
     pub(super) col_index: usize,
     pub(super) row_key: Vec<Value>,
+    pub(super) draft_id: Option<u64>,
     pub(super) nullable: bool,
     pub(super) kind: FullValueKind,
     pub(super) sender: relm4::Sender<super::GridMsg>,
@@ -271,16 +272,16 @@ fn create_text_view(initial_text: &str) -> sourceview5::View {
 }
 
 fn create_actions(nullable: bool, is_json: bool) -> EditorActions {
-    let apply = gtk::Button::with_label(&crate::tr!("Apply"));
+    let apply = gtk::Button::with_label(&bookie_app_services::tr!("Apply"));
     apply.add_css_class("suggested-action");
-    let cancel = gtk::Button::with_label(&crate::tr!("Cancel"));
-    let format = is_json.then(|| gtk::Button::with_label(&crate::tr!("Format JSON")));
+    let cancel = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
+    let format = is_json.then(|| gtk::Button::with_label(&bookie_app_services::tr!("Format JSON")));
     let container = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
         .spacing(8)
         .halign(gtk::Align::End)
         .build();
-    let set_null = nullable.then(|| gtk::Button::with_label(&crate::tr!("Set to NULL")));
+    let set_null = nullable.then(|| gtk::Button::with_label(&bookie_app_services::tr!("Set to NULL")));
     if let Some(button) = &set_null {
         container.append(button);
     }
@@ -364,6 +365,7 @@ fn connect_set_null(button: Option<gtk::Button>, dialog: &adw::Dialog, context: 
     let row_key = context.row_key.clone();
     let row_position = context.row_position;
     let col_index = context.col_index;
+    let draft_id = context.draft_id;
     let dialog = dialog.downgrade();
     button.connect_clicked(move |_| {
         sender
@@ -371,6 +373,7 @@ fn connect_set_null(button: Option<gtk::Button>, dialog: &adw::Dialog, context: 
                 row_position,
                 col_index,
                 row_key: row_key.clone(),
+                draft_id,
             })
             .ok();
         if let Some(dialog) = dialog.upgrade() {
@@ -406,6 +409,7 @@ fn connect_apply(
         row_position: context.row_position,
         col_index: context.col_index,
         row_key: context.row_key.clone(),
+        draft_id: context.draft_id,
         nullable: context.nullable,
         kind: context.kind,
         sender: context.sender.clone(),
@@ -426,6 +430,7 @@ fn connect_apply(
                 col_index: context.col_index,
                 value,
                 row_key: context.row_key.clone(),
+                draft_id: context.draft_id,
             })
             .ok();
         if let Some(dialog) = dialog.upgrade() {
@@ -436,7 +441,9 @@ fn connect_apply(
 
 fn show_payload_error(label: &gtk::Label, error: PayloadError) {
     match error {
-        PayloadError::TooLarge => label.set_text(&crate::tr!("Values over 1 MiB cannot be edited in this dialog.")),
+        PayloadError::TooLarge => label.set_text(&bookie_app_services::tr!(
+            "Values over 1 MiB cannot be edited in this dialog."
+        )),
         PayloadError::InvalidJson { line, column } => show_json_error(label, line, column),
     }
     label.set_visible(true);
@@ -445,9 +452,9 @@ fn show_payload_error(label: &gtk::Label, error: PayloadError) {
 fn show_json_error(label: &gtk::Label, line: usize, column: usize) {
     label.set_text(&format!(
         "{} {}, {} {}.",
-        crate::tr!("Invalid JSON at line"),
+        bookie_app_services::tr!("Invalid JSON at line"),
         line,
-        crate::tr!("column"),
+        bookie_app_services::tr!("column"),
         column
     ));
     label.set_visible(true);
@@ -455,10 +462,12 @@ fn show_json_error(label: &gtk::Label, line: usize, column: usize) {
 
 pub(super) fn present_too_large(parent: &impl IsA<gtk::Widget>) {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("Value is too large to edit")),
-        Some(&crate::tr!("Values over 1 MiB cannot be edited in this dialog.")),
+        Some(&bookie_app_services::tr!("Value is too large to edit")),
+        Some(&bookie_app_services::tr!(
+            "Values over 1 MiB cannot be edited in this dialog."
+        )),
     );
-    dialog.add_response("close", &crate::tr!("Close"));
+    dialog.add_response("close", &bookie_app_services::tr!("Close"));
     dialog.set_close_response("close");
     dialog.present(Some(parent));
 }

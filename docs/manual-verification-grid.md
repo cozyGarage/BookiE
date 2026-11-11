@@ -21,6 +21,8 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 
 - [ ] Separator and header-row detection are right for a comma file, a semicolon file, and a file with no header.
 - [ ] The preview grid matches the file.
+- [ ] On a large CSV, changing encoding or delimiter leaves the dialog responsive while the preview refreshes; Import stays disabled until the current settings finish previewing.
+- [ ] An unreadable encoding shows a preview error and keeps Import disabled; choosing a valid encoding refreshes the preview and enables Import again.
 - [ ] Column mapping is prefilled sensibly and can be changed.
 - [ ] For an existing table, remember a mapping, reorder the CSV headers, restore it, and confirm values still target the named columns; added destination columns remain on Skip.
 - [ ] Duplicate CSV headers are distinguishable, and a saved mapping refuses to restore if its selected header or destination column is missing or ambiguous.
@@ -140,6 +142,7 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 ## Result headers, selection statistics, error copy and connection strip
 
 - [ ] Browse a table: each column header shows its name, a key marker for primary and foreign keys, and the exact engine type spelling beneath it, in light and dark.
+- [ ] In Browse and SQL result grids, text headers align left with their cells and numeric headers align right with numeric values; verify this with active sort indicators and after moving or hiding a column.
 - [ ] Select several rows of a numeric column: the selection badge popover lists the column's count, sum, average, min and max, and Copy summary copies them. A text column is not listed.
 - [ ] Run a failing statement in the editor: Copy error places the exact error text on the clipboard.
 

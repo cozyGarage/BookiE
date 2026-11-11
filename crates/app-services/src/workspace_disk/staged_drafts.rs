@@ -126,6 +126,7 @@ mod tests {
     fn editor(draft: Uuid) -> ConnectionWorkspaceState {
         ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: "SELECT new".into(),
                 draft_id: Some(draft),
                 file: None,

@@ -42,7 +42,8 @@ for base in "${images[@]}"; do
   docker run --rm ${CARGO_BUILD_JOBS:+-e CARGO_BUILD_JOBS="$CARGO_BUILD_JOBS"} "${package_mount[@]}" "${package_env[@]}" -e BOOKIE_GTK_SHARD="${BOOKIE_GTK_SHARD:-}" -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" ${BOOKIE_GTK_Y_OFFSET:+-e BOOKIE_GTK_Y_OFFSET="$BOOKIE_GTK_Y_OFFSET"} ${BOOKIE_GTK_WAIT_SECONDS:+-e BOOKIE_GTK_WAIT_SECONDS="$BOOKIE_GTK_WAIT_SECONDS"} ${BOOKIE_GTK_SCENARIO_RETRIES:+-e BOOKIE_GTK_SCENARIO_RETRIES="$BOOKIE_GTK_SCENARIO_RETRIES"} -v "$PWD:/src:ro" "${build_mounts[@]}" "${build_environment[@]}" "$tag" bash -ceu -o pipefail '
     if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]; then
       apt-get update
-      apt-get install -y "/package/$DISTRO_FLOOR_DEB_NAME"
+      cd /package
+      apt install -y "./$DISTRO_FLOOR_DEB_NAME"
       status=0
       BOOKIE_GTK_BINARY=/usr/bin/bookie bash /src/scripts/test-gtk-safety.sh >/tmp/gtk-safety.log 2>&1 || status=$?
       if [ "$status" -ne 0 ]; then

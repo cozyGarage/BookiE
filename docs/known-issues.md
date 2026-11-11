@@ -16,6 +16,9 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | UI-51 | [#2625](https://github.com/cozyGarage/BookiE/issues/2625) | UX |
 | UI-52 | [#2626](https://github.com/cozyGarage/BookiE/issues/2626) | UX |
 | UI-53 | [#2630](https://github.com/cozyGarage/BookiE/issues/2630) | UX |
+| UI-57 | [#2662](https://github.com/cozyGarage/BookiE/issues/2662) | UX |
+| UI-58 | [#2673](https://github.com/cozyGarage/BookiE/issues/2673) | UX |
+| UI-60 | [#2725](https://github.com/cozyGarage/BookiE/issues/2725) | UX |
 | PEER-4 | [#1026](https://github.com/cozyGarage/BookiE/issues/1026) | UX |
 | PEER-7 | [#1029](https://github.com/cozyGarage/BookiE/issues/1029) | UX |
 | PEER-8 | [#1030](https://github.com/cozyGarage/BookiE/issues/1030) | Data |
@@ -82,10 +85,10 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PERF-11 | [#580](https://github.com/cozyGarage/BookiE/issues/580) | UX |
 | PERF-12 | [#1989](https://github.com/cozyGarage/BookiE/issues/1989) | Data |
 | PERF-13 | [#2159](https://github.com/cozyGarage/BookiE/issues/2159) | Data |
-| PERF-14 | [#2160](https://github.com/cozyGarage/BookiE/issues/2160) | UX |
 | PERF-15 | [#2282](https://github.com/cozyGarage/BookiE/issues/2282) | Data |
 | PERF-16 | [#2563](https://github.com/cozyGarage/BookiE/issues/2563) | UX |
 | PERF-18 | [#2604](https://github.com/cozyGarage/BookiE/issues/2604) | UX |
+| PERF-19 | [#2923](https://github.com/cozyGarage/BookiE/issues/2923) | Data |
 | AUD-14 | [#2578](https://github.com/cozyGarage/BookiE/issues/2578) | Data |
 | CI-1 | [#2597](https://github.com/cozyGarage/BookiE/issues/2597) | UX |
 | CI-2 | [#2617](https://github.com/cozyGarage/BookiE/issues/2617) | UX |

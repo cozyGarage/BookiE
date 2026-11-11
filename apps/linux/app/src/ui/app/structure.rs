@@ -76,7 +76,7 @@ impl App {
     /// Sidebar right-click → "New Table…" or schema-header "+" button.
     pub(super) fn on_new_table_tab(&mut self, schema: Option<String>, sender: ComponentSender<Self>) {
         if !self.connected {
-            self.show_toast(&crate::tr!("Connect to a database first."));
+            self.show_toast(&bookie_app_services::tr!("Connect to a database first."));
             return;
         }
         self.append_new_structure_tab(schema, sender);
@@ -95,7 +95,7 @@ impl App {
         sender: ComponentSender<Self>,
     ) {
         if !self.connected {
-            self.show_toast(&crate::tr!("Connect to a database first."));
+            self.show_toast(&bookie_app_services::tr!("Connect to a database first."));
             return;
         }
         let existing_structure = self.workspace_tabs.borrow().iter().find_map(|(_, tab)| match tab {
@@ -134,16 +134,16 @@ impl App {
         };
         let driver_id = self.driver_id().to_string();
         if let Err(e) = bookie_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
-            self.show_error_alert(&crate::tr!("Cannot truncate table"), &format!("{e}"));
+            self.show_error_alert(&bookie_app_services::tr!("Cannot truncate table"), &format!("{e}"));
             return;
         }
-        let title = crate::tr!("Truncate {table}?").replace("{table}", &table);
-        let body = crate::tr!(
+        let title = bookie_app_services::tr!("Truncate {table}?").replace("{table}", &table);
+        let body = bookie_app_services::tr!(
             "All rows will be removed and the table definition kept. This can't be undone from inside BookiE."
         );
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("truncate", &crate::tr!("Truncate"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("truncate", &bookie_app_services::tr!("Truncate"));
         dialog.set_response_appearance("truncate", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -175,7 +175,7 @@ impl App {
         let sql = match bookie_core::sql_ddl::build_truncate_table(&driver_id, schema.as_deref(), &table) {
             Ok(sql) => sql,
             Err(e) => {
-                self.show_error_alert(&crate::tr!("Cannot truncate table"), &format!("{e}"));
+                self.show_error_alert(&bookie_app_services::tr!("Cannot truncate table"), &format!("{e}"));
                 return;
             }
         };
@@ -188,8 +188,8 @@ impl App {
                 .register(async move {
                     let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Cannot truncate table"),
-                            body: crate::tr!("No active connection."),
+                            title: bookie_app_services::tr!("Cannot truncate table"),
+                            body: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -201,7 +201,7 @@ impl App {
                             table: Some(table),
                         }),
                         Err(e) => sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Truncate failed"),
+                            title: bookie_app_services::tr!("Truncate failed"),
                             body: format!("{e}"),
                         }),
                     }
@@ -221,18 +221,18 @@ impl App {
         };
         if self.has_open_tabs_for_table(schema.as_deref(), &table) {
             self.show_error_alert(
-                &crate::tr!("Cannot rename table"),
-                &crate::tr!("Close the open tabs for {table} first, so no pending changes are lost.")
+                &bookie_app_services::tr!("Cannot rename table"),
+                &bookie_app_services::tr!("Close the open tabs for {table} first, so no pending changes are lost.")
                     .replace("{table}", &table),
             );
             return;
         }
-        let title = crate::tr!("Rename {table}").replace("{table}", &table);
+        let title = bookie_app_services::tr!("Rename {table}").replace("{table}", &table);
         let dialog = adw::AlertDialog::new(Some(&title), None);
         let entry = gtk4::Entry::builder().text(&table).activates_default(true).build();
         dialog.set_extra_child(Some(&entry));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("rename", &crate::tr!("Rename"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("rename", &bookie_app_services::tr!("Rename"));
         dialog.set_response_appearance("rename", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("rename"));
         dialog.set_close_response("cancel");
@@ -267,7 +267,7 @@ impl App {
         let sql = match bookie_core::sql_ddl::build_rename_table(&driver_id, schema.as_deref(), &table, &new_name) {
             Ok(sql) => sql,
             Err(e) => {
-                self.show_error_alert(&crate::tr!("Cannot rename table"), &format!("{e}"));
+                self.show_error_alert(&bookie_app_services::tr!("Cannot rename table"), &format!("{e}"));
                 return;
             }
         };
@@ -280,8 +280,8 @@ impl App {
                 .register(async move {
                     let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Cannot rename table"),
-                            body: crate::tr!("No active connection."),
+                            title: bookie_app_services::tr!("Cannot rename table"),
+                            body: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -293,7 +293,7 @@ impl App {
                             table: None,
                         }),
                         Err(e) => sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Rename failed"),
+                            title: bookie_app_services::tr!("Rename failed"),
                             body: format!("{e}"),
                         }),
                     }
@@ -312,12 +312,13 @@ impl App {
         let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             return;
         };
-        let title = crate::tr!("Drop {table}?").replace("{table}", &table);
-        let body =
-            crate::tr!("All rows and the table definition will be removed. This can't be undone from inside BookiE.");
+        let title = bookie_app_services::tr!("Drop {table}?").replace("{table}", &table);
+        let body = bookie_app_services::tr!(
+            "All rows and the table definition will be removed. This can't be undone from inside BookiE."
+        );
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("drop", &crate::tr!("Drop"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("drop", &bookie_app_services::tr!("Drop"));
         dialog.set_response_appearance("drop", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -357,7 +358,7 @@ impl App {
         let sql = match bookie_core::sql_ddl::build_drop_table(&driver_id, schema.as_deref(), &table, true, false) {
             Ok(s) => s,
             Err(e) => {
-                self.show_error_alert(&crate::tr!("Cannot drop table"), &format!("{e}"));
+                self.show_error_alert(&bookie_app_services::tr!("Cannot drop table"), &format!("{e}"));
                 return;
             }
         };
@@ -372,8 +373,8 @@ impl App {
                 .register(async move {
                     let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("Cannot drop table"),
-                            body: crate::tr!("No active connection."),
+                            title: bookie_app_services::tr!("Cannot drop table"),
+                            body: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -388,7 +389,7 @@ impl App {
                         }
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowAlert {
-                                title: crate::tr!("Drop failed"),
+                                title: bookie_app_services::tr!("Drop failed"),
                                 body: format!("{e}"),
                             });
                         }
@@ -504,7 +505,10 @@ impl App {
         }
         let Some(driver_id) = self.current_driver_id.clone() else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            sender.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
+            sender.input(AppMsg::StructureSaveFailed(
+                tab_id,
+                bookie_app_services::tr!("No active connection."),
+            ));
             return;
         };
         let ddl_is_transactional = self
@@ -551,7 +555,10 @@ impl App {
 
         let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            sender.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
+            sender.input(AppMsg::StructureSaveFailed(
+                tab_id,
+                bookie_app_services::tr!("No active connection."),
+            ));
             return;
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
@@ -564,7 +571,10 @@ impl App {
             shutdown
                 .register(async move {
                     let Some(conn) = connection else {
-                        sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
+                        sender_for_cmd.input(AppMsg::StructureSaveFailed(
+                            tab_id,
+                            bookie_app_services::tr!("No active connection."),
+                        ));
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -762,7 +772,7 @@ impl App {
             shutdown
                 .register(async move {
                     let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
-                        sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("No active connection.")));
+                        sender_for_cmd.input(AppMsg::ShowToast(bookie_app_services::tr!("No active connection.")));
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -773,7 +783,7 @@ impl App {
                         Ok(keys) => keys,
                         Err(error) => {
                             sender_for_cmd.input(AppMsg::ShowAlert {
-                                title: crate::tr!("Couldn't read foreign keys"),
+                                title: bookie_app_services::tr!("Couldn't read foreign keys"),
                                 body: crate::services::error_text::driver_message(&error),
                             });
                             return;
@@ -782,7 +792,7 @@ impl App {
                     match bookie_core::join_skeleton(&driver_id, schema.as_deref(), &table, &keys) {
                         Ok(sql) => sender_for_cmd.input(AppMsg::ShowCreateTableLoaded { sql }),
                         Err(refusal) => sender_for_cmd.input(AppMsg::ShowAlert {
-                            title: crate::tr!("No join was built"),
+                            title: bookie_app_services::tr!("No join was built"),
                             body: refusal.to_string(),
                         }),
                     }
@@ -804,7 +814,7 @@ impl App {
             shutdown
                 .register(async move {
                     let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
-                        sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("No active connection.")));
+                        sender_for_cmd.input(AppMsg::ShowToast(bookie_app_services::tr!("No active connection.")));
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -815,20 +825,23 @@ impl App {
                         Ok(c) => c,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't read columns: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read columns: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
                     };
                     if columns.is_empty() {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            crate::tr!("Table {table} has no columns.").replace("{table}", &table_for_cmd),
+                            bookie_app_services::tr!("Table {table} has no columns.")
+                                .replace("{table}", &table_for_cmd),
                         ));
                         return;
                     }
                     if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            crate::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")),
+                            bookie_app_services::tr!("Couldn't read indexes: {error}")
+                                .replace("{error}", &format!("{e}")),
                         ));
                         return;
                     }
@@ -839,14 +852,16 @@ impl App {
                         Ok(indexes) => indexes,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read indexes: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
                     };
                     if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            crate::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")),
+                            bookie_app_services::tr!("Couldn't read foreign keys: {error}")
+                                .replace("{error}", &format!("{e}")),
                         ));
                         return;
                     }
@@ -857,7 +872,8 @@ impl App {
                         Ok(fks) => fks,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read foreign keys: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
@@ -876,6 +892,7 @@ impl App {
                             .collect(),
                         indexes,
                         fks,
+                        default_collation: None,
                     };
                     match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {
@@ -887,11 +904,12 @@ impl App {
                             sender_for_cmd.input(AppMsg::ShowCreateTableLoaded { sql });
                         }
                         Ok(_) => {
-                            sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("Nothing to show.")));
+                            sender_for_cmd.input(AppMsg::ShowToast(bookie_app_services::tr!("Nothing to show.")));
                         }
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                crate::tr!("Couldn't build SQL: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't build SQL: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                         }
                     }
@@ -929,7 +947,7 @@ impl App {
                     let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
                         sender_for_cmd.input(AppMsg::StructureLoadFailed {
                             tab_id,
-                            message: crate::tr!("No active connection."),
+                            message: bookie_app_services::tr!("No active connection."),
                         });
                         return;
                     };
@@ -993,6 +1011,55 @@ impl App {
             let _ = controller
                 .sender()
                 .send(StructureTabInput::StructureLoaded { columns, metadata });
+        }
+    }
+
+    pub(super) fn on_fetch_collations(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
+        let sender_for_cmd = sender.clone();
+        let connection_id = self.connection_id;
+        let database = self.database.clone();
+        let table_default_supported =
+            crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id())
+                .supports_table_default_collation;
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
+                        return;
+                    };
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
+                    let Ok(collations) =
+                        bookie_app_services::structure_metadata::load_collations(conn.as_ref(), &control).await
+                    else {
+                        return;
+                    };
+                    if control.cancellation_token().is_cancelled() {
+                        return;
+                    }
+                    sender_for_cmd.input(AppMsg::CollationsLoaded {
+                        tab_id,
+                        collations: collations.into_iter().map(|collation| collation.name).collect(),
+                        table_default_supported,
+                    });
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn on_collations_loaded(&self, tab_id: Uuid, collations: Vec<String>, table_default_supported: bool) {
+        if let Some(controller) = self
+            .workspace_tabs
+            .borrow()
+            .get(&tab_id)
+            .and_then(|t| t.structure_controller())
+        {
+            let _ = controller.sender().send(StructureTabInput::CollationsLoaded {
+                collations,
+                table_default_supported,
+            });
         }
     }
 
@@ -1078,6 +1145,7 @@ impl App {
         origin: CatalogOrigin,
         generation: u64,
         result: Result<crate::services::catalog::Catalog, String>,
+        sender: relm4::ComponentSender<App>,
     ) {
         if !origin.owns_window(self.connection_id, &self.database) || self.catalog_generation.get() != generation {
             return;
@@ -1086,10 +1154,10 @@ impl App {
             Ok((tables, views)) => {
                 self.set_completion_tables(&tables, &views);
                 self.sidebar_views = views;
-                self.repopulate_sidebar(&tables);
+                self.repopulate_sidebar(&tables, sender);
                 self.refresh_schema_index();
             }
-            Err(error) => self.show_error_alert(&crate::tr!("Catalog refresh failed"), &error),
+            Err(error) => self.show_error_alert(&bookie_app_services::tr!("Catalog refresh failed"), &error),
         }
     }
 
@@ -1114,14 +1182,14 @@ impl App {
             _ => return,
         };
         let base = if table_name.is_empty() {
-            crate::tr!("New Table")
+            bookie_app_services::tr!("New Table")
         } else if matches!(slot, WorkspaceTab::Structure(_)) {
             super::workspace_tabs::structure_tab_title(schemas_count, schema, &table_name)
         } else {
             super::workspace_tabs::qualified_browse_tab_label(schemas_count, schema, &table_name)
         };
         let title = if combined_dirty { format!("• {base}") } else { base };
-        page.set_title(&title);
+        super::tab_title::set_tab_title(page, &title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()

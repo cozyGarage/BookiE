@@ -27,6 +27,10 @@ CRATES=(
   bookie-app-services
   bookie-results
   bookie-ssh
+  bookie-checks
+  bookie-kafka-browser
+  bookie-avro-container
+  bookie-pg-sessions
   bookie-dump
   bookie-mcp
   bookie-agentd
@@ -38,6 +42,7 @@ CRATES=(
   bookie-driver-redis
   bookie-driver-mongodb
   bookie-driver-oracle
+  bookie-driver-cassandra
   bookie-release-tests
   bookie-driver-tls-tests
 )
@@ -70,6 +75,7 @@ python3 scripts/check-function-size.py
 
 echo "==> comment lines"
 python3 scripts/check-comment-lines.py
+python3 scripts/release-notes.py fragments
 
 echo "==> cargo fmt --check (workspace)"
 cargo fmt --all -- --check
@@ -79,7 +85,25 @@ cargo clippy "${PKG_ARGS[@]}" --all-targets -- -D warnings
 
 echo "==> nextest --lib --bins (non-GTK crates)"
 NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
-"$NEXTEST" nextest run "${PKG_ARGS[@]}" --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+unit_bundle="${BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}}"
+if [[ -n "$unit_bundle" ]]; then
+  expected_group=()
+  if [[ -n "${BOOKIE_UNIT_BUNDLE:-}" ]]; then expected_group+=(--expected-group unit); fi
+  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$unit_bundle" \
+    "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}" "${expected_group[@]}"
+  packages=""
+  for crate in "${CRATES[@]}"; do
+    packages+="${packages:+ | }package(=$crate)"
+  done
+  "$NEXTEST" nextest run --archive-file "$unit_bundle/nextest.tar.zst" \
+    --workspace-remap "$ROOT" --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail \
+    -E "($packages) & (kind(lib) | kind(bin))"
+elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then
+  echo 'a source-matched prebuilt test bundle is required' >&2
+  exit 1
+else
+  "$NEXTEST" nextest run "${PKG_ARGS[@]}" --lib --bins --profile "${BOOKIE_NEXTEST_PROFILE:-default}" --no-tests=fail
+fi
 
 echo "==> sandbox integration tier"
 "$ROOT/scripts/test-sandbox.sh"

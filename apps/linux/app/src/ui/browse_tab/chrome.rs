@@ -17,39 +17,41 @@ impl BrowseTab {
         // so a mis-aim toward Next doesn't land on Insert.
         let insert_button = gtk::Button::builder()
             .icon_name("list-add-symbolic")
-            .tooltip_text(crate::tr!("Insert row (Ctrl+N)"))
+            .tooltip_text(bookie_app_services::tr!("Insert row (Ctrl+N)"))
             .sensitive(false)
             .build();
         insert_button.add_css_class("flat");
-        insert_button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Insert row"))]);
+        insert_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Insert row"
+        ))]);
         let sender_for_insert = sender.clone();
         insert_button.connect_clicked(move |_| sender_for_insert.input(BrowseTabInput::InsertRow));
 
         let first_button = gtk::Button::builder()
             .icon_name("go-first-symbolic")
-            .tooltip_text(crate::tr!("First page"))
+            .tooltip_text(bookie_app_services::tr!("First page"))
             .sensitive(false)
             .build();
         let prev_button = gtk::Button::builder()
             .icon_name("go-previous-symbolic")
-            .tooltip_text(crate::tr!("Previous page (Page Up)"))
+            .tooltip_text(bookie_app_services::tr!("Previous page (Page Up)"))
             .sensitive(false)
             .build();
         let next_button = gtk::Button::builder()
             .icon_name("go-next-symbolic")
-            .tooltip_text(crate::tr!("Next page (Page Down)"))
+            .tooltip_text(bookie_app_services::tr!("Next page (Page Down)"))
             .sensitive(false)
             .build();
         let last_button = gtk::Button::builder()
             .icon_name("go-last-symbolic")
-            .tooltip_text(crate::tr!("Last page"))
+            .tooltip_text(bookie_app_services::tr!("Last page"))
             .sensitive(false)
             .build();
         for (button, label) in [
-            (&first_button, crate::tr!("First page")),
-            (&prev_button, crate::tr!("Previous page")),
-            (&next_button, crate::tr!("Next page")),
-            (&last_button, crate::tr!("Last page")),
+            (&first_button, bookie_app_services::tr!("First page")),
+            (&prev_button, bookie_app_services::tr!("Previous page")),
+            (&next_button, bookie_app_services::tr!("Next page")),
+            (&last_button, bookie_app_services::tr!("Last page")),
         ] {
             button.update_property(&[gtk::accessible::Property::Label(&label)]);
         }
@@ -67,7 +69,7 @@ impl BrowseTab {
         selection_count_label.add_css_class("caption-heading");
         selection_count_label.set_accessible_role(gtk::AccessibleRole::Status);
         let selection_details_label = gtk::Label::builder().xalign(0.0).wrap(true).selectable(true).build();
-        let copy_label = crate::tr!("Copy summary");
+        let copy_label = bookie_app_services::tr!("Copy summary");
         let copy_selection_button = gtk::Button::with_label(&copy_label);
         let selection_details = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
@@ -121,7 +123,7 @@ impl BrowseTab {
                 sender_for_size.input(BrowseTabInput::PageSizeChanged(size));
             }
         });
-        let page_size_label = gtk::Label::builder().label(crate::tr!("Rows:")).build();
+        let page_size_label = gtk::Label::builder().label(bookie_app_services::tr!("Rows:")).build();
         page_size_label.add_css_class("dim-label");
         page_size_combo.update_relation(&[gtk::accessible::Relation::LabelledBy(&[page_size_label.upcast_ref()])]);
 
@@ -144,11 +146,13 @@ impl BrowseTab {
 
         let export_button = gtk::Button::builder()
             .icon_name("document-save-symbolic")
-            .tooltip_text(crate::tr!("Export results"))
+            .tooltip_text(bookie_app_services::tr!("Export results"))
             .action_name("win.export-csv")
             .build();
         export_button.add_css_class("flat");
-        export_button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Export results"))]);
+        export_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Export results"
+        ))]);
 
         // Filter button — opens the rule editor for server-side WHERE.
         // Action `win.open-filter` is registered in app/mod.rs and
@@ -164,7 +168,7 @@ impl BrowseTab {
         // text label reads as native here. The `filter_badge` label
         // shows the active rule count next to the word when ≥1 rule
         // applies; hidden otherwise.
-        let filter_label = gtk::Label::new(Some(&crate::tr!("Filter")));
+        let filter_label = gtk::Label::new(Some(&bookie_app_services::tr!("Filter")));
         let filter_badge = gtk::Label::builder().label("").visible(false).build();
         filter_badge.add_css_class("numeric");
         filter_badge.add_css_class("caption-heading");
@@ -178,10 +182,12 @@ impl BrowseTab {
         let filter_button = gtk::Button::builder().child(&filter_box).build();
         filter_button.add_css_class("flat");
         if browse_filters {
-            filter_button.set_tooltip_text(Some(&crate::tr!("Filter rows (Ctrl+F)")));
+            filter_button.set_tooltip_text(Some(&bookie_app_services::tr!("Filter rows (Ctrl+F)")));
             filter_button.set_action_name(Some("win.open-filter"));
         } else {
-            filter_button.set_tooltip_text(Some(&crate::tr!("This database cannot filter a table view")));
+            filter_button.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "This database cannot filter a table view"
+            )));
             filter_button.set_sensitive(false);
         }
 
@@ -198,10 +204,10 @@ impl BrowseTab {
         let sort_status_label = gtk::Label::builder().visible(false).build();
         sort_status_label.add_css_class("dim-label");
         sort_status_label.add_css_class("caption");
-        let clear_sort_button = gtk::Button::with_label(&crate::tr!("Clear sort"));
+        let clear_sort_button = gtk::Button::with_label(&bookie_app_services::tr!("Clear sort"));
         clear_sort_button.add_css_class("flat");
         clear_sort_button.set_visible(false);
-        clear_sort_button.set_tooltip_text(Some(&crate::tr!("Clear column sort")));
+        clear_sort_button.set_tooltip_text(Some(&bookie_app_services::tr!("Clear column sort")));
         let sender_for_clear_sort = sender.clone();
         clear_sort_button.connect_clicked(move |_| sender_for_clear_sort.input(BrowseTabInput::ClearSort));
 
@@ -213,10 +219,12 @@ impl BrowseTab {
         paginator_bar.pack_start(&selection_label);
         let inspector_button = gtk::ToggleButton::builder()
             .icon_name("sidebar-show-right-symbolic")
-            .tooltip_text(crate::tr!("Row inspector"))
+            .tooltip_text(bookie_app_services::tr!("Row inspector"))
             .build();
         inspector_button.add_css_class("flat");
-        inspector_button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Row inspector"))]);
+        inspector_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Row inspector"
+        ))]);
         paginator_bar.pack_end(&inspector_button);
         paginator_bar.pack_end(&export_button);
         paginator_bar.pack_end(&filter_button);
@@ -256,24 +264,24 @@ impl BrowseTab {
         pending_label.add_css_class("caption");
 
         let discard_button = gtk::Button::builder()
-            .label(crate::tr!("Discard"))
-            .tooltip_text(crate::tr!("Discard all pending edits"))
+            .label(bookie_app_services::tr!("Discard"))
+            .tooltip_text(bookie_app_services::tr!("Discard all pending edits"))
             .build();
         let sender_for_discard = sender.clone();
         let sender_for_discard_preview = sender.clone();
         discard_button.connect_clicked(move |_| sender_for_discard.input(BrowseTabInput::DiscardAll));
 
         let save_button = gtk::Button::builder()
-            .label(crate::tr!("Save"))
-            .tooltip_text(crate::tr!("Save pending edits (Ctrl+S)"))
+            .label(bookie_app_services::tr!("Save"))
+            .tooltip_text(bookie_app_services::tr!("Save pending edits (Ctrl+S)"))
             .build();
         save_button.add_css_class("suggested-action");
         let sender_for_save = sender;
         save_button.connect_clicked(move |_| sender_for_save.input(BrowseTabInput::CommitSave));
 
         let preview_button = gtk::Button::builder()
-            .label(crate::tr!("Preview SQL"))
-            .tooltip_text(crate::tr!("Show the statements Save would run"))
+            .label(bookie_app_services::tr!("Preview SQL"))
+            .tooltip_text(bookie_app_services::tr!("Show the statements Save would run"))
             .build();
         let sender_for_preview = sender_for_discard_preview;
         preview_button.connect_clicked(move |_| sender_for_preview.input(BrowseTabInput::PreviewSql));
@@ -307,8 +315,8 @@ impl BrowseTab {
     pub(super) fn refresh_pending_bar(&self, count: usize) {
         let visible = count > 0;
         if visible {
-            let label =
-                crate::trn!("{n} unsaved change", "{n} unsaved changes", count).replace("{n}", &count.to_string());
+            let label = bookie_app_services::trn!("{n} unsaved change", "{n} unsaved changes", count)
+                .replace("{n}", &count.to_string());
             self.pending_label.set_label(&label);
         }
         // Slide the whole footer in/out as one unit instead of
@@ -348,12 +356,12 @@ impl BrowseTab {
         // affordance stays discoverable; tooltip explains the gate.
         self.insert_button.set_sensitive(has_columns && has_pk);
         if has_columns && !has_pk {
-            self.insert_button.set_tooltip_text(Some(&crate::tr!(
+            self.insert_button.set_tooltip_text(Some(&bookie_app_services::tr!(
                 "This table has no primary key. Inline editing is disabled."
             )));
         } else {
             self.insert_button
-                .set_tooltip_text(Some(&crate::tr!("Insert row (Ctrl+N)")));
+                .set_tooltip_text(Some(&bookie_app_services::tr!("Insert row (Ctrl+N)")));
         }
         self.refresh_banner_visibility();
     }
@@ -409,7 +417,7 @@ impl BrowseTab {
         match bookie_core::cell_filter_rule(column, value, exclude) {
             Some(rule) => sender.input(BrowseTabInput::FilterApplied(self.current_filter.narrowed_to(rule))),
             None => {
-                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                     "Values of this type can't be used as a filter"
                 )));
             }
@@ -422,12 +430,12 @@ impl BrowseTab {
             self.filter_badge.set_visible(false);
             self.filter_badge.set_label("");
             self.filter_button
-                .set_tooltip_text(Some(&crate::tr!("Filter rows (Ctrl+F)")));
+                .set_tooltip_text(Some(&bookie_app_services::tr!("Filter rows (Ctrl+F)")));
         } else {
             self.filter_badge.set_label(&n.to_string());
             self.filter_badge.set_visible(true);
             self.filter_button.set_tooltip_text(Some(
-                &crate::trn!(
+                &bookie_app_services::trn!(
                     "{n} filter rule active — click to edit",
                     "{n} filter rules active — click to edit",
                     n
@@ -525,7 +533,7 @@ impl BrowseTab {
         // guessing what failed.
         let page = adw::StatusPage::builder()
             .icon_name("dialog-error-symbolic")
-            .title(crate::tr!("Couldn't load rows"))
+            .title(bookie_app_services::tr!("Couldn't load rows"))
             .description(crate::ui::plain_text::escape_markup(message))
             .child(&retry_button(sender))
             .build();
@@ -547,16 +555,16 @@ fn sort_status_summary(keys: &[(usize, bool)], columns: &[ColumnInfo]) -> Option
         .collect::<Vec<_>>()
         .join(", ");
     let template = if keys.len() > 1 {
-        crate::tr!("Secondary sort applies only to the loaded page: {keys}")
+        bookie_app_services::tr!("Secondary sort applies only to the loaded page: {keys}")
     } else {
-        crate::tr!("Sorted by {keys}")
+        bookie_app_services::tr!("Sorted by {keys}")
     };
     Some(template.replace("{keys}", &parts))
 }
 
 fn retry_button(sender: &ComponentSender<BrowseTab>) -> gtk::Button {
     let button = gtk::Button::builder()
-        .label(crate::tr!("Retry"))
+        .label(bookie_app_services::tr!("Retry"))
         .halign(gtk::Align::Center)
         .build();
     button.add_css_class("pill");
@@ -569,16 +577,16 @@ fn paginator_summary(result: &QueryResult, offset: u64, total: Option<u64>) -> S
     let n_rows = result.rows.len();
     if n_rows == 0 {
         return if result.truncated {
-            crate::tr!("No rows on this page (result truncated)")
+            bookie_app_services::tr!("No rows on this page (result truncated)")
         } else {
-            crate::tr!("No rows on this page")
+            bookie_app_services::tr!("No rows on this page")
         };
     }
     let template = match (total.is_some(), result.truncated) {
-        (true, true) => crate::tr!("Rows {start} – {end} of {total} (result truncated)"),
-        (true, false) => crate::tr!("Rows {start} – {end} of {total}"),
-        (false, true) => crate::tr!("Rows {start} – {end} (result truncated)"),
-        (false, false) => crate::tr!("Rows {start} – {end}"),
+        (true, true) => bookie_app_services::tr!("Rows {start} – {end} of {total} (result truncated)"),
+        (true, false) => bookie_app_services::tr!("Rows {start} – {end} of {total}"),
+        (false, true) => bookie_app_services::tr!("Rows {start} – {end} (result truncated)"),
+        (false, false) => bookie_app_services::tr!("Rows {start} – {end}"),
     };
     template
         .replace("{start}", &format_thousands(u128::from(offset + 1)))

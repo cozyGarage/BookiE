@@ -88,11 +88,12 @@ impl Diagnostics {
                                 let Some(range) = character_range(&sql, warning.range.clone()) else {
                                     continue;
                                 };
-                                let text = crate::tr!("{character} ({code}): consider {suggestion} ({ascii})")
-                                    .replace("{character}", &warning.character.to_string())
-                                    .replace("{code}", &format!("U+{:04X}", warning.character as u32))
-                                    .replace("{suggestion}", &warning.suggestion.to_string())
-                                    .replace("{ascii}", &format!("U+{:04X}", warning.suggestion as u32));
+                                let text =
+                                    bookie_app_services::tr!("{character} ({code}): consider {suggestion} ({ascii})")
+                                        .replace("{character}", &warning.character.to_string())
+                                        .replace("{code}", &format!("U+{:04X}", warning.character as u32))
+                                        .replace("{suggestion}", &warning.suggestion.to_string())
+                                        .replace("{ascii}", &format!("U+{:04X}", warning.suggestion as u32));
                                 let item = gtk::Button::with_label(&text);
                                 let view = view.downgrade();
                                 let generation = generation.clone();
@@ -124,7 +125,8 @@ impl Diagnostics {
                             let popover = gtk::Popover::builder().child(&scrolled).build();
                             button.set_popover(Some(&popover));
                             button.set_label(
-                                &crate::tr!("SQL warnings ({n})").replace("{n}", &warnings.len().to_string()),
+                                &bookie_app_services::tr!("SQL warnings ({n})")
+                                    .replace("{n}", &warnings.len().to_string()),
                             );
                             button.set_visible(true);
                         });

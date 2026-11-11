@@ -1,5 +1,6 @@
 use bookie_core::{
-    Connection, DriverCapabilities, DriverError, ForeignKeyInfo, IndexInfo, OperationControl, check_pre_dispatch,
+    CollationInfo, Connection, DriverCapabilities, DriverError, ForeignKeyInfo, IndexInfo, OperationControl,
+    check_pre_dispatch,
 };
 
 #[derive(Debug, Default)]
@@ -8,6 +9,7 @@ pub struct StructureMetadata {
     pub foreign_keys_supported: bool,
     pub indexes: Vec<IndexInfo>,
     pub foreign_keys: Vec<ForeignKeyInfo>,
+    pub collations: Vec<CollationInfo>,
 }
 
 pub async fn load_structure_metadata(
@@ -30,12 +32,25 @@ pub async fn load_structure_metadata(
         Vec::new()
     };
     check_pre_dispatch(control)?;
+    let collations = connection.list_collations_controlled(control).await.unwrap_or_default();
+    check_pre_dispatch(control)?;
     Ok(StructureMetadata {
         indexes_supported: capabilities.supports_index_metadata,
         foreign_keys_supported: capabilities.supports_foreign_key_metadata,
         indexes,
         foreign_keys,
+        collations,
     })
+}
+
+pub async fn load_collations(
+    connection: &dyn Connection,
+    control: &OperationControl,
+) -> Result<Vec<CollationInfo>, DriverError> {
+    check_pre_dispatch(control)?;
+    let collations = connection.list_collations_controlled(control).await.unwrap_or_default();
+    check_pre_dispatch(control)?;
+    Ok(collations)
 }
 
 #[cfg(test)]

@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CHANGELOG = ROOT / "CHANGELOG.md"
 REPO = "https://github.com/cozyGarage/BookiE"
 UNRELEASED = "## [Unreleased]"
+FRAGMENTS = ROOT / "changelog.d"
 
 
 CATEGORIES = ("Added", "Changed", "Deprecated", "Removed", "Fixed", "Security")
@@ -89,6 +90,42 @@ def assemble(commits, allow_missing=False):
     return "\n\n".join(parts) + "\n"
 
 
+def read_fragments(directory):
+    """Return (grouped entries, errors) for `<slug>.<category>.md` files; README.md is documentation."""
+    grouped = {category: [] for category in CATEGORIES}
+    errors = []
+    for path in sorted(Path(directory).iterdir()):
+        if path.name in ("README.md", ".gitkeep"):
+            continue
+        slug, _, rest = path.name.partition(".")
+        category, _, extension = rest.rpartition(".")
+        if not slug or extension != "md" or category.capitalize() not in CATEGORIES or category != category.lower():
+            errors.append(f"{path.name}: name it <slug>.<category>.md with a category of "
+                          + ", ".join(c.lower() for c in CATEGORIES))
+            continue
+        lines = [line.strip() for line in path.read_text().splitlines() if line.strip()]
+        if len(lines) != 1:
+            errors.append(f"{path.name}: write exactly one line of user impact")
+        elif len(lines[0]) > MAX_NOTE:
+            errors.append(f"{path.name}: longer than {MAX_NOTE} characters")
+        else:
+            grouped[category.capitalize()].append(lines[0])
+    return grouped, errors
+
+
+def render_fragments(grouped):
+    parts = [f"### {category}\n\n" + "\n".join(f"- {line}" for line in grouped[category]) for category in CATEGORIES if grouped[category]]
+    return "\n\n".join(parts) + "\n"
+
+
+def cut_fragments(text, version, date, grouped):
+    if not any(grouped.values()):
+        raise SystemExit("changelog.d has no fragments to release")
+    text = cut(text, version, date)
+    heading = re.search(rf"(?m)^## \[{re.escape(version)}\][^\n]*\n", text)
+    return text[:heading.end()] + "\n" + render_fragments(grouped) + text[heading.end():]
+
+
 def commits_between(since, until):
     log = subprocess.run(
         ["git", "log", "--reverse", "--format=%s%x1f%B%x1e", f"{since}..{until}"],
@@ -138,6 +175,10 @@ def main():
     cutting.add_argument("date")
     checking = commands.add_parser("check", help="validate the Release-Note lines of a PR body or commit message")
     checking.add_argument("file", nargs="?", default="-", help="path, or - for standard input")
+    fragments = commands.add_parser("fragments", help="validate the changelog.d fragments")
+    releasing = commands.add_parser("release", help="move the changelog.d fragments into CHANGELOG.md under a new version and delete them")
+    releasing.add_argument("version")
+    releasing.add_argument("date")
     trailers = commands.add_parser("trailers", help="print only the validated Release-Note lines of a PR body, for `gh pr merge --body-file`")
     trailers.add_argument("file", nargs="?", default="-", help="path, or - for standard input")
     assembling = commands.add_parser("assemble", help="build release notes from Release-Note trailers in a commit range")
@@ -150,6 +191,18 @@ def main():
         _, errors = parse_notes(body)
         if errors:
             raise SystemExit("Release-Note check failed: " + "; ".join(errors))
+        return
+    if args.command in ("fragments", "release"):
+        grouped, errors = read_fragments(FRAGMENTS)
+        if errors:
+            raise SystemExit("changelog.d check failed:\n" + "\n".join(errors))
+        if args.command == "release":
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.date):
+                raise SystemExit("date must be YYYY-MM-DD")
+            CHANGELOG.write_text(cut_fragments(CHANGELOG.read_text(), args.version, args.date, grouped))
+            for path in FRAGMENTS.glob("*.*.md"):
+                if path.name != "README.md":
+                    path.unlink()
         return
     if args.command == "trailers":
         body = sys.stdin.read() if args.file == "-" else Path(args.file).read_text()

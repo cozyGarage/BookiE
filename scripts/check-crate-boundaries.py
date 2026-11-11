@@ -24,19 +24,23 @@ GUI = {
 }
 DRIVERS = {
     f"bookie-driver-{engine}"
-    for engine in ("clickhouse", "duckdb", "mongodb", "mssql", "mysql", "oracle", "postgres", "redis", "sqlite")
+    for engine in ("cassandra", "clickhouse", "duckdb", "mongodb", "mssql", "mysql", "oracle", "postgres", "redis", "sqlite")
 }
 TEST_CRATES = {"bookie-driver-tls-tests", "bookie-release-tests"}
 ALLOWED = {
     "bookie-core": set(),
     "bookie-ssh": set(),
+    "bookie-checks": set(),
+    "bookie-kafka-browser": set(),
+    "bookie-avro-container": set(),
+    "bookie-pg-sessions": {"bookie-core"},
     "bookie-dump": {"bookie-core"},
     "bookie-policy": {"bookie-core"},
     "bookie-storage": {"bookie-core", "bookie-policy"},
     "bookie-transport": {"bookie-core", "bookie-policy", "bookie-ssh", "bookie-storage"},
     "bookie-results": {"bookie-core"},
     "bookie-app-services": {
-        "bookie-core", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
+        "bookie-core", "bookie-checks", "bookie-kafka-browser", "bookie-pg-sessions", "bookie-dump", "bookie-policy", "bookie-results", "bookie-ssh", "bookie-storage",
         "bookie-transport",
     },
     "bookie-mcp": {"bookie-core", "bookie-policy", "bookie-storage"},
@@ -80,9 +84,12 @@ def check(metadata):
 EXPERIMENT_ALLOWED = {"bookie-core", "bookie-results", "bookie-app-services", "bookie-driver-registry"}
 
 
-def experiment_problems(experiments):
+def experiment_problems(experiments, gpui_app=None):
     problems = []
-    for manifest in sorted(Path(experiments).glob("*/Cargo.toml")):
+    manifests = sorted(Path(experiments).glob("*/Cargo.toml"))
+    if gpui_app:
+        manifests.append(Path(gpui_app) / "Cargo.toml")
+    for manifest in manifests:
         data = tomllib.loads(manifest.read_text())
         for table in ("dependencies", "dev-dependencies", "build-dependencies"):
             for name, spec in data.get(table, {}).items():
@@ -124,8 +131,9 @@ def main():
         return output.returncode
     metadata = json.loads(output.stdout)
     preflight = (Path(__file__).resolve().parent / "preflight.sh").read_text()
-    experiments = Path(__file__).resolve().parents[1] / "experiments"
-    problems = check(metadata) + unlisted_in_preflight(metadata, preflight) + experiment_problems(experiments)
+    root = Path(__file__).resolve().parents[1]
+    experiments = root / "experiments"
+    problems = check(metadata) + unlisted_in_preflight(metadata, preflight) + experiment_problems(experiments, root / "apps" / "gpui")
     for problem in problems:
         print(f"error: {problem}", file=sys.stderr)
     if problems:

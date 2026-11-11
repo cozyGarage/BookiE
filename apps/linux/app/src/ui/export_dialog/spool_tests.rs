@@ -57,6 +57,59 @@ fn spool_export_reads_original_pages_in_order_without_a_database_connection() {
 }
 
 #[test]
+fn spool_export_counts_decoded_pages_and_releases_capacity_between_reads() {
+    let (spool, columns, run) = fixture();
+    let budget = spool.page_budget();
+    let blocker = budget.reserve(budget.limit_bytes()).unwrap();
+    let factory = spool_export_factory_with_runner(spool, columns, 2, run);
+    let mut pages = factory(CancellationToken::new());
+
+    assert!(matches!(pages.next_page(), Err(ExportError::Source(_))));
+    drop(blocker);
+    assert_eq!(pages.next_page().unwrap(), Some(vec![vec![Value::Int(11)]]));
+    assert_eq!(budget.used_pages(), 1);
+    assert_eq!(pages.next_page().unwrap(), Some(vec![vec![Value::Int(22)]]));
+    assert_eq!(budget.used_pages(), 1);
+    assert!(pages.next_page().unwrap().is_none());
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_cells(), 0);
+    assert_eq!(budget.used_pages(), 0);
+}
+
+#[test]
+fn cancelling_after_a_page_releases_its_budget_when_export_finishes() {
+    let (spool, columns, run) = fixture();
+    let budget = spool.page_budget();
+    let factory = spool_export_factory_with_runner(spool, columns, 2, run);
+    let cancel = CancellationToken::new();
+    let mut pages = factory(cancel.clone());
+
+    assert_eq!(pages.next_page().unwrap(), Some(vec![vec![Value::Int(11)]]));
+    assert_eq!(budget.used_pages(), 1);
+    cancel.cancel();
+    assert!(matches!(pages.next_page(), Err(ExportError::Cancelled)));
+    pages.finish().unwrap();
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_pages(), 0);
+}
+
+#[test]
+fn finishing_a_cancelled_export_releases_the_last_page_without_another_fetch() {
+    let (spool, columns, run) = fixture();
+    let budget = spool.page_budget();
+    let factory = spool_export_factory_with_runner(spool, columns, 2, run);
+    let cancel = CancellationToken::new();
+    let mut pages = factory(cancel.clone());
+
+    assert!(pages.next_page().unwrap().is_some());
+    assert_eq!(budget.used_pages(), 1);
+    cancel.cancel();
+    pages.finish().unwrap();
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_pages(), 0);
+}
+
+#[test]
 fn complete_spool_is_written_in_order_to_a_csv_file() {
     let (spool, columns, run) = fixture();
     let factory = spool_export_factory_with_runner(spool, columns.clone(), 2, run);
@@ -112,4 +165,42 @@ fn spool_export_honors_cancellation_before_reading() {
     cancel.cancel();
     let mut pages = factory(cancel);
     assert!(matches!(pages.next_page(), Err(ExportError::Cancelled)));
+}
+
+#[test]
+fn cancelled_spool_export_releases_its_reservation_when_closed() {
+    let runtime = Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap(),
+    );
+    let manager = StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    runtime
+        .block_on(spool.append_page(
+            0,
+            Arc::new(QueryResult {
+                columns: vec![column()],
+                rows: vec![vec![Value::Int(11)]].into(),
+                truncated: false,
+            }),
+        ))
+        .unwrap();
+    let run_runtime = runtime.clone();
+    let cancel = CancellationToken::new();
+    let run_cancel = cancel.clone();
+    let run = Arc::new(move |future| {
+        let result = run_runtime.block_on(future);
+        run_cancel.cancel();
+        result
+    });
+    let factory = spool_export_factory_with_runner(spool.clone(), vec![column()], 1, run);
+    drop(spool);
+    let mut pages = factory(cancel);
+    drop(factory);
+    assert!(matches!(pages.next_page(), Err(ExportError::Cancelled)));
+    assert!(manager.reserved_bytes() > 0);
+    pages.finish().unwrap();
+    assert_eq!(manager.reserved_bytes(), 0);
 }

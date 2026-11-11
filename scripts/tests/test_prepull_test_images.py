@@ -25,6 +25,8 @@ GROUP_SOURCES = {
     "clickhouse": "crates/drivers/clickhouse/tests",
     "redis": "crates/drivers/redis/tests",
     "mongodb": "crates/drivers/mongodb/tests",
+    "oracle": "crates/drivers/oracle/tests",
+    "cassandra": "crates/drivers/cassandra/tests",
     "app-server": "apps/linux/app",
 }
 DRIVER_TLS_FIXTURES = ROOT / "tests/fixtures/driver-tls"
@@ -151,7 +153,7 @@ class PrepullTestImagesTests(unittest.TestCase):
 
     def test_the_list_covers_each_driver_and_the_tls_fixtures(self):
         groups = {line.split()[0] for line in IMAGES.read_text().splitlines() if line and not line.startswith("#")}
-        for group in ("postgres", "mysql", "mssql", "clickhouse", "redis", "mongodb", "driver-tls"):
+        for group in ("postgres", "mysql", "mssql", "clickhouse", "redis", "mongodb", "oracle", "cassandra", "driver-tls"):
             self.assertIn(group, groups)
 
     def test_each_group_pulls_exactly_the_images_its_tests_start(self):
@@ -166,9 +168,10 @@ class PrepullTestImagesTests(unittest.TestCase):
     def test_forgejo_fixture_jobs_pre_pull_their_container_images(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         for job, group, command in (
-            ("pg-release", "pg-release", "./scripts/test-postgres-release.sh"),
-            ("pg-dump", "pg-dump", "./scripts/test-pg-dump.sh"),
+            ("pg-release", "pg-release", "python3 scripts/run-test-layer.py postgres-release"),
+            ("driver", "pg-dump", "python3 scripts/run-test-layer.py pg-dump"),
             ("socket-ssh", "socket-ssh", "./scripts/test-postgres-socket.sh"),
+            ("driver-tls", "driver-tls", "python3 scripts/run-test-layer.py tls"),
         ):
             body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", ci).group(1)
             prepull = body.index(f"bash src/scripts/prepull-test-images.sh {group}")
@@ -179,6 +182,7 @@ class PrepullTestImagesTests(unittest.TestCase):
         inspect = script.index('if ! docker image inspect "$IMAGE"')
         pull = script.index('docker pull --quiet "$IMAGE"')
         self.assertLess(inspect, pull)
+        self.assertIn("-e PGPASSWORD", script)
 
     def test_a_tag_given_by_constant_resolves_to_that_tag(self):
         text = 'const DB_TAG: &str = "7";\nlet c = Mongo::default().with_tag(DB_TAG).start();'
@@ -191,18 +195,17 @@ class PrepullTestImagesTests(unittest.TestCase):
 
     def test_the_driver_jobs_pre_pull_before_their_tests(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertIn('bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"', ci)
+        driver = ci.split("  driver:\n", 1)[1].split("  e2e:\n", 1)[0]
+        group = (ROOT / "scripts/run-driver-group.sh").read_text()
+        self.assertIn('python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"', driver)
+        self.assertIn('bash scripts/prepull-test-images.sh "$driver"', group)
+        self.assertLess(group.index('bash scripts/prepull-test-images.sh "$driver"'), group.index("bash scripts/run-rust-tests.sh"))
         self.assertIn("bash src/scripts/prepull-test-images.sh driver-tls", ci)
 
     def test_the_embedded_duckdb_driver_skips_container_image_setup(self):
-        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        driver = ci.split("  driver:\n", 1)[1].split("  e2e:\n", 1)[0]
-        for step, condition in (
-            ("Docker Hub login", "if: matrix.driver != 'duckdb'"),
-            ("Pre-pull fixture images", "if: ${{ matrix.driver != 'duckdb' }}"),
-        ):
-            block = driver.split(f"- name: {step}\n", 1)[1].split("\n      - name:", 1)[0]
-            self.assertIn(condition, block)
+        group = (ROOT / "scripts/run-driver-group.sh").read_text()
+        self.assertIn('if [[ "$driver" != duckdb ]]; then\n    bash scripts/prepull-test-images.sh "$driver"', group)
+        self.assertIn('if [[ "$driver" == duckdb ]]; then', group)
 
     def test_distro_floor_package_builds_pre_pull_their_base_image(self):
         self.assertEqual(listed_groups().get("distro-floor"), {"debian:testing"})

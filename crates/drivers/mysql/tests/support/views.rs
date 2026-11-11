@@ -29,3 +29,50 @@ async fn assert_separate_views(conn: &dyn Connection) {
     assert!(views.iter().any(|item| item.name == "listing_view"));
     assert!(!views.iter().any(|item| item.name == "listing_items"));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn lists_server_collations_with_their_character_sets() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    let collations = conn.list_collations().await.unwrap();
+    assert!(collations.len() <= bookie_core::MAX_COLLATIONS);
+    let bin = collations.iter().find(|item| item.name == "utf8mb4_bin").unwrap();
+    assert_eq!(bin.charset, "utf8mb4");
+    assert!(
+        collations
+            .iter()
+            .any(|item| item.charset == "utf8mb4" && item.is_default)
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_picked_collation_is_applied_to_the_column() {
+    use bookie_core::sql_ddl::{DraftColumn, TableState, diff_to_ops, materialize_ops};
+
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE picked_collation (label varchar(40) COLLATE utf8mb4_general_ci NOT NULL)")
+        .await
+        .unwrap();
+    let original = conn.fetch_columns(None, "picked_collation").await.unwrap();
+    assert_eq!(original[0].collation.as_deref(), Some("utf8mb4_general_ci"));
+    let listed = conn.list_collations().await.unwrap();
+    assert!(listed.iter().any(|item| item.name == "utf8mb4_bin"));
+
+    let mut draft: Vec<DraftColumn> = original.iter().cloned().map(DraftColumn::from_info).collect();
+    draft[0].collation = Some("utf8mb4_bin".into());
+    let ops = diff_to_ops(
+        None,
+        TableState::bare("picked_collation", &original),
+        TableState::bare("picked_collation", &draft),
+    );
+    for statement in materialize_ops(&ops, "mysql").unwrap() {
+        conn.execute(&statement).await.unwrap();
+    }
+
+    let applied = conn.fetch_columns(None, "picked_collation").await.unwrap();
+    assert_eq!(applied[0].collation.as_deref(), Some("utf8mb4_bin"));
+    assert!(!applied[0].nullable);
+}

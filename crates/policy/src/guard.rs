@@ -380,14 +380,16 @@ impl PolicyGuard {
                     }
                 };
                 match outcome {
-                    ApprovalOutcome::AllowOnce => Ok(Authorization {
-                        decision: Decision::Allow {
-                            rule: format!("{rule}:approved"),
-                        },
-                        analysis,
-                        approval_outcome: AuditApprovalOutcome::Approved,
-                        preview_state,
-                    }),
+                    ApprovalOutcome::AllowOnce | ApprovalOutcome::AllowAndRemember | ApprovalOutcome::UsedGrant => {
+                        Ok(Authorization {
+                            decision: Decision::Allow {
+                                rule: format!("{rule}:approved"),
+                            },
+                            analysis,
+                            approval_outcome: approved_audit_outcome(outcome),
+                            preview_state,
+                        })
+                    }
                     ApprovalOutcome::Deny => {
                         let message = format!("approval denied: {reason}");
                         let operation =
@@ -1057,6 +1059,7 @@ pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
         | DriverError::IntegratedAuth(_)
         | DriverError::Tls(_)
         | DriverError::Internal(_)
+        | DriverError::CommitUnconfirmed(_)
         | DriverError::OperationOutcomeUnknown { .. } => true,
         DriverError::Transaction { source, .. } | DriverError::PartiallyApplied { source, .. } => {
             is_ambiguous_post_dispatch(source)
@@ -1085,7 +1088,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
         DriverError::Internal(_) => AuditErrorCategory::Internal,
         DriverError::Cancelled => AuditErrorCategory::Cancelled,
         DriverError::TimedOut => AuditErrorCategory::Timeout,
-        DriverError::OperationOutcomeUnknown { .. } => AuditErrorCategory::Unknown,
+        DriverError::OperationOutcomeUnknown { .. } | DriverError::CommitUnconfirmed(_) => AuditErrorCategory::Unknown,
         DriverError::Transaction { .. } | DriverError::PartiallyApplied { .. } => AuditErrorCategory::Transaction,
         DriverError::TransactionRollbackFailed { .. } => AuditErrorCategory::Unknown,
     }
@@ -1096,6 +1099,7 @@ mod audit_receipt;
 mod bulk;
 mod connection;
 mod excluded_catalog;
+mod governed_listing;
 mod panic_boundary;
 mod scoped_tables;
 mod session;
@@ -1110,3 +1114,11 @@ pub use bulk::{
 #[cfg(test)]
 #[path = "guard_tests.rs"]
 mod guard_tests;
+
+fn approved_audit_outcome(outcome: ApprovalOutcome) -> AuditApprovalOutcome {
+    match outcome {
+        ApprovalOutcome::AllowAndRemember => AuditApprovalOutcome::ApprovedAndRemembered,
+        ApprovalOutcome::UsedGrant => AuditApprovalOutcome::ApprovedByGrant,
+        _ => AuditApprovalOutcome::Approved,
+    }
+}

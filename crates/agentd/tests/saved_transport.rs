@@ -121,11 +121,13 @@ fn saved_with_bastion(host: &str, bastion_port: u16) -> SavedConnection {
             client: Default::default(),
             agent: false,
             agent_identity: None,
+            local_port: None,
         }),
         last_opened_at: None,
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 
@@ -155,6 +157,7 @@ fn saved_sqlite(path: &std::path::Path) -> SavedConnection {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 

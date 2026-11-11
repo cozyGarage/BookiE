@@ -103,7 +103,7 @@ impl App {
             let title = if combined_dirty { format!("• {label}") } else { label };
             (slot.page.clone(), title)
         };
-        page.set_title(&title);
+        super::tab_title::set_tab_title(&page, &title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()

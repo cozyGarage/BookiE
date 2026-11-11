@@ -4,7 +4,7 @@ The standing principles. An explicit edit to this file is the only way to change
 
 - **Security first.** Validate input at system boundaries. Deny unsafe operations by default. Every consumer database handle is a `PolicyGuard`.
 - **No account gate.** Every shipped feature works without an account, license, subscription, paid tier or remote entitlement check.
-- **Linux-native client.** The shipped application uses GTK4, libadwaita and Relm4. Isolated synthetic frontend experiments follow [ADR 0028](docs/decisions/0028-isolated-frontend-experiments.md).
+- **Linux-native client.** The shipped application uses GTK4, libadwaita and Relm4. GPUI is the chosen cross-platform frontend and GTK is maintained in parallel ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)).
 - **Static drivers.** Engine support is a workspace crate registered at compile time, not a plugin ABI.
 - **One home per fact.** Write a rule or a number once. Link to it. If a restatement must exist, declare it.
 - **Decisions before construction.** Accepted ADRs bind work in their scope. Supersede a record; do not edit it into a different decision.

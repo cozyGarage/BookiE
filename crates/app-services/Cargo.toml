@@ -26,7 +26,11 @@ bookie-policy = { path = "../policy" }
 bookie-transport = { path = "../transport" }
 bookie-storage = { path = "../storage" }
 bookie-ssh = { path = "../ssh" }
+bookie-pg-sessions = { path = "../pg-sessions" }
+bookie-checks = { path = "../checks" }
+bookie-kafka-browser = { path = "../kafka-browser" }
 chrono.workspace = true
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
 thiserror.workspace = true
 serde.workspace = true
 tracing.workspace = true

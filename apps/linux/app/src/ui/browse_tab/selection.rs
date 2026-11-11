@@ -156,8 +156,8 @@ fn selection_details(n: u32, stats_tooltip: Option<&str>) -> String {
     let details_text = stats_tooltip
         .filter(|text| !text.is_empty())
         .map(str::to_owned)
-        .unwrap_or_else(|| crate::tr!("No numeric values in the selected rows."));
-    let scope = crate::tr!("Selected loaded rows: {n}").replace("{n}", &n.to_string());
+        .unwrap_or_else(|| bookie_app_services::tr!("No numeric values in the selected rows."));
+    let scope = bookie_app_services::tr!("Selected loaded rows: {n}").replace("{n}", &n.to_string());
     format!("{scope}\n{details_text}")
 }
 
@@ -178,13 +178,13 @@ pub(super) fn update_selection_chrome(
     }
     let count = n.to_string();
     let template = if deletable {
-        crate::trn!(
+        bookie_app_services::trn!(
             "{n} selected · press Delete to remove",
             "{n} selected · press Delete to remove",
             n
         )
     } else {
-        crate::trn!("{n} selected", "{n} selected", n)
+        bookie_app_services::trn!("{n} selected", "{n} selected", n)
     };
     let selected_label = template.replace("{n}", &count);
     count_label.set_label(&selected_label);

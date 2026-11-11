@@ -1,5 +1,5 @@
 Patched crates.io snapshots used through `[patch.crates-io]` in the workspace
-`Cargo.toml`. Each directory is the pristine crate plus one patch file in
+or experiment `Cargo.toml`. Each directory is the pristine crate plus one patch file in
 [`patches/`](patches/); nothing else may differ. `python3 scripts/vendor-patches.py
 check` downloads each pristine crate, verifies it against the registry checksum,
 applies the patch and fails on any difference, so an undocumented edit cannot

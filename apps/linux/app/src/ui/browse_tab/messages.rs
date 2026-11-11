@@ -44,6 +44,7 @@ pub enum BrowseTabInput {
         new_value: String,
         value: Option<Value>,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
     },
     GridReplaceBatch {
         report: bookie_app_services::grid_replace::ReplaceReport,
@@ -74,14 +75,23 @@ pub enum BrowseTabInput {
         row_position: u32,
         col_index: usize,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
+    },
+    GridResetCell(crate::ui::grid::ResetCellRequest),
+    GridResetConfirmed {
+        row_key: crate::services::change_tracker::RowKey,
+        statement: (String, Vec<Value>),
     },
     GridDeleteRowAt {
         row_position: u32,
         row_key: Vec<Value>,
+        draft_id: Option<u64>,
     },
     GridCopyRowAsStatement(Vec<u32>, bookie_core::sql_literal::RowStatement),
-    DuplicateRow {
+    GridDuplicateRow {
         row_position: u32,
+        row_key: Vec<Value>,
+        draft_id: Option<u64>,
     },
     GridCopyToClipboard(String),
     GridFetchCellValue {
