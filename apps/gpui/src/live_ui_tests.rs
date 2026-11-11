@@ -969,3 +969,39 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
         );
     });
 }
+
+#[gpui::test]
+fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    cx.simulate_input("select 1");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_input.read(cx).value(), "select 1");
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    view.read_with(cx, |view, _| assert!(view.palette_open, "global shortcuts still work in the editor"));
+}
+
