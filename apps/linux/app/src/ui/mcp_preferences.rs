@@ -14,13 +14,53 @@ pub fn build_page(
     database: &crate::services::database_service::DatabaseService,
     mcp_bridge: Option<Arc<McpBridge>>,
 ) -> adw::PreferencesPage {
-    let policy_reload = database.reload_policy();
-
     let page = adw::PreferencesPage::builder()
         .title(tr!("MCP"))
         .icon_name("network-server-symbolic")
         .build();
 
+    let status_group = status_group(database);
+    let issue = issue_group();
+    let tokens_group = adw::PreferencesGroup::builder().title(tr!("Active tokens")).build();
+    refresh_token_list(&tokens_group, mcp_bridge.clone());
+
+    let name_for_issue = issue.name_row.clone();
+    let scope_for_issue = issue.scope_combo.clone();
+    let tokens_for_issue = tokens_group.clone();
+    let page_for_dialog = page.clone();
+    issue.button.connect_clicked(move |_| {
+        let name = name_for_issue.text().to_string();
+        if name.trim().is_empty() {
+            return;
+        }
+        let permissions = match scope_for_issue.selected() {
+            1 => TokenPermissions::ReadWrite,
+            _ => TokenPermissions::ReadOnly,
+        };
+        glib::spawn_future_local(issue_token_flow(
+            page_for_dialog.clone(),
+            tokens_for_issue.clone(),
+            mcp_bridge.clone(),
+            name,
+            permissions,
+        ));
+    });
+
+    page.add(&status_group);
+    page.add(&issue.group);
+    page.add(&tokens_group);
+    page
+}
+
+struct IssueGroup {
+    group: adw::PreferencesGroup,
+    name_row: adw::EntryRow,
+    scope_combo: adw::ComboRow,
+    button: gtk::Button,
+}
+
+fn status_group(database: &crate::services::database_service::DatabaseService) -> adw::PreferencesGroup {
+    let policy_reload = database.reload_policy();
     let status_group = adw::PreferencesGroup::builder()
         .title(tr!("Agent access"))
         .description(tr!(
@@ -48,8 +88,11 @@ pub fn build_page(
         .subtitle("http://127.0.0.1:17432/mcp")
         .build();
     status_group.add(&endpoint_row);
+    status_group
+}
 
-    let issue_group = adw::PreferencesGroup::builder()
+fn issue_group() -> IssueGroup {
+    let group = adw::PreferencesGroup::builder()
         .title(tr!("Issue token"))
         .description(tr!(
             "Plaintext is shown once. Keyring storage is best-effort; the confirmation states whether it was saved."
@@ -64,88 +107,65 @@ pub fn build_page(
     scope_combo.set_model(Some(&scope_model));
     scope_combo.set_selected(0);
 
-    let issue_button = gtk::Button::builder()
+    let button = gtk::Button::builder()
         .label(tr!("Issue token"))
         .valign(gtk::Align::Center)
         .build();
-    issue_button.add_css_class("suggested-action");
+    button.add_css_class("suggested-action");
     let issue_row = adw::ActionRow::builder().title(tr!("Create pairing token")).build();
-    issue_row.add_suffix(&issue_button);
+    issue_row.add_suffix(&button);
 
-    issue_group.add(&name_row);
-    issue_group.add(&scope_combo);
-    issue_group.add(&issue_row);
+    group.add(&name_row);
+    group.add(&scope_combo);
+    group.add(&issue_row);
+    IssueGroup {
+        group,
+        name_row,
+        scope_combo,
+        button,
+    }
+}
 
-    let tokens_group = adw::PreferencesGroup::builder().title(tr!("Active tokens")).build();
-    refresh_token_list(&tokens_group, mcp_bridge.clone());
+fn present_issue_error(parent: &impl IsA<gtk::Widget>, message: &str) {
+    let alert = adw::AlertDialog::new(Some(&tr!("Could not issue token")), Some(message));
+    alert.add_response("ok", &tr!("OK"));
+    alert.set_default_response(Some("ok"));
+    alert.present(Some(parent));
+}
 
-    let name_for_issue = name_row.clone();
-    let scope_for_issue = scope_combo.clone();
-    let tokens_for_issue = tokens_group.clone();
-    let page_for_dialog = page.clone();
-    let bridge_for_issue = mcp_bridge.clone();
-    issue_button.connect_clicked(move |_| {
-        let name = name_for_issue.text().to_string();
-        if name.trim().is_empty() {
+async fn issue_token_flow(
+    parent: adw::PreferencesPage,
+    tokens_group: adw::PreferencesGroup,
+    bridge: Option<Arc<McpBridge>>,
+    name: String,
+    permissions: TokenPermissions,
+) {
+    let allowlist = match bookie_storage::load_connections().await {
+        Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
+        Err(e) => {
+            present_issue_error(&parent, &format!("could not load connections: {e}"));
             return;
         }
-        let permissions = match scope_for_issue.selected() {
-            1 => TokenPermissions::ReadWrite,
-            _ => TokenPermissions::ReadOnly,
-        };
-        let tokens_group = tokens_for_issue.clone();
-        let parent = page_for_dialog.clone();
-        let bridge = bridge_for_issue.clone();
-        glib::spawn_future_local(async move {
-            let allowlist = match bookie_storage::load_connections().await {
-                Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
-                Err(e) => {
-                    let msg = format!("could not load connections: {e}");
-                    let alert = adw::AlertDialog::new(
-                        Some(&tr!("Could not issue token")),
-                        Some(&msg),
-                    );
-                    alert.add_response("ok", &tr!("OK"));
-                    alert.set_default_response(Some("ok"));
-                    alert.present(Some(&parent));
-                    return;
-                }
-            };
-            if allowlist.is_empty() {
-                let alert = adw::AlertDialog::new(
-                    Some(&tr!("Could not issue token")),
-                    Some(&tr!(
-                        "Save at least one connection before issuing an MCP token. Tokens are scoped to the connections that exist at issue time."
-                    )),
-                );
-                alert.add_response("ok", &tr!("OK"));
-                alert.set_default_response(Some("ok"));
-                alert.present(Some(&parent));
-                return;
-            }
-            match mcp_service::issue_token(bridge.as_ref(), name, permissions, allowlist).await {
-                Ok(issued) => {
-                    show_issued_token(&parent, &issued.plaintext, issued.keyring_saved);
-                    clear_and_refresh(&tokens_group, bridge.clone());
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "MCP token issue failed");
-                    let alert = adw::AlertDialog::new(
-                        Some(&tr!("Could not issue token")),
-                        Some(&e),
-                    );
-                    alert.add_response("ok", &tr!("OK"));
-                    alert.set_default_response(Some("ok"));
-                    alert.present(Some(&parent));
-                }
-            }
-        });
-    });
-
-    page.add(&status_group);
-    page.add(&issue_group);
-    page.add(&tokens_group);
-    page
+    };
+    if allowlist.is_empty() {
+        present_issue_error(
+            &parent,
+            &tr!(
+                "Save at least one connection before issuing an MCP token. Tokens are scoped to the connections that exist at issue time."
+            ),
+        );
+        return;
+    }
+    match mcp_service::issue_token(bridge.as_ref(), name, permissions, allowlist).await {
+        Ok(issued) => {
+            show_issued_token(&parent, &issued.plaintext, issued.keyring_saved);
+            clear_and_refresh(&tokens_group, bridge.clone());
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "MCP token issue failed");
+            present_issue_error(&parent, &e);
+        }
+    }
 }
 
 fn clear_and_refresh(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpBridge>>) {
