@@ -1,0 +1,29 @@
+name: Cancel closed pull request runs
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cancel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Cancel the queued and in-progress runs of this pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SELF: ${{ github.run_id }}
+        run: |
+          for status in queued in_progress; do
+            gh api --paginate "repos/$REPO/actions/runs?event=pull_request&status=$status&head_sha=$HEAD_SHA&per_page=100" \
+              --jq '.workflow_runs[].id' | while read -r id; do
+              [ "$id" = "$SELF" ] || gh run cancel "$id" --repo "$REPO" || true
+            done
+          done
