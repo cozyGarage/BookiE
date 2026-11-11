@@ -288,33 +288,35 @@ def prune(revision, retention_days):
     package_name = 'bookie-test-bundles'
     cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
     page = 1
-    removed = 0
+    packages = []
     while True:
         query = urllib.parse.urlencode({'type': 'generic', 'q': package_name, 'limit': 50, 'page': page})
         with request(f'{api}?{query}') as response:
-            packages = json.load(response)
-        for package in packages:
-            version = package.get('version', '')
-            created = package.get('created_at', '')
-            if (package.get('type') != 'generic' or package.get('name') != package_name
-                    or not re.fullmatch(r'[0-9a-f]{40}-[a-z0-9-]+', version)
-                    or version.startswith(revision + '-') or not created):
-                continue
-            try:
-                created_at = datetime.fromisoformat(created.replace('Z', '+00:00'))
-            except ValueError:
-                continue
-            if created_at.tzinfo is None or created_at >= cutoff:
-                continue
-            path = '/'.join(urllib.parse.quote(segment, safe='')
-                            for segment in ('generic', package_name, version))
-            with request(f'{api}/{path}', 'DELETE') as response:
-                if response.status != 204:
-                    raise ValueError('registry did not delete an expired test bundle')
-            removed += 1
-        if len(packages) < 50:
+            page_packages = json.load(response)
+        packages.extend(page_packages)
+        if len(page_packages) < 50:
             break
         page += 1
+    removed = 0
+    for package in packages:
+        version = package.get('version', '')
+        created = package.get('created_at', '')
+        if (package.get('type') != 'generic' or package.get('name') != package_name
+                or not re.fullmatch(r'[0-9a-f]{40}-[a-z0-9-]+', version)
+                or version.startswith(revision + '-') or not created):
+            continue
+        try:
+            created_at = datetime.fromisoformat(created.replace('Z', '+00:00'))
+        except ValueError:
+            continue
+        if created_at.tzinfo is None or created_at >= cutoff:
+            continue
+        path = '/'.join(urllib.parse.quote(segment, safe='')
+                        for segment in ('generic', package_name, version))
+        with request(f'{api}/{path}', 'DELETE') as response:
+            if response.status != 204:
+                raise ValueError('registry did not delete an expired test bundle')
+        removed += 1
     print(f'removed {removed} expired test bundle versions; retained {retention_days} days', flush=True)
 
 
