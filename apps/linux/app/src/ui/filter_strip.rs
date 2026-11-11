@@ -394,13 +394,16 @@ pub fn build(
 fn build_match_controls(state: &StripState) -> gtk::Revealer {
     let match_label = gtk::Label::builder().label(bookie_app_services::tr!("Match")).build();
     match_label.add_css_class("dim-label");
-    let combinator_dropdown = gtk::DropDown::from_strings(&[&bookie_app_services::tr!("all"), &bookie_app_services::tr!("any")]);
+    let combinator_dropdown =
+        gtk::DropDown::from_strings(&[&bookie_app_services::tr!("all"), &bookie_app_services::tr!("any")]);
     combinator_dropdown.set_valign(gtk::Align::Center);
     combinator_dropdown.set_selected(match state.filters.borrow().combinator {
         Combinator::And => 0,
         Combinator::Or => 1,
     });
-    let match_suffix = gtk::Label::builder().label(bookie_app_services::tr!("of these rules")).build();
+    let match_suffix = gtk::Label::builder()
+        .label(bookie_app_services::tr!("of these rules"))
+        .build();
     match_suffix.add_css_class("dim-label");
     let match_row_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)

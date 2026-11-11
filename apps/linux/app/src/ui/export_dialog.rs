@@ -183,9 +183,8 @@ fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String 
         }) => bookie_app_services::tr!("All {n} rows, read page by page; changes made meanwhile may be missed")
             .replace("{n}", &total.to_string()),
         Some(_) => bookie_app_services::tr!("All rows, read page by page; changes made meanwhile may be missed"),
-        None if result.truncated => {
-            bookie_app_services::tr!("{n} loaded rows (result truncated)").replace("{n}", &result.rows.len().to_string())
-        }
+        None if result.truncated => bookie_app_services::tr!("{n} loaded rows (result truncated)")
+            .replace("{n}", &result.rows.len().to_string()),
         None => bookie_app_services::tr!("{n} loaded rows").replace("{n}", &result.rows.len().to_string()),
     }
 }
@@ -210,7 +209,9 @@ fn build_sql_group(suggested_name: &str) -> (adw::PreferencesGroup, adw::EntryRo
     let group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("SQL options"))
         .build();
-    let target = adw::EntryRow::builder().title(bookie_app_services::tr!("Table name")).build();
+    let target = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Table name"))
+        .build();
     target.set_text(&match schema {
         Some(schema) => format!("{schema}.{table}"),
         None => table,
@@ -305,7 +306,9 @@ fn present_export(
 
     let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref());
     page.add(&scope_group);
-    let format_group = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("Format")).build();
+    let format_group = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Format"))
+        .build();
     let formats = available_formats(&driver_id, paged.as_ref());
     let labels: Vec<&str> = formats.iter().map(|format| format.label()).collect();
     let format_row = adw::ComboRow::builder()
@@ -375,7 +378,9 @@ fn present_export(
         sql_group_for_format.set_visible(format == ExportFormat::Sql);
     });
 
-    let reset_button = gtk::Button::builder().label(bookie_app_services::tr!("Reset to Defaults")).build();
+    let reset_button = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Reset to Defaults"))
+        .build();
     reset_button.add_css_class("flat");
     let include_header_for_reset = include_header.clone();
     let safe_csv_for_reset = safe_csv.clone();
@@ -386,7 +391,9 @@ fn present_export(
         spare_numbers_for_reset.set_active(false);
     });
 
-    let export_button = gtk::Button::builder().label(bookie_app_services::tr!("Export\u{2026}")).build();
+    let export_button = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Export\u{2026}"))
+        .build();
     export_button.add_css_class("suggested-action");
     if let Some(choice) = scope_choice.as_ref() {
         let export_button = export_button.downgrade();
@@ -483,7 +490,9 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         sql_target,
     } = request;
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&bookie_app_services::tr!("{format} files").replace("{format}", format.label())));
+    filter.set_name(Some(
+        &bookie_app_services::tr!("{format} files").replace("{format}", format.label()),
+    ));
     filter.add_mime_type(format.mime_type());
     filter.add_suffix(format.extension());
     let filters = gio::ListStore::new::<gtk::FileFilter>();

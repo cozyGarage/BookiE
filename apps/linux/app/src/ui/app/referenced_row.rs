@@ -17,7 +17,9 @@ pub(super) fn choose_referenced_row(
 ) {
     let dialog = adw::AlertDialog::new(
         Some(&bookie_app_services::tr!("Choose a referenced table")),
-        Some(&bookie_app_services::tr!("This column belongs to more than one foreign key.")),
+        Some(&bookie_app_services::tr!(
+            "This column belongs to more than one foreign key."
+        )),
     );
     dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
     dialog.set_close_response("cancel");

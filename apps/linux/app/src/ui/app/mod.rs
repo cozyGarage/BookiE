@@ -485,10 +485,14 @@ impl SimpleComponent for App {
         sidebar_layout::install(&widgets.split_view);
         widgets
             .table_search
-            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Search tables"))]);
+            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+                "Search tables"
+            ))]);
         widgets
             .sidebar_fold_button
-            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Collapse all"))]);
+            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+                "Collapse all"
+            ))]);
         let schema_filter_list = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(6)

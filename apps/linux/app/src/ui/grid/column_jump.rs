@@ -59,7 +59,9 @@ fn present(
         .margin_start(12)
         .margin_end(12)
         .build();
-    search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Search columns"))]);
+    search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Search columns"
+    ))]);
     content.append(&search);
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::Single)

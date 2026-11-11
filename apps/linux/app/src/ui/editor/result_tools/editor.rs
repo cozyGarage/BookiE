@@ -41,7 +41,9 @@ pub(super) fn failure_message(error: &FilterError) -> String {
         FilterError::Spool(StreamResultSpoolError::QuotaExceeded | StreamResultSpoolError::PageLimit) => {
             bookie_app_services::tr!("Not enough temporary storage; close results to free space")
         }
-        FilterError::Scan(bookie_app_services::result_scan::ScanError::Cancelled) => bookie_app_services::tr!("Filter cancelled"),
+        FilterError::Scan(bookie_app_services::result_scan::ScanError::Cancelled) => {
+            bookie_app_services::tr!("Filter cancelled")
+        }
         _ => bookie_app_services::tr!("The filter could not finish"),
     }
 }
@@ -90,7 +92,10 @@ impl SqlEditor {
 
     pub(in crate::ui::editor) fn on_filter_results(&mut self, request: FilterRequest, sender: &ComponentSender<Self>) {
         if !can_filter(&request.source) {
-            self.refuse_filter(&request, bookie_app_services::tr!("Only a complete result can be filtered"));
+            self.refuse_filter(
+                &request,
+                bookie_app_services::tr!("Only a complete result can be filtered"),
+            );
             return;
         }
         let Some(spool) = request.source.spool.clone() else {

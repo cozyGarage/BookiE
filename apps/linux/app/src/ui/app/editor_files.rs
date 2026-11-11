@@ -37,7 +37,8 @@ impl App {
         match outcome {
             Ok(file) => self.bind_editor_file(tab, EditorFile::from_disk(file)),
             Err(message) => self.show_toast(
-                &bookie_app_services::tr!("A reopened tab is no longer linked to its file: {reason}").replace("{reason}", &message),
+                &bookie_app_services::tr!("A reopened tab is no longer linked to its file: {reason}")
+                    .replace("{reason}", &message),
             ),
         }
     }

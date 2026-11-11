@@ -268,7 +268,9 @@ fn replace_controls() -> (gtk::Box, gtk::Entry, gtk::Button, gtk::Button) {
         .hexpand(true)
         .placeholder_text(bookie_app_services::tr!("Replace with"))
         .build();
-    entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Replace with"))]);
+    entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Replace with"
+    ))]);
     let replace_one = gtk::Button::with_label(&bookie_app_services::tr!("Replace"));
     let replace_all = gtk::Button::with_label(&bookie_app_services::tr!("Replace All"));
     let row = row_of(&[entry.upcast_ref(), replace_one.upcast_ref(), replace_all.upcast_ref()]);

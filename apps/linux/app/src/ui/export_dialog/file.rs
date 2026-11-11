@@ -89,7 +89,9 @@ fn finish_pages(result: Result<(), ExportError>, finish: Result<(), ExportError>
 }
 
 pub(super) fn snapshot_refusal_message() -> String {
-    bookie_app_services::tr!("Full-table export requires a consistent snapshot. Export the current page or a query result instead.")
+    bookie_app_services::tr!(
+        "Full-table export requires a consistent snapshot. Export the current page or a query result instead."
+    )
 }
 
 fn result_format(format: super::ExportFormat) -> ResultFormat {

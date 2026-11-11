@@ -253,8 +253,9 @@ impl BottomPanel {
         }
         self.error_button.set_label(&errors_label(count));
         if count == 0 {
-            self.errors
-                .append(&gtk::Label::new(Some(&bookie_app_services::tr!("No errors in the latest query run"))));
+            self.errors.append(&gtk::Label::new(Some(&bookie_app_services::tr!(
+                "No errors in the latest query run"
+            ))));
         }
     }
 }

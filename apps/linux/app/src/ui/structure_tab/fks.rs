@@ -60,7 +60,9 @@ pub(super) fn build_fk_row(
     remove_button.add_css_class("flat");
     if !driver_can_drop_foreign_key(driver_id) {
         remove_button.set_sensitive(false);
-        remove_button.set_tooltip_text(Some(&bookie_app_services::tr!("Dropping a foreign key isn't supported by SQLite.")));
+        remove_button.set_tooltip_text(Some(&bookie_app_services::tr!(
+            "Dropping a foreign key isn't supported by SQLite."
+        )));
     }
     let sender_for_remove = sender.clone();
     remove_button.connect_clicked(move |_| sender_for_remove.input(StructureTabInput::RemoveForeignKey(index)));

@@ -32,7 +32,9 @@ impl BrowseTab {
         if self.allows_row_mutations() || !is_row_mutation_input(input) {
             return false;
         }
-        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!("This connection is read-only.")));
+        let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
+            "This connection is read-only."
+        )));
         true
     }
 
@@ -53,16 +55,18 @@ impl BrowseTab {
         let values = match duplicate_row_values(&self.current_columns, &source_cells) {
             Ok(values) => values,
             Err(DuplicateRowError::Undecodable { column }) => {
-                let message = bookie_app_services::tr!("Cannot duplicate this row because column {name} is undecodable.")
-                    .replace("{name}", &column);
+                let message =
+                    bookie_app_services::tr!("Cannot duplicate this row because column {name} is undecodable.")
+                        .replace("{name}", &column);
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
                 return;
             }
             Err(DuplicateRowError::CellCountMismatch { expected, actual }) => {
-                let message =
-                    bookie_app_services::tr!("Cannot duplicate this row because it has {actual} values for {expected} columns.")
-                        .replace("{actual}", &actual.to_string())
-                        .replace("{expected}", &expected.to_string());
+                let message = bookie_app_services::tr!(
+                    "Cannot duplicate this row because it has {actual} values for {expected} columns."
+                )
+                .replace("{actual}", &actual.to_string())
+                .replace("{expected}", &expected.to_string());
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
                 return;
             }
@@ -248,8 +252,11 @@ impl BrowseTab {
             // window. The inner_stack is always parented to
             // the BrowseTab's root toolbar, so it resolves
             // correctly while the tab is visible.
-            let title = bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", count).replace("{n}", &count.to_string());
-            let body = bookie_app_services::tr!("These rows will be marked for deletion. They aren't removed until you click Save.");
+            let title = bookie_app_services::trn!("Delete {n} row?", "Delete {n} rows?", count)
+                .replace("{n}", &count.to_string());
+            let body = bookie_app_services::tr!(
+                "These rows will be marked for deletion. They aren't removed until you click Save."
+            );
             let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
             dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
             dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
@@ -316,12 +323,7 @@ impl BrowseTab {
         let col = self.current_columns.get(col_index);
         let row_obj = self.row_object_at(row_position);
         let current_value = row_obj.as_ref().map(|row| row.cell_value(col_index));
-        let new = match parse_grid_cell_input_with_style(
-            &new_value,
-            col,
-            &self.parse_hooks,
-            current_value.as_ref(),
-        ) {
+        let new = match parse_grid_cell_input_with_style(&new_value, col, &self.parse_hooks, current_value.as_ref()) {
             Ok(v) => v,
             Err(message) => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
@@ -496,13 +498,8 @@ impl BrowseTab {
                 if !crate::ui::grid::cell_allows_inline_edit(column, original) {
                     return Err(ReplaceApplyError::NotEditable);
                 }
-                parse_grid_cell_input_with_style(
-                    new_value,
-                    Some(column),
-                    &self.parse_hooks,
-                    Some(original),
-                )
-                .map_err(|_| ReplaceApplyError::InvalidValue)
+                parse_grid_cell_input_with_style(new_value, Some(column), &self.parse_hooks, Some(original))
+                    .map_err(|_| ReplaceApplyError::InvalidValue)
             },
         )
     }

@@ -5,13 +5,15 @@ pub(super) fn table_description(diagram: &SchemaDiagram, table: usize) -> String
         return String::new();
     };
     let count = found.columns.len();
-    let mut sentences = vec![bookie_app_services::trn!("{n} column.", "{n} columns.", count).replace("{n}", &count.to_string())];
+    let mut sentences =
+        vec![bookie_app_services::trn!("{n} column.", "{n} columns.", count).replace("{n}", &count.to_string())];
     let (references, referenced_by) = diagram.neighbours(table);
     if !references.is_empty() {
         sentences.push(bookie_app_services::tr!("References {tables}.").replace("{tables}", &references.join(", ")));
     }
     if !referenced_by.is_empty() {
-        sentences.push(bookie_app_services::tr!("Referenced by {tables}.").replace("{tables}", &referenced_by.join(", ")));
+        sentences
+            .push(bookie_app_services::tr!("Referenced by {tables}.").replace("{tables}", &referenced_by.join(", ")));
     }
     if !found.columns.is_empty() {
         let columns: Vec<String> = found.columns.iter().map(column_text).collect();

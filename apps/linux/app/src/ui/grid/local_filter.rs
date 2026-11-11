@@ -497,13 +497,17 @@ fn filter_summary(visible: u128, loaded: u128, truncated: bool) -> String {
 
 fn truncation_notice(sorted: bool, loaded_rows: usize) -> String {
     if sorted {
-        return bookie_app_services::tr!("Sorted the loaded rows only; the result is truncated. Use ORDER BY for the full result.");
+        return bookie_app_services::tr!(
+            "Sorted the loaded rows only; the result is truncated. Use ORDER BY for the full result."
+        );
     }
-    bookie_app_services::tr!("Only the first {loaded} rows were loaded; the result is truncated. Narrow the query to see the rest.")
-        .replace(
-            "{loaded}",
-            &crate::ui::count_format::format_thousands(loaded_rows as u128),
-        )
+    bookie_app_services::tr!(
+        "Only the first {loaded} rows were loaded; the result is truncated. Narrow the query to see the rest."
+    )
+    .replace(
+        "{loaded}",
+        &crate::ui::count_format::format_thousands(loaded_rows as u128),
+    )
 }
 
 fn same_filter_value(left: &Value, right: &Value) -> bool {

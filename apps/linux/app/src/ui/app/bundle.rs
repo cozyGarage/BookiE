@@ -321,7 +321,8 @@ async fn apply_import_with_audit(
         .is_err()
     {
         return Err(ImportFailure {
-            message: bookie_app_services::tr!("The import was cancelled because its audit record could not be saved.").to_string(),
+            message: bookie_app_services::tr!("The import was cancelled because its audit record could not be saved.")
+                .to_string(),
             affected_count: 0,
         });
     }
@@ -346,7 +347,8 @@ async fn apply_import_with_audit(
         .is_err()
     {
         return Err(ImportFailure {
-            message: bookie_app_services::tr!("The import finished, but its audit outcome could not be saved.").to_string(),
+            message: bookie_app_services::tr!("The import finished, but its audit outcome could not be saved.")
+                .to_string(),
             affected_count,
         });
     }
@@ -412,7 +414,8 @@ async fn read_peer_connections_at(path: &std::path::Path) -> Result<bookie_stora
         .max(bookie_storage::MAX_NAVICAT_BYTES)
         .max(bookie_storage::MAX_RESP_BYTES);
     let bytes = read_bounded(path, limit).await.map_err(|error| error.to_string())?;
-    let text = String::from_utf8(bytes).map_err(|_| bookie_app_services::tr!("The connection file is not valid UTF-8."))?;
+    let text =
+        String::from_utf8(bytes).map_err(|_| bookie_app_services::tr!("The connection file is not valid UTF-8."))?;
     let import = if text.contains("<Connections") {
         bookie_storage::parse_navicat_connections(&text)
     } else if text.trim_start().starts_with('<') {

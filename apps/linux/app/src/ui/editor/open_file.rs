@@ -120,7 +120,9 @@ pub(super) fn validate_dropped_sql(current: &str, cursor: usize, text: &str) -> 
         .validate_drop(current, cursor, text)
         .map_err(|error| match error {
             SqlTextError::InsertionTooLarge => {
-                bookie_app_services::tr!("Adding this SQL file would exceed the editor's 8 MiB limit. Open it in a separate tab.")
+                bookie_app_services::tr!(
+                    "Adding this SQL file would exceed the editor's 8 MiB limit. Open it in a separate tab."
+                )
             }
             other => sql_text_error_message(other),
         })

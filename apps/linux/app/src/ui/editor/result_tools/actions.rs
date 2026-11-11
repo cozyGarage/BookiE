@@ -284,7 +284,9 @@ impl Tools {
                 let base = status_text.clone();
                 let failed: Rc<dyn Fn()> = Rc::new(move || {
                     with(&status, |label| {
-                        label.set_label(&bookie_app_services::tr!("{status} · could not show this row").replace("{status}", &base));
+                        label.set_label(
+                            &bookie_app_services::tr!("{status} · could not show this row").replace("{status}", &base),
+                        );
                     });
                 });
                 go_to(&holder, &pages, target, &self.jump, failed);

@@ -114,7 +114,8 @@ impl SqlEditor {
                 self.plan_and_run(sql, anchor, sender);
             }
             Err(message) => self.status.set_label(
-                &bookie_app_services::tr!("Could not read the session's string settings: {message}").replace("{message}", &message),
+                &bookie_app_services::tr!("Could not read the session's string settings: {message}")
+                    .replace("{message}", &message),
             ),
         }
     }

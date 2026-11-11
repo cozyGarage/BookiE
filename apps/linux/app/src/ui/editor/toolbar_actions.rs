@@ -148,9 +148,10 @@ impl SqlEditor {
                             continue;
                         }
                         let name = format!("result-{statement}-{result_set}");
-                        let label = bookie_app_services::tr!("Export loaded rows: statement {statement}, result {result}")
-                            .replace("{statement}", &(statement + 1).to_string())
-                            .replace("{result}", &(result_set + 1).to_string());
+                        let label =
+                            bookie_app_services::tr!("Export loaded rows: statement {statement}, result {result}")
+                                .replace("{statement}", &(statement + 1).to_string())
+                                .replace("{result}", &(result_set + 1).to_string());
                         let action = gtk::gio::SimpleAction::new(&name, None);
                         let result = result.clone();
                         let sender = self.grid_sender.clone();

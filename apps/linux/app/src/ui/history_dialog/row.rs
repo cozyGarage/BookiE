@@ -80,8 +80,14 @@ pub(super) fn delete_button(entry: &Entry, sender: &ComponentSender<HistoryDialo
 pub(super) fn row_menu(entry: &Entry) -> gio::Menu {
     let menu = gio::Menu::new();
     let nav_section = gio::Menu::new();
-    nav_section.append(Some(&bookie_app_services::tr!("Open in new tab")), Some("history-row.open"));
-    nav_section.append(Some(&bookie_app_services::tr!("Replace current tab")), Some("history-row.replace"));
+    nav_section.append(
+        Some(&bookie_app_services::tr!("Open in new tab")),
+        Some("history-row.open"),
+    );
+    nav_section.append(
+        Some(&bookie_app_services::tr!("Replace current tab")),
+        Some("history-row.replace"),
+    );
     menu.append_section(None, &nav_section);
     let util_section = gio::Menu::new();
     util_section.append(

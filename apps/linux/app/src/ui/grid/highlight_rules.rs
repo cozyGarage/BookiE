@@ -231,7 +231,9 @@ fn build_shell() -> (
         .build();
     add.add_css_class("flat");
     let description = gtk::Label::builder()
-        .label(bookie_app_services::tr!("LIKE patterns are limited to 4 KiB (4,096 bytes)."))
+        .label(bookie_app_services::tr!(
+            "LIKE patterns are limited to 4 KiB (4,096 bytes)."
+        ))
         .halign(gtk::Align::Start)
         .wrap(true)
         .build();
@@ -332,7 +334,9 @@ fn wire_apply(
     apply.connect_clicked(move |_| {
         let set = normalize_highlight_rules(&state.borrow().rules);
         if validate_highlight_pattern_lengths(&original, &set).is_err() {
-            status.set_text(&bookie_app_services::tr!("New LIKE patterns must be 4 KiB (4,096 bytes) or less."));
+            status.set_text(&bookie_app_services::tr!(
+                "New LIKE patterns must be 4 KiB (4,096 bytes) or less."
+            ));
             status.remove_css_class("warning");
             status.add_css_class("error");
             status.set_visible(true);

@@ -717,7 +717,8 @@ impl SqlEditor {
             self.opening_session_id = None;
             self.session_button.set_sensitive(false);
             self.run_button.set_sensitive(false);
-            self.status.set_label(&bookie_app_services::tr!("Rolling back and closing session…"));
+            self.status
+                .set_label(&bookie_app_services::tr!("Rolling back and closing session…"));
             if let Some(token) = self.cancel_token.take() {
                 token.cancel();
             }
@@ -771,7 +772,8 @@ impl SqlEditor {
             Err(message) => self.status.set_label(message),
             Ok(()) => {
                 let status = self.status.label();
-                if status == bookie_app_services::tr!("Closing session…") || status == bookie_app_services::tr!("Rolling back and closing session…")
+                if status == bookie_app_services::tr!("Closing session…")
+                    || status == bookie_app_services::tr!("Rolling back and closing session…")
                 {
                     self.status.set_label("");
                 }
@@ -870,7 +872,8 @@ impl SqlEditor {
         self.session_teardown_running = true;
         self.session_button.set_sensitive(false);
         self.run_button.set_sensitive(false);
-        self.status.set_label(&bookie_app_services::tr!("Rolling back and closing session…"));
+        self.status
+            .set_label(&bookie_app_services::tr!("Rolling back and closing session…"));
         let shared = session.shared.clone();
         let sender = sender.clone();
         relm4::spawn(async move {

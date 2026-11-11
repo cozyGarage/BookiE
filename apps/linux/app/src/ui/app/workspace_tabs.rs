@@ -322,10 +322,9 @@ impl App {
             // New mode has nothing to introspect (no real table yet).
             defer_initial_fetch: false,
         };
-        let controller =
-            crate::ui::structure_tab::StructureTab::builder()
-                .launch(init)
-                .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
+        let controller = crate::ui::structure_tab::StructureTab::builder()
+            .launch(init)
+            .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
 
         let page = tab_view.append(controller.widget());
         super::tab_title::set_tab_title(&page, &bookie_app_services::tr!("New Table"));
@@ -455,7 +454,9 @@ impl App {
         }
         if preview {
             page.set_indicator_icon(Some(&gio::ThemedIcon::new("document-open-recent-symbolic")));
-            page.set_indicator_tooltip(&bookie_app_services::tr!("Preview tab. Use the tab menu to keep it open."));
+            page.set_indicator_tooltip(&bookie_app_services::tr!(
+                "Preview tab. Use the tab menu to keep it open."
+            ));
         }
         write_workspace_tab_id(&page, tab_id);
 
@@ -504,10 +505,9 @@ impl App {
             column_comment_capability,
             defer_initial_fetch: false,
         };
-        let controller =
-            crate::ui::structure_tab::StructureTab::builder()
-                .launch(init)
-                .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
+        let controller = crate::ui::structure_tab::StructureTab::builder()
+            .launch(init)
+            .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
 
         let page = tab_view.append(controller.widget());
         let title = structure_tab_title(self.sidebar_schemas_distinct(), schema.as_deref(), &table);
