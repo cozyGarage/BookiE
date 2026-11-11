@@ -102,7 +102,7 @@ where
         _ = control.cancellation_token.cancelled() => Err(Interruption::Cancelled),
         _ = wait_for_deadline(control.deadline) => Err(Interruption::TimedOut),
     } {
-        Ok(result) => return result,
+        Ok(result) => return settle_noticed_stop(result, control, confirms_cancellation),
         Err(interruption) => interruption,
     };
 
@@ -122,6 +122,19 @@ where
     match tokio::time::timeout(CANCELLATION_GRACE, &mut operation).await {
         Ok(result) => classify_interrupted(result, interruption, confirms_cancellation),
         Err(_) => Err(unknown_outcome(interruption.into_error())),
+    }
+}
+
+fn settle_noticed_stop<T>(
+    result: Result<T, DriverError>,
+    control: &OperationControl,
+    confirms_cancellation: fn(&DriverError) -> bool,
+) -> Result<T, DriverError> {
+    match result {
+        Err(error) if control.cancellation_token.is_cancelled() && confirms_cancellation(&error) => {
+            Err(DriverError::Cancelled)
+        }
+        other => other,
     }
 }
 

@@ -192,3 +192,22 @@ async fn completed_operation_waits_for_an_in_flight_server_cancel_dispatch() {
     ));
     assert!(cancellation_dispatched.load(Ordering::SeqCst));
 }
+
+#[tokio::test]
+async fn a_stop_the_operation_noticed_itself_is_reported_as_a_plain_cancellation() {
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let stopper = token.clone();
+    let operation = async move {
+        stopper.cancel();
+        Err::<(), _>(DriverError::Transaction {
+            statement_index: 3,
+            source: Box::new(DriverError::Cancelled),
+        })
+    };
+    let confirms = |error: &DriverError| matches!(error, DriverError::Transaction { source, .. } if matches!(source.as_ref(), DriverError::Cancelled));
+
+    let result = run_server_cancellable(operation, async { Ok(()) }, confirms, &control).await;
+
+    assert!(matches!(result, Err(DriverError::Cancelled)), "{result:?}");
+}
