@@ -8,6 +8,7 @@
 
 - The New Table tab now lets you pick each column's collation from the server's list, on engines that provide one. (#2862)
 - The New Table tab on MySQL and MariaDB can now set the table's default collation from the server's list. (#2865)
+- A workspace tab can be renamed from its menu or with F2, given a colour and tags, and these are saved with the workspace. Tags are found in Open Quickly and the tab overview. (#2887, #2889, #2890, #2892)
 
 ### Changed
 
