@@ -232,7 +232,7 @@ It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through w
 
 The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Keep run results in private verification records.
 
-The isolated [frontend experiment](../experiments/tauri-grid-prototype/README.md) has separate Rust and JavaScript tests. Run those commands when changing the experiment; they do not replace the product's GTK or database acceptance tests.
+The [GPUI app](../apps/gpui/README.md) has its own tests. Run them when changing it; they do not replace the product's GTK or database acceptance tests.
 
 ## Regression case selection
 

@@ -21,7 +21,7 @@ fn a_plain_click_selects_one_row_and_shift_extends_from_the_anchor() {
 }
 
 #[test]
-fn the_label_and_copy_limit_match_the_tauri_prototype() {
+fn the_label_and_copy_limit_are_fixed() {
     assert_eq!(Selection::after_click(None, 0, false).label(), "1 row selected");
     let wide = Selection {
         anchor: 0,
