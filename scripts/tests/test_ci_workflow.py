@@ -130,17 +130,20 @@ class CiWorkflowTests(unittest.TestCase):
         integration = local.split("run_integration() {", 1)[1].split("run_release() {", 1)[0]
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
-        github_drivers = set(re.findall(r"-p bookie-driver-([a-z]+)", integration))
-        forgejo_matrix = re.search(r"(?m)^        driver: \[([^]]+)\]", driver).group(1)
-        forgejo_drivers = set(forgejo_matrix.split(", "))
+        groups = {
+            "core": {"postgres", "mysql", "mssql"},
+            "analytics": {"clickhouse", "redis", "mongodb"},
+            "extended": {"oracle", "cassandra", "duckdb"},
+        }
+        group_script = (ROOT / "scripts/run-driver-group.sh").read_text()
 
-        self.assertIn(
-            "-p bookie-driver-duckdb --test integration --test read_only --test missing_file",
-            " ".join(integration.replace("\\\n", " ").split()),
-        )
-        self.assertEqual(github_drivers | {"duckdb"}, forgejo_drivers)
-        self.assertIn("driver: duckdb", driver)
-        self.assertIn("tests: --test integration --test read_only --test missing_file", driver)
+        self.assertIn('bash scripts/run-driver-group.sh "$group"', integration)
+        self.assertIn('driver: [core, analytics, extended]', driver)
+        self.assertIn('python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"', driver)
+        for group, drivers in groups.items():
+            with self.subTest(group=group):
+                self.assertIn(f"{group}) drivers=({' '.join(sorted(drivers))}) ;;", group_script)
+                self.assertIn(f'"driver-{group}"', (ROOT / "scripts/test-layers.json").read_text())
 
     def test_github_and_forgejo_run_the_same_change_contract_layer(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -316,11 +319,14 @@ class CiWorkflowTests(unittest.TestCase):
         matrix = re.search(r"(?m)^        driver: \[(.+)\]$", driver).group(1)
         forgejo_drivers = {name.strip() for name in matrix.split(",")}
         local_integration = (ROOT / "scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1]
-        github_drivers = set(re.findall(r"-p bookie-driver-([a-z0-9-]+)", local_integration)) & workspace_driver_names
-        self.assertEqual(forgejo_drivers, github_drivers)
-        self.assertIn("--test integration --test read_only --test missing_file", driver)
-        image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
-        self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
+        group_script = (ROOT / "scripts/run-driver-group.sh").read_text()
+        github_groups = set(re.findall(r"for group in ([^;]+);", local_integration)[0].split())
+        group_drivers = set(re.findall(r"\w+\) drivers=\(([^)]*)\)", group_script)[0].split())
+        for match in re.findall(r"\w+\) drivers=\(([^)]*)\)", group_script)[1:]:
+            group_drivers.update(match.split())
+        self.assertEqual(forgejo_drivers, github_groups)
+        self.assertEqual(group_drivers, workspace_driver_names - {"sqlite"})
+        self.assertIn("--test integration --test read_only --test missing_file", group_script)
 
     def test_github_jobs_fetch_the_bundle_groups_they_execute(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -503,12 +509,14 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
+        script = (ROOT / "scripts/run-driver-group.sh").read_text()
         self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
-        self.assertIn('mkdir -p "$TMPDIR"', driver)
         self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
-        self.assertIn("cleanup-testcontainers.py", driver)
-        self.assertIn("trap cleanup_testcontainers EXIT", driver)
-        self.assertIn("--test-threads=1", driver)
+        self.assertIn('python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"', driver)
+        self.assertIn('mkdir -p "${TMPDIR:-/tmp}"', script)
+        self.assertIn("cleanup-testcontainers.py", script)
+        self.assertIn("trap finish EXIT", script)
+        self.assertIn("--test-threads=1", script)
 
     def test_socket_ssh_job_cleans_run_scoped_containers_on_cancel(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()

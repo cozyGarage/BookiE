@@ -662,10 +662,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        driver: [postgres, mysql, mssql, clickhouse, redis, mongodb, oracle, cassandra, duckdb]
-        include:
-          - driver: duckdb
-            tests: --test integration --test read_only --test missing_file
+        driver: [core, analytics, extended]
     steps:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -688,25 +685,12 @@ jobs:
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
         run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
       - name: Docker Hub login
-        if: matrix.driver != 'duckdb'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
-      - name: Pre-pull fixture images
-        if: ${{ matrix.driver != 'duckdb' }}
-        run: bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"
       - name: Driver integration
-        run: |
-          cd src
-          cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
-          }
-          trap cleanup_testcontainers EXIT
-          trap 'cleanup_testcontainers; exit 143' TERM
-          trap 'cleanup_testcontainers; exit 130' INT
-          mkdir -p "$TMPDIR"
-          bash scripts/run-rust-tests.sh --locked -p bookie-driver-${{ matrix.driver }} ${{ matrix.tests || '--test integration' }} -- --include-ignored --test-threads=1
+        run: cd src && python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"
 
       - name: Finalize runner job
         if: always()

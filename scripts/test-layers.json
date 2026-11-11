@@ -134,7 +134,7 @@
     "drivers": {
       "purpose": "Database drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
-      "hosted_gate": "Build Linux / integration; lab-ci / driver, consumers and socket-ssh",
+      "hosted_gate": "Build Linux / integration; lab-ci / driver (core, analytics, extended), consumers and socket-ssh",
       "steps": [
         {
           "argv": [
@@ -143,6 +143,54 @@
             "integration"
           ],
           "timeout_seconds": 1200,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
+    "driver-core": {
+      "purpose": "PostgreSQL, MySQL and SQL Server integration tests",
+      "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
+      "hosted_gate": "lab-ci / driver (core)",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/run-driver-group.sh",
+            "core"
+          ],
+          "timeout_seconds": 2400,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
+    "driver-analytics": {
+      "purpose": "ClickHouse, MongoDB and Redis integration tests",
+      "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
+      "hosted_gate": "lab-ci / driver (analytics)",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/run-driver-group.sh",
+            "analytics"
+          ],
+          "timeout_seconds": 2400,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
+    "driver-extended": {
+      "purpose": "Cassandra, DuckDB and Oracle integration tests",
+      "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
+      "hosted_gate": "lab-ci / driver (extended)",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/run-driver-group.sh",
+            "extended"
+          ],
+          "timeout_seconds": 2400,
           "evidence": "rust-tests"
         }
       ]

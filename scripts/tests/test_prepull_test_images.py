@@ -195,18 +195,17 @@ class PrepullTestImagesTests(unittest.TestCase):
 
     def test_the_driver_jobs_pre_pull_before_their_tests(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertIn('bash src/scripts/prepull-test-images.sh "${{ matrix.driver }}"', ci)
+        driver = ci.split("  driver:\n", 1)[1].split("  e2e:\n", 1)[0]
+        group = (ROOT / "scripts/run-driver-group.sh").read_text()
+        self.assertIn('python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"', driver)
+        self.assertIn('bash scripts/prepull-test-images.sh "$driver"', group)
+        self.assertLess(group.index('bash scripts/prepull-test-images.sh "$driver"'), group.index("bash scripts/run-rust-tests.sh"))
         self.assertIn("bash src/scripts/prepull-test-images.sh driver-tls", ci)
 
     def test_the_embedded_duckdb_driver_skips_container_image_setup(self):
-        ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        driver = ci.split("  driver:\n", 1)[1].split("  e2e:\n", 1)[0]
-        for step, condition in (
-            ("Docker Hub login", "if: matrix.driver != 'duckdb'"),
-            ("Pre-pull fixture images", "if: ${{ matrix.driver != 'duckdb' }}"),
-        ):
-            block = driver.split(f"- name: {step}\n", 1)[1].split("\n      - name:", 1)[0]
-            self.assertIn(condition, block)
+        group = (ROOT / "scripts/run-driver-group.sh").read_text()
+        self.assertIn('if [[ "$driver" != duckdb ]]; then\n    bash scripts/prepull-test-images.sh "$driver"', group)
+        self.assertIn('if [[ "$driver" == duckdb ]]; then', group)
 
     def test_distro_floor_package_builds_pre_pull_their_base_image(self):
         self.assertEqual(listed_groups().get("distro-floor"), {"debian:testing"})
