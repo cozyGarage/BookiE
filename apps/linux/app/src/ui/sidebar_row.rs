@@ -924,6 +924,16 @@ mod columns_affordance_tests {
             expansion_button(row.upcast_ref()).expect("table columns can be expanded without opening the table");
         assert!(expander.is_focusable());
         assert!(!expander.is_active());
+        let body = row.child().and_downcast::<gtk::Box>().unwrap();
+        let reveal = body.last_child().and_downcast::<gtk::Revealer>().unwrap();
+        assert!(reveal.child().is_none());
+        expander.set_active(true);
+        while glib::MainContext::default().iteration(false) {}
+        assert!(reveal.child().is_some());
+        assert!(reveal.reveals_child());
+        expander.set_active(false);
+        while glib::MainContext::default().iteration(false) {}
+        assert!(!reveal.reveals_child());
 
         factory.guard().push_back(SidebarRowInit {
             info: TableInfo {
