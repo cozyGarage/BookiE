@@ -112,7 +112,6 @@ impl App {
         open_mode: OpenMode,
         sender: ComponentSender<Self>,
     ) {
-        // In overlay mode the sidebar covers the grid; picking a table closes it, as the table is what the user wants.
         if self.split_view.is_collapsed() {
             self.split_view.set_show_sidebar(false);
         }

@@ -519,8 +519,6 @@ pub trait Connection: Send + Sync {
     async fn server_version(&self) -> Result<Option<String>, DriverError> {
         Ok(None)
     }
-    /// [`Self::server_version`] bounded by `control`: a deadline or a cancellation returns instead of
-    /// waiting on a server that does not answer.
     async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
         run_controlled(self.server_version(), control).await
     }
@@ -691,8 +689,6 @@ mod controlled_default_tests {
             CancellationToken::new(),
             Some(tokio::time::Instant::now() + Duration::from_millis(50)),
         );
-        // A deadline that passes while the request is in flight reports an unknown outcome, as every
-        // other controlled call in this module does.
         assert!(matches!(
             connection.server_version_controlled(&control).await,
             Err(DriverError::OperationOutcomeUnknown { source }) if matches!(*source, DriverError::TimedOut)

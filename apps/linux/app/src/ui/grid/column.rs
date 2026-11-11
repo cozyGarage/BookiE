@@ -34,7 +34,6 @@ pub(super) fn header_column(column: &ColumnInfo, schema: Option<&ColumnInfo>) ->
     header
 }
 
-/// Numbers, and NULLs in a numeric column, line up on the right so their digits share one edge.
 pub(super) fn right_aligned_column(column: &ColumnInfo) -> bool {
     use bookie_core::FilterValueKind;
     matches!(
@@ -43,8 +42,6 @@ pub(super) fn right_aligned_column(column: &ColumnInfo) -> bool {
     )
 }
 
-/// Starting width of a column in pixels: by its type, grown for a long name, and never below `min`
-/// (wide tables use a minimum so their columns stay readable).
 pub(super) fn default_column_width_px(info: &ColumnInfo, min: Option<i32>) -> i32 {
     use bookie_core::FilterValueKind;
     let by_type = match bookie_core::filter_value_kind(info) {
@@ -80,8 +77,6 @@ fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
     title
 }
 
-/// The declared type to show, or `None` when there is none. An expression column (for example
-/// `count(*)`) has no declared type; some engines report the word NULL, which is not a type.
 fn shown_type(info: &ColumnInfo) -> Option<&str> {
     let data_type = info.data_type.trim();
     (!data_type.is_empty() && !data_type.eq_ignore_ascii_case("NULL")).then_some(data_type)
@@ -283,8 +278,6 @@ pub(super) fn build_column(
         let dummy = gtk4::CustomSorter::new(|_, _| gtk4::Ordering::Equal);
         column.set_sorter(Some(&dummy));
     }
-    // Every column but the last has a fixed width from its type and name; the last one takes the
-    // remaining space of the view, so the grid is neither crowded nor left with a blank area.
     let is_last = idx + 1 == display_columns.len();
     let default_width = (!is_last).then(|| default_column_width_px(info, default_min_width));
     if let Some(id) = connection_id {
