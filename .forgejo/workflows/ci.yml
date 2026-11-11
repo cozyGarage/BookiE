@@ -29,6 +29,9 @@ env:
   CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.job }}
   TMPDIR: /var/cache/ci/target
 
+permissions:
+  contents: read
+
 jobs:
   guards:
     runs-on: any-host
