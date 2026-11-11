@@ -1,27 +1,54 @@
-//! Typed parsing of values typed into the grid, pasted, or edited. The driver contributes its enum input
-//! style and Decimal128 canonicalisation through `ParseHooks`; this crate has no driver dependency.
-
-use bookie_core::{ColumnInfo, EnumInputStyle, Value};
+use bookie_core::{ColumnInfo, DriverValueInputCapabilities, EnumInputStyle, Value};
 use chrono::{Datelike, Timelike};
 
-/// What a driver contributes to parsing: its enum input style and, for MongoDB, the canonical form of a
-/// Decimal128 value (`None` when the text is not a valid Decimal128). Built by the frontend from the
-/// driver registry, so this crate does not depend on any driver.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValueInputError {
+    FieldRequired,
+    InvalidEnumMetadata,
+    UndeclaredEnumMember,
+    InvalidBoolean,
+    InvalidInteger,
+    InvalidNumber,
+    InvalidDecimal,
+    InvalidUuid,
+    InvalidJson(String),
+    InvalidTimestamp,
+    InvalidTimestampWithTimeZone,
+    InvalidDateTime,
+    InvalidDateAndTime,
+    InvalidDate,
+    InvalidTime,
+    InvalidSqlServerDateTimeOffsetColumnScale,
+    InvalidSqlServerDateTimeOffset,
+    SqlServerDateTimeOffsetOutOfRange,
+    MySqlSpatialValueNotEditable,
+    MySqlIntegerOutOfRange,
+    MongoInt32OutOfRange,
+    MongoDatePrecision,
+    DuckDbTimestampTzPrecision,
+    DuckDbTemporalPrecision { kind: &'static str },
+    BitWidthOutOfRange,
+}
+
 pub struct ParseHooks {
     pub enum_input_style: EnumInputStyle,
-    pub canonical_decimal128: fn(&str) -> Option<String>,
+    pub capabilities: DriverValueInputCapabilities,
 }
 
 impl ParseHooks {
     pub fn without_driver(enum_input_style: EnumInputStyle) -> Self {
+        Self::new(enum_input_style, DriverValueInputCapabilities::default())
+    }
+
+    pub fn new(enum_input_style: EnumInputStyle, capabilities: DriverValueInputCapabilities) -> Self {
         Self {
             enum_input_style,
-            canonical_decimal128: |_| None,
+            capabilities,
         }
     }
 }
 
-pub fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Value, String> {
+pub fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Value, ValueInputError> {
     let Some(col) = col else {
         return Ok(Value::Text(text.to_string()));
     };
@@ -32,7 +59,7 @@ pub fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Va
         if col.enum_type.is_none() && is_character_type(&col.data_type.to_ascii_lowercase()) {
             return Ok(Value::Text(String::new()));
         }
-        return Err(crate::tr!("Field is required"));
+        return Err(ValueInputError::FieldRequired);
     }
     if col.enum_type.is_some() {
         return Ok(Value::Text(text.to_string()));
@@ -66,15 +93,15 @@ pub fn mysql_enum_set_labels(data_type: &str) -> Option<(bool, Vec<String>)> {
     crate::enum_input::declared_member_labels(data_type.trim()).map(|labels| (is_set, labels))
 }
 
-fn parse_enum_input(text: &str, col: Option<&ColumnInfo>, style: EnumInputStyle) -> Option<Result<Value, String>> {
+fn parse_enum_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    style: EnumInputStyle,
+) -> Option<Result<Value, ValueInputError>> {
     crate::enum_input::parse_enum_input(text, col, style).map(|result| {
         result.map_err(|error| match error {
-            crate::enum_input::EnumInputError::InvalidMemberDeclaration => {
-                crate::tr!("Could not safely read ENUM or SET members")
-            }
-            crate::enum_input::EnumInputError::UndeclaredMember => {
-                crate::tr!("Value is not a declared ENUM or SET member")
-            }
+            crate::enum_input::EnumInputError::InvalidMemberDeclaration => ValueInputError::InvalidEnumMetadata,
+            crate::enum_input::EnumInputError::UndeclaredMember => ValueInputError::UndeclaredEnumMember,
         })
     })
 }
@@ -82,9 +109,8 @@ fn parse_enum_input(text: &str, col: Option<&ColumnInfo>, style: EnumInputStyle)
 pub fn parse_input_for_driver_with_style(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
     hooks: &ParseHooks,
-) -> Result<Value, String> {
+) -> Result<Value, ValueInputError> {
     if text == "''"
         && let Some(result) = parse_enum_input(text, col, hooks.enum_input_style)
     {
@@ -97,15 +123,15 @@ pub fn parse_input_for_driver_with_style(
         return result;
     }
     let trimmed = text.trim();
-    if driver_id == "mysql"
+    if hooks.capabilities.integer_range_validation
         && let Some(result) = parse_mysql_integer_input(trimmed, col)
     {
         return result;
     }
-    if let Some(result) = parse_special_driver_input(trimmed, col, driver_id, hooks) {
+    if let Some(result) = parse_special_driver_input(trimmed, col, hooks) {
         return result;
     }
-    if driver_id == "sqlite"
+    if hooks.capabilities.numeric_affinity_input
         && col.is_some_and(|column| {
             classify_type(&column.data_type.to_ascii_lowercase()) == TypeKind::Text
                 && bookie_core::sqlite_declared_type_has_numeric_affinity(&column.data_type)
@@ -115,13 +141,13 @@ pub fn parse_input_for_driver_with_style(
             return Ok(Value::Decimal(value));
         }
         return if bookie_core::is_numeric_input(text) {
-            Err(crate::tr!("Invalid number"))
+            Err(ValueInputError::InvalidNumber)
         } else {
             Ok(Value::Text(text.to_owned()))
         };
     }
     match parse_input_for_column(text, col) {
-        Err(error) => match sqlite_numeric_affinity_fallback(text, col, driver_id) {
+        Err(error) => match numeric_affinity_input_fallback(text, col, hooks) {
             Some(value) => Ok(value),
             None => Err(error),
         },
@@ -129,8 +155,8 @@ pub fn parse_input_for_driver_with_style(
     }
 }
 
-fn sqlite_numeric_affinity_fallback(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Value> {
-    if driver_id != "sqlite"
+fn numeric_affinity_input_fallback(text: &str, col: Option<&ColumnInfo>, hooks: &ParseHooks) -> Option<Value> {
+    if !hooks.capabilities.numeric_affinity_input
         || !col.is_some_and(|column| {
             matches!(
                 classify_type(&column.data_type.to_ascii_lowercase()),
@@ -149,38 +175,37 @@ fn sqlite_numeric_affinity_fallback(text: &str, col: Option<&ColumnInfo>, driver
 fn parse_special_driver_input(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
     hooks: &ParseHooks,
-) -> Option<Result<Value, String>> {
-    parse_mssql_datetimeoffset_input(text, col, driver_id)
-        .or_else(|| parse_mongodb_integer_input(text, col, driver_id))
-        .or_else(|| parse_mysql_spatial_input(col, driver_id))
+) -> Option<Result<Value, ValueInputError>> {
+    parse_mssql_datetimeoffset_input(text, col, hooks)
+        .or_else(|| parse_mongodb_integer_input(text, col, hooks))
+        .or_else(|| parse_mysql_spatial_input(col, hooks))
         .or_else(|| {
-            (driver_id == "postgres" && col.is_some_and(|column| is_postgres_numeric_type(&column.data_type))).then(
-                || match text {
-                    "NaN" | "Infinity" | "-Infinity" => Ok(Value::Text(text.into())),
-                    _ => match parse_decimal_value(text) {
-                        Ok(value) => Ok(value),
-                        Err(_) if is_postgres_numeric_literal(text) => Ok(Value::Text(text.into())),
-                        Err(error) => Err(error),
-                    },
+            (hooks.capabilities.special_numeric_literals
+                && col.is_some_and(|column| is_postgres_numeric_type(&column.data_type)))
+            .then(|| match text {
+                "NaN" | "Infinity" | "-Infinity" => Ok(Value::Text(text.into())),
+                _ => match parse_decimal_value(text) {
+                    Ok(value) => Ok(value),
+                    Err(_) if is_postgres_numeric_literal(text) => Ok(Value::Text(text.into())),
+                    Err(error) => Err(error),
                 },
-            )
+            })
         })
-        .or_else(|| parse_postgres_extended_temporal_input(text, col, driver_id))
-        .or_else(|| parse_duckdb_date_input(text, col, driver_id))
-        .or_else(|| parse_mongodb_decimal_input(text, col, driver_id, hooks))
-        .or_else(|| parse_mongodb_date_input(text, col, driver_id))
-        .or_else(|| parse_duckdb_timestamptz_input(text, col, driver_id))
-        .or_else(|| parse_duckdb_temporal_input(text, col, driver_id))
+        .or_else(|| parse_extended_calendar_temporals_input(text, col, hooks))
+        .or_else(|| parse_duckdb_date_input(text, col, hooks))
+        .or_else(|| parse_mongodb_decimal_input(text, col, hooks))
+        .or_else(|| parse_mongodb_date_input(text, col, hooks))
+        .or_else(|| parse_timestamp_with_timezone_input(text, col, hooks))
+        .or_else(|| parse_duckdb_temporal_input(text, col, hooks))
 }
 
 fn parse_mssql_datetimeoffset_input(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
-) -> Option<Result<Value, String>> {
-    if driver_id != "mssql" {
+    hooks: &ParseHooks,
+) -> Option<Result<Value, ValueInputError>> {
+    if !hooks.capabilities.datetimeoffset_input {
         return None;
     }
     let column = col?;
@@ -196,11 +221,11 @@ fn parse_mssql_datetimeoffset_input(
             .filter(|scale| *scale <= 7)
     };
     let Some(scale) = scale else {
-        return Some(Err(crate::tr!("Invalid SQL Server datetimeoffset column scale")));
+        return Some(Err(ValueInputError::InvalidSqlServerDateTimeOffsetColumnScale));
     };
     let parsed = chrono::DateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S%.f %:z");
     Some(parsed.map_or_else(
-        |_| Err(crate::tr!("Invalid SQL Server datetimeoffset")),
+        |_| Err(ValueInputError::InvalidSqlServerDateTimeOffset),
         |value| {
             let local = text.rsplit_once(' ').map_or(text, |(local, _)| local);
             let fraction_digits = local.split_once('.').map_or(0, |(_, fraction)| fraction.len());
@@ -212,9 +237,7 @@ fn parse_mssql_datetimeoffset_input(
                 || !(1..=9999).contains(&local_year)
                 || !(1..=9999).contains(&utc_year)
             {
-                return Err(crate::tr!(
-                    "SQL Server datetimeoffset value exceeds the column precision or offset range"
-                ));
+                return Err(ValueInputError::SqlServerDateTimeOffsetOutOfRange);
             }
             Ok(Value::Text(text.to_owned()))
         },
@@ -239,17 +262,16 @@ fn unchanged_empty_value(col: Option<&ColumnInfo>, current_value: Option<&Value>
 pub fn parse_input_for_grid_cell_with_style(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
     hooks: &ParseHooks,
     current_value: Option<&Value>,
-) -> Result<Value, String> {
+) -> Result<Value, ValueInputError> {
     if text.is_empty()
         && let Some(unchanged) = unchanged_empty_value(col, current_value)
     {
         return Ok(unchanged);
     }
     if text.is_empty()
-        && driver_id == "sqlite"
+        && hooks.capabilities.heterogeneous_cell_values
         && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
         && matches!(current_value, Some(Value::Text(_)))
     {
@@ -261,7 +283,7 @@ pub fn parse_input_for_grid_cell_with_style(
         return result;
     }
     if !text.is_empty()
-        && driver_id == "sqlite"
+        && hooks.capabilities.heterogeneous_cell_values
         && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
     {
         match current_value {
@@ -270,33 +292,28 @@ pub fn parse_input_for_grid_cell_with_style(
             Some(Value::Text(_)) => return Ok(Value::Text(text.to_owned())),
             _ => {}
         }
-        // A NULL or draft cell has no runtime kind to preserve. Keep its
-        // non-empty input as text instead of guessing that numeric-looking
-        // text means the user intended a different storage class.
     }
-    parse_input_for_driver_with_style(text, col, driver_id, hooks)
+    parse_input_for_driver_with_style(text, col, hooks)
 }
 
 pub fn parse_grid_cell_input_with_style(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
     hooks: &ParseHooks,
     current_value: Option<&Value>,
-) -> Result<Value, String> {
-    parse_input_for_grid_cell_with_style(text, col, driver_id, hooks, current_value)
+) -> Result<Value, ValueInputError> {
+    parse_input_for_grid_cell_with_style(text, col, hooks, current_value)
 }
 
 pub fn parse_pasted_cell_with_style(
     text: Option<&str>,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
     hooks: &ParseHooks,
     current_value: Option<&Value>,
-) -> Result<Value, String> {
+) -> Result<Value, ValueInputError> {
     match text {
         None if col.is_none_or(|column| column.nullable) => Ok(Value::Null),
-        None => Err(crate::tr!("Field is required")),
+        None => Err(ValueInputError::FieldRequired),
         Some("")
             if col.is_none_or(|column| {
                 column.enum_type.is_none() && is_character_type(&column.data_type.to_ascii_lowercase())
@@ -307,19 +324,19 @@ pub fn parse_pasted_cell_with_style(
                 default_value: None,
                 ..column.clone()
             });
-            parse_grid_cell_input_with_style("", required.as_ref(), driver_id, hooks, current_value)
+            parse_grid_cell_input_with_style("", required.as_ref(), hooks, current_value)
         }
-        Some(text) => parse_grid_cell_input_with_style(text, col, driver_id, hooks, current_value),
+        Some(text) => parse_grid_cell_input_with_style(text, col, hooks, current_value),
     }
 }
 
-fn parse_postgres_extended_temporal_input(
+fn parse_extended_calendar_temporals_input(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
-) -> Option<Result<Value, String>> {
+    hooks: &ParseHooks,
+) -> Option<Result<Value, ValueInputError>> {
     let column = col?;
-    if driver_id != "postgres" {
+    if !hooks.capabilities.extended_calendar_temporals {
         return None;
     }
     let kind = column.data_type.trim().to_ascii_lowercase();
@@ -330,7 +347,7 @@ fn parse_postgres_extended_temporal_input(
         return Some(if extended_duckdb_date(text).is_some() {
             Ok(Value::Text(text.to_owned()))
         } else {
-            Err(crate::tr!("Invalid date. Use YYYY-MM-DD."))
+            Err(ValueInputError::InvalidDate)
         });
     }
     if matches!(kind.as_str(), "timestamp" | "timestamp without time zone") {
@@ -339,7 +356,7 @@ fn parse_postgres_extended_temporal_input(
         }
         return Some(match extended_duckdb_timestamp_nanos(text) {
             Some(nanos) if nanos % 1_000 == 0 => Ok(Value::Text(text.replace('T', " "))),
-            _ => Err(crate::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS.")),
+            _ => Err(ValueInputError::InvalidDateTime),
         });
     }
     if matches!(kind.as_str(), "timestamptz" | "timestamp with time zone") {
@@ -350,14 +367,14 @@ fn parse_postgres_extended_temporal_input(
             bookie_core::import::duckdb_extended_timestamptz_nanos(text)
                 .filter(|nanos| nanos % 1_000 == 0)
                 .map(|_| Value::Text(text.replace('T', " ")))
-                .ok_or_else(|| crate::tr!("Invalid timestamp with time zone.")),
+                .ok_or(ValueInputError::InvalidTimestampWithTimeZone),
         );
     }
     None
 }
 
-fn parse_mysql_spatial_input(col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
-    if driver_id != "mysql" {
+fn parse_mysql_spatial_input(col: Option<&ColumnInfo>, hooks: &ParseHooks) -> Option<Result<Value, ValueInputError>> {
+    if !hooks.capabilities.spatial_edit_requires_native_value {
         return None;
     }
     let data_type = col?.data_type.trim().to_ascii_lowercase();
@@ -373,10 +390,10 @@ fn parse_mysql_spatial_input(col: Option<&ColumnInfo>, driver_id: &str) -> Optio
             | "multipolygon"
             | "geometrycollection"
     )
-    .then(|| Err(crate::tr!("MySQL spatial values cannot be edited losslessly")))
+    .then(|| Err(ValueInputError::MySqlSpatialValueNotEditable))
 }
 
-fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Result<Value, String>> {
+fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Result<Value, ValueInputError>> {
     let data_type = col?.data_type.trim().to_ascii_lowercase();
     let zerofill = data_type.strip_suffix(" zerofill");
     let data_type = zerofill.unwrap_or(&data_type);
@@ -387,9 +404,6 @@ fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Res
         .split('(')
         .next()?;
 
-    // MySQL exposes TINYINT(1) as the app's boolean editing contract when
-    // it is signed. Preserve that behavior; an UNSIGNED declaration uses
-    // its actual numeric range and is handled below.
     if !unsigned && base == "tinyint" && data_type.contains("(1)") {
         return None;
     }
@@ -407,22 +421,26 @@ fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Res
         _ => return None,
     };
     Some((|| {
-        let value = text.parse::<i128>().map_err(|_| crate::tr!("Invalid integer"))?;
+        let value = text.parse::<i128>().map_err(|_| ValueInputError::InvalidInteger)?;
         if !(minimum..=maximum).contains(&value) {
-            return Err(crate::tr!("Integer is outside the supported MySQL column range"));
+            return Err(ValueInputError::MySqlIntegerOutOfRange);
         }
         Ok(i64::try_from(value).map_or_else(|_| Value::Text(value.to_string()), Value::Int))
     })())
 }
 
-fn parse_mongodb_integer_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+fn parse_mongodb_integer_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+) -> Option<Result<Value, ValueInputError>> {
     let column = col?;
-    if driver_id != "mongodb" {
+    if !hooks.capabilities.typed_integer_widths {
         return None;
     }
     match column.data_type.trim().to_ascii_lowercase().as_str() {
         "int" => Some(text.parse::<i32>().map_or_else(
-            |_| Err(crate::tr!("Integer is outside the supported MongoDB Int32 range")),
+            |_| Err(ValueInputError::MongoInt32OutOfRange),
             |value| {
                 Ok(Value::Json(Box::new(
                     serde_json::json!({"$numberInt": value.to_string()}),
@@ -437,33 +455,37 @@ fn parse_mongodb_integer_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
 fn parse_mongodb_decimal_input(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
     hooks: &ParseHooks,
-) -> Option<Result<Value, String>> {
+) -> Option<Result<Value, ValueInputError>> {
     let column = col?;
-    if driver_id != "mongodb" || !column.data_type.trim().eq_ignore_ascii_case("decimal") {
+    if hooks.capabilities.canonical_decimal_input.is_none() || !column.data_type.trim().eq_ignore_ascii_case("decimal")
+    {
         return None;
     }
     if let Ok(value) = parse_decimal_value(text) {
         return Some(Ok(value));
     }
     Some(
-        (hooks.canonical_decimal128)(text)
+        hooks.capabilities.canonical_decimal_input?(text)
             .map(|canonical| Value::Json(Box::new(serde_json::json!({"$numberDecimal": canonical}))))
-            .ok_or_else(|| crate::tr!("Invalid decimal")),
+            .ok_or(ValueInputError::InvalidDecimal),
     )
 }
 
-fn parse_mongodb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+fn parse_mongodb_date_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+) -> Option<Result<Value, ValueInputError>> {
     let column = col?;
-    if driver_id != "mongodb" || !column.data_type.trim().eq_ignore_ascii_case("date") {
+    if !hooks.capabilities.millisecond_date_precision || !column.data_type.trim().eq_ignore_ascii_case("date") {
         return None;
     }
     let timestamp = chrono::DateTime::parse_from_rfc3339(text).ok()?;
     Some(if timestamp.timestamp_subsec_nanos() % 1_000_000 == 0 {
         Ok(Value::TimestampTz(timestamp.to_utc()))
     } else {
-        Err(crate::tr!("MongoDB BSON dates support millisecond precision only"))
+        Err(ValueInputError::MongoDatePrecision)
     })
 }
 
@@ -474,42 +496,46 @@ fn is_postgres_numeric_type(data_type: &str) -> bool {
         || data_type.starts_with("decimal(")
 }
 
-fn is_duckdb_timestamptz_type(data_type: &str) -> bool {
+fn is_timestamp_with_timezone_type(data_type: &str) -> bool {
     matches!(
         data_type.trim().to_ascii_lowercase().as_str(),
         "timestamptz" | "timestamp with time zone"
     )
 }
 
-fn parse_duckdb_timestamptz_input(
+fn parse_timestamp_with_timezone_input(
     text: &str,
     col: Option<&ColumnInfo>,
-    driver_id: &str,
-) -> Option<Result<Value, String>> {
+    hooks: &ParseHooks,
+) -> Option<Result<Value, ValueInputError>> {
     let column = col?;
-    if driver_id != "duckdb" || !is_duckdb_timestamptz_type(&column.data_type) {
+    if !hooks.capabilities.timestamp_with_timezone || !is_timestamp_with_timezone_type(&column.data_type) {
         return None;
     }
     Some((|| {
         if let Ok(Value::TimestampTz(timestamp)) = parse_timestamptz_value(text) {
             if timestamp.timestamp_subsec_nanos() % 1_000 != 0 {
-                return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
+                return Err(ValueInputError::DuckDbTimestampTzPrecision);
             }
             return Ok(Value::TimestampTz(timestamp));
         }
         let Some(nanos) = bookie_core::import::duckdb_extended_timestamptz_nanos(text) else {
-            return Err(crate::tr!("Invalid timestamp with time zone."));
+            return Err(ValueInputError::InvalidTimestampWithTimeZone);
         };
         if nanos % 1_000 != 0 {
-            return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
+            return Err(ValueInputError::DuckDbTimestampTzPrecision);
         }
         Ok(Value::Text(text.to_owned()))
     })())
 }
 
-fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+fn parse_duckdb_temporal_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+) -> Option<Result<Value, ValueInputError>> {
     let column = col?;
-    if driver_id != "duckdb" {
+    if !hooks.capabilities.temporal_fraction_precision {
         return None;
     }
     let data_type = column.data_type.trim().to_ascii_lowercase();
@@ -527,7 +553,7 @@ fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
                     let nanos = value.nanosecond();
                     (Value::Time(value), nanos)
                 }
-                _ => return Err(crate::tr!("Invalid time.")),
+                _ => return Err(ValueInputError::InvalidTime),
             }
         } else if let Ok(Value::DateTime(value)) = parse_datetime_value(text) {
             let nanos = value.nanosecond();
@@ -535,17 +561,21 @@ fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
         } else if let Some(nanos) = extended_duckdb_timestamp_nanos(text) {
             (Value::Text(text.to_owned()), nanos)
         } else {
-            return Err(crate::tr!("Invalid date and time."));
+            return Err(ValueInputError::InvalidDateAndTime);
         };
         if nanos % quantum_ns != 0 {
-            return Err(format!("DuckDB {kind} precision cannot represent this value exactly"));
+            return Err(ValueInputError::DuckDbTemporalPrecision { kind });
         }
         Ok(value)
     })())
 }
 
-fn parse_duckdb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
-    if driver_id != "duckdb" || !col?.data_type.trim().eq_ignore_ascii_case("date") {
+fn parse_duckdb_date_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    hooks: &ParseHooks,
+) -> Option<Result<Value, ValueInputError>> {
+    if !hooks.capabilities.extended_calendar_dates || !col?.data_type.trim().eq_ignore_ascii_case("date") {
         return None;
     }
     if parse_date_value(text).is_ok() {
@@ -554,7 +584,7 @@ fn parse_duckdb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str
     Some(if extended_duckdb_date(text).is_some() {
         Ok(Value::Text(text.to_owned()))
     } else {
-        Err(crate::tr!("Invalid date. Use YYYY-MM-DD."))
+        Err(ValueInputError::InvalidDate)
     })
 }
 
@@ -642,18 +672,18 @@ fn mysql_bit_width(data_type: &str) -> Option<u32> {
         .filter(|width| (1..=64).contains(width))
 }
 
-fn parse_mysql_bit_value(text: &str, width: u32) -> Result<Value, String> {
+fn parse_mysql_bit_value(text: &str, width: u32) -> Result<Value, ValueInputError> {
     if width == 1 {
         return parse_bool_value(text);
     }
-    let number = text.parse::<u64>().map_err(|_| crate::tr!("Invalid integer"))?;
+    let number = text.parse::<u64>().map_err(|_| ValueInputError::InvalidInteger)?;
     let maximum = if width == 64 {
         i64::MAX as u64
     } else {
         (1u64 << width) - 1
     };
     if number > maximum {
-        return Err(crate::tr!("Integer is outside the supported BIT range"));
+        return Err(ValueInputError::BitWidthOutOfRange);
     }
     Ok(Value::Int(number as i64))
 }
@@ -673,15 +703,7 @@ pub enum TypeKind {
     Text,
 }
 
-/// Map a lowercased `data_type` string to a coarse `TypeKind`. Order
-/// of checks matters because several SQL types share substrings — for
-/// example `timestamptz` / `timestamp with time zone` must be matched
-/// before bare `timestamp`, and `tinyint(1)` (MySQL bool) must be
-/// matched before generic `tinyint` / `int` patterns.
 pub fn classify_type(dt: &str) -> TypeKind {
-    // PostgreSQL arrays arrive as their textual array literal. Classifying
-    // by the element name (for example `uuid[]` or `date[]`) would feed the
-    // whole literal to a scalar parser and reject valid grid edits.
     if dt.trim_end().ends_with("[]") {
         return TypeKind::Text;
     }
@@ -700,11 +722,6 @@ pub fn classify_type(dt: &str) -> TypeKind {
     classify_numeric(dt).unwrap_or(TypeKind::Text)
 }
 
-// Postgres `format_type()` returns "bit(1)" for length-1 BIT columns
-// (not the bare "bit" the original guard expected). Both forms classify
-// as Bool so the cell renders as a checkbox rather than a text editor
-// that rejects "true"/"false" with "Invalid integer". Wider BIT(n)
-// values are integers.
 fn classify_bool_or_bit(dt: &str) -> Option<TypeKind> {
     if matches!(dt, "bool" | "boolean" | "bit" | "bit(1)" | "tinyint(1)") {
         return Some(TypeKind::Bool);
@@ -787,55 +804,53 @@ fn is_integer_type(dt: &str) -> bool {
         || dt.starts_with("mediumint(")
 }
 
-pub fn parse_bool_value(text: &str) -> Result<Value, String> {
+pub fn parse_bool_value(text: &str) -> Result<Value, ValueInputError> {
     match text.to_ascii_lowercase().as_str() {
         "true" | "t" | "1" | "yes" | "y" | "on" => Ok(Value::Bool(true)),
         "false" | "f" | "0" | "no" | "n" | "off" => Ok(Value::Bool(false)),
-        _ => Err(crate::tr!("Invalid boolean. Use true/false, yes/no, or 1/0.")),
+        _ => Err(ValueInputError::InvalidBoolean),
     }
 }
 
-pub fn parse_int_value(text: &str) -> Result<Value, String> {
+pub fn parse_int_value(text: &str) -> Result<Value, ValueInputError> {
     text.parse::<i64>()
         .map(Value::Int)
-        .map_err(|_| crate::tr!("Invalid integer"))
+        .map_err(|_| ValueInputError::InvalidInteger)
 }
 
-pub fn parse_float_value(text: &str) -> Result<Value, String> {
+pub fn parse_float_value(text: &str) -> Result<Value, ValueInputError> {
     bookie_core::parse_float_input(text)
         .map(Value::Float)
-        .map_err(|_| crate::tr!("Invalid number"))
+        .map_err(|_| ValueInputError::InvalidNumber)
 }
 
-pub fn parse_decimal_value(text: &str) -> Result<Value, String> {
+pub fn parse_decimal_value(text: &str) -> Result<Value, ValueInputError> {
     rust_decimal::Decimal::from_str_exact(text)
         .map(Value::Decimal)
-        .map_err(|_| crate::tr!("Invalid decimal"))
+        .map_err(|_| ValueInputError::InvalidDecimal)
 }
 
-pub fn parse_uuid_value(text: &str) -> Result<Value, String> {
+pub fn parse_uuid_value(text: &str) -> Result<Value, ValueInputError> {
     uuid::Uuid::parse_str(text)
         .map(Value::Uuid)
-        .map_err(|_| crate::tr!("Invalid UUID. Expected 8-4-4-4-12 hex digits."))
+        .map_err(|_| ValueInputError::InvalidUuid)
 }
 
-pub fn parse_json_value(text: &str) -> Result<Value, String> {
+pub fn parse_json_value(text: &str) -> Result<Value, ValueInputError> {
     serde_json::from_str::<serde_json::Value>(text)
         .map(Box::new)
         .map(Value::Json)
-        .map_err(|e| crate::tr!("Invalid JSON: {error}").replace("{error}", &e.to_string()))
+        .map_err(|e| ValueInputError::InvalidJson(e.to_string()))
 }
 
-pub fn parse_timestamptz_value(text: &str) -> Result<Value, String> {
+pub fn parse_timestamptz_value(text: &str) -> Result<Value, ValueInputError> {
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(text) {
         return Ok(Value::TimestampTz(dt.with_timezone(&chrono::Utc)));
     }
-    Err(crate::tr!(
-        "Invalid timestamp. Use ISO 8601, e.g. 2024-01-15T14:30:00Z."
-    ))
+    Err(ValueInputError::InvalidTimestamp)
 }
 
-pub fn parse_datetime_value(text: &str) -> Result<Value, String> {
+pub fn parse_datetime_value(text: &str) -> Result<Value, ValueInputError> {
     let formats = [
         "%Y-%m-%d %H:%M:%S",
         "%Y-%m-%dT%H:%M:%S",
@@ -847,21 +862,21 @@ pub fn parse_datetime_value(text: &str) -> Result<Value, String> {
             return Ok(Value::DateTime(dt));
         }
     }
-    Err(crate::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS."))
+    Err(ValueInputError::InvalidDateTime)
 }
 
-pub fn parse_date_value(text: &str) -> Result<Value, String> {
+pub fn parse_date_value(text: &str) -> Result<Value, ValueInputError> {
     chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d")
         .map(Value::Date)
-        .map_err(|_| crate::tr!("Invalid date. Use YYYY-MM-DD."))
+        .map_err(|_| ValueInputError::InvalidDate)
 }
 
-pub fn parse_time_value(text: &str) -> Result<Value, String> {
+pub fn parse_time_value(text: &str) -> Result<Value, ValueInputError> {
     let formats = ["%H:%M:%S", "%H:%M:%S%.f", "%H:%M"];
     for fmt in &formats {
         if let Ok(t) = chrono::NaiveTime::parse_from_str(text, fmt) {
             return Ok(Value::Time(t));
         }
     }
-    Err(crate::tr!("Invalid time. Use HH:MM:SS."))
+    Err(ValueInputError::InvalidTime)
 }

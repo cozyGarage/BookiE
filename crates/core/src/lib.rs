@@ -45,8 +45,8 @@ pub use connection::{
     uri_host,
 };
 pub use driver::{
-    ConnectionFormDefaults, DataModel, DatabaseDriver, DriverCapabilities, DriverMaturity, EnumInputStyle,
-    connection_form_defaults, initial_connection_form_defaults,
+    ConnectionFormDefaults, DataModel, DatabaseDriver, DriverCapabilities, DriverMaturity,
+    DriverValueInputCapabilities, EnumInputStyle, connection_form_defaults, initial_connection_form_defaults,
 };
 pub use error::DriverError;
 pub use filter::{

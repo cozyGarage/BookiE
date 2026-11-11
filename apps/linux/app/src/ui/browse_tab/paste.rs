@@ -270,7 +270,6 @@ impl BrowseTab {
         parse_pasted_cell_with_style(
             cell.text.as_deref(),
             column,
-            &self.driver_id,
             &self.parse_hooks,
             current.as_ref(),
         )

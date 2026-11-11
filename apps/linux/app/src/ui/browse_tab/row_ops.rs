@@ -319,7 +319,6 @@ impl BrowseTab {
         let new = match parse_grid_cell_input_with_style(
             &new_value,
             col,
-            &self.driver_id,
             &self.parse_hooks,
             current_value.as_ref(),
         ) {
@@ -500,7 +499,6 @@ impl BrowseTab {
                 parse_grid_cell_input_with_style(
                     new_value,
                     Some(column),
-                    &self.driver_id,
                     &self.parse_hooks,
                     Some(original),
                 )

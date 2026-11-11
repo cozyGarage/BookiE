@@ -24,10 +24,10 @@ mod temporal;
 
 use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
-    QueryResultBudget, QueryRows, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, EnumInputStyle,
+    ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
+    QueryResultBatch, QueryResultBudget, QueryRows, TableInfo, Transport, Value, check_pre_dispatch,
+    run_controlled_setup, run_server_cancellable,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -44,6 +44,14 @@ pub struct MysqlDriver;
 
 #[async_trait]
 impl DatabaseDriver for MysqlDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            integer_range_validation: true,
+            spatial_edit_requires_native_value: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn enum_input_style(&self) -> EnumInputStyle {
         EnumInputStyle::DeclaredMemberList
     }

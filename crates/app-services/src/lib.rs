@@ -39,6 +39,8 @@ pub mod filter_settings;
 pub mod highlight_settings;
 pub mod i18n;
 pub mod value_input;
+#[cfg(test)]
+mod value_input_tests;
 pub mod image_preview;
 pub mod open_failure;
 pub mod ordered_refresh;
