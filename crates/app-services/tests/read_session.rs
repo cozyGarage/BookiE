@@ -168,11 +168,50 @@ async fn an_old_session_cannot_read_or_close_a_replacement() {
         old.read_page(&table, 0, 2, &control).await,
         Err(DriverFailurePresentation::Disconnected)
     ));
+    assert!(matches!(
+        old.run_query("SELECT 1", &control).await,
+        Err(DriverFailurePresentation::Disconnected)
+    ));
+    let registry = DriverRegistry::new();
+    assert!(matches!(
+        old.with_subscription::<(), _, _>(&registry, &control, |_| async { panic!("stale callback") })
+            .await,
+        Err(DriverFailurePresentation::Disconnected)
+    ));
     drop(old);
     assert_eq!(
         replacement.read_page(&table, 0, 2, &control).await.unwrap().rows.len(),
         2
     );
+}
+
+#[tokio::test]
+async fn a_writable_saved_configuration_cannot_write_through_a_read_session() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("session.db");
+    seeded(&path).await;
+    let mut configuration = saved(&path, Uuid::new_v4());
+    configuration.read_only = false;
+    let mut registry = DriverRegistry::new();
+    registry.register(Arc::new(drivers_sqlite::SqliteDriver));
+    let session = ReadSession::open(
+        configuration,
+        Arc::new(registry),
+        Arc::new(DatabaseService::new_isolated()),
+    )
+    .await
+    .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    for sql in [
+        "INSERT INTO items VALUES (4, 'x')",
+        "UPDATE items SET name = 'x'",
+        "DELETE FROM items",
+        "CREATE TABLE extra (id INTEGER)",
+    ] {
+        assert!(session.run_query(sql, &control).await.is_err(), "write accepted: {sql}");
+    }
+    let result = session.run_query("SELECT count(*) FROM items", &control).await.unwrap();
+    assert_eq!(result.rows.iter().next().map(|row| row[0].clone()), Some(Value::Int(3)));
 }
 
 #[tokio::test]
