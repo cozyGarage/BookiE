@@ -1590,6 +1590,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::lifetime_tests::a_wide_result_realizes_a_bounded_row_window"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::lifetime_tests::alternating_editable_and_readonly_grids_release_every_retired_page"
     ],
     [

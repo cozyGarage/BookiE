@@ -4,6 +4,7 @@ import json
 import os
 import re
 import select
+import signal
 import shutil
 import subprocess
 import sys
@@ -903,14 +904,69 @@ GLib.MainLoop().run()
         assert count == expected_rows
 
     def profile_streamed_pin_retention(database, base):
+        trim_result = os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_RESULT")
+
+        def app_private_maps():
+            process = ui.owned_application().process
+            mappings = {}
+            current = None
+            private_kib = 0
+            with open(f"/proc/{process.pid}/smaps", encoding="utf-8") as memory:
+                for line in memory:
+                    fields = line.split()
+                    if fields and re.fullmatch(r"[0-9a-f]+-[0-9a-f]+", fields[0]):
+                        if current is not None:
+                            mappings[current] = mappings.get(current, 0) + private_kib
+                        current = " ".join(fields[5:]) or "[anonymous]"
+                        private_kib = 0
+                    elif current is not None and line.startswith("Private_Dirty:"):
+                        private_kib = int(fields[1])
+            if current is not None:
+                mappings[current] = mappings.get(current, 0) + private_kib
+            return sorted(
+                ({"mapping": name, "private_kib": size} for name, size in mappings.items()),
+                key=lambda item: item["private_kib"],
+                reverse=True,
+            )[:8]
+
+        def wait_for_completion(status, timeout=180):
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                if "Complete · Received" in ui.node_name(status):
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"active editor did not complete: {ui.node_name(status)!r}")
+
+        def trim_allocator():
+            result = Path(trim_result)
+            previous = result.read_text(encoding="utf-8").count("malloc_trim=") if result.is_file() else 0
+            os.kill(ui.owned_application().process.pid, signal.SIGUSR2)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if result.is_file() and result.read_text(encoding="utf-8").count("malloc_trim=") > previous:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError("the profile allocator trim signal was not handled")
+
         rows = int(os.environ.get("BOOKIE_PROFILE_STREAM_ROWS", "34000"))
         payload_bytes = int(os.environ.get("BOOKIE_PROFILE_STREAM_CELL_BYTES", "2048"))
+        value_kind = os.environ.get("BOOKIE_PROFILE_STREAM_VALUE", "text")
+        width = int(os.environ.get("BOOKIE_PROFILE_STREAM_WIDTH", "3"))
         repetitions = int(os.environ.get("BOOKIE_PROFILE_REPETITION", "1"))
         if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
             raise ValueError("stream profile rows or payload size are outside their bounded workload")
+        if not 3 <= width <= 64 or value_kind not in {"text", "binary", "json"}:
+            raise ValueError("stream profile width or value kind is outside its bounded workload")
+        payload = {
+            "text": f"repeat('x', {payload_bytes})",
+            "binary": f"decode(repeat('78', {payload_bytes}), 'hex')",
+            "json": f"jsonb_build_object('payload', repeat('x', {payload_bytes}))",
+        }[value_kind]
+        columns = ", ".join(f"repeat('y', 13) AS field_{index}" for index in range(1, width - 2))
+        fields = f", {columns}" if columns else ""
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
-        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        samples = [{"stage": "baseline", **app_memory_profile_kb()}]
+        frame = ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        samples = [{"stage": "baseline", **app_memory_profile_kb(), "private_maps": app_private_maps()}]
         runs = []
         for index in range(5):
             result_rows = rows + index * 1_000
@@ -920,22 +976,36 @@ GLib.MainLoop().run()
             ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
             started = time.monotonic()
             query = (
-                "SELECT value AS id, "
-                f"'{marker}' AS run_marker, repeat('x', {payload_bytes}) AS payload "
+                f"SELECT value AS id, '{marker}' AS run_marker{fields}, {payload} AS payload "
                 f"FROM generate_series(1, {result_rows}) AS value"
             )
             ui.set_editor_text(query)
             ui.invoke(ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
-            ui.wait_for_node(name=marker, role=pyatspi.ROLE_LABEL, timeout=180)
-            ui.wait_for_node_containing(f"Received {result_rows:,} rows", timeout=180)
+            status = ui.wait_for_node_containing(
+                f"Received {result_rows:,} rows", role=pyatspi.ROLE_LABEL, timeout=180
+            )
+            wait_for_completion(status)
             elapsed_seconds = round(time.monotonic() - started, 2)
+            samples.append({
+                "stage": f"after_streamed_editor_{index + 1}_before_pin",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
             ui.invoke(ui.wait_for_sensitive_node("Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
-            sample = {"stage": f"after_streamed_editor_{index + 1}", **app_memory_profile_kb()}
+            if trim_result is not None and os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_EACH_RESULT"):
+                trim_allocator()
+            sample = {
+                "stage": f"after_streamed_editor_{index + 1}",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            }
             samples.append(sample)
             runs.append({
                 "marker": marker,
                 "rows": result_rows,
+                "width": width,
+                "value_kind": value_kind,
                 "payload_bytes": payload_bytes,
                 "run_seconds": elapsed_seconds,
                 "pin_count": 1,
@@ -947,21 +1017,49 @@ GLib.MainLoop().run()
             unpin = ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
             ui.invoke(unpin)
             ui.wait_for_node_containing("Pin results", role=pyatspi.ROLE_PUSH_BUTTON)
-            teardown_samples.append({"stage": f"after_unpin_{marker}", **app_memory_profile_kb()})
+            teardown_samples.append({
+                "stage": f"after_unpin_{marker}",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
             ui.invoke_accessible_action("win.close-current")
-            ui.wait_for_node(name=marker, present=False)
-            teardown_samples.append({"stage": f"after_editor_close_{marker}", **app_memory_profile_kb()})
+            time.sleep(ui.SETTLE_SECONDS)
+            teardown_samples.append({
+                "stage": f"after_editor_close_{marker}",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
+            if trim_result is not None and os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_EACH_CLOSE"):
+                trim_allocator()
+                teardown_samples.append({
+                    "stage": f"after_editor_close_trim_{marker}",
+                    **app_memory_profile_kb(),
+                    "private_maps": app_private_maps(),
+                })
         time.sleep(3)
         frame = ui.find_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
         if frame is not None:
             ui.wait_within(frame, name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
-        teardown_samples.append({"stage": "after_all_editors_closed_idle_3s", **app_memory_profile_kb()})
+        teardown_samples.append({
+            "stage": "after_all_editors_closed_idle_3s",
+            **app_memory_profile_kb(),
+            "private_maps": app_private_maps(),
+        })
+        if trim_result is not None:
+            trim_allocator()
+            teardown_samples.append({
+                "stage": "after_allocator_trim",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
         with open(os.environ["BOOKIE_PROFILE_OUT"], "a", encoding="utf-8") as out:
             out.write(json.dumps({
                 **ui.owned_application().identity(),
                 "profile_mode": "postgres-stream-pin-retention-across-editors",
                 "repetition": repetitions,
                 "configured_rows_per_result": rows,
+                "configured_width": width,
+                "value_kind": value_kind,
                 "payload_bytes_per_row": payload_bytes,
                 "result_count": len(runs),
                 "editor_count": len(runs),
