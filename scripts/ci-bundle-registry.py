@@ -14,6 +14,7 @@ import urllib.error
 import urllib.request
 import urllib.parse
 import zipfile
+from datetime import datetime, timedelta, timezone
 
 MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
@@ -278,13 +279,60 @@ def github_fetch(directory, revision, group):
     raise ValueError('no successful GitHub build supplies the exact requested artifact')
 
 
+def prune(revision, retention_days):
+    if not re.fullmatch(r'[0-9a-f]{40}', revision):
+        raise ValueError('a full source commit is required')
+    if not 1 <= retention_days <= 90:
+        raise ValueError('package retention must be between 1 and 90 days')
+    api = os.environ['BOOKIE_REGISTRY_API_URL'].rstrip('/')
+    package_name = 'bookie-test-bundles'
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    page = 1
+    removed = 0
+    while True:
+        query = urllib.parse.urlencode({'type': 'generic', 'q': package_name, 'limit': 50, 'page': page})
+        with request(f'{api}?{query}') as response:
+            packages = json.load(response)
+        for package in packages:
+            version = package.get('version', '')
+            created = package.get('created_at', '')
+            if (package.get('type') != 'generic' or package.get('name') != package_name
+                    or not re.fullmatch(r'[0-9a-f]{40}-[a-z0-9-]+', version)
+                    or version.startswith(revision + '-') or not created):
+                continue
+            try:
+                created_at = datetime.fromisoformat(created.replace('Z', '+00:00'))
+            except ValueError:
+                continue
+            if created_at.tzinfo is None or created_at >= cutoff:
+                continue
+            path = '/'.join(urllib.parse.quote(segment, safe='')
+                            for segment in ('generic', package_name, version))
+            with request(f'{api}/{path}', 'DELETE') as response:
+                if response.status != 204:
+                    raise ValueError('registry did not delete an expired test bundle')
+            removed += 1
+        if len(packages) < 50:
+            break
+        page += 1
+    print(f'removed {removed} expired test bundle versions; retained {retention_days} days', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('operation', choices=['publish', 'fetch', 'github-fetch'])
-    parser.add_argument('directory', type=Path)
-    parser.add_argument('revision')
-    parser.add_argument('group', choices=sorted(BUNDLE_GROUPS))
+    commands = parser.add_subparsers(dest='operation', required=True)
+    for operation in ('publish', 'fetch', 'github-fetch'):
+        command = commands.add_parser(operation)
+        command.add_argument('directory', type=Path)
+        command.add_argument('revision')
+        command.add_argument('group', choices=sorted(BUNDLE_GROUPS))
+    prune_command = commands.add_parser('prune')
+    prune_command.add_argument('revision')
+    prune_command.add_argument('--retention-days', type=int, default=14)
     args = parser.parse_args()
+    if args.operation == 'prune':
+        prune(args.revision, args.retention_days)
+        return
     if not re.fullmatch('[0-9a-f]{40}', args.revision):
         parser.error('a full source commit is required')
     if args.operation == 'github-fetch':

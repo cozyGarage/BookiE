@@ -226,6 +226,13 @@ class CiWorkflowTests(unittest.TestCase):
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn('prepare-test-bundle.sh "${{ github.sha }}" "driver-${{ matrix.driver }}"', driver)
 
+    def test_forgejo_prunes_old_source_pinned_test_bundles(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("Remove expired test bundles", builder)
+        self.assertIn("BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung", builder)
+        self.assertIn('ci-bundle-registry.py prune "${{ github.sha }}" --retention-days 14', builder)
+
     def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)

@@ -10,6 +10,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 
 SPEC = importlib.util.spec_from_file_location('registry', Path(__file__).resolve().parents[1] / 'ci-bundle-registry.py')
 registry = importlib.util.module_from_spec(SPEC)
@@ -17,6 +18,48 @@ SPEC.loader.exec_module(registry)
 
 
 class RegistryExtractionTests(unittest.TestCase):
+    def test_prune_deletes_only_expired_bookie_bundles_and_keeps_current_revision(self):
+        now = datetime.now(timezone.utc)
+        old = (now - timedelta(days=20)).isoformat()
+        recent = (now - timedelta(days=2)).isoformat()
+        packages = [
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'a' * 40 + '-direct', 'created_at': old},
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'b' * 40 + '-direct', 'created_at': recent},
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'c' * 40 + '-direct', 'created_at': old},
+            {'type': 'generic', 'name': 'other-package', 'version': 'd' * 40 + '-direct', 'created_at': old},
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'invalid', 'created_at': old},
+        ]
+
+        class Response:
+            def __init__(self, status=200, body=b''):
+                self.status = status
+                self.body = body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return self.body
+
+        requests = []
+
+        def request(url, method='GET', data=None, size=None):
+            requests.append((method, url))
+            return Response(200, json.dumps(packages).encode()) if method == 'GET' else Response(204)
+
+        with patch.dict('os.environ', {'BOOKIE_REGISTRY_API_URL': 'https://forgejo.example/api/v1/packages/trung',
+                                       'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
+                patch.object(registry, 'request', side_effect=request):
+            registry.prune('c' * 40, 14)
+
+        deleted = [url for method, url in requests if method == 'DELETE']
+        self.assertEqual(deleted, [
+            'https://forgejo.example/api/v1/packages/trung/generic/bookie-test-bundles/' + 'a' * 40 + '-direct'
+        ])
+
     def test_archive_only_bundle_verifies_without_duplicate_executables(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

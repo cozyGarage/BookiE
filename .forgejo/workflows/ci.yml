@@ -332,6 +332,13 @@ jobs:
           for group in direct consumers driver-core driver-analytics driver-extended drivers pg-release socket-ssh driver-tls keyring unit sandbox gpui; do
             python3 scripts/ci-bundle-registry.py publish "$GITHUB_WORKSPACE/test-bundles/$group" "${{ github.sha }}" "$group"
           done
+      - name: Remove expired test bundles
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung
+        run: |
+          cd src
+          python3 scripts/ci-bundle-registry.py prune "${{ github.sha }}" --retention-days 14
       - name: Check the no-default-features layer
         run: |
           exec 9>>/target/.bookie-build-cache.lock
