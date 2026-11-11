@@ -88,8 +88,9 @@ class CiWorkflowTests(unittest.TestCase):
                 if name.startswith(".github/"):
                     self.assertIn("fetch-depth: 0", pin_job)
                 else:
-                    self.assertIn("+refs/heads/*:refs/remotes/origin/*", pin_job)
-                    self.assertIn("+refs/tags/*:refs/tags/*", pin_job)
+                    self.assertIn("uses: actions/checkout@", pin_job)
+                    self.assertIn("ref: ${{ inputs.ref || github.sha }}", pin_job)
+                    self.assertIn("fetch-depth: 0", pin_job)
                 for index, heading in enumerate(headings):
                     if heading.group(1) == "pin-revision":
                         continue
@@ -659,7 +660,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("compose logs --no-color --tail 50", script)
 
     def test_forgejo_jobs_bound_runtime_and_scope_checkout_credentials(self):
-        for name in ("ci", "nightly"):
+        for name, expected_checkouts in (("ci", 24), ("nightly", 6)):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             jobs = workflow.split("\njobs:\n", 1)[1]
             headings = list(re.finditer(r"^  ([A-Za-z0-9_-]+):\s*$", jobs, re.MULTILINE))
@@ -669,17 +670,14 @@ class CiWorkflowTests(unittest.TestCase):
                 block = jobs[heading.start() : end]
                 self.assertRegex(block, r"(?m)^    timeout-minutes: [1-9][0-9]*$", heading.group(1))
 
-            self.assertNotRegex(workflow, r"https?://oauth2:\$\{TOKEN\}@")
-            self.assertIn("TOKEN: ${{ secrets.FORGEJO_TOKEN }}", workflow)
-            self.assertNotIn("TOKEN: ${{ github.token }}", workflow)
-            lines = workflow.splitlines()
-            clone_lines = [index for index, line in enumerate(lines) if "git clone --quiet" in line]
-            self.assertTrue(clone_lines, name)
-            for index in clone_lines:
-                setup = "\n".join(lines[max(0, index - 4) : index])
-                self.assertIn('GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader"', setup)
-                self.assertIn('GIT_CONFIG_VALUE_0="Authorization: Basic $auth"', setup)
-                self.assertEqual(lines[index + 1].strip(), "unset TOKEN auth")
+            self.assertNotIn("git clone --quiet", workflow)
+            self.assertNotIn("TOKEN: ${{ secrets.FORGEJO_TOKEN }}", workflow)
+            self.assertEqual(workflow.count("uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"), expected_checkouts)
+            self.assertEqual(workflow.count("token: ${{ secrets.FORGEJO_TOKEN }}"), expected_checkouts)
+            self.assertEqual(workflow.count("persist-credentials: false"), expected_checkouts)
+            self.assertEqual(workflow.count("fetch-depth: 0"), expected_checkouts)
+            self.assertEqual(workflow.count("path: src"), expected_checkouts)
+            self.assertIn("name: Check runner space before checkout", workflow)
 
     def test_cargo_about_comes_from_the_pinned_installer_and_is_never_built_in_ci(self):
         for path in (
@@ -1535,6 +1533,7 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_forgejo_artifact_actions_are_pinned_and_bootstrap_their_runtime(self):
         allowed = {
+            "actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
             "https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5",
             "https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a",
         }
@@ -1544,8 +1543,10 @@ class CiWorkflowTests(unittest.TestCase):
                 if not actions:
                     continue
                 self.assertTrue(set(actions) <= allowed, workflow.name)
-                self.assertLess(job.index("ensure-node.sh"), job.index("uses:"), workflow.name)
-                self.assertIn('>> "$GITHUB_PATH"', job)
+                artifact_actions = [action for action in actions if "artifact@" in action]
+                if artifact_actions:
+                    self.assertLess(job.index("ensure-node.sh"), job.index(artifact_actions[0]), workflow.name)
+                    self.assertIn('>> "$GITHUB_PATH"', job)
 
     def test_forgejo_distro_floor_keeps_runtime_coverage_without_deb_release_lifecycle(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()

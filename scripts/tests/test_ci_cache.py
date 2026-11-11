@@ -405,7 +405,7 @@ class CiCacheTests(unittest.TestCase):
             self.assertIn('defaults:\n  run:\n    shell: /usr/local/libexec/bookie-ci-cache run {0}\n', workflow)
             self.assertEqual(workflow.count('shell: /usr/local/libexec/bookie-ci-cache run {0}'), 1)
             for step in workflow.split('      - name: ')[1:]:
-                if 'uses:' in step:
+                if 'uses: https://code.forgejo.org/actions/' in step:
                     self.assertRegex(step, r'(?m)^          path: (gtk|floor)-artifact/$')
                     self.assertNotIn('path: /var/cache/', step)
                     self.assertNotIn('path: ${{ env.CARGO_TARGET_DIR }}', step)
@@ -422,20 +422,18 @@ class CiCacheTests(unittest.TestCase):
             )
             self.assertTrue(jobs, filename)
             for name, block in jobs:
-                if '      - name: Check out\n' not in block:
+                if '      - name: Check out source revision\n' not in block:
                     continue
-                step = block.split('      - name: Check out\n', 1)[1].split('\n      - name:', 1)[0]
-                if 'shell: bash' in step:
-                    if name == 'guards':
-                        self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', block, filename)
-                        self.assertIn(f'TMPDIR: {pilot_tmp}', block, filename)
-                        self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', step, filename)
-                    else:
-                        self.assertIn('runs-on: build-host', block, name)
-                else:
+                self.assertIn('uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683', block, name)
+                self.assertIn('path: src', block, name)
+                if '      - name: Check runner space before checkout\n' in block:
+                    step = block.split('      - name: Check runner space before checkout\n', 1)[1].split('\n      - name:', 1)[0]
                     self.assertIn('shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}', step, filename)
-                if 'shell:' in step:
-                    self.assertLess(step.index('shell:'), step.index('run:'), filename)
+                    self.assertIn('run: true', step, filename)
+                if name == 'guards':
+                    self.assertIn(f'CARGO_TARGET_DIR: {pilot_target}', block, filename)
+                    self.assertIn(f'TMPDIR: {pilot_tmp}', block, filename)
+                    self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', block, filename)
 
     def test_missing_or_symlink_lock_fails_closed(self):
         self.lock.unlink()

@@ -62,29 +62,17 @@ jobs:
       revision: ${{ steps.pin.outputs.revision }}
     timeout-minutes: 5
     steps:
-      - name: Check out requested revision
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
-          REQUESTED_REF: ${{ inputs.ref }}
-          EVENT_SHA: ${{ github.sha }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          if [[ -n "$REQUESTED_REF" ]]; then
-            git -C src fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
-            revision="$(git -C src rev-parse --verify --end-of-options "${REQUESTED_REF}^{commit}")"
-            git -C src checkout --quiet --detach "$revision"
-          else
-            git -C src checkout --quiet "$EVENT_SHA"
-          fi
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Record the source revision
         id: pin
         shell: bash
@@ -115,22 +103,18 @@ jobs:
       TMPDIR: /var/cache/ci/tmp/bookie-guards-${{ github.run_id }}
       RUSTC_WRAPPER: ""
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Script harness and guards
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
@@ -164,21 +148,20 @@ jobs:
       CARGO_BUILD_JOBS: 4
       RUSTC_WRAPPER: ""
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned GPUI test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -227,24 +210,20 @@ jobs:
       BOOKIE_TOOL_DIR: /tools
       CARGO_PROFILE_CI_STRIP: symbols
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Prepare artifact runtime
         run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
       - name: Build the shared GTK binary
@@ -306,24 +285,20 @@ jobs:
       CARGO_TARGET_DIR: /target/bookie-${{ github.job }}
       TMPDIR: /target/tmp-${{ github.run_id }}-${{ github.job }}
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Clippy
         run: |
           exec 9>>/target/.bookie-build-cache.lock
@@ -374,24 +349,20 @@ jobs:
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       BOOKIE_BUILD_IMAGE: sha256:f21a3d99fb08a940f7fbf775ad6878d52a3fc957876970ae7d0f607b89696ec4
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Install the GPUI linker dependency
         run: |
           apt-get update -qq
@@ -449,21 +420,20 @@ jobs:
     needs: [pin-revision, test-build]
     timeout-minutes: 90
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -507,21 +477,20 @@ jobs:
     needs: [pin-revision, test-build]
     timeout-minutes: 90
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -549,21 +518,20 @@ jobs:
     needs: [pin-revision, test-build]
     timeout-minutes: 90
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -605,24 +573,20 @@ jobs:
       SCCACHE_SERVER_UDS: /target/tmp-${{ github.run_id }}-${{ github.job }}/sccache.sock
       PATH: /tools:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Install package validation tools
         run: |
           apt-get update -qq
@@ -679,21 +643,20 @@ jobs:
       matrix:
         shard_group: [1, 2]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -744,21 +707,20 @@ jobs:
       matrix:
         driver: [core, analytics, extended]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -796,22 +758,21 @@ jobs:
       TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-b4-rollback
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$TMPDIR"
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -850,21 +811,20 @@ jobs:
           - server: mysql
             mcp_port_slot: 6
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -902,21 +862,20 @@ jobs:
     needs: [pin-revision, test-build]
     timeout-minutes: 45
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -942,21 +901,20 @@ jobs:
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/consumers
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -998,21 +956,20 @@ jobs:
       matrix:
         shard: [1, 2, 3]
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -1054,21 +1011,20 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
       TMPDIR: /var/cache/ci/tmp
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -1106,21 +1062,20 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -1174,21 +1129,20 @@ jobs:
           - server: mongodb
             mcp_port_slot: 9
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -1228,21 +1182,20 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-driver-tls
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -1275,21 +1228,20 @@ jobs:
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/keyring
     steps:
-      - name: Check out
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check runner space before checkout
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Obtain the source-pinned test bundle
         env:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
@@ -1322,22 +1274,18 @@ jobs:
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
-      - name: Check out
-        shell: bash
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
+      - name: Prepare runner workspace
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Supply-chain tools
         run: |
           command -v cargo-deny >/dev/null || cargo install --locked cargo-deny --version 0.20.2
@@ -1391,20 +1339,17 @@ jobs:
     runs-on: any-host
     timeout-minutes: 5
     steps:
-      - name: Check out
+      - name: Check runner space before checkout
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        env:
-          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-          SERVER: ${{ github.server_url }}
-        run: |
-          : "${TOKEN:?Forgejo checkout token is missing}"
-          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
-          GIT_CONFIG_COUNT=1 \
-            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
-            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
-            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
-          unset TOKEN auth
-          git -C src checkout --quiet "${{ needs.pin-revision.outputs.revision }}"
+        run: true
+      - name: Check out source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ needs.pin-revision.outputs.revision }}
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: src
       - name: Evaluate finalized job results
         env:
           CI_JOB_RESULTS: ${{ toJSON(needs) }}
