@@ -1006,3 +1006,72 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
         assert!(view.palette_open, "global shortcuts still work in the editor")
     });
 }
+
+#[gpui::test]
+fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_buffer(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|window, cx| {
+        let editor = view.read(cx).sql_input.clone();
+        editor.update(cx, |editor, cx| {
+            editor.set_value("SELECT id\nFROM orders\nLIMIT 3", window, cx);
+            editor.set_cursor_position(gpui_kit::component::input::Position::new(0, 0), window, cx);
+            editor.focus(window, cx);
+        });
+    });
+    cx.simulate_keystrokes("shift-alt-down shift-alt-down");
+    cx.simulate_input("-- ");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(
+            view.sql_input.read(cx).value(),
+            "-- SELECT id\n-- FROM orders\n-- LIMIT 3",
+            "one keystroke burst edits every caret"
+        );
+    });
+    cx.simulate_keystrokes("escape");
+    cx.simulate_input("x");
+    view.read_with(cx, |view, cx| {
+        let value = view.sql_input.read(cx).value().to_string();
+        assert_eq!(
+            value.matches('x').count(),
+            1,
+            "Escape returns to a single caret: {value}"
+        );
+    });
+    cx.update(|window, cx| {
+        let editor = view.read(cx).sql_input.clone();
+        editor.update(cx, |editor, cx| {
+            editor.set_value("SELECT id\nFROM orders\nLIMIT 3", window, cx);
+            editor.set_cursor_position(gpui_kit::component::input::Position::new(0, 0), window, cx);
+        });
+    });
+    cx.simulate_keystrokes("shift-alt-down ctrl-enter");
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.runs.len(), 1, "{}", view.status);
+        assert_eq!(view.source.total(), 3, "the whole buffer ran, not one caret's line");
+    });
+}

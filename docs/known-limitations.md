@@ -38,7 +38,7 @@ This page describes user-visible behavior and limits in the current source. Curr
 
 ## Interface
 
-- Multi-cursor editing is unavailable. Split panes and SQL code folding are available. Vim keys are an opt-in preference. Preview tabs are temporary and are not restored after restart; kept tabs are restored. Query history opens in a docked panel.
+- Multi-cursor editing is unavailable in the GTK editor: GtkSourceView has one caret and no multi-cursor API ([#2210](https://github.com/cozyGarage/BookiE/issues/2210)). The GPUI editor has it ([GPUI README](../apps/gpui/README.md)). Split panes and SQL code folding are available. Vim keys are an opt-in preference. Preview tabs are temporary and are not restored after restart; kept tabs are restored. Query history opens in a docked panel.
 - The PostgreSQL catalog lists materialized views, routines, triggers, sequences, extensions and roles. The activity dialog is a plain result grid; it does not provide a typed activity console.
 - Server messages such as NOTICE and PRINT are not displayed. Query timing shows elapsed time only.
 - A foreign-key value picker and estimated row counts are unavailable. Go to Referenced Row, enum/set pickers and tab-separated row paste are available.
