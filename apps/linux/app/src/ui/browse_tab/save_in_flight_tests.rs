@@ -70,7 +70,7 @@ fn launch_for_driver(
             schema: schema.map(str::to_owned),
             table: "notes".into(),
             driver_id: driver_id.into(),
-            enum_input_style: bookie_core::EnumInputStyle::RawValue,
+            parse_hooks: bookie_app_services::value_input::ParseHooks::without_driver(bookie_core::EnumInputStyle::RawValue),
             browse_filters: true,
             connection_id: None,
             read_only,

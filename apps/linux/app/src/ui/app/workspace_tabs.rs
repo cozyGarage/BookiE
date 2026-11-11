@@ -375,12 +375,7 @@ impl App {
         };
         let tab_id = Uuid::new_v4();
         let driver_id = self.driver_id().to_string();
-        let enum_input_style = self
-            .registry
-            .get(&driver_id)
-            .map_or(bookie_core::EnumInputStyle::RawValue, |driver| {
-                driver.capabilities().enum_input_style
-            });
+        let parse_hooks = crate::ui::browse_tab::hooks_for(&driver_id);
         let browse_filters = self
             .registry
             .get(&driver_id)
@@ -394,7 +389,7 @@ impl App {
             schema: schema.clone(),
             table: table.clone(),
             driver_id,
-            enum_input_style,
+            parse_hooks,
             browse_filters,
             connection_id,
             read_only,
