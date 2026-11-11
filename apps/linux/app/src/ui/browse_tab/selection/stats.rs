@@ -156,7 +156,7 @@ pub(in crate::ui::browse_tab) fn tooltip(stats: &[ColumnStats]) -> String {
     stats
         .iter()
         .map(|s| {
-            crate::tr!("{column}: count {count}, min {minimum}, max {maximum}, sum {sum}, average {average}")
+            bookie_app_services::tr!("{column}: count {count}, min {minimum}, max {maximum}, sum {sum}, average {average}")
                 .replace("{column}", &s.column)
                 .replace("{count}", &s.count.to_string())
                 .replace("{minimum}", &s.minimum)

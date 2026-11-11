@@ -98,9 +98,9 @@ impl PinnedResults {
 impl SqlEditor {
     pub(super) fn refresh_pin_button(&self) {
         let label = if self.pinned.is_pinned() {
-            crate::tr!("Unpin results ({n})").replace("{n}", &self.pinned.count().to_string())
+            bookie_app_services::tr!("Unpin results ({n})").replace("{n}", &self.pinned.count().to_string())
         } else {
-            crate::tr!("Pin results")
+            bookie_app_services::tr!("Pin results")
         };
         self.pin_button.set_label(&label);
         self.pin_button
@@ -172,7 +172,7 @@ impl SqlEditor {
         self.refresh_pin_button();
         let kept = kept.to_string();
         self.status
-            .set_label(&crate::tr!("{n} pinned; they stay above the next run").replace("{n}", &kept));
+            .set_label(&bookie_app_services::tr!("{n} pinned; they stay above the next run").replace("{n}", &kept));
     }
 }
 
@@ -182,7 +182,7 @@ pub(super) fn with_pending_note(message: String, rendered: bool) -> String {
     }
     format!(
         "{message} · {}",
-        crate::tr!("Pinned; it shows when the running query finishes")
+        bookie_app_services::tr!("Pinned; it shows when the running query finishes")
     )
 }
 
@@ -190,7 +190,7 @@ pub(super) fn with_eviction_note(message: String, evicted: usize) -> String {
     if evicted == 0 {
         return message;
     }
-    format!("{message} · {}", crate::tr!("The oldest pinned result was closed"))
+    format!("{message} · {}", bookie_app_services::tr!("The oldest pinned result was closed"))
 }
 
 #[cfg(test)]

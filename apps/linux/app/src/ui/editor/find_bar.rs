@@ -18,11 +18,11 @@ pub struct FindBar {
 pub fn match_label(position: i32, count: i32) -> String {
     match (position, count) {
         (_, count) if count < 0 => String::new(),
-        (_, 0) => crate::tr!("No results"),
-        (position, count) if position > 0 => crate::tr!("{position} of {count}")
+        (_, 0) => bookie_app_services::tr!("No results"),
+        (position, count) if position > 0 => bookie_app_services::tr!("{position} of {count}")
             .replace("{position}", &position.to_string())
             .replace("{count}", &count.to_string()),
-        (_, count) => crate::tr!("{count} results").replace("{count}", &count.to_string()),
+        (_, count) => bookie_app_services::tr!("{count} results").replace("{count}", &count.to_string()),
     }
 }
 
@@ -40,17 +40,17 @@ impl FindBar {
 
         let entry = gtk::SearchEntry::builder()
             .hexpand(true)
-            .placeholder_text(crate::tr!("Find"))
+            .placeholder_text(bookie_app_services::tr!("Find"))
             .build();
-        entry.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Find"))]);
-        let previous = flat_button("go-up-symbolic", &crate::tr!("Previous match"));
-        let next = flat_button("go-down-symbolic", &crate::tr!("Next match"));
+        entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Find"))]);
+        let previous = flat_button("go-up-symbolic", &bookie_app_services::tr!("Previous match"));
+        let next = flat_button("go-down-symbolic", &bookie_app_services::tr!("Next match"));
         let count = gtk::Label::builder().xalign(1.0).width_chars(12).build();
         count.add_css_class("dim-label");
         let (match_case, regex) = search_option_toggles();
         let replace_toggle = gtk::ToggleButton::builder()
             .icon_name("edit-find-replace-symbolic")
-            .tooltip_text(crate::tr!("Replace"))
+            .tooltip_text(bookie_app_services::tr!("Replace"))
             .build();
         replace_toggle.add_css_class("flat");
 
@@ -266,11 +266,11 @@ impl FindHandle {
 fn replace_controls() -> (gtk::Box, gtk::Entry, gtk::Button, gtk::Button) {
     let entry = gtk::Entry::builder()
         .hexpand(true)
-        .placeholder_text(crate::tr!("Replace with"))
+        .placeholder_text(bookie_app_services::tr!("Replace with"))
         .build();
-    entry.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Replace with"))]);
-    let replace_one = gtk::Button::with_label(&crate::tr!("Replace"));
-    let replace_all = gtk::Button::with_label(&crate::tr!("Replace All"));
+    entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Replace with"))]);
+    let replace_one = gtk::Button::with_label(&bookie_app_services::tr!("Replace"));
+    let replace_all = gtk::Button::with_label(&bookie_app_services::tr!("Replace All"));
     let row = row_of(&[entry.upcast_ref(), replace_one.upcast_ref(), replace_all.upcast_ref()]);
     (row, entry, replace_one, replace_all)
 }
@@ -299,8 +299,8 @@ fn search_bar(find_row: &gtk::Box, replace_row: &gtk::Box, entry: &gtk::SearchEn
 
 fn search_option_toggles() -> (gtk::ToggleButton, gtk::ToggleButton) {
     (
-        flat_toggle("Aa", &crate::tr!("Match case")),
-        flat_toggle(".*", &crate::tr!("Regular expression")),
+        flat_toggle("Aa", &bookie_app_services::tr!("Match case")),
+        flat_toggle(".*", &bookie_app_services::tr!("Regular expression")),
     )
 }
 

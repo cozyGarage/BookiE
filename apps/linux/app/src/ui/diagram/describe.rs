@@ -5,17 +5,17 @@ pub(super) fn table_description(diagram: &SchemaDiagram, table: usize) -> String
         return String::new();
     };
     let count = found.columns.len();
-    let mut sentences = vec![crate::trn!("{n} column.", "{n} columns.", count).replace("{n}", &count.to_string())];
+    let mut sentences = vec![bookie_app_services::trn!("{n} column.", "{n} columns.", count).replace("{n}", &count.to_string())];
     let (references, referenced_by) = diagram.neighbours(table);
     if !references.is_empty() {
-        sentences.push(crate::tr!("References {tables}.").replace("{tables}", &references.join(", ")));
+        sentences.push(bookie_app_services::tr!("References {tables}.").replace("{tables}", &references.join(", ")));
     }
     if !referenced_by.is_empty() {
-        sentences.push(crate::tr!("Referenced by {tables}.").replace("{tables}", &referenced_by.join(", ")));
+        sentences.push(bookie_app_services::tr!("Referenced by {tables}.").replace("{tables}", &referenced_by.join(", ")));
     }
     if !found.columns.is_empty() {
         let columns: Vec<String> = found.columns.iter().map(column_text).collect();
-        sentences.push(crate::tr!("Columns: {columns}.").replace("{columns}", &columns.join("; ")));
+        sentences.push(bookie_app_services::tr!("Columns: {columns}.").replace("{columns}", &columns.join("; ")));
     }
     sentences.join(" ")
 }
@@ -23,13 +23,13 @@ pub(super) fn table_description(diagram: &SchemaDiagram, table: usize) -> String
 fn column_text(column: &DiagramColumn) -> String {
     let mut parts = vec![column.name.clone(), column.type_name.clone()];
     if column.primary_key {
-        parts.push(crate::tr!("primary key"));
+        parts.push(bookie_app_services::tr!("primary key"));
     }
     if column.foreign_key {
-        parts.push(crate::tr!("foreign key"));
+        parts.push(bookie_app_services::tr!("foreign key"));
     }
     if column.nullable {
-        parts.push(crate::tr!("optional"));
+        parts.push(bookie_app_services::tr!("optional"));
     }
     parts.retain(|part| !part.is_empty());
     parts.join(", ")
@@ -37,8 +37,8 @@ fn column_text(column: &DiagramColumn) -> String {
 
 pub(super) fn diagram_label(schema: Option<&str>) -> String {
     match schema {
-        Some(schema) => crate::tr!("Tables in {schema}").replace("{schema}", schema),
-        None => crate::tr!("Tables"),
+        Some(schema) => bookie_app_services::tr!("Tables in {schema}").replace("{schema}", schema),
+        None => bookie_app_services::tr!("Tables"),
     }
 }
 

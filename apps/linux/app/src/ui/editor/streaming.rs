@@ -175,13 +175,13 @@ impl SqlEditor {
             if let Err(error) = stream.cache.append_with_storage_status(sequence, page, spooled) {
                 let message = match error {
                     stream_pages::PageAppendError::OutOfOrder => {
-                        crate::tr!("A streamed result page arrived out of order.")
+                        bookie_app_services::tr!("A streamed result page arrived out of order.")
                     }
                     stream_pages::PageAppendError::SchemaChanged => {
-                        crate::tr!("The result columns changed between pages.")
+                        bookie_app_services::tr!("The result columns changed between pages.")
                     }
                     stream_pages::PageAppendError::InvalidRowWidth => {
-                        crate::tr!("A result page did not match its columns.")
+                        bookie_app_services::tr!("A result page did not match its columns.")
                     }
                 };
                 stream.error = Some(message);
@@ -189,7 +189,7 @@ impl SqlEditor {
                 return;
             }
             if !spooled {
-                stream.error = Some(crate::tr!(
+                stream.error = Some(bookie_app_services::tr!(
                     "BookiE could not keep the complete result in temporary storage. The received rows remain available."
                 ));
             }
@@ -237,7 +237,7 @@ impl SqlEditor {
             );
         }
         self.status.set_label(
-            &crate::tr!("Received {n} rows")
+            &bookie_app_services::tr!("Received {n} rows")
                 .replace("{n}", &crate::ui::count_format::format_thousands(total_rows as u128)),
         );
     }
@@ -296,9 +296,9 @@ impl SqlEditor {
         let history_outcome = match terminal {
             StreamTerminal::Complete => Outcome::Success,
             StreamTerminal::Cancelled => Outcome::Cancelled,
-            StreamTerminal::TimedOut => Outcome::Error(crate::tr!("Query timed out")),
+            StreamTerminal::TimedOut => Outcome::Error(bookie_app_services::tr!("Query timed out")),
             StreamTerminal::Failed(message) => Outcome::Error(message.to_string()),
-            StreamTerminal::Loading => Outcome::Error(crate::tr!("Stream ended before completion")),
+            StreamTerminal::Loading => Outcome::Error(bookie_app_services::tr!("Stream ended before completion")),
         };
         if self.ends_quiet_run() {
             let _ = context;
@@ -311,14 +311,14 @@ impl SqlEditor {
         match terminal {
             StreamTerminal::Complete => self
                 .status
-                .set_label(&crate::tr!("done in {ms} ms").replace("{ms}", &elapsed.max(0).to_string())),
-            StreamTerminal::Cancelled => self.status.set_label(&crate::tr!("cancelled")),
+                .set_label(&bookie_app_services::tr!("done in {ms} ms").replace("{ms}", &elapsed.max(0).to_string())),
+            StreamTerminal::Cancelled => self.status.set_label(&bookie_app_services::tr!("cancelled")),
             StreamTerminal::TimedOut => {
-                self.status.set_label(&crate::tr!("timed out"));
+                self.status.set_label(&bookie_app_services::tr!("timed out"));
                 self.offer_longer_timeout(timed_out.0, timed_out.1);
             }
             StreamTerminal::Failed(message) => self.status.set_label(message),
-            StreamTerminal::Loading => self.status.set_label(&crate::tr!("error")),
+            StreamTerminal::Loading => self.status.set_label(&bookie_app_services::tr!("error")),
         }
     }
 
@@ -366,7 +366,7 @@ fn load_stream_page(
                 let result = spool
                     .load_page(index, columns)
                     .await
-                    .map_err(|_| crate::tr!("The saved result page could not be read.").to_string());
+                    .map_err(|_| bookie_app_services::tr!("The saved result page could not be read.").to_string());
                 loader.input(SqlEditorInput::Stream(Input::PageLoaded {
                     generation,
                     index,
@@ -380,7 +380,7 @@ fn load_stream_page(
 
 fn waiting_for_stream_page() -> adw::StatusPage {
     adw::StatusPage::builder()
-        .title(crate::tr!("Waiting for result pages"))
+        .title(bookie_app_services::tr!("Waiting for result pages"))
         .icon_name("content-loading-symbolic")
         .vexpand(true)
         .build()

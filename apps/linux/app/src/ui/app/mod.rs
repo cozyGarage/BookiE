@@ -286,14 +286,14 @@ impl SimpleComponent for App {
                     #[name = "new_connection_button"]
                     pack_start = &gtk::Button {
                         set_icon_name: "list-add-symbolic",
-                        set_tooltip_text: Some(crate::tr!("New connection").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("New connection").as_str()),
                         connect_clicked => AppMsg::OpenConnect,
                     },
 
                     #[name = "saved_connections_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "document-open-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Open saved connection").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Open saved connection").as_str()),
 
                         #[wrap(Some)]
                         #[name = "connections_popover"]
@@ -303,13 +303,13 @@ impl SimpleComponent for App {
                     #[name = "sidebar_toggle"]
                     pack_start = &gtk::ToggleButton {
                         set_icon_name: "sidebar-show-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Tables sidebar").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Tables sidebar").as_str()),
                     },
 
                     #[name = "databases_button"]
                     pack_start = &gtk::MenuButton {
                         set_icon_name: "network-server-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Switch database").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Switch database").as_str()),
                         set_visible: false,
 
                         #[wrap(Some)]
@@ -320,8 +320,8 @@ impl SimpleComponent for App {
                     #[name = "environment_badge"]
                     pack_end = &gtk::Label {
                         set_visible: false,
-                        set_label: &crate::tr!("Production"),
-                        set_tooltip_text: Some(crate::tr!("This is a production connection. Changes can affect live data.").as_str()),
+                        set_label: &bookie_app_services::tr!("Production"),
+                        set_tooltip_text: Some(bookie_app_services::tr!("This is a production connection. Changes can affect live data.").as_str()),
                         set_margin_end: 6,
                         add_css_class: "error",
                         add_css_class: "caption-heading",
@@ -330,7 +330,7 @@ impl SimpleComponent for App {
                     #[name = "read_only_badge"]
                     pack_end = &gtk::Label {
                         set_visible: false,
-                        set_label: &crate::tr!("Read-only"),
+                        set_label: &bookie_app_services::tr!("Read-only"),
                         set_margin_end: 6,
                         add_css_class: "warning",
                         add_css_class: "caption-heading",
@@ -340,13 +340,13 @@ impl SimpleComponent for App {
                     pack_end = &gtk::Spinner {
                         set_visible: false,
                         set_margin_end: 6,
-                        set_tooltip_text: Some(crate::tr!("Saving…").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Saving…").as_str()),
                     },
 
                     #[name = "primary_menu_button"]
                     pack_end = &gtk::MenuButton {
                         set_icon_name: "open-menu-symbolic",
-                        set_tooltip_text: Some(crate::tr!("Main menu").as_str()),
+                        set_tooltip_text: Some(bookie_app_services::tr!("Main menu").as_str()),
                         set_primary: true,
                     },
                 },
@@ -375,25 +375,25 @@ impl SimpleComponent for App {
                             #[wrap(Some)]
                             #[name = "sidebar_title"]
                             set_title_widget = &adw::WindowTitle {
-                                set_title: &crate::tr!("Tables"),
+                                set_title: &bookie_app_services::tr!("Tables"),
                             },
 
                             pack_end = &gtk::Button {
                                 set_icon_name: "view-refresh-symbolic",
-                                set_tooltip_text: Some(crate::tr!("Refresh tables").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Refresh tables").as_str()),
                                 set_action_name: Some("win.refresh-sidebar"),
                             },
 
                             #[name = "table_search_toggle"]
                             pack_end = &gtk::ToggleButton {
                                 set_icon_name: "system-search-symbolic",
-                                set_tooltip_text: Some(crate::tr!("Search tables").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Search tables").as_str()),
                             },
 
                             #[name = "sidebar_fold_button"]
                             pack_end = &gtk::Button {
                                 set_icon_name: "go-up-symbolic",
-                                set_tooltip_text: Some(crate::tr!("Collapse all").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Collapse all").as_str()),
                                 set_visible: false,
                                 connect_clicked => AppMsg::ToggleAllSidebarGroups,
                             },
@@ -401,7 +401,7 @@ impl SimpleComponent for App {
                             #[name = "schema_filter_button"]
                             pack_end = &gtk::MenuButton {
                                 set_icon_name: crate::ui::icons::SCHEMA_FILTER_ICON_NAME,
-                                set_tooltip_text: Some(crate::tr!("Filter schemas").as_str()),
+                                set_tooltip_text: Some(bookie_app_services::tr!("Filter schemas").as_str()),
                                 set_visible: false,
 
                                 #[wrap(Some)]
@@ -422,7 +422,7 @@ impl SimpleComponent for App {
                                 #[wrap(Some)]
                                 #[name = "table_search"]
                                 set_child = &gtk::SearchEntry {
-                                    set_placeholder_text: Some(crate::tr!("Filter tables…").as_str()),
+                                    set_placeholder_text: Some(bookie_app_services::tr!("Filter tables…").as_str()),
                                     set_hexpand: true,
                                 },
                             },
@@ -445,7 +445,7 @@ impl SimpleComponent for App {
                             add_top_bar = &adw::Banner {
                                 set_revealed: false,
                                 set_use_markup: false,
-                                set_button_label: Some(crate::tr!("Retry").as_str()),
+                                set_button_label: Some(bookie_app_services::tr!("Retry").as_str()),
                             },
                             // Content is set imperatively at the end of
                             // init() — show_welcome_page swaps in the
@@ -476,10 +476,10 @@ impl SimpleComponent for App {
         sidebar_layout::install(&widgets.split_view);
         widgets
             .table_search
-            .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search tables"))]);
+            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Search tables"))]);
         widgets
             .sidebar_fold_button
-            .update_property(&[gtk::accessible::Property::Label(&crate::tr!("Collapse all"))]);
+            .update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Collapse all"))]);
         let schema_filter_list = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .spacing(6)
@@ -989,7 +989,7 @@ impl SimpleComponent for App {
             AppMsg::EditorTabQueryChanged(id, text) => self.on_editor_tab_query_changed(id, text),
             AppMsg::FavoritesLoaded(ticket, favorites) => self.on_favorites_loaded(ticket, favorites),
             AppMsg::PersistFavorite(favorite) => self.on_persist_favorite(favorite, sender),
-            AppMsg::FavoriteSaved => self.show_toast(&crate::tr!("Saved as favorite")),
+            AppMsg::FavoriteSaved => self.show_toast(&bookie_app_services::tr!("Saved as favorite")),
             AppMsg::FavoriteSaveFailed(reason) => self.show_toast(&reason),
             AppMsg::SaveQueryAsFavorite => self.on_save_query_as_favorite(sender),
             AppMsg::ShowSavedQueries => self.on_show_saved_queries(sender),
@@ -1006,14 +1006,14 @@ impl SimpleComponent for App {
                 if self.connected {
                     self.append_editor_tab(Some(text), sender);
                 } else {
-                    self.show_toast(&crate::tr!("Connect to a database first to run SQL."));
+                    self.show_toast(&bookie_app_services::tr!("Connect to a database first to run SQL."));
                 }
             }
             AppMsg::ReplaceActiveTabQuery(text) => {
                 if self.connected {
                     self.on_replace_active_tab_query(text, sender);
                 } else {
-                    self.show_toast(&crate::tr!("Connect to a database first to run SQL."));
+                    self.show_toast(&bookie_app_services::tr!("Connect to a database first to run SQL."));
                 }
             }
             AppMsg::PollHealth => self.on_poll_health(),
@@ -1096,7 +1096,7 @@ impl SimpleComponent for App {
                     .and_then(|view| view.selected_page())
                     .is_some_and(|page| crate::ui::grid::jump_to_column(&page.child()));
                 if !opened {
-                    self.show_toast(&crate::tr!("Open a result grid to jump to a column."));
+                    self.show_toast(&bookie_app_services::tr!("Open a result grid to jump to a column."));
                 }
             }
             AppMsg::ExportCsv => self.on_export(ExportFormat::Csv),

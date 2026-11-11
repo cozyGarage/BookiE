@@ -22,12 +22,12 @@ pub struct BackupReport {
 impl App {
     pub(super) fn on_back_up_database(&self, sender: ComponentSender<Self>) {
         if let Some(message) = self.backup_refusal(false) {
-            self.show_error_alert(&crate::tr!("Can't back up"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Can't back up"), &message);
             return;
         }
         let filter = archive_filter();
         let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Back Up Database"))
+            .title(bookie_app_services::tr!("Back Up Database"))
             .modal(true)
             .initial_name(format!("{}.dump", self.active_database_name()))
             .default_filter(&filter)
@@ -43,14 +43,14 @@ impl App {
 
     pub(super) fn on_restore_database(&self, sender: ComponentSender<Self>) {
         if let Some(message) = self.backup_refusal(true) {
-            self.show_error_alert(&crate::tr!("Can't restore"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Can't restore"), &message);
             return;
         }
         let filter = archive_filter();
         let filters = gio::ListStore::new::<gtk::FileFilter>();
         filters.append(&filter);
         let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Restore from Backup"))
+            .title(bookie_app_services::tr!("Restore from Backup"))
             .modal(true)
             .default_filter(&filter)
             .filters(&filters)
@@ -65,16 +65,16 @@ impl App {
 
     fn backup_refusal(&self, restore: bool) -> Option<String> {
         if self.connection_id.is_none() || self.current_driver_id.is_none() {
-            return Some(crate::tr!("No active connection."));
+            return Some(bookie_app_services::tr!("No active connection."));
         }
         if self.driver_id() != "postgres" {
-            return Some(crate::tr!("Backups are available for PostgreSQL connections."));
+            return Some(bookie_app_services::tr!("Backups are available for PostgreSQL connections."));
         }
         if restore && self.read_only {
-            return Some(crate::tr!("This connection is open read-only."));
+            return Some(bookie_app_services::tr!("This connection is open read-only."));
         }
         if self.backup_progress.is_some() {
-            return Some(crate::tr!("A backup or restore is already running."));
+            return Some(bookie_app_services::tr!("A backup or restore is already running."));
         }
         None
     }
@@ -90,7 +90,7 @@ impl App {
     pub(super) fn on_start_backup_job(&mut self, job: BackupJob, sender: ComponentSender<Self>) {
         let restore = matches!(job, BackupJob::Restore { .. });
         if let Some(message) = self.backup_refusal(restore) {
-            self.show_error_alert(&crate::tr!("Can't start"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Can't start"), &message);
             return;
         }
         let Some(id) = self.connection_id else {
@@ -101,15 +101,15 @@ impl App {
         let runtime_dir = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from);
         let (Some(saved), Some(guard), Some(runtime_dir)) = (saved, guard, runtime_dir) else {
             self.show_error_alert(
-                &crate::tr!("Can't start"),
-                &crate::tr!("The connection or the private runtime directory is not available."),
+                &bookie_app_services::tr!("Can't start"),
+                &bookie_app_services::tr!("The connection or the private runtime directory is not available."),
             );
             return;
         };
         let Some(driver) = self.registry.get(&saved.driver_id) else {
             self.show_error_alert(
-                &crate::tr!("Can't start"),
-                &crate::tr!("The connection or the private runtime directory is not available."),
+                &bookie_app_services::tr!("Can't start"),
+                &bookie_app_services::tr!("The connection or the private runtime directory is not available."),
             );
             return;
         };
@@ -118,9 +118,9 @@ impl App {
             .ssh_environment_for_connection(&saved, Principal::human_gui());
         let server_version = self.database.metadata(id).and_then(|metadata| metadata.server_version);
         let title = if restore {
-            crate::tr!("Restoring {database}")
+            bookie_app_services::tr!("Restoring {database}")
         } else {
-            crate::tr!("Backing up {database}")
+            bookie_app_services::tr!("Backing up {database}")
         }
         .replace("{database}", &saved.database);
         let spinner = gtk::Spinner::builder().spinning(true).build();
@@ -153,16 +153,16 @@ impl App {
         let restore = matches!(report.job, BackupJob::Restore { .. });
         match report.error {
             None if restore => {
-                self.show_toast(&crate::tr!("The database was restored from the backup."));
+                self.show_toast(&bookie_app_services::tr!("The database was restored from the backup."));
                 sender.input(AppMsg::RefreshPage);
             }
-            None => self.show_toast(&crate::tr!("The backup was saved.")),
-            Some(DriverError::Cancelled) => self.show_toast(&crate::tr!("Cancelled. Nothing was changed.")),
+            None => self.show_toast(&bookie_app_services::tr!("The backup was saved.")),
+            Some(DriverError::Cancelled) => self.show_toast(&bookie_app_services::tr!("Cancelled. Nothing was changed.")),
             Some(error) => {
                 let title = if restore {
-                    crate::tr!("Restore failed")
+                    bookie_app_services::tr!("Restore failed")
                 } else {
-                    crate::tr!("Backup failed")
+                    bookie_app_services::tr!("Backup failed")
                 };
                 self.show_error_alert(&title, &backup_error_text(&error));
             }
@@ -175,7 +175,7 @@ fn backup_error_text(error: &DriverError) -> String {
         DriverError::Unsupported(detail) | DriverError::Internal(detail) => detail.clone(),
         DriverError::OperationOutcomeUnknown { source } => match source.as_ref() {
             DriverError::Unsupported(detail) | DriverError::Internal(detail) => {
-                crate::tr!("The operation was interrupted, but the database outcome could not be confirmed: {detail}")
+                bookie_app_services::tr!("The operation was interrupted, but the database outcome could not be confirmed: {detail}")
                     .replace("{detail}", detail)
             }
             _ => return error_text::driver_message(error),
@@ -191,13 +191,13 @@ fn append_missing_role_hint(text: String) -> String {
     }
     format!(
         "{text}\n\n{}",
-        crate::tr!("Roles named in the backup must already exist on the target database.")
+        bookie_app_services::tr!("Roles named in the backup must already exist on the target database.")
     )
 }
 
 fn archive_filter() -> gtk::FileFilter {
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&crate::tr!("PostgreSQL backups")));
+    filter.set_name(Some(&bookie_app_services::tr!("PostgreSQL backups")));
     filter.add_suffix("dump");
     filter
 }

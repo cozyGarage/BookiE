@@ -39,22 +39,22 @@ impl std::fmt::Debug for FilterDone {
 pub(super) fn failure_message(error: &FilterError) -> String {
     match error {
         FilterError::Spool(StreamResultSpoolError::QuotaExceeded | StreamResultSpoolError::PageLimit) => {
-            crate::tr!("Not enough temporary storage; close results to free space")
+            bookie_app_services::tr!("Not enough temporary storage; close results to free space")
         }
-        FilterError::Scan(bookie_app_services::result_scan::ScanError::Cancelled) => crate::tr!("Filter cancelled"),
-        _ => crate::tr!("The filter could not finish"),
+        FilterError::Scan(bookie_app_services::result_scan::ScanError::Cancelled) => bookie_app_services::tr!("Filter cancelled"),
+        _ => bookie_app_services::tr!("The filter could not finish"),
     }
 }
 
 pub(super) fn success_message(rows: u64, unsearchable: u64, rendered: bool) -> String {
     let shown = if rendered {
-        crate::trn!(
+        bookie_app_services::trn!(
             "Showing {n} matching row in a new result",
             "Showing {n} matching rows in a new result",
             rows as usize
         )
     } else {
-        crate::trn!(
+        bookie_app_services::trn!(
             "{n} matching row pinned; it shows when the running query finishes",
             "{n} matching rows pinned; they show when the running query finishes",
             rows as usize
@@ -64,7 +64,7 @@ pub(super) fn success_message(rows: u64, unsearchable: u64, rendered: bool) -> S
     if unsearchable == 0 {
         return shown;
     }
-    let skipped = crate::trn!(
+    let skipped = bookie_app_services::trn!(
         "{n} cell could not be searched",
         "{n} cells could not be searched",
         unsearchable as usize
@@ -90,11 +90,11 @@ impl SqlEditor {
 
     pub(in crate::ui::editor) fn on_filter_results(&mut self, request: FilterRequest, sender: &ComponentSender<Self>) {
         if !can_filter(&request.source) {
-            self.refuse_filter(&request, crate::tr!("Only a complete result can be filtered"));
+            self.refuse_filter(&request, bookie_app_services::tr!("Only a complete result can be filtered"));
             return;
         }
         let Some(spool) = request.source.spool.clone() else {
-            self.refuse_filter(&request, crate::tr!("This result is no longer available"));
+            self.refuse_filter(&request, bookie_app_services::tr!("This result is no longer available"));
             return;
         };
         let manager = self.database.stream_result_spool_manager();
@@ -118,7 +118,7 @@ impl SqlEditor {
             })));
         });
         if spawned.is_err() {
-            let message = crate::tr!("The filter could not start");
+            let message = bookie_app_services::tr!("The filter could not start");
             self.status.set_label(&message);
             ticket.finish(message);
         }
@@ -127,7 +127,7 @@ impl SqlEditor {
     pub(in crate::ui::editor) fn on_filter_finished(&mut self, done: FilterDone, sender: &ComponentSender<Self>) {
         let FilterDone { request, outcome } = done;
         let message = match outcome {
-            Ok(filtered) if filtered.total_rows == 0 => crate::tr!("No rows match"),
+            Ok(filtered) if filtered.total_rows == 0 => bookie_app_services::tr!("No rows match"),
             Ok(filtered) => self.show_derived_result(&request, filtered, sender),
             Err(error) => failure_message(&error),
         };

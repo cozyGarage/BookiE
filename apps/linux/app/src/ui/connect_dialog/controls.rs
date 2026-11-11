@@ -125,13 +125,13 @@ fn choice_item(
 
 pub(super) fn timeout_rows() -> (adw::ActionRow, gtk::SpinButton, adw::ActionRow, gtk::SpinButton) {
     let connect = timeout_row(
-        &crate::tr!("Connect timeout (seconds)"),
-        &crate::tr!("0 uses the default of 30 seconds"),
+        &bookie_app_services::tr!("Connect timeout (seconds)"),
+        &bookie_app_services::tr!("0 uses the default of 30 seconds"),
         600.0,
     );
     let query = timeout_row(
-        &crate::tr!("Query timeout (seconds)"),
-        &crate::tr!("0 uses the timeout set in Preferences"),
+        &bookie_app_services::tr!("Query timeout (seconds)"),
+        &bookie_app_services::tr!("0 uses the timeout set in Preferences"),
         f64::from(crate::services::operation_control::MAX_QUERY_TIMEOUT_SECS),
     );
     (connect.0, connect.1, query.0, query.1)

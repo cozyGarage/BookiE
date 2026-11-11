@@ -74,7 +74,7 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
     // without it the only path was the keyboard shortcut and the
     // tab-bar "+", and the tab bar is hidden in this empty state.
     let workspace_empty_cta = gtk::Button::builder()
-        .label(crate::tr!("Open SQL editor"))
+        .label(bookie_app_services::tr!("Open SQL editor"))
         .action_name("win.open-editor")
         .halign(gtk::Align::Center)
         .build();
@@ -82,8 +82,8 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
     workspace_empty_cta.add_css_class("pill");
     let workspace_empty_page = adw::StatusPage::builder()
         .icon_name(StatusKind::Info.icon())
-        .title(crate::tr!("Select a table"))
-        .description(crate::tr!(
+        .title(bookie_app_services::tr!("Select a table"))
+        .description(bookie_app_services::tr!(
             "Pick a table from the sidebar, or use the button below (Ctrl+T)."
         ))
         .child(&workspace_empty_cta)

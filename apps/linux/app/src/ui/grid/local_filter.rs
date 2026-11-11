@@ -95,7 +95,7 @@ impl LocalResultView {
             .margin_bottom(4)
             .build();
         let status = gtk4::Label::builder().hexpand(true).halign(gtk4::Align::Start).build();
-        let clear = gtk4::Button::with_label(&crate::tr!("Clear"));
+        let clear = gtk4::Button::with_label(&bookie_app_services::tr!("Clear"));
         controls.append(&status);
         controls.append(&clear);
         let settings = settings_store.get(settings_key);
@@ -459,9 +459,9 @@ fn update_status(state: &LocalResultViewState) {
 
 fn clear_button_label(filtered: bool, sorted: bool) -> String {
     match (filtered, sorted) {
-        (true, false) => crate::tr!("Clear filter"),
-        (false, true) => crate::tr!("Clear sort"),
-        _ => crate::tr!("Clear"),
+        (true, false) => bookie_app_services::tr!("Clear filter"),
+        (false, true) => bookie_app_services::tr!("Clear sort"),
+        _ => bookie_app_services::tr!("Clear"),
     }
 }
 
@@ -481,25 +481,25 @@ fn sort_keys_summary(result: &QueryResult, keys: &[(usize, bool)]) -> Option<Str
             format!("{name} {arrow}")
         })
         .collect::<Vec<_>>();
-    Some(crate::tr!("Sorted by {keys}").replace("{keys}", &parts.join(", ")))
+    Some(bookie_app_services::tr!("Sorted by {keys}").replace("{keys}", &parts.join(", ")))
 }
 
 fn filter_summary(visible: u128, loaded: u128, truncated: bool) -> String {
-    let mut summary = crate::tr!("Showing {visible} of {loaded} loaded rows")
+    let mut summary = bookie_app_services::tr!("Showing {visible} of {loaded} loaded rows")
         .replace("{visible}", &crate::ui::count_format::format_thousands(visible))
         .replace("{loaded}", &crate::ui::count_format::format_thousands(loaded));
     if truncated {
         summary.push_str(" · ");
-        summary.push_str(&crate::tr!("result truncated"));
+        summary.push_str(&bookie_app_services::tr!("result truncated"));
     }
     summary
 }
 
 fn truncation_notice(sorted: bool, loaded_rows: usize) -> String {
     if sorted {
-        return crate::tr!("Sorted the loaded rows only; the result is truncated. Use ORDER BY for the full result.");
+        return bookie_app_services::tr!("Sorted the loaded rows only; the result is truncated. Use ORDER BY for the full result.");
     }
-    crate::tr!("Only the first {loaded} rows were loaded; the result is truncated. Narrow the query to see the rest.")
+    bookie_app_services::tr!("Only the first {loaded} rows were loaded; the result is truncated. Narrow the query to see the rest.")
         .replace(
             "{loaded}",
             &crate::ui::count_format::format_thousands(loaded_rows as u128),

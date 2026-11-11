@@ -1,5 +1,13 @@
-use crate::core_bridge::{parse_edit, render_tsv};
+use crate::core_bridge::parse_edit;
 use crate::model::{Cell, row_at};
+
+fn render_tsv(rows: impl IntoIterator<Item = Vec<crate::model::Cell>>, with_headers: bool) -> String {
+    bookie_app_services::result_copy::tsv(
+        &crate::core_bridge::column_infos(),
+        rows.into_iter().collect(),
+        with_headers,
+    )
+}
 
 #[test]
 fn a_driver_timestamp_keeps_its_type_and_value_through_the_cell() {
@@ -77,4 +85,15 @@ fn driver_type_names_map_to_the_edit_kind_that_parses_them() {
     assert_eq!(kind("bigint"), "integer");
     assert_eq!(kind("timestamp with time zone"), "timestamptz");
     assert_eq!(kind("varchar(20)"), "text");
+}
+
+#[test]
+fn copied_headers_are_the_result_columns_not_a_fixed_list() {
+    let columns = crate::core_bridge::column_infos_for(&[crate::model::ColumnMeta {
+        name: "customer_name".into(),
+        width: 120.0,
+        numeric: false,
+    }]);
+    let text = bookie_app_services::result_copy::tsv(&columns, vec![vec![Cell::Text("Ada".into())]], true);
+    assert_eq!(text, "customer_name\nAda");
 }

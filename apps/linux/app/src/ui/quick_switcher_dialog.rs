@@ -7,7 +7,7 @@ use relm4::gtk::glib;
 use relm4::{adw, gtk};
 
 use crate::services::quick_switcher::{QuickItem, QuickTarget, filter};
-use crate::tr;
+use bookie_app_services::tr;
 
 pub fn present<F>(parent: &impl IsA<gtk::Window>, items: Vec<QuickItem>, on_choice: F)
 where

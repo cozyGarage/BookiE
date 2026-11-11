@@ -916,7 +916,7 @@ fn transaction_buttons_close_only_the_idle_owned_session() {
     assert_eq!(fixture.sessions.commits.load(Ordering::SeqCst), 1);
     assert_eq!(
         fixture.controller.model().status.label().as_str(),
-        crate::tr!("Session committed")
+        bookie_app_services::tr!("Session committed")
     );
     let replacement = fixture.open_transaction();
     assert_ne!(replacement, id);
@@ -942,7 +942,7 @@ fn transaction_buttons_close_only_the_idle_owned_session() {
     assert_eq!(fixture.sessions.rollbacks.load(Ordering::SeqCst), 1);
     assert_eq!(
         fixture.controller.model().status.label().as_str(),
-        crate::tr!("Session rolled back")
+        bookie_app_services::tr!("Session rolled back")
     );
 }
 
@@ -959,7 +959,7 @@ fn closing_an_idle_session_clears_its_status() {
 
     assert_ne!(
         fixture.controller.model().status.label().as_str(),
-        crate::tr!("Closing session…")
+        bookie_app_services::tr!("Closing session…")
     );
 }
 

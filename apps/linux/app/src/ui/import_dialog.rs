@@ -70,12 +70,12 @@ pub(crate) fn present(
     let columns = ColumnSection::new(&request);
     page.add(columns.group());
     let skip_rejected = adw::SwitchRow::builder()
-        .title(crate::tr!("Skip rows the database rejects"))
-        .subtitle(crate::tr!(
+        .title(bookie_app_services::tr!("Skip rows the database rejects"))
+        .subtitle(bookie_app_services::tr!(
             "Off: the first rejected row stops the import. On: rejected rows are skipped and listed when the import finishes."
         ))
         .build();
-    let errors = adw::PreferencesGroup::builder().title(crate::tr!("Errors")).build();
+    let errors = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("Errors")).build();
     errors.add(&skip_rejected);
     page.add(&errors);
     let state = std::rc::Rc::new(State {
@@ -87,7 +87,7 @@ pub(crate) fn present(
     state.refresh();
     connect_refresh(&state);
 
-    let start_button = gtk::Button::builder().label(crate::tr!("Import")).build();
+    let start_button = gtk::Button::builder().label(bookie_app_services::tr!("Import")).build();
     start_button.add_css_class("suggested-action");
     let dialog = build_dialog(&page, &start_button);
     let dialog_weak = dialog.downgrade();
@@ -193,7 +193,7 @@ struct FileOptions {
 
 pub(crate) fn file_group(path: &std::path::Path) -> adw::PreferencesGroup {
     adw::PreferencesGroup::builder()
-        .title(crate::tr!("File"))
+        .title(bookie_app_services::tr!("File"))
         .description(crate::ui::plain_text::escape_markup(&path.display().to_string()))
         .build()
 }
@@ -203,21 +203,21 @@ impl FileOptions {
         let group = file_group(&request.path);
         let delimiter = delimiter_row(request.format.delimiter);
         let header = adw::SwitchRow::builder()
-            .title(crate::tr!("First row names the columns"))
+            .title(bookie_app_services::tr!("First row names the columns"))
             .active(request.format.has_header)
             .build();
         let null_marker = adw::EntryRow::builder()
-            .title(crate::tr!("Text that means NULL"))
+            .title(bookie_app_services::tr!("Text that means NULL"))
             .build();
         let quote = choice_row(
-            &crate::tr!("Quote character"),
+            &bookie_app_services::tr!("Quote character"),
             &["Double quote (\")", "Single quote (')", "None"],
         );
         let backslash = adw::SwitchRow::builder()
-            .title(crate::tr!("Backslash escapes a quote"))
+            .title(bookie_app_services::tr!("Backslash escapes a quote"))
             .build();
         let encoding = choice_row(
-            &crate::tr!("Encoding"),
+            &bookie_app_services::tr!("Encoding"),
             &["UTF-8", "Windows-1252", "UTF-16 LE", "UTF-16 BE"],
         );
         encoding.set_selected(starting_encoding(&request.bytes));
@@ -333,8 +333,8 @@ impl ExistingColumns {
         scope: Option<CsvMappingScope>,
     ) -> Self {
         let group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("Columns"))
-            .description(crate::tr!(
+            .title(bookie_app_services::tr!("Columns"))
+            .description(bookie_app_services::tr!(
                 "Generated columns stay on Skip and are filled by the database. Other columns left on Skip are not written, so their database defaults apply."
             ))
             .build();
@@ -430,9 +430,9 @@ struct MappingActionsParams {
 
 fn add_mapping_controls(group: &adw::PreferencesGroup, params: MappingActionsParams) {
     let actions = gtk::Box::builder().spacing(6).build();
-    let remember = gtk::Button::with_label(&crate::tr!("Remember mapping"));
-    let restore = gtk::Button::with_label(&crate::tr!("Restore mapping"));
-    let forget = gtk::Button::with_label(&crate::tr!("Forget mapping"));
+    let remember = gtk::Button::with_label(&bookie_app_services::tr!("Remember mapping"));
+    let restore = gtk::Button::with_label(&bookie_app_services::tr!("Restore mapping"));
+    let forget = gtk::Button::with_label(&bookie_app_services::tr!("Forget mapping"));
     let status = gtk::Label::builder().xalign(0.0).wrap(true).build();
     let available = params.store.is_some() && params.scope.is_some();
     for button in [&remember, &restore, &forget] {
@@ -440,7 +440,7 @@ fn add_mapping_controls(group: &adw::PreferencesGroup, params: MappingActionsPar
         actions.append(button);
     }
     if !available {
-        status.set_text(&crate::tr!("Saved mappings are unavailable for this connection."));
+        status.set_text(&bookie_app_services::tr!("Saved mappings are unavailable for this connection."));
     }
     group.add(&actions);
     group.add(&status);
@@ -488,7 +488,7 @@ impl MappingActions {
             );
             actions.status.set_text(
                 &result
-                    .map(|()| crate::tr!("Mapping saved for this table."))
+                    .map(|()| bookie_app_services::tr!("Mapping saved for this table."))
                     .unwrap_or_else(|error| error),
             );
         });
@@ -512,9 +512,9 @@ impl MappingActions {
                     }
                     actions
                         .status
-                        .set_text(&crate::tr!("Saved mapping restored. Review it before importing."));
+                        .set_text(&bookie_app_services::tr!("Saved mapping restored. Review it before importing."));
                 }
-                Ok(None) => actions.status.set_text(&crate::tr!("No saved mapping for this table.")),
+                Ok(None) => actions.status.set_text(&bookie_app_services::tr!("No saved mapping for this table.")),
                 Err(error) => actions.status.set_text(&error),
             }
         });
@@ -527,8 +527,8 @@ impl MappingActions {
                 return;
             };
             match store.forget(scope) {
-                Ok(true) => actions.status.set_text(&crate::tr!("Saved mapping removed.")),
-                Ok(false) => actions.status.set_text(&crate::tr!("No saved mapping for this table.")),
+                Ok(true) => actions.status.set_text(&bookie_app_services::tr!("Saved mapping removed.")),
+                Ok(false) => actions.status.set_text(&bookie_app_services::tr!("No saved mapping for this table.")),
                 Err(error) => actions.status.set_text(&error),
             }
         });
@@ -573,13 +573,13 @@ fn column_subtitle(capabilities: DriverCapabilities, column: &ColumnInfo) -> Str
         format!(
             "{} · {}",
             column.data_type,
-            crate::tr!("Auto-increment values are inserted when mapped.")
+            bookie_app_services::tr!("Auto-increment values are inserted when mapped.")
         )
     } else if server_managed(capabilities, column) {
         format!(
             "{} · {}",
             column.data_type,
-            crate::tr!("Generated by database; CSV values are ignored.")
+            bookie_app_services::tr!("Generated by database; CSV values are ignored.")
         )
     } else {
         column.data_type.clone()
@@ -628,12 +628,12 @@ struct NewColumnRow {
 impl NewColumns {
     fn new(driver_id: &str, suggested_table: &str) -> Self {
         let group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("New table"))
-            .description(crate::tr!(
+            .title(bookie_app_services::tr!("New table"))
+            .description(bookie_app_services::tr!(
                 "The type of each column is a guess from the first rows of the file. Change any that is wrong before the table is created."
             ))
             .build();
-        let table = adw::EntryRow::builder().title(crate::tr!("Table name")).build();
+        let table = adw::EntryRow::builder().title(bookie_app_services::tr!("Table name")).build();
         table.set_text(suggested_table);
         group.add(&table);
         Self {
@@ -651,7 +651,7 @@ impl NewColumns {
             self.group.remove(&existing.row);
         }
         for draft in infer_columns(sheet, options, &self.driver_id) {
-            let row = adw::EntryRow::builder().title(crate::tr!("Column")).build();
+            let row = adw::EntryRow::builder().title(bookie_app_services::tr!("Column")).build();
             row.set_text(&draft.name);
             let types = gtk::DropDown::from_strings(&self.type_names);
             types.set_valign(gtk::Align::Center);
@@ -773,7 +773,7 @@ fn delimiter_row(selected: CsvDelimiter) -> adw::ComboRow {
         .map(|delimiter| delimiter_label(*delimiter))
         .collect();
     let row = adw::ComboRow::builder()
-        .title(crate::tr!("Field separator"))
+        .title(bookie_app_services::tr!("Field separator"))
         .model(&gtk::StringList::new(&labels))
         .build();
     row.set_selected(
@@ -816,7 +816,7 @@ fn build_dialog(page: &adw::PreferencesPage, start_button: &gtk::Button) -> adw:
     toolbar.set_content(Some(page));
     toolbar.add_bottom_bar(&footer);
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Import CSV"))
+        .title(bookie_app_services::tr!("Import CSV"))
         .content_width(560)
         .content_height(680)
         .child(&toolbar)
@@ -867,18 +867,18 @@ impl ImportProgress {
 }
 
 fn rows_label(committed: u64, total: u64) -> String {
-    crate::tr!("{done} of {total} rows")
+    bookie_app_services::tr!("{done} of {total} rows")
         .replace("{done}", &committed.to_string())
         .replace("{total}", &total.to_string())
 }
 
 pub(crate) fn present_preparing(parent: &adw::ApplicationWindow, table: &str) -> ImportProgress {
-    let label = gtk::Label::new(Some(&crate::tr!("Reading and planning the import…")));
+    let label = gtk::Label::new(Some(&bookie_app_services::tr!("Reading and planning the import…")));
     let spinner = gtk::Spinner::new();
     spinner.start();
     let bar = gtk::ProgressBar::new();
     bar.set_visible(false);
-    let title = crate::tr!("Preparing import into {table}").replace("{table}", table);
+    let title = bookie_app_services::tr!("Preparing import into {table}").replace("{table}", table);
     let window = CancellableDialog::present(
         parent,
         &title,

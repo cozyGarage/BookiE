@@ -434,7 +434,7 @@ impl BrowseTab {
 
     pub(super) fn show_projection_error(&self, sender: &ComponentSender<Self>) {
         self.show_error_inner(
-            &crate::tr!("The database returned rows that do not match the table columns."),
+            &bookie_app_services::tr!("The database returned rows that do not match the table columns."),
             sender,
         );
         self.inner_stack.set_visible_child_name("error");

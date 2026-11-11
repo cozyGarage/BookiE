@@ -23,7 +23,7 @@ pub(super) fn reference_targets(
         .filter(|candidate| candidate.columns.iter().any(|name| name == column))
         .collect();
     if candidates.is_empty() {
-        return Err(crate::tr!("This column is not a foreign key"));
+        return Err(bookie_app_services::tr!("This column is not a foreign key"));
     }
     let (targets, errors): (Vec<_>, Vec<_>) = candidates
         .into_iter()
@@ -46,13 +46,13 @@ fn reference_target(
             .iter()
             .find(|(name, _)| name == local)
             .map(|(_, value)| value)
-            .ok_or_else(|| crate::tr!("A column of this foreign key is hidden"))?;
+            .ok_or_else(|| bookie_app_services::tr!("A column of this foreign key is hidden"))?;
         if matches!(value, Value::Null) {
-            return Err(crate::tr!("This foreign key is empty"));
+            return Err(bookie_app_services::tr!("This foreign key is empty"));
         }
         rules.push(
             bookie_core::equality_rule(referenced, value)
-                .ok_or_else(|| crate::tr!("Values of this type can't be used as a filter"))?,
+                .ok_or_else(|| bookie_app_services::tr!("Values of this type can't be used as a filter"))?,
         );
     }
     Ok(ReferencedRowTarget {
@@ -71,7 +71,7 @@ pub(super) fn referencing_targets(
     row: &[(String, Value)],
 ) -> Result<Vec<ReferencedRowTarget>, String> {
     if inbound_keys.is_empty() {
-        return Err(crate::tr!("No foreign keys reference this table"));
+        return Err(bookie_app_services::tr!("No foreign keys reference this table"));
     }
     let (targets, errors): (Vec<_>, Vec<_>) = inbound_keys
         .iter()
@@ -90,13 +90,13 @@ fn referencing_target(key: &InboundForeignKeyInfo, row: &[(String, Value)]) -> R
             .iter()
             .find(|(name, _)| name == target_col)
             .map(|(_, value)| value)
-            .ok_or_else(|| crate::tr!("A column referenced by this foreign key is hidden"))?;
+            .ok_or_else(|| bookie_app_services::tr!("A column referenced by this foreign key is hidden"))?;
         if matches!(value, Value::Null) {
-            return Err(crate::tr!("A referenced value is empty"));
+            return Err(bookie_app_services::tr!("A referenced value is empty"));
         }
         rules.push(
             bookie_core::equality_rule(source_col, value)
-                .ok_or_else(|| crate::tr!("Values of this type can't be used as a filter"))?,
+                .ok_or_else(|| bookie_app_services::tr!("Values of this type can't be used as a filter"))?,
         );
     }
     Ok(ReferencedRowTarget {

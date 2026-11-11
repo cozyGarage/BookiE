@@ -392,15 +392,15 @@ pub fn build(
 }
 
 fn build_match_controls(state: &StripState) -> gtk::Revealer {
-    let match_label = gtk::Label::builder().label(crate::tr!("Match")).build();
+    let match_label = gtk::Label::builder().label(bookie_app_services::tr!("Match")).build();
     match_label.add_css_class("dim-label");
-    let combinator_dropdown = gtk::DropDown::from_strings(&[&crate::tr!("all"), &crate::tr!("any")]);
+    let combinator_dropdown = gtk::DropDown::from_strings(&[&bookie_app_services::tr!("all"), &bookie_app_services::tr!("any")]);
     combinator_dropdown.set_valign(gtk::Align::Center);
     combinator_dropdown.set_selected(match state.filters.borrow().combinator {
         Combinator::And => 0,
         Combinator::Or => 1,
     });
-    let match_suffix = gtk::Label::builder().label(crate::tr!("of these rules")).build();
+    let match_suffix = gtk::Label::builder().label(bookie_app_services::tr!("of these rules")).build();
     match_suffix.add_css_class("dim-label");
     let match_row_box = gtk::Box::builder()
         .orientation(gtk::Orientation::Horizontal)
@@ -424,13 +424,13 @@ fn build_match_controls(state: &StripState) -> gtk::Revealer {
 }
 
 fn build_action_buttons() -> ActionButtons {
-    let clear = gtk::Button::with_label(&crate::tr!("Clear all"));
+    let clear = gtk::Button::with_label(&bookie_app_services::tr!("Clear all"));
     clear.add_css_class("flat");
-    let apply = gtk::Button::with_label(&crate::tr!("Apply"));
+    let apply = gtk::Button::with_label(&bookie_app_services::tr!("Apply"));
     apply.add_css_class("suggested-action");
     let close = gtk::Button::builder()
         .icon_name("window-close-symbolic")
-        .tooltip_text(crate::tr!("Close (Esc)"))
+        .tooltip_text(bookie_app_services::tr!("Close (Esc)"))
         .build();
     close.add_css_class("flat");
     ActionButtons { clear, apply, close }
@@ -441,7 +441,7 @@ fn build_where_row(state: &StripState, apply_btn: &gtk::Button) -> (gtk::Box, gt
     where_label.add_css_class("monospace");
     where_label.add_css_class("dim-label");
     let raw_entry = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("e.g. created_at > now() - interval '1 day'"))
+        .placeholder_text(bookie_app_services::tr!("e.g. created_at > now() - interval '1 day'"))
         .hexpand(true)
         .build();
     raw_entry.add_css_class("monospace");
@@ -477,7 +477,7 @@ fn build_saved_filters_button(
     let popover = gtk::Popover::new();
     popover.set_child(Some(&presets.widget));
     let saved = gtk::MenuButton::builder()
-        .label(crate::tr!("Saved filters"))
+        .label(bookie_app_services::tr!("Saved filters"))
         .popover(&popover)
         .build();
     saved.add_css_class("flat");
@@ -511,7 +511,7 @@ fn build_header(where_row: &gtk::Box, buttons: &ActionButtons, saved_filters: Op
 
 fn build_rules_section(state: &StripState, match_revealer: &gtk::Revealer) -> gtk::Expander {
     let rules_expander = gtk::Expander::builder()
-        .label(crate::tr!("Or use the rule editor"))
+        .label(bookie_app_services::tr!("Or use the rule editor"))
         .expanded(!state.filters.borrow().rules.is_empty())
         .build();
     let rules_body = gtk::Box::builder()
@@ -526,7 +526,7 @@ fn build_rules_section(state: &StripState, match_revealer: &gtk::Revealer) -> gt
     rules_body.append(&rules_list);
     let add_rule_btn = gtk::Button::builder()
         .icon_name("list-add-symbolic")
-        .label(crate::tr!("Add rule"))
+        .label(bookie_app_services::tr!("Add rule"))
         .halign(gtk::Align::Start)
         .build();
     add_rule_btn.add_css_class("flat");
@@ -756,7 +756,7 @@ fn build_operator_dropdown(index: usize, rule: &FilterRule, ops: &[OpEntry], sta
 
 fn single_value_entry(index: usize, rule: &FilterRule, column: &ColumnInfo, state: &StripState) -> gtk::Entry {
     let entry = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("Value"))
+        .placeholder_text(bookie_app_services::tr!("Value"))
         .valign(gtk::Align::Center)
         .hexpand(true)
         .build();
@@ -778,11 +778,11 @@ fn single_value_entry(index: usize, rule: &FilterRule, column: &ColumnInfo, stat
 
 fn pair_value_entries(index: usize, rule: &FilterRule, column: &ColumnInfo, state: &StripState) -> gtk::Box {
     let lo = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("From"))
+        .placeholder_text(bookie_app_services::tr!("From"))
         .valign(gtk::Align::Center)
         .build();
     let hi = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("To"))
+        .placeholder_text(bookie_app_services::tr!("To"))
         .valign(gtk::Align::Center)
         .build();
     lo.set_input_purpose(input_purpose_for(&column.data_type));
@@ -822,7 +822,7 @@ fn pair_value_entries(index: usize, rule: &FilterRule, column: &ColumnInfo, stat
 
 fn list_value_entry(index: usize, rule: &FilterRule, state: &StripState) -> gtk::Entry {
     let entry = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("a, b, c"))
+        .placeholder_text(bookie_app_services::tr!("a, b, c"))
         .valign(gtk::Align::Center)
         .hexpand(true)
         .build();
@@ -850,7 +850,7 @@ fn list_value_entry(index: usize, rule: &FilterRule, state: &StripState) -> gtk:
 fn build_remove_button(index: usize, state: &StripState) -> gtk::Button {
     let remove = gtk::Button::builder()
         .icon_name("user-trash-symbolic")
-        .tooltip_text(crate::tr!("Remove rule"))
+        .tooltip_text(bookie_app_services::tr!("Remove rule"))
         .valign(gtk::Align::Center)
         .build();
     remove.add_css_class("flat");

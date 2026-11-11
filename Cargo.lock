@@ -1125,6 +1125,7 @@ dependencies = [
  "bookie-storage",
  "bookie-transport",
  "chrono",
+ "gettext-rs",
  "rust_decimal",
  "secrecy",
  "serde",

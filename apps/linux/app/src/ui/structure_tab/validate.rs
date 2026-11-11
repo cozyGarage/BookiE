@@ -15,17 +15,17 @@ pub(super) struct SaveDraft<'a> {
 
 pub(super) fn validate_save(draft: &SaveDraft<'_>) -> Result<(), String> {
     if matches!(draft.mode, StructureMode::New) && draft.table_name.trim().is_empty() {
-        return Err(crate::tr!("Table name is required."));
+        return Err(bookie_app_services::tr!("Table name is required."));
     }
     if draft.columns.is_empty() {
-        return Err(crate::tr!("At least one column is required."));
+        return Err(bookie_app_services::tr!("At least one column is required."));
     }
     for col in draft.columns {
         validate_column(col)?;
     }
     let fold = identifiers_fold_case(draft.driver_id);
     if let Some(name) = first_duplicate(draft.columns.iter().map(|col| col.name.as_str()), fold) {
-        return Err(crate::tr!("Duplicate column name: {name}").replace("{name}", name));
+        return Err(bookie_app_services::tr!("Duplicate column name: {name}").replace("{name}", name));
     }
     let index_names = draft
         .indexes
@@ -33,20 +33,20 @@ pub(super) fn validate_save(draft: &SaveDraft<'_>) -> Result<(), String> {
         .map(|index| index.name.as_str())
         .filter(|name| !name.is_empty());
     if let Some(name) = first_duplicate(index_names, fold) {
-        return Err(crate::tr!("Duplicate index name: {name}").replace("{name}", name));
+        return Err(bookie_app_services::tr!("Duplicate index name: {name}").replace("{name}", name));
     }
     Ok(())
 }
 
 fn validate_column(col: &DraftColumn) -> Result<(), String> {
     if col.name.trim().is_empty() {
-        return Err(crate::tr!("Every column needs a name."));
+        return Err(bookie_app_services::tr!("Every column needs a name."));
     }
     if col.data_type.trim().is_empty() {
-        return Err(crate::tr!("Column {name} needs a type.").replace("{name}", &col.name));
+        return Err(bookie_app_services::tr!("Column {name} needs a type.").replace("{name}", &col.name));
     }
     if col.primary_key && col.nullable {
-        return Err(crate::tr!("Primary key columns must be NOT NULL: {name}").replace("{name}", &col.name));
+        return Err(bookie_app_services::tr!("Primary key columns must be NOT NULL: {name}").replace("{name}", &col.name));
     }
     Ok(())
 }

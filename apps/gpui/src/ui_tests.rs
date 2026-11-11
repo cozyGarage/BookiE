@@ -481,7 +481,8 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
     let actual = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
     let mut row = bookie_gpui::model::row_at(20);
     row[1] = Cell::Text(value.into());
-    let expected = bookie_gpui::selection::copy_tsv([row], false);
+    let columns = bookie_gpui::core_bridge::column_infos_for(&bookie_gpui::model::synthetic_columns());
+    let expected = bookie_app_services::result_copy::tsv(&columns, vec![row], false);
     assert_eq!(actual.as_deref(), Some(expected.as_str()));
 }
 
@@ -1132,7 +1133,6 @@ impl bookie_gpui::source::ResultSource for TwoColumns {
                     name: name.into(),
                     width: 150.0,
                     numeric: false,
-                    data_type: "text".into(),
                 })
                 .collect()
         })
