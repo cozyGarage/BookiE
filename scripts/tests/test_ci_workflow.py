@@ -924,7 +924,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_summary_depends_on_every_required_job_and_always_runs(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         section = workflow.split("  regression-gate:\n", 1)[1]
-        self.assertIn("if: always()", section)
+        self.assertIn("if: always() && !cancelled()", section)
         self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
         self.assertIn("python3 scripts/check-ci-jobs.py", section)
         for name in checker.REQUIRED | {checker.SCHEDULED}:
@@ -938,7 +938,7 @@ class CiWorkflowTests(unittest.TestCase):
         ]
         section = jobs.split("  regression-gate:\n", 1)[1]
 
-        self.assertIn("if: always()", section)
+        self.assertIn("if: always() && !cancelled()", section)
         self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
         self.assertIn("python3 src/scripts/check-forgejo-ci-jobs.py", section)
         for name in job_names:

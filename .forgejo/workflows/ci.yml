@@ -1230,7 +1230,7 @@ jobs:
           fi
   regression-gate:
     name: Forgejo regression gate
-    if: always()
+    if: always() && !cancelled()
     needs:
       - guards
       - gpui-tests
