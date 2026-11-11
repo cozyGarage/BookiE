@@ -1,6 +1,11 @@
 use super::model::*;
 use super::selection::*;
 
+fn copy_tsv(rows: impl IntoIterator<Item = Vec<crate::model::Cell>>, with_headers: bool) -> String {
+    let columns = crate::core_bridge::column_infos_for(&crate::model::synthetic_columns());
+    bookie_app_services::result_copy::tsv(&columns, rows.into_iter().collect(), with_headers)
+}
+
 #[test]
 fn a_plain_click_selects_one_row_and_shift_extends_from_the_anchor() {
     let one = Selection::after_click(None, 10, false);
