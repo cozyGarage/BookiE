@@ -11,9 +11,9 @@ use duckdb::{
 };
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, EnumInputStyle, ExecResult,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo, Value,
-    run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, DriverValueInputCapabilities,
+    EnumInputStyle, ExecResult, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo,
+    Value, run_server_cancellable,
 };
 use tempfile::TempDir;
 
@@ -24,6 +24,15 @@ pub struct DuckdbDriver;
 
 #[async_trait]
 impl DatabaseDriver for DuckdbDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            extended_calendar_dates: true,
+            timestamp_with_timezone: true,
+            temporal_fraction_precision: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn enum_input_style(&self) -> EnumInputStyle {
         EnumInputStyle::SqlQuotedLabel
     }

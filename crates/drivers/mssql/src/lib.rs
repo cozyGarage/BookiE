@@ -12,8 +12,9 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use bookie_core::sql_dialect::build_order_and_pagination;
 use bookie_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
-    ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
-    QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
+    DriverValueInputCapabilities, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS,
+    OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
+    run_server_cancellable,
 };
 
 mod catalog;
@@ -50,6 +51,13 @@ pub struct MssqlDriver;
 
 #[async_trait]
 impl DatabaseDriver for MssqlDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            datetimeoffset_input: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn supports_database_listing(&self) -> bool {
         true
     }

@@ -16,9 +16,9 @@ use sqlx::{
 use futures::stream::StreamExt;
 
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, QueryRows,
-    TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult,
+    ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget,
+    QueryRows, TableInfo, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod drop_guard;
@@ -32,6 +32,14 @@ pub struct SqliteDriver;
 
 #[async_trait]
 impl DatabaseDriver for SqliteDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            numeric_affinity_input: true,
+            heterogeneous_cell_values: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn id(&self) -> &'static str {
         "sqlite"
     }
