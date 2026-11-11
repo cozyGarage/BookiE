@@ -84,6 +84,26 @@ fn two_streams_share_page_capacity_and_release_it_with_the_last_owner() {
 }
 
 #[test]
+fn retained_snapshot_keeps_page_budget_until_its_last_owner_closes() {
+    let result = page(&["id"], &[1]);
+    let bytes = result.estimated_row_bytes();
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(bytes);
+    let mut cache = StreamPageCache::with_budget(budget.clone());
+    cache.append(0, result).unwrap();
+    let snapshot = cache.snapshot(StreamTerminal::Complete, None);
+    let second_owner = snapshot.clone();
+
+    drop(cache);
+    assert_eq!(budget.used_bytes(), bytes);
+    assert_eq!(snapshot.resident_pages.get(0).unwrap().rows[0][0], Value::Int(1));
+    drop(snapshot);
+    assert_eq!(budget.used_bytes(), bytes);
+    drop(second_owner);
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_pages(), 0);
+}
+
+#[test]
 fn spools_from_one_manager_share_the_page_budget() {
     let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
     let first = manager.create().expect("first spool");
