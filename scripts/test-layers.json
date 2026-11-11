@@ -305,7 +305,7 @@
     "pg-dump": {
       "purpose": "PostgreSQL dump and restore integration through the packaged client tools",
       "prerequisites": "Rust 1.98; Docker with postgres:18-alpine; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration; lab-ci / pg-dump",
+      "hosted_gate": "Build Linux / integration; lab-ci / driver (core)",
       "steps": [
         {
           "argv": [

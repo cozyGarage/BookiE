@@ -123,8 +123,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/cleanup-testcontainers.py", github_job)
         e2e = re.search(r"(?ms)^  e2e:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', e2e)
-        pg_dump = re.search(r"(?ms)^  pg-dump:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
-        self.assertIn("python3 scripts/run-test-layer.py pg-dump", pg_dump)
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        self.assertIn("if: matrix.driver == 'core'", driver)
+        self.assertIn("python3 scripts/run-test-layer.py pg-dump", driver)
 
     def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -300,7 +301,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_headless_fixtures_wait_for_cheap_checks_without_serializing_behind_widgets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         expected = {"guards", "clippy", "test-build"}
-        for name in ("driver", "pg-release", "pg-dump", "socket-ssh", "driver-tls"):
+        for name in ("driver", "pg-release", "socket-ssh", "driver-tls"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
@@ -398,7 +399,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = (
             "driver", "e2e", "consumers", "gtk",
-            "pg-release", "pg-dump", "socket-ssh", "gtk-server", "driver-tls",
+            "pg-release", "socket-ssh", "gtk-server", "driver-tls",
             "keyring", "supply-chain",
         )
         for name in jobs:
@@ -439,7 +440,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("runs-on: build-host", jobs[name])
         for name in (
             "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver", "e2e",
-            "consumers", "gtk", "pg-release", "pg-dump", "socket-ssh", "gtk-server",
+            "consumers", "gtk", "pg-release", "socket-ssh", "gtk-server",
             "driver-tls", "keyring",
         ):
             with self.subTest(job=name):

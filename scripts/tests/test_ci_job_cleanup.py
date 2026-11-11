@@ -231,7 +231,7 @@ class CiJobCleanupTests(unittest.TestCase):
             self.assertFalse((workspace / "src").exists())
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
-        job = runner_jobs(WORKFLOWS[0])["pg-dump"]
+        job = runner_jobs(WORKFLOWS[0])["driver"]
         self.assertIn("TMPDIR: ${{ github.workspace }}/.tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
