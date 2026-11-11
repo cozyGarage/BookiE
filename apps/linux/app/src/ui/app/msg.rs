@@ -337,6 +337,13 @@ pub enum AppMsg {
         tab_id: Uuid,
         message: String,
     },
+    FetchCollations {
+        tab_id: Uuid,
+    },
+    CollationsLoaded {
+        tab_id: Uuid,
+        collations: Vec<String>,
+    },
     StructureTabDirtyChanged(Uuid, bool),
     SchemaChanged {
         origin: crate::services::catalog::CatalogOrigin,
