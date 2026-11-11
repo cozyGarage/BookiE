@@ -42,6 +42,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertEqual(workflow.count('".forgejo/workflows/**"'), 2)
         self.assertEqual(workflow.count('".github/actionlint.yaml"'), 2)
 
+    def test_workflow_security_scans_both_providers(self):
+        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        security = re.search(r"(?ms)^  workflow-security:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+
+        self.assertIn("zizmor --offline", security)
+        self.assertIn(".github/workflows/*.yml .forgejo/workflows/*.yml", security)
+
     def test_shared_github_and_forgejo_tiers_use_the_layer_catalog(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
