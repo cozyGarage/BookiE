@@ -800,6 +800,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::completing_a_query_does_not_shift_the_editor_when_status_text_changes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_dispatch_resumes_after_success_cancel_and_timeout"
     ],
     [
@@ -1245,6 +1250,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::hiding_a_streamed_result_releases_its_grid_and_reloads_from_the_spool"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable"
     ],
     [
@@ -1411,6 +1421,11 @@
       "bookie-app",
       "--lib",
       "ui::grid::column_width_tests::unsaved_result_grid_width_stays_fixed_when_the_window_grows"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::column_width_tests::column_header_text_aligns_with_numeric_and_text_cells"
     ],
     [
       "bookie-app",
@@ -1586,6 +1601,11 @@
       "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::a_retired_grid_does_not_retain_its_inspector_through_selection_callback"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::lifetime_tests::a_wide_result_realizes_a_bounded_row_window"
     ],
     [
       "bookie-app",

@@ -192,6 +192,7 @@ pub enum StructureTabInput {
         metadata: StructureMetadata,
     },
     LoadFailed(String),
+    CollationsLoaded(Vec<String>),
     Save,
     Discard,
     DropTableRequested,
@@ -238,6 +239,7 @@ pub enum ColumnField {
 pub enum StructureTabOutput {
     DirtyChanged(bool),
     FetchStructure,
+    FetchCollations,
     ExecuteTransaction { statements: Vec<String> },
     DropTableRequested { schema: Option<String>, table: String },
     ShowToast(String),
@@ -263,6 +265,7 @@ impl StructureTab {
                 columns,
                 indexes: self.indexes.borrow().clone(),
                 fks: self.foreign_keys.borrow().clone(),
+                default_collation: None,
             }];
         }
         diff_to_ops(
@@ -811,6 +814,9 @@ impl SimpleComponent for StructureTab {
         if matches!(init.mode, StructureMode::Edit) && !init.defer_initial_fetch {
             let _ = sender.output(StructureTabOutput::FetchStructure);
         }
+        if matches!(init.mode, StructureMode::New) {
+            let _ = sender.output(StructureTabOutput::FetchCollations);
+        }
 
         let model = StructureTab {
             structure_trackers: init.structure_trackers,
@@ -881,6 +887,10 @@ impl SimpleComponent for StructureTab {
                 // ops the user could have provoked during the window.
                 self.refetching.set(false);
                 self.recompute_dirty_state(&sender);
+                sender.input(StructureTabInput::Refresh);
+            }
+            StructureTabInput::CollationsLoaded(collations) => {
+                self.collations = Rc::from(collations);
                 sender.input(StructureTabInput::Refresh);
             }
             StructureTabInput::LoadFailed(message) => {

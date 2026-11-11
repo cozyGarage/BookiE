@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import fcntl
+import json
 import os
 from pathlib import Path
 import re
@@ -13,7 +14,9 @@ import time
 
 
 DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:default|duckdb)\Z')
+BUNDLE_GROUPS = {'default', 'duckdb', 'unit', 'sandbox', 'gpui'}
+BUNDLE_GROUPS.update(json.loads(Path(__file__).with_name('ci-test-bundle-groups.json').read_text())['groups'])
+BUNDLE_DIRECTORY = re.compile(r'[0-9a-f]{40}-(?:' + '|'.join(map(re.escape, sorted(BUNDLE_GROUPS))) + r')\Z')
 DEFAULT_MIN_FREE_GIB = 30
 
 

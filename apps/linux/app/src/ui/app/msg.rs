@@ -259,6 +259,7 @@ pub enum AppMsg {
     BrowseTabDirtyChanged(Uuid, bool),
     EditorResultDirtyChanged(Uuid, bool),
     ToggleSidebarGroup(String),
+    ContinueSidebarPopulation(u64),
     SidebarSearchChanged,
     RefreshSidebar,
     RevealInSidebar,
@@ -336,6 +337,13 @@ pub enum AppMsg {
     StructureLoadFailed {
         tab_id: Uuid,
         message: String,
+    },
+    FetchCollations {
+        tab_id: Uuid,
+    },
+    CollationsLoaded {
+        tab_id: Uuid,
+        collations: Vec<String>,
     },
     StructureTabDirtyChanged(Uuid, bool),
     SchemaChanged {

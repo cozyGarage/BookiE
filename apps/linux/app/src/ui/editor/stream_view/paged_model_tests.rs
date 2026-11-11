@@ -545,9 +545,32 @@ fn realized_grid_rows_load_their_spooled_values() {
         },
     );
     model.imp().selection.set(Some(&selection));
-    let window = gtk4::Window::builder().child(&view).build();
+    model.attach_selection(&selection, &view);
+    let stack = gtk4::Stack::new();
+    stack.add_named(&view, Some("result"));
+    stack.add_named(&gtk4::Box::new(gtk4::Orientation::Vertical, 0), Some("other"));
+    let window = gtk4::Window::builder().child(&stack).build();
     window.present();
     wait_for_condition(|| has_label(view.upcast_ref(), "42") && has_label(view.upcast_ref(), "84"));
+    assert!(selection.select_item(0, false));
+    let loaded = model
+        .imp()
+        .pages
+        .borrow()
+        .as_ref()
+        .and_then(|pages| pages.get(0))
+        .cloned()
+        .unwrap();
+    let released = std::sync::Arc::downgrade(&loaded);
+    drop(loaded);
+    stack.set_visible_child_name("other");
+    wait_for_condition(|| !view.is_mapped());
+    assert!(released.upgrade().is_none());
+    assert_eq!(model.n_items(), 0);
+    stack.set_visible_child_name("result");
+    window.present();
+    wait_for_condition(|| has_label(view.upcast_ref(), "42") && has_label(view.upcast_ref(), "84"));
+    assert!(selection.is_selected(0));
     window.destroy();
 }
 

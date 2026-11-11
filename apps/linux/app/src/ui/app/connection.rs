@@ -133,7 +133,7 @@ impl App {
         self.sidebar_views = views;
         self.reset_sidebar_catalog();
         self.restore_sidebar_state();
-        self.repopulate_sidebar(&tables);
+        self.repopulate_sidebar(&tables, sender.clone());
         self.rebuild_schema_filter_popover(&sender);
         self.refresh_schema_index();
         self.refresh_window_title();
@@ -242,6 +242,7 @@ impl App {
         self.disconnect_action.set_enabled(false);
         self.refresh_window_title();
         self.table_search.set_text("");
+        self.cancel_sidebar_population();
         self.sidebar_nodes.borrow_mut().clear();
         self.sidebar_visible.borrow_mut().clear();
         self.sidebar_views.clear();

@@ -28,6 +28,7 @@ mod session_teardown;
 mod shortcuts;
 mod sidebar_catalog;
 mod sidebar_layout;
+mod sidebar_population;
 mod sidebar_state;
 mod status_pages;
 mod structure;
@@ -109,6 +110,13 @@ pub struct App {
     sidebar_title: adw::WindowTitle,
     disconnect_action: gio::SimpleAction,
     sidebar_factory: FactoryVecDeque<SidebarRow>,
+    sidebar_population: Option<sidebar_population::SidebarPopulation>,
+    sidebar_population_generation: u64,
+    sidebar_population_source: Option<crate::ui::sidebar_columns::ColumnSource>,
+    sidebar_population_schema_filter: bool,
+    sidebar_population_driver_id: String,
+    sidebar_population_elapsed: std::time::Duration,
+    sidebar_pending_focus: Option<usize>,
     sidebar_nodes: std::rc::Rc<std::cell::RefCell<Vec<crate::services::sidebar_tree::TreeNode>>>,
     sidebar_collapsed: std::rc::Rc<std::cell::RefCell<crate::services::sidebar_tree::CollapseState>>,
     sidebar_visible: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<usize>>>,
@@ -558,6 +566,13 @@ impl SimpleComponent for App {
             sidebar_title: widgets.sidebar_title.clone(),
             disconnect_action,
             sidebar_factory: sidebar.factory,
+            sidebar_population: None,
+            sidebar_population_generation: 0,
+            sidebar_population_source: None,
+            sidebar_population_schema_filter: false,
+            sidebar_population_driver_id: String::new(),
+            sidebar_population_elapsed: std::time::Duration::ZERO,
+            sidebar_pending_focus: None,
             sidebar_nodes: sidebar.nodes,
             sidebar_collapsed: sidebar.collapsed,
             sidebar_visible: sidebar.visible,
@@ -901,6 +916,9 @@ impl SimpleComponent for App {
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
             AppMsg::EditorResultDirtyChanged(tab_id, dirty) => self.refresh_editor_result_dirty(tab_id, dirty),
             AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
+            AppMsg::ContinueSidebarPopulation(generation) => {
+                self.continue_sidebar_population(generation, sender);
+            }
             AppMsg::SidebarSearchChanged => self.sync_sidebar_expansion(),
             AppMsg::RefreshSidebar => self.refresh_sidebar(sender),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
@@ -953,13 +971,15 @@ impl SimpleComponent for App {
                 metadata,
             } => self.on_structure_data_loaded(tab_id, columns, metadata),
             AppMsg::StructureLoadFailed { tab_id, message } => self.on_structure_load_failed(tab_id, message),
+            AppMsg::FetchCollations { tab_id } => self.on_fetch_collations(tab_id, sender),
+            AppMsg::CollationsLoaded { tab_id, collations } => self.on_collations_loaded(tab_id, collations),
             AppMsg::StructureTabDirtyChanged(tab_id, dirty) => self.refresh_structure_tab_dirty(tab_id, dirty),
             AppMsg::SchemaChanged { origin, schema, table } => self.on_schema_changed(origin, schema, table, sender),
             AppMsg::CatalogReloaded {
                 origin,
                 generation,
                 result,
-            } => self.on_catalog_reloaded(origin, generation, result),
+            } => self.on_catalog_reloaded(origin, generation, result, sender.clone()),
             AppMsg::RowOpStarted => self.set_row_op_in_flight(true),
             AppMsg::ReloadConnections => self.on_reload_connections(sender),
             AppMsg::ConnectionsLoaded(connections) => {
@@ -1040,7 +1060,7 @@ impl SimpleComponent for App {
             AppMsg::ShowCatalogKind(kind) => self.show_catalog(Some(kind)),
             AppMsg::LoadSidebarCatalog(kind) => self.on_load_sidebar_catalog(kind, &sender),
             AppMsg::SidebarCatalogLoaded { origin, kind, result } => {
-                self.on_sidebar_catalog_loaded(&origin, kind, result);
+                self.on_sidebar_catalog_loaded(&origin, kind, result, sender.clone());
             }
             AppMsg::ToggleAllSidebarGroups => self.toggle_all_sidebar_groups(),
             AppMsg::ShowErDiagram { schema } => self.on_show_er_diagram(schema),

@@ -16,6 +16,7 @@ mod editing;
 mod export;
 mod font_zoom;
 pub(crate) mod full_value_editor;
+mod header_alignment;
 mod highlight_paint;
 mod highlight_rules;
 pub(crate) use highlight_rules::HighlightPersist;
@@ -352,6 +353,7 @@ pub fn build_column_view(
             .zip(column_widths.clone())
             .map(|(id, store)| (id, table.to_string(), store)),
     );
+    header_alignment::install(&column_view, &display_columns);
     column_jump::install(
         &column_view,
         &grid_actions,

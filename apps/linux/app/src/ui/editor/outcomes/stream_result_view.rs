@@ -145,7 +145,7 @@ pub(in crate::ui::editor) fn stream_page_container(
         .and_then(std::sync::Weak::upgrade);
     if let Some(page) = resident {
         container.add_css_class("tp-stream-page-ram-resident");
-        container.append(&build_stream_page_widget(
+        let grid = build_stream_page_widget(
             &page,
             target.grid_sender,
             target.connection_id,
@@ -153,11 +153,42 @@ pub(in crate::ui::editor) fn stream_page_container(
             target.settings_store.clone(),
             streamed_view_key(identity, result.generation, page_index as usize),
             offers_whole_result_filter(result),
-        ));
+        );
+        let title = stream_page_label(result, page_index as usize);
+        release_stream_page_on_unmap(&container, &grid, title);
+        container.append(&grid);
     } else {
         container.append(&stream_page_placeholder(result, page_index));
     }
     container
+}
+
+pub(in crate::ui::editor) fn release_stream_page_on_unmap(container: &gtk::Box, grid: &gtk::Widget, title: String) {
+    let weak_grid = grid.downgrade();
+    let weak_container = container.downgrade();
+    grid.connect_unmap(move |_| {
+        let weak_grid = weak_grid.clone();
+        let weak_container = weak_container.clone();
+        let title = title.clone();
+        gtk::glib::idle_add_local_once(move || {
+            let (Some(grid), Some(container)) = (weak_grid.upgrade(), weak_container.upgrade()) else {
+                return;
+            };
+            if grid.is_mapped() || container.first_child().as_ref() != Some(&grid) {
+                return;
+            }
+            replace_stream_page_content(&container, &stream_page_placeholder_with_title(title));
+            if let Some(pages) = container.parent().and_downcast::<gtk::Stack>()
+                && pages.is_mapped()
+                && pages
+                    .visible_child()
+                    .as_ref()
+                    .is_some_and(|child| child == container.upcast_ref::<gtk::Widget>())
+            {
+                pages.notify("visible-child");
+            }
+        });
+    });
 }
 
 pub(in crate::ui::editor) fn replace_stream_page_content(container: &gtk::Box, page: &gtk::Widget) {
@@ -172,7 +203,9 @@ pub(in crate::ui::editor) fn stream_page_placeholder(result: &StreamedResult, pa
 pub(in crate::ui::editor) fn stream_page_placeholder_with_title(title: String) -> gtk::Widget {
     let page = adw::StatusPage::builder()
         .title(title)
-        .description(bookie_app_services::tr!("Select this page to load it from temporary storage."))
+        .description(bookie_app_services::tr!(
+            "Select this page to load it from temporary storage."
+        ))
         .icon_name("document-open-recent-symbolic")
         .vexpand(true)
         .build();
@@ -245,8 +278,12 @@ fn stream_terminal_notice(result: &StreamedResult) -> Option<String> {
         return None;
     }
     match result.terminal {
-        StreamTerminal::TimedOut => Some(bookie_app_services::tr!("Query timed out. All received pages remain available.")),
-        StreamTerminal::Cancelled => Some(bookie_app_services::tr!("Query cancelled. All received pages remain available.")),
+        StreamTerminal::TimedOut => Some(bookie_app_services::tr!(
+            "Query timed out. All received pages remain available."
+        )),
+        StreamTerminal::Cancelled => Some(bookie_app_services::tr!(
+            "Query cancelled. All received pages remain available."
+        )),
         _ => None,
     }
 }
