@@ -424,7 +424,7 @@ fn require_list(rule: &FilterRule) -> Result<&Vec<String>, BuildFilterError> {
 /// Backslash escapes `%` and `_` so a literal `50%` searches for
 /// exactly that text rather than matching anything ending in `50`.
 fn like_needs_escape_clause(driver_id: &str) -> bool {
-    matches!(driver_id, "sqlite" | "duckdb" | "mssql")
+    matches!(driver_id, "sqlite" | "duckdb" | "mssql" | "oracle")
 }
 
 fn escape_like(driver_id: &str, s: &str) -> String {
