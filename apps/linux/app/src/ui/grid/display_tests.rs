@@ -19,7 +19,7 @@ fn metadata(data_type: &str) -> ColumnInfo {
 
 #[test]
 fn display_text_primitive_variants() {
-    assert_eq!(value_to_display_text(&Value::Null), "NULL");
+    assert_eq!(value_to_display_text(&Value::Null), "<NULL>");
     assert_eq!(value_to_display_text(&Value::Bool(true)), "true");
     assert_eq!(value_to_display_text(&Value::Int(42)), "42");
     assert_eq!(value_to_display_text(&Value::Text("hello".into())), "hello");
@@ -273,7 +273,7 @@ fn cell_view_keeps_null_distinct_from_text_and_obeys_column_editability() {
     assert!(null.is_null);
     assert!(null.inline_editable);
     assert_eq!(null.text_for_bind(true), "<NULL>");
-    assert_eq!(null.text_for_bind(false), "NULL");
+    assert_eq!(null.text_for_bind(false), "<NULL>");
     let text_value = Value::Text("NULL".into());
     let text_null = cell_view(&text_value, &text_column);
     assert!(!text_null.is_null);
