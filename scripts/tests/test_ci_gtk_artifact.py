@@ -56,8 +56,8 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
             self.assertIn("BOOKIE_GTK_BINARY=", job)
             self.assertIn("GSETTINGS_SCHEMA_DIR=", job)
             self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build\n", job)
-            self.assertIn('"${{ github.sha }}"', job)
-            self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ github.sha }}", job)
+            self.assertIn('"${{ needs.pin-revision.outputs.revision }}"', job)
+            self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}", job)
             self.assertNotIn("cargo build", job)
             self.assertLess(job.index("ensure-node.sh"), job.index("uses:"))
 

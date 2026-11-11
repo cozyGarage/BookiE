@@ -27,6 +27,7 @@ on:
           every job in the run tests the same tree.
         required: false
         default: ""
+        type: string
 
 permissions:
   contents: read
@@ -56,27 +57,9 @@ jobs:
       - name: Pin the tested revision once
         id: pin
         env:
-          REQUESTED_REF: ${{ inputs.ref }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          revision="$(git rev-parse HEAD)"
-          echo "tree under test: $revision"
-          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$REQUESTED_REF" ]]; then
-            case "$REQUESTED_REF" in
-              refs/pull/*|pull/*)
-                echo "workflow_dispatch cannot pin a pull request ref" >&2
-                exit 1
-                ;;
-            esac
-            git fetch --no-tags origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
-            if ! git branch -r --contains "$revision" | grep -qE 'origin/' \
-              && ! git tag --contains "$revision" | grep -q .; then
-              echo "pinned revision must be on an origin branch or tag" >&2
-              exit 1
-            fi
-          fi
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          CI_REQUESTED_REF: ${{ inputs.ref }}
+          CI_EVENT_NAME: ${{ github.event_name }}
+        run: python3 scripts/check-ci-revision.py
 
   ensure-ci-gtk-image:
     name: Ensure CI debian-testing GTK image
