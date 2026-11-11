@@ -17,6 +17,8 @@ static APPROVAL_DIALOG: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
 const DENY_RESPONSE: &str = "deny";
 const APPROVE_ONCE_RESPONSE: &str = "once";
 const APPROVE_REMEMBER_RESPONSE: &str = "remember";
+const APPROVE_REMEMBER_LABEL: &str = "Approve and don't ask again";
+const MAX_RESPONSE_LABEL_CHARS: usize = 30;
 const CLOSE_RESPONSE: &str = DENY_RESPONSE;
 
 /// The window that actually owns the triggering connection wins over
@@ -54,7 +56,7 @@ fn build_approval_dialog(
     dialog.add_response(DENY_RESPONSE, "Deny");
     dialog.add_response(APPROVE_ONCE_RESPONSE, "Approve once");
     if can_remember {
-        dialog.add_response(APPROVE_REMEMBER_RESPONSE, "Approve and don't ask again for this rule");
+        dialog.add_response(APPROVE_REMEMBER_RESPONSE, APPROVE_REMEMBER_LABEL);
     }
     dialog.set_response_appearance(DENY_RESPONSE, relm4::adw::ResponseAppearance::Destructive);
     dialog.set_response_appearance(APPROVE_ONCE_RESPONSE, relm4::adw::ResponseAppearance::Suggested);
@@ -309,6 +311,11 @@ mod tests {
         let other = relm4::gtk::ScrolledWindow::new();
         let without = build_approval_dialog("Approve write: db", "body", &other, false);
         assert!(!without.has_response(APPROVE_REMEMBER_RESPONSE));
+    }
+
+    #[test]
+    fn the_remember_label_is_short_enough_not_to_be_ellipsized() {
+        assert!(APPROVE_REMEMBER_LABEL.chars().count() <= MAX_RESPONSE_LABEL_CHARS);
     }
 
     #[test]
