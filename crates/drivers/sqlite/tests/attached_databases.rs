@@ -166,6 +166,15 @@ async fn attached_schema_metadata() {
         .await
         .unwrap();
 
+    main_conn
+        .execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
+        .await
+        .unwrap();
+    main_conn
+        .execute("CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER)")
+        .await
+        .unwrap();
+
     let columns = main_conn.fetch_columns(Some("aux"), "parent").await.unwrap();
     assert_eq!(columns.len(), 2);
     assert_eq!(columns[0].name, "id");
@@ -182,6 +191,24 @@ async fn attached_schema_metadata() {
     assert_eq!(foreign_keys[0].ref_schema.as_deref(), Some("aux"));
     assert_eq!(foreign_keys[0].columns, vec!["parent_id".to_string()]);
     assert_eq!(foreign_keys[0].ref_columns, vec!["id".to_string()]);
+
+    let inbound = main_conn
+        .fetch_inbound_foreign_keys(Some("aux"), "parent")
+        .await
+        .unwrap();
+    assert_eq!(inbound.len(), 1, "{inbound:?}");
+    assert_eq!(inbound[0].source_schema.as_deref(), Some("aux"));
+    assert_eq!(inbound[0].source_table, "child");
+    assert_eq!(inbound[0].source_columns, vec!["parent_id".to_string()]);
+    assert_eq!(inbound[0].target_columns, vec!["id".to_string()]);
+
+    assert!(
+        main_conn
+            .fetch_inbound_foreign_keys(None, "parent")
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[tokio::test]
