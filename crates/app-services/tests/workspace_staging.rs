@@ -7,11 +7,13 @@ fn state(a: Uuid, b: Uuid, first: &str, second: &str) -> ConnectionWorkspaceStat
     ConnectionWorkspaceState {
         tabs: vec![
             WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: first.into(),
                 draft_id: Some(a),
                 file: None,
             },
             WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: second.into(),
                 draft_id: Some(b),
                 file: None,

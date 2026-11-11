@@ -210,6 +210,7 @@ impl App {
                 query: String::new(),
                 running: false,
                 file: None,
+                mark: Default::default(),
             };
             {
                 let mut tabs = workspace_tabs_for_create.borrow_mut();
@@ -248,8 +249,14 @@ impl App {
         }
         for record in &saved.tabs {
             match workspace_state::restored_workspace_tab(record) {
-                Some(workspace_state::RestoredWorkspaceTab::Editor { query, draft_id, file }) => {
+                Some(workspace_state::RestoredWorkspaceTab::Editor {
+                    query,
+                    draft_id,
+                    file,
+                    mark,
+                }) => {
                     self.append_editor_draft(Some(query), draft_id, sender.clone());
+                    self.restore_tab_mark(mark);
                     if let (Some(path), Some(tab)) = (file, self.selected_editor_tab_id()) {
                         self.restore_editor_file(tab, path, sender.clone());
                     }
@@ -261,6 +268,7 @@ impl App {
                     page_size,
                     sort,
                     preview,
+                    mark,
                 }) => {
                     self.append_table_tab(
                         schema,
@@ -268,8 +276,9 @@ impl App {
                         TableTabStart::new(offset, page_size, sort, preview),
                         sender.clone(),
                     );
+                    self.restore_tab_mark(mark);
                 }
-                Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table }) => {
+                Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table, .. }) => {
                     self.append_existing_structure_tab(schema, table, sender.clone());
                 }
                 None => {}
@@ -455,6 +464,7 @@ impl App {
             schema,
             table,
             browse,
+            mark: Default::default(),
         };
         self.workspace_tabs
             .borrow_mut()
@@ -571,6 +581,7 @@ impl App {
             query,
             running: false,
             file: None,
+            mark: Default::default(),
         };
         self.workspace_tabs
             .borrow_mut()
@@ -681,6 +692,17 @@ impl App {
 }
 
 impl App {
+    fn restore_tab_mark(&self, mark: bookie_app_services::tab_mark::TabMark) {
+        let Some(id) = self.selected_workspace_tab_id() else {
+            return;
+        };
+        match self.workspace_tabs.borrow_mut().get_mut(&id) {
+            Some(WorkspaceTab::Editor(slot)) => slot.mark = mark,
+            Some(WorkspaceTab::Table(slot)) => slot.mark = mark,
+            _ => {}
+        }
+    }
+
     pub(super) fn selected_workspace_tab_id(&self) -> Option<Uuid> {
         let tab_view = self.workspace_tab_view.as_ref()?;
         let page = tab_view.selected_page()?;

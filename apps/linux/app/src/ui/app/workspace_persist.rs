@@ -119,6 +119,7 @@ fn do_persist_workspace_state(
                     query: s.query.clone(),
                     draft_id: Some(id),
                     file: s.file.as_ref().map(|file| file.path.clone()),
+                    mark: s.mark.clone(),
                 }),
                 WorkspaceTab::Structure(_) => None,
                 WorkspaceTab::Table(s) if s.table.is_empty() => None,
@@ -156,6 +157,7 @@ fn table_record(slot: &super::TableTabSlot, preview: bool) -> WorkspaceTabRecord
         sort_col: sort.map(|(column, _)| column),
         sort_asc: sort.map(|(_, ascending)| ascending),
         preview,
+        mark: slot.mark.clone(),
     }
 }
 

@@ -32,6 +32,7 @@ pub struct EditorTabSlot {
     pub query: String,
     pub running: bool,
     pub file: Option<EditorFile>,
+    pub mark: bookie_app_services::tab_mark::TabMark,
 }
 
 impl EditorTabSlot {
@@ -88,6 +89,7 @@ pub struct TableTabSlot {
     pub schema: Option<String>,
     pub table: String,
     pub browse: Controller<BrowseTab>,
+    pub mark: bookie_app_services::tab_mark::TabMark,
 }
 
 pub enum WorkspaceTab {

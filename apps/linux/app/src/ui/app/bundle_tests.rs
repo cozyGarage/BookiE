@@ -166,6 +166,7 @@ async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
                 query: "SELECT stale_session".into(),
                 draft_id: None,
                 file: None,
+                mark: Default::default(),
             }],
             ..Default::default()
         },
@@ -182,6 +183,7 @@ async fn a_successful_reimport_rejects_old_session_saves_and_allows_new_ones() {
                 query: "SELECT after_reimport".into(),
                 draft_id: None,
                 file: None,
+                mark: Default::default(),
             }],
             ..Default::default()
         },
