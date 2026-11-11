@@ -94,6 +94,7 @@ const EXTENSIONS_SQL: &str = "SELECT n.nspname, e.extname, e.extversion
      JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
      WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.unnest($1::text[]) AS hidden_schema(schema_name) \
                        WHERE hidden_schema.schema_name = n.nspname)
+       AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
      ORDER BY 2 LIMIT $2";
 
 const ROLES_SQL: &str = "SELECT NULL::text, r.rolname,

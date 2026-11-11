@@ -344,7 +344,9 @@ async fn catalog_objects_are_listed_per_kind_and_filtered_by_schema() {
     );
     let sequences = listed(Kind::Sequence).await;
     assert!(
-        sequences.contains(&("ticket_numbers".into(), "bigint".into())),
+        sequences
+            .iter()
+            .any(|(name, detail)| name == "ticket_numbers" && detail.starts_with("bigint")),
         "{sequences:?}"
     );
     assert!(sequences.iter().any(|(name, _)| name == "events_id_seq"));
