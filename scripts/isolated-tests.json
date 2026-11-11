@@ -1770,6 +1770,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::import_dialog::lifetime_tests::changing_encoding_does_not_block_the_dialog_and_close_discards_its_preview"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::lifetime_tests::malformed_preview_displays_an_error_and_keeps_import_disabled"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::import_dialog::lifetime_tests::the_skip_switch_is_off_by_default_and_its_state_reaches_the_import"
     ],
     [
