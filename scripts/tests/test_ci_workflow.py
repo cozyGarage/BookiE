@@ -38,7 +38,7 @@ class CiWorkflowTests(unittest.TestCase):
 
         for workflow in (ROOT / ".forgejo/workflows").glob("*.yml"):
             with self.subTest(workflow=workflow.name):
-                self.assertNotIn("\npermissions:\n", workflow.read_text())
+                self.assertNotRegex(workflow.read_text(), r"(?m)^\s*permissions\s*:")
         self.assertIn("\npermissions:\n  contents: read\n", github)
 
     def test_forgejo_gate_event_profile_matches_github_build_linux(self):
