@@ -97,13 +97,33 @@ impl ApprovalSink for TtyApprovalSink {
             sanitize_for_terminal(&req.sql),
             nonce,
         );
-        terminal_approval(move |cancelled| {
+        let queued_cancel = cancellation.clone();
+        let approval = terminal_approval(move |cancelled| {
             ask_on_controlling_terminal(&prompt, &nonce, std::time::Instant::now() + APPROVAL_TIMEOUT, || {
                 cancelled.load(std::sync::atomic::Ordering::Acquire)
                     || cancellation.as_ref().is_some_and(|token| token.is_cancelled())
             })
-        })
+        });
+        deny_when_cancelled(
+            async move {
+                match queued_cancel {
+                    Some(token) => token.cancelled().await,
+                    None => std::future::pending().await,
+                }
+            },
+            approval,
+        )
         .await
+    }
+}
+
+async fn deny_when_cancelled<F>(cancelled: impl std::future::Future<Output = ()>, approval: F) -> ApprovalOutcome
+where
+    F: std::future::Future<Output = ApprovalOutcome>,
+{
+    tokio::select! {
+        outcome = approval => outcome,
+        () = cancelled => ApprovalOutcome::Deny,
     }
 }
 
@@ -111,11 +131,24 @@ async fn terminal_approval<F>(work: F) -> ApprovalOutcome
 where
     F: FnOnce(std::sync::Arc<std::sync::atomic::AtomicBool>) -> ApprovalOutcome + Send + 'static,
 {
+    terminal_approval_within(APPROVAL_TIMEOUT, work).await
+}
+
+async fn terminal_approval_within<F>(queue_wait: std::time::Duration, work: F) -> ApprovalOutcome
+where
+    F: FnOnce(std::sync::Arc<std::sync::atomic::AtomicBool>) -> ApprovalOutcome + Send + 'static,
+{
     static TERMINAL: std::sync::OnceLock<std::sync::Arc<tokio::sync::Mutex<()>>> = std::sync::OnceLock::new();
     let terminal = TERMINAL
         .get_or_init(|| std::sync::Arc::new(tokio::sync::Mutex::new(())))
         .clone();
-    let lease = terminal.lock_owned().await;
+    let Ok(lease) = tokio::time::timeout(queue_wait, terminal.lock_owned()).await else {
+        tracing::warn!(
+            seconds = queue_wait.as_secs(),
+            "another approval prompt held the terminal; denying"
+        );
+        return ApprovalOutcome::Deny;
+    };
     let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let _cancel_reader = CancelApprovalReader(cancelled.clone());
     approval_with_timeout(APPROVAL_TIMEOUT + APPROVAL_GRACE, move || {
@@ -206,8 +239,13 @@ fn ask_on_controlling_terminal(
     match tty_answer::read_answer(&mut terminal, deadline, &cancelled, nonce) {
         Some(outcome) => outcome,
         None => {
+            let message: &[u8] = if cancelled() {
+                b"\n[bookie-agentd] approval cancelled; denied\n"
+            } else {
+                b"\n[bookie-agentd] approval timed out; denied\n"
+            };
             tracing::warn!("approval prompt unanswered; denying");
-            let _ = writer.write_all(b"\n[bookie-agentd] approval timed out; denied\n");
+            let _ = writer.write_all(message);
             ApprovalOutcome::Deny
         }
     }

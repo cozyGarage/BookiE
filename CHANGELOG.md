@@ -19,9 +19,11 @@
 - Large database sidebars remain responsive while the full catalog loads in batches. (#2871)
 - The AppImage requires glibc 2.43 or newer. (#2875)
 - Grid column headers align with their cell values. (#2874)
+- A terminal approval in bookie-agentd now asks you to type `approve` and a code shown in the prompt instead of `y`, so a late answer to an older prompt cannot approve a new one. (#2938)
 
 ### Fixed
 
+- A cancelled or timed-out terminal approval in bookie-agentd no longer lets a second prompt start while the first is still reading, and a request waiting for the terminal is denied when it is cancelled or has waited two minutes. (#2938)
 - Result pages finishing after their rows disappear no longer remain unnecessarily loaded. (#2751)
 - A delayed row delete no longer discards a different unsaved draft after the grid changes. (#2755)
 - A grid menu no longer redirects a row delete to another row if the cell changes while the menu is open. (#2756)
