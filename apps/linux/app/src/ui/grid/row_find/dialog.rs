@@ -195,12 +195,17 @@ fn result_row(label: &str) -> gtk::ListBoxRow {
 }
 
 pub(super) fn preview(text: &str) -> String {
-    let single_line: String = text.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
-    if single_line.chars().count() <= PREVIEW_CHARS {
-        return single_line;
+    preview_chars(text.chars())
+}
+
+pub(super) fn preview_chars(chars: impl Iterator<Item = char>) -> String {
+    let mut chars = chars.map(|character| if character.is_control() { ' ' } else { character });
+    let shown = chars.by_ref().take(PREVIEW_CHARS).collect::<String>();
+    if chars.next().is_some() {
+        format!("{shown}…")
+    } else {
+        shown
     }
-    let cut: String = single_line.chars().take(PREVIEW_CHARS).collect();
-    format!("{cut}…")
 }
 
 fn status_text(query: &str, shown: usize, problem: Option<&str>) -> String {
