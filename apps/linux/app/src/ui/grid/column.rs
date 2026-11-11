@@ -42,18 +42,25 @@ fn column_header_title(info: &ColumnInfo, is_foreign_key: bool) -> String {
     if is_foreign_key {
         title.push_str(" \u{1F517}");
     }
-    if !info.data_type.is_empty() {
+    if let Some(data_type) = shown_type(info) {
         title.push('\n');
-        title.push_str(&info.data_type);
+        title.push_str(data_type);
     }
     title
+}
+
+/// The declared type to show, or `None` when there is none. An expression column (for example
+/// `count(*)`) has no declared type; some engines report the word NULL, which is not a type.
+fn shown_type(info: &ColumnInfo) -> Option<&str> {
+    let data_type = info.data_type.trim();
+    (!data_type.is_empty() && !data_type.eq_ignore_ascii_case("NULL")).then_some(data_type)
 }
 
 fn header_details(info: &ColumnInfo, foreign_key: bool, sort_enabled: bool) -> gtk4::gio::Menu {
     let details = gtk4::gio::Menu::new();
     for text in [
         bookie_app_services::tr!("Column: {name}").replace("{name}", &info.name),
-        bookie_app_services::tr!("Type: {type}").replace("{type}", &info.data_type),
+        bookie_app_services::tr!("Type: {type}").replace("{type}", shown_type(info).unwrap_or("\u{2014}")),
         if info.nullable {
             bookie_app_services::tr!("NULL allowed")
         } else {
@@ -684,5 +691,34 @@ mod metadata_presentation_tests {
             domain_type: None,
         };
         assert_eq!(column_header_title(&info, false), "value\npublic.MixedCaseType");
+    }
+}
+
+#[cfg(test)]
+mod expression_column_tests {
+    use super::*;
+
+    fn info(data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: "count(*)".into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn an_expression_column_shows_no_type_label_even_when_the_engine_reports_null() {
+        assert_eq!(column_header_title(&info("NULL"), false), "count(*)");
+        assert_eq!(column_header_title(&info(""), false), "count(*)");
+        assert_eq!(column_header_title(&info("integer"), false), "count(*)\ninteger");
+        assert_eq!(shown_type(&info("null")), None);
     }
 }
