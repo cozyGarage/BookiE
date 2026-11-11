@@ -15,6 +15,11 @@ ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("ci_jobs", ROOT / "scripts/check-ci-jobs.py")
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
+forgejo_spec = importlib.util.spec_from_file_location(
+    "forgejo_ci_jobs", ROOT / "scripts/check-forgejo-ci-jobs.py"
+)
+checker_forgejo = importlib.util.module_from_spec(forgejo_spec)
+forgejo_spec.loader.exec_module(checker_forgejo)
 bounded_spec = importlib.util.spec_from_file_location("bounded_operations", ROOT / "scripts/check-bounded-operations.py")
 bounded_checker = importlib.util.module_from_spec(bounded_spec)
 bounded_spec.loader.exec_module(bounded_checker)
@@ -1096,6 +1101,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("if: always() && !cancelled()", section)
         self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
         self.assertIn("python3 src/scripts/check-forgejo-ci-jobs.py", section)
+        self.assertEqual(set(job_names), checker_forgejo.REQUIRED | checker_forgejo.OPTIONAL_ON_NON_MAIN)
         for name in job_names:
             with self.subTest(job=name):
                 self.assertIn(f"      - {name}\n", section)
