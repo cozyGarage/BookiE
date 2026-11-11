@@ -248,6 +248,17 @@ pub enum SidebarRowOutput {
     },
 }
 
+fn group_button(icon: &str, tooltip: String) -> gtk::Button {
+    let button = gtk::Button::builder()
+        .icon_name(icon)
+        .tooltip_text(&tooltip)
+        .valign(gtk::Align::Center)
+        .css_classes(["flat"])
+        .build();
+    button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
+    button
+}
+
 #[relm4::factory(pub)]
 impl FactoryComponent for SidebarRow {
     type Init = SidebarRowInit;
@@ -326,16 +337,6 @@ impl FactoryComponent for SidebarRow {
             button.update_property(&[gtk::accessible::Property::Label(&open_label)]);
             button
         });
-        let group_button = |icon: &str, tooltip: String| {
-            let button = gtk::Button::builder()
-                .icon_name(icon)
-                .tooltip_text(&tooltip)
-                .valign(gtk::Align::Center)
-                .css_classes(["flat"])
-                .build();
-            button.update_property(&[gtk::accessible::Property::Label(&tooltip)]);
-            button
-        };
         let (new_table_button, csv_button) = if init.group.as_ref().is_some_and(|group| group.actions) {
             let labels = match init.info.schema.as_deref() {
                 Some(schema) => (

@@ -129,11 +129,7 @@ impl Component for HistoryDialog {
         search_bar.set_key_capture_widget(Some(&inner));
 
         let selection = build::selection_bar(&sender);
-        toolbar.add_bottom_bar(&selection.revealer);
-        toolbar.add_top_bar(&header);
-        toolbar.set_content(Some(&inner));
-        root.append(&toolbar);
-        root.insert_action_group("history", Some(&build::action_group(&sender)));
+        build::assemble(&root, &toolbar, &header, &inner, &selection.revealer, &sender);
 
         let model = Self {
             history: init.history,

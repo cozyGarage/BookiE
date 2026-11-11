@@ -124,14 +124,7 @@ fn build_column_checklist(columns: &[DraftColumn]) -> (gtk::ListBox, ColumnCheck
     (list, checks)
 }
 
-pub(super) fn present_index_dialog(
-    parent: &gtk::Widget,
-    columns: &[DraftColumn],
-    sender: ComponentSender<StructureTab>,
-) {
-    let (dialog, body, submit_btn) =
-        build_form_dialog(&bookie_app_services::tr!("Add Index"), &bookie_app_services::tr!("Add"));
-
+fn index_detail_group() -> (adw::PreferencesGroup, adw::EntryRow, adw::SwitchRow) {
     // Name + Unique inside one AdwPreferencesGroup. AdwEntryRow's
     // title slot doubles as the placeholder when empty (floats up
     // when filled), so no separate "Name" label is needed.
@@ -145,6 +138,18 @@ pub(super) fn present_index_dialog(
         ))
         .build();
     detail_group.add(&unique_row);
+    (detail_group, name_row, unique_row)
+}
+
+pub(super) fn present_index_dialog(
+    parent: &gtk::Widget,
+    columns: &[DraftColumn],
+    sender: ComponentSender<StructureTab>,
+) {
+    let (dialog, body, submit_btn) =
+        build_form_dialog(&bookie_app_services::tr!("Add Index"), &bookie_app_services::tr!("Add"));
+
+    let (detail_group, name_row, unique_row) = index_detail_group();
     body.append(&detail_group);
 
     body.append(&section_label(&bookie_app_services::tr!("Columns")));
