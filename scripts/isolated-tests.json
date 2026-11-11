@@ -1720,6 +1720,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::wide_scroll_tests::keyboard_focus_moving_right_brings_every_column_into_view_to_the_last"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::wide_scroll_tests::the_last_column_of_a_wide_result_is_reachable_by_scrolling"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::highlight_rules::tests::a_new_over_limit_pattern_is_refused_without_saving_or_closing"
     ],
     [

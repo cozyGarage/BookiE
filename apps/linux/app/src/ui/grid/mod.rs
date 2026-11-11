@@ -32,6 +32,8 @@ mod row_number_column;
 mod row_number_tests;
 mod types;
 mod value_viewer;
+#[cfg(test)]
+mod wide_scroll_tests;
 pub(crate) use column_order::displayed_column_order;
 pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_null};
 
