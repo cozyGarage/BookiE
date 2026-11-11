@@ -45,7 +45,17 @@ class CiWorkflowTests(unittest.TestCase):
     def test_shared_github_and_forgejo_tiers_use_the_layer_catalog(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        for layer in ("app-server", "widgets", "keyring", "ui", "tls", "postgres-release"):
+        for layer in (
+            "app-server",
+            "change-contracts",
+            "distro-floor",
+            "keyring",
+            "pg-dump",
+            "postgres-release",
+            "tls",
+            "ui",
+            "widgets",
+        ):
             with self.subTest(layer=layer):
                 invocation = f"python3 scripts/run-test-layer.py {layer}"
                 self.assertIn(invocation, github)
@@ -113,11 +123,15 @@ class CiWorkflowTests(unittest.TestCase):
         integration = local.split("run_integration() {", 1)[1].split("run_release() {", 1)[0]
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        github_drivers = set(re.findall(r"-p bookie-driver-([a-z]+)", integration))
+        forgejo_matrix = re.search(r"(?m)^        driver: \[([^]]+)\]", driver).group(1)
+        forgejo_drivers = set(forgejo_matrix.split(", "))
 
         self.assertIn(
             "-p bookie-driver-duckdb --test integration --test read_only --test missing_file",
             " ".join(integration.replace("\\\n", " ").split()),
         )
+        self.assertEqual(github_drivers | {"duckdb"}, forgejo_drivers)
         self.assertIn("driver: duckdb", driver)
         self.assertIn("tests: --test integration --test read_only --test missing_file", driver)
 
