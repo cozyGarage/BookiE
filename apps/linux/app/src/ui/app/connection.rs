@@ -707,11 +707,7 @@ impl App {
             if let Some(previous) = self.connection_id.take() {
                 self.overview_front_connection_id.set(None);
                 self.multi.sessions.disconnect(previous);
-                self.multi.guards.remove(previous);
-                self.multi.catalogs.remove(&previous);
-                self.database.close(previous);
-                crate::services::approval_grants::shared().revoke_connection(previous);
-                crate::services::window_registry::unregister(previous);
+                self.release_connection_resources(previous);
             }
         }
         let Some(activated) = prepared.activate(&self.database) else {

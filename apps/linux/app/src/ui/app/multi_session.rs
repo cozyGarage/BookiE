@@ -188,13 +188,17 @@ impl App {
         true
     }
 
-    pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
-        let closed_tabs = self.multi.sessions.disconnect(connection_id);
+    pub(super) fn release_connection_resources(&mut self, connection_id: Uuid) {
         self.multi.guards.remove(connection_id);
         self.multi.catalogs.remove(&connection_id);
         self.database.close(connection_id);
         crate::services::approval_grants::shared().revoke_connection(connection_id);
         crate::services::window_registry::unregister(connection_id);
+    }
+
+    pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
+        let closed_tabs = self.multi.sessions.disconnect(connection_id);
+        self.release_connection_resources(connection_id);
         for tab_id in closed_tabs {
             sender.input(AppMsg::FinishCloseWorkspaceTab(tab_id));
         }
