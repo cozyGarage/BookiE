@@ -72,6 +72,7 @@ async fn a_created_table_matches_the_drafted_columns_indexes_and_keys() {
                 has_expression_key: false,
             }],
             fks: vec![],
+            default_collation: None,
         }],
     )
     .await;
@@ -114,6 +115,7 @@ async fn a_drafted_foreign_key_is_created_and_enforced() {
             columns: vec![draft("id", "integer", false, true)],
             indexes: vec![],
             fks: vec![],
+            default_collation: None,
         }],
     )
     .await;
@@ -136,6 +138,7 @@ async fn a_drafted_foreign_key_is_created_and_enforced() {
                 on_delete: Some("CASCADE".into()),
                 on_update: Some("RESTRICT".into()),
             }],
+            default_collation: None,
         }],
     )
     .await;
@@ -197,6 +200,7 @@ async fn an_edited_draft_applies_the_diffed_column_changes() {
             ],
             indexes: vec![],
             fks: vec![],
+            default_collation: None,
         }],
     )
     .await;
@@ -269,6 +273,7 @@ async fn a_renamed_table_keeps_its_rows() {
             columns: vec![draft("id", "integer", false, true)],
             indexes: vec![],
             fks: vec![],
+            default_collation: None,
         }],
     )
     .await;
@@ -313,6 +318,7 @@ async fn a_failed_statement_rolls_back_the_whole_ddl_batch() {
             columns: vec![draft("id", "integer", false, true)],
             indexes: vec![],
             fks: vec![],
+            default_collation: None,
         }],
     )
     .await;
@@ -422,6 +428,7 @@ async fn column_comments_are_created_added_edited_and_cleared() {
             ],
             indexes: vec![],
             fks: vec![],
+            default_collation: None,
         }],
     )
     .await;
@@ -498,6 +505,7 @@ async fn a_renamed_column_keeps_a_comment_edited_in_the_same_save() {
             ],
             indexes: vec![],
             fks: vec![],
+            default_collation: None,
         }],
     )
     .await;
