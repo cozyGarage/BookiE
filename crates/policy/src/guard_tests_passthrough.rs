@@ -253,6 +253,7 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
             .fetch_foreign_keys_controlled(schema, "t", c)),
         read!(guard.fetch_inbound_foreign_keys(schema, "t"), |c| guard
             .fetch_inbound_foreign_keys_controlled(schema, "t", c)),
+        read!(guard.server_version(), |c| guard.server_version_controlled(c)),
         read!(guard.fetch_enum_labels("public", "mood"), |c| guard
             .fetch_enum_labels_controlled("public", "mood", c)),
         guard.server_version().await.map(|_| ()),

@@ -383,6 +383,10 @@ impl Connection for SessionConnection {
         self.inner.server_version().await
     }
 
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        self.inner.server_version_controlled(control).await
+    }
+
     async fn resolve_commit(
         &self,
         token: &bookie_core::CommitToken,

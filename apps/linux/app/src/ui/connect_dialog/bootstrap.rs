@@ -51,12 +51,25 @@ pub(super) async fn open_candidate(
         .guard_factory
         .guard(conn.clone(), bootstrap.metadata, bookie_policy::Principal::human_gui())
         .map_err(|failure| crate::services::error_text::open_failure_message(&failure))?;
-    let server_version = match guarded.server_version().await {
+    let control = crate::services::operation_control::bounded_with(timeout_secs, cancellation);
+    // The version request is bounded like the catalog requests below: a server that never answers
+    // ends the attempt at the deadline, and a cancellation reaches it.
+    let server_version = match guarded.server_version_controlled(&control).await {
         Ok(version) => version,
         Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(error @ (bookie_core::DriverError::Cancelled | bookie_core::DriverError::TimedOut)) => {
+            return Err(crate::services::error_text::driver_message(&error));
+        }
+        Err(bookie_core::DriverError::OperationOutcomeUnknown { source })
+            if matches!(
+                *source,
+                bookie_core::DriverError::Cancelled | bookie_core::DriverError::TimedOut
+            ) =>
+        {
+            return Err(crate::services::error_text::driver_message(&source));
+        }
         Err(_) => None,
     };
-    let control = crate::services::operation_control::bounded_with(timeout_secs, cancellation);
     let tables = crate::services::catalog::list_tables_excluding(&guarded, bootstrap.hidden_schemas, &control)
         .await
         .map_err(|error| crate::services::error_text::driver_message(&error))?;

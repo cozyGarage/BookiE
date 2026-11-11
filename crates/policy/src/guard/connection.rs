@@ -724,6 +724,19 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.metadata_operation("SERVER VERSION", Vec::new());
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read("SERVER VERSION", self.inner.server_version_controlled(control))
+            .await;
+        self.audit_controlled_read_result(&operation, start, &result, None)
+            .await?;
+        result
+    }
+
     async fn resolve_commit(
         &self,
         token: &bookie_core::CommitToken,
