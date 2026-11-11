@@ -540,7 +540,12 @@ impl BrowseTab {
         row_key_matches(&self.current_columns, &row_obj, expected_key)
     }
 
-    fn reject_stale_row_edit(&mut self, row_position: u32, row_key: &[Value], sender: &ComponentSender<Self>) -> bool {
+    pub(super) fn reject_stale_row_edit(
+        &mut self,
+        row_position: u32,
+        row_key: &[Value],
+        sender: &ComponentSender<Self>,
+    ) -> bool {
         if self.row_position_still_holds(row_position, row_key) {
             return false;
         }
@@ -746,6 +751,7 @@ impl BrowseTab {
                 | BrowseTabInput::GridCellEdited { .. }
                 | BrowseTabInput::GridReplaceBatch { .. }
                 | BrowseTabInput::GridSetCellNull { .. }
+                | BrowseTabInput::GridResetCell(_)
                 | BrowseTabInput::GridDeleteRowAt { .. }
                 | BrowseTabInput::Undo
                 | BrowseTabInput::Redo
@@ -974,6 +980,7 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
+            | BrowseTabInput::GridResetCell(_)
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave
             | BrowseTabInput::Paste(_)

@@ -2,6 +2,7 @@ mod keyboard_menu;
 mod pointer_menu;
 mod whole_result;
 
+use bookie_core::sql_dialect::ColumnReset;
 use bookie_core::sql_literal::RowStatement;
 use std::rc::Rc;
 
@@ -9,12 +10,12 @@ use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio};
 
-use super::GridMsg;
 use super::display::{FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
 use super::editing::enter_edit_mode;
 use super::export;
 use super::local_filter::LocalResultView;
 use super::value_viewer;
+use super::{GridMsg, ResetCellRequest};
 
 const CELL_MENU_TRIGGER: &str = "Menu|<Shift>F10";
 
@@ -44,6 +45,35 @@ pub(super) struct GridMenuOptions {
     pub(super) local_result_view: Option<LocalResultView>,
     pub(super) whole_result_filter: bool,
     pub(super) snapshot_export: bool,
+}
+
+fn reset_cell_entry(
+    name: &str,
+    reset: Option<ColumnReset>,
+    context: &CellContextStore,
+    sender: &relm4::Sender<GridMsg>,
+) -> gio::ActionEntry<gio::SimpleActionGroup> {
+    let context = context.clone();
+    let sender = sender.clone();
+    gio::ActionEntry::builder(name)
+        .activate(move |_, _, _| {
+            let snapshot = context.snapshot();
+            let Some(slot) = snapshot.as_ref() else {
+                return;
+            };
+            let Some(row_position) = slot.row_position else { return };
+            if slot.draft_target.is_some() {
+                return;
+            }
+            let request = ResetCellRequest {
+                row_position,
+                col_index: slot.col_index,
+                row_key: slot.row_key.clone(),
+                reset: reset.clone(),
+            };
+            sender.send(GridMsg::ResetCell(request)).ok();
+        })
+        .build()
 }
 
 pub(super) fn install_grid_context_menus(
@@ -429,6 +459,8 @@ pub(super) fn install_grid_context_menus(
             })
             .build()
     };
+    let set_default_action = reset_cell_entry("set-default", Some(ColumnReset::Default), &context, &sender);
+    let set_expression_action = reset_cell_entry("set-expression", None, &context, &sender);
     let delete_row_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -539,6 +571,8 @@ pub(super) fn install_grid_context_menus(
         copy_row_where_action,
         insert_row_action,
         set_null_action,
+        set_default_action,
+        set_expression_action,
         delete_row_action,
         duplicate_row_action,
         filter_action,
@@ -784,6 +818,14 @@ fn build_menu(
             Some("cell.duplicate-row"),
         );
         actions.append(Some(&bookie_app_services::tr!("Set to NULL")), Some("cell.set-null"));
+        actions.append(
+            Some(&bookie_app_services::tr!("Set to Default")),
+            Some("cell.set-default"),
+        );
+        actions.append(
+            Some(&bookie_app_services::tr!("Set to Expression…")),
+            Some("cell.set-expression"),
+        );
         actions.append(Some(&bookie_app_services::tr!("Delete row")), Some("cell.delete-row"));
     }
     menu.append_section(None, &actions);
