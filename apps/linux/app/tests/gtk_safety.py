@@ -524,7 +524,7 @@ def application_memory_kib():
     return values
 
 
-def application_sidebar_row_construction():
+def application_sidebar_model_metrics(minimum_nodes):
     process = owned_application().process
     stderr = process.stderr
     deadline = time.monotonic() + WAIT_SECONDS
@@ -533,13 +533,17 @@ def application_sidebar_row_construction():
         stderr.seek(0)
         output = stderr.read()
         stderr.seek(position)
-        matches = re.findall(r"sidebar rows constructed sidebar_nodes=(\d+) row_construction_ms=([0-9.]+)", output)
+        matches = re.findall(
+            r"sidebar tree model ready sidebar_nodes=(\d+) tree_model_build_ms=([0-9.]+) created_list_items=(\d+)",
+            output,
+        )
+        matches = [match for match in matches if int(match[0]) >= minimum_nodes]
         if matches:
-            count, elapsed = matches[-1]
+            count, elapsed, created = matches[-1]
             stalls = [int(value) for value in re.findall(r"UI thread stalled.*?stall_ms=(\d+)", output)]
-            return int(count), float(elapsed), len(stalls), max(stalls, default=0)
+            return int(count), float(elapsed), int(created), len(stalls), max(stalls, default=0)
         time.sleep(POLL_SECONDS)
-    raise AssertionError("the app did not finish sidebar row construction")
+    raise AssertionError("the app did not publish sidebar tree model metrics")
 
 
 def wait_for_database_count(path, expected, timeout=WAIT_SECONDS):
@@ -1722,6 +1726,24 @@ def expanding_a_sidebar_table_loads_its_columns(database, _base):
 expanding_a_sidebar_table_loads_its_columns.environment = "local"
 
 
+def sidebar_table_opens_with_keyboard(_database, _base):
+    search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
+    if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
+        invoke(search_toggle)
+    for _ in range(40):
+        row = find_node(name="safety_items", role=pyatspi.ROLE_LIST_ITEM)
+        if row is not None and row.getState().contains(pyatspi.STATE_FOCUSED):
+            press_x11_key("Return")
+            wait_for_node(name="safety_items", role=pyatspi.ROLE_PAGE_TAB)
+            return
+        press_x11_key("Tab")
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"the table row is not keyboard reachable:\n{accessible_snapshot()}")
+
+
+sidebar_table_opens_with_keyboard.environment = "local"
+
+
 def postgres_sidebar_catalog_profile(_database, base):
     target = os.environ["BOOKIE_GTK_CATALOG_TARGET"]
     before = application_memory_kib()
@@ -1729,12 +1751,13 @@ def postgres_sidebar_catalog_profile(_database, base):
     open_saved_connection(POSTGRES_CONNECTION_NAME)
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
-    wait_for_node(name=target, role=pyatspi.ROLE_LIST_ITEM, timeout=120)
-    sidebar_nodes, row_construction_ms, ui_stall_count, ui_stall_max_ms = application_sidebar_row_construction()
+    sidebar_search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON, timeout=120)
+    sidebar_nodes, tree_model_build_ms, created_list_items, ui_stall_count, ui_stall_max_ms = (
+        application_sidebar_model_metrics(int(os.environ["BOOKIE_GTK_CATALOG_TABLES"]))
+    )
     catalog_ready = time.monotonic()
-    search_toggle = wait_for_node(name="Search tables", role=pyatspi.ROLE_TOGGLE_BUTTON)
-    if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
-        invoke(search_toggle)
+    if not sidebar_search_toggle.getState().contains(pyatspi.STATE_CHECKED):
+        invoke(sidebar_search_toggle)
     search = wait_for_node(name="Search tables", role=pyatspi.ROLE_ENTRY)
     filter_started = time.monotonic()
     search.queryEditableText().setTextContents(target)
@@ -1747,10 +1770,11 @@ def postgres_sidebar_catalog_profile(_database, base):
         "created_tables": int(os.environ["BOOKIE_GTK_CATALOG_TABLES"]),
         "target": target,
         "connect_and_catalog_frame_ms": (frame_ready - connect_started) * 1000,
-        "catalog_accessible_ms": (catalog_ready - connect_started) * 1000,
+        "sidebar_model_ready_ms": (catalog_ready - connect_started) * 1000,
         "search_filter_ms": (filter_ready - filter_started) * 1000,
         "sidebar_nodes": sidebar_nodes,
-        "row_construction_ms": row_construction_ms,
+        "tree_model_build_ms": tree_model_build_ms,
+        "created_list_items": created_list_items,
         "ui_stall_count": ui_stall_count,
         "ui_stall_max_ms": ui_stall_max_ms,
         "memory_before_kib": before,
@@ -3083,6 +3107,7 @@ def main():
         sidebar_tables_group_collapses_and_expands,
         sidebar_search_reveals_groups_as_expanded,
         expanding_a_sidebar_table_loads_its_columns,
+        sidebar_table_opens_with_keyboard,
         restart_with_a_deleted_connection_opens_the_welcome_list,
         a_bundle_from_one_profile_imports_unchanged_into_an_empty_second_profile,
     ]

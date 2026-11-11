@@ -5,9 +5,8 @@ use relm4::{ComponentSender, gtk};
 use std::time::{Duration, Instant};
 
 use super::App;
-use super::init_sidebar::refresh_visible;
 use crate::services::sidebar_tree::{CollapseState, NodeKind, Reveal, build_nodes, reveal_target};
-use crate::ui::sidebar_row::{GroupInit, SchemaCatalogActions, SidebarObjectKind, SidebarRowInit, SidebarRowMsg};
+use crate::ui::sidebar_row::{GroupInit, SchemaCatalogActions, SidebarObjectKind, SidebarRowInit};
 
 fn reveal_sidebar_unless_overlay(split_view: &adw::OverlaySplitView, generation: &std::rc::Rc<std::cell::Cell<u32>>) {
     reveal_with(split_view, generation, show_unless_overlay);
@@ -78,8 +77,7 @@ impl App {
         sidebar_follows_connection(&self.split_view, &self.sidebar_toggle, connected);
     }
 
-    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo], sender: ComponentSender<App>) {
-        self.cancel_sidebar_population();
+    pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo], _sender: ComponentSender<App>) {
         self.sidebar_tables = tables.to_vec();
         let mut nodes = build_nodes(tables, &self.sidebar_views);
         let catalog_kinds = self
@@ -88,152 +86,56 @@ impl App {
             .and_then(|id| self.registry.get(id))
             .map_or(&[][..], |driver| driver.capabilities().catalog_object_kinds);
         crate::services::sidebar_tree::append_catalog_entries_with(&mut nodes, catalog_kinds, &self.sidebar_catalog);
-        self.sidebar_population_schema_filter = self.current_driver_id.as_deref() == Some("postgres");
-        self.sidebar_population_driver_id = self.current_driver_id.clone().unwrap_or_default();
+        let schema_filter_enabled = self.current_driver_id.as_deref() == Some("postgres");
         let timeout =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
-        self.sidebar_population_source =
+        let column_source =
             crate::ui::sidebar_columns::ColumnSource::capture(self.connection_id, self.database.clone(), timeout);
-        self.sidebar_population_elapsed = Duration::ZERO;
         *self.sidebar_nodes.borrow_mut() = nodes;
-        self.sidebar_factory.guard().clear();
-        self.sidebar_population = Some(super::sidebar_population::SidebarPopulation::new(
-            self.sidebar_nodes.borrow().len(),
-        ));
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.schema_filter_button
-            .set_visible(self.sidebar_population_schema_filter);
+        let mut render_context = self.sidebar_render_context.borrow_mut();
+        render_context.driver_id = self.current_driver_id.clone().unwrap_or_default();
+        render_context.schema_filter_enabled = schema_filter_enabled;
+        render_context.column_source = column_source;
+        drop(render_context);
+        self.schema_filter_button.set_visible(schema_filter_enabled);
+        self.refresh_sidebar_model();
         self.sync_sidebar_fold_button();
-        let generation = self.sidebar_population_generation;
-        self.continue_sidebar_population(generation, sender);
-    }
-
-    pub(super) fn cancel_sidebar_population(&mut self) {
-        self.sidebar_population_generation = self.sidebar_population_generation.wrapping_add(1);
-        self.sidebar_population = None;
-        self.sidebar_population_source = None;
-        self.sidebar_pending_focus = None;
-    }
-
-    pub(super) fn continue_sidebar_population(&mut self, generation: u64, sender: ComponentSender<App>) {
-        if generation != self.sidebar_population_generation {
-            return;
-        }
-        let Some(range) = self
-            .sidebar_population
-            .as_mut()
-            .and_then(|population| population.next_batch())
-        else {
-            return self.finish_sidebar_population();
-        };
-        self.append_sidebar_batch(range);
-        self.apply_pending_sidebar_focus();
-        let has_remaining = self
-            .sidebar_population
-            .as_ref()
-            .is_some_and(super::sidebar_population::SidebarPopulation::has_remaining);
-        if has_remaining {
-            gtk::glib::timeout_add_local_once(Duration::from_millis(1), move || {
-                sender.input(super::AppMsg::ContinueSidebarPopulation(generation));
-            });
-            return;
-        }
-        self.finish_sidebar_population();
-    }
-
-    fn append_sidebar_batch(&mut self, range: std::ops::Range<usize>) {
-        let started = Instant::now();
-        let nodes = self.sidebar_nodes.borrow();
-        let collapsed = self.sidebar_collapsed.borrow();
-        let searching = !self.table_search.text().trim().is_empty();
-        let driver_id = &self.sidebar_population_driver_id;
-        let schema_filter_enabled = self.sidebar_population_schema_filter;
-        let source = self.sidebar_population_source.clone();
-        let mut guard = self.sidebar_factory.guard();
-        for index in range {
-            let Some(node) = nodes.get(index) else {
-                continue;
-            };
-            guard.push_back(row_for(
-                node,
-                &collapsed,
-                searching,
-                schema_filter_enabled,
-                driver_id,
-                source.clone(),
-            ));
-        }
-        drop(guard);
-        self.sidebar_population_elapsed += started.elapsed();
-    }
-
-    fn finish_sidebar_population(&mut self) {
-        self.sidebar_population = None;
-        self.sidebar_population_source = None;
-        tracing::debug!(
-            sidebar_nodes = self.sidebar_nodes.borrow().len(),
-            row_construction_ms = self.sidebar_population_elapsed.as_secs_f64() * 1000.0,
-            "sidebar rows constructed"
-        );
         self.sync_sidebar_selection();
     }
 
-    fn apply_pending_sidebar_focus(&mut self) {
-        let Some(index) = self.sidebar_pending_focus else {
-            return;
-        };
-        let Some(row) = self.sidebar_factory.widget().row_at_index(index as i32) else {
-            return;
-        };
-        self.sidebar_pending_focus = None;
-        self.sidebar_factory.widget().select_row(Some(&row));
-        row.grab_focus();
+    pub(super) fn refresh_sidebar_model(&self) {
+        let started = Instant::now();
+        let nodes = self.sidebar_nodes.borrow();
+        let sidebar_nodes = nodes.len();
+        let included = crate::services::sidebar_tree::visible_nodes_with_hidden_schemas(
+            &nodes,
+            &CollapseState::default(),
+            &self.table_search.text(),
+            &self.sidebar_hidden_schemas.borrow(),
+        );
+        super::init_sidebar::disconnect_expansion_handlers(&self.sidebar_expansion_handlers);
+        self.sidebar_model.replace_nodes(&nodes, &included);
+        let model_build_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let row_factories = self.sidebar_row_factories.clone();
+        gtk::glib::timeout_add_local_once(Duration::from_millis(250), move || {
+            tracing::debug!(
+                sidebar_nodes,
+                tree_model_build_ms = model_build_ms,
+                created_list_items = row_factories.borrow().len(),
+                "sidebar tree model ready"
+            );
+        });
+        self.sync_sidebar_selection();
     }
 
-    pub(super) fn sync_sidebar_expansion(&self) {
-        use crate::services::sidebar_tree::NodeKind;
-        let searching = !self.table_search.text().trim().is_empty();
-        let collapsed = self.sidebar_collapsed.borrow();
-        for (index, node) in self
-            .sidebar_nodes
-            .borrow()
-            .iter()
-            .take(self.sidebar_factory.len())
-            .enumerate()
-        {
-            if matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)) {
-                self.sidebar_factory.send(
-                    index,
-                    SidebarRowMsg::SetCollapsed(!searching && collapsed.is_collapsed(&node.key)),
-                );
-            }
-        }
-    }
-
-    pub(super) fn toggle_sidebar_group(&mut self, key: &str) {
+    pub(super) fn sidebar_group_expansion_changed(&mut self, key: &str, expanded: bool) {
         if !self.table_search.text().trim().is_empty() {
             return;
         }
-        self.sidebar_collapsed.borrow_mut().toggle(key);
-        let collapsed = self.sidebar_collapsed.borrow().is_collapsed(key);
-        let row = self.sidebar_nodes.borrow().iter().position(|node| node.key == key);
-        if let Some(row) = row.filter(|index| *index < self.sidebar_factory.len()) {
-            self.sidebar_factory.send(row, SidebarRowMsg::SetCollapsed(collapsed));
+        let is_collapsed = self.sidebar_collapsed.borrow().is_collapsed(key);
+        if is_collapsed == expanded {
+            self.sidebar_collapsed.borrow_mut().toggle(key);
         }
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.sidebar_factory.widget().invalidate_filter();
         self.sync_sidebar_fold_button();
         self.persist_workspace_state();
     }
@@ -242,37 +144,29 @@ impl App {
         if !self.table_search.text().is_empty() {
             return;
         }
-        {
+        let collapse = {
             let nodes = self.sidebar_nodes.borrow();
             let mut collapsed = self.sidebar_collapsed.borrow_mut();
             if collapsed.is_all_collapsed(&nodes) {
                 collapsed.expand_all();
+                false
             } else {
                 collapsed.collapse_all(&nodes);
+                true
             }
-        }
-        let states: Vec<(usize, bool)> = {
-            let collapsed = self.sidebar_collapsed.borrow();
-            self.sidebar_nodes
-                .borrow()
-                .iter()
-                .take(self.sidebar_factory.len())
-                .enumerate()
-                .filter(|(_, node)| matches!(node.kind, NodeKind::Schema | NodeKind::Group(_)))
-                .map(|(index, node)| (index, collapsed.is_collapsed(&node.key)))
-                .collect()
         };
-        for (index, collapsed) in states {
-            self.sidebar_factory.send(index, SidebarRowMsg::SetCollapsed(collapsed));
+        let mut position = 0;
+        while position < self.sidebar_model.tree().n_items() {
+            let Some(row) = self.sidebar_model.tree().row(position) else {
+                break;
+            };
+            let node = crate::ui::sidebar_tree_model::SidebarTreeModel::node_index(&row)
+                .and_then(|index| self.sidebar_nodes.borrow().get(index).cloned());
+            if node.is_some_and(|node| crate::ui::app::init_sidebar::is_expandable(&node)) {
+                row.set_expanded(!collapse);
+            }
+            position += 1;
         }
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.sidebar_factory.widget().invalidate_filter();
         self.sync_sidebar_fold_button();
         self.persist_workspace_state();
     }
@@ -346,29 +240,26 @@ impl App {
                     self.table_search.set_text("");
                 }
                 for key in &uncollapse {
-                    self.toggle_sidebar_group(key);
+                    if self.sidebar_collapsed.borrow().is_collapsed(key) {
+                        self.sidebar_collapsed.borrow_mut().toggle(key);
+                    }
                 }
-                refresh_visible(
-                    &self.sidebar_nodes,
-                    &self.sidebar_collapsed,
-                    &self.sidebar_visible,
-                    &self.table_search.text(),
-                    &self.sidebar_hidden_schemas,
-                );
-                self.sidebar_factory.widget().invalidate_filter();
+                self.refresh_sidebar_model();
                 self.focus_sidebar_row(index);
             }
         }
     }
 
     fn focus_sidebar_row(&mut self, index: usize) {
-        let listbox = self.sidebar_factory.widget();
-        if let Some(row) = listbox.row_at_index(index as i32) {
-            listbox.select_row(Some(&row));
-            row.grab_focus();
-            self.sidebar_pending_focus = None;
-        } else if self.sidebar_population.is_some() {
-            self.sidebar_pending_focus = Some(index);
+        for position in 0..self.sidebar_model.tree().n_items() {
+            let Some(row) = self.sidebar_model.tree().row(position) else {
+                continue;
+            };
+            if crate::ui::sidebar_tree_model::SidebarTreeModel::node_index(&row) == Some(index) {
+                self.sidebar_selection.set_selected(position);
+                self.sidebar_list.grab_focus();
+                return;
+            }
         }
     }
 
@@ -455,14 +346,7 @@ impl App {
     }
 
     fn refresh_schema_filter(&self, sender: &relm4::ComponentSender<App>) {
-        refresh_visible(
-            &self.sidebar_nodes,
-            &self.sidebar_collapsed,
-            &self.sidebar_visible,
-            &self.table_search.text(),
-            &self.sidebar_hidden_schemas,
-        );
-        self.sidebar_factory.widget().invalidate_filter();
+        self.refresh_sidebar_model();
         self.rebuild_schema_filter_popover(sender);
     }
 }
@@ -483,7 +367,7 @@ fn sidebar_group_label(node: &crate::services::sidebar_tree::TreeNode) -> String
     }
 }
 
-fn row_for(
+pub(super) fn row_for(
     node: &crate::services::sidebar_tree::TreeNode,
     collapsed: &crate::services::sidebar_tree::CollapseState,
     searching: bool,

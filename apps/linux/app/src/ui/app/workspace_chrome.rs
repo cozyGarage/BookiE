@@ -101,9 +101,8 @@ impl App {
     /// row highlighted while the user is in the editor would imply
     /// the editor is showing that table's data, which it isn't.
     pub(crate) fn sync_sidebar_selection(&self) {
-        let listbox = self.sidebar_factory.widget();
         let Some((schema, table)) = self.selected_browse_slot_table() else {
-            listbox.unselect_all();
+            self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
             return;
         };
         let nodes = self.sidebar_nodes.borrow();
@@ -118,9 +117,20 @@ impl App {
             } => name.as_str() == table && node_schema.as_deref() == schema.as_deref(),
             _ => false,
         });
-        if let Some(row) = found.and_then(|index| listbox.row_at_index(index as i32)) {
-            listbox.select_row(Some(&row));
+        let Some(found) = found else {
+            self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
+            return;
+        };
+        for position in 0..self.sidebar_model.tree().n_items() {
+            let Some(row) = self.sidebar_model.tree().row(position) else {
+                continue;
+            };
+            if crate::ui::sidebar_tree_model::SidebarTreeModel::node_index(&row) == Some(found) {
+                self.sidebar_selection.set_selected(position);
+                return;
+            }
         }
+        self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
     }
 }
 

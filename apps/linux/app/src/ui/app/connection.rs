@@ -242,12 +242,15 @@ impl App {
         self.disconnect_action.set_enabled(false);
         self.refresh_window_title();
         self.table_search.set_text("");
-        self.cancel_sidebar_population();
         self.sidebar_nodes.borrow_mut().clear();
-        self.sidebar_visible.borrow_mut().clear();
         self.sidebar_views.clear();
         self.reset_sidebar_catalog();
-        self.sidebar_factory.guard().clear();
+        super::init_sidebar::disconnect_expansion_handlers(&self.sidebar_expansion_handlers);
+        for factory in self.sidebar_row_factories.borrow_mut().values_mut() {
+            factory.guard().clear();
+        }
+        self.sidebar_model.replace_nodes(&[], &[]);
+        self.sidebar_selection.set_selected(relm4::gtk::INVALID_LIST_POSITION);
         self.show_welcome_page(sender);
         tracing::info!("disconnected");
     }
