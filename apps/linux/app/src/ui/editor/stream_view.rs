@@ -1,6 +1,4 @@
 mod continuous;
-mod page_index;
-mod page_window;
 mod paged_model;
 pub(super) use continuous::install as install_continuous;
 mod header;

@@ -1,10 +1,10 @@
 #[derive(Default)]
-pub(super) struct PageIndex {
+pub struct PageIndex {
     ends: Vec<usize>,
 }
 
 impl PageIndex {
-    pub(super) fn new(counts: &[usize]) -> Self {
+    pub fn new(counts: &[usize]) -> Self {
         let mut total = 0_usize;
         let ends = counts
             .iter()
@@ -16,25 +16,29 @@ impl PageIndex {
         Self { ends }
     }
 
-    pub(super) fn row(&self, row: usize) -> Option<(u64, usize)> {
+    pub fn row(&self, row: usize) -> Option<(u64, usize)> {
         let page = self.ends.partition_point(|end| *end <= row);
         let end = *self.ends.get(page)?;
         let start = page.checked_sub(1).map_or(0, |previous| self.ends[previous]);
         (row < end).then_some((page as u64, row - start))
     }
 
-    pub(super) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.ends.last().copied().unwrap_or(0)
     }
 
-    pub(super) fn page_range(&self, page: u64) -> Option<(usize, usize)> {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn page_range(&self, page: u64) -> Option<(usize, usize)> {
         let page = usize::try_from(page).ok()?;
         let end = *self.ends.get(page)?;
         let start = page.checked_sub(1).map_or(0, |previous| self.ends[previous]);
         Some((start, end - start))
     }
 
-    pub(super) fn pages_in(&self, start: usize, count: usize) -> Vec<u64> {
+    pub fn pages_in(&self, start: usize, count: usize) -> Vec<u64> {
         if count == 0 {
             return Vec::new();
         }

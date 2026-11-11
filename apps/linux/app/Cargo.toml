@@ -21,6 +21,7 @@ kerberos = ["bookie-driver-mssql/kerberos"]
 [dependencies]
 bookie-app-services = { path = "../../../crates/app-services" }
 bookie-core = { path = "../../../crates/core" }
+bookie-results = { path = "../../../crates/results" }
 bookie-policy = { path = "../../../crates/policy" }
 bookie-mcp = { path = "../../../crates/mcp" }
 bookie-driver-registry = { path = "../../../crates/registry" }
