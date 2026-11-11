@@ -178,3 +178,35 @@ fn legacy_datetime_refuses_inexact_ticks_outside_one_day() {
         Value::Undecodable("datetime".into())
     );
 }
+
+#[test]
+fn empty_text_and_empty_bytes_stay_distinct_from_null() {
+    use std::borrow::Cow;
+    assert_eq!(
+        column_data_to_value(&ColumnData::String(Some(Cow::Borrowed("")))),
+        Value::Text(String::new())
+    );
+    assert_eq!(column_data_to_value(&ColumnData::String(None)), Value::Null);
+    assert_eq!(
+        column_data_to_value(&ColumnData::Binary(Some(Cow::Borrowed(&[])))),
+        Value::Bytes(Vec::new())
+    );
+    assert_eq!(column_data_to_value(&ColumnData::Binary(None)), Value::Null);
+}
+
+#[test]
+fn a_clr_udt_value_is_never_read_as_null() {
+    use std::borrow::Cow;
+    let serialized = vec![0xE6, 0x10, 0x00, 0x00, 0x01];
+    assert_eq!(
+        column_data_to_value_for_type(
+            &ColumnData::Binary(Some(Cow::Owned(serialized.clone()))),
+            ColumnType::Udt
+        ),
+        Value::Bytes(serialized)
+    );
+    assert_eq!(
+        column_data_to_value_for_type(&ColumnData::Binary(None), ColumnType::Udt),
+        Value::Null
+    );
+}
