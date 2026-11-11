@@ -480,6 +480,30 @@
           ],
           "timeout_seconds": 900,
           "evidence": "exit"
+        },
+        {
+          "argv": [
+            "cargo",
+            "deny",
+            "--manifest-path",
+            "apps/gpui/Cargo.toml",
+            "--config",
+            "deny.toml",
+            "check",
+            "advisories"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit"
+        },
+        {
+          "argv": [
+            "cargo",
+            "audit",
+            "--file",
+            "apps/gpui/Cargo.lock"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit"
         }
       ]
     },
