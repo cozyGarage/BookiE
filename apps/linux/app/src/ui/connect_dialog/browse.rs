@@ -106,7 +106,10 @@ pub(super) fn attach_database_file_picker(row: &adw::EntryRow) -> gtk::Box {
             move |result| set_entry_from_file(&entry, result),
         );
     });
-    let create = picker_button("document-new-symbolic", &bookie_app_services::tr!("Create a new database file"));
+    let create = picker_button(
+        "document-new-symbolic",
+        &bookie_app_services::tr!("Create a new database file"),
+    );
     let entry = row.clone();
     create.connect_clicked(move |button| {
         let dialog = gtk::FileDialog::builder()

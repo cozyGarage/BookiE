@@ -313,8 +313,9 @@ impl App {
             return;
         };
         let title = bookie_app_services::tr!("Drop {table}?").replace("{table}", &table);
-        let body =
-            bookie_app_services::tr!("All rows and the table definition will be removed. This can't be undone from inside BookiE.");
+        let body = bookie_app_services::tr!(
+            "All rows and the table definition will be removed. This can't be undone from inside BookiE."
+        );
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
         dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
         dialog.add_response("drop", &bookie_app_services::tr!("Drop"));
@@ -504,7 +505,10 @@ impl App {
         }
         let Some(driver_id) = self.current_driver_id.clone() else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            sender.input(AppMsg::StructureSaveFailed(tab_id, bookie_app_services::tr!("No active connection.")));
+            sender.input(AppMsg::StructureSaveFailed(
+                tab_id,
+                bookie_app_services::tr!("No active connection."),
+            ));
             return;
         };
         let ddl_is_transactional = self
@@ -551,7 +555,10 @@ impl App {
 
         let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            sender.input(AppMsg::StructureSaveFailed(tab_id, bookie_app_services::tr!("No active connection.")));
+            sender.input(AppMsg::StructureSaveFailed(
+                tab_id,
+                bookie_app_services::tr!("No active connection."),
+            ));
             return;
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
@@ -564,7 +571,10 @@ impl App {
             shutdown
                 .register(async move {
                     let Some(conn) = connection else {
-                        sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, bookie_app_services::tr!("No active connection.")));
+                        sender_for_cmd.input(AppMsg::StructureSaveFailed(
+                            tab_id,
+                            bookie_app_services::tr!("No active connection."),
+                        ));
                         return;
                     };
                     let control = crate::services::operation_control::bounded(timeout_secs);
@@ -815,20 +825,23 @@ impl App {
                         Ok(c) => c,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                bookie_app_services::tr!("Couldn't read columns: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read columns: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
                     };
                     if columns.is_empty() {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            bookie_app_services::tr!("Table {table} has no columns.").replace("{table}", &table_for_cmd),
+                            bookie_app_services::tr!("Table {table} has no columns.")
+                                .replace("{table}", &table_for_cmd),
                         ));
                         return;
                     }
                     if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            bookie_app_services::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")),
+                            bookie_app_services::tr!("Couldn't read indexes: {error}")
+                                .replace("{error}", &format!("{e}")),
                         ));
                         return;
                     }
@@ -839,14 +852,16 @@ impl App {
                         Ok(indexes) => indexes,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                bookie_app_services::tr!("Couldn't read indexes: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read indexes: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
                     };
                     if let Err(e) = bookie_core::check_pre_dispatch(&control) {
                         sender_for_cmd.input(AppMsg::ShowToast(
-                            bookie_app_services::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")),
+                            bookie_app_services::tr!("Couldn't read foreign keys: {error}")
+                                .replace("{error}", &format!("{e}")),
                         ));
                         return;
                     }
@@ -857,7 +872,8 @@ impl App {
                         Ok(fks) => fks,
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                bookie_app_services::tr!("Couldn't read foreign keys: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't read foreign keys: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                             return;
                         }
@@ -892,7 +908,8 @@ impl App {
                         }
                         Err(e) => {
                             sender_for_cmd.input(AppMsg::ShowToast(
-                                bookie_app_services::tr!("Couldn't build SQL: {error}").replace("{error}", &format!("{e}")),
+                                bookie_app_services::tr!("Couldn't build SQL: {error}")
+                                    .replace("{error}", &format!("{e}")),
                             ));
                         }
                     }

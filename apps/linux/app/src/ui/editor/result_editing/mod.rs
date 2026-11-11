@@ -481,8 +481,8 @@ impl SqlEditor {
         };
         let visible = count > 0;
         if visible {
-            let label =
-                bookie_app_services::trn!("{n} unsaved change", "{n} unsaved changes", count).replace("{n}", &count.to_string());
+            let label = bookie_app_services::trn!("{n} unsaved change", "{n} unsaved changes", count)
+                .replace("{n}", &count.to_string());
             editing.pending.pending_label.set_label(&label);
         }
         editing.pending.revealer.set_reveal_child(visible);

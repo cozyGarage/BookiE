@@ -68,7 +68,9 @@ impl App {
             return Some(bookie_app_services::tr!("No active connection."));
         }
         if self.driver_id() != "postgres" {
-            return Some(bookie_app_services::tr!("Backups are available for PostgreSQL connections."));
+            return Some(bookie_app_services::tr!(
+                "Backups are available for PostgreSQL connections."
+            ));
         }
         if restore && self.read_only {
             return Some(bookie_app_services::tr!("This connection is open read-only."));
@@ -157,7 +159,9 @@ impl App {
                 sender.input(AppMsg::RefreshPage);
             }
             None => self.show_toast(&bookie_app_services::tr!("The backup was saved.")),
-            Some(DriverError::Cancelled) => self.show_toast(&bookie_app_services::tr!("Cancelled. Nothing was changed.")),
+            Some(DriverError::Cancelled) => {
+                self.show_toast(&bookie_app_services::tr!("Cancelled. Nothing was changed."))
+            }
             Some(error) => {
                 let title = if restore {
                     bookie_app_services::tr!("Restore failed")
@@ -174,10 +178,10 @@ fn backup_error_text(error: &DriverError) -> String {
     let text = match error {
         DriverError::Unsupported(detail) | DriverError::Internal(detail) => detail.clone(),
         DriverError::OperationOutcomeUnknown { source } => match source.as_ref() {
-            DriverError::Unsupported(detail) | DriverError::Internal(detail) => {
-                bookie_app_services::tr!("The operation was interrupted, but the database outcome could not be confirmed: {detail}")
-                    .replace("{detail}", detail)
-            }
+            DriverError::Unsupported(detail) | DriverError::Internal(detail) => bookie_app_services::tr!(
+                "The operation was interrupted, but the database outcome could not be confirmed: {detail}"
+            )
+            .replace("{detail}", detail),
             _ => return error_text::driver_message(error),
         },
         error => return error_text::driver_message(error),

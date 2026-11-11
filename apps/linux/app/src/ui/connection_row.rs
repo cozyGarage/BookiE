@@ -196,14 +196,22 @@ fn connection_actions(sender: FactorySender<ConnectionRow>) -> gtk::MenuButton {
         .tooltip_text(bookie_app_services::tr!("Connection actions"))
         .css_classes(["flat"])
         .build();
-    button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Connection actions"))]);
+    button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Connection actions"
+    ))]);
     let popover = gtk::Popover::new();
     let content = gtk::Box::new(gtk::Orientation::Vertical, 2);
     for (label, message) in [
         (bookie_app_services::tr!("Group and tags"), ConnectionRowMsg::Organize),
         (bookie_app_services::tr!("Edit connection"), ConnectionRowMsg::Edit),
-        (bookie_app_services::tr!("Duplicate connection"), ConnectionRowMsg::Duplicate),
-        (bookie_app_services::tr!("Remove connection"), ConnectionRowMsg::RequestDelete),
+        (
+            bookie_app_services::tr!("Duplicate connection"),
+            ConnectionRowMsg::Duplicate,
+        ),
+        (
+            bookie_app_services::tr!("Remove connection"),
+            ConnectionRowMsg::RequestDelete,
+        ),
     ] {
         let action = gtk::Button::with_label(&label);
         action.add_css_class("flat");

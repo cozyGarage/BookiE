@@ -49,7 +49,9 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
         .popover(&gtk::Popover::builder().child(&content).build())
         .build();
     menu.add_css_class("flat");
-    menu.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("SQL line bookmarks"))]);
+    menu.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "SQL line bookmarks"
+    ))]);
     menu
 }
 

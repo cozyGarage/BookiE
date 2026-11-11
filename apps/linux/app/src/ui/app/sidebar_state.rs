@@ -661,8 +661,14 @@ mod sidebar_label_tests {
             .find(|node| node.kind == NodeKind::Group(GroupKind::Views))
             .expect("view group exists");
 
-        assert_eq!(sidebar_group_label(table_group), bookie_app_services::tr!("Tables").to_string());
-        assert_eq!(sidebar_group_label(view_group), bookie_app_services::tr!("Views").to_string());
+        assert_eq!(
+            sidebar_group_label(table_group),
+            bookie_app_services::tr!("Tables").to_string()
+        );
+        assert_eq!(
+            sidebar_group_label(view_group),
+            bookie_app_services::tr!("Views").to_string()
+        );
     }
 
     #[test]
@@ -679,7 +685,10 @@ mod sidebar_label_tests {
             .find(|node| node.kind == NodeKind::Catalog(bookie_core::CatalogObjectKind::Role))
             .unwrap();
 
-        assert_eq!(sidebar_group_label(group), bookie_app_services::tr!("Catalog").to_string());
+        assert_eq!(
+            sidebar_group_label(group),
+            bookie_app_services::tr!("Catalog").to_string()
+        );
         let init = row_for(entry, &Default::default(), false, false, "postgres", None);
         assert_eq!(init.kind, SidebarObjectKind::Catalog);
         let group_init = init.group.unwrap();

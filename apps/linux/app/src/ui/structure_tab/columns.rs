@@ -247,7 +247,9 @@ pub(super) fn build_column_expander_row(
     type_row.set_text(&col.data_type);
     if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
         type_row.set_sensitive(false);
-        type_row.set_tooltip_text(Some(&bookie_app_services::tr!("Type changes aren't supported by SQLite.")));
+        type_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+            "Type changes aren't supported by SQLite."
+        )));
     }
     let sender_for_type = sender.clone();
     let suppress_for_type = suppress_emit.clone();
@@ -274,7 +276,9 @@ pub(super) fn build_column_expander_row(
         .build();
     if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
         nullable_row.set_sensitive(false);
-        nullable_row.set_tooltip_text(Some(&bookie_app_services::tr!("Nullability changes aren't supported by SQLite.")));
+        nullable_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+            "Nullability changes aren't supported by SQLite."
+        )));
     }
     let sender_for_null = sender.clone();
     let suppress_for_null = suppress_emit.clone();
@@ -290,11 +294,15 @@ pub(super) fn build_column_expander_row(
     row.add_row(&nullable_row);
 
     // Default value (AdwEntryRow). Empty input means no DEFAULT clause.
-    let default_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Default value")).build();
+    let default_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Default value"))
+        .build();
     default_row.set_text(col.default_value.as_deref().unwrap_or(""));
     if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
         default_row.set_sensitive(false);
-        default_row.set_tooltip_text(Some(&bookie_app_services::tr!("Default changes aren't supported by SQLite.")));
+        default_row.set_tooltip_text(Some(&bookie_app_services::tr!(
+            "Default changes aren't supported by SQLite."
+        )));
     }
     let sender_for_default = sender.clone();
     let suppress_for_default = suppress_emit.clone();
@@ -451,7 +459,9 @@ fn configure_comment_row(row: &adw::EntryRow, capability: ColumnCommentCapabilit
         CommentEditability::CreateOnly => {
             row.set_visible(true);
             row.set_sensitive(false);
-            row.set_tooltip_text(Some(&bookie_app_services::tr!("This driver only supports comments on new columns.")));
+            row.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "This driver only supports comments on new columns."
+            )));
         }
         CommentEditability::Editable => {
             row.set_visible(true);
@@ -473,7 +483,9 @@ fn add_comment_row(
     sender: ComponentSender<StructureTab>,
     suppress_emit: Rc<Cell<bool>>,
 ) {
-    let comment_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Comment")).build();
+    let comment_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Comment"))
+        .build();
     comment_row.set_text(col.comment.as_deref().unwrap_or(""));
     comment_row.set_widget_name(&format!("col-comment-{index}"));
     configure_comment_row(&comment_row, column_comment_capability, col.original.is_some());

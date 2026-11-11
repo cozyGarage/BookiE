@@ -273,7 +273,9 @@ impl App {
         };
         let dialog = adw::AlertDialog::new(
             Some(&bookie_app_services::tr!("Close with an open transaction?")),
-            Some(&bookie_app_services::tr!("The transaction is rolled back when the tab closes.")),
+            Some(&bookie_app_services::tr!(
+                "The transaction is rolled back when the tab closes."
+            )),
         );
         dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
         dialog.add_response("close", &bookie_app_services::tr!("Roll Back and Close"));

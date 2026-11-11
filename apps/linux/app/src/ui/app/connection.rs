@@ -689,7 +689,9 @@ impl App {
             self.switch.transition = ConnectionTransition::Idle;
             self.switch.saves_pending.clear();
             self.switch.cancel_audit_was_disabled = None;
-            self.show_toast(&bookie_app_services::tr!("This connection is already open in another window."));
+            self.show_toast(&bookie_app_services::tr!(
+                "This connection is already open in another window."
+            ));
             return;
         }
         crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
@@ -722,7 +724,9 @@ impl App {
                 self.disconnect_action.set_enabled(false);
                 self.refresh_window_title();
             }
-            self.show_toast(&bookie_app_services::tr!("This connection is already open in another window."));
+            self.show_toast(&bookie_app_services::tr!(
+                "This connection is already open in another window."
+            ));
             return;
         };
         self.switch.transition = ConnectionTransition::Idle;
@@ -772,8 +776,10 @@ impl App {
             }
             Some(ConnectionHealth::Failed { reason }) => {
                 self.reconnect_banner.set_title(
-                    &bookie_app_services::tr!("Connection lost and cannot be restored: {reason}. Reopen the connection to retry.")
-                        .replace("{reason}", &crate::services::error_text::open_failure_message(&reason)),
+                    &bookie_app_services::tr!(
+                        "Connection lost and cannot be restored: {reason}. Reopen the connection to retry."
+                    )
+                    .replace("{reason}", &crate::services::error_text::open_failure_message(&reason)),
                 );
                 self.reconnect_banner.set_revealed(true);
             }
@@ -891,7 +897,9 @@ fn execute_delete_connection(
                 let result = bookie_storage::delete_connection(id).await;
                 if let Err(error) = result {
                     tracing::warn!(error = %error, "deleting the connection file entry failed");
-                    sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!("The connection could not be deleted.")));
+                    sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
+                        "The connection could not be deleted."
+                    )));
                     return;
                 }
                 workspace.forget_connection(id);

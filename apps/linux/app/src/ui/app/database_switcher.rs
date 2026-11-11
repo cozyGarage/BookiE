@@ -168,7 +168,8 @@ impl App {
             return;
         };
         clear(&self.databases_list);
-        self.databases_list.append(&message_row(&bookie_app_services::tr!("Loading…"), ""));
+        self.databases_list
+            .append(&message_row(&bookie_app_services::tr!("Loading…"), ""));
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let cancel = crate::services::request_generation::replace_in_flight(&self.database_list_cancel);
@@ -204,8 +205,10 @@ impl App {
         let names = match result {
             Ok(names) => names,
             Err(message) => {
-                self.databases_list
-                    .append(&message_row(&bookie_app_services::tr!("Could not list databases"), &message));
+                self.databases_list.append(&message_row(
+                    &bookie_app_services::tr!("Could not list databases"),
+                    &message,
+                ));
                 return;
             }
         };

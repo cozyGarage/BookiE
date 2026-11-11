@@ -79,7 +79,10 @@ fn context_menu_model(kind: SidebarObjectKind) -> gtk::gio::Menu {
 
 fn append_table_context_sections(menu: &gtk::gio::Menu) {
     let structure_section = gtk::gio::Menu::new();
-    structure_section.append(Some(&bookie_app_services::tr!("Edit Structure")), Some("sidebar-row.edit-structure"));
+    structure_section.append(
+        Some(&bookie_app_services::tr!("Edit Structure")),
+        Some("sidebar-row.edit-structure"),
+    );
     structure_section.append(
         Some(&bookie_app_services::tr!("Show CREATE TABLE")),
         Some("sidebar-row.show-create-table"),
@@ -88,10 +91,16 @@ fn append_table_context_sections(menu: &gtk::gio::Menu) {
         Some(&bookie_app_services::tr!("Join Referenced Tables")),
         Some("sidebar-row.join-referenced"),
     );
-    structure_section.append(Some(&bookie_app_services::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
+    structure_section.append(
+        Some(&bookie_app_services::tr!("Show ER Diagram")),
+        Some("sidebar-row.show-diagram"),
+    );
     menu.append_section(None, &structure_section);
     let mutate_section = gtk::gio::Menu::new();
-    mutate_section.append(Some(&bookie_app_services::tr!("Import CSV\u{2026}")), Some("sidebar-row.import-csv"));
+    mutate_section.append(
+        Some(&bookie_app_services::tr!("Import CSV\u{2026}")),
+        Some("sidebar-row.import-csv"),
+    );
     mutate_section.append(
         Some(&bookie_app_services::tr!("Rename Table\u{2026}")),
         Some("sidebar-row.rename-table"),
@@ -100,7 +109,10 @@ fn append_table_context_sections(menu: &gtk::gio::Menu) {
         Some(&bookie_app_services::tr!("Truncate Table\u{2026}")),
         Some("sidebar-row.truncate-table"),
     );
-    mutate_section.append(Some(&bookie_app_services::tr!("Drop Table\u{2026}")), Some("sidebar-row.drop-table"));
+    mutate_section.append(
+        Some(&bookie_app_services::tr!("Drop Table\u{2026}")),
+        Some("sidebar-row.drop-table"),
+    );
     menu.append_section(None, &mutate_section);
 }
 
@@ -330,7 +342,10 @@ impl FactoryComponent for SidebarRow {
                     bookie_app_services::tr!("New Table in {schema}\u{2026}").replace("{schema}", schema),
                     bookie_app_services::tr!("Table from CSV in {schema}\u{2026}").replace("{schema}", schema),
                 ),
-                None => (bookie_app_services::tr!("New Table\u{2026}"), bookie_app_services::tr!("Table from CSV\u{2026}")),
+                None => (
+                    bookie_app_services::tr!("New Table\u{2026}"),
+                    bookie_app_services::tr!("Table from CSV\u{2026}"),
+                ),
             };
             (
                 Some(group_button("list-add-symbolic", labels.0)),
@@ -339,11 +354,12 @@ impl FactoryComponent for SidebarRow {
         } else {
             (None, None)
         };
-        let new_schema_button = init
-            .group
-            .as_ref()
-            .is_some_and(|group| group.new_schema)
-            .then(|| group_button("folder-new-symbolic", bookie_app_services::tr!("New Schema\u{2026}").to_string()));
+        let new_schema_button = init.group.as_ref().is_some_and(|group| group.new_schema).then(|| {
+            group_button(
+                "folder-new-symbolic",
+                bookie_app_services::tr!("New Schema\u{2026}").to_string(),
+            )
+        });
         let collapsed = init.group.as_ref().is_some_and(|group| group.collapsed);
         let chevron = gtk::Image::from_icon_name(chevron_icon(collapsed));
         chevron.set_visible(init.group.as_ref().is_some_and(|group| !group.entry));
@@ -690,9 +706,15 @@ fn attach_schema_popover(root: &gtk::ListBoxRow, popover: &gtk::PopoverMenu) {
 
 fn schema_menu(compare_enabled: bool, actions: SchemaCatalogActions) -> gtk::gio::Menu {
     let menu = gtk::gio::Menu::new();
-    menu.append(Some(&bookie_app_services::tr!("Show ER Diagram")), Some("sidebar-row.show-diagram"));
+    menu.append(
+        Some(&bookie_app_services::tr!("Show ER Diagram")),
+        Some("sidebar-row.show-diagram"),
+    );
     if actions.create {
-        menu.append(Some(&bookie_app_services::tr!("New Schema\u{2026}")), Some("sidebar-row.new-schema"));
+        menu.append(
+            Some(&bookie_app_services::tr!("New Schema\u{2026}")),
+            Some("sidebar-row.new-schema"),
+        );
     }
     if actions.drop {
         menu.append(
@@ -707,7 +729,10 @@ fn schema_menu(compare_enabled: bool, actions: SchemaCatalogActions) -> gtk::gio
         );
     }
     if actions.hide {
-        menu.append(Some(&bookie_app_services::tr!("Hide schema")), Some("sidebar-row.hide-schema"));
+        menu.append(
+            Some(&bookie_app_services::tr!("Hide schema")),
+            Some("sidebar-row.hide-schema"),
+        );
     }
     menu
 }

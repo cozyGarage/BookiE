@@ -127,7 +127,9 @@ impl App {
             )
         };
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
-        let url_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Connection URL")).build();
+        let url_row = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Connection URL"))
+            .build();
         if let Some(url) = launched {
             url_row.set_text(url);
         }
@@ -241,7 +243,9 @@ fn organize_dialog_fields(
     current: &ConnectionOrganization,
     existing_paths: &[String],
 ) -> (adw::EntryRow, adw::EntryRow, Rc<Cell<u32>>) {
-    let group_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Group path")).build();
+    let group_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Group path"))
+        .build();
     group_row.set_text(current.group.as_deref().unwrap_or_default());
     let path_row = existing_group_path_row(&group_row, existing_paths);
     let tags_row = adw::EntryRow::builder()
@@ -295,7 +299,9 @@ fn existing_group_path_row(group_row: &adw::EntryRow, paths: &[String]) -> Optio
     });
     let row = adw::ActionRow::builder()
         .title(bookie_app_services::tr!("Existing group"))
-        .subtitle(bookie_app_services::tr!("Choose a folder, then edit the path to nest further"))
+        .subtitle(bookie_app_services::tr!(
+            "Choose a folder, then edit the path to nest further"
+        ))
         .build();
     row.add_suffix(&dropdown);
     row.set_activatable_widget(Some(&dropdown));
@@ -325,7 +331,9 @@ fn color_chooser(initial: u32) -> (adw::ActionRow, Rc<Cell<u32>>) {
     popover.set_child(Some(&choices));
     button.set_popover(Some(&popover));
 
-    let row = adw::ActionRow::builder().title(bookie_app_services::tr!("Colour")).build();
+    let row = adw::ActionRow::builder()
+        .title(bookie_app_services::tr!("Colour"))
+        .build();
     row.add_suffix(&button);
     (row, selected)
 }
@@ -399,7 +407,9 @@ fn persist_connection_organization(mutation: OrganizationMutation, sender: Compo
                     Ok(index) => sender_clone.input(AppMsg::ConnectionOrganizationLoaded(index)),
                     Err(error) => {
                         tracing::warn!(error = %error, "connection organization mutation failed");
-                        sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!("This connection could not be updated.")));
+                        sender_clone.input(AppMsg::ShowToast(bookie_app_services::tr!(
+                            "This connection could not be updated."
+                        )));
                     }
                 }
             })

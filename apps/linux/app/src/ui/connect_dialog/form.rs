@@ -95,7 +95,9 @@ fn apply_values(
 
 pub(super) fn test_result_text(result: &Result<usize, String>) -> String {
     match result {
-        Ok(tables) => bookie_app_services::tr!("Connection ok · {n} table(s) visible").replace("{n}", &tables.to_string()),
+        Ok(tables) => {
+            bookie_app_services::tr!("Connection ok · {n} table(s) visible").replace("{n}", &tables.to_string())
+        }
         Err(error) => bookie_app_services::tr!("Test failed: {error}").replace("{error}", error),
     }
 }

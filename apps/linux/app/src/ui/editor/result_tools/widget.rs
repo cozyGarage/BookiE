@@ -125,16 +125,34 @@ fn build_widgets(column_names: &[String]) -> Widgets {
     entry.set_width_chars(18);
     entry.set_max_width_chars(24);
     entry.set_placeholder_text(Some(&bookie_app_services::tr!("Find in all rows")));
-    entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Find in all rows"))]);
+    entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Find in all rows"
+    ))]);
     let previous = labelled_button(
         "go-up-symbolic",
         "tp-result-find-previous",
         &bookie_app_services::tr!("Previous match"),
     );
-    let next = labelled_button("go-down-symbolic", "tp-result-find-next", &bookie_app_services::tr!("Next match"));
-    let match_case = flat_toggle("Aa", &bookie_app_services::tr!("Match case"), "tp-result-find-match-case");
-    let whole_words = flat_toggle("W", &bookie_app_services::tr!("Whole words"), "tp-result-find-whole-words");
-    let regex = flat_toggle(".*", &bookie_app_services::tr!("Regular expression"), "tp-result-find-regex");
+    let next = labelled_button(
+        "go-down-symbolic",
+        "tp-result-find-next",
+        &bookie_app_services::tr!("Next match"),
+    );
+    let match_case = flat_toggle(
+        "Aa",
+        &bookie_app_services::tr!("Match case"),
+        "tp-result-find-match-case",
+    );
+    let whole_words = flat_toggle(
+        "W",
+        &bookie_app_services::tr!("Whole words"),
+        "tp-result-find-whole-words",
+    );
+    let regex = flat_toggle(
+        ".*",
+        &bookie_app_services::tr!("Regular expression"),
+        "tp-result-find-regex",
+    );
     let columns = column_dropdown(column_names);
     let status = gtk::Label::new(None);
     status.set_widget_name("tp-result-find-status");

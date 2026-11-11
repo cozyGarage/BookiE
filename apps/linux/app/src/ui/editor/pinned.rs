@@ -190,7 +190,10 @@ pub(super) fn with_eviction_note(message: String, evicted: usize) -> String {
     if evicted == 0 {
         return message;
     }
-    format!("{message} · {}", bookie_app_services::tr!("The oldest pinned result was closed"))
+    format!(
+        "{message} · {}",
+        bookie_app_services::tr!("The oldest pinned result was closed")
+    )
 }
 
 #[cfg(test)]

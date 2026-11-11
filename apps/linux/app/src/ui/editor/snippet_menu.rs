@@ -30,7 +30,9 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
         .popover(&popover)
         .build();
     menu.add_css_class("flat");
-    menu.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("SQL snippets"))]);
+    menu.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "SQL snippets"
+    ))]);
     popover.connect_show({
         let (sender, content, popover) = (sender.clone(), content, popover.downgrade());
         move |_| fill(&content, &sender, &popover)

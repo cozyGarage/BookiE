@@ -116,7 +116,8 @@ impl SavedQueriesDialog {
         let Some(existing) = self.saved.iter().find(|candidate| candidate.id == id) else {
             return;
         };
-        let body = bookie_app_services::tr!("\"{name}\" will be removed from your saved queries.").replace("{name}", &existing.name);
+        let body = bookie_app_services::tr!("\"{name}\" will be removed from your saved queries.")
+            .replace("{name}", &existing.name);
         let dialog = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Delete saved query?")), Some(&body));
         dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
         dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
@@ -155,7 +156,8 @@ impl SavedQueriesDialog {
                 .set_description(Some(&bookie_app_services::tr!("Try a different search term.")));
             return;
         }
-        self.status_page.set_title(&bookie_app_services::tr!("No saved queries yet"));
+        self.status_page
+            .set_title(&bookie_app_services::tr!("No saved queries yet"));
         self.status_page.set_description(Some(&bookie_app_services::tr!(
             "Press Ctrl+D in the SQL editor to save the query you are writing."
         )));
@@ -343,7 +345,8 @@ impl Component for SavedQueriesDialog {
             }
             SavedQueriesCmd::Failed(error) => {
                 tracing::warn!(error = %error, "saved queries update failed");
-                self.status_page.set_title(&bookie_app_services::tr!("Saved queries are unavailable"));
+                self.status_page
+                    .set_title(&bookie_app_services::tr!("Saved queries are unavailable"));
                 self.stack.set_visible_child_name("empty");
             }
         }

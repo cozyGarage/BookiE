@@ -89,7 +89,9 @@ fn start_view(
     let container = container.downgrade();
     let runtime = relm4::spawn(async { tokio::runtime::Handle::current() });
     gtk::glib::MainContext::default().spawn_local(async move {
-        let (Some(container), Ok(runtime)) = (container.upgrade(), runtime.await) else { return };
+        let (Some(container), Ok(runtime)) = (container.upgrade(), runtime.await) else {
+            return;
+        };
         if generation.get() != request {
             return;
         }

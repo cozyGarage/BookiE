@@ -55,10 +55,14 @@ pub(crate) fn disposition_detail(item: &ImportItem) -> String {
     match item.disposition {
         ImportDisposition::New => bookie_app_services::tr!("Not on this device yet."),
         ImportDisposition::UpdateInPlace => {
-            bookie_app_services::tr!("Updates the matching connection. Read-only, environment and TLS are never relaxed.")
+            bookie_app_services::tr!(
+                "Updates the matching connection. Read-only, environment and TLS are never relaxed."
+            )
         }
         ImportDisposition::Remapped => {
-            bookie_app_services::tr!("A different server already uses this entry's identifier here, so the import keeps both.")
+            bookie_app_services::tr!(
+                "A different server already uses this entry's identifier here, so the import keeps both."
+            )
         }
     }
 }

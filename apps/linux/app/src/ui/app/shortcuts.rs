@@ -10,31 +10,58 @@ pub(super) fn primary_menu_model() -> gio::Menu {
     let disconnect_item = gio::MenuItem::new(Some(&bookie_app_services::tr!("Disconnect")), Some("win.disconnect"));
     disconnect_item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
     connection_section.append_item(&disconnect_item);
-    connection_section.append(Some(&bookie_app_services::tr!("Back Up Database…")), Some("win.back-up-database"));
-    connection_section.append(Some(&bookie_app_services::tr!("Restore from Backup…")), Some("win.restore-database"));
+    connection_section.append(
+        Some(&bookie_app_services::tr!("Back Up Database…")),
+        Some("win.back-up-database"),
+    );
+    connection_section.append(
+        Some(&bookie_app_services::tr!("Restore from Backup…")),
+        Some("win.restore-database"),
+    );
     menu.append_section(None, &connection_section);
     let query_section = gio::Menu::new();
-    query_section.append(Some(&bookie_app_services::tr!("Open Quickly")), Some("win.open-quickly"));
-    query_section.append(Some(&bookie_app_services::tr!("Jump to Column…")), Some("win.jump-column"));
+    query_section.append(
+        Some(&bookie_app_services::tr!("Open Quickly")),
+        Some("win.open-quickly"),
+    );
+    query_section.append(
+        Some(&bookie_app_services::tr!("Jump to Column…")),
+        Some("win.jump-column"),
+    );
     query_section.append(
         Some(&bookie_app_services::tr!("Reveal Table in Sidebar")),
         Some("win.reveal-in-sidebar"),
     );
-    query_section.append(Some(&bookie_app_services::tr!("Save Query as Favorite")), Some("win.save-favorite"));
+    query_section.append(
+        Some(&bookie_app_services::tr!("Save Query as Favorite")),
+        Some("win.save-favorite"),
+    );
     menu.append_section(None, &query_section);
     let history_section = gio::Menu::new();
-    history_section.append(Some(&bookie_app_services::tr!("Query History")), Some("win.show-history"));
-    history_section.append(Some(&bookie_app_services::tr!("Server Activity")), Some("win.show-activity"));
+    history_section.append(
+        Some(&bookie_app_services::tr!("Query History")),
+        Some("win.show-history"),
+    );
+    history_section.append(
+        Some(&bookie_app_services::tr!("Server Activity")),
+        Some("win.show-activity"),
+    );
     history_section.append(Some(&bookie_app_services::tr!("Audit Log")), Some("win.show-audit"));
     history_section.append(Some(&bookie_app_services::tr!("Catalog")), Some("win.show-catalog"));
-    history_section.append(Some(&bookie_app_services::tr!("Explain query")), Some("win.explain-query"));
+    history_section.append(
+        Some(&bookie_app_services::tr!("Explain query")),
+        Some("win.explain-query"),
+    );
     menu.append_section(None, &history_section);
     let prefs_section = gio::Menu::new();
     prefs_section.append(Some(&bookie_app_services::tr!("Preferences")), Some("win.preferences"));
     prefs_section.append(Some(&bookie_app_services::tr!("New Window")), Some("win.new-window"));
     menu.append_section(None, &prefs_section);
     let app_section = gio::Menu::new();
-    app_section.append(Some(&bookie_app_services::tr!("Keyboard Shortcuts")), Some("win.shortcuts"));
+    app_section.append(
+        Some(&bookie_app_services::tr!("Keyboard Shortcuts")),
+        Some("win.shortcuts"),
+    );
     app_section.append(Some(&bookie_app_services::tr!("About BookiE")), Some("win.about"));
     app_section.append(Some(&bookie_app_services::tr!("Quit")), Some("win.quit"));
     menu.append_section(None, &app_section);
@@ -229,15 +256,30 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &bookie_app_services::tr!("General"),
         &[
             ("<Primary>e", bookie_app_services::tr!("Open SQL editor")),
-            ("<Primary>j", bookie_app_services::tr!("Show or hide query results in the editor")),
-            ("<Primary>o", bookie_app_services::tr!("Open a SQL file in a new editor tab")),
+            (
+                "<Primary>j",
+                bookie_app_services::tr!("Show or hide query results in the editor"),
+            ),
+            (
+                "<Primary>o",
+                bookie_app_services::tr!("Open a SQL file in a new editor tab"),
+            ),
             ("F5", bookie_app_services::tr!("Refresh table")),
             ("<Primary><Shift>r", bookie_app_services::tr!("Refresh tables sidebar")),
             ("<Primary>comma", bookie_app_services::tr!("Open Preferences")),
             ("<Primary>h", bookie_app_services::tr!("Open Query History")),
-            ("<Primary>p", bookie_app_services::tr!("Open Quickly: favorites and open tabs")),
-            ("<Primary><Shift>l", bookie_app_services::tr!("Reveal the open table in the sidebar")),
-            ("<Primary>d", bookie_app_services::tr!("Save the editor query as a favorite")),
+            (
+                "<Primary>p",
+                bookie_app_services::tr!("Open Quickly: favorites and open tabs"),
+            ),
+            (
+                "<Primary><Shift>l",
+                bookie_app_services::tr!("Reveal the open table in the sidebar"),
+            ),
+            (
+                "<Primary>d",
+                bookie_app_services::tr!("Save the editor query as a favorite"),
+            ),
             ("<Primary><Shift>b", bookie_app_services::tr!("Manage saved queries")),
             ("<Primary><Shift>e", bookie_app_services::tr!("Export Results")),
             ("<Primary>question", bookie_app_services::tr!("Show keyboard shortcuts")),
@@ -249,8 +291,14 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &bookie_app_services::tr!("Browse table"),
         &[
             ("F2", bookie_app_services::tr!("Edit focused cell (or press Return)")),
-            ("Tab", bookie_app_services::tr!("Move to next cell (commits if editing)")),
-            ("<Shift>Tab", bookie_app_services::tr!("Move to previous cell (commits if editing)")),
+            (
+                "Tab",
+                bookie_app_services::tr!("Move to next cell (commits if editing)"),
+            ),
+            (
+                "<Shift>Tab",
+                bookie_app_services::tr!("Move to previous cell (commits if editing)"),
+            ),
             ("Left", bookie_app_services::tr!("Move to previous cell")),
             ("Right", bookie_app_services::tr!("Move to next cell")),
             ("Up", bookie_app_services::tr!("Move to cell above")),
@@ -258,12 +306,27 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("space", bookie_app_services::tr!("Toggle boolean cell")),
             ("<Primary>n", bookie_app_services::tr!("Insert row")),
             ("Delete", bookie_app_services::tr!("Delete selected row")),
-            ("<Primary><Shift>n", bookie_app_services::tr!("Set focused cell to NULL")),
+            (
+                "<Primary><Shift>n",
+                bookie_app_services::tr!("Set focused cell to NULL"),
+            ),
             ("<Primary>f", bookie_app_services::tr!("Filter rows")),
-            ("<Primary><Shift>j", bookie_app_services::tr!("Jump to Column (focused grid)")),
-            ("<Primary><Alt>f", bookie_app_services::tr!("Find in loaded rows (focused grid)")),
-            ("<Primary>equal", bookie_app_services::tr!("Increase result grid font size")),
-            ("<Primary>minus", bookie_app_services::tr!("Decrease result grid font size")),
+            (
+                "<Primary><Shift>j",
+                bookie_app_services::tr!("Jump to Column (focused grid)"),
+            ),
+            (
+                "<Primary><Alt>f",
+                bookie_app_services::tr!("Find in loaded rows (focused grid)"),
+            ),
+            (
+                "<Primary>equal",
+                bookie_app_services::tr!("Increase result grid font size"),
+            ),
+            (
+                "<Primary>minus",
+                bookie_app_services::tr!("Decrease result grid font size"),
+            ),
             ("<Primary>0", bookie_app_services::tr!("Reset result grid font size")),
             ("<Primary>a", bookie_app_services::tr!("Select all rows")),
             ("<Primary>c", bookie_app_services::tr!("Copy selected rows as TSV")),
@@ -277,8 +340,14 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &dialog,
         &bookie_app_services::tr!("Row selection"),
         &[
-            ("Shift-click", bookie_app_services::tr!("Extend selection to the clicked row")),
-            ("Ctrl-click", bookie_app_services::tr!("Toggle the clicked row in selection")),
+            (
+                "Shift-click",
+                bookie_app_services::tr!("Extend selection to the clicked row"),
+            ),
+            (
+                "Ctrl-click",
+                bookie_app_services::tr!("Toggle the clicked row in selection"),
+            ),
         ],
     );
     add_shortcut_group(
@@ -288,22 +357,49 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary><Alt>g", bookie_app_services::tr!("Focus result grid")),
             ("<Primary><Alt>e", bookie_app_services::tr!("Focus SQL editor")),
             ("<Primary>Return", bookie_app_services::tr!("Run query")),
-            ("<Primary><Shift>Return", bookie_app_services::tr!("Run statement at cursor")),
+            (
+                "<Primary><Shift>Return",
+                bookie_app_services::tr!("Run statement at cursor"),
+            ),
             ("<Primary><Shift>s", bookie_app_services::tr!("Save the SQL file as")),
             ("<Primary>slash", bookie_app_services::tr!("Toggle line comment")),
-            ("<Primary><Shift>bracketleft", bookie_app_services::tr!("Fold SQL block at cursor")),
-            ("<Primary><Shift>bracketright", bookie_app_services::tr!("Unfold all SQL blocks")),
-            ("<Primary>F2", bookie_app_services::tr!("Toggle bookmark on the current line")),
-            ("<Primary><Shift>Down", bookie_app_services::tr!("Jump to the next bookmark")),
-            ("<Primary><Shift>Up", bookie_app_services::tr!("Jump to the previous bookmark")),
+            (
+                "<Primary><Shift>bracketleft",
+                bookie_app_services::tr!("Fold SQL block at cursor"),
+            ),
+            (
+                "<Primary><Shift>bracketright",
+                bookie_app_services::tr!("Unfold all SQL blocks"),
+            ),
+            (
+                "<Primary>F2",
+                bookie_app_services::tr!("Toggle bookmark on the current line"),
+            ),
+            (
+                "<Primary><Shift>Down",
+                bookie_app_services::tr!("Jump to the next bookmark"),
+            ),
+            (
+                "<Primary><Shift>Up",
+                bookie_app_services::tr!("Jump to the previous bookmark"),
+            ),
             ("<Primary>t", bookie_app_services::tr!("New editor tab")),
             ("<Primary>w", bookie_app_services::tr!("Close current tab or window")),
-            ("<Primary>Tab", bookie_app_services::tr!("Switch to the most recently used tab")),
+            (
+                "<Primary>Tab",
+                bookie_app_services::tr!("Switch to the most recently used tab"),
+            ),
             ("<Primary><Shift>Tab", bookie_app_services::tr!("Previous editor tab")),
             ("<Primary><Shift>t", bookie_app_services::tr!("Reopen last closed tab")),
             ("<Primary><Shift>f", bookie_app_services::tr!("Format SQL")),
-            ("<Alt><Shift>Down", bookie_app_services::tr!("Jump to the next statement")),
-            ("<Alt><Shift>Up", bookie_app_services::tr!("Jump to the previous statement")),
+            (
+                "<Alt><Shift>Down",
+                bookie_app_services::tr!("Jump to the next statement"),
+            ),
+            (
+                "<Alt><Shift>Up",
+                bookie_app_services::tr!("Jump to the previous statement"),
+            ),
         ],
     );
     add_shortcut_group(

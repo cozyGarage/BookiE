@@ -78,7 +78,11 @@ pub(in crate::ui::editor) fn present(
     let form = Rc::new(Form {
         dialog: dialog.downgrade(),
         left: dropdown(&labels, 0, &bookie_app_services::tr!("Left result")),
-        right: dropdown(&labels, u32::from(labels.len() > 1), &bookie_app_services::tr!("Right result")),
+        right: dropdown(
+            &labels,
+            u32::from(labels.len() > 1),
+            &bookie_app_services::tr!("Right result"),
+        ),
         keys: gtk::ListBox::new(),
         note: note(String::new()),
         progress: note(String::new()),
@@ -99,7 +103,10 @@ fn assemble(form: &Rc<Form>, content: &gtk::Box) {
     content.append(&labelled(&bookie_app_services::tr!("Right result"), &form.right));
     form.keys.set_selection_mode(gtk::SelectionMode::None);
     form.keys.add_css_class("boxed-list");
-    content.append(&labelled(&bookie_app_services::tr!("Key columns (optional)"), &form.keys));
+    content.append(&labelled(
+        &bookie_app_services::tr!("Key columns (optional)"),
+        &form.keys,
+    ));
     content.append(&note(bookie_app_services::tr!(
         "Without a key, whole rows are compared and row order is ignored. With a key, changed rows are shown as Before and After."
     )));
@@ -209,7 +216,8 @@ fn cancel_running(form: &Form) -> bool {
 
 fn start(form: &Rc<Form>) {
     if form.left.selected() == form.right.selected() {
-        form.note.set_label(&bookie_app_services::tr!("Choose two different results"));
+        form.note
+            .set_label(&bookie_app_services::tr!("Choose two different results"));
         return;
     }
     let Some(request) = build_request(form) else { return };

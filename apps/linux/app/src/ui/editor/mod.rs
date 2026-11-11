@@ -873,7 +873,8 @@ impl SimpleComponent for SqlEditor {
                     .map(|duration| duration.as_millis() as i64)
                     .unwrap_or(0);
                 let secs_str = secs.to_string();
-                let reason = bookie_app_services::tr!("Query exceeded the {n}s query timeout.").replace("{n}", &secs_str);
+                let reason =
+                    bookie_app_services::tr!("Query exceeded the {n}s query timeout.").replace("{n}", &secs_str);
                 let timed_out_sql = context.sql.clone();
                 self.record_history(context, elapsed, None, Outcome::Error(reason.clone()));
                 if !terminal.replace_ui {
@@ -934,8 +935,9 @@ impl SimpleComponent for SqlEditor {
                 }
                 let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
                 let Some(grammar) = statement_cursor::grammar_for(&driver_id) else {
-                    self.status
-                        .set_label(&bookie_app_services::tr!("Formatting is unavailable for this connection"));
+                    self.status.set_label(&bookie_app_services::tr!(
+                        "Formatting is unavailable for this connection"
+                    ));
                     return;
                 };
                 let settings = self.lexing(&driver_id).settings_for(grammar);
@@ -960,7 +962,8 @@ impl SqlEditor {
         sender: ComponentSender<Self>,
     ) {
         if !self.can_start_run() || self.session_ending() {
-            self.status.set_label(&bookie_app_services::tr!("Waiting for session to finish"));
+            self.status
+                .set_label(&bookie_app_services::tr!("Waiting for session to finish"));
             return;
         }
         let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);

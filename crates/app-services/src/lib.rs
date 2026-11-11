@@ -38,9 +38,6 @@ pub mod export_pages;
 pub mod filter_settings;
 pub mod highlight_settings;
 pub mod i18n;
-pub mod value_input;
-#[cfg(test)]
-mod value_input_tests;
 pub mod image_preview;
 pub mod open_failure;
 pub mod ordered_refresh;
@@ -58,9 +55,12 @@ pub mod state_file;
 pub mod stream_page_validation;
 pub mod structure_metadata;
 pub mod structure_tracker;
+pub mod tab_mark;
+pub mod value_input;
+#[cfg(test)]
+mod value_input_tests;
 pub mod window_sessions;
 pub mod window_state;
-pub mod tab_mark;
 pub mod workspace;
 
 mod workspace_disk;

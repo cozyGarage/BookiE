@@ -352,7 +352,9 @@ where
             sql_preview: attempt.preview.clone(),
             sql: attempt.sql.to_owned(),
             elapsed_ms: attempt.started.elapsed().as_millis(),
-            kind: StatementOutcomeKind::Error(bookie_app_services::tr!("Temporary result storage is unavailable.").into()),
+            kind: StatementOutcomeKind::Error(
+                bookie_app_services::tr!("Temporary result storage is unavailable.").into(),
+            ),
             pinned: false,
         })
     })?;
@@ -515,7 +517,8 @@ where
         if truncated {
             finish_stream_cursor(cursor, true).await;
             return ScriptRunResult::Streamed(StreamTerminal::Failed(
-                bookie_app_services::tr!("A result page exceeded the query result limit. The result is incomplete.").into(),
+                bookie_app_services::tr!("A result page exceeded the query result limit. The result is incomplete.")
+                    .into(),
             ));
         }
         if !has_next_page {
@@ -615,7 +618,10 @@ fn build_outcome_widget(
         }
         StatementOutcomeKind::Error(msg) => error_page(o.identity.statement_index, msg).upcast(),
         StatementOutcomeKind::NotRun => adw::StatusPage::builder()
-            .title(bookie_app_services::tr!("Statement {n} not run").replace("{n}", &(o.identity.statement_index + 1).to_string()))
+            .title(
+                bookie_app_services::tr!("Statement {n} not run")
+                    .replace("{n}", &(o.identity.statement_index + 1).to_string()),
+            )
             .description(bookie_app_services::tr!("Skipped because an earlier statement failed."))
             .icon_name("media-playback-stop-symbolic")
             .vexpand(true)
@@ -655,7 +661,9 @@ fn build_multi_result_widget(
         stack.add_titled(&widget, Some(&format!("set{index}")), &labels[index]);
     }
     let dropdown = gtk::DropDown::from_strings(&labels.iter().map(String::as_str).collect::<Vec<_>>());
-    dropdown.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Result set"))]);
+    dropdown.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Result set"
+    ))]);
     dropdown.connect_selected_notify({
         let stack = stack.downgrade();
         move |dropdown| {
@@ -980,7 +988,9 @@ fn build_result_drop_down(stack: &adw::ViewStack, outcomes: &[StatementOutcome])
     let labels: Vec<String> = outcomes.iter().map(outcome_tab_label).collect();
     let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
     let drop_down = gtk::DropDown::from_strings(&label_refs);
-    drop_down.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Statement result"))]);
+    drop_down.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Statement result"
+    ))]);
     let first_error = first_failure(outcomes).unwrap_or(0);
     drop_down.set_selected(first_error as u32);
     drop_down.connect_selected_notify({
