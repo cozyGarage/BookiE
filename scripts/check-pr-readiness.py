@@ -38,6 +38,8 @@ class TransientGitHubError(ReadinessError):
 def required_contexts(paths):
     required = set(REQUIRED_ALWAYS)
     code_change = any(not path.startswith("docs/") and not path.endswith(".md") for path in paths)
+    if paths and all(path.startswith("docs/") or path.endswith(".md") for path in paths):
+        return sorted(required | {"harness"})
     contract_change = any(path.startswith(CONTRACT_PREFIXES) or path.endswith(".md") for path in paths)
     if code_change:
         required.update(REQUIRED_CODE_CHECKS)

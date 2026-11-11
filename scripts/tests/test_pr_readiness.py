@@ -77,13 +77,10 @@ class PullRequestReadinessTests(unittest.TestCase):
         self.assertEqual(triggers.count('"**/Cargo.toml"'), 2, "push and pull_request")
         self.assertEqual(triggers.count('"Cargo.lock"'), 2, "push and pull_request")
 
-    def test_docs_only_changes_require_contract_checks_without_build_checks(self):
+    def test_docs_only_changes_require_only_the_harness_and_hygiene_checks(self):
         required = readiness.required_contexts(["docs/testing.md", "README.md"])
 
-        self.assertEqual(
-            set(required),
-            {"pr-title", "release-note", "harness", "workflow-lint", "workflow-security"},
-        )
+        self.assertEqual(set(required), {"pr-title", "release-note", "harness"})
 
     def test_mixed_changes_require_code_and_contract_checks(self):
         required = readiness.required_contexts(["docs/testing.md", "scripts/check-pr-title.py"])
