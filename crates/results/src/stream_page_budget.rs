@@ -235,6 +235,19 @@ mod tests {
     }
 
     #[test]
+    fn rejected_resize_keeps_the_original_reservation_until_drop() {
+        let result = page();
+        let budget = StreamPageBudget::new(result.estimated_row_bytes() - 1);
+        let mut lease = budget.reserve(1).unwrap();
+        assert!(!lease.resize_page(&result));
+        assert_eq!(budget.used_bytes(), 1);
+        assert_eq!(budget.used_pages(), 0);
+        assert_eq!(budget.used_cells(), 0);
+        drop(lease);
+        assert_eq!(budget.used_bytes(), 0);
+    }
+
+    #[test]
     fn detached_export_page_stays_charged_until_its_lease_drops() {
         let page = page();
         let budget = StreamPageBudget::new(page.estimated_row_bytes());
