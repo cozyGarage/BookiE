@@ -365,6 +365,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::workspace_overview::tests::overview_titles_show_current_tags_and_restore_titles_when_closed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::tab_title::tests::the_colour_mark_shows_as_the_tab_icon_and_clears_with_no_colour"
     ],
     [
