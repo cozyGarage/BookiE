@@ -263,6 +263,7 @@ impl StructureTab {
                 columns,
                 indexes: self.indexes.borrow().clone(),
                 fks: self.foreign_keys.borrow().clone(),
+                default_collation: None,
             }];
         }
         diff_to_ops(
