@@ -800,6 +800,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::completing_a_query_does_not_shift_the_editor_when_status_text_changes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_dispatch_resumes_after_success_cancel_and_timeout"
     ],
     [
