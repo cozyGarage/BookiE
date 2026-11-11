@@ -18,6 +18,7 @@ import zipfile
 MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
 UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
+PROGRESS_INTERVAL_SECONDS = 10
 SPEC = importlib.util.spec_from_file_location('bundle', Path(__file__).with_name('ci-test-bundle.py'))
 bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
@@ -83,6 +84,17 @@ def verify_manifest(manifest, revision, group):
         raise ValueError('registry bundle chunk sizes do not match the archive')
 
 
+def report_download_progress(group, downloaded, total, started, last_report):
+    now = time.monotonic()
+    if downloaded < total and now - last_report < PROGRESS_INTERVAL_SECONDS:
+        return last_report
+    elapsed = now - started
+    rate = downloaded / 1024 ** 2 / elapsed if elapsed else 0
+    print(f"bundle download progress: {group} {downloaded / 1024 ** 2:.1f}/"
+          f"{total / 1024 ** 2:.1f} MiB ({rate:.1f} MiB/s)", flush=True)
+    return now
+
+
 def publish(directory, revision, group, url):
     index = bundle.verify(directory, revision)
     if index['build_group'] != group:
@@ -144,6 +156,8 @@ def fetch(directory, revision, group, url):
         archive = temporary / 'bundle.tar.gz'
         parts = manifest.get('chunks', [{'name': 'bundle.tar.gz', 'size': manifest['size'], 'sha256': manifest['sha256']}])
         transfer_started = time.monotonic()
+        last_progress = transfer_started
+        downloaded = 0
         response_seconds = 0.0
         write_seconds = 0.0
         with archive.open('wb') as output:
@@ -162,6 +176,9 @@ def fetch(directory, revision, group, url):
                         write_seconds += time.monotonic() - write_started
                         digest.update(block)
                         remaining -= len(block)
+                        downloaded += len(block)
+                        last_progress = report_download_progress(
+                            group, downloaded, manifest['size'], transfer_started, last_progress)
                     if response.read(1):
                         raise ValueError('registry bundle chunk exceeds its declared size')
                 if digest.hexdigest() != part['sha256']:
@@ -223,11 +240,15 @@ def github_fetch(directory, revision, group):
                 archive = temporary / 'bundle.zip'
                 with api('actions/artifacts/' + str(artifact['id']) + '/zip') as response, archive.open('wb') as output:
                     total = 0
+                    download_started = time.monotonic()
+                    last_progress = download_started
                     while block := response.read(1024 * 1024):
                         total += len(block)
                         if total > MAX_ARCHIVE:
                             raise ValueError('GitHub artifact exceeds download limit')
                         output.write(block)
+                        last_progress = report_download_progress(
+                            group, total, artifact['size_in_bytes'], download_started, last_progress)
                 expected_digest = artifact.get('digest', '')
                 if expected_digest != 'sha256:' + bundle.digest(archive):
                     raise ValueError('GitHub artifact digest is unavailable or mismatched')

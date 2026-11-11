@@ -56,6 +56,18 @@ class RegistryExtractionTests(unittest.TestCase):
             registry.request('https://registry.example/bundle/bundle.tar.gz', 'PUT')
         self.assertEqual(raised.exception.code, 500)
 
+    def test_download_progress_is_quiet_until_the_interval_then_reports_rate(self):
+        output = io.StringIO()
+        with patch.object(registry.time, 'monotonic', return_value=9), redirect_stdout(output):
+            last_report = registry.report_download_progress('direct', 1024 ** 2, 4 * 1024 ** 2, 0, 0)
+        self.assertEqual(last_report, 0)
+        self.assertEqual(output.getvalue(), '')
+
+        with patch.object(registry.time, 'monotonic', return_value=10), redirect_stdout(output):
+            last_report = registry.report_download_progress('direct', 1024 ** 2, 4 * 1024 ** 2, 0, last_report)
+        self.assertEqual(last_report, 10)
+        self.assertIn('bundle download progress: direct 1.0/4.0 MiB (0.1 MiB/s)', output.getvalue())
+
     def test_missing_registry_manifest_remains_a_cache_miss(self):
         error = registry.urllib.error.HTTPError('https://registry.example/bundle/manifest.json', 404, 'Not Found', {}, None)
         with patch.dict('os.environ', {'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
@@ -180,6 +192,7 @@ class RegistryExtractionTests(unittest.TestCase):
                     patch.object(registry, 'request', side_effect=request), redirect_stdout(output):
                 registry.fetch(destination, 'a' * 40, 'default', 'https://registry.example/bundle/')
             self.assertEqual((destination / 'program').read_bytes(), bytes(range(256)) * 8)
+            self.assertIn('bundle download progress: default', output.getvalue())
             self.assertIn('bundle response reads:', output.getvalue())
             self.assertIn('local write calls:', output.getvalue())
             self.assertIn('bundle receive/write total:', output.getvalue())
