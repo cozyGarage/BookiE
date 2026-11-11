@@ -878,9 +878,13 @@ GLib.MainLoop().run()
                 if ":" in line:
                     name, value = line.split(":", 1)
                     fields[name] = int(value.split()[0])
+        with open(f"/proc/{process.pid}/status", encoding="utf-8") as status:
+            peak_rss_kib = next(int(line.split()[1]) for line in status if line.startswith("VmHWM:"))
+        assert peak_rss_kib >= fields["Rss"]
         application.memory_kb()
         return {
             "rss_kib": fields["Rss"],
+            "peak_rss_kib": peak_rss_kib,
             "pss_kib": fields["Pss"],
             "private_kib": fields["Private_Clean"] + fields["Private_Dirty"],
         }
