@@ -766,6 +766,68 @@ fn assert_editor_toolbar_fits(width: i32, style: &str) {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn completing_a_query_does_not_shift_the_editor_when_status_text_changes() {
+    let fixture = EditorFixture::new();
+    let (source_view, run_button, run_options, status) = {
+        let model = fixture.controller.model();
+        (
+            model.source_view.clone(),
+            model.run_button.clone(),
+            model.run_options.clone(),
+            model.status.clone(),
+        )
+    };
+    let root = fixture.controller.widget();
+    let window = gtk::Window::builder()
+        .default_width(917)
+        .default_height(700)
+        .child(root)
+        .build();
+    window.present();
+    let frames = std::rc::Rc::new(std::cell::Cell::new(0));
+    let observed = frames.clone();
+    window.add_tick_callback(move |_, _| {
+        let count = observed.get() + 1;
+        observed.set(count);
+        if count < 2 {
+            gtk::glib::ControlFlow::Continue
+        } else {
+            gtk::glib::ControlFlow::Break
+        }
+    });
+    spin_until(|| frames.get() >= 2 && root.width() > 0 && run_button.width() > 0);
+    assert_eq!(root.width(), 917);
+    assert!(source_view.height() > 0);
+    let editor_y_before = source_view.compute_bounds(root).unwrap().y();
+    let run_y_before = run_button.compute_bounds(root).unwrap().y();
+    let run_options_y_before = run_options.compute_bounds(root).unwrap().y();
+    fixture.controller.sender().send(SqlEditorInput::Run).unwrap();
+    let query = fixture.next_query();
+    fixture.finish(query, success());
+    spin_until(|| status.label().starts_with("done in"));
+    frames.set(0);
+    let observed = frames.clone();
+    window.add_tick_callback(move |_, _| {
+        let count = observed.get() + 1;
+        observed.set(count);
+        if count < 2 {
+            gtk::glib::ControlFlow::Continue
+        } else {
+            gtk::glib::ControlFlow::Break
+        }
+    });
+    spin_until(|| frames.get() >= 2);
+    let editor_y_after = source_view.compute_bounds(root).unwrap().y();
+    let run_y_after = run_button.compute_bounds(root).unwrap().y();
+    let run_options_y_after = run_options.compute_bounds(root).unwrap().y();
+    assert_eq!(editor_y_after, editor_y_before);
+    assert_eq!(run_y_after, run_y_before);
+    assert_eq!(run_options_y_after, run_options_y_before);
+    window.close();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn run_scope_menu_executes_the_current_statement_and_blocks_overlap() {
     let fixture = EditorFixture::new();
     fixture
