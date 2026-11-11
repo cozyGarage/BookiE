@@ -169,6 +169,33 @@ class CiCacheTests(unittest.TestCase):
         self.assertTrue((unrelated / 'payload').is_file())
         self.assertTrue((target / 'debug/deps/artifact').exists())
 
+    def test_pressure_cleanup_evicts_each_supported_test_bundle_group(self):
+        spec = importlib.util.spec_from_file_location('ci_cache', SCRIPT)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+
+        for group in helper.BUNDLE_GROUPS:
+            with self.subTest(group=group), tempfile.TemporaryDirectory() as temporary:
+                bundle_root = Path(temporary) / 'bundles'
+                bundle_root.mkdir()
+                stale = bundle_root / ('a' * 40 + '-' + group)
+                current = bundle_root / ('c' * 40 + '-' + group)
+                stale.mkdir()
+                current.mkdir()
+                os.utime(stale, (1, 1))
+                os.utime(current, (2, 2))
+
+                with patch.object(
+                    helper.shutil,
+                    'disk_usage',
+                    side_effect=lambda _: SimpleNamespace(free=100 if not stale.exists() else 0),
+                ), patch.dict(os.environ, {'GITHUB_SHA': 'c' * 40, 'BOOKIE_BUNDLE_CACHE': str(bundle_root)}):
+                    result = helper.cleanup(self.cache, 50)
+
+                self.assertEqual(result, 0)
+                self.assertFalse(stale.exists())
+                self.assertTrue(current.exists())
+
     def test_checkout_refuses_to_run_when_cleanup_cannot_restore_the_reserve(self):
         self.target('unit', 0)
         shell = self.directory / 'checkout.sh'
@@ -318,7 +345,7 @@ class CiCacheTests(unittest.TestCase):
             status = Path(f'/proc/{int(child_pid.read_text())}/stat')
             try:
                 process_state = status.read_text().split()[2]
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
                 process_state = 'Z'
             self.assertEqual(process_state, 'Z')
         finally:

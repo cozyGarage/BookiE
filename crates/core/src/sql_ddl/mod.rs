@@ -32,6 +32,8 @@ mod collation_tests;
 #[cfg(test)]
 mod comment_tests;
 #[cfg(test)]
+mod default_collation_tests;
+#[cfg(test)]
 mod default_tests;
 #[cfg(test)]
 mod diff_replacement_tests;
@@ -57,7 +59,10 @@ pub use index_fk::{
 };
 pub use review::{DestructiveChange, review_changes};
 pub use sequence::build_restart_sequence;
-pub use table::{build_create_table, build_drop_table, build_rename_table, build_truncate_table};
+pub use table::{
+    build_create_table, build_create_table_with_default_collation, build_drop_table, build_rename_table,
+    build_truncate_table,
+};
 pub use types::{
     BuildDdlError, ColumnCommentCapability, CommentPlacement, DraftColumn, StructureOp, column_comment_capability,
     column_comment_placement, identifiers_fold_case, supported_fk_actions,

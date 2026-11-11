@@ -20,7 +20,10 @@ def load_index(bundle):
     checkout = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if revision and revision != checkout:
         raise ValueError('test bundle source revision differs from the checkout')
-    return verifier.verify(bundle, checkout)
+    index = verifier.verify(bundle, checkout)
+    if index.get('archive_only'):
+        raise ValueError('test bundle contains a Nextest archive, not direct test executables')
+    return index
 
 
 def commands(bundle, arguments, index=None):

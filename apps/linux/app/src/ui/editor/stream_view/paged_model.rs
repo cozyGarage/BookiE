@@ -14,6 +14,9 @@ mod imp {
     pub struct PagedModel {
         pub(super) index: RefCell<PageIndex>,
         pub(super) width: Cell<usize>,
+        pub(super) byte_limit: Cell<usize>,
+        pub(super) suspended: Cell<bool>,
+        pub(super) selection_snapshot: RefCell<Option<gtk4::Bitset>>,
         pub(super) pages: RefCell<Option<PageWindow<std::sync::Arc<bookie_core::QueryResult>>>>,
         pub(super) selection: glib::WeakRef<gtk4::MultiSelection>,
         pub(super) view: glib::WeakRef<gtk4::ColumnView>,
@@ -35,10 +38,16 @@ mod imp {
         }
 
         fn n_items(&self) -> u32 {
+            if self.suspended.get() {
+                return 0;
+            }
             u32::try_from(self.index.borrow().len()).unwrap_or(u32::MAX)
         }
 
         fn item(&self, position: u32) -> Option<glib::Object> {
+            if self.suspended.get() {
+                return None;
+            }
             let (page, offset) = self.index.borrow().row(position as usize)?;
             let pages = self.pages.borrow();
             let row = pages
@@ -63,6 +72,7 @@ impl PagedModel {
         let model: Self = glib::Object::new();
         *model.imp().index.borrow_mut() = PageIndex::new(counts);
         model.imp().width.set(width);
+        model.imp().byte_limit.set(limit);
         *model.imp().pages.borrow_mut() = Some(PageWindow::new(limit, 2));
         model
     }
@@ -221,6 +231,60 @@ impl PagedModel {
     pub(super) fn attach_selection(&self, selection: &gtk4::MultiSelection, view: &gtk4::ColumnView) {
         self.imp().selection.set(Some(selection));
         self.imp().view.set(Some(view));
+        view.connect_unmap({
+            let model = self.downgrade();
+            move |_| {
+                if let Some(model) = model.upgrade() {
+                    model.release_pages();
+                }
+            }
+        });
+        view.connect_map({
+            let model = self.downgrade();
+            move |_| {
+                let model = model.clone();
+                glib::idle_add_local_once(move || {
+                    if let Some(model) = model.upgrade() {
+                        model.restore_rows();
+                    }
+                });
+            }
+        });
+    }
+
+    fn release_pages(&self) {
+        let rows = self.n_items() as usize;
+        if rows == 0 {
+            return;
+        }
+        *self.imp().selection_snapshot.borrow_mut() = self
+            .imp()
+            .selection
+            .upgrade()
+            .map(|selection| selection.selection().copy());
+        self.imp().suspended.set(true);
+        let limit = self.imp().byte_limit.get();
+        let Some(pages) = self.imp().pages.replace(Some(PageWindow::new(limit, 2))) else {
+            return;
+        };
+        drop(pages);
+        self.items_changed(0, rows as u32, 0);
+        self.sync_status();
+    }
+
+    fn restore_rows(&self) {
+        if !self.imp().suspended.replace(false) {
+            return;
+        }
+        let rows = self.n_items();
+        self.items_changed(0, 0, rows);
+        let (Some(selection), Some(snapshot)) = (
+            self.imp().selection.upgrade(),
+            self.imp().selection_snapshot.borrow_mut().take(),
+        ) else {
+            return;
+        };
+        selection.set_selection(&snapshot, &gtk4::Bitset::new_range(0, rows));
     }
 
     pub(super) fn attach_status(&self, status: &gtk4::Label) {

@@ -9,7 +9,7 @@ if [[ "$(git -C "$ROOT" rev-parse HEAD)" != "$revision" ]]; then
 fi
 cache=${BOOKIE_BUNDLE_CACHE:-/var/cache/ci/bundles}
 mkdir -p "$cache"
-exec 9>"$cache/.lock"
+exec 9>"$cache/.$revision-$group.lock"
 flock 9
 destination="$cache/$revision-$group"
 if ! python3 "$ROOT/scripts/ci-bundle-registry.py" fetch "$destination" "$revision" "$group"; then

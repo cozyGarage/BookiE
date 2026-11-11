@@ -211,6 +211,7 @@ pub(super) fn install_page_loader(
         };
         handle_visible_child_change(pages, &context, &previous_index);
     });
+    pages.connect_map(|pages| pages.notify("visible-child"));
 }
 
 struct VisiblePageLoadContext<'a> {
@@ -259,7 +260,9 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
     }
     if let Some(page) = context.resident_pages.get(index) {
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-            status.set_description(Some(&bookie_app_services::tr!("Restoring this result page from memory…")));
+            status.set_description(Some(&bookie_app_services::tr!(
+                "Restoring this result page from memory…"
+            )));
         }
         let _ = context
             .sender
@@ -279,7 +282,9 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
         return;
     };
     if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-        status.set_description(Some(&bookie_app_services::tr!("Loading this page from temporary storage…")));
+        status.set_description(Some(&bookie_app_services::tr!(
+            "Loading this page from temporary storage…"
+        )));
     }
     let _ = context
         .sender
@@ -360,6 +365,12 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
                 super::outcomes::streamed_view_key(identity, generation, index as usize),
                 named::<gtk::Widget>(&root, "tp-result-find-entry").is_some(),
             );
+            let title = container
+                .parent()
+                .and_downcast::<gtk::Stack>()
+                .map(|pages| pages.page(&container).title().unwrap_or_default().to_string())
+                .unwrap_or_default();
+            super::outcomes::stream_result_view::release_stream_page_on_unmap(&container, &widget, title);
             replace_stream_page_content(&container, &widget);
         }
         Err(message) => {

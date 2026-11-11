@@ -14,6 +14,8 @@ The [GitHub release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.
 
 From 0.2.5 the release workflow no longer publishes a Debian package ([ADR 0031](decisions/0031-stop-publishing-the-debian-package.md)) or a Flatpak bundle ([ADR 0032](decisions/0032-stop-publishing-the-flatpak.md)); the 0.2.4 release above still carries both. The workflow builds the Arch package against current Arch packages and the AppImage against Debian testing. Current source requirements are listed above.
 
+The AppImage requires glibc 2.43 or newer. Ubuntu 24.04 LTS provides glibc 2.39 and is below this floor ([Ubuntu package](https://packages.ubuntu.com/noble/libc6)); Ubuntu 26.04 LTS provides glibc 2.43 ([Ubuntu package](https://packages.ubuntu.com/resolute/libc6)). The AppImage build checks the versioned glibc symbols required by every bundled ELF file and fails when any requires a newer version than the floor in `scripts/appimage-glibc-floor.txt`. Passing this check establishes the glibc boundary only; desktop, portal, keyring and database acceptance remain tracked in [#2207](https://github.com/cozyGarage/BookiE/issues/2207).
+
 ## Rust toolchain
 
 Rust 1.98 is the minimum supported version, declared in `rust-toolchain.toml`, `Cargo.toml` and `clippy.toml`. Use rustup to select the repository toolchain. On Arch, the `rust` and `rustup` packages conflict; install `rustup` instead:

@@ -113,3 +113,41 @@ fn spool_export_honors_cancellation_before_reading() {
     let mut pages = factory(cancel);
     assert!(matches!(pages.next_page(), Err(ExportError::Cancelled)));
 }
+
+#[test]
+fn cancelled_spool_export_releases_its_reservation_when_closed() {
+    let runtime = Arc::new(
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap(),
+    );
+    let manager = StreamResultSpoolManager::default();
+    let spool = manager.create().unwrap();
+    runtime
+        .block_on(spool.append_page(
+            0,
+            Arc::new(QueryResult {
+                columns: vec![column()],
+                rows: vec![vec![Value::Int(11)]].into(),
+                truncated: false,
+            }),
+        ))
+        .unwrap();
+    let run_runtime = runtime.clone();
+    let cancel = CancellationToken::new();
+    let run_cancel = cancel.clone();
+    let run = Arc::new(move |future| {
+        let result = run_runtime.block_on(future);
+        run_cancel.cancel();
+        result
+    });
+    let factory = spool_export_factory_with_runner(spool.clone(), vec![column()], 1, run);
+    drop(spool);
+    let mut pages = factory(cancel);
+    drop(factory);
+    assert!(matches!(pages.next_page(), Err(ExportError::Cancelled)));
+    assert!(manager.reserved_bytes() > 0);
+    pages.finish().unwrap();
+    assert_eq!(manager.reserved_bytes(), 0);
+}

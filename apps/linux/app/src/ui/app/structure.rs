@@ -876,6 +876,7 @@ impl App {
                             .collect(),
                         indexes,
                         fks,
+                        default_collation: None,
                     };
                     match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {
@@ -996,6 +997,55 @@ impl App {
         }
     }
 
+    pub(super) fn on_fetch_collations(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
+        let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
+        let sender_for_cmd = sender.clone();
+        let connection_id = self.connection_id;
+        let database = self.database.clone();
+        let table_default_supported =
+            crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id())
+                .supports_table_default_collation;
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
+                        return;
+                    };
+                    let control = crate::services::operation_control::bounded_with(timeout_secs, token);
+                    let Ok(collations) =
+                        bookie_app_services::structure_metadata::load_collations(conn.as_ref(), &control).await
+                    else {
+                        return;
+                    };
+                    if control.cancellation_token().is_cancelled() {
+                        return;
+                    }
+                    sender_for_cmd.input(AppMsg::CollationsLoaded {
+                        tab_id,
+                        collations: collations.into_iter().map(|collation| collation.name).collect(),
+                        table_default_supported,
+                    });
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn on_collations_loaded(&self, tab_id: Uuid, collations: Vec<String>, table_default_supported: bool) {
+        if let Some(controller) = self
+            .workspace_tabs
+            .borrow()
+            .get(&tab_id)
+            .and_then(|t| t.structure_controller())
+        {
+            let _ = controller.sender().send(StructureTabInput::CollationsLoaded {
+                collations,
+                table_default_supported,
+            });
+        }
+    }
+
     pub(super) fn on_structure_load_failed(&self, tab_id: Uuid, message: String) {
         if let Some(controller) = self
             .workspace_tabs
@@ -1078,6 +1128,7 @@ impl App {
         origin: CatalogOrigin,
         generation: u64,
         result: Result<crate::services::catalog::Catalog, String>,
+        sender: relm4::ComponentSender<App>,
     ) {
         if !origin.owns_window(self.connection_id, &self.database) || self.catalog_generation.get() != generation {
             return;
@@ -1086,7 +1137,7 @@ impl App {
             Ok((tables, views)) => {
                 self.set_completion_tables(&tables, &views);
                 self.sidebar_views = views;
-                self.repopulate_sidebar(&tables);
+                self.repopulate_sidebar(&tables, sender);
                 self.refresh_schema_index();
             }
             Err(error) => self.show_error_alert(&bookie_app_services::tr!("Catalog refresh failed"), &error),

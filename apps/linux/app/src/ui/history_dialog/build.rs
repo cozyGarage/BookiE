@@ -35,6 +35,7 @@ pub(super) fn close_button(sender: &ComponentSender<HistoryDialog>) -> gtk::Butt
 fn combo_row(title: String, options: &[String]) -> adw::ComboRow {
     let options: Vec<&str> = options.iter().map(String::as_str).collect();
     adw::ComboRow::builder()
+        .use_markup(false)
         .title(title)
         .model(&gtk::StringList::new(&options))
         .build()

@@ -112,6 +112,9 @@ pub struct StructureTab {
     supports_index_metadata: bool,
     supports_foreign_key_metadata: bool,
     collations: Rc<[String]>,
+    default_collation: Rc<RefCell<Option<String>>>,
+    table_collation_choices: Rc<RefCell<Vec<String>>>,
+    table_collation_row: adw::ComboRow,
     columns: Rc<RefCell<Vec<DraftColumn>>>,
     indexes: Rc<RefCell<Vec<IndexInfo>>>,
     foreign_keys: Rc<RefCell<Vec<ForeignKeyInfo>>>,
@@ -192,6 +195,11 @@ pub enum StructureTabInput {
         metadata: StructureMetadata,
     },
     LoadFailed(String),
+    CollationsLoaded {
+        collations: Vec<String>,
+        table_default_supported: bool,
+    },
+    TableCollationEdited(Option<String>),
     Save,
     Discard,
     DropTableRequested,
@@ -238,6 +246,7 @@ pub enum ColumnField {
 pub enum StructureTabOutput {
     DirtyChanged(bool),
     FetchStructure,
+    FetchCollations,
     ExecuteTransaction { statements: Vec<String> },
     DropTableRequested { schema: Option<String>, table: String },
     ShowToast(String),
@@ -245,6 +254,23 @@ pub enum StructureTabOutput {
 }
 
 impl StructureTab {
+    fn show_table_default_collation(&self, collations: &[String], supported: bool) {
+        let visible = supported && !collations.is_empty() && matches!(*self.mode.borrow(), StructureMode::New);
+        self.table_collation_row.set_visible(visible);
+        if !visible {
+            return;
+        }
+        let default_label = bookie_app_services::tr!("Server default");
+        let labels: Vec<&str> = std::iter::once(default_label.as_str())
+            .chain(collations.iter().map(String::as_str))
+            .collect();
+        *self.table_collation_choices.borrow_mut() = collations.to_vec();
+        self.suppress_emit.set(true);
+        self.table_collation_row.set_model(Some(&gtk::StringList::new(&labels)));
+        self.table_collation_row.set_selected(0);
+        self.suppress_emit.set(false);
+    }
+
     /// Compute the pending-op list from the diff between original
     /// snapshot and current model state. The single source of truth
     /// for "what will Save emit?". Pure function on the live state.
@@ -263,6 +289,7 @@ impl StructureTab {
                 columns,
                 indexes: self.indexes.borrow().clone(),
                 fks: self.foreign_keys.borrow().clone(),
+                default_collation: self.default_collation.borrow().clone(),
             }];
         }
         diff_to_ops(
@@ -693,6 +720,12 @@ impl SimpleComponent for StructureTab {
             .margin_end(12)
             .build();
         name_row.add(&name_entry);
+        let table_collation_row = adw::ComboRow::builder()
+            .title(bookie_app_services::tr!("Default collation"))
+            .enable_search(true)
+            .visible(false)
+            .build();
+        name_row.add(&table_collation_row);
         name_row.set_visible(matches!(init.mode, StructureMode::New));
         editor_box.append(&name_row);
         editor_box.append(&view_switcher);
@@ -793,6 +826,19 @@ impl SimpleComponent for StructureTab {
         // Wire the table-name entry to push RenameTable / propagate to
         // the model.
         let suppress_emit = Rc::new(Cell::new(false));
+        let table_collation_choices = Rc::new(RefCell::new(Vec::<String>::new()));
+        {
+            let sender_for_collation = sender.clone();
+            let suppress_for_collation = suppress_emit.clone();
+            let choices = table_collation_choices.clone();
+            table_collation_row.connect_selected_notify(move |row| {
+                if suppress_for_collation.get() {
+                    return;
+                }
+                let choice = columns::collation_selection(&choices.borrow(), row.selected());
+                sender_for_collation.input(StructureTabInput::TableCollationEdited(choice));
+            });
+        }
         let sender_for_name = sender.clone();
         let suppress_for_name = suppress_emit.clone();
         name_entry.connect_changed(move |e| {
@@ -811,6 +857,9 @@ impl SimpleComponent for StructureTab {
         if matches!(init.mode, StructureMode::Edit) && !init.defer_initial_fetch {
             let _ = sender.output(StructureTabOutput::FetchStructure);
         }
+        if matches!(init.mode, StructureMode::New) {
+            let _ = sender.output(StructureTabOutput::FetchCollations);
+        }
 
         let model = StructureTab {
             structure_trackers: init.structure_trackers,
@@ -824,6 +873,9 @@ impl SimpleComponent for StructureTab {
             supports_index_metadata: false,
             supports_foreign_key_metadata: false,
             collations: Rc::from(Vec::new()),
+            default_collation: Rc::new(RefCell::new(None)),
+            table_collation_choices,
+            table_collation_row,
             columns: Rc::new(RefCell::new(Vec::new())),
             indexes: Rc::new(RefCell::new(Vec::new())),
             foreign_keys: Rc::new(RefCell::new(Vec::new())),
@@ -882,6 +934,21 @@ impl SimpleComponent for StructureTab {
                 self.refetching.set(false);
                 self.recompute_dirty_state(&sender);
                 sender.input(StructureTabInput::Refresh);
+            }
+            StructureTabInput::CollationsLoaded {
+                collations,
+                table_default_supported,
+            } => {
+                self.show_table_default_collation(&collations, table_default_supported);
+                self.collations = Rc::from(collations);
+                sender.input(StructureTabInput::Refresh);
+            }
+            StructureTabInput::TableCollationEdited(collation) => {
+                if *self.default_collation.borrow() == collation {
+                    return;
+                }
+                *self.default_collation.borrow_mut() = collation;
+                self.recompute_dirty_state(&sender);
             }
             StructureTabInput::LoadFailed(message) => {
                 // Surface the driver error inline on the StatusPage —
@@ -1161,5 +1228,7 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod default_collation_tests;
 #[cfg(test)]
 mod lifetime_tests;

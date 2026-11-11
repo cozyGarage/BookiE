@@ -231,31 +231,57 @@ class CiJobCleanupTests(unittest.TestCase):
             self.assertFalse((workspace / "src").exists())
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
-        job = runner_jobs(WORKFLOWS[0])["pg-dump"]
-        self.assertIn("TMPDIR: ${{ github.workspace }}/.tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
+        job = runner_jobs(WORKFLOWS[0])["driver"]
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", job)
+        self.assertNotIn(".tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
             workspace.mkdir()
             job_tmp = workspace / ".tmp-pg-dump-123-2"
             job_tmp.mkdir()
             (job_tmp / "temporary-data").touch()
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, subprocess, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+                "target = sys.argv[-1]\n"
+                "if target != '/var/cache/ci/tmp/bookie-driver-123-2-core':\n"
+                "    subprocess.run(['/usr/bin/rm', *sys.argv[1:]], check=True)\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            child_env = {
+                **os.environ,
+                "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                "GITHUB_RUN_ID": "123",
+                "GITHUB_RUN_ATTEMPT": "2",
+                "GITHUB_JOB": "driver",
+                "GITHUB_WORKSPACE": str(workspace),
+                "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
+                "TMPDIR": "/var/cache/ci/tmp/bookie-driver-123-2-core",
+                "RM_CALLS": str(calls),
+            }
+            child_env.pop("BASH_ENV", None)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 cwd=workspace,
-                env={
-                    **os.environ,
-                    "GITHUB_RUN_ID": "123",
-                    "GITHUB_RUN_ATTEMPT": "2",
-                    "GITHUB_WORKSPACE": str(workspace),
-                    "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
-                    "TMPDIR": str(job_tmp),
-                },
+                env=child_env,
                 capture_output=True,
                 text=True,
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertFalse(job_tmp.exists())
+            self.assertFalse(
+                job_tmp.exists(),
+                f"cleanup output: {result.stdout}\ncleanup errors: {result.stderr}\nrm calls: {calls.read_text(encoding='utf-8')}",
+            )
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertIn(["-rf", "--", "/var/cache/ci/tmp/bookie-driver-123-2-core"], rm_calls)
 
     def test_driver_finalizer_removes_only_its_scoped_scratch_path(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -271,7 +297,7 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             rm.chmod(0o755)
-            scratch = "/var/cache/ci/tmp/bookie-driver-123-2-mysql"
+            scratch = "/var/cache/ci/tmp/bookie-driver-123-2-core"
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 env={
