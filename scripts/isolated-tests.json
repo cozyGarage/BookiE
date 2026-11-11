@@ -1895,6 +1895,21 @@
     [
       "bookie-app",
       "--lib",
+      "ui::structure_tab::default_collation_tests::a_driver_without_table_level_collations_never_shows_the_default_collation_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::a_new_table_tab_offers_a_default_collation_when_the_driver_supports_one"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::choosing_a_default_collation_puts_it_in_the_create_table_statement"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::structure_tab::lifetime_tests::closing_a_structure_tab_releases_its_generated_views"
     ],
     [

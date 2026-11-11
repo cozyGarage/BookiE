@@ -1002,6 +1002,9 @@ impl App {
         let sender_for_cmd = sender.clone();
         let connection_id = self.connection_id;
         let database = self.database.clone();
+        let table_default_supported =
+            crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id())
+                .supports_table_default_collation;
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         sender.command(move |_, shutdown| {
@@ -1022,22 +1025,24 @@ impl App {
                     sender_for_cmd.input(AppMsg::CollationsLoaded {
                         tab_id,
                         collations: collations.into_iter().map(|collation| collation.name).collect(),
+                        table_default_supported,
                     });
                 })
                 .drop_on_shutdown()
         });
     }
 
-    pub(super) fn on_collations_loaded(&self, tab_id: Uuid, collations: Vec<String>) {
+    pub(super) fn on_collations_loaded(&self, tab_id: Uuid, collations: Vec<String>, table_default_supported: bool) {
         if let Some(controller) = self
             .workspace_tabs
             .borrow()
             .get(&tab_id)
             .and_then(|t| t.structure_controller())
         {
-            let _ = controller
-                .sender()
-                .send(StructureTabInput::CollationsLoaded(collations));
+            let _ = controller.sender().send(StructureTabInput::CollationsLoaded {
+                collations,
+                table_default_supported,
+            });
         }
     }
 
