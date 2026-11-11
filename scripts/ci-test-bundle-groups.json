@@ -11,7 +11,7 @@
       "test": ["bookie-app", "bookie-mcp", "bookie-policy"]
     },
     "driver-core": {
-      "test": ["bookie-driver-mssql", "bookie-driver-mysql", "bookie-driver-postgres"]
+      "test": ["bookie-app-services", "bookie-dump", "bookie-driver-mssql", "bookie-driver-mysql", "bookie-driver-postgres"]
     },
     "driver-analytics": {
       "test": ["bookie-driver-clickhouse", "bookie-driver-mongodb", "bookie-driver-redis"]

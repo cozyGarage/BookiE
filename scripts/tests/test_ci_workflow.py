@@ -215,6 +215,10 @@ class CiWorkflowTests(unittest.TestCase):
         for group in ("driver-core", "driver-analytics", "driver-extended"):
             self.assertTrue(bundle_groups[group]["test"])
 
+    def test_forgejo_driver_core_bundle_includes_pg_dump_targets(self):
+        bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertTrue({"bookie-app-services", "bookie-dump"} <= set(bundle_groups["driver-core"]["test"]))
+
     def test_forgejo_workflow_and_actionlint_config_changes_run_contract_checks(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
 
