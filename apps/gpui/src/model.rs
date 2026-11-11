@@ -1,11 +1,9 @@
-use tokio_util::sync::CancellationToken;
-
 pub const ALLOWED_ROWS: [u64; 3] = [150_000, 500_000, 1_000_000];
 pub const DEFAULT_ROWS: u64 = 1_000_000;
 pub const MAX_FIND_MATCHES: usize = 10_000;
 pub const MAX_DIFF_ROWS: usize = 200;
-pub const PAGE_ROWS: u64 = 5_000;
-pub const PAGE_SIZES: [u64; 4] = [500, 1_000, 5_000, 20_000];
+pub const PAGE_ROWS: u64 = bookie_results::result_page::DEFAULT_PAGE_ROWS;
+pub const PAGE_SIZES: [u64; 4] = bookie_results::result_page::PAGE_SIZES;
 pub const TYPED_KINDS: u64 = 12;
 
 /// A cell is the core value: one type for the grid, the copy formats and the drivers.
@@ -140,23 +138,20 @@ pub struct ColumnMeta {
     pub name: String,
     pub width: f32,
     pub numeric: bool,
-    /// The declared type name, parsed the same way as an edit of this column.
-    pub data_type: String,
 }
 
 pub fn synthetic_columns() -> Vec<ColumnMeta> {
     [
-        ("value", 240.0, true, "integer"),
-        ("label", 280.0, false, "text"),
-        ("state", 120.0, false, "boolean"),
-        ("typed", 320.0, false, "text"),
+        ("value", 240.0, true),
+        ("label", 280.0, false),
+        ("state", 120.0, false),
+        ("typed", 320.0, false),
     ]
     .into_iter()
-    .map(|(name, width, numeric, data_type)| ColumnMeta {
+    .map(|(name, width, numeric)| ColumnMeta {
         name: name.into(),
         width,
         numeric,
-        data_type: data_type.into(),
     })
     .collect()
 }
@@ -219,6 +214,8 @@ pub struct DiffSummary {
     pub added: u64,
     pub removed: u64,
     pub changed: u64,
+    /// Rows that could not be compared exactly (an unreadable cell on either side).
+    pub unknown: u64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -242,161 +239,13 @@ fn right_state(index: u64) -> &'static str {
     }
 }
 
-pub fn build_diff(total: u64, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
-    if cancel.is_cancelled() {
-        return Err("comparison cancelled");
-    }
-    let mut summary = DiffSummary {
-        keyed,
-        ..DiffSummary::default()
-    };
-    let mut rows: Vec<DiffRow> = Vec::new();
-    let mut capped = false;
-    for index in 0..total {
-        if index.is_multiple_of(1_024) && cancel.is_cancelled() {
-            return Err("comparison cancelled");
-        }
-        let mut produced: Vec<(&'static str, Vec<Cell>)> = Vec::new();
-        let original = label_of(index);
-        let edited = format!("{original} (edited)");
-        match right_state(index) {
-            "same" => summary.equal += 1,
-            "dropped" => {
-                summary.removed += 1;
-                produced.push(("Removed", cells_of(index, &original)));
-            }
-            _ if keyed => {
-                summary.changed += 1;
-                produced.push(("Before", cells_of(index, &original)));
-                produced.push(("After", cells_of(index, &edited)));
-            }
-            _ => {
-                summary.removed += 1;
-                summary.added += 1;
-                produced.push(("Removed", cells_of(index, &original)));
-                produced.push(("Added", cells_of(index, &edited)));
-            }
-        }
-        for (change, cells) in produced {
-            if rows.len() < MAX_DIFF_ROWS {
-                rows.push(DiffRow { change, cells });
-            } else {
-                capped = true;
-            }
-        }
-    }
-    Ok(Diff { summary, rows, capped })
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Pager {
-    pub total: u64,
-    pub page: u64,
-    pub rows: u64,
-    pub append: bool,
-}
-
-impl Pager {
-    pub fn new(total: u64) -> Self {
-        Pager {
-            total,
-            page: 0,
-            rows: PAGE_ROWS,
-            append: false,
-        }
-    }
-
-    pub fn pages(&self) -> u64 {
-        self.total.div_ceil(self.rows).max(1)
-    }
-
-    pub fn first(&mut self) {
-        if !self.append {
-            self.page = 0;
-        }
-    }
-
-    pub fn last(&mut self) {
-        self.page = self.pages() - 1;
-    }
-
-    pub fn next(&mut self) {
-        self.page = (self.page + 1).min(self.pages() - 1);
-    }
-
-    pub fn previous(&mut self) {
-        if !self.append {
-            self.page = self.page.saturating_sub(1);
-        }
-    }
-
-    pub fn window(&self) -> (u64, u64) {
-        if self.total == 0 {
-            return (0, 0);
-        }
-        let end = ((self.page + 1) * self.rows).min(self.total);
-        if self.append {
-            (0, end)
-        } else {
-            (self.page * self.rows, end)
-        }
-    }
-
-    pub fn range(&self) -> (u64, u64) {
-        let (start, end) = self.window();
-        if self.total == 0 { (0, 0) } else { (start + 1, end) }
-    }
-
-    pub fn contains_row(&mut self, row: u64) {
-        self.page = (row / self.rows).min(self.pages() - 1);
-    }
-
-    pub fn with_total(self, total: u64) -> Self {
-        Pager { total, page: 0, ..self }
-    }
-
-    pub fn resized(self, rows: u64) -> Self {
-        let first_row = self.page * self.rows;
-        let mut next = Pager { rows, page: 0, ..self };
-        next.page = (first_row / rows).min(next.pages() - 1);
-        next
+/// The right-hand side of the synthetic comparison: `None` when the row was dropped.
+pub fn right_row(index: u64) -> Option<Vec<Cell>> {
+    match right_state(index) {
+        "dropped" => None,
+        "edited" => Some(cells_of(index, &format!("{} (edited)", label_of(index)))),
+        _ => Some(row_at(index)),
     }
 }
 
-#[derive(Debug, Default)]
-pub struct MatchCursor {
-    pub matches: Vec<u64>,
-    pub current: Option<usize>,
-}
-
-impl MatchCursor {
-    pub fn set(&mut self, matches: Vec<u64>) {
-        self.matches = matches;
-        self.current = None;
-    }
-
-    pub fn step(&mut self, forward: bool) -> Option<u64> {
-        let count = self.matches.len();
-        if count == 0 {
-            return None;
-        }
-        let next = match (self.current, forward) {
-            (None, true) => 0,
-            (None, false) => count - 1,
-            (Some(index), true) => (index + 1) % count,
-            (Some(index), false) => (index + count - 1) % count,
-        };
-        self.current = Some(next);
-        self.matches.get(next).copied()
-    }
-
-    pub fn status(&self, capped: bool) -> String {
-        let count = self.matches.len();
-        if count == 0 {
-            return "No match".into();
-        }
-        let shown = self.current.map_or(0, |index| index + 1);
-        let more = if capped { "+" } else { "" };
-        format!("Match {shown} of {count}{more}")
-    }
-}
+pub use bookie_results::result_page::{MatchCursor, Pager};

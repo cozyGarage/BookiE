@@ -70,10 +70,10 @@ impl CardText {
 fn row(context: &pango::Context, column: &DiagramColumn) -> RowText {
     let mut badges = Vec::new();
     if column.primary_key {
-        badges.push(crate::tr!("PK"));
+        badges.push(bookie_app_services::tr!("PK"));
     }
     if column.foreign_key {
-        badges.push(crate::tr!("FK"));
+        badges.push(bookie_app_services::tr!("FK"));
     }
     let badge = (!badges.is_empty()).then(|| text(context, &badges.join(" "), MAX_NAME, Style::Badge));
     RowText {

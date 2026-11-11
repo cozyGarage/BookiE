@@ -7,36 +7,36 @@ use super::{App, AppMsg};
 pub(super) fn primary_menu_model() -> gio::Menu {
     let menu = gio::Menu::new();
     let connection_section = gio::Menu::new();
-    let disconnect_item = gio::MenuItem::new(Some(&crate::tr!("Disconnect")), Some("win.disconnect"));
+    let disconnect_item = gio::MenuItem::new(Some(&bookie_app_services::tr!("Disconnect")), Some("win.disconnect"));
     disconnect_item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
     connection_section.append_item(&disconnect_item);
-    connection_section.append(Some(&crate::tr!("Back Up Database…")), Some("win.back-up-database"));
-    connection_section.append(Some(&crate::tr!("Restore from Backup…")), Some("win.restore-database"));
+    connection_section.append(Some(&bookie_app_services::tr!("Back Up Database…")), Some("win.back-up-database"));
+    connection_section.append(Some(&bookie_app_services::tr!("Restore from Backup…")), Some("win.restore-database"));
     menu.append_section(None, &connection_section);
     let query_section = gio::Menu::new();
-    query_section.append(Some(&crate::tr!("Open Quickly")), Some("win.open-quickly"));
-    query_section.append(Some(&crate::tr!("Jump to Column…")), Some("win.jump-column"));
+    query_section.append(Some(&bookie_app_services::tr!("Open Quickly")), Some("win.open-quickly"));
+    query_section.append(Some(&bookie_app_services::tr!("Jump to Column…")), Some("win.jump-column"));
     query_section.append(
-        Some(&crate::tr!("Reveal Table in Sidebar")),
+        Some(&bookie_app_services::tr!("Reveal Table in Sidebar")),
         Some("win.reveal-in-sidebar"),
     );
-    query_section.append(Some(&crate::tr!("Save Query as Favorite")), Some("win.save-favorite"));
+    query_section.append(Some(&bookie_app_services::tr!("Save Query as Favorite")), Some("win.save-favorite"));
     menu.append_section(None, &query_section);
     let history_section = gio::Menu::new();
-    history_section.append(Some(&crate::tr!("Query History")), Some("win.show-history"));
-    history_section.append(Some(&crate::tr!("Server Activity")), Some("win.show-activity"));
-    history_section.append(Some(&crate::tr!("Audit Log")), Some("win.show-audit"));
-    history_section.append(Some(&crate::tr!("Catalog")), Some("win.show-catalog"));
-    history_section.append(Some(&crate::tr!("Explain query")), Some("win.explain-query"));
+    history_section.append(Some(&bookie_app_services::tr!("Query History")), Some("win.show-history"));
+    history_section.append(Some(&bookie_app_services::tr!("Server Activity")), Some("win.show-activity"));
+    history_section.append(Some(&bookie_app_services::tr!("Audit Log")), Some("win.show-audit"));
+    history_section.append(Some(&bookie_app_services::tr!("Catalog")), Some("win.show-catalog"));
+    history_section.append(Some(&bookie_app_services::tr!("Explain query")), Some("win.explain-query"));
     menu.append_section(None, &history_section);
     let prefs_section = gio::Menu::new();
-    prefs_section.append(Some(&crate::tr!("Preferences")), Some("win.preferences"));
-    prefs_section.append(Some(&crate::tr!("New Window")), Some("win.new-window"));
+    prefs_section.append(Some(&bookie_app_services::tr!("Preferences")), Some("win.preferences"));
+    prefs_section.append(Some(&bookie_app_services::tr!("New Window")), Some("win.new-window"));
     menu.append_section(None, &prefs_section);
     let app_section = gio::Menu::new();
-    app_section.append(Some(&crate::tr!("Keyboard Shortcuts")), Some("win.shortcuts"));
-    app_section.append(Some(&crate::tr!("About BookiE")), Some("win.about"));
-    app_section.append(Some(&crate::tr!("Quit")), Some("win.quit"));
+    app_section.append(Some(&bookie_app_services::tr!("Keyboard Shortcuts")), Some("win.shortcuts"));
+    app_section.append(Some(&bookie_app_services::tr!("About BookiE")), Some("win.about"));
+    app_section.append(Some(&bookie_app_services::tr!("Quit")), Some("win.quit"));
     menu.append_section(None, &app_section);
     menu
 }
@@ -222,109 +222,109 @@ fn make_shortcut(trigger: &str, action: &str) -> gtk::Shortcut {
 
 pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
     let dialog = adw::ShortcutsDialog::builder()
-        .title(crate::tr!("Keyboard Shortcuts"))
+        .title(bookie_app_services::tr!("Keyboard Shortcuts"))
         .build();
     add_shortcut_group(
         &dialog,
-        &crate::tr!("General"),
+        &bookie_app_services::tr!("General"),
         &[
-            ("<Primary>e", crate::tr!("Open SQL editor")),
-            ("<Primary>j", crate::tr!("Show or hide query results in the editor")),
-            ("<Primary>o", crate::tr!("Open a SQL file in a new editor tab")),
-            ("F5", crate::tr!("Refresh table")),
-            ("<Primary><Shift>r", crate::tr!("Refresh tables sidebar")),
-            ("<Primary>comma", crate::tr!("Open Preferences")),
-            ("<Primary>h", crate::tr!("Open Query History")),
-            ("<Primary>p", crate::tr!("Open Quickly: favorites and open tabs")),
-            ("<Primary><Shift>l", crate::tr!("Reveal the open table in the sidebar")),
-            ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
-            ("<Primary><Shift>b", crate::tr!("Manage saved queries")),
-            ("<Primary><Shift>e", crate::tr!("Export Results")),
-            ("<Primary>question", crate::tr!("Show keyboard shortcuts")),
-            ("<Primary>q", crate::tr!("Quit")),
+            ("<Primary>e", bookie_app_services::tr!("Open SQL editor")),
+            ("<Primary>j", bookie_app_services::tr!("Show or hide query results in the editor")),
+            ("<Primary>o", bookie_app_services::tr!("Open a SQL file in a new editor tab")),
+            ("F5", bookie_app_services::tr!("Refresh table")),
+            ("<Primary><Shift>r", bookie_app_services::tr!("Refresh tables sidebar")),
+            ("<Primary>comma", bookie_app_services::tr!("Open Preferences")),
+            ("<Primary>h", bookie_app_services::tr!("Open Query History")),
+            ("<Primary>p", bookie_app_services::tr!("Open Quickly: favorites and open tabs")),
+            ("<Primary><Shift>l", bookie_app_services::tr!("Reveal the open table in the sidebar")),
+            ("<Primary>d", bookie_app_services::tr!("Save the editor query as a favorite")),
+            ("<Primary><Shift>b", bookie_app_services::tr!("Manage saved queries")),
+            ("<Primary><Shift>e", bookie_app_services::tr!("Export Results")),
+            ("<Primary>question", bookie_app_services::tr!("Show keyboard shortcuts")),
+            ("<Primary>q", bookie_app_services::tr!("Quit")),
         ],
     );
     add_shortcut_group(
         &dialog,
-        &crate::tr!("Browse table"),
+        &bookie_app_services::tr!("Browse table"),
         &[
-            ("F2", crate::tr!("Edit focused cell (or press Return)")),
-            ("Tab", crate::tr!("Move to next cell (commits if editing)")),
-            ("<Shift>Tab", crate::tr!("Move to previous cell (commits if editing)")),
-            ("Left", crate::tr!("Move to previous cell")),
-            ("Right", crate::tr!("Move to next cell")),
-            ("Up", crate::tr!("Move to cell above")),
-            ("Down", crate::tr!("Move to cell below")),
-            ("space", crate::tr!("Toggle boolean cell")),
-            ("<Primary>n", crate::tr!("Insert row")),
-            ("Delete", crate::tr!("Delete selected row")),
-            ("<Primary><Shift>n", crate::tr!("Set focused cell to NULL")),
-            ("<Primary>f", crate::tr!("Filter rows")),
-            ("<Primary><Shift>j", crate::tr!("Jump to Column (focused grid)")),
-            ("<Primary><Alt>f", crate::tr!("Find in loaded rows (focused grid)")),
-            ("<Primary>equal", crate::tr!("Increase result grid font size")),
-            ("<Primary>minus", crate::tr!("Decrease result grid font size")),
-            ("<Primary>0", crate::tr!("Reset result grid font size")),
-            ("<Primary>a", crate::tr!("Select all rows")),
-            ("<Primary>c", crate::tr!("Copy selected rows as TSV")),
-            ("Page_Up", crate::tr!("Previous page")),
-            ("Page_Down", crate::tr!("Next page")),
-            ("<Primary>Home", crate::tr!("Jump to first row of page")),
-            ("<Primary>End", crate::tr!("Jump to last row of page")),
+            ("F2", bookie_app_services::tr!("Edit focused cell (or press Return)")),
+            ("Tab", bookie_app_services::tr!("Move to next cell (commits if editing)")),
+            ("<Shift>Tab", bookie_app_services::tr!("Move to previous cell (commits if editing)")),
+            ("Left", bookie_app_services::tr!("Move to previous cell")),
+            ("Right", bookie_app_services::tr!("Move to next cell")),
+            ("Up", bookie_app_services::tr!("Move to cell above")),
+            ("Down", bookie_app_services::tr!("Move to cell below")),
+            ("space", bookie_app_services::tr!("Toggle boolean cell")),
+            ("<Primary>n", bookie_app_services::tr!("Insert row")),
+            ("Delete", bookie_app_services::tr!("Delete selected row")),
+            ("<Primary><Shift>n", bookie_app_services::tr!("Set focused cell to NULL")),
+            ("<Primary>f", bookie_app_services::tr!("Filter rows")),
+            ("<Primary><Shift>j", bookie_app_services::tr!("Jump to Column (focused grid)")),
+            ("<Primary><Alt>f", bookie_app_services::tr!("Find in loaded rows (focused grid)")),
+            ("<Primary>equal", bookie_app_services::tr!("Increase result grid font size")),
+            ("<Primary>minus", bookie_app_services::tr!("Decrease result grid font size")),
+            ("<Primary>0", bookie_app_services::tr!("Reset result grid font size")),
+            ("<Primary>a", bookie_app_services::tr!("Select all rows")),
+            ("<Primary>c", bookie_app_services::tr!("Copy selected rows as TSV")),
+            ("Page_Up", bookie_app_services::tr!("Previous page")),
+            ("Page_Down", bookie_app_services::tr!("Next page")),
+            ("<Primary>Home", bookie_app_services::tr!("Jump to first row of page")),
+            ("<Primary>End", bookie_app_services::tr!("Jump to last row of page")),
         ],
     );
     add_shortcut_group(
         &dialog,
-        &crate::tr!("Row selection"),
+        &bookie_app_services::tr!("Row selection"),
         &[
-            ("Shift-click", crate::tr!("Extend selection to the clicked row")),
-            ("Ctrl-click", crate::tr!("Toggle the clicked row in selection")),
+            ("Shift-click", bookie_app_services::tr!("Extend selection to the clicked row")),
+            ("Ctrl-click", bookie_app_services::tr!("Toggle the clicked row in selection")),
         ],
     );
     add_shortcut_group(
         &dialog,
-        &crate::tr!("SQL editor"),
+        &bookie_app_services::tr!("SQL editor"),
         &[
-            ("<Primary><Alt>g", crate::tr!("Focus result grid")),
-            ("<Primary><Alt>e", crate::tr!("Focus SQL editor")),
-            ("<Primary>Return", crate::tr!("Run query")),
-            ("<Primary><Shift>Return", crate::tr!("Run statement at cursor")),
-            ("<Primary><Shift>s", crate::tr!("Save the SQL file as")),
-            ("<Primary>slash", crate::tr!("Toggle line comment")),
-            ("<Primary><Shift>bracketleft", crate::tr!("Fold SQL block at cursor")),
-            ("<Primary><Shift>bracketright", crate::tr!("Unfold all SQL blocks")),
-            ("<Primary>F2", crate::tr!("Toggle bookmark on the current line")),
-            ("<Primary><Shift>Down", crate::tr!("Jump to the next bookmark")),
-            ("<Primary><Shift>Up", crate::tr!("Jump to the previous bookmark")),
-            ("<Primary>t", crate::tr!("New editor tab")),
-            ("<Primary>w", crate::tr!("Close current tab or window")),
-            ("<Primary>Tab", crate::tr!("Switch to the most recently used tab")),
-            ("<Primary><Shift>Tab", crate::tr!("Previous editor tab")),
-            ("<Primary><Shift>t", crate::tr!("Reopen last closed tab")),
-            ("<Primary><Shift>f", crate::tr!("Format SQL")),
-            ("<Alt><Shift>Down", crate::tr!("Jump to the next statement")),
-            ("<Alt><Shift>Up", crate::tr!("Jump to the previous statement")),
+            ("<Primary><Alt>g", bookie_app_services::tr!("Focus result grid")),
+            ("<Primary><Alt>e", bookie_app_services::tr!("Focus SQL editor")),
+            ("<Primary>Return", bookie_app_services::tr!("Run query")),
+            ("<Primary><Shift>Return", bookie_app_services::tr!("Run statement at cursor")),
+            ("<Primary><Shift>s", bookie_app_services::tr!("Save the SQL file as")),
+            ("<Primary>slash", bookie_app_services::tr!("Toggle line comment")),
+            ("<Primary><Shift>bracketleft", bookie_app_services::tr!("Fold SQL block at cursor")),
+            ("<Primary><Shift>bracketright", bookie_app_services::tr!("Unfold all SQL blocks")),
+            ("<Primary>F2", bookie_app_services::tr!("Toggle bookmark on the current line")),
+            ("<Primary><Shift>Down", bookie_app_services::tr!("Jump to the next bookmark")),
+            ("<Primary><Shift>Up", bookie_app_services::tr!("Jump to the previous bookmark")),
+            ("<Primary>t", bookie_app_services::tr!("New editor tab")),
+            ("<Primary>w", bookie_app_services::tr!("Close current tab or window")),
+            ("<Primary>Tab", bookie_app_services::tr!("Switch to the most recently used tab")),
+            ("<Primary><Shift>Tab", bookie_app_services::tr!("Previous editor tab")),
+            ("<Primary><Shift>t", bookie_app_services::tr!("Reopen last closed tab")),
+            ("<Primary><Shift>f", bookie_app_services::tr!("Format SQL")),
+            ("<Alt><Shift>Down", bookie_app_services::tr!("Jump to the next statement")),
+            ("<Alt><Shift>Up", bookie_app_services::tr!("Jump to the previous statement")),
         ],
     );
     add_shortcut_group(
         &dialog,
-        &crate::tr!("Context-sensitive actions"),
+        &bookie_app_services::tr!("Context-sensitive actions"),
         &[
             (
                 "<Primary>s",
-                crate::tr!("Save grid edits, the SQL file, or table structure changes"),
+                bookie_app_services::tr!("Save grid edits, the SQL file, or table structure changes"),
             ),
             (
                 "<Primary>z",
-                crate::tr!("Undo a grid, SQL editor, or table structure change"),
+                bookie_app_services::tr!("Undo a grid, SQL editor, or table structure change"),
             ),
             (
                 "<Primary>y",
-                crate::tr!("Redo the current change (or press Ctrl+Shift+Z)"),
+                bookie_app_services::tr!("Redo the current change (or press Ctrl+Shift+Z)"),
             ),
             (
                 "Escape",
-                crate::tr!("Cancel editing or a query, clear selection, or close a dialog"),
+                bookie_app_services::tr!("Cancel editing or a query, clear selection, or close a dialog"),
             ),
         ],
     );
@@ -348,11 +348,11 @@ fn add_shortcut_group(dialog: &adw::ShortcutsDialog, title: &str, entries: &[(&s
 
 fn localized_browse_key(key: &str) -> String {
     match key {
-        "Left" => crate::tr!("Left"),
-        "Right" => crate::tr!("Right"),
-        "space" => crate::tr!("space"),
-        "Shift-click" => crate::tr!("Shift-click"),
-        "Ctrl-click" => crate::tr!("Ctrl-click"),
+        "Left" => bookie_app_services::tr!("Left"),
+        "Right" => bookie_app_services::tr!("Right"),
+        "space" => bookie_app_services::tr!("space"),
+        "Shift-click" => bookie_app_services::tr!("Shift-click"),
+        "Ctrl-click" => bookie_app_services::tr!("Ctrl-click"),
         other => other.to_string(),
     }
 }

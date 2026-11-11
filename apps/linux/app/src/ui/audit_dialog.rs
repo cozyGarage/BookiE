@@ -10,7 +10,7 @@ use crate::services::audit_view::{
     status_label,
 };
 use crate::services::database_service::DatabaseService;
-use crate::tr;
+use bookie_app_services::tr;
 
 const RECENT_RECORDS: usize = 1_000;
 

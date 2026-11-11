@@ -319,11 +319,11 @@ pub fn labels() -> Vec<String> {
 
 fn label(theme: ThemePref) -> String {
     match theme {
-        ThemePref::Default => crate::tr!("Default"),
-        ThemePref::Ledger => crate::tr!("Ledger"),
-        ThemePref::Catppuccin => crate::tr!("Catppuccin"),
-        ThemePref::Tokyo => crate::tr!("Tokyo Night"),
-        ThemePref::Gruvbox => crate::tr!("Gruvbox"),
+        ThemePref::Default => bookie_app_services::tr!("Default"),
+        ThemePref::Ledger => bookie_app_services::tr!("Ledger"),
+        ThemePref::Catppuccin => bookie_app_services::tr!("Catppuccin"),
+        ThemePref::Tokyo => bookie_app_services::tr!("Tokyo Night"),
+        ThemePref::Gruvbox => bookie_app_services::tr!("Gruvbox"),
     }
 }
 

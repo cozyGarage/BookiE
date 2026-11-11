@@ -101,8 +101,8 @@ pub(super) fn install_window_lifecycle(
         // with no UI feedback.
         if !force_close_for_close.get() && in_flight_saves_for_close.get() > 0 {
             let dialog = adw::AlertDialog::new(
-                Some(&crate::tr!("Saving in progress")),
-                Some(&crate::tr!(
+                Some(&bookie_app_services::tr!("Saving in progress")),
+                Some(&bookie_app_services::tr!(
                     "Waiting for pending saves to finish before closing the window."
                 )),
             );
@@ -143,13 +143,13 @@ pub(super) fn install_window_lifecycle(
             // to {name}"); window close groups across N tabs so
             // it stays generic.
             let dialog = adw::AlertDialog::new(None, None);
-            dialog.set_heading(Some(&crate::tr!("Save changes before closing?")));
-            dialog.set_body(&crate::tr!(
+            dialog.set_heading(Some(&bookie_app_services::tr!("Save changes before closing?")));
+            dialog.set_body(&bookie_app_services::tr!(
                 "One or more tabs have unsaved changes. They will be permanently lost if you discard them."
             ));
-            dialog.add_response("cancel", &crate::tr!("Cancel"));
-            dialog.add_response("discard", &crate::tr!("Discard"));
-            dialog.add_response("save", &crate::tr!("Save"));
+            dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+            dialog.add_response("discard", &bookie_app_services::tr!("Discard"));
+            dialog.add_response("save", &bookie_app_services::tr!("Save"));
             dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
             dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
             dialog.set_default_response(Some("save"));
@@ -259,12 +259,12 @@ pub(super) fn install_window_lifecycle(
                                 workspace_flush_in_progress_for_poll.set(false);
                                 window_for_flush.set_sensitive(true);
                                 let dialog = adw::AlertDialog::new(
-                                    Some(&crate::tr!("Could not save workspace")),
-                                    Some(&crate::tr!(
+                                    Some(&bookie_app_services::tr!("Could not save workspace")),
+                                    Some(&bookie_app_services::tr!(
                                         "The window will remain open so you can retry without losing your workspace."
                                     )),
                                 );
-                                dialog.add_response("close", &crate::tr!("Close"));
+                                dialog.add_response("close", &bookie_app_services::tr!("Close"));
                                 dialog.present(Some(&window_for_flush));
                                 glib::ControlFlow::Break
                             }

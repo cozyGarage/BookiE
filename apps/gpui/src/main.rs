@@ -11,17 +11,20 @@ mod render;
 mod text_input;
 mod ui_theme;
 
-use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
-use bookie_gpui::cursor::Cursor;
+use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
+use bookie_gpui::core_bridge::column_infos_for;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
 use bookie_gpui::model::*;
 use bookie_gpui::palette::{Action, matches as palette_matches, step as palette_step};
-use bookie_gpui::selection::{Selection, copy_tsv};
-use bookie_gpui::shell::{Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag};
+use bookie_gpui::selection::Selection;
+use bookie_gpui::shell::{
+    Catalog, DEFAULT_RESULT_RATIO, ResultView, Run, Tab, Tabs, next_run, result_ratio_from_drag, table_label,
+};
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
+use bookie_results::grid_cursor::Cursor;
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
     ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,
@@ -247,7 +250,7 @@ impl GridView {
             window,
             |this: &mut Self, _, event: &gpui_kit::component::table::TableEvent, window, cx| match event {
                 gpui_kit::component::table::TableEvent::SelectCell(row, column) => {
-                    let cursor = bookie_gpui::cursor::Cursor {
+                    let cursor = bookie_results::grid_cursor::Cursor {
                         row: *row,
                         column: *column,
                     };
@@ -411,7 +414,8 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let text = copy_tsv(self.selected_rows(selection), with_headers);
+        let columns = column_infos_for(self.source.columns());
+        let text = result_copy::tsv(&columns, self.selected_rows(selection), with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
         self.status = format!(
@@ -436,13 +440,14 @@ impl GridView {
             .live
             .as_ref()
             .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
+        let columns = column_infos_for(self.source.columns());
         let context = CopyContext {
-            columns: self.source.columns(),
+            columns: &columns,
             driver_id: &driver_id,
-            table: &self.catalog.grid_table,
+            target: (!self.grid_is_query).then(|| self.catalog.grid_table.clone()),
             column: self.cell_cursor.map_or(0, |cursor| cursor.column),
         };
-        match copy_format::render(format, &context, &rows) {
+        match result_copy::render(format, &context, &rows) {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
                 let noun = if selection.count() == 1 { "row" } else { "rows" };
@@ -1079,7 +1084,7 @@ impl GridView {
                 action("settings", "Open settings", true),
                 action(
                     "table",
-                    &format!("Open {}", self.catalog.grid_table),
+                    &format!("Open {}", table_label(&self.catalog.grid_table)),
                     !self.catalog.tables.is_empty(),
                 ),
                 action(
@@ -1479,7 +1484,7 @@ fn load_keymap() -> Keymap {
 }
 
 fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
-    use bookie_gpui::live::{LiveTable, Origin};
+    use bookie_gpui::live::{LiveSession, Origin};
     let table = std::env::var("BOOKIE_PROTOTYPE_TABLE").ok()?;
     let origin = match (
         std::env::var("BOOKIE_PROTOTYPE_FILE").ok(),
@@ -1489,7 +1494,22 @@ fn live_source() -> Option<std::sync::Arc<bookie_gpui::live::LiveTable>> {
         (None, Some(connection)) => Origin::Saved(connection),
         (None, None) => return None,
     };
-    match LiveTable::load(&origin, &table, bookie_gpui::live::ROW_CAP) {
+    let session = match LiveSession::open(&origin) {
+        Ok(session) => session,
+        Err(error) => {
+            eprintln!("could not open live source: {error}");
+            std::process::exit(2);
+        }
+    };
+    let Some(target) = session
+        .tables
+        .iter()
+        .find(|candidate| candidate.name == table || table_label(candidate) == table)
+    else {
+        eprintln!("could not find table {table}");
+        std::process::exit(2);
+    };
+    match session.load_table(target, bookie_gpui::live::ROW_CAP) {
         Ok(live) => Some(std::sync::Arc::new(live)),
         Err(error) => {
             eprintln!("could not read {table}: {error}");

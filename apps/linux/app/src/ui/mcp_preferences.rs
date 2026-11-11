@@ -8,7 +8,7 @@ use std::sync::Arc;
 use bookie_mcp::{McpBridge, TokenPermissions};
 
 use crate::services::mcp_service;
-use crate::tr;
+use bookie_app_services::tr;
 
 pub fn build_page(
     database: &crate::services::database_service::DatabaseService,

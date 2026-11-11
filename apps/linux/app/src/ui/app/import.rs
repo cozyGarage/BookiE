@@ -121,8 +121,8 @@ impl App {
     pub(super) fn on_create_table_from_csv(&self, schema: Option<String>, sender: ComponentSender<Self>) {
         if !bookie_core::import::supports_table_creation(self.driver_id()) {
             self.show_error_alert(
-                &crate::tr!("Can't create a table"),
-                &crate::tr!(
+                &bookie_app_services::tr!("Can't create a table"),
+                &bookie_app_services::tr!(
                     "This connection type cannot create a table from a file. Import into an existing table instead."
                 ),
             );
@@ -133,11 +133,11 @@ impl App {
 
     fn choose_csv_file(&self, schema: Option<String>, table: Option<String>, sender: ComponentSender<Self>) {
         if let Some(message) = self.import_refusal() {
-            self.show_error_alert(&crate::tr!("Can't import"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Can't import"), &message);
             return;
         }
         let filter = gtk::FileFilter::new();
-        filter.set_name(Some(&crate::tr!("CSV and Excel files")));
+        filter.set_name(Some(&bookie_app_services::tr!("CSV and Excel files")));
         filter.add_mime_type("text/csv");
         filter.add_suffix("csv");
         filter.add_suffix("tsv");
@@ -145,7 +145,7 @@ impl App {
         let filters = gio::ListStore::new::<gtk::FileFilter>();
         filters.append(&filter);
         let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Import CSV"))
+            .title(bookie_app_services::tr!("Import CSV"))
             .modal(true)
             .default_filter(&filter)
             .filters(&filters)
@@ -166,13 +166,13 @@ impl App {
     /// file, so a refusal never arrives after the work looks under way.
     fn import_refusal(&self) -> Option<String> {
         if self.connection_id.is_none() || self.current_driver_id.is_none() {
-            return Some(crate::tr!("No active connection."));
+            return Some(bookie_app_services::tr!("No active connection."));
         }
         if self.read_only {
-            return Some(crate::tr!("This connection is open read-only."));
+            return Some(bookie_app_services::tr!("This connection is open read-only."));
         }
         if !self.database.policy_available() {
-            return Some(crate::tr!(
+            return Some(bookie_app_services::tr!(
                 "The policy rules could not be loaded, so writes are not permitted."
             ));
         }
@@ -180,7 +180,7 @@ impl App {
             .connection_id
             .is_some_and(|id| self.database.governed_writes_disabled(id))
         {
-            return Some(crate::tr!(
+            return Some(bookie_app_services::tr!(
                 "A previous operation's audit record could not be written, so writes are not permitted."
             ));
         }
@@ -199,8 +199,8 @@ impl App {
         };
         let Some(capabilities) = self.registry.get(&driver_id).map(|driver| driver.capabilities()) else {
             self.show_error_alert(
-                &crate::tr!("Can't import"),
-                &crate::tr!("This connection type is not available in this build."),
+                &bookie_app_services::tr!("Can't import"),
+                &bookie_app_services::tr!("This connection type is not available in this build."),
             );
             return;
         };
@@ -323,12 +323,12 @@ impl App {
         if cancelled {
             return;
         }
-        self.show_error_alert(&crate::tr!("Can't import"), &failure.message);
+        self.show_error_alert(&bookie_app_services::tr!("Can't import"), &failure.message);
     }
 
     pub(super) fn on_start_csv_import(&mut self, choice: ImportChoice, sender: ComponentSender<Self>) {
         if let Some(message) = self.import_refusal() {
-            self.show_error_alert(&crate::tr!("Can't import"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Can't import"), &message);
             return;
         }
         let (Some(connection_id), Some(driver_id)) = (self.connection_id, self.current_driver_id.clone()) else {
@@ -361,14 +361,14 @@ impl App {
         }
         if let Some(message) = self.import_refusal() {
             self.close_csv_import_progress();
-            self.show_error_alert(&crate::tr!("Can't import"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Can't import"), &message);
             return;
         }
         let (plan, create_sql) = match preparation.result {
             Ok(prepared) => prepared,
             Err(message) => {
                 self.close_csv_import_progress();
-                self.show_error_alert(&crate::tr!("Can't import"), &message);
+                self.show_error_alert(&bookie_app_services::tr!("Can't import"), &message);
                 return;
             }
         };
@@ -385,14 +385,14 @@ impl App {
             .guard(preparation.connection_id, bookie_policy::Principal::human_gui())
         else {
             self.close_csv_import_progress();
-            self.show_error_alert(&crate::tr!("Can't import"), &crate::tr!("No active connection."));
+            self.show_error_alert(&bookie_app_services::tr!("Can't import"), &bookie_app_services::tr!("No active connection."));
             return;
         };
         let Some(choice) = preparation.choice else {
             self.close_csv_import_progress();
             self.show_error_alert(
-                &crate::tr!("Can't import"),
-                &crate::tr!("The import plan could not be prepared."),
+                &bookie_app_services::tr!("Can't import"),
+                &bookie_app_services::tr!("The import plan could not be prepared."),
             );
             return;
         };
@@ -453,35 +453,35 @@ impl App {
                 return;
             }
             self.show_toast(
-                &crate::tr!("Imported {done} rows into {table}")
+                &bookie_app_services::tr!("Imported {done} rows into {table}")
                     .replace("{done}", &report.committed.to_string())
                     .replace("{table}", &report.table),
             );
             return;
         };
-        let message = crate::tr!("{done} of {total} rows were written to {table} before the import stopped. {error}")
+        let message = bookie_app_services::tr!("{done} of {total} rows were written to {table} before the import stopped. {error}")
             .replace("{done}", &report.committed.to_string())
             .replace("{total}", &report.total.to_string())
             .replace("{table}", &report.table)
             .replace("{error}", &error)
             + &skipped_note(report.skipped, &report.skipped_summary);
-        self.show_error_alert(&crate::tr!("Import stopped"), &message);
+        self.show_error_alert(&bookie_app_services::tr!("Import stopped"), &message);
     }
 
     fn report_skipped_rows(&self, report: &CsvImportReport) {
         self.show_toast(
-            &crate::tr!("Imported {done} rows into {table}; {skipped} skipped")
+            &bookie_app_services::tr!("Imported {done} rows into {table}; {skipped} skipped")
                 .replace("{done}", &report.committed.to_string())
                 .replace("{table}", &report.table)
                 .replace("{skipped}", &report.skipped.to_string()),
         );
         let message = skipped_rows_message(report);
-        self.show_error_alert(&crate::tr!("Import finished with skipped rows"), &message);
+        self.show_error_alert(&bookie_app_services::tr!("Import finished with skipped rows"), &message);
     }
 }
 
 fn skipped_rows_message(report: &CsvImportReport) -> String {
-    crate::tr!(
+    bookie_app_services::tr!(
         "{done} of {total} rows were written to {table}. The database rejected {skipped} rows, which were skipped and not imported."
     )
     .replace("{done}", &report.committed.to_string())
@@ -496,7 +496,7 @@ fn skipped_note(skipped: u64, summary: &str) -> String {
     if skipped == 0 {
         return String::new();
     }
-    crate::tr!("\n\n{skipped} rows were skipped before the import stopped.\n{summary}")
+    bookie_app_services::tr!("\n\n{skipped} rows were skipped before the import stopped.\n{summary}")
         .replace("{skipped}", &skipped.to_string())
         .replace("{summary}", summary)
 }
@@ -700,7 +700,7 @@ enum BatchStop {
 fn stop_message(outcome: Result<(), BatchStop>) -> Option<String> {
     match outcome {
         Ok(()) => None,
-        Err(BatchStop::Cancelled) => Some(crate::tr!("The import was cancelled.")),
+        Err(BatchStop::Cancelled) => Some(bookie_app_services::tr!("The import was cancelled.")),
         Err(BatchStop::Failed(error)) => Some(error_text::driver_message(&error)),
     }
 }
@@ -723,9 +723,9 @@ async fn prepare_import(
     let path = prepare.path.clone();
     let bytes = tokio::task::spawn_blocking(move || read_file(&path))
         .await
-        .map_err(|_| crate::tr!("The import file could not be prepared."))??;
+        .map_err(|_| bookie_app_services::tr!("The import file could not be prepared."))??;
     if control.cancellation_token().is_cancelled() {
-        return Err(crate::tr!("Import preparation was cancelled."));
+        return Err(bookie_app_services::tr!("Import preparation was cancelled."));
     }
     let format = detect_format(&bytes);
     let columns = match &prepare.table {
@@ -757,7 +757,7 @@ async fn existing_columns(
         .await
         .map_err(|error| error_text::driver_message(&error))?;
     if columns.is_empty() {
-        return Err(crate::tr!("The table has no columns to import into."));
+        return Err(bookie_app_services::tr!("The table has no columns to import into."));
     }
     Ok(columns)
 }
@@ -774,7 +774,7 @@ fn create_statement(driver_id: &str, choice: &ImportChoice) -> Result<Option<Str
         .into_iter()
         .next()
         .map(Some)
-        .ok_or_else(|| crate::tr!("The table could not be built from the file."))
+        .ok_or_else(|| bookie_app_services::tr!("The table could not be built from the file."))
 }
 
 fn suggested_table_name(path: &std::path::Path) -> String {
@@ -793,9 +793,9 @@ fn suggested_table_name(path: &std::path::Path) -> String {
 
 fn read_file(path: &std::path::Path) -> Result<Vec<u8>, String> {
     let bytes = read_import_file(path).map_err(|error| match error {
-        ImportError::FileTooLarge { .. } => crate::tr!("The file is larger than the {limit} MB import limit.")
+        ImportError::FileTooLarge { .. } => bookie_app_services::tr!("The file is larger than the {limit} MB import limit.")
             .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()),
-        _ => crate::tr!("The file could not be read."),
+        _ => bookie_app_services::tr!("The file could not be read."),
     })?;
     if bookie_core::import::is_xlsx(&bytes) {
         return bookie_core::import::xlsx_to_csv(&bytes).map_err(|error| error.to_string());
@@ -836,7 +836,7 @@ async fn prepare_csv_plan(connection_id: Uuid, driver_id: String, choice: Import
         connection_id,
         driver_id,
         choice: None,
-        result: Err(crate::tr!("The import plan could not be prepared.")),
+        result: Err(bookie_app_services::tr!("The import plan could not be prepared.")),
     })
 }
 
@@ -848,7 +848,7 @@ fn plan_error_text(error: PlanError) -> String {
     let lines: Vec<String> = first
         .iter()
         .map(|row| {
-            crate::tr!("Line {line}, column {column}: {reason}")
+            bookie_app_services::tr!("Line {line}, column {column}: {reason}")
                 .replace("{line}", &row.line.to_string())
                 .replace("{column}", &row.column)
                 .replace("{reason}", &row.reason.to_string())

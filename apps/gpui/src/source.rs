@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
-use bookie_core::{QueryResult, QueryRows, Value};
+use bookie_core::{FilterValueKind, QueryResult, QueryRows, Value, filter_value_kind};
+use bookie_results::result_compare::{CompareError, CompareInput, CompareReport, CompareRequest, compare_results};
 use bookie_results::result_find::{FindError, find_matches};
 use bookie_results::result_predicate::{ColumnScope, ResultPredicate};
 use bookie_results::result_scan::{ScanProgress, ScanSource, scan_pages};
@@ -10,7 +11,8 @@ use tokio_util::sync::CancellationToken;
 
 use crate::core_bridge::column_infos;
 use crate::model::{
-    Cell, CellText, ColumnMeta, Diff, FindResult, Op, PAGE_ROWS, Predicate, build_diff, row_at, synthetic_columns,
+    Cell, CellText, ColumnMeta, Diff, DiffRow, DiffSummary, FindResult, MAX_DIFF_ROWS, Op, PAGE_ROWS, Predicate,
+    right_row, row_at, synthetic_columns,
 };
 
 pub trait ResultSource: Send + Sync + 'static {
@@ -61,13 +63,17 @@ impl Synthetic {
         if let Some(scan) = scan.as_ref() {
             return Ok(scan.clone());
         }
-        let created = spool_rows(self.total, cancel)?;
+        let created = spool_rows_from((0..self.total).map(row_at), cancel)?;
         *scan = Some(created.clone());
         Ok(created)
     }
 }
 
-fn spool_rows(total: u64, cancel: &CancellationToken) -> Result<ScanSource, &'static str> {
+/// Spools rows into pages of `PAGE_ROWS`, so a large source never sits in memory at once.
+fn spool_rows_from(
+    rows: impl Iterator<Item = Vec<Value>>,
+    cancel: &CancellationToken,
+) -> Result<ScanSource, &'static str> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .map_err(|_| "the result could not be prepared for scanning")?;
@@ -75,24 +81,35 @@ fn spool_rows(total: u64, cancel: &CancellationToken) -> Result<ScanSource, &'st
         .create()
         .map_err(|_| "the result could not be prepared for scanning")?;
     let columns = column_infos();
-    let mut start = 0;
-    while start < total {
-        if cancel.is_cancelled() {
-            return Err("the operation was cancelled");
-        }
-        let end = (start + PAGE_ROWS).min(total);
-        let rows: Vec<Vec<Value>> = (start..end).map(row_at).collect();
-        let page = QueryResult {
+    let mut page: Vec<Vec<Value>> = Vec::new();
+    let mut page_index = 0_u64;
+    let mut count = 0_u64;
+    let flush = |page: &mut Vec<Vec<Value>>, page_index: &mut u64| -> Result<(), &'static str> {
+        let rows = QueryResult {
             columns: columns.clone(),
-            rows: QueryRows::from_rows(rows),
+            rows: QueryRows::from_rows(std::mem::take(page)),
             truncated: false,
         };
         runtime
-            .block_on(spool.append_page(start / PAGE_ROWS, Arc::new(page)))
+            .block_on(spool.append_page(*page_index, Arc::new(rows)))
             .map_err(|_| "the result could not be prepared for scanning")?;
-        start = end;
+        *page_index += 1;
+        Ok(())
+    };
+    for row in rows {
+        if cancel.is_cancelled() {
+            return Err("the operation was cancelled");
+        }
+        page.push(row);
+        count += 1;
+        if page.len() as u64 == PAGE_ROWS {
+            flush(&mut page, &mut page_index)?;
+        }
     }
-    Ok(ScanSource::new(spool, columns, total))
+    if !page.is_empty() {
+        flush(&mut page, &mut page_index)?;
+    }
+    Ok(ScanSource::new(spool, columns, count))
 }
 
 /// Equals and NotEquals: typed and exact through `bookie-results` when the column's type is a known
@@ -104,11 +121,15 @@ enum Equality {
 
 fn equality(scan: &ScanSource, predicate: &Predicate) -> Result<Equality, &'static str> {
     let negate = predicate.op == Op::NotEquals;
-    let kind = scan
-        .columns()
-        .get(predicate.column)
-        .map_or(String::new(), |column| column.data_type.to_lowercase());
-    match crate::core_bridge::parse_edit(&kind, &predicate.text) {
+    let kind = scan.columns().get(predicate.column).map(filter_value_kind);
+    // Text is compared on its displayed text, which is already the exact text.
+    let typed = match kind {
+        None | Some(FilterValueKind::Text) => Err(()),
+        Some(kind) => {
+            crate::core_bridge::parse_edit(crate::core_bridge::edit_kind(kind), &predicate.text).map_err(|_| ())
+        }
+    };
+    match typed {
         Ok(value) => {
             let result = if negate {
                 ResultPredicate::NotEquals {
@@ -176,7 +197,18 @@ impl ResultSource for Synthetic {
     }
 
     fn compare(&self, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str> {
-        build_diff(self.total, keyed, cancel)
+        if cancel.is_cancelled() {
+            return Err("comparison cancelled");
+        }
+        let left = self.scan(cancel)?;
+        let right = spool_rows_from((0..self.total).filter_map(right_row), cancel)?;
+        let request = CompareRequest {
+            left: CompareInput::Spool(left),
+            right: CompareInput::Spool(right),
+            key_columns: if keyed { vec!["value".into()] } else { Vec::new() },
+        };
+        let report = compare_results(&request, cancel, &ScanProgress::default()).map_err(compare_message)?;
+        Ok(diff_view(&report, keyed))
     }
 }
 
@@ -256,6 +288,44 @@ pub fn filter_in(
         _ => "the scan did not finish",
     })?;
     Ok(kept)
+}
+
+fn compare_message(error: CompareError) -> &'static str {
+    match error {
+        CompareError::Cancelled => "comparison cancelled",
+        _ => "the comparison did not finish",
+    }
+}
+
+/// The grid's view of a compare: at most `MAX_DIFF_ROWS` rows, with the change label first.
+fn diff_view(report: &CompareReport, keyed: bool) -> Diff {
+    let summary = &report.summary;
+    let rows = &report.diff.rows;
+    let shown = rows.len().min(MAX_DIFF_ROWS);
+    let diff_rows = (0..shown)
+        .filter_map(|index| rows.get(index))
+        .map(|row| DiffRow {
+            change: match row.first() {
+                Some(Value::Text(label)) if label == "Added" => "Added",
+                Some(Value::Text(label)) if label == "Removed" => "Removed",
+                Some(Value::Text(label)) if label == "Before" => "Before",
+                _ => "After",
+            },
+            cells: row.iter().skip(1).cloned().collect(),
+        })
+        .collect();
+    Diff {
+        summary: DiffSummary {
+            keyed,
+            equal: summary.equal,
+            added: summary.added,
+            removed: summary.removed,
+            changed: summary.changed,
+            unknown: summary.unknown_left + summary.unknown_right,
+        },
+        rows: diff_rows,
+        capped: rows.len() > MAX_DIFF_ROWS,
+    }
 }
 
 fn find_message(error: FindError) -> &'static str {

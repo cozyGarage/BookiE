@@ -25,7 +25,7 @@ impl BrowseTab {
         self.save_button.set_sensitive(true);
         self.discard_button.set_sensitive(true);
         let _ = sender.output(BrowseTabOutput::ShowSelectionAlert {
-            title: crate::tr!("Save failed"),
+            title: bookie_app_services::tr!("Save failed"),
             body: message,
         });
     }

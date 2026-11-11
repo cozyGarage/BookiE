@@ -1,7 +1,7 @@
 use bookie_core::import::{ColumnKind, parse_cell};
-use bookie_core::{ColumnInfo, QueryRows, Value};
+use bookie_core::{ColumnInfo, FilterValueKind, Value};
 
-use crate::model::Cell;
+use crate::model::{Cell, ColumnMeta};
 
 fn column_kind(kind: &str) -> Option<ColumnKind> {
     Some(match kind {
@@ -19,6 +19,24 @@ fn column_kind(kind: &str) -> Option<ColumnKind> {
         "text" | "json_text" | "null" => ColumnKind::Text,
         _ => return None,
     })
+}
+
+/// The edit-kind name that `parse_edit` understands for a core filter kind.
+pub fn edit_kind(kind: FilterValueKind) -> &'static str {
+    match kind {
+        FilterValueKind::Text => "text",
+        FilterValueKind::Bool => "boolean",
+        FilterValueKind::Int => "integer",
+        FilterValueKind::Float => "float",
+        FilterValueKind::Decimal => "decimal",
+        FilterValueKind::Date => "date",
+        FilterValueKind::Time => "time",
+        FilterValueKind::DateTime => "datetime",
+        FilterValueKind::TimestampTz => "timestamptz",
+        FilterValueKind::Uuid => "uuid",
+        FilterValueKind::Json => "json",
+        FilterValueKind::Bytes => "bytes",
+    }
 }
 
 pub fn parse_edit(kind: &str, text: &str) -> Result<Cell, String> {
@@ -57,10 +75,23 @@ pub fn column_infos() -> Vec<ColumnInfo> {
         .collect()
 }
 
-pub fn render_tsv(rows: impl IntoIterator<Item = Vec<Cell>>, with_headers: bool) -> String {
-    bookie_core::export::render_tsv(
-        &column_infos(),
-        &QueryRows::from_rows(rows.into_iter().collect()),
-        with_headers,
-    )
+/// The core column description for a result's columns. Types are not carried by the grid's
+/// columns, so the declared type is left empty.
+pub fn column_infos_for(columns: &[ColumnMeta]) -> Vec<ColumnInfo> {
+    columns
+        .iter()
+        .map(|column| ColumnInfo {
+            name: column.name.clone(),
+            data_type: String::new(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        })
+        .collect()
 }

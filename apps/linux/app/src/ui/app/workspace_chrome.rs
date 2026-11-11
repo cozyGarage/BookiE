@@ -90,7 +90,7 @@ impl App {
                 self.sidebar_title.set_title(name);
             }
             None => {
-                self.sidebar_title.set_title(&crate::tr!("Tables"));
+                self.sidebar_title.set_title(&bookie_app_services::tr!("Tables"));
             }
         }
     }
