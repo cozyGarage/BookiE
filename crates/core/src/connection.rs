@@ -519,6 +519,11 @@ pub trait Connection: Send + Sync {
     async fn server_version(&self) -> Result<Option<String>, DriverError> {
         Ok(None)
     }
+    /// [`Self::server_version`] bounded by `control`: a deadline or a cancellation returns instead of
+    /// waiting on a server that does not answer.
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        run_controlled(self.server_version(), control).await
+    }
     /// Whether an interrupted `*_controlled` call asks the server to
     /// stop the statement. When false the driver can only drop its own
     /// future, so the statement may still be running and the outcome is
@@ -642,6 +647,10 @@ mod controlled_default_tests {
             self.stall().await
         }
 
+        async fn server_version(&self) -> Result<Option<String>, DriverError> {
+            self.stall().await
+        }
+
         async fn ping(&self) -> Result<(), DriverError> {
             Ok(())
         }
@@ -672,6 +681,30 @@ mod controlled_default_tests {
     }
 
     #[tokio::test]
+    async fn a_silent_server_version_request_is_bounded_by_the_deadline() {
+        let dispatched = Arc::new(AtomicUsize::new(0));
+        let connection = SlowConnection {
+            dispatched: dispatched.clone(),
+            ..SlowConnection::default()
+        };
+        let control = OperationControl::new(
+            CancellationToken::new(),
+            Some(tokio::time::Instant::now() + Duration::from_millis(50)),
+        );
+        // A deadline that passes while the request is in flight reports an unknown outcome, as every
+        // other controlled call in this module does.
+        assert!(matches!(
+            connection.server_version_controlled(&control).await,
+            Err(DriverError::OperationOutcomeUnknown { source }) if matches!(*source, DriverError::TimedOut)
+        ));
+        assert_eq!(
+            dispatched.load(Ordering::SeqCst),
+            1,
+            "the request was dispatched and then bounded"
+        );
+    }
+
+    #[tokio::test]
     async fn a_cancelled_control_stops_every_metadata_read_before_dispatch() {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
@@ -681,6 +714,10 @@ mod controlled_default_tests {
         };
         let control = cancelled_control();
 
+        assert!(matches!(
+            connection.server_version_controlled(&control).await,
+            Err(DriverError::Cancelled)
+        ));
         assert!(matches!(
             connection.list_tables_controlled(&control).await,
             Err(DriverError::Cancelled)
