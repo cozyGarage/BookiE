@@ -148,6 +148,8 @@ impl App {
                 self.claim_orphan_tabs(connection_id);
             }
             self.refresh_multi_session_tab_titles();
+            self.persist_open_sessions(sender.clone());
+            sender.input(AppMsg::ContinueSessionRestore);
             touch_last_opened(connection_id, sender);
             return;
         }
@@ -232,6 +234,7 @@ impl App {
             self.set_last_connection_id(None, sender.clone());
         }
         self.clear_multi_session_state();
+        self.persist_open_sessions(sender.clone());
         self.current_driver_id = None;
         self.read_only = false;
         self.read_only_badge.set_visible(false);
@@ -293,23 +296,8 @@ impl App {
         self.prune_connection_organization(sender.clone());
         if !self.connected {
             self.show_welcome_page(sender.clone());
-            self.restore_last_connection(connections, sender);
+            self.begin_session_restore(connections, sender);
         }
-    }
-
-    fn restore_last_connection(&mut self, connections: &[SavedConnection], sender: ComponentSender<Self>) {
-        if !crate::services::window_state::take_session_restore_turn() {
-            return;
-        }
-        let last = self.window_state.borrow().last_connection_id;
-        let available: Vec<Uuid> = connections.iter().map(|saved| saved.id).collect();
-        let Some(id) = bookie_app_services::window_state::connection_id_to_restore(last, &available) else {
-            return;
-        };
-        let Some(saved) = connections.iter().find(|saved| saved.id == id).cloned() else {
-            return;
-        };
-        self.on_open_saved(saved, sender);
     }
 
     pub(super) fn on_poll_health(&mut self) {
@@ -431,6 +419,7 @@ impl App {
     }
 
     pub(super) fn on_connection_cancelled(&mut self) {
+        self.stop_session_restore();
         self.connect_cancel = None;
         self.pending_database_switch = None;
         if self.switch.transition != ConnectionTransition::Connecting || self.switch.prepared.is_some() {
@@ -484,6 +473,7 @@ impl App {
         self.switch.cancel_audit_was_disabled = None;
         self.dismiss_loading_page();
         tracing::warn!(error = %message, "candidate connection failed");
+        sender.input(AppMsg::ContinueSessionRestore);
         self.show_connection_failed_alert(&message, saved, sender);
     }
 

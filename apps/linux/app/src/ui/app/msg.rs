@@ -152,6 +152,7 @@ pub enum AppMsg {
         height: i32,
         maximized: bool,
     },
+    ContinueSessionRestore,
     WindowStatePersisted(Result<(), String>),
     WindowStatePersistedForClose(Result<(), String>),
     ConnectionDeleted(Uuid),

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use bookie_app_services::window_sessions::{GuardedSessionMap, WindowSessions};
 use bookie_core::TableInfo;
@@ -22,6 +22,7 @@ pub(super) struct MultiSessionState {
     pub sessions: WindowSessions,
     pub guards: GuardedSessionMap,
     pub catalogs: HashMap<Uuid, SessionCatalog>,
+    pub restore_queue: VecDeque<Uuid>,
 }
 
 pub(super) fn opens_additional_session(connected: bool, front: Option<Uuid>, target: Uuid) -> bool {
@@ -199,6 +200,7 @@ impl App {
     pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
         let closed_tabs = self.multi.sessions.disconnect(connection_id);
         self.release_connection_resources(connection_id);
+        self.persist_open_sessions(sender.clone());
         for tab_id in closed_tabs {
             sender.input(AppMsg::FinishCloseWorkspaceTab(tab_id));
         }

@@ -84,3 +84,20 @@ pub fn restore_window_keys(keys: &[Uuid], available: &[Uuid]) -> Vec<Uuid> {
     let available = available.iter().copied().collect::<HashSet<_>>();
     keys.iter().copied().filter(|key| available.contains(key)).collect()
 }
+
+pub fn startup_restore_keys(stored: Option<&[u8]>, last_connection_id: Option<Uuid>, available: &[Uuid]) -> Vec<Uuid> {
+    let Some(front) = last_connection_id else {
+        return Vec::new();
+    };
+    let stored_window = match stored.map(parse_open_sessions) {
+        Some(OpenSessionsLoad::Restored(record)) => record.windows.into_iter().find(|keys| keys.contains(&front)),
+        _ => None,
+    };
+    let window = stored_window.unwrap_or_else(|| vec![front]);
+    let mut keys = restore_window_keys(&window, available);
+    if let Some(position) = keys.iter().position(|key| *key == front) {
+        let front = keys.remove(position);
+        keys.push(front);
+    }
+    keys
+}

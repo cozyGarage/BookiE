@@ -24,6 +24,7 @@ mod referenced_row;
 mod render;
 mod row_ops;
 mod schema_index;
+mod session_restore;
 mod session_teardown;
 mod shortcuts;
 mod sidebar_catalog;
@@ -1142,6 +1143,7 @@ impl SimpleComponent for App {
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
             AppMsg::CancelConnect => self.on_cancel_connect(),
             AppMsg::ConnectionCancelled => self.on_connection_cancelled(),
+            AppMsg::ContinueSessionRestore => self.continue_session_restore(sender),
             AppMsg::EditConnection(saved) => self.on_edit_connection(saved, sender),
             AppMsg::EditConnectionLoaded(prefill) => self.open_connect_dialog(Some(*prefill), sender),
             AppMsg::DuplicateConnection(id) => self.on_duplicate_connection(id, sender),

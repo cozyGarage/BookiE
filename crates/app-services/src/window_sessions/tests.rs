@@ -201,3 +201,65 @@ fn clearing_one_connection_leaves_other_sessions_dirty_tabs() {
     assert_eq!(prompt.dirty_count(), 1);
     assert_eq!(prompt.dirty_connections(), vec![second]);
 }
+
+fn stored_windows(windows: &[&[Uuid]]) -> Vec<u8> {
+    serde_json::to_vec(&OpenSessionsRecord::from_windows(
+        windows.iter().map(|keys| keys.to_vec()),
+    ))
+    .unwrap()
+}
+
+#[test]
+fn startup_restores_every_key_of_the_window_and_opens_the_front_session_last() {
+    let [first, front, third] = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+    let stored = stored_windows(&[&[first, front, third]]);
+    assert_eq!(
+        startup_restore_keys(Some(&stored), Some(front), &[first, front, third]),
+        vec![first, third, front]
+    );
+}
+
+#[test]
+fn startup_skips_keys_whose_saved_connection_is_gone() {
+    let [first, front] = [Uuid::new_v4(), Uuid::new_v4()];
+    let stored = stored_windows(&[&[first, front]]);
+    assert_eq!(startup_restore_keys(Some(&stored), Some(front), &[front]), vec![front]);
+    assert!(startup_restore_keys(Some(&stored), Some(front), &[]).is_empty());
+}
+
+#[test]
+fn startup_restores_the_window_that_holds_the_last_connection() {
+    let [other, first, front] = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+    let stored = stored_windows(&[&[other], &[first, front]]);
+    assert_eq!(
+        startup_restore_keys(Some(&stored), Some(front), &[other, first, front]),
+        vec![first, front]
+    );
+}
+
+#[test]
+fn startup_falls_back_to_the_single_last_connection_without_a_usable_record() {
+    let [stale, front] = [Uuid::new_v4(), Uuid::new_v4()];
+    assert_eq!(startup_restore_keys(None, Some(front), &[front]), vec![front]);
+    assert_eq!(
+        startup_restore_keys(Some(b"{ not json"), Some(front), &[front]),
+        vec![front]
+    );
+    let unsupported = br#"{"version":99,"windows":[]}"#;
+    assert_eq!(
+        startup_restore_keys(Some(unsupported), Some(front), &[front]),
+        vec![front]
+    );
+    let stored = stored_windows(&[&[stale]]);
+    assert_eq!(
+        startup_restore_keys(Some(&stored), Some(front), &[stale, front]),
+        vec![front]
+    );
+}
+
+#[test]
+fn startup_restores_nothing_after_the_last_connection_was_cleared() {
+    let key = Uuid::new_v4();
+    let stored = stored_windows(&[&[key]]);
+    assert!(startup_restore_keys(Some(&stored), None, &[key]).is_empty());
+}
