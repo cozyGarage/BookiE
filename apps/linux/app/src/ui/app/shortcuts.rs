@@ -17,6 +17,10 @@ fn history_menu_section() -> gio::Menu {
     history_section.append(Some(&bookie_app_services::tr!("Audit Log")), Some("win.show-audit"));
     history_section.append(Some(&bookie_app_services::tr!("Catalog")), Some("win.show-catalog"));
     history_section.append(
+        Some(&bookie_app_services::tr!("Remembered Approvals…")),
+        Some("win.remembered-approvals"),
+    );
+    history_section.append(
         Some(&bookie_app_services::tr!("Explain query")),
         Some("win.explain-query"),
     );
@@ -102,6 +106,10 @@ fn add_window_input_actions(
                 .build()
         }};
     }
+    let window_for_approvals = window.clone();
+    let remembered_approvals = gio::ActionEntry::builder("remembered-approvals")
+        .activate(move |_, _, _| crate::ui::remembered_approvals_dialog::present(&window_for_approvals))
+        .build();
     let window_for_quit = window.clone();
     let quit = gio::ActionEntry::builder("quit")
         .activate(move |_, _, _| window_for_quit.close())
@@ -110,6 +118,7 @@ fn add_window_input_actions(
         input_action!("shortcuts", AppMsg::ShowShortcuts),
         input_action!("about", AppMsg::ShowAbout),
         quit,
+        remembered_approvals,
         input_action!("open-editor", AppMsg::NewEditorTab),
         input_action!("open-file", AppMsg::OpenSqlFile),
         input_action!("save-file-as", AppMsg::SaveActiveEditorFileAs),

@@ -95,6 +95,8 @@ pub fn approval_text(approval: AuditApprovalOutcome) -> &'static str {
     match approval {
         AuditApprovalOutcome::NotRequired => "no approval needed",
         AuditApprovalOutcome::Approved => "approved",
+        AuditApprovalOutcome::ApprovedAndRemembered => "approved and remembered",
+        AuditApprovalOutcome::ApprovedByGrant => "approved by a remembered approval",
         AuditApprovalOutcome::Denied => "denied",
         AuditApprovalOutcome::Cancelled => "approval cancelled",
         AuditApprovalOutcome::TimedOut => "approval timed out",

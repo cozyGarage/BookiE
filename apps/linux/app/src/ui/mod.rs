@@ -27,6 +27,7 @@ mod popover;
 mod preferences;
 mod progress_dialog;
 mod quick_switcher_dialog;
+pub mod remembered_approvals_dialog;
 mod row_inspector;
 mod row_object;
 mod row_store;

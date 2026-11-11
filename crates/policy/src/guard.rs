@@ -380,14 +380,16 @@ impl PolicyGuard {
                     }
                 };
                 match outcome {
-                    ApprovalOutcome::AllowOnce => Ok(Authorization {
-                        decision: Decision::Allow {
-                            rule: format!("{rule}:approved"),
-                        },
-                        analysis,
-                        approval_outcome: AuditApprovalOutcome::Approved,
-                        preview_state,
-                    }),
+                    ApprovalOutcome::AllowOnce | ApprovalOutcome::AllowAndRemember | ApprovalOutcome::UsedGrant => {
+                        Ok(Authorization {
+                            decision: Decision::Allow {
+                                rule: format!("{rule}:approved"),
+                            },
+                            analysis,
+                            approval_outcome: approved_audit_outcome(outcome),
+                            preview_state,
+                        })
+                    }
                     ApprovalOutcome::Deny => {
                         let message = format!("approval denied: {reason}");
                         let operation =
@@ -1112,3 +1114,11 @@ pub use bulk::{
 #[cfg(test)]
 #[path = "guard_tests.rs"]
 mod guard_tests;
+
+fn approved_audit_outcome(outcome: ApprovalOutcome) -> AuditApprovalOutcome {
+    match outcome {
+        ApprovalOutcome::AllowAndRemember => AuditApprovalOutcome::ApprovedAndRemembered,
+        ApprovalOutcome::UsedGrant => AuditApprovalOutcome::ApprovedByGrant,
+        _ => AuditApprovalOutcome::Approved,
+    }
+}
