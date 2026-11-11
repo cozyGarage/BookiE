@@ -54,7 +54,9 @@ mod tests {
         });
         let second = track(async { waited() });
         let (first, second) = tokio::join!(first, second);
-        assert!(first >= Duration::from_millis(20));
+        // The sleep's deadline is rounded to the timer tick and starts before `measure` takes its
+        // start time, so the measured wait can fall slightly short of 20 ms under load (#2829).
+        assert!(first >= Duration::from_millis(15), "{first:?}");
         assert_eq!(second, Duration::ZERO);
     }
 }
