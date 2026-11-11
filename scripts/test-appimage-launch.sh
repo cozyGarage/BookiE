@@ -3,7 +3,7 @@ set -euo pipefail
 image_file="${1:?usage: test-appimage-launch.sh <BookiE-X.Y.Z-x86_64.AppImage> [container image...]}"
 shift
 images=("$@")
-[ "${#images[@]}" -gt 0 ] || images=(ubuntu:26.04 fedora:latest)
+[ "${#images[@]}" -gt 0 ] || images=(ubuntu:26.04 fedora:latest archlinux:latest)
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 mkdir "$work/extract"
@@ -15,6 +15,9 @@ if command -v apt-get >/dev/null; then
   apt-get update -qq >/dev/null 2>&1
   apt-get install -y -qq xvfb dbus-x11 libx11-6 libx11-xcb1 libxcb1 libgl1 libegl1 libdrm2 libgbm1 \
     libfontconfig1 libfreetype6 libharfbuzz0b libfribidi0 libwayland-client0 >/dev/null 2>&1
+elif command -v pacman >/dev/null; then
+  pacman -Syu --noconfirm --needed xorg-server-xvfb dbus libx11 libxcb mesa libdrm fontconfig freetype2 harfbuzz \
+    fribidi wayland xorg-xauth >/dev/null 2>&1
 else
   dnf -q -y install xorg-x11-server-Xvfb dbus-x11 libX11 libX11-xcb libxcb mesa-libGL mesa-libEGL libdrm \
     mesa-libgbm fontconfig freetype harfbuzz fribidi libwayland-client >/dev/null 2>&1
