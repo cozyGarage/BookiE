@@ -26,6 +26,42 @@ bundle_spec.loader.exec_module(bundle_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_forgejo_gate_event_profile_matches_github_build_linux(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+
+        def event_block(workflow, event, stop_at):
+            triggers = workflow.split("\non:\n", 1)[1].split(stop_at, 1)[0]
+            start = triggers.index(f"  {event}:\n")
+            remainder = triggers[start + len(f"  {event}:\n"):]
+            next_event = re.search(r"(?m)^  [a-z_]+:\n", remainder)
+            if next_event is None:
+                return triggers[start:]
+            return triggers[start:start + len(f"  {event}:\n") + next_event.start()]
+
+        def trigger_events(workflow, stop_at):
+            triggers = workflow.split("\non:\n", 1)[1].split(stop_at, 1)[0]
+            return set(re.findall(r"(?m)^  ([a-z_]+):\n", triggers))
+
+        github_events = trigger_events(github, "\npermissions:\n")
+        forgejo_events = trigger_events(forgejo, "\nconcurrency:\n")
+        self.assertEqual(github_events, forgejo_events, "GitHub and Forgejo trigger event names differ")
+
+        for event in ("push", "pull_request", "schedule"):
+            if event in github_events and event in forgejo_events:
+                with self.subTest(event=event):
+                    self.assertTrue(
+                        event_block(github, event, "\npermissions:\n")
+                        == event_block(forgejo, event, "\nconcurrency:\n"),
+                        f"{event} trigger settings differ",
+                    )
+
+        github_triggers = github.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+        forgejo_triggers = forgejo.split("\non:\n", 1)[1].split("\nconcurrency:\n", 1)[0]
+        self.assertIn("  workflow_dispatch:\n", github_triggers)
+        self.assertIn("  workflow_dispatch:\n", forgejo_triggers)
+        self.assertNotIn("if: github.event_name != 'pull_request'", forgejo)
+
     def test_test_bundle_groups_cover_their_consumers_without_copying_every_test_binary(self):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
         metadata = json.loads(subprocess.check_output(
@@ -562,7 +598,8 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIsNotNone(match, name)
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
             self.assertEqual(settings["group"].strip(), "bookie-ci-${{ github.ref }}", name)
-            self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
+            expected_cancel = "${{ github.event_name == 'pull_request' }}" if name == "ci" else "false"
+            self.assertEqual(settings["cancel-in-progress"].strip(), expected_cancel, name)
             groups.append(settings["group"].strip())
         self.assertEqual(groups[0], groups[1])
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()

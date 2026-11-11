@@ -2,14 +2,28 @@ name: lab-ci
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**.md"
+      - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**.md"
+      - ".github/workflows/build-linux.yml"
+      - ".github/actions/dockerhub-login/**"
   schedule:
-    - cron: "0 22 * * *"
+    - cron: "13 14 * * 1"
   workflow_dispatch:
 
 concurrency:
   group: bookie-ci-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -133,7 +147,6 @@ jobs:
   gtk-build:
     runs-on: build-host
     needs: [guards]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 20
     defaults:
       run:
@@ -651,7 +664,6 @@ jobs:
   driver:
     runs-on: any-host
     needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
@@ -751,7 +763,6 @@ jobs:
   e2e:
     runs-on: any-host
     needs: [guards, clippy, gtk-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
@@ -852,7 +863,6 @@ jobs:
   consumers:
     runs-on: any-host
     needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/consumers
@@ -904,7 +914,6 @@ jobs:
   gtk:
     runs-on: any-host
     needs: [guards, clippy, gtk-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
@@ -963,7 +972,6 @@ jobs:
   pg-release:
     runs-on: any-host
     needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/pg-release
@@ -1015,7 +1023,6 @@ jobs:
   socket-ssh:
     runs-on: any-host
     needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
@@ -1072,7 +1079,6 @@ jobs:
   gtk-server:
     runs-on: any-host
     needs: [guards, clippy, gtk-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
@@ -1137,7 +1143,6 @@ jobs:
   driver-tls:
     runs-on: any-host
     needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/driver-tls
@@ -1185,7 +1190,6 @@ jobs:
   keyring:
     runs-on: any-host
     needs: [guards, clippy, test-build]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 30
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/keyring
@@ -1225,7 +1229,6 @@ jobs:
   supply-chain:
     runs-on: build-host
     needs: [guards, clippy]
-    if: github.event_name != 'pull_request'
     timeout-minutes: 45
     defaults:
       run:
