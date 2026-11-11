@@ -573,6 +573,34 @@ mod tests {
     }
 
     #[test]
+    fn a_writable_connection_configuration_cannot_write_from_the_query_editor() {
+        let Origin::File(source) = fixture() else {
+            unreachable!()
+        };
+        let path = std::env::temp_dir().join(format!("bookie-gpui-read-only-{}.sqlite", uuid::Uuid::new_v4()));
+        std::fs::copy(source, &path).unwrap();
+        let file = FixtureFile(path);
+        let database_file = bookie_app_services::open_request::classify_file(&file.0).unwrap();
+        let mut saved = bookie_app_services::open_request::file_connection(&database_file);
+        saved.read_only = false;
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let registry = drivers_registry::default_registry();
+        let database = Arc::new(bookie_app_services::database_service::DatabaseService::new());
+        let session = runtime
+            .block_on(ReadSession::open(saved, Arc::new(registry), database))
+            .unwrap();
+        let live = Arc::new(LiveSession {
+            driver_id: session.driver_id.clone(),
+            tables: session.tables.clone(),
+            session: Some(session),
+            runtime,
+            label: "fixture".into(),
+        });
+        assert!(live.run_query("DELETE FROM orders", 100).is_err());
+        assert_eq!(live.run_query("SELECT id FROM orders", 100).unwrap().total(), 6);
+    }
+
+    #[test]
     fn a_database_file_loads_as_a_live_table_with_real_columns_and_nulls() {
         let table = LiveTable::load(
             &fixture(),
