@@ -112,6 +112,10 @@ impl App {
         open_mode: OpenMode,
         sender: ComponentSender<Self>,
     ) {
+        // In overlay mode the sidebar covers the grid; picking a table closes it, as the table is what the user wants.
+        if self.split_view.is_collapsed() {
+            self.split_view.set_show_sidebar(false);
+        }
         self.dispatch_select_table(schema, name, open_mode, sender);
     }
 
@@ -504,7 +508,11 @@ impl App {
             None => {
                 tracing::warn!(error = %failure.message, "app-level load failed");
                 self.dismiss_loading_page();
-                self.set_status_page(super::StatusKind::Error, &bookie_app_services::tr!("Failed"), &failure.message);
+                self.set_status_page(
+                    super::StatusKind::Error,
+                    &bookie_app_services::tr!("Failed"),
+                    &failure.message,
+                );
             }
         }
     }
@@ -610,7 +618,9 @@ impl App {
 
     pub(super) fn on_export_streamed_results(&self, request: crate::ui::export_dialog::StreamExportRequest) {
         let Some(spool) = request.spool else {
-            self.show_toast(&bookie_app_services::tr!("The complete query result is no longer available."));
+            self.show_toast(&bookie_app_services::tr!(
+                "The complete query result is no longer available."
+            ));
             return;
         };
         let fetcher =
@@ -743,7 +753,9 @@ impl App {
             }
             RefreshDecision::ConfirmDiscard => {}
             RefreshDecision::SaveInFlight => {
-                self.show_toast(&bookie_app_services::tr!("Saving changes. Refresh after the save finishes."));
+                self.show_toast(&bookie_app_services::tr!(
+                    "Saving changes. Refresh after the save finishes."
+                ));
                 return;
             }
         }
@@ -819,7 +831,9 @@ fn browse_cell_value_query(
     row_key: &[bookie_core::Value],
 ) -> Result<crate::services::browse_query::BoundQuery, String> {
     if columns.get(col_index).is_none_or(|column| column.name != column_name) {
-        return Err(bookie_app_services::tr!("The table columns changed before the value could be fetched.").to_string());
+        return Err(
+            bookie_app_services::tr!("The table columns changed before the value could be fetched.").to_string(),
+        );
     }
     BrowseTarget {
         driver_id,

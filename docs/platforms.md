@@ -33,6 +33,10 @@ Use the [packaging guide](../apps/linux/packaging/README.md) to build Arch packa
 
 The Arch package installs `bookie`, `bookie-agentd` and `bookie-askpass`. It replaces the legacy `tablepro` package; the first start copies legacy state, as described in the [storage guide](storage.md).
 
+## OpenSSL
+
+The Arch package links OpenSSL 4 (`libssl.so.4`, `libcrypto.so.4`) and depends on those sonames (`libssl.so=4-64`, `libcrypto.so=4-64`), so a system still on OpenSSL 3 cannot install it. Builds from source need OpenSSL 4 development headers.
+
 ## Accessibility
 
 The application uses GTK and libadwaita controls. Manual checks for keyboard navigation, screen readers, high contrast, text scaling and native desktop interaction are listed in the [manual verification checklist](manual-verification-0.2-features.md).
