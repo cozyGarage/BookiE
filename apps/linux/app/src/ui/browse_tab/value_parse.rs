@@ -76,6 +76,10 @@ mod tests;
 mod sqlite_any_contract;
 
 #[cfg(test)]
+#[path = "../../../tests/support/empty_text_contract.rs"]
+mod empty_text_contract;
+
+#[cfg(test)]
 #[path = "../../../tests/support/duckdb_enum_contract.rs"]
 mod duckdb_enum_contract;
 
