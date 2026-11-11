@@ -1030,7 +1030,7 @@ jobs:
 
   regression-gate:
     name: Linux regression gate
-    if: always()
+    if: always() && !cancelled()
     runs-on: ubuntu-24.04
     needs:
       - pin-revision

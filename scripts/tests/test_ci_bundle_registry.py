@@ -60,6 +60,48 @@ class RegistryExtractionTests(unittest.TestCase):
             'https://forgejo.example/api/v1/packages/trung/generic/bookie-test-bundles/' + 'a' * 40 + '-direct'
         ])
 
+    def test_prune_reads_all_pages_before_deleting_versions(self):
+        recent = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+        old = (datetime.now(timezone.utc) - timedelta(days=20)).isoformat()
+        packages = [
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': f'{number:040x}-direct',
+             'created_at': recent}
+            for number in range(50)
+        ] + [{'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'a' * 40 + '-direct',
+              'created_at': old}]
+        requests = []
+
+        class Response:
+            def __init__(self, status=200, body=b''):
+                self.status = status
+                self.body = body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return self.body
+
+        def request(url, method='GET', data=None, size=None):
+            requests.append((method, url))
+            if method == 'DELETE':
+                return Response(204)
+            page = int(registry.urllib.parse.parse_qs(registry.urllib.parse.urlsplit(url).query)['page'][0])
+            selection = packages[(page - 1) * 50:page * 50]
+            return Response(body=json.dumps(selection).encode())
+
+        with patch.dict('os.environ', {'BOOKIE_REGISTRY_API_URL': 'https://forgejo.example/api/v1/packages/trung',
+                                       'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
+                patch.object(registry, 'request', side_effect=request):
+            registry.prune('c' * 40, 14)
+
+        self.assertEqual([method for method, _ in requests[:2]], ['GET', 'GET'])
+        self.assertEqual([method for method, _ in requests[2:]], ['DELETE'])
+        self.assertTrue(requests[2][1].endswith('/' + 'a' * 40 + '-direct'))
+
     def test_archive_only_bundle_verifies_without_duplicate_executables(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
