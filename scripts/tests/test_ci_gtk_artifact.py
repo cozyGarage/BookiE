@@ -56,10 +56,11 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
             self.assertIn("BOOKIE_GTK_BINARY=", job)
             self.assertIn("GSETTINGS_SCHEMA_DIR=", job)
             self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build\n", job)
-            self.assertIn('"${{ github.sha }}"', job)
-            self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ github.sha }}", job)
+            self.assertIn('"${{ needs.pin-revision.outputs.revision }}"', job)
+            self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}", job)
             self.assertNotIn("cargo build", job)
-            self.assertLess(job.index("ensure-node.sh"), job.index("uses:"))
+            self.assertLess(job.index("uses: actions/checkout@"), job.index("ensure-node.sh"))
+            self.assertLess(job.index("ensure-node.sh"), job.index("uses: https://code.forgejo.org/actions/"))
 
     def test_distro_floor_package_uses_the_default_app_feature_set(self):
         package_workflow = (ROOT / "scripts/distro-floor-package.sh").read_text()
@@ -92,7 +93,7 @@ class GtkArtifactTests(unittest.TestCase):
 
     def compile_schemas(self, command, check):
         destination = Path(command[command.index("--targetdir") + 1])
-        destination.mkdir(parents=True, exist_ok=True)
+        self.assertTrue(destination.is_dir())
         (destination / "gschemas.compiled").write_bytes(b"compiled schemas")
 
     def verify(self, expected_sha=SHA, *, package=False, features=FEATURES, toolkit=TOOLKIT):

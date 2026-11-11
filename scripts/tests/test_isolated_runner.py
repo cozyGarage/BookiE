@@ -40,7 +40,7 @@ class IsolatedRunnerTests(unittest.TestCase):
             (bundle / 'index.json').write_text(json.dumps(index))
             result = subprocess.run(['/usr/bin/python3', str(scripts / 'run-isolated-tests.py'), 'gtk'],
                                     env=os.environ | {'BOOKIE_TEST_BUNDLE': str(bundle), 'BOOKIE_SOURCE_COMMIT': revision,
-                                                      'EXPECTED_CWD': str(package)}, capture_output=True, text=True)
+                                                      'EXPECTED_CWD': str(package.resolve())}, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def run_fixture(self, output, status=0, diagnostic=""):

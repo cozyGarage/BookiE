@@ -96,7 +96,7 @@ def main():
     execution_environment = environment(bundle, index)
     passed = 0
     for command in commands(bundle, sys.argv[1:], index):
-        entry = next(entry for entry in index['tests'] if (bundle / entry['path']).resolve() == Path(command[0]))
+        entry = next(entry for entry in index['tests'] if (bundle / entry['path']).resolve() == Path(command[0]).resolve())
         directory = (ROOT / index['package_directories'][entry['package']]).resolve()
         if not directory.is_relative_to(ROOT.resolve()):
             raise ValueError('package directory is outside the source checkout')

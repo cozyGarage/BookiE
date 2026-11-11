@@ -53,6 +53,7 @@ mod tests {
             "database": "",
             "username": "",
             "password": "",
+            "auth_mode": "kerberos",
         }))
         .expect("saved connection")
     }
