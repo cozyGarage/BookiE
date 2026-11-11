@@ -1006,3 +1006,138 @@ async fn an_approved_controlled_write_never_cancels_the_callers_token() {
     assert_eq!(executes.load(Ordering::SeqCst), 2);
     assert!(!control.cancellation_token().is_cancelled());
 }
+
+struct StalledVersionConn(Arc<Notify>);
+
+#[async_trait]
+impl Connection for StalledVersionConn {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn server_version(&self) -> Result<Option<String>, DriverError> {
+        self.0.notify_one();
+        std::future::pending().await
+    }
+
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_params(&self, _: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
+        Ok(ExecResult { rows_affected: 0 })
+    }
+
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn ping(&self) -> Result<(), DriverError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
+    }
+}
+
+fn stalled_version_guard(audit: Arc<SequenceAuditSink>, state: Arc<AuditState>) -> (PolicyGuard, Arc<Notify>) {
+    let dispatched = Arc::new(Notify::new());
+    let guard = PolicyGuard::new(
+        Arc::new(StalledVersionConn(dispatched.clone())),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit,
+            state,
+        ),
+    );
+    (guard, dispatched)
+}
+
+fn last_terminal_status(audit: &SequenceAuditSink) -> Option<AuditTerminalStatus> {
+    audit
+        .events
+        .lock()
+        .expect("audit events")
+        .iter()
+        .rev()
+        .find(|event| event.phase == AuditRecordPhase::Outcome)
+        .map(|event| event.terminal_status)
+}
+
+#[tokio::test]
+async fn cancelling_a_version_request_records_a_terminal_unknown_outcome_and_keeps_writes_enabled() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let state = Arc::new(AuditState::new());
+    let (guard, dispatched) = stalled_version_guard(audit.clone(), state.clone());
+    let token = tokio_util::sync::CancellationToken::new();
+    let control = OperationControl::new(
+        token.clone(),
+        Some(tokio::time::Instant::now() + Duration::from_secs(30)),
+    );
+    tokio::spawn(async move {
+        dispatched.notified().await;
+        token.cancel();
+    });
+
+    let result = guard.server_version_controlled(&control).await;
+
+    assert!(
+        matches!(&result, Err(DriverError::OperationOutcomeUnknown { source }) if matches!(**source, DriverError::Cancelled)),
+        "{result:?}"
+    );
+    assert_eq!(last_terminal_status(&audit), Some(AuditTerminalStatus::Unknown));
+    assert!(
+        !state.governed_writes_disabled(),
+        "an interrupted read must not disable writes"
+    );
+}
+
+#[tokio::test]
+async fn a_version_request_past_its_deadline_records_a_terminal_outcome() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let (guard, _dispatched) = stalled_version_guard(audit.clone(), Arc::new(AuditState::new()));
+    let control = OperationControl::new(
+        tokio_util::sync::CancellationToken::new(),
+        Some(tokio::time::Instant::now() + Duration::from_millis(100)),
+    );
+
+    let result = tokio::time::timeout(Duration::from_secs(5), guard.server_version_controlled(&control))
+        .await
+        .expect("the deadline must end the version request");
+
+    assert!(
+        matches!(&result, Err(DriverError::OperationOutcomeUnknown { source }) if matches!(**source, DriverError::TimedOut)),
+        "{result:?}"
+    );
+    assert_eq!(last_terminal_status(&audit), Some(AuditTerminalStatus::Unknown));
+}
+
+#[tokio::test]
+async fn an_already_cancelled_control_refuses_the_version_request_before_it_is_audited_or_sent() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let (guard, _dispatched) = stalled_version_guard(audit.clone(), Arc::new(AuditState::new()));
+    let token = tokio_util::sync::CancellationToken::new();
+    token.cancel();
+    let control = OperationControl::new(token, None);
+
+    let result = guard.server_version_controlled(&control).await;
+
+    assert!(matches!(result, Err(DriverError::Cancelled)), "{result:?}");
+    assert!(audit.events.lock().expect("audit events").is_empty());
+}
