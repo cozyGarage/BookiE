@@ -60,7 +60,8 @@ fn append_live_page(
 #[ignore = "requires an isolated GTK display"]
 fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
     gtk::init().unwrap();
-    let mut cache = StreamPageCache::default();
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::default();
+    let mut cache = StreamPageCache::with_budget(budget.clone());
     let mut pages = Vec::new();
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let (sender, _receiver) = relm4::channel();
@@ -99,6 +100,7 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
     holder.append(&build_outcome_widget(&outcome, &sender, None, database, settings, None));
     drop(outcome);
     drop(cache);
+    assert!(budget.used_bytes() > 0);
     assert_eq!(
         pages.iter().filter(|page| page.upgrade().is_some()).count(),
         pages.len()
@@ -109,4 +111,6 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
         pages.iter().all(|page| page.upgrade().is_none()),
         "closing cancelled results must release their pages"
     );
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_pages(), 0);
 }
