@@ -17,6 +17,7 @@ mod effects_classification;
 mod explain_options;
 mod guard;
 mod input_refusal;
+mod linked_server;
 mod mask;
 mod principal;
 mod rules;

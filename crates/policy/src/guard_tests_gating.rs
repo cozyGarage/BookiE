@@ -87,6 +87,81 @@ async fn dangerous_effects_ask_for_approval_without_running_a_blast_radius_query
     }));
 }
 
+fn mssql_guard(principal: Principal, approval: Arc<dyn ApprovalSink>, queries: Arc<AtomicUsize>) -> PolicyGuard {
+    let mut guard_context = context(
+        principal,
+        Environment::Local,
+        PolicyConfig::default(),
+        approval,
+        Arc::new(SequenceAuditSink::new(vec![])),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "mssql".into();
+    PolicyGuard::new(query_counting_connection(queries), guard_context)
+}
+
+#[tokio::test]
+async fn a_linked_server_read_asks_for_approval_for_a_human_and_for_an_agent_before_it_runs() {
+    for principal in [
+        Principal::human_gui(),
+        Principal::Agent {
+            token: "token".into(),
+            client: None,
+            model: None,
+        },
+    ] {
+        let queries = Arc::new(AtomicUsize::new(0));
+        let approvals = Arc::new(AtomicUsize::new(0));
+        let guard = mssql_guard(
+            principal.clone(),
+            Arc::new(CountingApprovalSink {
+                calls: approvals.clone(),
+            }),
+            queries.clone(),
+        );
+
+        guard
+            .query("SELECT * FROM linked.db.dbo.t")
+            .await
+            .expect("the mocked approval sink approves the linked-server read");
+
+        assert_eq!(approvals.load(Ordering::SeqCst), 1, "{principal:?}");
+        assert_eq!(queries.load(Ordering::SeqCst), 1, "{principal:?}");
+    }
+}
+
+#[tokio::test]
+async fn a_refused_linked_server_read_never_reaches_the_driver() {
+    let queries = Arc::new(AtomicUsize::new(0));
+    let guard = mssql_guard(Principal::human_gui(), Arc::new(DenyApprovalSink), queries.clone());
+
+    let error = guard
+        .query("SELECT * FROM linked.db.dbo.t")
+        .await
+        .expect_err("a denied approval must stop the read");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(queries.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn a_read_of_a_local_sql_server_table_does_not_ask_for_approval() {
+    let queries = Arc::new(AtomicUsize::new(0));
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let guard = mssql_guard(
+        Principal::human_gui(),
+        Arc::new(CountingApprovalSink {
+            calls: approvals.clone(),
+        }),
+        queries.clone(),
+    );
+
+    guard.query("SELECT * FROM db.dbo.t").await.expect("an ordinary read");
+
+    assert_eq!(approvals.load(Ordering::SeqCst), 0);
+    assert_eq!(queries.load(Ordering::SeqCst), 1);
+}
+
 #[tokio::test]
 async fn oracle_stored_function_is_denied_before_driver_dispatch_without_approval() {
     let queries = Arc::new(AtomicUsize::new(0));

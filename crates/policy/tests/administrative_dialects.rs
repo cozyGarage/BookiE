@@ -396,3 +396,83 @@ fn a_column_named_like_an_external_source_function_stays_an_ordinary_read() {
         );
     }
 }
+
+fn decision_for(principal: &Principal, sql: &str, driver_id: &str, read_only: bool) -> Decision {
+    evaluate(
+        principal,
+        Environment::Local,
+        &classify(sql, driver_id),
+        read_only,
+        &PolicyConfig::default().for_environment(Environment::Local),
+        None,
+    )
+}
+
+fn human() -> Principal {
+    Principal::human_gui()
+}
+
+#[test]
+fn a_sql_server_four_part_name_needs_approval_from_a_human_and_from_an_agent() {
+    for sql in [
+        "SELECT * FROM linked.db.dbo.t",
+        "SELECT * FROM [linked].[db].[dbo].[t]",
+        "SELECT a.id FROM dbo.local_t a JOIN linked.db.dbo.t b ON b.id = a.id",
+        "WITH x AS (SELECT * FROM linked.db.dbo.t) SELECT * FROM x",
+        "SELECT * FROM dbo.t WHERE id IN (SELECT id FROM linked.db.dbo.t)",
+    ] {
+        for principal in [human(), agent()] {
+            let decision = decision_for(&principal, sql, "mssql", false);
+            assert!(
+                matches!(&decision, Decision::RequireApproval { rule, .. } if rule.contains("linked_server_approval")),
+                "{sql}: {decision:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_write_that_copies_from_a_linked_server_is_never_a_plain_allow() {
+    let sql = "INSERT INTO dbo.t SELECT * FROM linked.db.dbo.t";
+    let decision = decision_for(&human(), sql, "mssql", false);
+    assert!(
+        matches!(&decision, Decision::RequireApproval { rule, .. } if rule.contains("linked_server_approval")),
+        "{decision:?}"
+    );
+    assert!(!decision_for(&agent(), sql, "mssql", false).is_allow());
+}
+
+#[test]
+fn a_linked_server_read_stays_a_read_so_a_read_only_connection_only_asks_for_approval() {
+    let facts = classify("SELECT * FROM linked.db.dbo.t", "mssql");
+    assert_eq!(facts.class, StatementClass::Select);
+    assert!(!facts.writes());
+    let decision = decision_for(&agent(), "SELECT * FROM linked.db.dbo.t", "mssql", true);
+    assert!(matches!(decision, Decision::RequireApproval { .. }), "{decision:?}");
+}
+
+#[test]
+fn ordinary_names_with_up_to_three_parts_stay_ordinary_reads() {
+    for sql in [
+        "SELECT * FROM t",
+        "SELECT * FROM dbo.t",
+        "SELECT * FROM db.dbo.t",
+        "SELECT a.id, a.name FROM dbo.t a",
+    ] {
+        for principal in [human(), agent()] {
+            let decision = decision_for(&principal, sql, "mssql", false);
+            assert!(decision.is_allow(), "{sql}: {decision:?}");
+        }
+    }
+}
+
+#[test]
+fn four_part_names_are_only_linked_servers_on_sql_server() {
+    for driver_id in ["postgres", "mysql", "sqlite"] {
+        let decision = decision_for(&agent(), "SELECT * FROM a.b.c.d", driver_id, false);
+        assert!(
+            !matches!(&decision, Decision::RequireApproval { rule, .. } if rule.contains("linked_server")),
+            "{driver_id}: {decision:?}"
+        );
+    }
+}
