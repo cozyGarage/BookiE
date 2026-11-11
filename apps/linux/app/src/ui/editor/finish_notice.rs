@@ -20,9 +20,9 @@ pub(super) fn notify_if_unattended(widget: &impl IsA<gtk::Widget>, elapsed: Dura
     let Some(application) = window.application() else {
         return;
     };
-    let notification = gio::Notification::new(&crate::tr!("Query finished"));
+    let notification = gio::Notification::new(&bookie_app_services::tr!("Query finished"));
     notification.set_body(Some(
-        &crate::tr!("The query ran for {seconds} seconds.").replace("{seconds}", &elapsed.as_secs().to_string()),
+        &bookie_app_services::tr!("The query ran for {seconds} seconds.").replace("{seconds}", &elapsed.as_secs().to_string()),
     ));
     application.send_notification(Some("query-finished"), &notification);
 }

@@ -12,7 +12,7 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
         if col.enum_type.is_none() && is_character_type(&col.data_type.to_ascii_lowercase()) {
             return Ok(Value::Text(String::new()));
         }
-        return Err(crate::tr!("Field is required"));
+        return Err(bookie_app_services::tr!("Field is required"));
     }
     if col.enum_type.is_some() {
         return Ok(Value::Text(text.to_string()));
@@ -50,10 +50,10 @@ fn parse_enum_input(text: &str, col: Option<&ColumnInfo>, style: EnumInputStyle)
     bookie_app_services::enum_input::parse_enum_input(text, col, style).map(|result| {
         result.map_err(|error| match error {
             bookie_app_services::enum_input::EnumInputError::InvalidMemberDeclaration => {
-                crate::tr!("Could not safely read ENUM or SET members")
+                bookie_app_services::tr!("Could not safely read ENUM or SET members")
             }
             bookie_app_services::enum_input::EnumInputError::UndeclaredMember => {
-                crate::tr!("Value is not a declared ENUM or SET member")
+                bookie_app_services::tr!("Value is not a declared ENUM or SET member")
             }
         })
     })
@@ -112,7 +112,7 @@ pub(super) fn parse_input_for_driver_with_style(
             return Ok(Value::Decimal(value));
         }
         return if bookie_core::is_numeric_input(text) {
-            Err(crate::tr!("Invalid number"))
+            Err(bookie_app_services::tr!("Invalid number"))
         } else {
             Ok(Value::Text(text.to_owned()))
         };
@@ -188,11 +188,11 @@ fn parse_mssql_datetimeoffset_input(
             .filter(|scale| *scale <= 7)
     };
     let Some(scale) = scale else {
-        return Some(Err(crate::tr!("Invalid SQL Server datetimeoffset column scale")));
+        return Some(Err(bookie_app_services::tr!("Invalid SQL Server datetimeoffset column scale")));
     };
     let parsed = chrono::DateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S%.f %:z");
     Some(parsed.map_or_else(
-        |_| Err(crate::tr!("Invalid SQL Server datetimeoffset")),
+        |_| Err(bookie_app_services::tr!("Invalid SQL Server datetimeoffset")),
         |value| {
             let local = text.rsplit_once(' ').map_or(text, |(local, _)| local);
             let fraction_digits = local.split_once('.').map_or(0, |(_, fraction)| fraction.len());
@@ -204,7 +204,7 @@ fn parse_mssql_datetimeoffset_input(
                 || !(1..=9999).contains(&local_year)
                 || !(1..=9999).contains(&utc_year)
             {
-                return Err(crate::tr!(
+                return Err(bookie_app_services::tr!(
                     "SQL Server datetimeoffset value exceeds the column precision or offset range"
                 ));
             }
@@ -315,7 +315,7 @@ pub(super) fn parse_pasted_cell_with_style(
 ) -> Result<Value, String> {
     match text {
         None if col.is_none_or(|column| column.nullable) => Ok(Value::Null),
-        None => Err(crate::tr!("Field is required")),
+        None => Err(bookie_app_services::tr!("Field is required")),
         Some("")
             if col.is_none_or(|column| {
                 column.enum_type.is_none() && is_character_type(&column.data_type.to_ascii_lowercase())
@@ -349,7 +349,7 @@ fn parse_postgres_extended_temporal_input(
         return Some(if extended_duckdb_date(text).is_some() {
             Ok(Value::Text(text.to_owned()))
         } else {
-            Err(crate::tr!("Invalid date. Use YYYY-MM-DD."))
+            Err(bookie_app_services::tr!("Invalid date. Use YYYY-MM-DD."))
         });
     }
     if matches!(kind.as_str(), "timestamp" | "timestamp without time zone") {
@@ -358,7 +358,7 @@ fn parse_postgres_extended_temporal_input(
         }
         return Some(match extended_duckdb_timestamp_nanos(text) {
             Some(nanos) if nanos % 1_000 == 0 => Ok(Value::Text(text.replace('T', " "))),
-            _ => Err(crate::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS.")),
+            _ => Err(bookie_app_services::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS.")),
         });
     }
     if matches!(kind.as_str(), "timestamptz" | "timestamp with time zone") {
@@ -369,7 +369,7 @@ fn parse_postgres_extended_temporal_input(
             bookie_core::import::duckdb_extended_timestamptz_nanos(text)
                 .filter(|nanos| nanos % 1_000 == 0)
                 .map(|_| Value::Text(text.replace('T', " ")))
-                .ok_or_else(|| crate::tr!("Invalid timestamp with time zone.")),
+                .ok_or_else(|| bookie_app_services::tr!("Invalid timestamp with time zone.")),
         );
     }
     None
@@ -392,7 +392,7 @@ fn parse_mysql_spatial_input(col: Option<&ColumnInfo>, driver_id: &str) -> Optio
             | "multipolygon"
             | "geometrycollection"
     )
-    .then(|| Err(crate::tr!("MySQL spatial values cannot be edited losslessly")))
+    .then(|| Err(bookie_app_services::tr!("MySQL spatial values cannot be edited losslessly")))
 }
 
 fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Result<Value, String>> {
@@ -426,9 +426,9 @@ fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Res
         _ => return None,
     };
     Some((|| {
-        let value = text.parse::<i128>().map_err(|_| crate::tr!("Invalid integer"))?;
+        let value = text.parse::<i128>().map_err(|_| bookie_app_services::tr!("Invalid integer"))?;
         if !(minimum..=maximum).contains(&value) {
-            return Err(crate::tr!("Integer is outside the supported MySQL column range"));
+            return Err(bookie_app_services::tr!("Integer is outside the supported MySQL column range"));
         }
         Ok(i64::try_from(value).map_or_else(|_| Value::Text(value.to_string()), Value::Int))
     })())
@@ -441,7 +441,7 @@ fn parse_mongodb_integer_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
     }
     match column.data_type.trim().to_ascii_lowercase().as_str() {
         "int" => Some(text.parse::<i32>().map_or_else(
-            |_| Err(crate::tr!("Integer is outside the supported MongoDB Int32 range")),
+            |_| Err(bookie_app_services::tr!("Integer is outside the supported MongoDB Int32 range")),
             |value| {
                 Ok(Value::Json(Box::new(
                     serde_json::json!({"$numberInt": value.to_string()}),
@@ -464,7 +464,7 @@ fn parse_mongodb_decimal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
     Some(
         drivers_mongodb::canonical_decimal128_text(text)
             .map(|canonical| Value::Json(Box::new(serde_json::json!({"$numberDecimal": canonical}))))
-            .map_err(|_| crate::tr!("Invalid decimal")),
+            .map_err(|_| bookie_app_services::tr!("Invalid decimal")),
     )
 }
 
@@ -477,7 +477,7 @@ fn parse_mongodb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &st
     Some(if timestamp.timestamp_subsec_nanos() % 1_000_000 == 0 {
         Ok(Value::TimestampTz(timestamp.to_utc()))
     } else {
-        Err(crate::tr!("MongoDB BSON dates support millisecond precision only"))
+        Err(bookie_app_services::tr!("MongoDB BSON dates support millisecond precision only"))
     })
 }
 
@@ -507,15 +507,15 @@ fn parse_duckdb_timestamptz_input(
     Some((|| {
         if let Ok(Value::TimestampTz(timestamp)) = parse_timestamptz_value(text) {
             if timestamp.timestamp_subsec_nanos() % 1_000 != 0 {
-                return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
+                return Err(bookie_app_services::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
             }
             return Ok(Value::TimestampTz(timestamp));
         }
         let Some(nanos) = bookie_core::import::duckdb_extended_timestamptz_nanos(text) else {
-            return Err(crate::tr!("Invalid timestamp with time zone."));
+            return Err(bookie_app_services::tr!("Invalid timestamp with time zone."));
         };
         if nanos % 1_000 != 0 {
-            return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
+            return Err(bookie_app_services::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
         }
         Ok(Value::Text(text.to_owned()))
     })())
@@ -541,7 +541,7 @@ fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
                     let nanos = value.nanosecond();
                     (Value::Time(value), nanos)
                 }
-                _ => return Err(crate::tr!("Invalid time.")),
+                _ => return Err(bookie_app_services::tr!("Invalid time.")),
             }
         } else if let Ok(Value::DateTime(value)) = parse_datetime_value(text) {
             let nanos = value.nanosecond();
@@ -549,7 +549,7 @@ fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
         } else if let Some(nanos) = extended_duckdb_timestamp_nanos(text) {
             (Value::Text(text.to_owned()), nanos)
         } else {
-            return Err(crate::tr!("Invalid date and time."));
+            return Err(bookie_app_services::tr!("Invalid date and time."));
         };
         if nanos % quantum_ns != 0 {
             return Err(format!("DuckDB {kind} precision cannot represent this value exactly"));
@@ -568,7 +568,7 @@ fn parse_duckdb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str
     Some(if extended_duckdb_date(text).is_some() {
         Ok(Value::Text(text.to_owned()))
     } else {
-        Err(crate::tr!("Invalid date. Use YYYY-MM-DD."))
+        Err(bookie_app_services::tr!("Invalid date. Use YYYY-MM-DD."))
     })
 }
 
@@ -660,14 +660,14 @@ fn parse_mysql_bit_value(text: &str, width: u32) -> Result<Value, String> {
     if width == 1 {
         return parse_bool_value(text);
     }
-    let number = text.parse::<u64>().map_err(|_| crate::tr!("Invalid integer"))?;
+    let number = text.parse::<u64>().map_err(|_| bookie_app_services::tr!("Invalid integer"))?;
     let maximum = if width == 64 {
         i64::MAX as u64
     } else {
         (1u64 << width) - 1
     };
     if number > maximum {
-        return Err(crate::tr!("Integer is outside the supported BIT range"));
+        return Err(bookie_app_services::tr!("Integer is outside the supported BIT range"));
     }
     Ok(Value::Int(number as i64))
 }
@@ -805,46 +805,46 @@ pub(super) fn parse_bool_value(text: &str) -> Result<Value, String> {
     match text.to_ascii_lowercase().as_str() {
         "true" | "t" | "1" | "yes" | "y" | "on" => Ok(Value::Bool(true)),
         "false" | "f" | "0" | "no" | "n" | "off" => Ok(Value::Bool(false)),
-        _ => Err(crate::tr!("Invalid boolean. Use true/false, yes/no, or 1/0.")),
+        _ => Err(bookie_app_services::tr!("Invalid boolean. Use true/false, yes/no, or 1/0.")),
     }
 }
 
 pub(super) fn parse_int_value(text: &str) -> Result<Value, String> {
     text.parse::<i64>()
         .map(Value::Int)
-        .map_err(|_| crate::tr!("Invalid integer"))
+        .map_err(|_| bookie_app_services::tr!("Invalid integer"))
 }
 
 pub(super) fn parse_float_value(text: &str) -> Result<Value, String> {
     bookie_core::parse_float_input(text)
         .map(Value::Float)
-        .map_err(|_| crate::tr!("Invalid number"))
+        .map_err(|_| bookie_app_services::tr!("Invalid number"))
 }
 
 pub(super) fn parse_decimal_value(text: &str) -> Result<Value, String> {
     rust_decimal::Decimal::from_str_exact(text)
         .map(Value::Decimal)
-        .map_err(|_| crate::tr!("Invalid decimal"))
+        .map_err(|_| bookie_app_services::tr!("Invalid decimal"))
 }
 
 pub(super) fn parse_uuid_value(text: &str) -> Result<Value, String> {
     uuid::Uuid::parse_str(text)
         .map(Value::Uuid)
-        .map_err(|_| crate::tr!("Invalid UUID. Expected 8-4-4-4-12 hex digits."))
+        .map_err(|_| bookie_app_services::tr!("Invalid UUID. Expected 8-4-4-4-12 hex digits."))
 }
 
 pub(super) fn parse_json_value(text: &str) -> Result<Value, String> {
     serde_json::from_str::<serde_json::Value>(text)
         .map(Box::new)
         .map(Value::Json)
-        .map_err(|e| crate::tr!("Invalid JSON: {error}").replace("{error}", &e.to_string()))
+        .map_err(|e| bookie_app_services::tr!("Invalid JSON: {error}").replace("{error}", &e.to_string()))
 }
 
 pub(super) fn parse_timestamptz_value(text: &str) -> Result<Value, String> {
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(text) {
         return Ok(Value::TimestampTz(dt.with_timezone(&chrono::Utc)));
     }
-    Err(crate::tr!(
+    Err(bookie_app_services::tr!(
         "Invalid timestamp. Use ISO 8601, e.g. 2024-01-15T14:30:00Z."
     ))
 }
@@ -861,13 +861,13 @@ pub(super) fn parse_datetime_value(text: &str) -> Result<Value, String> {
             return Ok(Value::DateTime(dt));
         }
     }
-    Err(crate::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS."))
+    Err(bookie_app_services::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS."))
 }
 
 pub(super) fn parse_date_value(text: &str) -> Result<Value, String> {
     chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d")
         .map(Value::Date)
-        .map_err(|_| crate::tr!("Invalid date. Use YYYY-MM-DD."))
+        .map_err(|_| bookie_app_services::tr!("Invalid date. Use YYYY-MM-DD."))
 }
 
 pub(super) fn parse_time_value(text: &str) -> Result<Value, String> {
@@ -877,7 +877,7 @@ pub(super) fn parse_time_value(text: &str) -> Result<Value, String> {
             return Ok(Value::Time(t));
         }
     }
-    Err(crate::tr!("Invalid time. Use HH:MM:SS."))
+    Err(bookie_app_services::tr!("Invalid time. Use HH:MM:SS."))
 }
 
 #[cfg(test)]

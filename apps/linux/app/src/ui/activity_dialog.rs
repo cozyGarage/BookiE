@@ -15,7 +15,7 @@ use bookie_core::{
 
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
-use crate::tr;
+use bookie_app_services::tr;
 
 pub fn present(
     parent: &gtk::Window,

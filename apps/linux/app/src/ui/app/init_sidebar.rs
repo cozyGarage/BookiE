@@ -157,8 +157,8 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
     // sidebar-empty look).
     let sidebar_placeholder = adw::StatusPage::builder()
         .icon_name("view-list-symbolic")
-        .title(crate::tr!("No tables"))
-        .description(crate::tr!(
+        .title(bookie_app_services::tr!("No tables"))
+        .description(bookie_app_services::tr!(
             "Nothing matches the current search, or this connection has no tables yet. Use Refresh tables to check again."
         ))
         .build();

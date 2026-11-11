@@ -321,9 +321,9 @@ impl StructureTab {
         self.discard_button.set_sensitive(has_pending);
         if has_pending {
             let label = if pending_count == 1 {
-                crate::tr!("1 pending change")
+                bookie_app_services::tr!("1 pending change")
             } else {
-                crate::tr!("{n} pending changes").replace("{n}", &pending_count.to_string())
+                bookie_app_services::tr!("{n} pending changes").replace("{n}", &pending_count.to_string())
             };
             self.pending_label.set_label(&label);
             self.pending_label.set_visible(true);
@@ -335,7 +335,7 @@ impl StructureTab {
     fn regenerate_sql_preview_from(&self, ops: &[StructureOp]) {
         let text = match materialize_ops(ops, &self.driver_id) {
             Ok(stmts) if !stmts.is_empty() => stmts.join(";\n\n") + ";",
-            Ok(_) => crate::tr!("-- No pending changes."),
+            Ok(_) => bookie_app_services::tr!("-- No pending changes."),
             Err(e) => format!("-- {e}"),
         };
         self.sql_buffer.set_text(&text);
@@ -397,7 +397,7 @@ impl StructureTab {
         let list = boxed_list();
         self.append_column_rows(&list, &sender);
         let sender_for_add = sender.clone();
-        append_add_button(&list, &crate::tr!("Add Column"), move || {
+        append_add_button(&list, &bookie_app_services::tr!("Add Column"), move || {
             sender_for_add.input(StructureTabInput::AddColumn);
         });
         self.columns_box.append(&list);
@@ -414,8 +414,8 @@ impl StructureTab {
         if metadata_availability(*self.mode.borrow(), self.supports_index_metadata) == MetadataAvailability::Unsupported
         {
             list.append(&metadata_notice_row(
-                &crate::tr!("Index metadata unavailable"),
-                &crate::tr!("This driver doesn't expose index metadata for existing tables."),
+                &bookie_app_services::tr!("Index metadata unavailable"),
+                &bookie_app_services::tr!("This driver doesn't expose index metadata for existing tables."),
             ));
         }
         for (i, idx) in self.indexes.borrow().iter().enumerate() {
@@ -424,7 +424,7 @@ impl StructureTab {
         let columns_for_dialog = self.columns.clone();
         let sender_for_add = sender.clone();
         let parent_box = self.indexes_box.downgrade();
-        append_add_button(&list, &crate::tr!("Add Index…"), move || {
+        append_add_button(&list, &bookie_app_services::tr!("Add Index…"), move || {
             let Some(parent_box) = parent_box.upgrade() else {
                 return;
             };
@@ -445,8 +445,8 @@ impl StructureTab {
             == MetadataAvailability::Unsupported
         {
             list.append(&metadata_notice_row(
-                &crate::tr!("Foreign-key metadata unavailable"),
-                &crate::tr!("This driver doesn't expose foreign-key metadata for existing tables."),
+                &bookie_app_services::tr!("Foreign-key metadata unavailable"),
+                &bookie_app_services::tr!("This driver doesn't expose foreign-key metadata for existing tables."),
             ));
         }
         for (i, fk) in self.foreign_keys.borrow().iter().enumerate() {
@@ -456,7 +456,7 @@ impl StructureTab {
         let sender_for_add = sender.clone();
         let parent_box = self.fks_box.downgrade();
         let driver_id_for_dialog = driver_id.clone();
-        let add_row = append_add_button(&list, &crate::tr!("Add Foreign Key…"), move || {
+        let add_row = append_add_button(&list, &bookie_app_services::tr!("Add Foreign Key…"), move || {
             let Some(parent_box) = parent_box.upgrade() else {
                 return;
             };
@@ -468,7 +468,7 @@ impl StructureTab {
             );
         });
         if !fks::can_add_foreign_key(&driver_id, &self.mode.borrow()) {
-            let reason = crate::tr!("Adding a foreign key to an existing table isn't supported by SQLite.");
+            let reason = bookie_app_services::tr!("Adding a foreign key to an existing table isn't supported by SQLite.");
             add_row.set_sensitive(false);
             add_row.set_subtitle(&reason);
             add_row.set_tooltip_text(Some(&reason));
@@ -541,7 +541,7 @@ impl SimpleComponent for StructureTab {
         let columns_page = view_stack.add_titled_with_icon(
             &columns_scroll,
             Some("columns"),
-            &crate::tr!("Columns"),
+            &bookie_app_services::tr!("Columns"),
             "view-list-symbolic",
         );
         let _ = columns_page;
@@ -554,7 +554,7 @@ impl SimpleComponent for StructureTab {
         let indexes_page = view_stack.add_titled_with_icon(
             &indexes_scroll,
             Some("indexes"),
-            &crate::tr!("Indexes"),
+            &bookie_app_services::tr!("Indexes"),
             "view-sort-ascending-symbolic",
         );
         let _ = indexes_page;
@@ -567,7 +567,7 @@ impl SimpleComponent for StructureTab {
         let fks_page = view_stack.add_titled_with_icon(
             &fks_scroll,
             Some("fks"),
-            &crate::tr!("Foreign Keys"),
+            &bookie_app_services::tr!("Foreign Keys"),
             "emblem-shared-symbolic",
         );
         let _ = fks_page;
@@ -586,7 +586,7 @@ impl SimpleComponent for StructureTab {
         // the generated DDL into a different tool.
         let copy_sql_btn = gtk::Button::builder()
             .icon_name("edit-copy-symbolic")
-            .tooltip_text(crate::tr!("Copy SQL to clipboard"))
+            .tooltip_text(bookie_app_services::tr!("Copy SQL to clipboard"))
             .valign(gtk::Align::Center)
             .build();
         copy_sql_btn.add_css_class("flat");
@@ -611,7 +611,7 @@ impl SimpleComponent for StructureTab {
         let sql_page = view_stack.add_titled_with_icon(
             &sql_page_box,
             Some("sql"),
-            &crate::tr!("SQL Preview"),
+            &bookie_app_services::tr!("SQL Preview"),
             "text-x-generic-symbolic",
         );
         let _ = sql_page;
@@ -647,10 +647,10 @@ impl SimpleComponent for StructureTab {
             .width_request(48)
             .height_request(48)
             .build();
-        let loading_title = gtk::Label::builder().label(crate::tr!("Loading structure…")).build();
+        let loading_title = gtk::Label::builder().label(bookie_app_services::tr!("Loading structure…")).build();
         loading_title.add_css_class("title-2");
         let loading_subtitle = gtk::Label::builder()
-            .label(crate::tr!("Reading columns, indexes, and foreign keys…"))
+            .label(bookie_app_services::tr!("Reading columns, indexes, and foreign keys…"))
             .build();
         loading_subtitle.add_css_class("dim-label");
         let loading_box = gtk::Box::builder()
@@ -683,10 +683,10 @@ impl SimpleComponent for StructureTab {
         // GNOME Settings's text input pattern. The PreferencesGroup
         // around it carries only the helper description; no redundant
         // "New table" title since the tab title already says so.
-        let name_entry = adw::EntryRow::builder().title(crate::tr!("Name")).build();
+        let name_entry = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
         name_entry.set_text(&init.table);
         let name_row = adw::PreferencesGroup::builder()
-            .description(crate::tr!("Add a name and at least one column to save."))
+            .description(bookie_app_services::tr!("Add a name and at least one column to save."))
             .margin_top(12)
             .margin_bottom(6)
             .margin_start(12)
@@ -714,7 +714,7 @@ impl SimpleComponent for StructureTab {
 
         let error_status = adw::StatusPage::builder()
             .icon_name("dialog-error-symbolic")
-            .title(crate::tr!("Couldn't load structure"))
+            .title(bookie_app_services::tr!("Couldn't load structure"))
             .build();
         // "Try again" — fires another FetchStructure round-trip via
         // the existing output channel. Without this, a transient
@@ -723,7 +723,7 @@ impl SimpleComponent for StructureTab {
         // GNOME Software's "Try Again" affordance on its own
         // load-failure page.
         let retry_button = gtk::Button::builder()
-            .label(crate::tr!("Try Again"))
+            .label(bookie_app_services::tr!("Try Again"))
             .halign(gtk::Align::Center)
             .build();
         retry_button.add_css_class("suggested-action");
@@ -756,16 +756,16 @@ impl SimpleComponent for StructureTab {
         action_bar.pack_start(&pending_label);
 
         let discard_button = gtk::Button::builder()
-            .label(crate::tr!("Discard"))
+            .label(bookie_app_services::tr!("Discard"))
             .sensitive(false)
             .build();
         let save_button = gtk::Button::builder()
-            .label(crate::tr!("Save"))
+            .label(bookie_app_services::tr!("Save"))
             .sensitive(false)
             .build();
         save_button.add_css_class("suggested-action");
         let drop_button = gtk::Button::builder()
-            .label(crate::tr!("Drop Table…"))
+            .label(bookie_app_services::tr!("Drop Table…"))
             .visible(matches!(init.mode, StructureMode::Edit))
             .build();
         drop_button.add_css_class("destructive-action");
@@ -1038,17 +1038,17 @@ impl SimpleComponent for StructureTab {
                         let _ = sender.output(StructureTabOutput::ExecuteTransaction { statements });
                     }
                     Ok(_) => {
-                        let _ = sender.output(StructureTabOutput::ShowToast(crate::tr!("Nothing to save.")));
+                        let _ = sender.output(StructureTabOutput::ShowToast(bookie_app_services::tr!("Nothing to save.")));
                     }
                     Err(BuildDdlError::SqliteNotSupported(detail)) => {
                         let _ = sender.output(StructureTabOutput::ShowAlert {
-                            title: crate::tr!("Cannot save"),
-                            body: crate::tr!("SQLite doesn't support: {detail}").replace("{detail}", detail),
+                            title: bookie_app_services::tr!("Cannot save"),
+                            body: bookie_app_services::tr!("SQLite doesn't support: {detail}").replace("{detail}", detail),
                         });
                     }
                     Err(e) => {
                         let _ = sender.output(StructureTabOutput::ShowAlert {
-                            title: crate::tr!("Cannot save"),
+                            title: bookie_app_services::tr!("Cannot save"),
                             body: format!("{e}"),
                         });
                     }
@@ -1121,7 +1121,7 @@ impl SimpleComponent for StructureTab {
             StructureTabInput::SaveFailed(message) => {
                 self.recompute_dirty_state(&sender);
                 let _ = sender.output(StructureTabOutput::ShowAlert {
-                    title: crate::tr!("Save failed"),
+                    title: bookie_app_services::tr!("Save failed"),
                     body: message,
                 });
             }

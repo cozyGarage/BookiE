@@ -41,7 +41,7 @@ impl SqlEditor {
             return Some(message);
         }
         if should_block_mutation_during_save(&message, self.result_save_in_flight()) {
-            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+            let _ = sender.output(SqlEditorOutput::ShowToast(bookie_app_services::tr!(
                 "Saving changes. Edit again when the save finishes."
             )));
             return None;
@@ -375,7 +375,7 @@ impl SqlEditor {
             return;
         }
         let Some((key, cells)) = self.result_row_key_and_cells(row_position) else {
-            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+            let _ = sender.output(SqlEditorOutput::ShowToast(bookie_app_services::tr!(
                 "This row can't be identified for editing"
             )));
             return;
@@ -424,7 +424,7 @@ impl SqlEditor {
             return true;
         };
         if editing.save_in_flight.is_some() {
-            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+            let _ = sender.output(SqlEditorOutput::ShowToast(bookie_app_services::tr!(
                 "Saving changes. Edit again when the save finishes."
             )));
             return true;
@@ -442,7 +442,7 @@ impl SqlEditor {
                 .is_none();
         };
         if current != expected {
-            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+            let _ = sender.output(SqlEditorOutput::ShowToast(bookie_app_services::tr!(
                 "This row changed. Edit it again."
             )));
             self.refresh_result_row(row_position);
@@ -483,13 +483,13 @@ impl SqlEditor {
         };
         let cells = source.cells_clone();
         if cells.len() != editing.columns.len() {
-            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+            let _ = sender.output(SqlEditorOutput::ShowToast(bookie_app_services::tr!(
                 "Cannot duplicate this row because its columns no longer match the result."
             )));
             return;
         }
         if cells.iter().any(|value| matches!(value, Value::Undecodable(_))) {
-            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+            let _ = sender.output(SqlEditorOutput::ShowToast(bookie_app_services::tr!(
                 "Cannot duplicate this row because it contains an undecodable value."
             )));
             return;
@@ -548,7 +548,7 @@ impl SqlEditor {
             return;
         }
         let Some((key, cells)) = self.result_row_key_and_cells(row_position) else {
-            let _ = sender.output(SqlEditorOutput::ShowToast(crate::tr!(
+            let _ = sender.output(SqlEditorOutput::ShowToast(bookie_app_services::tr!(
                 "This row can't be identified for editing"
             )));
             return;
@@ -639,7 +639,7 @@ impl SqlEditor {
             Some(Ok(_)) => self.refresh_result_pending_bar(0, Some(&sender)),
             Some(Err(error)) => {
                 let _ = sender.output(SqlEditorOutput::ShowAlert {
-                    title: crate::tr!("Cannot save"),
+                    title: bookie_app_services::tr!("Cannot save"),
                     body: format!("{error}"),
                 });
             }
@@ -670,13 +670,13 @@ impl SqlEditor {
                     .collect::<Vec<_>>()
                     .join(";\n");
                 let _ = sender.output(SqlEditorOutput::ShowAlert {
-                    title: crate::tr!("Preview SQL"),
+                    title: bookie_app_services::tr!("Preview SQL"),
                     body,
                 });
             }
             Some(Err(error)) => {
                 let _ = sender.output(SqlEditorOutput::ShowAlert {
-                    title: crate::tr!("Cannot preview"),
+                    title: bookie_app_services::tr!("Cannot preview"),
                     body: format!("{error}"),
                 });
             }
@@ -730,7 +730,7 @@ impl SqlEditor {
         editing.pending.save_button.set_sensitive(true);
         editing.pending.discard_button.set_sensitive(true);
         let _ = sender.output(SqlEditorOutput::ShowAlert {
-            title: crate::tr!("Save failed"),
+            title: bookie_app_services::tr!("Save failed"),
             body: message,
         });
     }

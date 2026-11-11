@@ -53,7 +53,7 @@ impl App {
         }
         match result {
             Ok(objects) if objects.is_empty() => {
-                self.show_toast(&crate::tr!("Nothing of this kind was found."));
+                self.show_toast(&bookie_app_services::tr!("Nothing of this kind was found."));
             }
             Ok(objects) => {
                 self.sidebar_catalog.insert(kind, objects);

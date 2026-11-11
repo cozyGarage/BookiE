@@ -47,13 +47,13 @@ async fn await_editor_sessions(
 }
 
 fn close_anyway_dialog(message: &str, on_close_anyway: impl Fn() + 'static) -> adw::AlertDialog {
-    let body = crate::tr!(
+    let body = bookie_app_services::tr!(
         "{message}\n\nIf you close anyway, the database rolls back any transaction that was not committed when its connection drops."
     )
     .replace("{message}", message);
-    let dialog = adw::AlertDialog::new(Some(&crate::tr!("Could not close database sessions")), Some(&body));
-    dialog.add_response("keep", &crate::tr!("Keep Open"));
-    dialog.add_response("close-anyway", &crate::tr!("Close Anyway"));
+    let dialog = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Could not close database sessions")), Some(&body));
+    dialog.add_response("keep", &bookie_app_services::tr!("Keep Open"));
+    dialog.add_response("close-anyway", &bookie_app_services::tr!("Close Anyway"));
     dialog.set_response_appearance("close-anyway", adw::ResponseAppearance::Destructive);
     dialog.set_default_response(Some("keep"));
     dialog.set_close_response("keep");
@@ -138,7 +138,7 @@ impl App {
                     return;
                 }
             }
-            self.show_error_alert(&crate::tr!("Could not close database sessions"), &message);
+            self.show_error_alert(&bookie_app_services::tr!("Could not close database sessions"), &message);
             return;
         }
 

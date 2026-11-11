@@ -47,11 +47,11 @@ pub enum SshSecretToStore {
 
 impl SshSection {
     pub fn build() -> Self {
-        let group = adw::PreferencesGroup::builder().title(crate::tr!("SSH tunnel")).build();
+        let group = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("SSH tunnel")).build();
 
         let expander = adw::ExpanderRow::builder()
-            .title(crate::tr!("Use SSH tunnel"))
-            .subtitle(crate::tr!(
+            .title(bookie_app_services::tr!("Use SSH tunnel"))
+            .subtitle(bookie_app_services::tr!(
                 "Reach the database through a bastion host. Jump chains can be set in the saved connection JSON (ssh.jump)."
             ))
             .show_enable_switch(true)
@@ -59,46 +59,46 @@ impl SshSection {
             .build();
         group.add(&expander);
 
-        let host = adw::EntryRow::builder().title(crate::tr!("Host")).build();
+        let host = adw::EntryRow::builder().title(bookie_app_services::tr!("Host")).build();
         let port = adw::SpinRow::with_range(1.0, 65535.0, 1.0);
-        port.set_title(&crate::tr!("Port"));
+        port.set_title(&bookie_app_services::tr!("Port"));
         port.set_value(22.0);
         let local_port = adw::SpinRow::with_range(0.0, 65535.0, 1.0);
-        local_port.set_title(&crate::tr!("Local port"));
-        local_port.set_subtitle(&crate::tr!("0 picks a free port"));
-        let user = adw::EntryRow::builder().title(crate::tr!("Username")).build();
+        local_port.set_title(&bookie_app_services::tr!("Local port"));
+        local_port.set_subtitle(&bookie_app_services::tr!("0 picks a free port"));
+        let user = adw::EntryRow::builder().title(bookie_app_services::tr!("Username")).build();
 
-        let auth_pwd = crate::tr!("Password");
-        let auth_key = crate::tr!("Private key");
-        let auth_agent = crate::tr!("SSH agent");
+        let auth_pwd = bookie_app_services::tr!("Password");
+        let auth_key = bookie_app_services::tr!("Private key");
+        let auth_agent = bookie_app_services::tr!("SSH agent");
         let auth_model = gtk::StringList::new(&[auth_pwd.as_str(), auth_key.as_str(), auth_agent.as_str()]);
         let auth_combo = adw::ComboRow::builder()
-            .title(crate::tr!("Authentication"))
+            .title(bookie_app_services::tr!("Authentication"))
             .model(&auth_model)
             .selected(SSH_AUTH_PASSWORD)
             .build();
 
-        let password = adw::PasswordEntryRow::builder().title(crate::tr!("Password")).build();
+        let password = adw::PasswordEntryRow::builder().title(bookie_app_services::tr!("Password")).build();
         let key_path = adw::EntryRow::builder()
-            .title(crate::tr!("Private key path"))
+            .title(bookie_app_services::tr!("Private key path"))
             .text(default_ssh_key_path())
             .build();
         attach_key_browse_button(
             &key_path,
-            &crate::tr!("Browse for private key"),
-            &crate::tr!("Select SSH private key"),
+            &bookie_app_services::tr!("Browse for private key"),
+            &bookie_app_services::tr!("Select SSH private key"),
             &["id_*", "*.pem", "*.key"],
         );
         let agent_key = adw::EntryRow::builder()
-            .title(crate::tr!("Agent key file (optional)"))
+            .title(bookie_app_services::tr!("Agent key file (optional)"))
             .build();
         attach_key_browse_button(
             &agent_key,
-            &crate::tr!("Browse for public key"),
-            &crate::tr!("Select SSH public key"),
+            &bookie_app_services::tr!("Browse for public key"),
+            &bookie_app_services::tr!("Select SSH public key"),
             &["*.pub"],
         );
-        let passphrase = adw::PasswordEntryRow::builder().title(crate::tr!("Passphrase")).build();
+        let passphrase = adw::PasswordEntryRow::builder().title(bookie_app_services::tr!("Passphrase")).build();
         let system_client = system_client_row();
 
         expander.add_row(&host);
@@ -192,7 +192,7 @@ impl SshSection {
             SSH_AUTH_KEY => {
                 let path = self.key_path.text().to_string();
                 if path.trim().is_empty() {
-                    return Err(crate::tr!("Private key path is required"));
+                    return Err(bookie_app_services::tr!("Private key path is required"));
                 }
                 let path_buf = PathBuf::from(path);
                 let raw_passphrase = self.passphrase.text().to_string();
@@ -231,12 +231,12 @@ impl SshSection {
     pub fn collect(&self) -> Result<SshInputs, String> {
         let host = self.host.text().to_string();
         if host.trim().is_empty() {
-            return Err(crate::tr!("SSH host is required"));
+            return Err(bookie_app_services::tr!("SSH host is required"));
         }
         let port: u16 = self.port.value() as u16;
         let username = self.user.text().to_string();
         if username.trim().is_empty() {
-            return Err(crate::tr!("SSH username is required"));
+            return Err(bookie_app_services::tr!("SSH username is required"));
         }
 
         let agent = self.auth_combo.selected() == SSH_AUTH_AGENT;
@@ -293,8 +293,8 @@ fn local_port_setting(value: f64) -> Option<u16> {
 
 fn system_client_row() -> adw::SwitchRow {
     adw::SwitchRow::builder()
-        .title(crate::tr!("Use system OpenSSH"))
-        .subtitle(crate::tr!(
+        .title(bookie_app_services::tr!("Use system OpenSSH"))
+        .subtitle(bookie_app_services::tr!(
             "Run the ssh program so ~/.ssh/config, ProxyJump, ssh-agent and host certificates apply"
         ))
         .build()
@@ -345,7 +345,7 @@ fn attach_key_browse_button(key_path: &adw::EntryRow, tooltip: &str, title: &str
         // entries — matches the pattern GNOME Settings uses for
         // certificate pickers.
         let filter = gtk::FileFilter::new();
-        filter.set_name(Some(&crate::tr!("SSH keys")));
+        filter.set_name(Some(&bookie_app_services::tr!("SSH keys")));
         for pattern in &patterns {
             filter.add_pattern(pattern);
         }

@@ -4,9 +4,9 @@ use relm4::gtk::prelude::*;
 pub(in crate::ui::editor) fn build(pages: &gtk::Stack) -> gtk::Box {
     let controls = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     controls.set_halign(gtk::Align::Start);
-    let previous = gtk::Button::with_label(&crate::tr!("Previous page"));
+    let previous = gtk::Button::with_label(&bookie_app_services::tr!("Previous page"));
     let range = gtk::Label::new(None);
-    let next = gtk::Button::with_label(&crate::tr!("Next page"));
+    let next = gtk::Button::with_label(&bookie_app_services::tr!("Next page"));
     previous.connect_clicked({
         let pages = pages.downgrade();
         move |_| {

@@ -70,7 +70,7 @@ impl RunTotals {
                 StatementOutcomeKind::Error(message) => Some(message.to_string()),
                 StatementOutcomeKind::Streamed(result) => match &result.terminal {
                     StreamTerminal::Failed(message) => Some(message.to_string()),
-                    StreamTerminal::TimedOut => Some(crate::tr!("Query timed out")),
+                    StreamTerminal::TimedOut => Some(bookie_app_services::tr!("Query timed out")),
                     StreamTerminal::Loading | StreamTerminal::Complete | StreamTerminal::Cancelled => None,
                 },
                 StatementOutcomeKind::NotRun | StatementOutcomeKind::Rows(_) => None,
@@ -227,14 +227,14 @@ async fn lexical_settings_change(
     };
     match target.lexical_settings(control).await {
         Ok(current) if current.is_none_or(|current| current == expected) => Ok(None),
-        Ok(_) => Ok(Some(crate::tr!(
+        Ok(_) => Ok(Some(bookie_app_services::tr!(
             "Not run: the previous statement changed how this session reads strings, so the rest of the script \
              would split differently. Run the remaining statements again."
         ))),
         Err(DriverError::Cancelled) => Err(ScriptRunResult::Cancelled),
         Err(DriverError::TimedOut) => Err(ScriptRunResult::TimedOut),
         Err(error) => Ok(Some(
-            crate::tr!("Not run: could not confirm how this session reads strings: {error}")
+            bookie_app_services::tr!("Not run: could not confirm how this session reads strings: {error}")
                 .replace("{error}", &crate::services::error_text::driver_message(&error)),
         )),
     }
@@ -352,7 +352,7 @@ where
             sql_preview: attempt.preview.clone(),
             sql: attempt.sql.to_owned(),
             elapsed_ms: attempt.started.elapsed().as_millis(),
-            kind: StatementOutcomeKind::Error(crate::tr!("Temporary result storage is unavailable.").into()),
+            kind: StatementOutcomeKind::Error(bookie_app_services::tr!("Temporary result storage is unavailable.").into()),
             pinned: false,
         })
     })?;
@@ -508,14 +508,14 @@ where
         if !spooled {
             finish_stream_cursor(cursor, true).await;
             return ScriptRunResult::Streamed(StreamTerminal::Failed(
-                crate::tr!("BookiE could not keep the complete result in temporary storage. The received rows remain available.")
+                bookie_app_services::tr!("BookiE could not keep the complete result in temporary storage. The received rows remain available.")
                     .into(),
             ));
         }
         if truncated {
             finish_stream_cursor(cursor, true).await;
             return ScriptRunResult::Streamed(StreamTerminal::Failed(
-                crate::tr!("A result page exceeded the query result limit. The result is incomplete.").into(),
+                bookie_app_services::tr!("A result page exceeded the query result limit. The result is incomplete.").into(),
             ));
         }
         if !has_next_page {
@@ -558,20 +558,20 @@ pub(crate) fn summary_label(n_total: usize, n_ok: usize, total_ms: u128, has_err
     if n_total == 1 {
         let ms = total_ms.to_string();
         if has_error {
-            crate::tr!("error in {ms} ms").replace("{ms}", &ms)
+            bookie_app_services::tr!("error in {ms} ms").replace("{ms}", &ms)
         } else {
-            crate::tr!("done in {ms} ms").replace("{ms}", &ms)
+            bookie_app_services::tr!("done in {ms} ms").replace("{ms}", &ms)
         }
     } else {
         let ok_s = n_ok.to_string();
         let total_s = n_total.to_string();
         let ms = total_ms.to_string();
-        let base = crate::tr!("{ok}/{total} statements · {ms} ms")
+        let base = bookie_app_services::tr!("{ok}/{total} statements · {ms} ms")
             .replace("{ok}", &ok_s)
             .replace("{total}", &total_s)
             .replace("{ms}", &ms);
         if has_error {
-            format!("{base} · {}", crate::tr!("error"))
+            format!("{base} · {}", bookie_app_services::tr!("error"))
         } else {
             base
         }
@@ -603,8 +603,8 @@ fn build_outcome_widget(
             let ms = o.elapsed_ms.to_string();
             let number = (o.identity.statement_index + 1).to_string();
             adw::StatusPage::builder()
-                .title(crate::tr!("Statement {n} executed").replace("{n}", &number))
-                .description(crate::tr!("No rows returned · {ms} ms").replace("{ms}", &ms))
+                .title(bookie_app_services::tr!("Statement {n} executed").replace("{n}", &number))
+                .description(bookie_app_services::tr!("No rows returned · {ms} ms").replace("{ms}", &ms))
                 .icon_name("emblem-default-symbolic")
                 .vexpand(true)
                 .build()
@@ -615,8 +615,8 @@ fn build_outcome_widget(
         }
         StatementOutcomeKind::Error(msg) => error_page(o.identity.statement_index, msg).upcast(),
         StatementOutcomeKind::NotRun => adw::StatusPage::builder()
-            .title(crate::tr!("Statement {n} not run").replace("{n}", &(o.identity.statement_index + 1).to_string()))
-            .description(crate::tr!("Skipped because an earlier statement failed."))
+            .title(bookie_app_services::tr!("Statement {n} not run").replace("{n}", &(o.identity.statement_index + 1).to_string()))
+            .description(bookie_app_services::tr!("Skipped because an earlier statement failed."))
             .icon_name("media-playback-stop-symbolic")
             .vexpand(true)
             .build()
@@ -637,7 +637,7 @@ fn build_multi_result_widget(
         .iter()
         .enumerate()
         .map(|(index, result)| {
-            crate::tr!("Result set {n} ({rows})")
+            bookie_app_services::tr!("Result set {n} ({rows})")
                 .replace("{n}", &(index + 1).to_string())
                 .replace("{rows}", &result.rows.len().to_string())
         })
@@ -655,7 +655,7 @@ fn build_multi_result_widget(
         stack.add_titled(&widget, Some(&format!("set{index}")), &labels[index]);
     }
     let dropdown = gtk::DropDown::from_strings(&labels.iter().map(String::as_str).collect::<Vec<_>>());
-    dropdown.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Result set"))]);
+    dropdown.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Result set"))]);
     dropdown.connect_selected_notify({
         let stack = stack.downgrade();
         move |dropdown| {
@@ -681,7 +681,7 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
         .vexpand(true)
         .build();
     let title = gtk::Label::builder()
-        .label(crate::tr!("Statement {n} failed").replace("{n}", &(idx + 1).to_string()))
+        .label(bookie_app_services::tr!("Statement {n} failed").replace("{n}", &(idx + 1).to_string()))
         .css_classes(["title-3"])
         .xalign(0.0)
         .wrap(true)
@@ -694,7 +694,7 @@ fn error_page(idx: usize, message: &super::StatementFailure) -> gtk::Box {
         .column_spacing(6)
         .row_spacing(4)
         .build();
-    let copy = gtk::Button::with_label(&crate::tr!("Copy error"));
+    let copy = gtk::Button::with_label(&bookie_app_services::tr!("Copy error"));
     let text = message.to_string();
     copy.connect_clicked(move |button| button.clipboard().set_text(&text));
     actions.insert(&copy, -1);
@@ -730,7 +730,7 @@ fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &sup
             .collect::<Vec<_>>()
             .join(", ");
         let label = gtk::Label::builder()
-            .label(crate::tr!("Audit operation: {id}").replace("{id}", &audit_ids))
+            .label(bookie_app_services::tr!("Audit operation: {id}").replace("{id}", &audit_ids))
             .xalign(0.0)
             .selectable(true)
             .wrap(true)
@@ -740,7 +740,7 @@ fn append_audit_actions(holder: &gtk::Box, actions: &gtk::FlowBox, message: &sup
     for operation_id in message.audit_operation_ids() {
         let action_target = operation_id.to_string().to_variant();
         let audit = gtk::Button::builder()
-            .label(crate::tr!("View in Audit Log"))
+            .label(bookie_app_services::tr!("View in Audit Log"))
             .action_name("win.show-audit-for")
             .action_target(&action_target)
             .css_classes(["pill", "flat"])
@@ -806,7 +806,7 @@ pub(super) fn build_result_set_widget(
 ) -> gtk::Widget {
     if result.columns.is_empty() {
         return adw::StatusPage::builder()
-            .title(crate::tr!("No rows returned"))
+            .title(bookie_app_services::tr!("No rows returned"))
             .icon_name("emblem-default-symbolic")
             .vexpand(true)
             .build()
@@ -893,29 +893,29 @@ fn outcome_tab_label(o: &StatementOutcome) -> String {
     let n = (o.identity.statement_index + 1).to_string();
     let Some(statement) = statement_subject(&o.sql_preview) else {
         return match &o.kind {
-            StatementOutcomeKind::Rows(sets) => crate::tr!("Result {n} ({rows})")
+            StatementOutcomeKind::Rows(sets) => bookie_app_services::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
                 .replace("{rows}", &format_result_rows(result_rows(sets))),
-            StatementOutcomeKind::Streamed(result) => crate::tr!("Result {n} ({rows})")
+            StatementOutcomeKind::Streamed(result) => bookie_app_services::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
                 .replace("{rows}", &format_result_rows(result.total_rows)),
-            StatementOutcomeKind::Error(_) => crate::tr!("Result {n} (error)").replace("{n}", &n),
-            StatementOutcomeKind::NotRun => crate::tr!("Result {n} (skipped)").replace("{n}", &n),
+            StatementOutcomeKind::Error(_) => bookie_app_services::tr!("Result {n} (error)").replace("{n}", &n),
+            StatementOutcomeKind::NotRun => bookie_app_services::tr!("Result {n} (skipped)").replace("{n}", &n),
         };
     };
     match &o.kind {
-        StatementOutcomeKind::Rows(sets) => crate::tr!("{n} · {statement} ({rows})")
+        StatementOutcomeKind::Rows(sets) => bookie_app_services::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
             .replace("{rows}", &format_result_rows(result_rows(sets))),
-        StatementOutcomeKind::Streamed(result) => crate::tr!("{n} · {statement} ({rows})")
+        StatementOutcomeKind::Streamed(result) => bookie_app_services::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
             .replace("{rows}", &format_result_rows(result.total_rows)),
-        StatementOutcomeKind::Error(_) => crate::tr!("{n} · {statement} (error)")
+        StatementOutcomeKind::Error(_) => bookie_app_services::tr!("{n} · {statement} (error)")
             .replace("{n}", &n)
             .replace("{statement}", &statement),
-        StatementOutcomeKind::NotRun => crate::tr!("{n} · {statement} (skipped)")
+        StatementOutcomeKind::NotRun => bookie_app_services::tr!("{n} · {statement} (skipped)")
             .replace("{n}", &n)
             .replace("{statement}", &statement),
     }
@@ -927,8 +927,8 @@ fn pinned_tab_label(o: &StatementOutcome) -> String {
         StatementOutcomeKind::Streamed(result) => format_result_rows(result.total_rows),
         StatementOutcomeKind::Error(_) | StatementOutcomeKind::NotRun => String::new(),
     };
-    let subject = statement_subject(&o.sql_preview).unwrap_or_else(|| crate::tr!("Result"));
-    crate::tr!("📌 {statement} ({rows})")
+    let subject = statement_subject(&o.sql_preview).unwrap_or_else(|| bookie_app_services::tr!("Result"));
+    bookie_app_services::tr!("📌 {statement} ({rows})")
         .replace("{statement}", &subject)
         .replace("{rows}", &rows)
 }
@@ -980,7 +980,7 @@ fn build_result_drop_down(stack: &adw::ViewStack, outcomes: &[StatementOutcome])
     let labels: Vec<String> = outcomes.iter().map(outcome_tab_label).collect();
     let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
     let drop_down = gtk::DropDown::from_strings(&label_refs);
-    drop_down.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Statement result"))]);
+    drop_down.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Statement result"))]);
     let first_error = first_failure(outcomes).unwrap_or(0);
     drop_down.set_selected(first_error as u32);
     drop_down.connect_selected_notify({
@@ -1014,8 +1014,8 @@ pub(crate) fn render_outcomes(
     settings_store.retain(&result_view_keys(outcomes));
     if outcomes.is_empty() {
         let placeholder = adw::StatusPage::builder()
-            .title(crate::tr!("Empty query"))
-            .description(crate::tr!("Type a SQL statement and press Run."))
+            .title(bookie_app_services::tr!("Empty query"))
+            .description(bookie_app_services::tr!("Type a SQL statement and press Run."))
             .icon_name("text-x-generic-symbolic")
             .vexpand(true)
             .build();

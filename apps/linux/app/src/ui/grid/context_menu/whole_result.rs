@@ -9,11 +9,11 @@ use crate::ui::editor::StatementIdentity;
 pub(super) fn extend_menu(menu: &gio::Menu) {
     let section = gio::Menu::new();
     section.append(
-        Some(&crate::tr!("Show All Rows Equal to This Value")),
+        Some(&bookie_app_services::tr!("Show All Rows Equal to This Value")),
         Some("cell.whole-result-equals"),
     );
     section.append(
-        Some(&crate::tr!("Show All Rows Not Equal to This Value")),
+        Some(&bookie_app_services::tr!("Show All Rows Not Equal to This Value")),
         Some("cell.whole-result-not-equals"),
     );
     let before_actions = menu.n_items().saturating_sub(1);

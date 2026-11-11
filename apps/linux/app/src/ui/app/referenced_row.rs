@@ -16,10 +16,10 @@ pub(super) fn choose_referenced_row(
     sender: ComponentSender<App>,
 ) {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("Choose a referenced table")),
-        Some(&crate::tr!("This column belongs to more than one foreign key.")),
+        Some(&bookie_app_services::tr!("Choose a referenced table")),
+        Some(&bookie_app_services::tr!("This column belongs to more than one foreign key.")),
     );
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
     dialog.set_close_response("cancel");
     for (index, target) in targets.iter().enumerate() {
         let response = format!("foreign-key-{index}");

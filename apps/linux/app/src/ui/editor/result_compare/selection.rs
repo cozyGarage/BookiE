@@ -41,7 +41,7 @@ fn short(text: &str) -> String {
 }
 
 fn label(preview: &str, rows: u64, set: Option<usize>) -> String {
-    let rows = crate::trn!("{n} row", "{n} rows", rows as usize)
+    let rows = bookie_app_services::trn!("{n} row", "{n} rows", rows as usize)
         .replace("{n}", &crate::ui::count_format::format_thousands(u128::from(rows)));
     match set {
         Some(set) => format!("{} · #{} · {rows}", short(preview), set + 1),

@@ -7,7 +7,7 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
 use crate::services::query_parameters::{self, QueryParameterError};
-use crate::tr;
+use bookie_app_services::tr;
 
 const RUN_RESPONSE: &str = "run";
 const CANCEL_RESPONSE: &str = "cancel";
