@@ -255,20 +255,22 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             rm.chmod(0o755)
+            child_env = {
+                **os.environ,
+                "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                "GITHUB_RUN_ID": "123",
+                "GITHUB_RUN_ATTEMPT": "2",
+                "GITHUB_JOB": "driver",
+                "GITHUB_WORKSPACE": str(workspace),
+                "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
+                "TMPDIR": "/var/cache/ci/tmp/bookie-driver-123-2-core",
+                "RM_CALLS": str(calls),
+            }
+            child_env.pop("BASH_ENV", None)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 cwd=workspace,
-                env={
-                    **os.environ,
-                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
-                    "GITHUB_RUN_ID": "123",
-                    "GITHUB_RUN_ATTEMPT": "2",
-                    "GITHUB_JOB": "driver",
-                    "GITHUB_WORKSPACE": str(workspace),
-                    "CARGO_TARGET_DIR": str(Path(temporary) / "target"),
-                    "TMPDIR": "/var/cache/ci/tmp/bookie-driver-123-2-core",
-                    "RM_CALLS": str(calls),
-                },
+                env=child_env,
                 capture_output=True,
                 text=True,
                 check=False,
