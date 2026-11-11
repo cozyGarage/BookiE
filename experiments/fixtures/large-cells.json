@@ -1,6 +1,0 @@
-[
-  {"name":"unicode_text","kind":"text","prefix":"","unit":"💾","repeats":4096,"suffix":"\n\u0000tail"},
-  {"name":"raw_json","kind":"json_text","prefix":"{ \"payload\":  \"","unit":"x","repeats":65536,"suffix":"\" }"},
-  {"name":"control_characters","kind":"text","prefix":"","unit":"a\n\t\u0000","repeats":1024,"suffix":""},
-  {"name":"binary_invalid_tail","kind":"bytes","prefix":"\\x","unit":"61","repeats":65536,"suffix":"00ff"}
-]
