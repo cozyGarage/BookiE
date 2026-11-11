@@ -396,14 +396,16 @@ jobs:
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-direct-bundle
         run: python3 scripts/run-test-layer.py app-server
       - name: Build GTK safety binary
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
-          cargo build --locked -p bookie-app --bin bookie-app
-          install -Dm755 target/debug/bookie-app target/gtk-safety/bookie
+          cargo build --profile ci --locked -p bookie-app --bin bookie-app
+          python3 scripts/ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety "$BOOKIE_SOURCE_COMMIT"
       - name: Upload GTK safety binary
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
-          path: target/gtk-safety/bookie
+          path: target/gtk-safety/
           if-no-files-found: error
           retention-days: 1
 
@@ -450,8 +452,13 @@ jobs:
         with:
           name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/gtk-safety
-      - name: Ensure GTK safety binary is executable
-        run: chmod 0755 target/gtk-safety/bookie
+      - name: Verify the source-pinned GTK binary and schemas
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+        run: |
+          binary=$(python3 scripts/ci-gtk-artifact.py verify target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
+            "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Install GTK test dependencies
         run: |
           apt-get update
@@ -464,7 +471,6 @@ jobs:
       - name: GTK installed-flow smoke
         env:
           BOOKIE_GTK_ARTIFACT_DIR: ${{ github.workspace }}/gtk-artifacts/smoke
-          BOOKIE_GTK_BINARY: target/gtk-safety/bookie
         run: python3 scripts/run-test-layer.py ui
       - name: Upload GTK diagnostics
         if: always()
@@ -525,16 +531,19 @@ jobs:
         with:
           name: gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/gtk-safety
-      - name: Ensure GTK safety binary is executable
-        run: chmod 0755 target/gtk-safety/bookie
+      - name: Verify the source-pinned GTK binary and schemas
+        env:
+          BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+        run: |
+          binary=$(python3 scripts/ci-gtk-artifact.py verify target/gtk-safety "$BOOKIE_SOURCE_COMMIT")
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/target/gtk-safety/schemas\n' \
+            "$binary" "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Installed GTK scenarios against ${{ matrix.server }}
-        env:
-          BOOKIE_GTK_BINARY: target/gtk-safety/bookie
         run: python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
       - name: Clean fixture containers
         if: always()

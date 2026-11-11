@@ -703,7 +703,7 @@ jobs:
           fi
   e2e:
     runs-on: any-host
-    needs: [guards, clippy, gtk-build, test-build]
+    needs: [guards, clippy, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 45
     env:
@@ -733,12 +733,6 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -751,7 +745,7 @@ jobs:
       - name: Verify the shared GTK binary
         run: |
           binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -862,7 +856,7 @@ jobs:
           fi
   gtk:
     runs-on: any-host
-    needs: [guards, clippy, gtk-build, test-build]
+    needs: [guards, clippy, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
@@ -886,12 +880,6 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -904,7 +892,7 @@ jobs:
       - name: Verify the shared GTK binary
         run: |
           binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -1085,7 +1073,7 @@ jobs:
           fi
   gtk-server:
     runs-on: any-host
-    needs: [guards, clippy, gtk-build, test-build]
+    needs: [guards, clippy, gtk-build]
     if: github.event_name != 'pull_request'
     timeout-minutes: 60
     env:
@@ -1117,12 +1105,6 @@ jobs:
             git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
           unset TOKEN auth
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ github.sha }}" direct
       - name: Prepare artifact runtime
         env:
           BOOKIE_TOOL_DIR: /var/cache/ci/tools
@@ -1135,7 +1117,7 @@ jobs:
       - name: Verify the shared GTK binary
         run: |
           binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ github.sha }}")
-          printf 'BOOKIE_GTK_BINARY=%s\n' "$binary" >> "$GITHUB_ENV"
+          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

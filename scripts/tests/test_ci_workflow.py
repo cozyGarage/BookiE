@@ -307,11 +307,13 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('"$GITHUB_WORKSPACE/test-bundles/gpui" "${{ github.sha }}" gpui', default_build)
         self.assertNotIn("duckdb-build", workflow)
         self.assertNotRegex(workflow, r"(?m)^  duckdb:\n")
-        for name in ("unit", "sandbox", "widgets", "driver", "consumers", "gtk"):
+        for name in ("unit", "sandbox", "widgets", "driver", "consumers"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        gtk = re.search(r"(?ms)^  gtk:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("gtk-build", re.search(r"(?m)^    needs: \[(.+)\]$", gtk).group(1))
         workspace_driver_names = {
             tomllib.loads(path.read_text())["package"]["name"].removeprefix("bookie-driver-")
             for path in (ROOT / "crates/drivers").glob("*/Cargo.toml")
@@ -392,7 +394,7 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 expected = {"guards", "clippy"}
-                if name != "supply-chain":
+                if name not in {"supply-chain", "e2e", "gtk", "gtk-server"}:
                     expected.add("test-build")
                 if name in {"e2e", "gtk", "gtk-server"}:
                     expected.add("gtk-build")
@@ -939,14 +941,14 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
         gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
-        self.assertIn("cargo build --locked -p bookie-app --bin bookie-app", fast)
-        self.assertIn("install -Dm755 target/debug/bookie-app target/gtk-safety/bookie", fast)
+        self.assertIn("cargo build --profile ci --locked -p bookie-app --bin bookie-app", fast)
+        self.assertIn("ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety", fast)
         self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", fast)
         self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, fast]", gtk_safety)
         self.assertIn("image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", gtk_safety)
         self.assertIn("actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131", gtk_safety)
-        self.assertIn("chmod 0755 target/gtk-safety/bookie", gtk_safety)
-        self.assertIn("BOOKIE_GTK_BINARY: target/gtk-safety/bookie", gtk_safety)
+        self.assertIn("ci-gtk-artifact.py verify target/gtk-safety", gtk_safety)
+        self.assertIn("GSETTINGS_SCHEMA_DIR=", gtk_safety)
 
     def test_gtk_safety_installs_pinned_rust_before_keyring_tests(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
