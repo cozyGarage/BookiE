@@ -88,6 +88,10 @@ impl DatabaseDriver for MysqlDriver {
         true
     }
 
+    fn supports_table_default_collation(&self) -> bool {
+        true
+    }
+
     fn supports_explicit_auto_increment_values(&self) -> bool {
         true
     }
@@ -150,7 +154,8 @@ struct MysqlConnection {
 impl Connection for MysqlConnection {
     async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
         let rows = sqlx::query(
-            "SELECT CAST(collation_name AS CHAR), CAST(character_set_name AS CHAR), is_default = 'Yes'
+            "SELECT CAST(collation_name AS CHAR), COALESCE(CAST(character_set_name AS CHAR), ''),
+                    COALESCE(is_default = 'Yes', 0)
              FROM information_schema.collations
              ORDER BY collation_name
              LIMIT ?",

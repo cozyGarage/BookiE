@@ -31,6 +31,8 @@ mod mysql_atomic;
 mod mysql_trigger_errors;
 #[path = "support/result_sets.rs"]
 mod result_sets;
+#[path = "support/table_default_collation.rs"]
+mod table_default_collation;
 #[path = "support/schema_introspection.rs"]
 mod schema_introspection;
 #[path = "support/views.rs"]
