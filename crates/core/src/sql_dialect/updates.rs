@@ -112,6 +112,36 @@ pub fn build_keyed_update(
     Ok((sql, params))
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ColumnReset {
+    Default,
+    Expression(String),
+}
+
+pub fn build_keyed_column_reset(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    column: usize,
+    reset: &ColumnReset,
+    pk_values: &[Value],
+) -> Result<(String, Vec<Value>), BuildSqlError> {
+    let pk_indexes = checked_pk_indexes(columns, pk_values)?;
+    let target = columns.get(column).ok_or(BuildSqlError::StaleColumns)?;
+    let value_sql = match reset {
+        ColumnReset::Default if matches!(driver_id, "postgres" | "mysql" | "mssql") => "DEFAULT".to_owned(),
+        ColumnReset::Default => return Err(BuildSqlError::DefaultUnsupported(driver_id.to_owned())),
+        ColumnReset::Expression(text) if text.trim().is_empty() => return Err(BuildSqlError::EmptyExpression),
+        ColumnReset::Expression(text) => format!("({})", text.trim()),
+    };
+    let mut params = Vec::with_capacity(pk_values.len());
+    let where_clause = keyed_where_clause(driver_id, columns, &pk_indexes, pk_values, &mut params);
+    let set_clause = format!("{} = {value_sql}", quote_ident(driver_id, &target.name));
+    let qualified = qualified_table(driver_id, schema, table);
+    Ok((build_update(driver_id, &qualified, &set_clause, &where_clause), params))
+}
+
 pub fn build_optimistic_keyed_update(
     driver_id: &str,
     schema: Option<&str>,

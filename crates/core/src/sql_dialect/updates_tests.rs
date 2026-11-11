@@ -1,6 +1,6 @@
 use super::{
-    build_keyed_update, build_keyed_value_select, build_mongodb_keyed_delete, build_mongodb_keyed_update,
-    build_optimistic_keyed_update,
+    ColumnReset, build_keyed_column_reset, build_keyed_update, build_keyed_value_select, build_mongodb_keyed_delete,
+    build_mongodb_keyed_update, build_optimistic_keyed_update,
 };
 use crate::{ColumnInfo, Value};
 
@@ -328,4 +328,74 @@ fn original_postgres_json_text_keeps_source_identity() {
     .unwrap();
     assert!(!sql.contains("jsonb"));
     assert_eq!(params.last(), Some(&original));
+}
+
+#[test]
+fn a_column_reset_sets_default_or_a_parenthesised_expression_on_the_keyed_row() {
+    let columns = [column("id", true), column("payload", false)];
+    for (driver, expected) in [
+        (
+            "postgres",
+            "UPDATE \"records\" SET \"payload\" = DEFAULT WHERE \"id\" = $1",
+        ),
+        ("mysql", "UPDATE `records` SET `payload` = DEFAULT WHERE `id` = ?"),
+        ("mssql", "UPDATE [records] SET [payload] = DEFAULT WHERE [id] = @P1"),
+    ] {
+        let (sql, params) = build_keyed_column_reset(
+            driver,
+            None,
+            "records",
+            &columns,
+            1,
+            &ColumnReset::Default,
+            &[Value::Int(7)],
+        )
+        .unwrap();
+        assert!(
+            sql.starts_with(expected.split(" WHERE").next().unwrap()),
+            "{driver}: {sql}"
+        );
+        assert_eq!(sql, expected, "{driver}");
+        assert_eq!(params, vec![Value::Int(7)]);
+    }
+    let (sql, _) = build_keyed_column_reset(
+        "postgres",
+        None,
+        "records",
+        &columns,
+        1,
+        &ColumnReset::Expression(" upper(payload) ".into()),
+        &[Value::Int(7)],
+    )
+    .unwrap();
+    assert_eq!(
+        sql,
+        "UPDATE \"records\" SET \"payload\" = (upper(payload)) WHERE \"id\" = $1"
+    );
+}
+
+#[test]
+fn a_column_reset_refuses_default_where_the_dialect_has_none_and_empty_expressions() {
+    let columns = [column("id", true), column("payload", false)];
+    let pk = [Value::Int(7)];
+    assert!(matches!(
+        build_keyed_column_reset("sqlite", None, "records", &columns, 1, &ColumnReset::Default, &pk),
+        Err(crate::sql_dialect::BuildSqlError::DefaultUnsupported(_))
+    ));
+    assert!(matches!(
+        build_keyed_column_reset(
+            "postgres",
+            None,
+            "records",
+            &columns,
+            1,
+            &ColumnReset::Expression("  ".into()),
+            &pk
+        ),
+        Err(crate::sql_dialect::BuildSqlError::EmptyExpression)
+    ));
+    assert!(matches!(
+        build_keyed_column_reset("postgres", None, "records", &columns, 9, &ColumnReset::Default, &pk),
+        Err(crate::sql_dialect::BuildSqlError::StaleColumns)
+    ));
 }
