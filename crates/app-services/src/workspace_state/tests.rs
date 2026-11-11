@@ -2,6 +2,7 @@ use super::*;
 
 fn editor_with_file(path: &str) -> WorkspaceTabRecord {
     WorkspaceTabRecord::Editor {
+        mark: Default::default(),
         query: "SELECT 1".into(),
         draft_id: None,
         file: Some(std::path::PathBuf::from(path)),
@@ -86,6 +87,7 @@ fn browse(table: &str) -> WorkspaceTabRecord {
 
 fn editor(query: &str) -> WorkspaceTabRecord {
     WorkspaceTabRecord::Editor {
+        mark: Default::default(),
         query: query.into(),
         draft_id: None,
         file: None,
@@ -547,12 +549,14 @@ fn round_trip_preserves_mixed_tabs() {
 #[test]
 fn a_structure_record_restores_as_a_structure_tab() {
     let record = WorkspaceTabRecord::Structure {
+        mark: Default::default(),
         schema: Some("public".into()),
         table: "users".into(),
     };
     assert_eq!(
         restored_workspace_tab(&record),
         Some(RestoredWorkspaceTab::Structure {
+            mark: Default::default(),
             schema: Some("public".into()),
             table: "users".into(),
         })
@@ -562,6 +566,7 @@ fn a_structure_record_restores_as_a_structure_tab() {
 #[test]
 fn a_table_record_in_structure_mode_restores_as_a_structure_tab() {
     let record = WorkspaceTabRecord::Table {
+        mark: Default::default(),
         schema: Some("public".into()),
         table: "users".into(),
         mode: PersistedTableMode::Structure,
@@ -574,6 +579,7 @@ fn a_table_record_in_structure_mode_restores_as_a_structure_tab() {
     assert_eq!(
         restored_workspace_tab(&record),
         Some(RestoredWorkspaceTab::Structure {
+            mark: Default::default(),
             schema: Some("public".into()),
             table: "users".into(),
         })
@@ -583,6 +589,7 @@ fn a_table_record_in_structure_mode_restores_as_a_structure_tab() {
 #[test]
 fn a_table_record_in_data_mode_restores_browse_state() {
     let record = WorkspaceTabRecord::Table {
+        mark: Default::default(),
         schema: None,
         table: "jobs".into(),
         mode: PersistedTableMode::Data,
@@ -595,6 +602,7 @@ fn a_table_record_in_data_mode_restores_browse_state() {
     assert_eq!(
         restored_workspace_tab(&record),
         Some(RestoredWorkspaceTab::Table {
+            mark: Default::default(),
             schema: None,
             table: "jobs".into(),
             offset: 50,
@@ -608,6 +616,7 @@ fn a_table_record_in_data_mode_restores_browse_state() {
 #[test]
 fn an_empty_structure_table_is_not_restored() {
     let record = WorkspaceTabRecord::Structure {
+        mark: Default::default(),
         schema: None,
         table: String::new(),
     };
@@ -776,10 +785,12 @@ fn saving_with_a_cold_cache_keeps_the_other_databases_on_disk() {
 fn a_workspace_with_only_unrestorable_structure_tabs_becomes_empty() {
     let records = [
         WorkspaceTabRecord::Structure {
+            mark: Default::default(),
             schema: None,
             table: String::new(),
         },
         WorkspaceTabRecord::Table {
+            mark: Default::default(),
             schema: None,
             table: String::new(),
             mode: PersistedTableMode::Structure,
@@ -806,6 +817,7 @@ fn dropping_unrestorable_structure_tabs_preserves_the_selected_editor() {
     let mut state = ConnectionWorkspaceState {
         tabs: vec![
             WorkspaceTabRecord::Structure {
+                mark: Default::default(),
                 schema: None,
                 table: String::new(),
             },
