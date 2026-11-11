@@ -261,7 +261,7 @@ fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext)
     );
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.cell_cursor = Some(bookie_gpui::cursor::Cursor { row: 0, column: 1 });
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
             view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::InList, cx);
         })
     });

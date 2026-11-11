@@ -86,7 +86,7 @@ impl GridView {
         }
         let column = self.cell_cursor.map_or(0, |cursor| cursor.column);
         let source = self.source_row(self.base() + row as u64);
-        self.cell_cursor = Some(bookie_gpui::cursor::Cursor { row, column });
+        self.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row, column });
         self.start_edit(source, column, window, cx);
     }
 }

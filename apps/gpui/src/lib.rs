@@ -1,6 +1,5 @@
 pub mod copy_format;
 pub mod core_bridge;
-pub mod cursor;
 pub mod detail;
 pub mod edit;
 pub mod font_settings;

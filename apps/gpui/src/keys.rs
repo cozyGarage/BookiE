@@ -1,4 +1,4 @@
-use bookie_gpui::cursor::{Cursor, move_cursor};
+use bookie_results::grid_cursor::{Cursor, move_cursor};
 use bookie_gpui::keymap::{Chord, Command};
 use gpui::{Context, Focusable, KeyDownEvent, KeystrokeEvent, Window};
 
