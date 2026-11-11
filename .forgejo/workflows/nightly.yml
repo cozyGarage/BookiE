@@ -41,7 +41,7 @@ jobs:
           ref: ${{ github.sha }}
           token: ${{ secrets.FORGEJO_TOKEN }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
           path: src
       - name: Coverage tools
         run: |
@@ -89,7 +89,7 @@ jobs:
           ref: ${{ github.sha }}
           token: ${{ secrets.FORGEJO_TOKEN }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
           path: src
       - name: Docker Hub login
         run: bash src/scripts/docker-hub-login.sh
@@ -157,7 +157,7 @@ jobs:
           ref: ${{ github.sha }}
           token: ${{ secrets.FORGEJO_TOKEN }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
           path: src
       - name: Mutation tool
         run: |
@@ -213,7 +213,7 @@ jobs:
           ref: ${{ github.sha }}
           token: ${{ secrets.FORGEJO_TOKEN }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
           path: src
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.run }}"
@@ -258,7 +258,7 @@ jobs:
           ref: ${{ github.sha }}
           token: ${{ secrets.FORGEJO_TOKEN }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
           path: src
       - name: Build the Arch package in a container and upgrade from the released one
         run: |
@@ -292,7 +292,7 @@ jobs:
           ref: ${{ github.sha }}
           token: ${{ secrets.FORGEJO_TOKEN }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
           path: src
       - name: Shared value contracts across drivers, GTK and DuckDB
         run: |

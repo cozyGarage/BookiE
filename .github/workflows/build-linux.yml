@@ -322,7 +322,7 @@ jobs:
         with:
           ref: ${{ needs.pin-revision.outputs.revision }}
           persist-credentials: false
-          fetch-depth: 0
+          fetch-depth: 1
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:

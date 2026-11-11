@@ -450,6 +450,11 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("mapfile -t publish_groups", forgejo_builder)
         self.assertIn('["providers"]["forgejo"]', forgejo_builder)
 
+    def test_github_gtk_test_job_uses_a_shallow_checkout(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  fast:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("fetch-depth: 1", job)
+
     def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", workflow, re.M | re.S).group(1)
@@ -719,9 +724,18 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertEqual(workflow.count("uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683"), expected_checkouts)
             self.assertEqual(workflow.count("token: ${{ secrets.FORGEJO_TOKEN }}"), expected_checkouts)
             self.assertEqual(workflow.count("persist-credentials: false"), expected_checkouts)
-            self.assertEqual(workflow.count("fetch-depth: 0"), expected_checkouts)
+            expected_full_fetches = 2 if name == "ci" else 0
+            self.assertEqual(workflow.count("fetch-depth: 0"), expected_full_fetches)
+            self.assertEqual(workflow.count("fetch-depth: 1"), expected_checkouts - expected_full_fetches)
             self.assertEqual(workflow.count("path: src"), expected_checkouts)
             self.assertIn("name: Check runner space before checkout", workflow)
+            for index, heading in enumerate(headings):
+                end = headings[index + 1].start() if index + 1 < len(headings) else len(jobs)
+                block = jobs[heading.start() : end]
+                if "uses: actions/checkout@" not in block:
+                    continue
+                expected_depth = "0" if name == "ci" and heading.group(1) in {"pin-revision", "unit"} else "1"
+                self.assertRegex(block, rf"(?m)^          fetch-depth: {expected_depth}$", heading.group(1))
 
     def test_cargo_about_comes_from_the_pinned_installer_and_is_never_built_in_ci(self):
         for path in (
