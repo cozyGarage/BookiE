@@ -88,6 +88,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | PERF-15 | [#2282](https://github.com/cozyGarage/BookiE/issues/2282) | Data |
 | PERF-16 | [#2563](https://github.com/cozyGarage/BookiE/issues/2563) | UX |
 | PERF-18 | [#2604](https://github.com/cozyGarage/BookiE/issues/2604) | UX |
+| PERF-19 | [#2923](https://github.com/cozyGarage/BookiE/issues/2923) | Data |
 | AUD-14 | [#2578](https://github.com/cozyGarage/BookiE/issues/2578) | Data |
 | CI-1 | [#2597](https://github.com/cozyGarage/BookiE/issues/2597) | UX |
 | CI-2 | [#2617](https://github.com/cozyGarage/BookiE/issues/2617) | UX |
