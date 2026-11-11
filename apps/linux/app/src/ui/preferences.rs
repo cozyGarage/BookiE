@@ -453,7 +453,7 @@ mod tests {
             null_display_choices()[NullDisplayPref::Standard.index() as usize],
             crate::tr!("<NULL>")
         );
-        assert_eq!(value_to_display_text(&Value::Null), crate::tr!("NULL"));
+        assert_eq!(value_to_display_text(&Value::Null), crate::tr!("<NULL>"));
     }
 
     #[test]
