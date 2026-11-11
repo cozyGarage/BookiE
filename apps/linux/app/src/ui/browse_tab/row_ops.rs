@@ -320,7 +320,7 @@ impl BrowseTab {
             &new_value,
             col,
             &self.driver_id,
-            self.enum_input_style,
+            &self.parse_hooks,
             current_value.as_ref(),
         ) {
             Ok(v) => v,
@@ -501,7 +501,7 @@ impl BrowseTab {
                     new_value,
                     Some(column),
                     &self.driver_id,
-                    self.enum_input_style,
+                    &self.parse_hooks,
                     Some(original),
                 )
                 .map_err(|_| ReplaceApplyError::InvalidValue)

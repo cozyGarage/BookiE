@@ -1,6 +1,3 @@
-//! Copying result rows: the formats the grid offers (CSV, JSON, Markdown, SQL IN list, INSERT) and
-//! the tab-separated text used for a plain copy. Shared by every frontend; no GUI types here.
-
 use bookie_core::export::{CsvOptions, render_csv, render_in_clause, render_json, render_markdown, render_tsv};
 use bookie_core::sql_literal::build_insert_literal;
 use bookie_core::{ColumnInfo, QueryRows, TableInfo, Value};
@@ -56,7 +53,6 @@ pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Value>]
     }
 }
 
-/// Tab-separated text for the given columns; headers are the column names when asked for.
 pub fn tsv(columns: &[ColumnInfo], rows: Vec<Vec<Value>>, with_headers: bool) -> String {
     render_tsv(columns, &QueryRows::from_rows(rows), with_headers)
 }

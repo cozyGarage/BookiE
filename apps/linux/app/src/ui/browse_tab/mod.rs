@@ -4,7 +4,7 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 use uuid::Uuid;
 
-use bookie_core::{ColumnInfo, EnumInputStyle, ForeignKeyInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
@@ -66,7 +66,7 @@ pub struct BrowseTabInit {
     pub schema: Option<String>,
     pub table: String,
     pub driver_id: String,
-    pub enum_input_style: EnumInputStyle,
+    pub parse_hooks: ParseHooks,
     pub browse_filters: bool,
     pub connection_id: Option<Uuid>,
     pub read_only: bool,
@@ -83,7 +83,7 @@ pub struct BrowseTab {
     schema: Option<String>,
     table: String,
     driver_id: String,
-    enum_input_style: EnumInputStyle,
+    parse_hooks: ParseHooks,
     browse_filters: bool,
     connection_id: Option<Uuid>,
     read_only: bool,
@@ -233,9 +233,11 @@ pub use messages::{BrowseTabInput, BrowseTabOutput};
 pub use requests::{BrowseCellValueRequest, BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
 use requests::{CellValueRequestTracker, PageRequestTracker, RowCountRequestTracker};
 use selection::*;
-pub(crate) use value_parse::mysql_enum_set_labels;
+pub(crate) use bookie_app_services::value_input::mysql_enum_set_labels;
 pub(in crate::ui) use value_parse::parse_grid_cell_input;
 use value_parse::*;
+pub(crate) use value_parse::hooks_for;
+use bookie_app_services::value_input::ParseHooks;
 
 impl BrowseTab {
     fn reset_keyset_navigation(&mut self) {
@@ -650,7 +652,7 @@ impl SimpleComponent for BrowseTab {
             schema: init.schema,
             table: init.table,
             driver_id: init.driver_id,
-            enum_input_style: init.enum_input_style,
+            parse_hooks: init.parse_hooks,
             browse_filters: init.browse_filters,
             connection_id: init.connection_id,
             read_only: init.read_only,

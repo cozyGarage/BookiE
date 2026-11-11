@@ -50,7 +50,6 @@ struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
     keystroke_hook: Option<gpui::Subscription>,
-    /// Set when a new Query tab opens: its editor takes focus on the next render, once it exists.
     focus_editor: bool,
     source: Source,
     table_source: Source,

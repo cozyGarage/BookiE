@@ -69,7 +69,6 @@ impl Synthetic {
     }
 }
 
-/// Spools rows into pages of `PAGE_ROWS`, so a large source never sits in memory at once.
 fn spool_rows_from(
     rows: impl Iterator<Item = Vec<Value>>,
     cancel: &CancellationToken,
@@ -112,8 +111,6 @@ fn spool_rows_from(
     Ok(ScanSource::new(spool, columns, count))
 }
 
-/// Equals and NotEquals: typed and exact through `bookie-results` when the column's type is a known
-/// edit kind; otherwise the displayed text must match exactly (case-sensitive).
 enum Equality {
     Typed(bookie_results::result_predicate::PreparedPredicate),
     Displayed { column: usize, text: String, negate: bool },
@@ -122,7 +119,6 @@ enum Equality {
 fn equality(scan: &ScanSource, predicate: &Predicate) -> Result<Equality, &'static str> {
     let negate = predicate.op == Op::NotEquals;
     let kind = scan.columns().get(predicate.column).map(filter_value_kind);
-    // Text is compared on its displayed text, which is already the exact text.
     let typed = match kind {
         None | Some(FilterValueKind::Text) => Err(()),
         Some(kind) => {
@@ -297,7 +293,6 @@ fn compare_message(error: CompareError) -> &'static str {
     }
 }
 
-/// The grid's view of a compare: at most `MAX_DIFF_ROWS` rows, with the change label first.
 fn diff_view(report: &CompareReport, keyed: bool) -> Diff {
     let summary = &report.summary;
     let rows = &report.diff.rows;

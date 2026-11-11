@@ -271,7 +271,7 @@ impl BrowseTab {
             cell.text.as_deref(),
             column,
             &self.driver_id,
-            self.enum_input_style,
+            &self.parse_hooks,
             current.as_ref(),
         )
         .map_err(|message| {

@@ -1,5 +1,3 @@
-//! The grid's paging: which dataset rows are in view, and how the window moves.
-
 pub const DEFAULT_PAGE_ROWS: u64 = 5_000;
 pub const PAGE_SIZES: [u64; 4] = [500, 1_000, 5_000, 20_000];
 

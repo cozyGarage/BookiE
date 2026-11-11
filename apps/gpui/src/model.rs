@@ -6,10 +6,8 @@ pub const PAGE_ROWS: u64 = bookie_results::result_page::DEFAULT_PAGE_ROWS;
 pub const PAGE_SIZES: [u64; 4] = bookie_results::result_page::PAGE_SIZES;
 pub const TYPED_KINDS: u64 = 12;
 
-/// A cell is the core value: one type for the grid, the copy formats and the drivers.
 pub type Cell = bookie_core::Value;
 
-/// Display and kind helpers for a cell, kept out of `bookie-core` because they are view text.
 pub trait CellText {
     fn kind(&self) -> &'static str;
     fn display(&self) -> String;
@@ -59,25 +57,39 @@ impl CellText for Cell {
     }
 }
 
-pub fn typed_of(index: u64) -> Cell {
-    fn literal<T: std::str::FromStr>(text: &str) -> T {
-        text.parse().unwrap_or_else(|_| panic!("synthetic literal {text}"))
+fn literal<T: std::str::FromStr>(text: &str, type_name: &str, convert: impl FnOnce(T) -> Cell) -> Cell {
+    match text.parse() {
+        Ok(value) => convert(value),
+        Err(_) => Cell::Undecodable(type_name.into()),
     }
+}
+
+pub fn typed_of(index: u64) -> Cell {
     match index % TYPED_KINDS {
         0 => Cell::Float(0.1 + 0.2),
         1 => Cell::Bytes(vec![0xde, 0xad, 0xbe, 0xef]),
-        2 => Cell::Date(literal("2026-11-04")),
-        3 => Cell::Time(literal("23:59:59.123456")),
-        4 => Cell::DateTime(literal("2026-11-04T23:59:59.123456")),
-        5 => Cell::TimestampTz(literal("2026-11-04T23:59:59.123456+00:00")),
-        6 => Cell::Decimal(literal("12345678901234567890.12345678")),
-        7 => Cell::Uuid(literal("67e55044-10b1-426f-9247-bb680e5fe0c8")),
+        2 => literal("2026-11-04", "date", Cell::Date),
+        3 => literal("23:59:59.123456", "time", Cell::Time),
+        4 => literal("2026-11-04T23:59:59.123456", "datetime", Cell::DateTime),
+        5 => literal("2026-11-04T23:59:59.123456+00:00", "timestamptz", Cell::TimestampTz),
+        6 => literal("12345678901234567890.12345678", "decimal", Cell::Decimal),
+        7 => literal("67e55044-10b1-426f-9247-bb680e5fe0c8", "uuid", Cell::Uuid),
         8 => Cell::Json(Box::new(
             serde_json::from_str(r#"{"a":[1,{"b":null}]}"#).unwrap_or_default(),
         )),
         9 => Cell::JsonText("{\"raw\":  1,   \"keep\" : 2}".into()),
         10 => Cell::Undecodable("numeric(40,20)".into()),
         _ => Cell::Null,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Cell, literal};
+
+    #[test]
+    fn invalid_synthetic_literal_is_displayed_as_undecodable() {
+        assert_eq!(literal("invalid", "date", Cell::Date), Cell::Undecodable("date".into()));
     }
 }
 
@@ -214,7 +226,6 @@ pub struct DiffSummary {
     pub added: u64,
     pub removed: u64,
     pub changed: u64,
-    /// Rows that could not be compared exactly (an unreadable cell on either side).
     pub unknown: u64,
 }
 
@@ -239,7 +250,6 @@ fn right_state(index: u64) -> &'static str {
     }
 }
 
-/// The right-hand side of the synthetic comparison: `None` when the row was dropped.
 pub fn right_row(index: u64) -> Option<Vec<Cell>> {
     match right_state(index) {
         "dropped" => None,

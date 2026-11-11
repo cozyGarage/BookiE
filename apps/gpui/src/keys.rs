@@ -99,7 +99,6 @@ impl GridView {
             Command::NewQuery => {
                 self.tabs.open_query();
                 self.sync_grid_owner();
-                // The editor is only drawn for a live connection; otherwise the grid keeps the keys.
                 if self.live.is_some() {
                     self.focus_editor = true;
                 } else {
