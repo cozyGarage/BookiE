@@ -16,6 +16,8 @@ pub enum ScanError {
     Incomplete,
     #[error("the scan found more rows than it can keep")]
     TooManyRows,
+    #[error("there is not enough page memory to scan right now")]
+    PageBudget,
     #[error(transparent)]
     Spool(#[from] StreamResultSpoolError),
 }
@@ -96,10 +98,19 @@ pub fn scan_pages(
         if cancel.is_cancelled() {
             return Err(ScanError::Cancelled);
         }
+        let mut lease = source
+            .spool
+            .page_budget()
+            .reserve(bookie_core::MAX_QUERY_RESULT_BYTES)
+            .ok_or(ScanError::PageBudget)?;
         let page = source.load_page(index)?;
+        if !lease.resize_page(&page) {
+            return Err(ScanError::PageBudget);
+        }
         rows_seen = rows_seen.saturating_add(page.rows.len() as u64);
         let flow = visit(index, &page)?;
         progress.advance(page.rows.len());
+        drop(lease);
         if flow.is_break() {
             return Ok(ScanEnd::Stopped);
         }
