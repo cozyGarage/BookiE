@@ -1002,6 +1002,7 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
         assert_eq!(view.sql_input.read(cx).value(), "select 1");
     });
     cx.simulate_keystrokes("ctrl-shift-p");
-    view.read_with(cx, |view, _| assert!(view.palette_open, "global shortcuts still work in the editor"));
+    view.read_with(cx, |view, _| {
+        assert!(view.palette_open, "global shortcuts still work in the editor")
+    });
 }
-

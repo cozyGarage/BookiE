@@ -23,6 +23,7 @@ fn a_scan_visits_every_page_in_order_and_reports_progress() {
 #[test]
 fn a_cancelled_scan_stops_before_the_next_page() {
     let source = source_of(vec![numbered(0, 2), numbered(2, 2), numbered(4, 2)]);
+    let budget = source.spool().page_budget();
     let cancel = CancellationToken::new();
     let mut visited = 0;
     let error = scan_pages(&source, &cancel, &ScanProgress::default(), |_, _| {
@@ -33,6 +34,8 @@ fn a_cancelled_scan_stops_before_the_next_page() {
     .unwrap_err();
     assert_eq!(error, ScanError::Cancelled);
     assert_eq!(visited, 1);
+    assert_eq!(budget.used_pages(), 0);
+    assert_eq!(budget.used_bytes(), 0);
 }
 
 #[test]
@@ -91,11 +94,52 @@ fn an_empty_result_with_no_pages_is_complete() {
 #[test]
 fn a_visitor_error_ends_the_scan_with_that_error() {
     let source = source_of(vec![numbered(0, 2)]);
+    let budget = source.spool().page_budget();
     let error = scan_pages(&source, &CancellationToken::new(), &ScanProgress::default(), |_, _| {
         Err(ScanError::TooManyRows)
     })
     .unwrap_err();
     assert_eq!(error, ScanError::TooManyRows);
+    assert_eq!(budget.used_pages(), 0);
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
+fn a_scan_refuses_to_decode_when_the_shared_page_budget_is_full() {
+    let source = source_of(vec![numbered(0, 2)]);
+    let budget = source.spool().page_budget();
+    let reservation = budget.reserve(budget.limit_bytes()).expect("whole budget");
+    let mut visited = false;
+
+    let error = scan_pages(&source, &CancellationToken::new(), &ScanProgress::default(), |_, _| {
+        visited = true;
+        Ok(ControlFlow::Continue(()))
+    });
+
+    assert_eq!(error.unwrap_err(), ScanError::BudgetExceeded);
+    assert!(!visited);
+    assert_eq!(budget.used_bytes(), budget.limit_bytes());
+    drop(reservation);
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
+fn a_scan_releases_each_page_lease_after_its_visitor_returns() {
+    let source = source_of(vec![numbered(0, 2), numbered(2, 2)]);
+    let budget = source.spool().page_budget();
+    let mut visited = 0;
+
+    let end = scan_pages(&source, &CancellationToken::new(), &ScanProgress::default(), |_, _| {
+        visited += 1;
+        assert_eq!(budget.used_pages(), 1);
+        Ok(ControlFlow::Continue(()))
+    })
+    .unwrap();
+
+    assert_eq!(end, ScanEnd::Finished);
+    assert_eq!(visited, 2);
+    assert_eq!(budget.used_pages(), 0);
+    assert_eq!(budget.used_bytes(), 0);
 }
 
 #[test]

@@ -44,6 +44,9 @@ pub(super) fn failure_message(error: &FilterError) -> String {
         FilterError::Scan(bookie_app_services::result_scan::ScanError::Cancelled) => {
             bookie_app_services::tr!("Filter cancelled")
         }
+        FilterError::Scan(bookie_app_services::result_scan::ScanError::BudgetExceeded) => {
+            bookie_app_services::tr!("Not enough memory to scan this result; close other large results and retry")
+        }
         _ => bookie_app_services::tr!("The filter could not finish"),
     }
 }

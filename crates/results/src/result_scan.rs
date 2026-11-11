@@ -16,6 +16,8 @@ pub enum ScanError {
     Incomplete,
     #[error("the scan found more rows than it can keep")]
     TooManyRows,
+    #[error("the shared result memory budget is full")]
+    BudgetExceeded,
     #[error(transparent)]
     Spool(#[from] StreamResultSpoolError),
 }
@@ -96,7 +98,14 @@ pub fn scan_pages(
         if cancel.is_cancelled() {
             return Err(ScanError::Cancelled);
         }
+        let budget = source.spool.page_budget();
+        let Some(mut lease) = budget.reserve(bookie_core::MAX_QUERY_RESULT_BYTES) else {
+            return Err(ScanError::BudgetExceeded);
+        };
         let page = source.load_page(index)?;
+        if !lease.resize_page(&page) {
+            return Err(ScanError::BudgetExceeded);
+        }
         rows_seen = rows_seen.saturating_add(page.rows.len() as u64);
         let flow = visit(index, &page)?;
         progress.advance(page.rows.len());

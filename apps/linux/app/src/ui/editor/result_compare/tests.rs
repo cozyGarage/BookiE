@@ -145,6 +145,7 @@ fn every_failure_has_a_distinct_message() {
         CompareError::UnreadableKey,
         CompareError::DuplicateKey,
         CompareError::TooManyRows,
+        CompareError::BudgetExceeded,
         CompareError::Source,
     ];
     let messages: std::collections::HashSet<String> = errors.iter().map(failure_message).collect();

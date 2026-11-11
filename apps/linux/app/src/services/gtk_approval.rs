@@ -18,7 +18,6 @@ const DENY_RESPONSE: &str = "deny";
 const APPROVE_ONCE_RESPONSE: &str = "once";
 const APPROVE_REMEMBER_RESPONSE: &str = "remember";
 const APPROVE_REMEMBER_LABEL: &str = "Approve and don't ask again";
-const MAX_RESPONSE_LABEL_CHARS: usize = 30;
 const CLOSE_RESPONSE: &str = DENY_RESPONSE;
 
 /// The window that actually owns the triggering connection wins over
@@ -268,6 +267,8 @@ impl ApprovalSink for GtkApprovalSink {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const MAX_RESPONSE_LABEL_CHARS: usize = 30;
 
     #[test]
     fn approval_body_omits_empty_table_preview_but_keeps_meaningful_previews() {

@@ -278,6 +278,12 @@ fn a_truncated_input_is_refused() {
 }
 
 #[test]
+fn a_spooled_compare_surfaces_shared_budget_refusal() {
+    let error = CompareError::from(crate::result_scan::ScanError::BudgetExceeded);
+    assert_eq!(error, CompareError::BudgetExceeded);
+}
+
+#[test]
 fn a_cancelled_comparison_returns_cancelled() {
     let request = CompareRequest {
         left: pages(&[(1, "a")]),
