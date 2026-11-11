@@ -20,6 +20,18 @@ pub fn build_create_table(
     indexes: &[IndexInfo],
     fks: &[ForeignKeyInfo],
 ) -> Result<Vec<String>, BuildDdlError> {
+    build_create_table_with_default_collation(driver_id, schema, table, columns, indexes, fks, None)
+}
+
+pub fn build_create_table_with_default_collation(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[DraftColumn],
+    indexes: &[IndexInfo],
+    fks: &[ForeignKeyInfo],
+    default_collation: Option<&str>,
+) -> Result<Vec<String>, BuildDdlError> {
     validate_table(table)?;
     if columns.is_empty() {
         return Err(BuildDdlError::NoColumns);
@@ -30,9 +42,10 @@ pub fn build_create_table(
     let mut out = Vec::with_capacity(1 + indexes.len() + fks.len());
 
     let create_sql = format!(
-        "CREATE TABLE {} (\n  {}\n)",
+        "CREATE TABLE {} (\n  {}\n){}",
         qualified_table(driver_id, schema, table),
-        col_defs.join(",\n  ")
+        col_defs.join(",\n  "),
+        default_collation_clause(driver_id, default_collation)?
     );
     out.push(create_sql);
 
@@ -159,4 +172,17 @@ pub fn build_rename_table(
             quote_ident(driver_id, new_name)
         )),
     }
+}
+
+fn default_collation_clause(driver_id: &str, collation: Option<&str>) -> Result<String, BuildDdlError> {
+    let Some(collation) = collation else {
+        return Ok(String::new());
+    };
+    if driver_id != "mysql" {
+        return Err(BuildDdlError::TableCollationUnsupported);
+    }
+    if collation.is_empty() || !collation.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err(BuildDdlError::UnsafeCollation(collation.into()));
+    }
+    Ok(format!("\nDEFAULT COLLATE {collation}"))
 }

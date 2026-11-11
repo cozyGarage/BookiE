@@ -26,7 +26,7 @@ def source_identity():
 
 def digest(path):
     if path.is_symlink() or not path.is_file():
-        raise ValueError("Build artifact must contain a regular binary file")
+        raise ValueError("Build artifact must contain a regular file")
     if not 0 < path.stat().st_size <= 512 * 1024 * 1024:
         raise ValueError("Build artifact binary size is outside the supported limit")
     with path.open("rb") as binary:
@@ -87,9 +87,27 @@ def create(binary, output, expected_sha, *, package=False):
         raise ValueError("Build artifact output must be a regular directory")
     output.mkdir(parents=True, exist_ok=True)
     filename = "bookie.deb" if package else "bookie"
+    schemas = output / "schemas"
+    if schemas.exists() or schemas.is_symlink():
+        schema_files = list(schemas.iterdir()) if schemas.is_dir() and not schemas.is_symlink() else []
+        if (schemas.is_symlink() or not schemas.is_dir() or len(schema_files) != 1
+                or schema_files[0].name != "gschemas.compiled" or schema_files[0].is_symlink()
+                or not schema_files[0].is_file()):
+            raise ValueError("Build artifact output contains an unexpected schema directory")
+        if package:
+            shutil.rmtree(schemas)
     for entry in output.iterdir():
+        if entry.name == "schemas" and not package:
+            continue
         if entry.name not in {filename, "manifest.json"} or entry.is_symlink() or not entry.is_file():
             raise ValueError("Build artifact output contains an unexpected file")
+    schema_digest = None
+    if not package:
+        subprocess.run(
+            ["glib-compile-schemas", "--strict", "--targetdir", str(schemas), str(ROOT / "apps/linux/data")],
+            check=True,
+        )
+        schema_digest = digest(schemas / "gschemas.compiled")
     destination = output / filename
     shutil.copyfile(binary, destination)
     destination.chmod(0o644)
@@ -101,6 +119,7 @@ def create(binary, output, expected_sha, *, package=False):
         "profile": "release-package" if package else "ci",
         "features": feature_identity(),
         "toolkit_runtime": None if package else toolkit_identity(),
+        "gsettings_schema_sha256": schema_digest,
         "sha256": binary_digest,
     }
     (output / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
@@ -127,10 +146,16 @@ def verify(directory, expected_sha, *, package=False):
     if manifest.get("features") != feature_identity():
         raise ValueError("Build artifact feature set does not match this checkout")
     if package:
-        if manifest.get("toolkit_runtime") is not None:
+        if manifest.get("toolkit_runtime") is not None or manifest.get("gsettings_schema_sha256") is not None:
             raise ValueError("Package artifact cannot claim a native GTK runtime identity")
     else:
         verify_toolkit_runtime(manifest.get("toolkit_runtime"), toolkit_identity())
+        schemas = directory / "schemas"
+        if schemas.is_symlink() or not schemas.is_dir():
+            raise ValueError("Build artifact GSettings schema directory is unavailable")
+        schema_file = schemas / "gschemas.compiled"
+        if digest(schema_file) != manifest.get("gsettings_schema_sha256"):
+            raise ValueError("Build artifact schema digest does not match its manifest")
     binary = directory / ("bookie.deb" if package else "bookie")
     if digest(binary) != manifest.get("sha256"):
         raise ValueError("Build artifact digest does not match its manifest")

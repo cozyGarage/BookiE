@@ -13,6 +13,10 @@ class GtkMarkupTests(unittest.TestCase):
         source = 'adw::ActionRow::builder().title(connection_name).subtitle("fixed").build();'
         self.assertEqual(len(CHECKER.source_violations(Path("row.rs"), source)), 1)
 
+    def test_history_filter_connection_names_use_plain_text_mode(self):
+        path = CHECKER.APP_SOURCE / "ui/history_dialog/build.rs"
+        self.assertEqual(CHECKER.check_paths([path]), [])
+
     def test_escaped_description_is_allowed(self):
         source = 'page.set_description(Some(&escape_markup(message)));'
         self.assertEqual(CHECKER.source_violations(Path("page.rs"), source), [])

@@ -35,9 +35,8 @@ apps/linux/app/src/ui/grid/column_jump.rs 1
 apps/linux/app/src/ui/grid/context_menu.rs 1
 apps/linux/app/src/ui/grid/editing.rs 1
 apps/linux/app/src/ui/grid/mod.rs 1
-apps/linux/app/src/ui/history_dialog.rs 3
+apps/linux/app/src/ui/history_dialog.rs 2
 apps/linux/app/src/ui/parameters_dialog.rs 1
-apps/linux/app/src/ui/preferences.rs 1
 apps/linux/app/src/ui/quick_switcher_dialog.rs 1
 apps/linux/app/src/ui/sidebar_row.rs 1
 apps/linux/app/src/ui/ssh_section.rs 1

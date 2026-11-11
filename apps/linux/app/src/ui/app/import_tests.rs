@@ -36,7 +36,7 @@ fn choice(create: Option<Vec<DraftColumn>>) -> ImportChoice {
     ImportChoice {
         schema: None,
         table: "people".into(),
-        bytes: Vec::new(),
+        bytes: Vec::new().into(),
         options: CsvImportOptions::default(),
         mapping: Vec::new(),
         columns: Vec::new(),
@@ -92,7 +92,7 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
     let choice = ImportChoice {
         schema: None,
         table: "people".into(),
-        bytes,
+        bytes: bytes.into(),
         options,
         mapping,
         columns,
@@ -199,7 +199,7 @@ async fn a_row_the_real_database_rejects_is_skipped_and_every_other_row_is_impor
     let choice = ImportChoice {
         schema: None,
         table: "people".into(),
-        bytes,
+        bytes: bytes.into(),
         options,
         mapping,
         columns,

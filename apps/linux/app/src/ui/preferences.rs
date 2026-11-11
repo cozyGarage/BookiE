@@ -2,7 +2,9 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
 
-use crate::services::preferences::{ColorSchemePref, DateFormatPref, NullDisplayPref, PreferencesStore, ThemePref};
+use crate::services::preferences::{
+    ColorSchemePref, DateFormatPref, NullDisplayPref, Preferences, PreferencesStore, ThemePref,
+};
 use crate::ui::count_format::format_thousands;
 
 /// Must match `browse_tab`'s own `PAGE_SIZE_OPTIONS` (duplicated there and
@@ -11,6 +13,32 @@ use crate::ui::count_format::format_thousands;
 /// default outside it would silently snap back to 1,000 on restart instead
 /// of the value chosen here.
 const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
+
+struct BrowseGroup {
+    group: adw::PreferencesGroup,
+    page_size: adw::ComboRow,
+    confirm: adw::SwitchRow,
+    preview_tab: adw::SwitchRow,
+}
+
+struct EditorPage {
+    page: adw::PreferencesPage,
+    font_size: adw::SpinRow,
+    font_family: adw::EntryRow,
+    vim: adw::SwitchRow,
+    timeout: adw::SpinRow,
+}
+
+struct LiveSaveRows {
+    page_size: adw::ComboRow,
+    confirm: adw::SwitchRow,
+    preview_tab: adw::SwitchRow,
+    font_size: adw::SpinRow,
+    font_family: adw::EntryRow,
+    vim: adw::SwitchRow,
+    retention: adw::SpinRow,
+    timeout: adw::SpinRow,
+}
 
 pub fn present(
     parent: &impl IsA<gtk::Widget>,
@@ -28,6 +56,38 @@ pub fn present(
         .icon_name("preferences-system-symbolic")
         .build();
 
+    let current = preferences.load();
+
+    let browse = browse_group(parent, preferences, &current);
+    general.add(&browse.group);
+    let (history_group, retention) = history_group(&window, history, &current);
+    general.add(&history_group);
+    let editor = editor_page(&current);
+
+    window.add(&general);
+    window.add(&appearance_page(preferences, &current));
+    window.add(&editor.page);
+    window.add(&super::mcp_preferences::build_page(database, mcp_bridge));
+
+    wire_live_save(
+        preferences,
+        LiveSaveRows {
+            page_size: browse.page_size,
+            confirm: browse.confirm,
+            preview_tab: browse.preview_tab,
+            font_size: editor.font_size,
+            font_family: editor.font_family,
+            vim: editor.vim,
+            retention,
+            timeout: editor.timeout,
+        },
+    );
+
+    crate::ui::leak_probe::track("preferences", &window);
+    window.present(Some(parent));
+}
+
+fn appearance_page(preferences: &PreferencesStore, current: &Preferences) -> adw::PreferencesPage {
     let appearance = adw::PreferencesPage::builder()
         .title(bookie_app_services::tr!("Appearance"))
         .icon_name("preferences-desktop-appearance-symbolic")
@@ -36,44 +96,6 @@ pub fn present(
     let appearance_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Appearance"))
         .description(bookie_app_services::tr!("Choose how BookiE looks on this desktop."))
-        .build();
-
-    let browse_group = adw::PreferencesGroup::builder()
-        .title(bookie_app_services::tr!("Data browser"))
-        .description(bookie_app_services::tr!(
-            "Choose how table data is displayed and how destructive actions are confirmed."
-        ))
-        .build();
-
-    let current = preferences.load();
-
-    let page_size_row = adw::ComboRow::new();
-    page_size_row.set_title(&bookie_app_services::tr!("Default page size"));
-    page_size_row.set_subtitle(&bookie_app_services::tr!("Rows fetched per request when browsing a table"));
-    let page_size_labels: Vec<String> = PAGE_SIZE_OPTIONS
-        .iter()
-        .map(|n| format_thousands(u128::from(*n)))
-        .collect();
-    let page_size_strs: Vec<&str> = page_size_labels.iter().map(String::as_str).collect();
-    page_size_row.set_model(Some(&gtk::StringList::new(&page_size_strs)));
-    let initial_page_size_idx = PAGE_SIZE_OPTIONS
-        .iter()
-        .position(|n| *n == current.default_page_size)
-        .unwrap_or(2) as u32;
-    page_size_row.set_selected(initial_page_size_idx);
-
-    let confirm_row = adw::SwitchRow::builder()
-        .title(bookie_app_services::tr!("Confirm before deleting rows"))
-        .subtitle(bookie_app_services::tr!("Show a confirmation dialog before each destructive action"))
-        .build();
-    confirm_row.set_active(current.confirm_destructive);
-
-    let preview_tab_row = adw::SwitchRow::builder()
-        .title(bookie_app_services::tr!("Reuse one tab when opening tables"))
-        .subtitle(bookie_app_services::tr!(
-            "Opening a table replaces the temporary preview tab. Turn off to give every table its own tab."
-        ))
-        .active(current.open_tables_in_preview_tab)
         .build();
 
     let scheme_row = adw::ComboRow::new();
@@ -119,6 +141,74 @@ pub fn present(
         }
     });
 
+    appearance_group.add(&scheme_row);
+    appearance_group.add(&theme_row);
+    appearance.add(&appearance_group);
+    appearance
+}
+
+fn browse_group(parent: &impl IsA<gtk::Widget>, preferences: &PreferencesStore, current: &Preferences) -> BrowseGroup {
+    let group = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Data browser"))
+        .description(bookie_app_services::tr!(
+            "Choose how table data is displayed and how destructive actions are confirmed."
+        ))
+        .build();
+    let page_size = page_size_row(current);
+    let (confirm, preview_tab) = confirmation_rows(current);
+    group.add(&null_display_row(preferences, current));
+    group.add(&date_format_row(parent, preferences, current));
+    group.add(&invisibles_row(preferences, current));
+    group.add(&page_size);
+    group.add(&confirm);
+    group.add(&preview_tab);
+    BrowseGroup {
+        group,
+        page_size,
+        confirm,
+        preview_tab,
+    }
+}
+
+fn page_size_row(current: &Preferences) -> adw::ComboRow {
+
+    let page_size_row = adw::ComboRow::new();
+    page_size_row.set_title(&bookie_app_services::tr!("Default page size"));
+    page_size_row.set_subtitle(&bookie_app_services::tr!("Rows fetched per request when browsing a table"));
+    let page_size_labels: Vec<String> = PAGE_SIZE_OPTIONS
+        .iter()
+        .map(|n| format_thousands(u128::from(*n)))
+        .collect();
+    let page_size_strs: Vec<&str> = page_size_labels.iter().map(String::as_str).collect();
+    page_size_row.set_model(Some(&gtk::StringList::new(&page_size_strs)));
+    let initial_page_size_idx = PAGE_SIZE_OPTIONS
+        .iter()
+        .position(|n| *n == current.default_page_size)
+        .unwrap_or(2) as u32;
+    page_size_row.set_selected(initial_page_size_idx);
+    page_size_row
+}
+
+fn confirmation_rows(current: &Preferences) -> (adw::SwitchRow, adw::SwitchRow) {
+
+    let confirm_row = adw::SwitchRow::builder()
+        .title(bookie_app_services::tr!("Confirm before deleting rows"))
+        .subtitle(bookie_app_services::tr!("Show a confirmation dialog before each destructive action"))
+        .build();
+    confirm_row.set_active(current.confirm_destructive);
+
+    let preview_tab_row = adw::SwitchRow::builder()
+        .title(bookie_app_services::tr!("Reuse one tab when opening tables"))
+        .subtitle(bookie_app_services::tr!(
+            "Opening a table replaces the temporary preview tab. Turn off to give every table its own tab."
+        ))
+        .active(current.open_tables_in_preview_tab)
+        .build();
+    (confirm_row, preview_tab_row)
+}
+
+fn null_display_row(preferences: &PreferencesStore, current: &Preferences) -> adw::ComboRow {
+
     let null_row = adw::ComboRow::new();
     null_row.set_title(&bookie_app_services::tr!("NULL display"));
     null_row.set_subtitle(&bookie_app_services::tr!(
@@ -141,6 +231,14 @@ pub fn present(
             }
         }
     });
+    null_row
+}
+
+fn date_format_row(
+    parent: &impl IsA<gtk::Widget>,
+    preferences: &PreferencesStore,
+    current: &Preferences,
+) -> adw::ComboRow {
 
     let date_row = adw::ComboRow::new();
     date_row.set_title(&bookie_app_services::tr!("Date format"));
@@ -164,6 +262,10 @@ pub fn present(
             }
         }
     });
+    date_row
+}
+
+fn invisibles_row(preferences: &PreferencesStore, current: &Preferences) -> adw::SwitchRow {
 
     let invisibles_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Mark spaces, tabs and line breaks"))
@@ -182,18 +284,14 @@ pub fn present(
             }
         }
     });
+    invisibles_row
+}
 
-    browse_group.add(&null_row);
-    browse_group.add(&date_row);
-    browse_group.add(&invisibles_row);
-    browse_group.add(&page_size_row);
-    browse_group.add(&confirm_row);
-    browse_group.add(&preview_tab_row);
-    general.add(&browse_group);
-
-    appearance_group.add(&scheme_row);
-    appearance_group.add(&theme_row);
-    appearance.add(&appearance_group);
+fn history_group(
+    window: &adw::PreferencesDialog,
+    history: Option<bookie_storage::query_history::HistoryStore>,
+    current: &Preferences,
+) -> (adw::PreferencesGroup, adw::SpinRow) {
 
     let history_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Query history"))
@@ -205,6 +303,15 @@ pub fn present(
     retention_row.set_subtitle(&bookie_app_services::tr!("0 keeps history forever; pinned entries are never pruned."));
     retention_row.set_value(current.history_retention_days as f64);
     history_group.add(&retention_row);
+    history_group.add(&clear_history_row(window, history.clone()));
+    history_group.add(&storage_location_row(window, history));
+    (history_group, retention_row)
+}
+
+fn clear_history_row(
+    window: &adw::PreferencesDialog,
+    history: Option<bookie_storage::query_history::HistoryStore>,
+) -> adw::ActionRow {
 
     // Trigger button uses `.flat`, NOT `.destructive-action`. GNOME
     // Settings convention: the trigger that opens a destructive
@@ -256,7 +363,13 @@ pub fn present(
             alert.present(Some(&dialog));
         }
     });
-    history_group.add(&clear_row);
+    clear_row
+}
+
+fn storage_location_row(
+    window: &adw::PreferencesDialog,
+    history: Option<bookie_storage::query_history::HistoryStore>,
+) -> adw::ActionRow {
 
     let storage_button = gtk::Button::builder()
         .label(bookie_app_services::tr!("Show in Files"))
@@ -292,9 +405,10 @@ pub fn present(
             .and_then(|r| r.downcast::<gtk::Window>().ok());
         launcher.launch(parent_window.as_ref(), gio::Cancellable::NONE, |_| {});
     });
-    history_group.add(&storage_row);
+    storage_row
+}
 
-    general.add(&history_group);
+fn editor_page(current: &Preferences) -> EditorPage {
 
     let editor = adw::PreferencesPage::builder()
         .title(bookie_app_services::tr!("Editor"))
@@ -336,80 +450,83 @@ pub fn present(
     editor_group.add(&timeout_row);
 
     editor.add(&editor_group);
+    EditorPage {
+        page: editor,
+        font_size: font_size_row,
+        font_family: font_family_row,
+        vim: vim_row,
+        timeout: timeout_row,
+    }
+}
 
-    window.add(&general);
-    window.add(&appearance);
-    window.add(&editor);
-    window.add(&super::mcp_preferences::build_page(database, mcp_bridge));
-
+fn wire_live_save(preferences: &PreferencesStore, rows: LiveSaveRows) {
     // Live save — write on every value change instead of batching to
     // window.connect_closed. GNOME Settings applies its preferences
     // immediately (no Apply button); same model here. The previous
     // close-only save lost edits on a crash between change and close.
-    let save_all: std::rc::Rc<dyn Fn()> = {
-        let page_size = page_size_row.clone();
-        let confirm = confirm_row.clone();
-        let preview_tab = preview_tab_row.clone();
-        let font = font_size_row.clone();
-        let family = font_family_row.clone();
-        let vim = vim_row.clone();
-        let retention = retention_row.clone();
-        let timeout = timeout_row.clone();
-        let preferences = preferences.clone();
-        std::rc::Rc::new(move || {
-            let default_page_size = PAGE_SIZE_OPTIONS
-                .get(page_size.selected() as usize)
-                .copied()
-                .unwrap_or(1_000);
-            if let Err(error) = preferences.update(|prefs| {
-                prefs.default_page_size = default_page_size;
-                prefs.confirm_destructive = confirm.is_active();
-                prefs.open_tables_in_preview_tab = preview_tab.is_active();
-                prefs.editor_font_size = font.value() as u32;
-                prefs.editor_font_family = family.text().trim().to_string();
-                prefs.editor_vim_mode = vim.is_active();
-                prefs.history_retention_days = retention.value() as u32;
-                prefs.query_timeout_secs = timeout.value() as u32;
-            }) {
-                tracing::warn!(%error, "preferences: update rejected");
-            }
-        })
-    };
-    page_size_row.connect_selected_notify({
+    let save_all = save_all_closure(preferences, &rows);
+    rows.page_size.connect_selected_notify({
         let s = save_all.clone();
         move |_| s()
     });
-    font_size_row.connect_value_notify({
+    rows.font_size.connect_value_notify({
         let s = save_all.clone();
         move |_| s()
     });
-    vim_row.connect_active_notify({
+    rows.vim.connect_active_notify({
         let s = save_all.clone();
         move |_| s()
     });
-    font_family_row.connect_changed({
+    rows.font_family.connect_changed({
         let s = save_all.clone();
         move |_| s()
     });
-    retention_row.connect_value_notify({
+    rows.retention.connect_value_notify({
         let s = save_all.clone();
         move |_| s()
     });
-    timeout_row.connect_value_notify({
+    rows.timeout.connect_value_notify({
         let s = save_all.clone();
         move |_| s()
     });
-    confirm_row.connect_active_notify({
+    rows.confirm.connect_active_notify({
         let s = save_all.clone();
         move |_| s()
     });
-    preview_tab_row.connect_active_notify({
+    rows.preview_tab.connect_active_notify({
         let s = save_all.clone();
         move |_| s()
     });
+}
 
-    crate::ui::leak_probe::track("preferences", &window);
-    window.present(Some(parent));
+fn save_all_closure(preferences: &PreferencesStore, rows: &LiveSaveRows) -> std::rc::Rc<dyn Fn()> {
+    let page_size = rows.page_size.clone();
+    let confirm = rows.confirm.clone();
+    let preview_tab = rows.preview_tab.clone();
+    let font = rows.font_size.clone();
+    let family = rows.font_family.clone();
+    let vim = rows.vim.clone();
+    let retention = rows.retention.clone();
+    let timeout = rows.timeout.clone();
+    let preferences = preferences.clone();
+    std::rc::Rc::new(move || {
+        let default_page_size = PAGE_SIZE_OPTIONS
+            .get(page_size.selected() as usize)
+            .copied()
+            .unwrap_or(1_000);
+        if let Err(error) = preferences.update(|prefs| {
+            prefs.default_page_size = default_page_size;
+            prefs.confirm_destructive = confirm.is_active();
+            prefs.open_tables_in_preview_tab = preview_tab.is_active();
+            prefs.editor_font_size = font.value() as u32;
+            prefs.editor_font_family = family.text().trim().to_string();
+            prefs.editor_vim_mode = vim.is_active();
+            prefs.history_retention_days = retention.value() as u32;
+            prefs.query_timeout_secs = timeout.value() as u32;
+        }) {
+            tracing::warn!(%error, "preferences: update rejected");
+        }
+    })
 }
 
 fn null_display_choices() -> [String; 3] {
