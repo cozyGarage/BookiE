@@ -710,6 +710,7 @@ impl App {
                 self.multi.guards.remove(previous);
                 self.multi.catalogs.remove(&previous);
                 self.database.close(previous);
+                crate::services::approval_grants::shared().revoke_connection(previous);
                 crate::services::window_registry::unregister(previous);
             }
         }

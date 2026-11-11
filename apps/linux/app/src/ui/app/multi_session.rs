@@ -193,6 +193,7 @@ impl App {
         self.multi.guards.remove(connection_id);
         self.multi.catalogs.remove(&connection_id);
         self.database.close(connection_id);
+        crate::services::approval_grants::shared().revoke_connection(connection_id);
         crate::services::window_registry::unregister(connection_id);
         for tab_id in closed_tabs {
             sender.input(AppMsg::FinishCloseWorkspaceTab(tab_id));

@@ -94,7 +94,7 @@ impl ApprovalGrants {
         self.lock().contains(grant)
     }
 
-    fn add(&self, grant: ApprovalGrant) {
+    pub(crate) fn add(&self, grant: ApprovalGrant) {
         let mut grants = self.lock();
         if !grants.contains(&grant) {
             grants.push(grant);

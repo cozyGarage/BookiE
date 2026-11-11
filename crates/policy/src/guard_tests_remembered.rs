@@ -1,5 +1,5 @@
 use super::*;
-use crate::approval::{ApprovalGrants, RememberingApprovalSink};
+use crate::approval::{ApprovalGrant, ApprovalGrants, RememberingApprovalSink};
 
 struct CountingSink {
     prompts: Arc<AtomicUsize>,
@@ -137,4 +137,22 @@ async fn revoking_a_grant_restores_the_prompt() {
     rig.guard.execute(WRITE).await.expect("write after revoke");
 
     assert_eq!(rig.prompts.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn closing_a_connection_removes_only_its_grants() {
+    let grants = Arc::new(ApprovalGrants::default());
+    let rig = rig(Principal::human_gui(), Environment::Local, &grants);
+    rig.guard.execute(WRITE).await.expect("write");
+    let other = ApprovalGrant {
+        connection_id: Uuid::new_v4(),
+        rule: "other".into(),
+        principal: Principal::human_gui(),
+    };
+    grants.add(other.clone());
+    let remembered = grants.list().into_iter().find(|grant| grant != &other).expect("grant");
+
+    grants.revoke_connection(remembered.connection_id);
+
+    assert_eq!(grants.list(), vec![other]);
 }
