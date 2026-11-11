@@ -62,6 +62,17 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("  workflow_dispatch:\n", forgejo_triggers)
         self.assertNotIn("if: github.event_name != 'pull_request'", forgejo)
 
+    def test_closing_a_pull_request_cancels_its_runs_and_release_records_queue_wait(self):
+        cancel = (ROOT / ".github/workflows/cancel-closed-pr-runs.yml").read_text()
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+
+        self.assertIn("types: [closed]", cancel)
+        self.assertIn("branches: [main]", cancel)
+        self.assertIn("head_sha=$HEAD_SHA", cancel)
+        self.assertIn("event=pull_request", cancel)
+        self.assertIn("actions: write", cancel)
+        self.assertIn("Queue wait before start", release)
+
     def test_test_bundle_groups_cover_their_consumers_without_copying_every_test_binary(self):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
         metadata = json.loads(subprocess.check_output(

@@ -51,6 +51,14 @@ jobs:
           persist-credentials: false
           ref: ${{ github.sha }}
           fetch-depth: 0
+      - name: Record how long this run waited in the queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          created="$(gh api "repos/$REPO/actions/runs/$RUN_ID" --jq .created_at)"
+          echo "Queue wait before start: $(( $(date +%s) - $(date -d "$created" +%s) )) seconds since $created" | tee -a "$GITHUB_STEP_SUMMARY"
       - id: version
         env:
           REF: ${{ github.ref }}
