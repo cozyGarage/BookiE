@@ -186,9 +186,9 @@ BOOKIE_SIDEBAR_PROFILE_OUTPUT="$PWD/target/quality/sidebar-search-50000.jsonl" \
   cargo bench --locked -p bookie-app-services --bench sidebar_search -- 50000
 ```
 
-It runs 101 samples for a specific match, a schema-prefix match, and a broad match. The output includes the number of visible nodes and median/p95 time in nanoseconds. It measures the tree algorithm only; use the GTK profile below to measure widget construction and accessibility costs.
+It runs 101 samples for a specific match, a schema-prefix match, and a broad match. The output includes the number of visible nodes and median/p95 time in nanoseconds. It measures the tree algorithm only; use the GTK profile below to measure GTK model readiness, created list-item objects and accessibility.
 
-The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connected-window availability, target-row accessibility, accessible sidebar filtering, GTK row-construction time, UI-thread stalls, and app process memory before and after loading a synthetic catalog. It enables the existing 16 ms UI-stall monitor and records the stall count and maximum duration through completion of sidebar row construction, before the search measurement. Start a disposable PostgreSQL database containing the named target table, then run:
+The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connected-window availability, sidebar model readiness, search-filter accessibility, tree-model construction time, created `GtkListView` item objects, UI-thread stalls, and app process memory before and after loading a synthetic catalog. It enables the existing 16 ms UI-stall monitor and samples the model and item-object metrics before the search measurement. Start a disposable PostgreSQL database containing the named target table, then run:
 
 ```bash
 BOOKIE_GTK_POSTGRES_PORT=15432 \
@@ -199,8 +199,8 @@ BOOKIE_GTK_SCENARIO=postgres_sidebar_catalog_profile \
 bash scripts/test-gtk-safety.sh
 ```
 
-`BOOKIE_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. The connected-window timing is an accessibility-observed window-title milestone, not a native presentation timestamp. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
-The app also logs the number of sidebar nodes and the time spent constructing their GTK rows at debug level; the GTK scenario records this value in its JSON output.
+`BOOKIE_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The scenario searches for this row after measuring the unfiltered model. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. The connected-window timing is an accessibility-observed window-title milestone, not a native presentation timestamp. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
+The app logs the sidebar node count, tree-model construction time and number of list-item objects created by the factory at debug level; the GTK scenario records these values in its JSON output.
 
 ## Local PostgreSQL smoke test
 

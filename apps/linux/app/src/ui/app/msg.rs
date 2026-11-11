@@ -259,8 +259,10 @@ pub enum AppMsg {
     ShowToast(String),
     BrowseTabDirtyChanged(Uuid, bool),
     EditorResultDirtyChanged(Uuid, bool),
-    ToggleSidebarGroup(String),
-    ContinueSidebarPopulation(u64),
+    SidebarGroupExpansionChanged {
+        key: String,
+        expanded: bool,
+    },
     SidebarSearchChanged,
     RefreshSidebar,
     RevealInSidebar,

@@ -6,7 +6,6 @@ use crate::services::catalog::CatalogOrigin;
 
 impl App {
     pub(super) fn reset_sidebar_catalog(&mut self) {
-        self.cancel_sidebar_population();
         self.sidebar_catalog.clear();
         let fresh = tokio_util::sync::CancellationToken::new();
         self.sidebar_catalog_cancel.replace(fresh).cancel();

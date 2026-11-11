@@ -12,7 +12,6 @@ apps/linux/app/src/services/gtk_approval.rs 1
 apps/linux/app/src/ui/activity_dialog.rs 1
 apps/linux/app/src/ui/app/browse.rs 1
 apps/linux/app/src/ui/app/connection.rs 1
-apps/linux/app/src/ui/app/init_sidebar.rs 1
 apps/linux/app/src/ui/app/init_window.rs 1
 apps/linux/app/src/ui/app/init_workspace.rs 1
 apps/linux/app/src/ui/app/mod.rs 2

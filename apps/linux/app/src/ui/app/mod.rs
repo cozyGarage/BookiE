@@ -29,7 +29,6 @@ mod session_teardown;
 mod shortcuts;
 mod sidebar_catalog;
 mod sidebar_layout;
-mod sidebar_population;
 mod sidebar_state;
 mod status_pages;
 mod structure;
@@ -59,7 +58,6 @@ use super::connect_dialog::ConnectDialog;
 use super::connection_row::ConnectionRow;
 use super::editor::SqlEditorInput;
 use super::history_dialog::HistoryDialog;
-use super::sidebar_row::SidebarRow;
 use super::welcome_view::{WelcomeView, WelcomeViewInit, WelcomeViewOutput};
 use crate::services::database_service::ConnectionHealth;
 
@@ -111,17 +109,14 @@ pub struct App {
     environment_badge: gtk::Label,
     sidebar_title: adw::WindowTitle,
     disconnect_action: gio::SimpleAction,
-    sidebar_factory: FactoryVecDeque<SidebarRow>,
-    sidebar_population: Option<sidebar_population::SidebarPopulation>,
-    sidebar_population_generation: u64,
-    sidebar_population_source: Option<crate::ui::sidebar_columns::ColumnSource>,
-    sidebar_population_schema_filter: bool,
-    sidebar_population_driver_id: String,
-    sidebar_population_elapsed: std::time::Duration,
-    sidebar_pending_focus: Option<usize>,
+    sidebar_model: crate::ui::sidebar_tree_model::SidebarTreeModel,
+    sidebar_selection: gtk::SingleSelection,
+    sidebar_list: gtk::ListView,
+    sidebar_row_factories: init_sidebar::RowFactories,
+    sidebar_expansion_handlers: init_sidebar::ExpansionHandlers,
+    sidebar_render_context: std::rc::Rc<std::cell::RefCell<init_sidebar::SidebarRenderContext>>,
     sidebar_nodes: std::rc::Rc<std::cell::RefCell<Vec<crate::services::sidebar_tree::TreeNode>>>,
     sidebar_collapsed: std::rc::Rc<std::cell::RefCell<crate::services::sidebar_tree::CollapseState>>,
-    sidebar_visible: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<usize>>>,
     sidebar_hidden_schemas: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<String>>>,
     schema_filter_button: gtk::MenuButton,
     sidebar_fold_button: gtk::Button,
@@ -571,17 +566,14 @@ impl SimpleComponent for App {
             environment_badge: widgets.environment_badge.clone(),
             sidebar_title: widgets.sidebar_title.clone(),
             disconnect_action,
-            sidebar_factory: sidebar.factory,
-            sidebar_population: None,
-            sidebar_population_generation: 0,
-            sidebar_population_source: None,
-            sidebar_population_schema_filter: false,
-            sidebar_population_driver_id: String::new(),
-            sidebar_population_elapsed: std::time::Duration::ZERO,
-            sidebar_pending_focus: None,
+            sidebar_model: sidebar.model,
+            sidebar_selection: sidebar.selection,
+            sidebar_list: sidebar.list,
+            sidebar_row_factories: sidebar.row_factories,
+            sidebar_expansion_handlers: sidebar.expansion_handlers,
+            sidebar_render_context: sidebar.render_context,
             sidebar_nodes: sidebar.nodes,
             sidebar_collapsed: sidebar.collapsed,
-            sidebar_visible: sidebar.visible,
             sidebar_hidden_schemas: sidebar.hidden_schemas,
             schema_filter_button: widgets.schema_filter_button.clone(),
             sidebar_fold_button: widgets.sidebar_fold_button.clone(),
@@ -921,11 +913,10 @@ impl SimpleComponent for App {
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
             AppMsg::EditorResultDirtyChanged(tab_id, dirty) => self.refresh_editor_result_dirty(tab_id, dirty),
-            AppMsg::ToggleSidebarGroup(key) => self.toggle_sidebar_group(&key),
-            AppMsg::ContinueSidebarPopulation(generation) => {
-                self.continue_sidebar_population(generation, sender);
+            AppMsg::SidebarGroupExpansionChanged { key, expanded } => {
+                self.sidebar_group_expansion_changed(&key, expanded);
             }
-            AppMsg::SidebarSearchChanged => self.sync_sidebar_expansion(),
+            AppMsg::SidebarSearchChanged => self.refresh_sidebar_model(),
             AppMsg::RefreshSidebar => self.refresh_sidebar(sender),
             AppMsg::RevealInSidebar => self.on_reveal_in_sidebar(),
             AppMsg::HideSidebarSchema(schema) => self.hide_sidebar_schema(&schema, &sender),
