@@ -78,6 +78,21 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("zizmor --offline", security)
         self.assertIn(".github/workflows/*.yml .forgejo/workflows/*.yml", security)
 
+    def test_forgejo_change_contract_step_uses_env_for_event_values(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        step = re.search(
+            r"(?ms)^      - name: Focused Data-lane change contracts\n(.*?)(?=^      - name: )",
+            workflow,
+        ).group(1)
+
+        self.assertIn("BOOKIE_CI_REF: ${{ github.ref }}", step)
+        self.assertIn("BOOKIE_CI_EVENT_NAME: ${{ github.event_name }}", step)
+        self.assertIn("BOOKIE_CI_EVENT_BEFORE: ${{ github.event.before || 'HEAD^' }}", step)
+        self.assertIn('"$BOOKIE_CI_REF"', step)
+        self.assertNotIn('${{ github.ref }}"', step)
+        self.assertNotIn('${{ github.event_name }}"', step)
+        self.assertNotIn('${{ github.event.before', step.split("        run: |", 1)[1])
+
     def test_shared_github_and_forgejo_tiers_use_the_layer_catalog(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -196,7 +211,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/run-test-layer.py change-contracts", unit)
         self.assertIn('git merge-base HEAD origin/main', unit)
         self.assertIn("github.event.before", unit)
-        self.assertIn('github.event_name }}" != "push"', unit)
+        self.assertIn('"$BOOKIE_CI_EVENT_NAME" != "push"', unit)
 
     def test_forgejo_runs_gpui_model_and_interaction_tests(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()

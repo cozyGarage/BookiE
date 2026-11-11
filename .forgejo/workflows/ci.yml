@@ -401,10 +401,14 @@ jobs:
           export TMPDIR="$CARGO_TARGET_DIR"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
       - name: Focused Data-lane change contracts
+        env:
+          BOOKIE_CI_REF: ${{ github.ref }}
+          BOOKIE_CI_EVENT_NAME: ${{ github.event_name }}
+          BOOKIE_CI_EVENT_BEFORE: ${{ github.event.before || 'HEAD^' }}
         run: |
           cd src
-          if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.event_name }}" != "push" ]]; then
-            export BOOKIE_CHANGE_BASE="${{ github.event.before || 'HEAD^' }}"
+          if [[ "$BOOKIE_CI_REF" == "refs/heads/main" || "$BOOKIE_CI_EVENT_NAME" != "push" ]]; then
+            export BOOKIE_CHANGE_BASE="$BOOKIE_CI_EVENT_BEFORE"
           else
             export BOOKIE_CHANGE_BASE="$(git merge-base HEAD origin/main)"
           fi
