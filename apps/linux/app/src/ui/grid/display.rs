@@ -38,8 +38,9 @@ pub fn editable_null_sentinel() -> String {
 }
 
 pub(crate) fn readonly_null_sentinel() -> String {
+    // One presentation for a NULL: the same text as an editable cell, so a query result and a table agree.
     match NULL_DISPLAY.get() {
-        NullDisplayPref::Standard => bookie_app_services::tr!("NULL"),
+        NullDisplayPref::Standard => bookie_app_services::tr!("<NULL>"),
         NullDisplayPref::Symbol => "\u{2205}".to_owned(),
         NullDisplayPref::Parenthesized => bookie_app_services::tr!("(null)"),
     }
