@@ -222,7 +222,9 @@ Forgejo branch pushes use the pull-request regression profile. The Debian floor 
 
 These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.
 
-`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a readiness report, not a substitute for required check results; it blocks merging only if the repository ruleset is configured to require its stable check context.
+`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. The active `protect main` ruleset on GitHub requires the status check context `Linux PR readiness`, so a pull request cannot merge while that check is missing, pending, failed, skipped or cancelled. CodeQL and SonarCloud stay reference scans and are not required.
+
+Emergency override: the ruleset has no bypass actors. A maintainer who must merge without the check sets the ruleset to `disabled` under Settings, Rules, Rulesets (or `gh api -X PUT repos/cozyGarage/BookiE/rulesets/25505952` with `"enforcement": "disabled"`), merges, and restores `"active"` straight away. Record the pull request, the reason and both ruleset changes in a comment on the pull request; the repository audit log holds the change times.
 
 | Check | What it enforces |
 |---|---|
