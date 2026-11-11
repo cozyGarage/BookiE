@@ -23,7 +23,7 @@ class IsolatedRunnerTests(unittest.TestCase):
             revision = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
             scripts = root / 'scripts'
             scripts.mkdir()
-            for name in ('run-isolated-tests.py', 'run-prebuilt-tests.py', 'ci-test-bundle.py', 'rust_test_evidence.py'):
+            for name in ('run-isolated-tests.py', 'run-prebuilt-tests.py', 'ci-test-bundle.py', 'ci-test-bundle-groups.json', 'rust_test_evidence.py'):
                 shutil.copy2(ROOT / name, scripts / name)
             (scripts / 'isolated-tests.json').write_text(json.dumps({'gtk': [['sample', 'integration', 'example']]}))
             package = root / 'crates/sample'

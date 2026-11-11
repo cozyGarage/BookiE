@@ -34,7 +34,7 @@ pub struct CsvImportPreparation {
     /// The existing table, or `None` when the import is creating one.
     pub table: Option<String>,
     pub path: PathBuf,
-    pub bytes: Vec<u8>,
+    pub bytes: Arc<[u8]>,
     pub format: CsvFormat,
     pub columns: Vec<ColumnInfo>,
     pub driver_id: String,
@@ -385,7 +385,10 @@ impl App {
             .guard(preparation.connection_id, bookie_policy::Principal::human_gui())
         else {
             self.close_csv_import_progress();
-            self.show_error_alert(&bookie_app_services::tr!("Can't import"), &bookie_app_services::tr!("No active connection."));
+            self.show_error_alert(
+                &bookie_app_services::tr!("Can't import"),
+                &bookie_app_services::tr!("No active connection."),
+            );
             return;
         };
         let Some(choice) = preparation.choice else {
@@ -459,11 +462,13 @@ impl App {
             );
             return;
         };
-        let message = bookie_app_services::tr!("{done} of {total} rows were written to {table} before the import stopped. {error}")
-            .replace("{done}", &report.committed.to_string())
-            .replace("{total}", &report.total.to_string())
-            .replace("{table}", &report.table)
-            .replace("{error}", &error)
+        let message = bookie_app_services::tr!(
+            "{done} of {total} rows were written to {table} before the import stopped. {error}"
+        )
+        .replace("{done}", &report.committed.to_string())
+        .replace("{total}", &report.total.to_string())
+        .replace("{table}", &report.table)
+        .replace("{error}", &error)
             + &skipped_note(report.skipped, &report.skipped_summary);
         self.show_error_alert(&bookie_app_services::tr!("Import stopped"), &message);
     }
@@ -721,7 +726,7 @@ async fn prepare_import(
     prepare: Prepare,
 ) -> Result<CsvImportPreparation, String> {
     let path = prepare.path.clone();
-    let bytes = tokio::task::spawn_blocking(move || read_file(&path))
+    let bytes = tokio::task::spawn_blocking(move || read_file(&path).map(Arc::from))
         .await
         .map_err(|_| bookie_app_services::tr!("The import file could not be prepared."))??;
     if control.cancellation_token().is_cancelled() {
@@ -793,8 +798,10 @@ fn suggested_table_name(path: &std::path::Path) -> String {
 
 fn read_file(path: &std::path::Path) -> Result<Vec<u8>, String> {
     let bytes = read_import_file(path).map_err(|error| match error {
-        ImportError::FileTooLarge { .. } => bookie_app_services::tr!("The file is larger than the {limit} MB import limit.")
-            .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()),
+        ImportError::FileTooLarge { .. } => {
+            bookie_app_services::tr!("The file is larger than the {limit} MB import limit.")
+                .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string())
+        }
         _ => bookie_app_services::tr!("The file could not be read."),
     })?;
     if bookie_core::import::is_xlsx(&bytes) {
