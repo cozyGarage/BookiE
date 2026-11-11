@@ -1172,7 +1172,7 @@ impl App {
             super::workspace_tabs::qualified_browse_tab_label(schemas_count, schema, &table_name)
         };
         let title = if combined_dirty { format!("• {base}") } else { base };
-        page.set_title(&title);
+        super::tab_title::set_tab_title(page, &title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()
