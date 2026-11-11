@@ -344,6 +344,7 @@ pub enum AppMsg {
     CollationsLoaded {
         tab_id: Uuid,
         collations: Vec<String>,
+        table_default_supported: bool,
     },
     StructureTabDirtyChanged(Uuid, bool),
     SchemaChanged {
