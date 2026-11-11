@@ -167,6 +167,18 @@ class ExperimentBoundaryTests(unittest.TestCase):
         root = self.manifest('db = { package = "bookie-storage", path = "x" }')
         self.assertEqual(len(checker.experiment_problems(root)), 1)
 
+    def test_target_specific_dependencies_cannot_bypass_the_boundary(self):
+        for table in ("dependencies", "dev-dependencies", "build-dependencies"):
+            with self.subTest(table=table):
+                root = self.manifest(
+                    f'\n[target.\'cfg(unix)\'.{table}]\ndb = {{ package = "bookie-policy", path = "x" }}'
+                )
+                self.assertEqual(len(checker.experiment_problems(root)), 1)
+
+    def test_allowed_target_specific_dependencies_remain_allowed(self):
+        root = self.manifest('\n[target.\'cfg(windows)\'.dependencies]\nbookie-core = { path = "x" }')
+        self.assertEqual(checker.experiment_problems(root), [])
+
     def test_the_gpui_app_follows_the_same_rule(self):
         root = self.manifest('bookie-driver-sqlite = { path = "x" }')
         empty = tempfile.TemporaryDirectory()
