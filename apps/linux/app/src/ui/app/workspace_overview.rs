@@ -2,13 +2,15 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
 pub(super) fn build_workspace_tab_overview(view: &adw::TabView, child: &impl IsA<gtk::Widget>) -> adw::TabOverview {
-    adw::TabOverview::builder()
+    let overview = adw::TabOverview::builder()
         .view(view)
         .enable_new_tab(true)
         .enable_search(true)
         .show_end_title_buttons(false)
         .child(child)
-        .build()
+        .build();
+    watch_overview_tags(view, &overview);
+    overview
 }
 
 pub(super) fn watch_overview_tags(view: &adw::TabView, overview: &adw::TabOverview) {
@@ -50,7 +52,6 @@ mod tests {
         let view = adw::TabView::new();
         let child = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let overview = build_workspace_tab_overview(&view, &child);
-        watch_overview_tags(&view, &overview);
 
         let first = view.append(&gtk::Box::new(gtk::Orientation::Vertical, 0));
         tab_title::set_tab_title(&first, "SELECT 1");
