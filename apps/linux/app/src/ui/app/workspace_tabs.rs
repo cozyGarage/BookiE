@@ -281,6 +281,9 @@ impl App {
             tab_view.set_selected_page(&page);
         }
         self.workspace_outer_stack.set_visible_child_name("tabs");
+        if let Some(tab_id) = self.selected_editor_tab_id() {
+            self.dispatch_to_editor(tab_id, SqlEditorInput::FocusEditor);
+        }
         if let Some(notice) = omitted_tabs_notice(saved.omitted_tabs) {
             self.show_toast(&notice);
         }

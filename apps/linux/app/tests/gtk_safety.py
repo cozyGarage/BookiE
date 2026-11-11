@@ -2066,6 +2066,56 @@ restart_restores_active_editor_and_connection.environment = "local"
 restart_restores_active_editor_and_connection.needs_restart = True
 
 
+def first_keyboard_input_after_restore_targets_selected_editor(database, _base, restart):
+    queries = ["SELECT 1;", "SELECT 2;", "SELECT 3;"]
+
+    def seed_editor_tabs(environment):
+        path = Path(environment["XDG_CONFIG_HOME"]) / storage_dir_name() / "workspace_state.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "connections": {
+                        "d4f5e246-c40a-4a30-90f2-39e93e94d920": {
+                            "tabs": [
+                                {"kind": "editor", "query": query, "draft_id": None} for query in queries
+                            ],
+                            "active_idx": 1,
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    restart(before_start=seed_editor_tabs, restored=True)
+    window = wait_for_frame_containing(" — BookiE")
+    wait_within(window, name="SELECT 2;", role=pyatspi.ROLE_PAGE_TAB)
+    wait_within(window, name="SELECT 3;", role=pyatspi.ROLE_PAGE_TAB)
+    wait_within(window, name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+    press_x11_key("x")
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        editor_values = [
+            node.queryText().getText(0, -1)
+            for node in descendants(window)
+            if node_role(node) == pyatspi.ROLE_TEXT
+        ]
+        if any("x" in value for value in editor_values):
+            break
+        time.sleep(POLL_SECONDS)
+    assert any("x" in value for value in editor_values), "keyboard input did not reach an editor"
+    assert any("x" in value and "SELECT 2;" in value for value in editor_values), (
+        f"first keyboard input after restore missed the selected editor: {editor_values}"
+    )
+    assert all("x" not in value for value in editor_values if "SELECT 1;" in value or "SELECT 3;" in value), (
+        f"first keyboard input after restore reached a background editor: {editor_values}"
+    )
+
+
+first_keyboard_input_after_restore_targets_selected_editor.environment = "local"
+first_keyboard_input_after_restore_targets_selected_editor.needs_restart = True
+
+
 def restart_with_a_deleted_connection_opens_the_welcome_list(database, base, restart):
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
@@ -3016,6 +3066,7 @@ def main():
         current_page_csv_export_is_pk_ordered,
         current_page_json_export_preserves_values,
         restart_restores_active_editor_and_connection,
+        first_keyboard_input_after_restore_targets_selected_editor,
         pending_edits_survive_opening_another_connection,
         preview_sql_shows_the_pending_statement_without_saving,
         browse_tabs_read_their_own_connections,
