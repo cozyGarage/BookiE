@@ -36,16 +36,20 @@ done
 echo "==> sandbox tier: all integration targets"
 NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
 PROFILE="${BOOKIE_NEXTEST_PROFILE:-default}"
-if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then
+test_bundle="${BOOKIE_SANDBOX_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}}"
+if [[ -n "$test_bundle" ]]; then
   mkdir -p "${CARGO_TARGET_DIR:?Cargo target directory required}"
   export TMPDIR="$CARGO_TARGET_DIR"
-  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE" "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}"
+  expected_group=()
+  if [[ -n "${BOOKIE_SANDBOX_BUNDLE:-}" ]]; then expected_group+=(--expected-group sandbox); fi
+  python3 "$ROOT/scripts/ci-test-bundle.py" verify "$test_bundle" \
+    "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}" "${expected_group[@]}"
   packages=""
   for crate in "${CRATES[@]}"; do
     packages+="${packages:+ | }package(=$crate)"
   done
-  "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$ROOT" --profile "$PROFILE" --no-tests=fail -E "($packages) & kind(test)"
-  "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$ROOT" --profile "$PROFILE" --no-tests=fail -E 'package(=bookie-driver-redis) & binary(=cancellation)'
+  "$NEXTEST" nextest run --archive-file "$test_bundle/nextest.tar.zst" --workspace-remap "$ROOT" --profile "$PROFILE" --no-tests=fail -E "($packages) & kind(test)"
+  "$NEXTEST" nextest run --archive-file "$test_bundle/nextest.tar.zst" --workspace-remap "$ROOT" --profile "$PROFILE" --no-tests=fail -E 'package(=bookie-driver-redis) & binary(=cancellation)'
   exit 0
 fi
 if [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then

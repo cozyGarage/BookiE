@@ -4,11 +4,13 @@ import io
 import json
 import os
 import platform
+from contextlib import redirect_stdout
 from unittest.mock import patch
 from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 
 SPEC = importlib.util.spec_from_file_location('registry', Path(__file__).resolve().parents[1] / 'ci-bundle-registry.py')
 registry = importlib.util.module_from_spec(SPEC)
@@ -16,6 +18,62 @@ SPEC.loader.exec_module(registry)
 
 
 class RegistryExtractionTests(unittest.TestCase):
+    def test_prune_deletes_only_expired_bookie_bundles_and_keeps_current_revision(self):
+        now = datetime.now(timezone.utc)
+        old = (now - timedelta(days=20)).isoformat()
+        recent = (now - timedelta(days=2)).isoformat()
+        packages = [
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'a' * 40 + '-direct', 'created_at': old},
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'b' * 40 + '-direct', 'created_at': recent},
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'c' * 40 + '-direct', 'created_at': old},
+            {'type': 'generic', 'name': 'other-package', 'version': 'd' * 40 + '-direct', 'created_at': old},
+            {'type': 'generic', 'name': 'bookie-test-bundles', 'version': 'invalid', 'created_at': old},
+        ]
+
+        class Response:
+            def __init__(self, status=200, body=b''):
+                self.status = status
+                self.body = body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, *_):
+                return self.body
+
+        requests = []
+
+        def request(url, method='GET', data=None, size=None):
+            requests.append((method, url))
+            return Response(200, json.dumps(packages).encode()) if method == 'GET' else Response(204)
+
+        with patch.dict('os.environ', {'BOOKIE_REGISTRY_API_URL': 'https://forgejo.example/api/v1/packages/trung',
+                                       'BOOKIE_REGISTRY_TOKEN': 'test-token'}), \
+                patch.object(registry, 'request', side_effect=request):
+            registry.prune('c' * 40, 14)
+
+        deleted = [url for method, url in requests if method == 'DELETE']
+        self.assertEqual(deleted, [
+            'https://forgejo.example/api/v1/packages/trung/generic/bookie-test-bundles/' + 'a' * 40 + '-direct'
+        ])
+
+    def test_archive_only_bundle_verifies_without_duplicate_executables(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / 'nextest.tar.zst'
+            archive.write_bytes(b'nextest archive')
+            index = {'schema_version': 1, 'source_commit': 'a' * 40, 'build_group': 'unit',
+                     'architecture': platform.machine(), 'archive_only': True,
+                     'tests': [{'path': 'tests/not-copied', 'kind': 'lib'}], 'binaries': {},
+                     'files': {'nextest.tar.zst': {
+                         'sha256': hashlib.sha256(archive.read_bytes()).hexdigest(),
+                         'size': archive.stat().st_size}}}
+            (root / 'index.json').write_text(json.dumps(index))
+            self.assertTrue(registry.bundle.verify(root, 'a' * 40, 'unit')['archive_only'])
+
     def test_bundle_verification_checks_the_requested_group(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -40,6 +98,18 @@ class RegistryExtractionTests(unittest.TestCase):
                 self.assertRaisesRegex(registry.urllib.error.HTTPError, 'PUT /bundle/bundle.tar.gz returned HTTP 500') as raised:
             registry.request('https://registry.example/bundle/bundle.tar.gz', 'PUT')
         self.assertEqual(raised.exception.code, 500)
+
+    def test_download_progress_is_quiet_until_the_interval_then_reports_rate(self):
+        output = io.StringIO()
+        with patch.object(registry.time, 'monotonic', return_value=9), redirect_stdout(output):
+            last_report = registry.report_download_progress('direct', 1024 ** 2, 4 * 1024 ** 2, 0, 0)
+        self.assertEqual(last_report, 0)
+        self.assertEqual(output.getvalue(), '')
+
+        with patch.object(registry.time, 'monotonic', return_value=10), redirect_stdout(output):
+            last_report = registry.report_download_progress('direct', 1024 ** 2, 4 * 1024 ** 2, 0, last_report)
+        self.assertEqual(last_report, 10)
+        self.assertIn('bundle download progress: direct 1.0/4.0 MiB (0.1 MiB/s)', output.getvalue())
 
     def test_missing_registry_manifest_remains_a_cache_miss(self):
         error = registry.urllib.error.HTTPError('https://registry.example/bundle/manifest.json', 404, 'Not Found', {}, None)
@@ -160,10 +230,17 @@ class RegistryExtractionTests(unittest.TestCase):
             self.assertEqual(requests[0], ('DELETE', 'bundle'))
             self.assertEqual(requests[-1], ('PUT', 'manifest.json'))
             destination = root / 'destination'
+            output = io.StringIO()
             with patch.object(registry.bundle, 'verify', return_value={'build_group': 'default'}), \
-                    patch.object(registry, 'request', side_effect=request):
+                    patch.object(registry, 'request', side_effect=request), redirect_stdout(output):
                 registry.fetch(destination, 'a' * 40, 'default', 'https://registry.example/bundle/')
             self.assertEqual((destination / 'program').read_bytes(), bytes(range(256)) * 8)
+            self.assertIn('bundle download progress: default', output.getvalue())
+            self.assertIn('bundle response reads:', output.getvalue())
+            self.assertIn('local write calls:', output.getvalue())
+            self.assertIn('bundle receive/write total:', output.getvalue())
+            self.assertIn('bundle checksum:', output.getvalue())
+            self.assertIn('bundle extract/verify:', output.getvalue())
 
     def test_regular_payload_is_extracted(self):
         self.assertEqual(self.check_archive('tests/program'), b'test')

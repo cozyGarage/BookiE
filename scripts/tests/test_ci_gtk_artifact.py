@@ -22,6 +22,17 @@ TOOLKIT = {
 
 
 class GtkArtifactWorkflowTests(unittest.TestCase):
+    def test_github_gtk_jobs_consume_the_verified_binary_and_schema_artifact(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
+        for name, end in (("gtk-safety", "current-stable-clippy"), ("gtk-server", "integration")):
+            job = workflow.split(f"  {name}:\n", 1)[1].split(f"  {end}:\n", 1)[0]
+            self.assertIn("ci-gtk-artifact.py verify", job)
+            self.assertIn("BOOKIE_GTK_BINARY=", job)
+            self.assertIn("GSETTINGS_SCHEMA_DIR=", job)
+        self.assertIn("ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety", fast)
+        self.assertIn("path: target/gtk-safety/", fast)
+
     def test_native_scenario_jobs_consume_the_single_verified_build(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         headings = list(re.finditer(r"(?m)^  ([a-z0-9-]+):\n", workflow.split("jobs:\n", 1)[1]))
@@ -39,8 +50,11 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
         for name in ("e2e", "gtk", "gtk-server"):
             job = jobs[name]
             self.assertRegex(job, r"needs: \[[^\]]*gtk-build[^\]]*\]")
+            self.assertNotIn("test-build", job)
+            self.assertNotIn("prepare-test-bundle.sh", job)
             self.assertIn("ci-gtk-artifact.py verify", job)
             self.assertIn("BOOKIE_GTK_BINARY=", job)
+            self.assertIn("GSETTINGS_SCHEMA_DIR=", job)
             self.assertIn("CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build\n", job)
             self.assertIn('"${{ github.sha }}"', job)
             self.assertIn("name: gtk-ci-${{ github.run_id }}-${{ github.sha }}", job)
@@ -72,8 +86,14 @@ class GtkArtifactTests(unittest.TestCase):
             patch.object(artifact, "source_identity", return_value=SHA),
             patch.object(artifact, "feature_identity", return_value=FEATURES),
             patch.object(artifact, "toolkit_identity", return_value=TOOLKIT),
+            patch.object(artifact.subprocess, "run", side_effect=self.compile_schemas),
         ):
             artifact.create(self.binary, self.output, SHA)
+
+    def compile_schemas(self, command, check):
+        destination = Path(command[command.index("--targetdir") + 1])
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / "gschemas.compiled").write_bytes(b"compiled schemas")
 
     def verify(self, expected_sha=SHA, *, package=False, features=FEATURES, toolkit=TOOLKIT):
         with (
@@ -88,6 +108,30 @@ class GtkArtifactTests(unittest.TestCase):
         manifest = json.loads((self.output / "manifest.json").read_text())
         self.assertEqual(manifest["features"], FEATURES)
         self.assertEqual(manifest["toolkit_runtime"], TOOLKIT)
+        self.assertEqual(
+            manifest["gsettings_schema_sha256"],
+            artifact.digest(self.output / "schemas" / "gschemas.compiled"),
+        )
+
+    def test_native_artifact_compiles_schemas_from_the_source_tree(self):
+        with patch.object(artifact, "source_identity", return_value=SHA), \
+                patch.object(artifact, "feature_identity", return_value=FEATURES), \
+                patch.object(artifact, "toolkit_identity", return_value=TOOLKIT), \
+                patch.object(artifact.subprocess, "run", side_effect=self.compile_schemas) as compile_schemas:
+            artifact.create(self.binary, self.output, SHA)
+
+        compile_schemas.assert_called_once_with(
+            ["glib-compile-schemas", "--strict", "--targetdir", str(self.output / "schemas"),
+             str(artifact.ROOT / "apps/linux/data")],
+            check=True,
+        )
+
+    def test_a_tampered_schema_bundle_is_refused(self):
+        self.create()
+        (self.output / "schemas" / "gschemas.compiled").write_bytes(b"changed")
+
+        with self.assertRaisesRegex(ValueError, "schema digest"):
+            self.verify()
 
     def test_feature_identity_reads_default_features_from_the_app_manifest(self):
         self.assertEqual(artifact.feature_identity(), FEATURES)

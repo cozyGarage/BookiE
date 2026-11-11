@@ -47,8 +47,8 @@ class SandboxSelectionTests(unittest.TestCase):
 
     def test_preflight_requires_and_verifies_a_source_pinned_bundle_when_requested(self):
         script = (ROOT / "scripts/preflight.sh").read_text()
-        self.assertIn('if [[ -n "${BOOKIE_TEST_BUNDLE:-}" ]]; then', script)
-        self.assertIn('ci-test-bundle.py" verify "$BOOKIE_TEST_BUNDLE"', script)
+        self.assertIn('unit_bundle="${BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}}"', script)
+        self.assertIn('ci-test-bundle.py" verify "$unit_bundle"', script)
         self.assertIn('elif [[ "${BOOKIE_REQUIRE_PREBUILT:-0}" == 1 ]]; then', script)
         self.assertIn('package(=$crate)', script)
 

@@ -105,7 +105,7 @@ impl App {
         if let Some(catalog) = catalog {
             self.sidebar_views = catalog.views;
             self.reset_sidebar_catalog();
-            self.repopulate_sidebar(&catalog.tables);
+            self.repopulate_sidebar(&catalog.tables, sender.clone());
             self.rebuild_schema_filter_popover(&sender);
             self.refresh_schema_index();
         }

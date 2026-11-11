@@ -1128,6 +1128,7 @@ impl App {
         origin: CatalogOrigin,
         generation: u64,
         result: Result<crate::services::catalog::Catalog, String>,
+        sender: relm4::ComponentSender<App>,
     ) {
         if !origin.owns_window(self.connection_id, &self.database) || self.catalog_generation.get() != generation {
             return;
@@ -1136,7 +1137,7 @@ impl App {
             Ok((tables, views)) => {
                 self.set_completion_tables(&tables, &views);
                 self.sidebar_views = views;
-                self.repopulate_sidebar(&tables);
+                self.repopulate_sidebar(&tables, sender);
                 self.refresh_schema_index();
             }
             Err(error) => self.show_error_alert(&bookie_app_services::tr!("Catalog refresh failed"), &error),
