@@ -16,6 +16,7 @@ mod editing;
 mod export;
 mod font_zoom;
 pub(crate) mod full_value_editor;
+mod header_alignment;
 mod highlight_paint;
 mod highlight_rules;
 pub(crate) use highlight_rules::HighlightPersist;
@@ -48,6 +49,7 @@ use column::{ColumnSpec, build_column, header_column, is_cell_editable};
 use context_menu::install_grid_context_menus;
 
 pub(crate) use context_menu::{LoadedCellEdit, present_loaded_cell_editor};
+pub(crate) use display::focused_cell_draft_id;
 pub(crate) use display::focused_row_position;
 pub(crate) use display::preview_to_display_text;
 pub use display::{focused_cell_identity, last_clicked_cell, set_date_format, set_null_display, value_to_display_text};
@@ -57,6 +59,14 @@ pub(crate) use value_viewer::present as present_value_viewer;
 
 pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
     editing::enter_edit_mode(label);
+}
+
+#[derive(Debug, Clone)]
+pub struct ResetCellRequest {
+    pub row_position: u32,
+    pub col_index: usize,
+    pub row_key: Vec<bookie_core::Value>,
+    pub reset: Option<bookie_core::sql_dialect::ColumnReset>,
 }
 
 #[derive(Debug)]
@@ -80,6 +90,7 @@ pub enum GridMsg {
         col_index: usize,
         value: bookie_core::Value,
         row_key: Vec<bookie_core::Value>,
+        draft_id: Option<u64>,
     },
     ReplaceBatch {
         report: bookie_app_services::grid_replace::ReplaceReport,
@@ -109,14 +120,19 @@ pub enum GridMsg {
         row_position: u32,
         col_index: usize,
         row_key: Vec<bookie_core::Value>,
+        draft_id: Option<u64>,
     },
+    ResetCell(ResetCellRequest),
     DeleteRowAt {
         row_position: u32,
         row_key: Vec<bookie_core::Value>,
+        draft_id: Option<u64>,
     },
     InsertRow,
     DuplicateRow {
         row_position: u32,
+        row_key: Vec<bookie_core::Value>,
+        draft_id: Option<u64>,
     },
     FilterByValue {
         column: String,
@@ -346,6 +362,7 @@ pub fn build_column_view(
             .zip(column_widths.clone())
             .map(|(id, store)| (id, table.to_string(), store)),
     );
+    header_alignment::install(&column_view, &display_columns);
     column_jump::install(
         &column_view,
         &grid_actions,

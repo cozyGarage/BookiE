@@ -188,6 +188,7 @@ mod tests {
             connection.to_string(),
             ConnectionWorkspaceState {
                 tabs: vec![WorkspaceTabRecord::Editor {
+                    mark: Default::default(),
                     query: "SELECT 1".into(),
                     draft_id: Some(draft),
                     file: None,
@@ -217,6 +218,7 @@ mod tests {
             id.clone(),
             ConnectionWorkspaceState {
                 tabs: vec![WorkspaceTabRecord::Editor {
+                    mark: Default::default(),
                     query: query.clone(),
                     draft_id: None,
                     file: None,
@@ -253,6 +255,7 @@ mod tests {
         let id = Uuid::new_v4().to_string();
         let editor = |query: &str| ConnectionWorkspaceState {
             tabs: vec![WorkspaceTabRecord::Editor {
+                mark: Default::default(),
                 query: query.into(),
                 draft_id: None,
                 file: None,
@@ -296,6 +299,7 @@ mod tests {
             broken_id.clone(),
             ConnectionWorkspaceState {
                 tabs: vec![WorkspaceTabRecord::Editor {
+                    mark: Default::default(),
                     query: "SELECT 1".into(),
                     draft_id: Some(Uuid::new_v4()),
                     file: Some("/home/me/report.sql".into()),
@@ -308,6 +312,7 @@ mod tests {
             healthy_id.clone(),
             ConnectionWorkspaceState {
                 tabs: vec![WorkspaceTabRecord::Editor {
+                    mark: Default::default(),
                     query: "SELECT 2".into(),
                     draft_id: Some(healthy_draft),
                     file: None,
@@ -326,7 +331,7 @@ mod tests {
 
         let loaded = load(&path, &drafts).unwrap();
         assert!(
-            matches!(&loaded.connections[&broken_id].tabs[0], WorkspaceTabRecord::Editor { query, draft_id: None, file: Some(file) } if query.is_empty() && file.ends_with("report.sql"))
+            matches!(&loaded.connections[&broken_id].tabs[0], WorkspaceTabRecord::Editor { query, draft_id: None, file: Some(file), .. } if query.is_empty() && file.ends_with("report.sql"))
         );
         assert!(
             matches!(&loaded.connections[&healthy_id].tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 2")
@@ -344,6 +349,7 @@ mod tests {
             id,
             ConnectionWorkspaceState {
                 tabs: vec![WorkspaceTabRecord::Editor {
+                    mark: Default::default(),
                     query: "SELECT 1".into(),
                     draft_id: Some(Uuid::new_v4()),
                     file: None,

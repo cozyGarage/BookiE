@@ -54,9 +54,15 @@ IBUS_LIBRARY="$(ldconfig -p | awk '/libibus-1.0.so.5 .*x86-64/ {print $NF; exit}
   --plugin gtk
 sed -i 's|^export GDK_BACKEND=x11.*$|export GDK_BACKEND="${GDK_BACKEND:-wayland,x11}"|' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
 grep -q 'wayland,x11' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
+# The GTK plugin forces GTK_THEME=Adwaita:<variant>; with it set GTK loads its built-in theme and
+# libadwaita's own stylesheet and the app's colour-scheme preference no longer apply.
+sed -i '/^export GTK_THEME=/d' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
+! grep -q '^export GTK_THEME=' "$APPDIR"/apprun-hooks/linuxdeploy-plugin-gtk.sh
 for module in "$APPDIR"/usr/lib/gtk-4.0/*/immodules/*.so; do
   patchelf --set-rpath '$ORIGIN/../../..' "$module"
 done
+APPIMAGE_GLIBC_FLOOR="$(tr -d '[:space:]' < "$ROOT/scripts/appimage-glibc-floor.txt")"
+python3 "$ROOT/scripts/check-appimage-glibc-floor.py" "$APPDIR" --max "$APPIMAGE_GLIBC_FLOOR"
 "$TOOLS/linuxdeploy-x86_64.AppImage" --appdir "$APPDIR" --output appimage
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
 echo "Wrote $OUT/$OUTPUT"

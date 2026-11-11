@@ -365,22 +365,19 @@ fn preview_value(value: &Value) -> Option<CellPreview> {
 
 struct JsonPreviewWriter {
     prefix: Vec<u8>,
-    byte_count: usize,
+    byte_limit: usize,
     exceeded: bool,
 }
 
 impl std::io::Write for JsonPreviewWriter {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let remaining = PREVIEW_BYTES.saturating_add(1).saturating_sub(self.byte_count);
-        let counted = bytes.len().min(remaining);
-        self.byte_count += counted;
-        let retained = counted.min(PREVIEW_BYTES.saturating_sub(self.prefix.len()));
-        self.prefix.extend_from_slice(&bytes[..retained]);
-        if counted < bytes.len() || self.byte_count > PREVIEW_BYTES {
+        let remaining = self.byte_limit.saturating_sub(self.prefix.len());
+        let written = bytes.len().min(remaining);
+        self.prefix.extend_from_slice(&bytes[..written]);
+        if written < bytes.len() {
             self.exceeded = true;
-            return Err(std::io::ErrorKind::WriteZero.into());
         }
-        Ok(bytes.len())
+        Ok(written)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
@@ -388,21 +385,76 @@ impl std::io::Write for JsonPreviewWriter {
     }
 }
 
-fn json_preview(json: &serde_json::Value) -> Option<CellPreview> {
+impl JsonPreviewWriter {
+    fn remaining(&self) -> usize {
+        self.byte_limit.saturating_sub(self.prefix.len())
+    }
+}
+
+pub(crate) fn bounded_json_prefix(json: &serde_json::Value, byte_limit: usize) -> (String, bool) {
     let mut writer = JsonPreviewWriter {
-        prefix: Vec::with_capacity(PREVIEW_BYTES),
-        byte_count: 0,
+        prefix: Vec::with_capacity(byte_limit),
+        byte_limit,
         exceeded: false,
     };
-    let result = serde_json::to_writer(&mut writer, json);
-    if !writer.exceeded {
-        result.ok()?;
-        return None;
-    }
+    let result = write_bounded_json(&mut writer, json);
+    let exceeded = writer.exceeded || result.is_err();
     let end = std::str::from_utf8(&writer.prefix).map_or_else(|error| error.valid_up_to(), str::len);
     writer.prefix.truncate(end);
+    (String::from_utf8_lossy(&writer.prefix).into_owned(), exceeded)
+}
+
+fn write_bounded_json(writer: &mut JsonPreviewWriter, value: &serde_json::Value) -> std::io::Result<()> {
+    match value {
+        serde_json::Value::String(text) => write_bounded_json_string(writer, text),
+        serde_json::Value::Array(values) => {
+            std::io::Write::write_all(writer, b"[")?;
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    std::io::Write::write_all(writer, b",")?;
+                }
+                write_bounded_json(writer, value)?;
+            }
+            std::io::Write::write_all(writer, b"]")
+        }
+        serde_json::Value::Object(values) => {
+            std::io::Write::write_all(writer, b"{")?;
+            for (index, (key, value)) in values.iter().enumerate() {
+                if index > 0 {
+                    std::io::Write::write_all(writer, b",")?;
+                }
+                write_bounded_json_string(writer, key)?;
+                std::io::Write::write_all(writer, b":")?;
+                write_bounded_json(writer, value)?;
+            }
+            std::io::Write::write_all(writer, b"}")
+        }
+        _ => Ok(serde_json::to_writer(writer, value)?),
+    }
+}
+
+fn write_bounded_json_string(writer: &mut JsonPreviewWriter, text: &str) -> std::io::Result<()> {
+    let (prefix, truncated) = bounded_json_string_prefix(text, writer.remaining());
+    serde_json::to_writer(&mut *writer, prefix)?;
+    if truncated {
+        writer.exceeded = true;
+        return Err(std::io::ErrorKind::WriteZero.into());
+    }
+    Ok(())
+}
+
+fn bounded_json_string_prefix(text: &str, byte_limit: usize) -> (&str, bool) {
+    let end = text.floor_char_boundary(byte_limit);
+    (&text[..end], end < text.len())
+}
+
+fn json_preview(json: &serde_json::Value) -> Option<CellPreview> {
+    let (prefix, exceeded) = bounded_json_prefix(json, PREVIEW_BYTES);
+    if !exceeded {
+        return None;
+    }
     Some(CellPreview {
-        value: Value::Text(String::from_utf8(writer.prefix).ok()?),
+        value: Value::Text(prefix),
         byte_count: PreviewByteCount::MoreThan(PREVIEW_BYTES),
     })
 }

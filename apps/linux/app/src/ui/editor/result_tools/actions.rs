@@ -213,7 +213,7 @@ impl Tools {
         };
         if worker.is_err() {
             self.cursor.borrow_mut().invalidate();
-            self.set_status(&crate::tr!("Could not start the search"));
+            self.set_status(&bookie_app_services::tr!("Could not start the search"));
             return;
         }
         self.set_busy(true);
@@ -259,15 +259,21 @@ impl Tools {
             }
             Err(FindError::Scan(ScanError::Cancelled)) => {
                 self.cursor.borrow_mut().end_search(generation);
-                self.set_status(&crate::tr!("Search cancelled"));
+                self.set_status(&bookie_app_services::tr!("Search cancelled"));
             }
             Err(FindError::Predicate(_)) => {
                 self.cursor.borrow_mut().end_search(generation);
-                self.set_status(&crate::tr!("Invalid regular expression"));
+                self.set_status(&bookie_app_services::tr!("Invalid regular expression"));
+            }
+            Err(FindError::Scan(ScanError::PageBudget)) => {
+                self.cursor.borrow_mut().end_search(generation);
+                self.set_status(&bookie_app_services::tr!(
+                    "Other results are using the page memory; close one and try again"
+                ));
             }
             Err(_) => {
                 self.cursor.borrow_mut().end_search(generation);
-                self.set_status(&crate::tr!("The search could not finish"));
+                self.set_status(&bookie_app_services::tr!("The search could not finish"));
             }
         }
     }
@@ -284,12 +290,14 @@ impl Tools {
                 let base = status_text.clone();
                 let failed: Rc<dyn Fn()> = Rc::new(move || {
                     with(&status, |label| {
-                        label.set_label(&crate::tr!("{status} · could not show this row").replace("{status}", &base));
+                        label.set_label(
+                            &bookie_app_services::tr!("{status} · could not show this row").replace("{status}", &base),
+                        );
                     });
                 });
                 go_to(&holder, &pages, target, &self.jump, failed);
             }
-            status = crate::tr!("{status} · row {row}")
+            status = bookie_app_services::tr!("{status} · row {row}")
                 .replace("{status}", &status)
                 .replace("{row}", &format_thousands(target.global_row as u128 + 1));
         }
@@ -314,7 +322,7 @@ impl Tools {
         }
         let spec = self.search_spec();
         if spec.needle.is_empty() {
-            self.set_status(&crate::tr!("Enter text to filter by"));
+            self.set_status(&bookie_app_services::tr!("Enter text to filter by"));
             return;
         }
         let ticket = Arc::new(FilterTicket::default());
@@ -335,7 +343,7 @@ impl Tools {
                 ticket: ticket.clone(),
             })));
         if sent.is_err() {
-            ticket.finish(crate::tr!("The filter could not start"));
+            ticket.finish(bookie_app_services::tr!("The filter could not start"));
         }
     }
 
@@ -372,13 +380,13 @@ pub(super) fn received(
 }
 
 fn searching_text(done: u64, total: u64) -> String {
-    crate::tr!("Searching… {done} of {total} rows")
+    bookie_app_services::tr!("Searching… {done} of {total} rows")
         .replace("{done}", &format_thousands(u128::from(done)))
         .replace("{total}", &format_thousands(u128::from(total)))
 }
 
 pub(super) fn filtering_text(done: u64, total: u64) -> String {
-    crate::tr!("Filtering… {done} of {total} rows")
+    bookie_app_services::tr!("Filtering… {done} of {total} rows")
         .replace("{done}", &format_thousands(u128::from(done)))
         .replace("{total}", &format_thousands(u128::from(total)))
 }

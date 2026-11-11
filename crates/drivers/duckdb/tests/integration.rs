@@ -27,6 +27,8 @@ mod result_budget;
 mod result_column_types;
 #[path = "support/rust_decimal_boundaries.rs"]
 mod rust_decimal_boundaries;
+#[path = "support/single_precision_filter.rs"]
+mod single_precision_filter;
 #[path = "support/submicro_parameter_expression.rs"]
 mod submicro_parameter_expression;
 #[path = "support/uhugeint_union.rs"]

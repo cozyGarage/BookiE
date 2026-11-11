@@ -51,6 +51,7 @@ pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "tls_root_cert",
     "tls_client_cert",
     "tls_client_key",
+    "tls_strict_encryption",
     "read_only",
     "auth_mode",
     "environment",
@@ -95,6 +96,8 @@ pub struct SavedConnection {
     pub tls_client_cert: Option<PathBuf>,
     #[serde(default)]
     pub tls_client_key: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tls_strict_encryption: bool,
     #[serde(default)]
     pub read_only: bool,
     #[serde(default)]
@@ -151,6 +154,8 @@ pub struct SavedSshConfig {
     pub agent: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_identity: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

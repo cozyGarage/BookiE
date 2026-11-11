@@ -1,6 +1,29 @@
 use super::*;
 
 #[test]
+fn an_in_flight_page_is_discarded_when_no_rows_remain_visible() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let spool = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default()
+        .create()
+        .unwrap();
+    let model = PagedModel::new(&[1], 1);
+    model.show(0, 1);
+    assert_eq!(model.next_request(), Some(0));
+    let visibility = model.visibility_callback(runtime.handle(), &spool, &[]);
+    visibility(0, false);
+    let context = glib::MainContext::default();
+    while context.iteration(false) {}
+    let page = std::sync::Arc::new(bookie_core::QueryResult {
+        columns: Vec::new(),
+        rows: vec![vec![bookie_core::Value::Int(10)]].into(),
+        truncated: false,
+    });
+    assert!(!model.install(0, page));
+    model.show(0, 1);
+    assert_eq!(model.next_request(), Some(0));
+}
+
+#[test]
 fn result_model_maps_global_positions_without_allocating_rows() {
     let model = PagedModel::new(&[2, 0, 1], 1);
     assert_eq!(model.n_items(), 3);
@@ -522,9 +545,32 @@ fn realized_grid_rows_load_their_spooled_values() {
         },
     );
     model.imp().selection.set(Some(&selection));
-    let window = gtk4::Window::builder().child(&view).build();
+    model.attach_selection(&selection, &view);
+    let stack = gtk4::Stack::new();
+    stack.add_named(&view, Some("result"));
+    stack.add_named(&gtk4::Box::new(gtk4::Orientation::Vertical, 0), Some("other"));
+    let window = gtk4::Window::builder().child(&stack).build();
     window.present();
     wait_for_condition(|| has_label(view.upcast_ref(), "42") && has_label(view.upcast_ref(), "84"));
+    assert!(selection.select_item(0, false));
+    let loaded = model
+        .imp()
+        .pages
+        .borrow()
+        .as_ref()
+        .and_then(|pages| pages.get(0))
+        .cloned()
+        .unwrap();
+    let released = std::sync::Arc::downgrade(&loaded.0);
+    drop(loaded);
+    stack.set_visible_child_name("other");
+    wait_for_condition(|| !view.is_mapped());
+    assert!(released.upgrade().is_none());
+    assert_eq!(model.n_items(), 0);
+    stack.set_visible_child_name("result");
+    window.present();
+    wait_for_condition(|| has_label(view.upcast_ref(), "42") && has_label(view.upcast_ref(), "84"));
+    assert!(selection.is_selected(0));
     window.destroy();
 }
 

@@ -6,6 +6,7 @@ mod parser_contract;
 
 mod activity;
 mod catalog;
+mod commit;
 mod connection;
 mod driver;
 mod error;
@@ -13,10 +14,12 @@ pub mod export;
 pub mod filter;
 pub mod import;
 mod join_skeleton;
+mod messagepack;
 mod numeric_input;
 mod operation;
 mod pagination;
 mod params;
+mod protobuf_wire;
 mod query;
 mod query_rows;
 mod registry;
@@ -36,10 +39,14 @@ mod transaction;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
-pub use connection::{AttachedDatabase, AuthMode, ConnectOptions, Connection, SocketOrigin, Transport, uri_host};
+pub use commit::{CommitResolution, CommitToken};
+pub use connection::{
+    AttachedDatabase, AuthMode, CollationInfo, ConnectOptions, Connection, MAX_COLLATIONS, SocketOrigin, Transport,
+    uri_host,
+};
 pub use driver::{
-    ConnectionFormDefaults, DataModel, DatabaseDriver, DriverCapabilities, DriverMaturity, EnumInputStyle,
-    connection_form_defaults, initial_connection_form_defaults,
+    ConnectionFormDefaults, DataModel, DatabaseDriver, DriverCapabilities, DriverMaturity,
+    DriverValueInputCapabilities, EnumInputStyle, connection_form_defaults, initial_connection_form_defaults,
 };
 pub use error::DriverError;
 pub use filter::{
@@ -47,6 +54,7 @@ pub use filter::{
     cell_filter_rule, equality_rule, filter_value_kind,
 };
 pub use join_skeleton::{JoinSkeletonError, MAX_JOINS, join_skeleton};
+pub use messagepack::{MAX_PAYLOAD_BYTES as MAX_MESSAGEPACK_BYTES, MessagePackError, decode_messagepack};
 pub use numeric_input::{
     FloatInputError, is_numeric_input, parse_float_input, single_precision_as_f64, sqlite_affinity_decimal,
     sqlite_declared_type_has_numeric_affinity,
@@ -60,6 +68,7 @@ pub use pagination::{
     keyset_where_clause,
 };
 pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse_parameter_value};
+pub use protobuf_wire::{MAX_PAYLOAD_BYTES as MAX_PROTOBUF_BYTES, ProtobufWireError, decode_protobuf_wire};
 pub use query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_CURSOR_PAGE_ROWS,
     MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QualifiedTypeName, QueryCursorId, QueryCursorPage,

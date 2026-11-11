@@ -17,6 +17,7 @@ mod effects_classification;
 mod explain_options;
 mod guard;
 mod input_refusal;
+mod linked_server;
 mod mask;
 mod principal;
 mod rules;
@@ -29,7 +30,10 @@ mod transaction_control;
 mod tsql_transaction;
 mod verdict;
 
-pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
+pub use approval::{
+    ApprovalGrant, ApprovalGrants, ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink,
+    RememberingApprovalSink,
+};
 pub use audit::{
     AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditConnectionContext,
     AuditConnectionIdentity, AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState,

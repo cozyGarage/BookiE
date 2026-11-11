@@ -5,6 +5,7 @@ pub use bookie_app_services::{
 
 #[cfg(test)]
 pub use bookie_app_services::filter_settings;
+pub mod approval_grants;
 pub mod approval_router;
 pub mod audit_view;
 pub mod change_tracker;

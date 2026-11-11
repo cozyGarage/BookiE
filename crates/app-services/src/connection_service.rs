@@ -83,26 +83,30 @@ impl PreparedConnection {
     /// switch (tearing down a previous connection, clearing tabs) so a
     /// refusal here never needs to be rolled back.
     pub fn activate(self, database: &DatabaseService) -> Option<ActivatedConnection> {
+        self.activate_with_generation(database).map(|(activated, _)| activated)
+    }
+
+    pub(crate) fn activate_with_generation(self, database: &DatabaseService) -> Option<(ActivatedConnection, Uuid)> {
         let id = self.id;
         let database_name = self.params.opts.database.clone();
-        let activated = database.activate_shared(
+        let generation = database.activate_shared(
             id,
             self.metadata,
             self.connection,
             self.tunnel,
             self.read_only,
             self.params,
-        );
-        if !activated {
-            return None;
-        }
-        Some(ActivatedConnection {
-            id,
-            tables: self.tables,
-            views: self.views,
-            driver_id: self.driver_id,
-            database: database_name,
-        })
+        )?;
+        Some((
+            ActivatedConnection {
+                id,
+                tables: self.tables,
+                views: self.views,
+                driver_id: self.driver_id,
+                database: database_name,
+            },
+            generation,
+        ))
     }
 }
 
@@ -135,7 +139,7 @@ pub async fn open_saved(
         opts.clone(),
         ssh_hops.clone(),
         &ssh_environment,
-        cancellation,
+        cancellation.clone(),
     )
     .await
     .map_err(OpenFailure::from)?;
@@ -150,12 +154,17 @@ pub async fn open_saved(
         query_timeout_secs: saved.query_timeout_secs,
     };
     let guarded = guard_factory.guard(connection.clone(), &metadata, bookie_policy::Principal::human_gui())?;
-    let server_version = match guarded.server_version().await {
+    let control = crate::operation_control::bounded_with(timeout_secs, cancellation);
+    let server_version = match guarded.server_version_controlled(&control).await {
         Ok(version) => version,
-        Err(error @ bookie_core::DriverError::PolicyDenied(_)) => return Err(OpenFailure::from_driver(&error)),
+        Err(
+            error @ (bookie_core::DriverError::PolicyDenied(_)
+            | bookie_core::DriverError::Cancelled
+            | bookie_core::DriverError::TimedOut
+            | bookie_core::DriverError::OperationOutcomeUnknown { .. }),
+        ) => return Err(OpenFailure::from_driver(&error)),
         Err(_) => None,
     };
-    let control = crate::operation_control::bounded(timeout_secs);
     let tables = crate::catalog::list_tables_excluding(&guarded, &hidden_schemas, &control)
         .await
         .map_err(|error| OpenFailure::from_driver(&error))?;

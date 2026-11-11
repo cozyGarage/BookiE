@@ -20,9 +20,270 @@ bounded_spec.loader.exec_module(bounded_checker)
 port_spec = importlib.util.spec_from_file_location("ci_mcp_port", ROOT / "scripts/ci-mcp-port.py")
 port_helper = importlib.util.module_from_spec(port_spec)
 port_spec.loader.exec_module(port_helper)
+bundle_spec = importlib.util.spec_from_file_location("ci_test_bundle", ROOT / "scripts/ci-test-bundle.py")
+bundle_helper = importlib.util.module_from_spec(bundle_spec)
+bundle_spec.loader.exec_module(bundle_helper)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_closing_a_pull_request_cancels_its_runs_and_release_records_queue_wait(self):
+        cancel = (ROOT / ".github/workflows/cancel-closed-pr-runs.yml").read_text()
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+
+        self.assertIn("types: [closed]", cancel)
+        self.assertIn("branches: [main]", cancel)
+        self.assertIn("head_sha=$HEAD_SHA", cancel)
+        self.assertIn("event=pull_request", cancel)
+        self.assertIn("actions: write", cancel)
+        self.assertIn("Queue wait before start", release)
+
+    def test_test_bundle_groups_cover_their_consumers_without_copying_every_test_binary(self):
+        bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        metadata = json.loads(subprocess.check_output(
+            ["cargo", "metadata", "--no-deps", "--format-version=1"], cwd=ROOT, text=True
+        ))
+        packages = {package["name"]: package for package in metadata["packages"]}
+        for group, selections in bundle_groups.items():
+            with self.subTest(group=group):
+                self.assertIn(group, bundle_helper.BUNDLE_GROUPS)
+                for kind, names in selections.items():
+                    for name in names:
+                        self.assertTrue(
+                            any(target["test"] and kind in target["kind"]
+                                for target in packages[name]["targets"]),
+                            f"{group} has no testable {name}:{kind} target",
+                        )
+        direct = {(package, kind) for kind, packages in bundle_groups["direct"].items() for package in packages}
+
+        self.assertEqual(
+            {package for package, kind in direct if kind == "lib"},
+            {"bookie-app", "bookie-app-services", "bookie-core", "bookie-driver-clickhouse", "bookie-driver-sqlite", "bookie-policy"},
+        )
+        self.assertEqual(
+            {package for package, kind in direct if kind == "test"},
+            {"bookie-app", "bookie-core", "bookie-driver-postgres", "bookie-driver-sqlite", "bookie-policy"},
+        )
+        self.assertEqual(bundle_groups["direct"]["bin"], ["bookie-app"])
+        self.assertTrue(bundle_helper.target_selected("bookie-app", "lib", set(), direct))
+        self.assertFalse(bundle_helper.target_selected("bookie-driver-duckdb", "test", set(), direct))
+        self.assertEqual(
+            set(bundle_groups),
+            {"direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "drivers",
+             "pg-release", "socket-ssh", "driver-tls", "keyring"},
+        )
+        self.assertTrue({"bookie-app", "bookie-mcp", "bookie-policy"} <= set(bundle_groups["consumers"]["lib"] + bundle_groups["consumers"]["test"]))
+        self.assertIn("bookie-app", bundle_groups["consumers"]["test"])
+        for group in ("driver-core", "driver-analytics", "driver-extended"):
+            self.assertTrue(bundle_groups[group]["test"])
+
+    def test_forgejo_workflow_and_actionlint_config_changes_run_contract_checks(self):
+        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+
+        self.assertEqual(workflow.count('".forgejo/workflows/**"'), 2)
+        self.assertEqual(workflow.count('".github/actionlint.yaml"'), 2)
+
+    def test_workflow_security_scans_both_providers(self):
+        workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        security = re.search(r"(?ms)^  workflow-security:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+
+        self.assertIn("zizmor --offline", security)
+        self.assertIn(".github/workflows/*.yml .forgejo/workflows/*.yml", security)
+
+    def test_forgejo_change_contract_step_uses_env_for_event_values(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        step = re.search(
+            r"(?ms)^      - name: Focused Data-lane change contracts\n(.*?)(?=^      - name: )",
+            workflow,
+        ).group(1)
+
+        self.assertIn("BOOKIE_CI_REF: ${{ github.ref }}", step)
+        self.assertIn("BOOKIE_CI_EVENT_NAME: ${{ github.event_name }}", step)
+        self.assertIn("BOOKIE_CI_EVENT_BEFORE: ${{ github.event.before || 'HEAD^' }}", step)
+        self.assertIn('"$BOOKIE_CI_REF"', step)
+        self.assertNotIn('${{ github.ref }}"', step)
+        self.assertNotIn('${{ github.event_name }}"', step)
+        self.assertNotIn('${{ github.event.before', step.split("        run: |", 1)[1])
+
+    def test_shared_github_and_forgejo_tiers_use_the_layer_catalog(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for layer in (
+            "app-server",
+            "change-contracts",
+            "distro-floor",
+            "keyring",
+            "pg-dump",
+            "postgres-release",
+            "tls",
+            "ui",
+            "widgets",
+        ):
+            with self.subTest(layer=layer):
+                invocation = f"python3 scripts/run-test-layer.py {layer}"
+                self.assertIn(invocation, github)
+                self.assertIn(invocation, forgejo)
+
+    def test_packaging_contracts_run_in_both_hosted_gates(self):
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        guards = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        harness = (ROOT / "scripts/test-harness.sh").read_text()
+
+        self.assertEqual(layers["packaging-contracts"]["hosted_gate"],
+                         "Linux CI contracts / harness; lab-ci / guards")
+        self.assertIn("bash scripts/test-harness.sh", guards)
+        self.assertIn("python3 scripts/tests/test_arch_candidate.py", harness)
+        self.assertIn("python3 scripts/tests/test_deb_package.py", harness)
+
+    def test_forgejo_runs_the_shared_security_policy_layer(self):
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_security = (ROOT / ".github/workflows/linux-security.yml").read_text()
+        security_policy = re.search(r"(?ms)^  security-policy:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py security-policy", security_policy)
+        self.assertIn('run: python3 scripts/run-test-layer.py "$VALIDATION_LAYER"', github_security)
+
+    def test_both_test_builders_run_the_shared_no_default_features_layer(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_builder = re.search(r"(?ms)^  reusable-test-builds:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        forgejo_builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py no-default-features", github_builder)
+        self.assertIn("python3 scripts/run-test-layer.py no-default-features", forgejo_builder)
+
+    def test_gtk_server_layers_use_the_shared_catalog_on_both_providers(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        forgejo_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+        self.assertIn("server: [clickhouse, mongodb, postgres, mysql]", github_job)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', github_job)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
+        self.assertIn("Build Linux / postgres-release", layers["gtk-mysql-approval"]["hosted_gate"])
+        self.assertIn("lab-ci / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
+        for layer in ("gtk-clickhouse", "gtk-mongodb"):
+            with self.subTest(layer=layer):
+                self.assertIn("Build Linux / gtk-server", layers[layer]["hosted_gate"])
+                self.assertIn("lab-ci / gtk-server", layers[layer]["hosted_gate"])
+        for layer in ("gtk-postgres", "gtk-mysql"):
+            with self.subTest(layer=layer):
+                self.assertIn("Build Linux / gtk-server", layers[layer]["hosted_gate"])
+                self.assertIn("lab-ci / e2e", layers[layer]["hosted_gate"])
+        self.assertIn("gtk-server", checker.REQUIRED)
+        self.assertIn("actions/download-artifact@", github_job)
+        self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", github_job)
+        self.assertIn("python3 scripts/cleanup-testcontainers.py", github_job)
+        e2e = re.search(r"(?ms)^  e2e:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', e2e)
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        self.assertIn("if: matrix.driver == 'core'", driver)
+        self.assertIn("python3 scripts/run-test-layer.py pg-dump", driver)
+
+    def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        preflight = (ROOT / "scripts/preflight.sh").read_text()
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+
+        self.assertIn("python3 scripts/run-test-layer.py quick", github)
+        self.assertIn('"$ROOT/scripts/test-sandbox.sh"', preflight)
+        self.assertEqual(layers["sandbox"]["steps"][0]["argv"], ["bash", "scripts/test-sandbox.sh"])
+        self.assertIn("python3 scripts/run-test-layer.py sandbox", forgejo)
+
+    def test_github_and_forgejo_driver_tiers_both_run_duckdb_fixture_targets(self):
+        local = (ROOT / "scripts/ci-local.sh").read_text()
+        integration = local.split("run_integration() {", 1)[1].split("run_release() {", 1)[0]
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        groups = {
+            "core": {"postgres", "mysql", "mssql"},
+            "analytics": {"clickhouse", "redis", "mongodb"},
+            "extended": {"oracle", "cassandra", "duckdb"},
+        }
+        group_script = (ROOT / "scripts/run-driver-group.sh").read_text()
+
+        self.assertIn('bash scripts/run-driver-group.sh "$group"', integration)
+        self.assertIn('driver: [core, analytics, extended]', driver)
+        self.assertIn('python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"', driver)
+        for group, drivers in groups.items():
+            with self.subTest(group=group):
+                self.assertIn(f"{group}) drivers=({' '.join(sorted(drivers))}) ;;", group_script)
+                self.assertIn(f'"driver-{group}"', (ROOT / "scripts/test-layers.json").read_text())
+
+    def test_github_and_forgejo_run_the_same_change_contract_layer(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        unit = re.search(r"(?ms)^  unit:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("python3 scripts/run-test-layer.py change-contracts", github)
+        self.assertIn("python3 scripts/run-test-layer.py change-contracts", unit)
+        self.assertIn('git merge-base HEAD origin/main', unit)
+        self.assertIn("github.event.before", unit)
+        self.assertIn('"$BOOKIE_CI_EVENT_NAME" != "push"', unit)
+
+    def test_forgejo_runs_gpui_model_and_interaction_tests(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("timeout-minutes:", job)
+        self.assertIn("needs: [test-build]", job)
+        self.assertIn('prepare-test-bundle.sh "${{ github.sha }}" gpui', job)
+        self.assertIn('nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst"', job)
+        self.assertIn('mkdir -p "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
+        self.assertIn('workspace_root="$(cd apps/gpui && pwd -P)"', job)
+        self.assertIn('test -r "$workspace_root/tests/fixtures/orders.sqlite"', job)
+        self.assertIn('--workspace-remap "$workspace_root"', job)
+        self.assertIn('--extract-to "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
+        self.assertNotIn("cargo test", job)
+        self.assertIn('rm -rf -- "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}"', job)
+
+    def test_forgejo_jobs_fetch_the_bundle_group_they_execute(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        for name, group in (("unit", "unit"), ("sandbox", "sandbox"), ("gpui-tests", "gpui"),
+                            ("widgets", "direct"), ("security-policy", "consumers"),
+                            ("consumers", "consumers"), ("pg-release", "pg-release"),
+                            ("socket-ssh", "socket-ssh"), ("driver-tls", "driver-tls"),
+                            ("keyring", "keyring")):
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+                self.assertIn(f'prepare-test-bundle.sh "${{{{ github.sha }}}}" {group}', job)
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn('prepare-test-bundle.sh "${{ github.sha }}" "driver-${{ matrix.driver }}"', driver)
+
+    def test_forgejo_prunes_old_source_pinned_test_bundles(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        builder = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("Remove expired test bundles", builder)
+        self.assertIn("BOOKIE_REGISTRY_API_URL: ${{ github.server_url }}/api/v1/packages/trung", builder)
+        self.assertIn('ci-bundle-registry.py prune "${{ github.sha }}" --retention-days 14', builder)
+
+    def test_github_runs_the_same_gpui_tests_in_the_shared_linux_image(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        job = re.search(r"(?ms)^  gpui-tests:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        builder = re.search(r"(?ms)^  reusable-test-builds:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", job)
+        self.assertIn("ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", job)
+        self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-gpui", job)
+        self.assertIn("--expected-group gpui", job)
+        self.assertIn("nextest run --archive-file", job)
+        self.assertIn('mkdir -p "$RUNNER_TEMP/bookie-gpui-extract"', job)
+        self.assertIn('workspace_root="$(cd apps/gpui && pwd -P)"', job)
+        self.assertIn('test -r "$workspace_root/tests/fixtures/orders.sqlite"', job)
+        self.assertIn('--workspace-remap "$workspace_root"', job)
+        self.assertIn('--extract-to "$RUNNER_TEMP/bookie-gpui-extract"', job)
+        self.assertNotIn("cargo test", job)
+        self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/reusable-builds" all', builder)
+        for group in ("direct", "unit", "sandbox"):
+            with self.subTest(group=group):
+                self.assertIn(f"bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}", builder)
+                self.assertIn(f"path: reusable-builds/{group}/", builder)
+        self.assertIn('path: reusable-builds/gpui/', builder)
+        self.assertIn('RUSTC_WRAPPER: ""', job)
+        self.assertIn('"gpui-tests"', (ROOT / "scripts/check-ci-jobs.py").read_text())
+        self.assertIn("libxkbcommon-x11-dev", (ROOT / "ci/debian-testing-gtk/Dockerfile").read_text())
+
     def test_containerized_gtk_job_shares_docker_config_with_image_pulls(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = re.search(r"^  fast:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", workflow, re.M | re.S).group(1)
@@ -34,9 +295,15 @@ class CiWorkflowTests(unittest.TestCase):
     def test_ci_build_artifacts_strip_symbols(self):
         build = (ROOT / "scripts/build-test-bundles.sh").read_text()
         self.assertIn('export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"', build)
+        self.assertIn('--message-format=json-render-diagnostics', build)
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         gtk_build = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)
+
+    def test_forgejo_gpui_test_builder_installs_linker_dependency(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        job = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("apt-get install -y --no-install-recommends libxkbcommon-x11-dev", job)
 
     def test_forgejo_temporary_files_use_the_persistent_runner_volume(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -101,30 +368,87 @@ class CiWorkflowTests(unittest.TestCase):
     def test_headless_fixtures_wait_for_cheap_checks_without_serializing_behind_widgets(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         expected = {"guards", "clippy", "test-build"}
-        for name in ("driver", "pg-release", "pg-dump", "socket-ssh", "driver-tls"):
+        for name in ("driver", "pg-release", "socket-ssh", "driver-tls"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
         widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("test-gtk-widgets.sh", widgets)
+        self.assertIn("python3 scripts/run-test-layer.py widgets", widgets)
         self.assertNotRegex(widgets, r"(?m)^    (if|continue-on-error):")
 
     def test_default_test_jobs_wait_for_the_one_test_bundle_and_duckdb_runs_with_the_drivers(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         default_build = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" default', default_build)
+        self.assertIn('build-test-bundles.sh "$GITHUB_WORKSPACE/test-bundles" forgejo', default_build)
+        publish_groups = re.search(r"for group in ([^;]+);", default_build).group(1).split()
+        groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertEqual(set(publish_groups), set(groups) | {"unit", "sandbox", "gpui"})
+        self.assertIn('"$GITHUB_WORKSPACE/test-bundles/$group" "${{ github.sha }}" "$group"', default_build)
         self.assertNotIn("duckdb-build", workflow)
         self.assertNotRegex(workflow, r"(?m)^  duckdb:\n")
-        for name in ("unit", "sandbox", "widgets", "driver", "consumers", "gtk"):
+        for name in ("unit", "sandbox", "widgets", "driver", "consumers"):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn("test-build", re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1))
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        self.assertIn("mongodb, duckdb]", driver)
-        self.assertIn("--test integration --test read_only --test missing_file", driver)
-        image_prepull = driver[driver.index("- name: Pre-pull fixture images"):]
-        self.assertIn("if: ${{ matrix.driver != 'duckdb' }}", image_prepull)
+        gtk = re.search(r"(?ms)^  gtk:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("gtk-build", re.search(r"(?m)^    needs: \[(.+)\]$", gtk).group(1))
+        workspace_driver_names = {
+            tomllib.loads(path.read_text())["package"]["name"].removeprefix("bookie-driver-")
+            for path in (ROOT / "crates/drivers").glob("*/Cargo.toml")
+        }
+        matrix = re.search(r"(?m)^        driver: \[(.+)\]$", driver).group(1)
+        forgejo_drivers = {name.strip() for name in matrix.split(",")}
+        local_integration = (ROOT / "scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1]
+        group_script = (ROOT / "scripts/run-driver-group.sh").read_text()
+        github_groups = set(re.findall(r"for group in ([^;]+);", local_integration)[0].split())
+        group_drivers = set(re.findall(r"\w+\) drivers=\(([^)]*)\)", group_script)[0].split())
+        for match in re.findall(r"\w+\) drivers=\(([^)]*)\)", group_script)[1:]:
+            group_drivers.update(match.split())
+        self.assertEqual(forgejo_drivers, github_groups)
+        self.assertEqual(group_drivers, workspace_driver_names - {"sqlite"})
+        self.assertIn("--test integration --test read_only --test missing_file", group_script)
+
+    def test_github_jobs_fetch_the_bundle_groups_they_execute(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        expected = {"preflight": ("unit", "sandbox"), "fast": ("unit", "direct"), "integration": ("drivers",)}
+        for name, groups in expected.items():
+            with self.subTest(job=name):
+                job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+                self.assertIn("reusable-test-builds", job)
+                self.assertIn("actions/download-artifact@", job)
+                for group in groups:
+                    with self.subTest(group=group):
+                        self.assertIn(f"--expected-group {group}", job)
+                        self.assertIn(f"bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}", job)
+                self.assertNotIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-default", job)
+        for name in ("preflight", "fast"):
+            job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+            self.assertIn("BOOKIE_REQUIRE_PREBUILT=1", job)
+            self.assertIn("GSETTINGS_SCHEMA_DIR=%s/bookie-unit-bundle/schemas", job)
+        preflight = re.search(r"(?ms)^  preflight:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("needs.ensure-ci-gtk-image.outputs.tag", preflight)
+        preflight_script = (ROOT / "scripts/preflight.sh").read_text()
+        sandbox_script = (ROOT / "scripts/test-sandbox.sh").read_text()
+        builder = (ROOT / "scripts/build-test-bundles.sh").read_text()
+        self.assertIn("--package-kind", builder)
+        self.assertIn("ci-test-bundle-groups.json", builder)
+        bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
+        self.assertIn("bookie-core", bundle_groups["direct"]["lib"])
+        self.assertIn("bookie-mcp", bundle_groups["consumers"]["lib"])
+        builder_workflow = re.search(
+            r"(?ms)^  reusable-test-builds:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)",
+            (ROOT / ".github/workflows/build-linux.yml").read_text(),
+        ).group(1)
+        uploaded_groups = re.findall(
+            r"name: bookie-tests-\$\{\{ needs\.pin-revision\.outputs\.revision \}\}-([a-z-]+)",
+            builder_workflow,
+        )
+        self.assertEqual(set(uploaded_groups), set(bundle_groups) | {"unit", "sandbox", "gpui"})
+        self.assertIn('BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', preflight_script)
+        self.assertIn('BOOKIE_SANDBOX_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}', sandbox_script)
+        self.assertIn("--workspace-remap", preflight_script)
 
     def test_native_duckdb_build_jobs_normalize_and_clean_the_shared_compiler_cache(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -151,8 +475,8 @@ class CiWorkflowTests(unittest.TestCase):
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = (
-            "distro-floor", "driver", "e2e", "consumers", "gtk",
-            "pg-release", "pg-dump", "socket-ssh", "gtk-server", "driver-tls",
+            "driver", "e2e", "consumers", "gtk",
+            "pg-release", "socket-ssh", "gtk-server", "driver-tls",
             "keyring", "supply-chain",
         )
         for name in jobs:
@@ -160,9 +484,7 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 expected = {"guards", "clippy"}
-                if name == "distro-floor":
-                    expected.add("floor-build")
-                elif name != "supply-chain":
+                if name not in {"supply-chain", "e2e", "gtk", "gtk-server"}:
                     expected.add("test-build")
                 if name in {"e2e", "gtk", "gtk-server"}:
                     expected.add("gtk-build")
@@ -194,8 +516,8 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
         for name in (
-            "guards", "unit", "sandbox", "widgets", "distro-floor", "distro-floor-scenarios", "driver", "e2e",
-            "consumers", "gtk", "pg-release", "pg-dump", "socket-ssh", "gtk-server",
+            "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver", "e2e",
+            "consumers", "gtk", "pg-release", "socket-ssh", "gtk-server",
             "driver-tls", "keyring",
         ):
             with self.subTest(job=name):
@@ -243,14 +565,17 @@ class CiWorkflowTests(unittest.TestCase):
             harness.index("scripts/update-third-party-notices.py --check"),
         )
 
-    def test_forgejo_workflows_do_not_block_other_runs(self):
+    def test_forgejo_ci_and_nightly_share_a_per_ref_concurrency_group(self):
+        groups = []
         for name in ("ci", "nightly"):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             match = re.search(r"^concurrency:\n((?:[ \t]+[^\n]*\n)+)", workflow, re.MULTILINE)
             self.assertIsNotNone(match, name)
             settings = dict(line.strip().split(":", 1) for line in match[1].splitlines())
-            self.assertNotIn("group", settings, name)
+            self.assertEqual(settings["group"].strip(), "bookie-ci-${{ github.ref }}", name)
             self.assertEqual(settings["cancel-in-progress"].strip(), "false", name)
+            groups.append(settings["group"].strip())
+        self.assertEqual(groups[0], groups[1])
         gate = (ROOT / "scripts/forgejo-gate.sh").read_text()
         self.assertIn('printf \'%s/%s\' "$remote" "$target" | sha256sum', gate)
 
@@ -276,10 +601,14 @@ class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_driver_jobs_reuse_and_clean_the_run_scoped_database(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         driver = workflow.split("  driver:\n", 1)[1].split("  consumers:\n", 1)[0]
+        script = (ROOT / "scripts/run-driver-group.sh").read_text()
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
         self.assertIn("BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", driver)
-        self.assertIn("cleanup-testcontainers.py", driver)
-        self.assertIn("trap cleanup_testcontainers EXIT", driver)
-        self.assertIn("--test-threads=1", driver)
+        self.assertIn('python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"', driver)
+        self.assertIn('mkdir -p "${TMPDIR:-/tmp}"', script)
+        self.assertIn("cleanup-testcontainers.py", script)
+        self.assertIn("trap finish EXIT", script)
+        self.assertIn("--test-threads=1", script)
 
     def test_socket_ssh_job_cleans_run_scoped_containers_on_cancel(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -460,8 +789,8 @@ class CiWorkflowTests(unittest.TestCase):
         preflight = workflow.split("  preflight:\n", 1)[1].split("  fast:\n", 1)[0]
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
         ensure = workflow.split("  ensure-ci-gtk-image:\n", 1)[1].split("  preflight:\n", 1)[0]
-        self.assertIn("needs: pin-revision", preflight)
-        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image]", fast)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", preflight)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", fast)
         self.assertNotIn("needs: preflight", fast)
         self.assertIn("mozilla-actions/sccache-action@", preflight)
         self.assertIn("mozilla-actions/sccache-action@", fast)
@@ -516,11 +845,12 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_push_and_pull_request_require_every_regression_job(self):
         self.assertEqual(checker.MERGE_ONLY, set())
-        self.assertEqual(checker.PULL_REQUEST_ONLY, set())
+        self.assertEqual(checker.OPTIONAL_ON_PULL_REQUEST, {"distro-floor-scenarios"})
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         for name in checker.REQUIRED:
             results = success | {name: {"result": "skipped"}}
-            self.assertEqual(checker.assess(results, "pull_request")[0], [name], name)
+            expected_pr = [] if name in checker.OPTIONAL_ON_PULL_REQUEST else [name]
+            self.assertEqual(checker.assess(results, "pull_request")[0], expected_pr, name)
             self.assertEqual(checker.assess(results, "push")[0], [name], name)
         results = success | {"driver-tls": {"result": "skipped"}}
         self.assertEqual(checker.assess(results, "pull_request")[0], ["driver-tls"])
@@ -593,14 +923,53 @@ class CiWorkflowTests(unittest.TestCase):
         for event in ["schedule", "workflow_dispatch"]:
             self.assertEqual(checker.assess(results, event)[0], [checker.SCHEDULED])
 
+    def test_distro_floor_is_not_a_pull_request_gate(self):
+        results = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
+        results["distro-floor-scenarios"] = {"result": "skipped"}
+        self.assertEqual(checker.assess(results, "pull_request")[0], [])
+        self.assertIn("distro-floor-scenarios", checker.assess(results, "push")[0])
+
+    def test_distro_floor_profiles_match_between_github_and_forgejo(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(
+            r"(?ms)^  distro-floor-scenarios:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", github
+        ).group(1)
+        forgejo_jobs = re.search(
+            r"(?ms)^  floor-build:\n(.*?)(?=^  driver:\n|\Z)", forgejo
+        ).group(1)
+        full_profile = (
+            "github.ref == 'refs/heads/main' || github.event_name == 'schedule' "
+            "|| github.event_name == 'workflow_dispatch'"
+        )
+
+        self.assertIn("if: github.event_name != 'pull_request'", github_job)
+        self.assertEqual(forgejo_jobs.count(f"if: {full_profile}"), 2)
+        self.assertEqual(checker.OPTIONAL_ON_PULL_REQUEST, {"distro-floor-scenarios"})
+
     def test_summary_depends_on_every_required_job_and_always_runs(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         section = workflow.split("  regression-gate:\n", 1)[1]
-        self.assertIn("if: always()", section)
+        self.assertIn("if: always() && !cancelled()", section)
         self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
         self.assertIn("python3 scripts/check-ci-jobs.py", section)
         for name in checker.REQUIRED | {checker.SCHEDULED}:
             self.assertIn(f"      - {name}\n", section)
+
+    def test_forgejo_regression_gate_waits_for_every_workflow_job(self):
+        workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        jobs = workflow.split("jobs:\n", 1)[1]
+        job_names = [
+            name for name in re.findall(r"(?m)^  ([a-z][a-z0-9-]+):\n", jobs) if name != "regression-gate"
+        ]
+        section = jobs.split("  regression-gate:\n", 1)[1]
+
+        self.assertIn("if: always() && !cancelled()", section)
+        self.assertIn("CI_JOB_RESULTS: ${{ toJSON(needs) }}", section)
+        self.assertIn("python3 src/scripts/check-forgejo-ci-jobs.py", section)
+        for name in job_names:
+            with self.subTest(job=name):
+                self.assertIn(f"      - {name}\n", section)
 
     def test_b4_rollback_gate_runs_focused_mysql_and_postgres_tests_before_broad_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -616,7 +985,7 @@ class CiWorkflowTests(unittest.TestCase):
             focused.split("\n    steps:\n", 1)[0],
         )
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
-        self.assertIn("needs: [pin-revision, b4-rollback]", integration)
+        self.assertIn("needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]", integration)
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["b4-rollback"]
         commands = [step["argv"] for step in layers["steps"]]
         self.assertEqual(len(commands), 2)
@@ -626,12 +995,32 @@ class CiWorkflowTests(unittest.TestCase):
             commands[1],
         )
 
+    def test_b4_rollback_runs_in_both_hosted_gates(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(r"(?ms)^  b4-rollback:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", github)
+        forgejo_job = re.search(r"(?ms)^  b4-rollback:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo)
+        self.assertIsNotNone(github_job)
+        self.assertIsNotNone(forgejo_job)
+        self.assertIn("python3 scripts/run-test-layer.py b4-rollback", github_job.group(1))
+        self.assertIn("python3 scripts/run-test-layer.py b4-rollback", forgejo_job.group(1))
+
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+        self.assertEqual(
+            layers["b4-rollback"]["hosted_gate"],
+            "Build Linux / Policy rollback acceptance; lab-ci / b4-rollback",
+        )
+        gate = re.search(r"(?ms)^  regression-gate:\n(.*?)(?=\Z)", forgejo).group(1)
+        self.assertRegex(gate, r"(?m)^      - b4-rollback$")
+
     def test_mysql_approval_dialog_runs_in_hosted_installed_gtk_acceptance(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
         self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', acceptance)
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", acceptance)
-        self.assertIn("bash scripts/test-gtk-mysql-approval.sh", acceptance)
+        self.assertIn("python3 scripts/run-test-layer.py gtk-mysql-approval", acceptance)
+        integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        self.assertIn("python3 scripts/run-test-layer.py pg-dump", integration)
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -678,14 +1067,14 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
         gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
-        self.assertIn("cargo build --locked -p bookie-app --bin bookie-app", fast)
-        self.assertIn("install -Dm755 target/debug/bookie-app target/gtk-safety/bookie", fast)
+        self.assertIn("cargo build --profile ci --locked -p bookie-app --bin bookie-app", fast)
+        self.assertIn("ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety", fast)
         self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", fast)
         self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, fast]", gtk_safety)
         self.assertIn("image: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}", gtk_safety)
         self.assertIn("actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131", gtk_safety)
-        self.assertIn("chmod 0755 target/gtk-safety/bookie", gtk_safety)
-        self.assertIn("BOOKIE_GTK_BINARY: target/gtk-safety/bookie", gtk_safety)
+        self.assertIn("ci-gtk-artifact.py verify target/gtk-safety", gtk_safety)
+        self.assertIn("GSETTINGS_SCHEMA_DIR=", gtk_safety)
 
     def test_gtk_safety_installs_pinned_rust_before_keyring_tests(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -783,6 +1172,7 @@ class CiWorkflowTests(unittest.TestCase):
                     "DISPLAY=:\"${display:-1234}\" exec \"$@\"\n"
                 ),
                 "python3": "printf 'simulated GTK initialization failure\\n' >&2\nexit 23\n",
+                "localedef": "exit 0\n",
                 "xdpyinfo": "printf '%s\\n' \"$*\" >> \"$XDPYINFO_LOG\"\nexit 1\n",
             }
             for name, contents in commands.items():
@@ -815,6 +1205,107 @@ class CiWorkflowTests(unittest.TestCase):
             self.assertIn("exit=23", result.stderr)
             self.assertIn("display_alive=unavailable", result.stderr)
             self.assertIn("-display :", xdpyinfo_log.read_text())
+
+    def test_widget_wrapper_generates_missing_locale_in_its_private_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            locale_log = directory / "locale.log"
+            localedef_log = directory / "localedef.log"
+            for name, contents in {
+                "dbus-run-session": "while [ \"$1\" != -- ]; do shift; done\nshift\nexec \"$@\"\n",
+                "xvfb-run": (
+                    "while [ $# -gt 0 ]; do\n"
+                    "  case \"$1\" in\n"
+                    "    -e|-s|--server-num) shift 2 ;;\n"
+                    "    --server-num=*) shift ;;\n"
+                    "    --auto-servernum) shift ;;\n"
+                    "    *) break ;;\n"
+                    "  esac\n"
+                    "done\n"
+                    "DISPLAY=:1234 exec \"$@\"\n"
+                ),
+                "localedef": "printf '%s\\n' \"$*\" > \"$LOCALEDEF_LOG\"\nmkdir -p \"${6%/*}\"\n",
+                "python3": (
+                    "if [ \"$1\" = -c ]; then exit 1; fi\n"
+                    "printf '%s\\n%s\\n' \"$LOCPATH\" \"$XDG_RUNTIME_DIR\" > \"$LOCALE_LOG\"\n"
+                ),
+            }.items():
+                executable = binaries / name
+                executable.write_text("#!/bin/sh\n" + contents)
+                executable.chmod(0o755)
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{binaries}{os.pathsep}{environment['PATH']}",
+                    "LOCALE_LOG": str(locale_log),
+                    "LOCALEDEF_LOG": str(localedef_log),
+                }
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-gtk-widgets.sh")],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            locale_path, runtime_path = locale_log.read_text().splitlines()
+            self.assertEqual(Path(locale_path).parent, Path(runtime_path).parent)
+            self.assertTrue(localedef_log.read_text().endswith(f" {locale_path}/en_US.UTF-8\n"))
+
+    def test_widget_wrapper_falls_back_to_c_utf8_when_locale_data_is_missing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            binaries = directory / "bin"
+            binaries.mkdir()
+            locale_log = directory / "locale.log"
+            for name, contents in {
+                "dbus-run-session": "while [ \"$1\" != -- ]; do shift; done\nshift\nexec \"$@\"\n",
+                "xvfb-run": (
+                    "while [ $# -gt 0 ]; do\n"
+                    "  case \"$1\" in\n"
+                    "    -e|-s|--server-num) shift 2 ;;\n"
+                    "    --server-num=*) shift ;;\n"
+                    "    --auto-servernum) shift ;;\n"
+                    "    *) break ;;\n"
+                    "  esac\n"
+                    "done\n"
+                    "DISPLAY=:1234 exec \"$@\"\n"
+                ),
+                "localedef": "exit 1\n",
+                "python3": (
+                    "if [ \"$1\" = -c ]; then\n"
+                    "  case \"$2\" in *C.UTF-8*) exit 0 ;; *) exit 1 ;; esac\n"
+                    "fi\n"
+                    "printf '%s\\n%s\\n' \"$LC_ALL\" \"$XDG_RUNTIME_DIR\" > \"$LOCALE_LOG\"\n"
+                ),
+            }.items():
+                executable = binaries / name
+                executable.write_text("#!/bin/sh\n" + contents)
+                executable.chmod(0o755)
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": f"{binaries}{os.pathsep}{environment['PATH']}",
+                    "LOCALE_LOG": str(locale_log),
+                    "LC_ALL": "",
+                }
+            )
+            result = subprocess.run(
+                ["bash", str(ROOT / "scripts/test-gtk-widgets.sh")],
+                cwd=ROOT,
+                env=environment,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            locale_name, runtime_path = locale_log.read_text().splitlines()
+            self.assertEqual(locale_name, "C.UTF-8")
+            self.assertTrue(runtime_path.endswith("/runtime"))
 
     def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
         script = (ROOT / "scripts/test-postgres-release.sh").read_text()
@@ -919,16 +1410,22 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertLess(job.index("ensure-node.sh"), job.index("uses:"), workflow.name)
                 self.assertIn('>> "$GITHUB_PATH"', job)
 
-    def test_forgejo_distro_floor_reuses_one_package_across_bases(self):
+    def test_forgejo_distro_floor_keeps_runtime_coverage_without_deb_release_lifecycle(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        self.assertNotIn("\n  distro-floor-build:\n", workflow)
-        floor = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        self.assertNotIn("\n  distro-floor:\n", workflow)
+        self.assertNotIn("tablepro_0.1.5-1_amd64.deb", workflow)
+        scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
+        producer = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("runs-on: build-host", producer)
         self.assertIn("scripts/build-deb.sh", producer)
-        self.assertNotIn("scripts/distro-floor-package.sh", floor)
-        self.assertIn("DISTRO_FLOOR_PACKAGE=", floor)
-        self.assertIn("PREBUILT_DEB=", floor)
+        self.assertNotIn("scripts/test-deb-package.sh", workflow)
+        self.assertIn("needs: [floor-build]", scenarios)
+        full_profile = "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        self.assertIn(f"if: {full_profile}", producer)
+        self.assertIn(f"if: {full_profile}", scenarios)
+        self.assertIn("ci-gtk-artifact.py create --package", producer)
+        self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
+        self.assertIn("python3 scripts/run-test-layer.py distro-floor", scenarios)
         builder = (ROOT / "scripts/distro-floor-package.sh").read_text()
         self.assertIn("BASE=debian:testing", builder)
         self.assertIn("scripts/build-deb.sh", builder)
@@ -940,9 +1437,11 @@ class CiWorkflowTests(unittest.TestCase):
         floor_script = (ROOT / "scripts/test-distro-floor.sh").read_text()
         self.assertIn('docker build -t "$tag"', floor_script)
         self.assertIn("apt-get update\n", floor_script)
-        self.assertIn('apt-get install -y "/package/$DISTRO_FLOOR_DEB_NAME"', floor_script)
+        self.assertIn('cd /package\n      apt install -y "./$DISTRO_FLOOR_DEB_NAME"', floor_script)
+        deb_package_script = (ROOT / "scripts/test-deb-package.sh").read_text()
+        self.assertIn('apt install -y -qq "$older"', deb_package_script)
+        self.assertIn('apt install -y -qq "$newer"', deb_package_script)
         self.assertLess(floor_script.index('if [ -n "${DISTRO_FLOOR_DEB_NAME:-}" ]'), floor_script.index("pkg-config --modversion"))
-        self.assertIn('cp "/prebuilt/$PREBUILT_DEB_NAME"', (ROOT / "scripts/test-deb-package.sh").read_text())
         gtk_safety_script = (ROOT / "scripts/test-gtk-safety.sh").read_text()
         self.assertIn('timeout 1500s "$system_python" -u "$ROOT/apps/linux/app/tests/gtk_safety.py"', gtk_safety_script)
         runtime_image = (ROOT / "scripts/distro-floor/Dockerfile.runtime").read_text()
@@ -966,24 +1465,20 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_distro_scenarios_share_the_package_and_partition_all_six_shards(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        producer = workflow.split("\n  distro-floor:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         scenarios = workflow.split("\n  distro-floor-scenarios:\n", 1)[1].split("\n  driver:\n", 1)[0]
-        self.assertNotIn("scripts/test-distro-floor.sh", producer)
-        self.assertIn("scripts/test-deb-package.sh", producer)
-        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor:\n", 1)[0]
+        builder = workflow.split("\n  floor-build:\n", 1)[1].split("\n  distro-floor-scenarios:\n", 1)[0]
         self.assertIn("ci-gtk-artifact.py create --package", builder)
-        self.assertIn("ci-gtk-artifact.py verify --package", producer)
-        self.assertIn("needs: [distro-floor]", scenarios)
+        self.assertIn("needs: [floor-build]", scenarios)
         self.assertIn("max-parallel: 2", scenarios)
         self.assertIn("shard_group: [1, 2]", scenarios)
         self.assertIn("ci-gtk-artifact.py verify --package", scenarios)
         self.assertIn('SHARD_GROUP: ${{ matrix.shard_group }}', scenarios)
         self.assertIn('for shard in "$SHARD_GROUP" "$((SHARD_GROUP + 2))" "$((SHARD_GROUP + 4))"; do', scenarios)
-        self.assertIn('BOOKIE_GTK_SHARD="${shard}/6" bash scripts/test-distro-floor.sh debian:testing', scenarios)
+        self.assertIn('BOOKIE_GTK_SHARD="${shard}/6" python3 scripts/run-test-layer.py distro-floor', scenarios)
         self.assertIn('scripts/ci-mcp-port.py "$((10 + shard))"', scenarios)
         self.assertNotIn("scripts/distro-floor-package.sh", scenarios)
-        self.assertIn("scripts/test-distro-floor.sh debian:testing", scenarios)
-        for job in (producer, scenarios):
+        self.assertIn("python3 scripts/run-test-layer.py distro-floor", scenarios)
+        for job in (builder, scenarios):
             self.assertIn("name: floor-package-${{ github.run_id }}-${{ github.sha }}", job)
 
     def test_packaged_distro_smoke_does_not_mount_a_stale_build_target(self):

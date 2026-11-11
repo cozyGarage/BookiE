@@ -34,6 +34,23 @@ pub enum EnumInputStyle {
     SqlQuotedLabel,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct DriverValueInputCapabilities {
+    pub integer_range_validation: bool,
+    pub spatial_edit_requires_native_value: bool,
+    pub numeric_affinity_input: bool,
+    pub heterogeneous_cell_values: bool,
+    pub datetimeoffset_input: bool,
+    pub special_numeric_literals: bool,
+    pub extended_calendar_temporals: bool,
+    pub typed_integer_widths: bool,
+    pub canonical_decimal_input: Option<fn(&str) -> Option<String>>,
+    pub millisecond_date_precision: bool,
+    pub extended_calendar_dates: bool,
+    pub timestamp_with_timezone: bool,
+    pub temporal_fraction_precision: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DataModel {
     #[default]
@@ -61,8 +78,11 @@ pub struct DriverCapabilities {
     pub supports_local_socket_file: bool,
     pub supports_local_socket_directory: bool,
     pub supports_client_tls_auth: bool,
+    pub supports_strict_encryption: bool,
+    pub supports_sequence_restart: bool,
     pub supports_explicit_auto_increment_values: bool,
     pub supports_browse_filters: bool,
+    pub supports_table_default_collation: bool,
 }
 
 #[async_trait]
@@ -98,9 +118,16 @@ pub trait DatabaseDriver: Send + Sync {
             supports_local_socket_file: self.supports_local_socket_file(),
             supports_local_socket_directory: self.supports_local_socket_directory(),
             supports_client_tls_auth: self.supports_client_tls_auth(),
+            supports_strict_encryption: self.supports_strict_encryption(),
+            supports_sequence_restart: self.supports_sequence_restart(),
             supports_explicit_auto_increment_values: self.supports_explicit_auto_increment_values(),
             supports_browse_filters: self.supports_browse_filters(),
+            supports_table_default_collation: self.supports_table_default_collation(),
         }
+    }
+
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities::default()
     }
 
     fn maturity(&self) -> DriverMaturity {
@@ -180,6 +207,10 @@ pub trait DatabaseDriver: Send + Sync {
         true
     }
 
+    fn supports_table_default_collation(&self) -> bool {
+        false
+    }
+
     fn catalog_object_kinds(&self) -> &'static [crate::CatalogObjectKind] {
         &[]
     }
@@ -204,6 +235,14 @@ pub trait DatabaseDriver: Send + Sync {
     /// certificate and private key. Transport refuses configured identities
     /// for drivers that do not explicitly opt in.
     fn supports_client_tls_auth(&self) -> bool {
+        false
+    }
+
+    fn supports_strict_encryption(&self) -> bool {
+        false
+    }
+
+    fn supports_sequence_restart(&self) -> bool {
         false
     }
 

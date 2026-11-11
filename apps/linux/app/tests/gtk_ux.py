@@ -4,6 +4,7 @@ import json
 import os
 import re
 import select
+import signal
 import shutil
 import subprocess
 import sys
@@ -163,9 +164,15 @@ def scenarios(ui):
         ui.invoke(ui.wait_for_node(name=action))
 
     def wait_for_adw_dialog(name, present=True):
-        roles = (pyatspi.ROLE_DIALOG, pyatspi.ROLE_LABEL)
+        def has_dialog():
+            return any(
+                ui.node_role(dialog) == pyatspi.ROLE_DIALOG
+                and any(ui.node_name(node) == name for node in ui.descendants(dialog))
+                for dialog in ui.descendants(ui.application_node())
+            )
+
         wait_until(
-            lambda: any(ui.find_node(name=name, role=role) is not None for role in roles) == present,
+            lambda: has_dialog() == present,
             f"dialog {name!r} did not become {'visible' if present else 'hidden'}",
         )
 
@@ -228,7 +235,23 @@ def scenarios(ui):
         time.sleep(0.4)
 
     def wait_for_result_column(name, present=True):
-        ui.wait_for_node_containing(f"{name}\n", role=pyatspi.ROLE_LABEL, present=present)
+        def header_exists():
+            for node in ui.descendants(ui.application_node()):
+                if ui.node_role(node) != pyatspi.ROLE_LABEL:
+                    continue
+                if ui.node_name(node) not in (name, f"{name}\n") and not ui.node_name(node).startswith(f"{name}\n"):
+                    continue
+                parent = node.parent
+                while parent is not None and ui.node_role(parent) != pyatspi.ROLE_TABLE_ROW:
+                    parent = parent.parent
+                if parent is not None and ui.node_name(parent).startswith("# "):
+                    return True
+            return False
+
+        wait_until(
+            lambda: header_exists() == present,
+            f"result column {name!r} did not become {'visible' if present else 'hidden'}",
+        )
 
     def toggle_table_column(cell_text, column_name):
         open_cell_menu(cell_text)
@@ -573,7 +596,7 @@ GLib.MainLoop().run()
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
         psql("DROP TABLE IF EXISTS public.session_rollback_probe; CREATE TABLE public.session_rollback_probe (id integer PRIMARY KEY)")
 
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         session_toggle = ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
         ui.invoke(session_toggle)
@@ -605,7 +628,7 @@ GLib.MainLoop().run()
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
         psql("DROP TABLE IF EXISTS public.session_commit_probe; CREATE TABLE public.session_commit_probe (id integer PRIMARY KEY)")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         for row_id, recover, status, count in [
             (1, False, "Session rolled back", "0"),
@@ -695,7 +718,7 @@ GLib.MainLoop().run()
         try:
             ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
             ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-            ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+            ui.invoke_accessible_action("win.open-editor")
             ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
             run_active_editor(f"SET search_path TO {schemas[0]}")
             time.sleep(0.5)
@@ -856,7 +879,7 @@ GLib.MainLoop().run()
         ui.wait_for_node(name="Connect to PostgreSQL", present=False)
         ui.open_saved_connection(ui.CONNECTION_B_NAME)
         ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql("INSERT INTO safety_items(id) VALUES (55)")
         database_b = base / "safety-b.sqlite"
@@ -877,9 +900,13 @@ GLib.MainLoop().run()
                 if ":" in line:
                     name, value = line.split(":", 1)
                     fields[name] = int(value.split()[0])
+        with open(f"/proc/{process.pid}/status", encoding="utf-8") as status:
+            peak_rss_kib = next(int(line.split()[1]) for line in status if line.startswith("VmHWM:"))
+        assert peak_rss_kib >= fields["Rss"]
         application.memory_kb()
         return {
             "rss_kib": fields["Rss"],
+            "peak_rss_kib": peak_rss_kib,
             "pss_kib": fields["Pss"],
             "private_kib": fields["Private_Clean"] + fields["Private_Dirty"],
         }
@@ -903,41 +930,108 @@ GLib.MainLoop().run()
         assert count == expected_rows
 
     def profile_streamed_pin_retention(database, base):
+        trim_result = os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_RESULT")
+
+        def app_private_maps():
+            process = ui.owned_application().process
+            mappings = {}
+            current = None
+            private_kib = 0
+            with open(f"/proc/{process.pid}/smaps", encoding="utf-8") as memory:
+                for line in memory:
+                    fields = line.split()
+                    if fields and re.fullmatch(r"[0-9a-f]+-[0-9a-f]+", fields[0]):
+                        if current is not None:
+                            mappings[current] = mappings.get(current, 0) + private_kib
+                        current = " ".join(fields[5:]) or "[anonymous]"
+                        private_kib = 0
+                    elif current is not None and line.startswith("Private_Dirty:"):
+                        private_kib = int(fields[1])
+            if current is not None:
+                mappings[current] = mappings.get(current, 0) + private_kib
+            return sorted(
+                ({"mapping": name, "private_kib": size} for name, size in mappings.items()),
+                key=lambda item: item["private_kib"],
+                reverse=True,
+            )[:8]
+
+        def wait_for_completion(status, timeout=180):
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                if "Complete · Received" in ui.node_name(status):
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"active editor did not complete: {ui.node_name(status)!r}")
+
+        def trim_allocator():
+            result = Path(trim_result)
+            previous = result.read_text(encoding="utf-8").count("malloc_trim=") if result.is_file() else 0
+            os.kill(ui.owned_application().process.pid, signal.SIGUSR2)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if result.is_file() and result.read_text(encoding="utf-8").count("malloc_trim=") > previous:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError("the profile allocator trim signal was not handled")
+
         rows = int(os.environ.get("BOOKIE_PROFILE_STREAM_ROWS", "34000"))
         payload_bytes = int(os.environ.get("BOOKIE_PROFILE_STREAM_CELL_BYTES", "2048"))
+        value_kind = os.environ.get("BOOKIE_PROFILE_STREAM_VALUE", "text")
+        width = int(os.environ.get("BOOKIE_PROFILE_STREAM_WIDTH", "3"))
         repetitions = int(os.environ.get("BOOKIE_PROFILE_REPETITION", "1"))
         if not 34_000 <= rows <= 40_000 or not 1_024 <= payload_bytes <= 4_096:
             raise ValueError("stream profile rows or payload size are outside their bounded workload")
+        if not 3 <= width <= 64 or value_kind not in {"text", "binary", "json"}:
+            raise ValueError("stream profile width or value kind is outside its bounded workload")
+        payload = {
+            "text": f"repeat('x', {payload_bytes})",
+            "binary": f"decode(repeat('78', {payload_bytes}), 'hex')",
+            "json": f"jsonb_build_object('payload', repeat('x', {payload_bytes}))",
+        }[value_kind]
+        columns = ", ".join(f"repeat('y', 13) AS field_{index}" for index in range(1, width - 2))
+        fields = f", {columns}" if columns else ""
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
-        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        samples = [{"stage": "baseline", **app_memory_profile_kb()}]
+        frame = ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        samples = [{"stage": "baseline", **app_memory_profile_kb(), "private_maps": app_private_maps()}]
         runs = []
         for index in range(5):
             result_rows = rows + index * 1_000
             marker = f"retention-{repetitions}-{index + 1}"
-            if index == 0:
-                ui.invoke(ui.wait_for_node(name="Open SQL editor"))
-            else:
+            if index:
                 ui.invoke_accessible_action("win.open-editor")
             ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
             started = time.monotonic()
             query = (
-                "SELECT value AS id, "
-                f"'{marker}' AS run_marker, repeat('x', {payload_bytes}) AS payload "
+                f"SELECT value AS id, '{marker}' AS run_marker{fields}, {payload} AS payload "
                 f"FROM generate_series(1, {result_rows}) AS value"
             )
             ui.set_editor_text(query)
             ui.invoke(ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
-            ui.wait_for_node(name=marker, role=pyatspi.ROLE_LABEL, timeout=180)
-            ui.wait_for_node_containing(f"Received {result_rows:,} rows", timeout=180)
+            status = ui.wait_for_node_containing(
+                f"Received {result_rows:,} rows", role=pyatspi.ROLE_LABEL, timeout=180
+            )
+            wait_for_completion(status)
             elapsed_seconds = round(time.monotonic() - started, 2)
+            samples.append({
+                "stage": f"after_streamed_editor_{index + 1}_before_pin",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
             ui.invoke(ui.wait_for_sensitive_node("Pin results", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
-            sample = {"stage": f"after_streamed_editor_{index + 1}", **app_memory_profile_kb()}
+            if trim_result is not None and os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_EACH_RESULT"):
+                trim_allocator()
+            sample = {
+                "stage": f"after_streamed_editor_{index + 1}",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            }
             samples.append(sample)
             runs.append({
                 "marker": marker,
                 "rows": result_rows,
+                "width": width,
+                "value_kind": value_kind,
                 "payload_bytes": payload_bytes,
                 "run_seconds": elapsed_seconds,
                 "pin_count": 1,
@@ -949,19 +1043,49 @@ GLib.MainLoop().run()
             unpin = ui.wait_for_node_containing("Unpin results (1)", role=pyatspi.ROLE_PUSH_BUTTON)
             ui.invoke(unpin)
             ui.wait_for_node_containing("Pin results", role=pyatspi.ROLE_PUSH_BUTTON)
-            teardown_samples.append({"stage": f"after_unpin_{marker}", **app_memory_profile_kb()})
+            teardown_samples.append({
+                "stage": f"after_unpin_{marker}",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
             ui.invoke_accessible_action("win.close-current")
-            ui.wait_for_node(name=marker, present=False)
-            teardown_samples.append({"stage": f"after_editor_close_{marker}", **app_memory_profile_kb()})
+            time.sleep(ui.SETTLE_SECONDS)
+            teardown_samples.append({
+                "stage": f"after_editor_close_{marker}",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
+            if trim_result is not None and os.environ.get("BOOKIE_PROFILE_MALLOC_TRIM_EACH_CLOSE"):
+                trim_allocator()
+                teardown_samples.append({
+                    "stage": f"after_editor_close_trim_{marker}",
+                    **app_memory_profile_kb(),
+                    "private_maps": app_private_maps(),
+                })
         time.sleep(3)
-        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
-        teardown_samples.append({"stage": "after_all_editors_closed_idle_3s", **app_memory_profile_kb()})
+        frame = ui.find_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        if frame is not None:
+            ui.wait_within(frame, name="Run", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        teardown_samples.append({
+            "stage": "after_all_editors_closed_idle_3s",
+            **app_memory_profile_kb(),
+            "private_maps": app_private_maps(),
+        })
+        if trim_result is not None:
+            trim_allocator()
+            teardown_samples.append({
+                "stage": "after_allocator_trim",
+                **app_memory_profile_kb(),
+                "private_maps": app_private_maps(),
+            })
         with open(os.environ["BOOKIE_PROFILE_OUT"], "a", encoding="utf-8") as out:
             out.write(json.dumps({
                 **ui.owned_application().identity(),
                 "profile_mode": "postgres-stream-pin-retention-across-editors",
                 "repetition": repetitions,
                 "configured_rows_per_result": rows,
+                "configured_width": width,
+                "value_kind": value_kind,
                 "payload_bytes_per_row": payload_bytes,
                 "result_count": len(runs),
                 "editor_count": len(runs),
@@ -979,7 +1103,7 @@ GLib.MainLoop().run()
             raise ValueError("stream export profile rows or payload size are outside their bounded workload")
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         query_started = time.monotonic()
         columns = ", ".join(
@@ -1483,25 +1607,9 @@ GLib.MainLoop().run()
             connection.execute("INSERT INTO safety_items(id, note) VALUES (1, ?)", (value,))
         ui.run_sql("SELECT note FROM safety_items")
         wait_for_result_column("note")
-        ui.press_x11_key("j", ("Control_L", "Shift_L"))
-        search = ui.wait_for_node(name="Search columns")
-        search.queryEditableText().setTextContents("note")
-        ui.press_x11_key("Return")
-        ui.wait_for_node(name="Search columns", present=False)
-        deadline = time.monotonic() + ui.WAIT_SECONDS
-        while time.monotonic() < deadline:
-            focused = next((
-                node for node in ui.descendants(ui.application_node())
-                if ui.node_role(node) in (pyatspi.ROLE_TABLE_CELL, pyatspi.ROLE_TABLE_ROW)
-                and "1200000 bytes total" in ui.node_name(node)
-                and node.getState().contains(pyatspi.STATE_FOCUSED)
-                and node.getState().contains(pyatspi.STATE_SHOWING)
-            ), None)
-            if focused is not None:
-                break
-            time.sleep(ui.POLL_SECONDS)
-        else:
-            raise AssertionError(f"large result row was not focused:\n{ui.accessible_snapshot()}")
+        cell = ui.wait_for_node_containing("1200000 bytes total", role=pyatspi.ROLE_LABEL)
+        bounds = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(bounds.x + min(bounds.width, 40) // 2, bounds.y + bounds.height // 2, button=1)
         started = time.monotonic()
         ui.press_x11_key("Menu")
         ui.wait_for_node(role=pyatspi.ROLE_MENU)
@@ -1556,23 +1664,18 @@ GLib.MainLoop().run()
         ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
         session_toggle("Session")
 
-    def switching_connection_asks_before_rolling_back_an_open_session_transaction(database, base):
+    def opening_another_connection_keeps_the_original_transaction(database, base):
         ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
         time.sleep(0.5)
         ui.run_sql("BEGIN")
         ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
 
         ui.open_saved_connection(ui.CONNECTION_B_NAME)
-        ui.wait_for_node(name="Switch with an open session transaction?")
-        time.sleep(0.5)
-        ui.press_x11_key("Escape")
-        ui.wait_for_node(name="Switch with an open session transaction?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
+        ui.press_x11_key("Tab", ("Control_L",))
         ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} \u2014 BookiE")
         ui.wait_for_node(name="Session \u00b7 transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
-
-        ui.open_saved_connection(ui.CONNECTION_B_NAME)
-        ui.wait_for_node(name="Switch with an open session transaction?")
-        ui.invoke(ui.wait_for_node(name="Roll Back and Switch", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.press_x11_key("Tab", ("Control_L",))
         ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} \u2014 BookiE")
 
     def closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back(database, base):
@@ -1604,6 +1707,30 @@ GLib.MainLoop().run()
 
         with sqlite3.connect(database) as connection:
             assert connection.execute("SELECT COUNT(*) FROM transaction_close_probe").fetchone()[0] == 0
+
+    def closing_window_with_open_session_transaction_dismisses_confirmation(database, base):
+        ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.press_x11_key("q", ("Control_L",))
+        ui.wait_for_node(name="Close with open session transactions?")
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Close with open session transactions?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} — BookiE")
+
+        ui.press_x11_key("q", ("Control_L",))
+        ui.wait_for_node(name="Close with open session transactions?")
+        time.sleep(0.5)
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Close with open session transactions?", present=False)
+
+        ui.press_x11_key("q", ("Control_L",))
+        ui.wait_for_node(name="Close with open session transactions?")
+        ui.invoke(ui.wait_for_node(name="Roll Back and Close", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Close with open session transactions?", present=False)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_NAME} — BookiE", present=False)
 
     def wait_for_editor_text(expected):
         deadline = time.monotonic() + ui.WAIT_SECONDS
@@ -1676,7 +1803,7 @@ GLib.MainLoop().run()
             window_width = frame.queryComponent().getExtents(pyatspi.WINDOW_COORDS).width
 
             def aligned_in_view():
-                header = ui.find_node_containing(f"c{index}\n", role=pyatspi.ROLE_LABEL)
+                header = ui.find_node(name=f"c{index}", role=pyatspi.ROLE_LABEL)
                 cell = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_LABEL)
                 target = ui.find_node(name=str(1000 + index), role=pyatspi.ROLE_TABLE_CELL)
                 if not (showing(header) and showing(cell) and showing(target)):
@@ -2036,7 +2163,7 @@ GLib.MainLoop().run()
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
         ui.wait_for_node(name="people")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql("SELECT id, name, profile, active FROM people ORDER BY id")
         ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
@@ -2070,7 +2197,7 @@ GLib.MainLoop().run()
         assert 1 <= payload_bytes <= 2048
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql(
             "SELECT value AS id, md5(transaction_timestamp()::text) AS run_marker, "
@@ -2200,7 +2327,7 @@ GLib.MainLoop().run()
     def postgres_visible_evicted_page_can_be_revisited(database, base):
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         payload_expression = "value::text"
         for _ in range(32):
@@ -2265,7 +2392,7 @@ GLib.MainLoop().run()
     def postgres_saved_mtls_connection_authenticates_and_queries(database, base):
         ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_MTLS_CONNECTION_NAME} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql("SELECT count(*) AS row_count FROM release_items")
         ui.wait_for_node(name="3", role=pyatspi.ROLE_LABEL)
@@ -2334,7 +2461,7 @@ GLib.MainLoop().run()
                 "the full jump chain must persist both accepted host keys"
             )
 
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.run_sql("SELECT count(*) AS row_count FROM release_items")
         ui.wait_for_node(name="3", role=pyatspi.ROLE_LABEL)
@@ -2478,7 +2605,7 @@ GLib.MainLoop().run()
         ui.open_saved_connection(name)
         trust_postgres_ssh_chain()
         ui.wait_for_frame_containing(f"{name} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.invoke(ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
@@ -2714,11 +2841,11 @@ GLib.MainLoop().run()
         ui.invoke_named_action_within("default.enum_grid", "Open enum_grid")
         ui.wait_for_node(name="low8", role=pyatspi.ROLE_LABEL)
         click_cell("low8", count=2)
-        for key in "high8":
+        for key in ("apostrophe", *"high8", "apostrophe"):
             ui.press_x11_key(key)
         ui.press_x11_key("Return")
         click_cell("low16", count=2)
-        for key in "high16":
+        for key in ("apostrophe", *"high16", "apostrophe"):
             ui.press_x11_key(key)
         ui.press_x11_key("Return")
         ui.wait_for_node(name="2 unsaved changes")
@@ -3102,8 +3229,9 @@ GLib.MainLoop().run()
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
-        switching_connection_asks_before_rolling_back_an_open_session_transaction,
+        opening_another_connection_keeps_the_original_transaction,
         closing_an_editor_with_an_open_transaction_can_cancel_or_roll_back,
+        closing_window_with_open_session_transaction_dismisses_confirmation,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,

@@ -1,0 +1,15 @@
+[package]
+name = "bookie-avro-container"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "bookie_avro_container"
+path = "src/lib.rs"
+
+[dependencies]
+apache-avro = "0.17"
+serde_json.workspace = true

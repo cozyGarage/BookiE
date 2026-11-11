@@ -315,6 +315,31 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::workspace_close::tests::browse_grid_edit_save_reaches_guarded_connection_and_audit"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_denied_by_approval_preserves_data_and_audits"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_dispatch_executes_and_audits_a_guarded_transaction"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_dispatch_on_read_only_connection_is_denied_and_audited"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_close::tests::browse_save_waits_for_approval_before_writing"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::workspace_close::tests::force_dismissing_connection_deletion_does_not_abort"
     ],
     [
@@ -331,6 +356,21 @@
       "bookie-app",
       "--lib",
       "ui::app::workspace_tabs::bulk_close::tests::bulk_close_actions_dispatch_the_selected_page_id"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::tab_title::tests::renaming_survives_later_automatic_titles_and_an_empty_name_restores_them"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::workspace_overview::tests::overview_titles_show_current_tags_and_restore_titles_when_closed"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::tab_title::tests::the_colour_mark_shows_as_the_tab_icon_and_clears_with_no_colour"
     ],
     [
       "bookie-app",
@@ -460,6 +500,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::grid_save_runs_through_policy_and_records_its_outcome"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::keyless_tab_refuses_to_stage_deletion_of_a_persisted_row"
     ],
     [
@@ -515,7 +560,22 @@
     [
       "bookie-app",
       "--lib",
+      "ui::browse_tab::save_in_flight_tests::stale_set_null_does_not_modify_a_replacement_draft"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::keyboard_set_null_targets_the_focused_draft"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::save_in_flight_tests::the_row_menu_deletes_a_draft_row_by_discarding_it"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::browse_tab::save_in_flight_tests::stale_row_menu_delete_does_not_discard_a_new_draft"
     ],
     [
       "bookie-app",
@@ -755,6 +815,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::completing_a_query_does_not_shift_the_editor_when_status_text_changes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::editor_dispatch_resumes_after_success_cancel_and_timeout"
     ],
     [
@@ -866,6 +931,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::dispatch_tests::the_results_panel_can_be_hidden_without_releasing_or_rerunning_its_result"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::editor::dispatch_tests::stale_set_null_does_not_modify_a_replacement_query_result_draft"
     ],
     [
       "bookie-app",
@@ -1195,6 +1265,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::stream_view::tests::hiding_a_streamed_result_releases_its_grid_and_reloads_from_the_spool"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::stream_view::tests::navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable"
     ],
     [
@@ -1365,6 +1440,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::column_width_tests::column_header_text_aligns_with_numeric_and_text_cells"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::context_menu::tests::copy_value_keeps_keyless_previews_pending_edits_and_drafts_whole"
     ],
     [
@@ -1386,6 +1466,41 @@
       "bookie-app",
       "--lib",
       "ui::grid::context_menu::tests::the_cell_menu_opens_with_the_menu_key_and_shift_f10"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::delete_action_carries_the_selected_draft_identity"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::delete_action_preserves_the_stored_row_selected_when_menu_opened"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::full_value_edit_does_not_fetch_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::filter_menu_does_not_use_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::inline_edit_does_not_open_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::reference_menu_does_not_navigate_from_a_rebound_cell"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::context_menu::tests::view_value_does_not_fetch_a_rebound_cell"
     ],
     [
       "bookie-app",
@@ -1501,6 +1616,11 @@
       "bookie-app",
       "--lib",
       "ui::grid::lifetime_tests::a_retired_grid_does_not_retain_its_inspector_through_selection_callback"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::lifetime_tests::a_wide_result_realizes_a_bounded_row_window"
     ],
     [
       "bookie-app",
@@ -1665,6 +1785,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::import_dialog::lifetime_tests::changing_encoding_does_not_block_the_dialog_and_close_discards_its_preview"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::lifetime_tests::malformed_preview_displays_an_error_and_keeps_import_disabled"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::import_dialog::lifetime_tests::the_skip_switch_is_off_by_default_and_its_state_reaches_the_import"
     ],
     [
@@ -1806,6 +1936,21 @@
       "bookie-app",
       "--lib",
       "ui::structure_tab::columns::tests::column_comment_editor_enabled_state_follows_typed_capability"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::a_driver_without_table_level_collations_never_shows_the_default_collation_row"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::a_new_table_tab_offers_a_default_collation_when_the_driver_supports_one"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::structure_tab::default_collation_tests::choosing_a_default_collation_puts_it_in_the_create_table_statement"
     ],
     [
       "bookie-app",

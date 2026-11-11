@@ -184,18 +184,91 @@ fn repeated_result_grid_replacement_releases_every_retired_page() {
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn a_wide_result_realizes_a_bounded_row_window() {
+    gtk4::init().unwrap();
+    let columns: Vec<_> = (0..64)
+        .map(|index| ColumnInfo {
+            name: format!("column-{index}"),
+            data_type: "TEXT".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        })
+        .collect();
+    let result = Arc::new(QueryResult {
+        columns: columns.clone(),
+        rows: (0..5_000)
+            .map(|row| {
+                (0..columns.len())
+                    .map(|column| Value::Text(format!("value-{row}-{column}")))
+                    .collect()
+            })
+            .collect(),
+        truncated: false,
+    });
+    let (view, _) = build_column_view(
+        &result,
+        &columns,
+        "items",
+        None,
+        crate::ui::grid::GridSenders {
+            edit: None,
+            menu: None,
+            sort: None,
+        },
+        crate::ui::grid::GridEnv {
+            connection_id: None,
+            tab_ctx: TabGridContext::default(),
+            column_widths: None,
+            highlight_settings: None,
+            database: Arc::new(DatabaseService::new()),
+        },
+    );
+    let window = gtk4::Window::builder()
+        .default_width(640)
+        .default_height(300)
+        .child(&gtk4::ScrolledWindow::builder().child(&view).build())
+        .build();
+    window.present();
+    drain();
+    let mut cell_refs = Vec::new();
+    cells(view.upcast_ref(), &mut cell_refs);
+    let realized_row_limit = columns.len() * 512;
+    assert!(
+        cell_refs.len() <= realized_row_limit,
+        "wide result realized {} cells across {} columns",
+        cell_refs.len(),
+        columns.len()
+    );
+    window.destroy();
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn a_menu_context_does_not_keep_a_removed_cell_alive() {
     gtk4::init().unwrap();
     let widget: gtk4::Widget = gtk4::Label::new(Some("value")).upcast();
     let weak = widget.downgrade();
     let context = super::cell_context::CellContextStore::default();
-    context.set(&widget, 2, "value".into());
+    let row = crate::ui::row_object::RowObject::new(vec![bookie_core::Value::Int(1)]);
+    let weak_row = row.downgrade();
+    context.set(&widget, 2, "value".into(), None, Some(&row));
     {
         let snapshot = context.snapshot().unwrap();
         assert_eq!(snapshot.widget, widget);
         assert_eq!(snapshot.col_index, 2);
         assert_eq!(snapshot.column_name, "value");
+        assert_eq!(snapshot.row.as_ref(), Some(&row));
     }
+    drop(row);
+    assert!(weak_row.upgrade().is_none());
+    assert!(context.snapshot().unwrap().row.is_none());
     drop(widget);
     assert!(weak.upgrade().is_none());
     assert!(context.snapshot().is_none());

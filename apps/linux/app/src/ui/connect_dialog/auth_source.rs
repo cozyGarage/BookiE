@@ -2,10 +2,10 @@ use relm4::adw::{self, prelude::*};
 
 pub(super) fn row() -> adw::EntryRow {
     let row = adw::EntryRow::builder()
-        .title(crate::tr!("Authentication database (optional)"))
+        .title(bookie_app_services::tr!("Authentication database (optional)"))
         .visible(false)
         .build();
-    row.set_tooltip_text(Some(&crate::tr!(
+    row.set_tooltip_text(Some(&bookie_app_services::tr!(
         "The database holding the user, for example admin. Leave empty to authenticate against the Database above."
     )));
     row

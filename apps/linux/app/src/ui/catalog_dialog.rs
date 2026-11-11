@@ -10,7 +10,7 @@ use bookie_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, Driver
 use crate::services::database_service::DatabaseService;
 use crate::services::preferences::PreferencesStore;
 use crate::services::request_generation::replace_scoped_in_flight;
-use crate::tr;
+use bookie_app_services::tr;
 
 struct CatalogSource {
     connection: uuid::Uuid,
@@ -18,7 +18,14 @@ struct CatalogSource {
     preferences: PreferencesStore,
     connection_scope: CancellationToken,
     hidden_schemas: Vec<String>,
+    can_restart_sequences: bool,
     in_flight: Rc<RefCell<CancellationToken>>,
+}
+
+pub struct CatalogRequest {
+    pub initial_kind: Option<CatalogObjectKind>,
+    pub hidden_schemas: Vec<String>,
+    pub can_restart_sequences: bool,
 }
 
 pub fn present(
@@ -27,9 +34,13 @@ pub fn present(
     database: &std::sync::Arc<DatabaseService>,
     preferences: &PreferencesStore,
     connection_scope: CancellationToken,
-    initial_kind: Option<CatalogObjectKind>,
-    hidden_schemas: Vec<String>,
+    request: CatalogRequest,
 ) {
+    let CatalogRequest {
+        initial_kind,
+        hidden_schemas,
+        can_restart_sequences,
+    } = request;
     let Some(connection) = connection_id.filter(|id| database.metadata(*id).is_some()) else {
         let alert = adw::AlertDialog::new(
             Some(&tr!("No active connection")),
@@ -45,6 +56,7 @@ pub fn present(
         preferences: preferences.clone(),
         connection_scope: connection_scope.clone(),
         hidden_schemas,
+        can_restart_sequences,
         in_flight: Rc::new(RefCell::new(connection_scope.child_token())),
     });
     let dialog = adw::Dialog::builder().title(tr!("Catalog")).build();
@@ -64,23 +76,7 @@ pub fn present(
     toolbar.set_content(Some(&catalog_layout(&kinds, &schema, &list, &status)));
     dialog.set_child(Some(&toolbar));
 
-    let reload = {
-        let (source, kinds, schema, list, status) = (
-            source.clone(),
-            kinds.clone(),
-            schema.clone(),
-            list.clone(),
-            status.clone(),
-        );
-        Rc::new(move || {
-            let kind = CatalogObjectKind::ALL
-                .get(kinds.selected() as usize)
-                .copied()
-                .unwrap_or(CatalogObjectKind::Routine);
-            let filter = Some(schema.text().trim().to_string()).filter(|text| !text.is_empty());
-            load(&source, kind, filter, &list, &status);
-        })
-    };
+    let reload = reload_action(&source, &kinds, &schema, &list, &status);
     let on_kind = reload.clone();
     kinds.connect_selected_notify(move |_| on_kind());
     let on_schema = reload.clone();
@@ -90,6 +86,30 @@ pub fn present(
     dialog.connect_closed(move |_| in_flight.borrow().cancel());
     crate::ui::leak_probe::track("catalog", &dialog);
     dialog.present(Some(parent));
+}
+
+fn reload_action(
+    source: &Rc<CatalogSource>,
+    kinds: &gtk::DropDown,
+    schema: &gtk::SearchEntry,
+    list: &gtk::ListBox,
+    status: &gtk::Label,
+) -> Rc<dyn Fn()> {
+    let (source, kinds, schema, list, status) = (
+        source.clone(),
+        kinds.clone(),
+        schema.clone(),
+        list.clone(),
+        status.clone(),
+    );
+    Rc::new(move || {
+        let kind = CatalogObjectKind::ALL
+            .get(kinds.selected() as usize)
+            .copied()
+            .unwrap_or(CatalogObjectKind::Routine);
+        let filter = Some(schema.text().trim().to_string()).filter(|text| !text.is_empty());
+        load(&source, kind, filter, &list, &status);
+    })
 }
 
 fn kind_dropdown(initial: Option<CatalogObjectKind>) -> gtk::DropDown {
@@ -166,6 +186,11 @@ fn load(
     let timeout_secs =
         crate::services::operation_control::timeout_for(&source.preferences, &source.database, Some(source.connection));
     let hidden_schemas = source.hidden_schemas.clone();
+    let driver_id = source
+        .database
+        .metadata(source.connection)
+        .map(|metadata| metadata.driver_id);
+    let can_restart_sequences = source.can_restart_sequences;
     let (list, status) = (list.clone(), status.clone());
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
@@ -182,11 +207,97 @@ fn load(
         }
         if let Ok(objects) = &outcome {
             for object in objects {
-                list.append(&object_row(object));
+                let row = object_row(object);
+                if let (CatalogObjectKind::Sequence, true, Some(driver_id)) =
+                    (object.kind, can_restart_sequences, driver_id.as_deref())
+                {
+                    let target = SequenceTarget {
+                        connection: conn.clone(),
+                        driver_id: driver_id.to_owned(),
+                        schema: object.schema.clone(),
+                        name: object.name.clone(),
+                        timeout_secs,
+                    };
+                    row.add_suffix(&set_value_button(target, &status));
+                }
+                list.append(&row);
             }
         }
         status.set_text(&outcome_text(kind, &outcome));
     });
+}
+
+struct SequenceTarget {
+    connection: std::sync::Arc<dyn bookie_core::Connection>,
+    driver_id: String,
+    schema: Option<String>,
+    name: String,
+    timeout_secs: u32,
+}
+
+fn set_value_button(target: SequenceTarget, status: &gtk::Label) -> gtk::Button {
+    let button = gtk::Button::builder()
+        .label(tr!("Set value"))
+        .valign(gtk::Align::Center)
+        .build();
+    let target = Rc::new(target);
+    let status = status.clone();
+    button.connect_clicked(move |button| prompt_set_value(button, target.clone(), status.clone()));
+    button
+}
+
+fn prompt_set_value(anchor: &gtk::Button, target: Rc<SequenceTarget>, status: gtk::Label) {
+    let dialog = adw::AlertDialog::new(
+        Some(&tr!("Set value of {name}").replace("{name}", &target.name)),
+        Some(&tr!("The next value handed out will be the number you enter.")),
+    );
+    let entry = gtk::Entry::builder()
+        .placeholder_text(tr!("Next value"))
+        .activates_default(true)
+        .build();
+    dialog.set_extra_child(Some(&entry));
+    dialog.add_response("cancel", &tr!("Cancel"));
+    dialog.add_response("set", &tr!("Set value"));
+    dialog.set_response_appearance("set", adw::ResponseAppearance::Destructive);
+    dialog.set_default_response(Some("set"));
+    dialog.set_close_response("cancel");
+    dialog.connect_response(None, move |_, response| {
+        if response != "set" {
+            return;
+        }
+        let text = entry.text().to_string();
+        let (target, status) = (target.clone(), status.clone());
+        status.set_text(&tr!("Setting value…"));
+        glib::spawn_future_local(async move {
+            let control = crate::services::operation_control::bounded(target.timeout_secs);
+            let outcome = bookie_app_services::sequence_value::set_sequence_value(
+                target.connection.as_ref(),
+                &target.driver_id,
+                target.schema.as_deref(),
+                &target.name,
+                &text,
+                &control,
+            )
+            .await;
+            status.set_text(&set_value_outcome_text(&target.name, &outcome));
+        });
+    });
+    dialog.present(Some(anchor));
+}
+
+fn set_value_outcome_text(
+    name: &str,
+    outcome: &Result<(), bookie_app_services::sequence_value::SetSequenceError>,
+) -> String {
+    use bookie_app_services::sequence_value::SetSequenceError;
+    match outcome {
+        Ok(()) => tr!("{name} restarted. Reload the list to see its state.").replace("{name}", name),
+        Err(SetSequenceError::Driver(DriverError::PolicyDenied(_))) => {
+            tr!("Policy does not allow changing this sequence.")
+        }
+        Err(SetSequenceError::Driver(error)) => crate::services::error_text::driver_message(error),
+        Err(error) => error.to_string(),
+    }
 }
 
 fn object_row(object: &CatalogObject) -> adw::ActionRow {
@@ -285,5 +396,20 @@ mod tests {
             outcome_text(CatalogObjectKind::Trigger, &Ok(vec![object("a")])),
             "1 found"
         );
+    }
+
+    #[test]
+    fn a_policy_denial_and_a_bad_number_get_their_own_messages() {
+        use bookie_app_services::sequence_value::SetSequenceError;
+        let denied = Err(SetSequenceError::Driver(DriverError::PolicyDenied("read-only".into())));
+        let invalid = Err(SetSequenceError::NotANumber);
+        let done = Ok(());
+
+        assert_eq!(
+            set_value_outcome_text("job_ids", &denied),
+            "Policy does not allow changing this sequence."
+        );
+        assert_eq!(set_value_outcome_text("job_ids", &invalid), "enter a whole number");
+        assert!(set_value_outcome_text("job_ids", &done).starts_with("job_ids restarted"));
     }
 }

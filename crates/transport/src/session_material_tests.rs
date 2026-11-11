@@ -30,6 +30,7 @@ fn sqlite_saved() -> SavedConnection {
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 
@@ -48,6 +49,7 @@ fn key_hop(path: PathBuf) -> SavedSshConfig {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     }
 }
 

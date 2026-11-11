@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 
 concurrency:
+  group: bookie-ci-${{ github.ref }}
   cancel-in-progress: false
 
 defaults:
@@ -19,6 +20,9 @@ env:
   RUSTC_WRAPPER: sccache
   SCCACHE_DIR: /var/cache/ci/sccache
   SCCACHE_CACHE_SIZE: 40G
+
+permissions:
+  contents: read
 
 jobs:
   coverage:

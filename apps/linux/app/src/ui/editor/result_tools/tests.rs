@@ -330,6 +330,7 @@ fn filter_messages_name_the_quota_and_count_rows() {
         failure_message(&FilterError::Scan(ScanError::Cancelled)),
         "Filter cancelled"
     );
+    assert!(failure_message(&FilterError::Scan(ScanError::PageBudget)).contains("page memory"));
     assert_eq!(success_message(1, 0, true), "Showing 1 matching row in a new result");
     assert_eq!(
         success_message(3, 0, false),

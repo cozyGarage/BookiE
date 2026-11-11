@@ -9,7 +9,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 The Forgejo mirror may retain a separate `linux` branch until that service is migrated. Specify the remote and branch explicitly for mirror operations; GitHub PRs and canonical development use `main`.
 
 - The rename is complete ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)): Cargo packages, binaries, crates, environment variables, application ID, paths and keyring schema are `bookie-*` / `BOOKIE_*` / `com.bookie.linux`. Legacy `tablepro` names appear only for upstream attribution and for reading old state. Do not reintroduce `tablepro` identifiers.
-- The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. Isolated synthetic frontend experiments follow [ADR 0028](docs/decisions/0028-isolated-frontend-experiments.md).
+- The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. The GPUI app in `apps/gpui` is the chosen cross-platform frontend and GTK is maintained in parallel ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)).
 - Every shipped feature works without an account, license key, subscription, paid tier or remote entitlement check.
 - The root [LICENSE](LICENSE) applies. User-facing changes carry a `Release-Note:` line ([changelog and commits](#changelog-and-commits)).
 
@@ -59,6 +59,14 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 10. Never leave a background job, container or temporary resource running that you did not start, and never stop one you did not start. On shared systems, stop only resources you own.
 11. Keep the diff to the requested behaviour. No drive-by refactors, renames, formatting of untouched files, or edits to another lane's ledger/sprint/policy files.
 
+## Reuse before building
+
+1. Before writing a UI control, grid, editor, settings page or protocol client, check the ready-made crate or component already in the dependency graph: `gpui-component` (table, editor, setting, tree, dialog, sidebar) for the GPUI app, and the GTK stack for the GTK app. Read its installed source; do not invent its API.
+2. Adopt a component through its crate. Our code is only the adapter: it maps our `ResultSource`, `Connection` and policy types onto the component. Do not copy component source into this repository.
+3. Adopting a component that is not yet a dependency needs an ADR and the licence and advisory review in [Validation](#validation), in the same pull request.
+4. A replacement lands as one pull request. It adds the adapter, moves every caller, deletes the code it replaces, and keeps the tests that proved the old behaviour. Two paths for the same feature are not allowed after a merge.
+5. A feature slice may be larger than a single fix when it is one replacement or one feature end to end. The size rules still apply: no baseline raised, no function over 60 lines, and every changed behaviour has a test.
+
 ## Principles
 
 1. Security comes first. Validate input at system boundaries and deny unsafe operations by default.
@@ -79,8 +87,8 @@ The workspace manifest is `Cargo.toml`. [ARCHITECTURE.md](ARCHITECTURE.md) has t
 - `crates/storage`: saved connections, Secret Service access, query history and the audit journal.
 - `crates/ssh`: SSH tunnels through built-in `russh` or system OpenSSH.
 - `crates/transport`: connection assembly for the GUI and `agentd`: driver options, SSH chain, tunnel and the service endpoint used for certificate verification.
-- `crates/results`: pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree) that depends only on `crates/core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)); `crates/app-services` re-exports it.
-- `crates/app-services`: GTK-free application logic moved out of `apps/linux/app/src/services` in stages ([ADR 0018](docs/decisions/0018-headless-app-services-crate.md)); it must not depend on `gtk4`, `libadwaita`, `glib` or `relm4`.
+- `crates/results`: pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree, paging window, grid cursor, stream page index and window) that depends only on `crates/core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)); `crates/app-services` re-exports it.
+- `crates/app-services`: GTK-free application logic (result copy formats and TSV in `result_copy`, `tr!`/`trn!` in `i18n`) moved out of `apps/linux/app/src/services` in stages ([ADR 0018](docs/decisions/0018-headless-app-services-crate.md)); it must not depend on `gtk4`, `libadwaita`, `glib` or `relm4`.
 - `crates/mcp`: MCP authentication, scopes, connection allowlists, rate limits, tools and transport.
 - `crates/agentd`: headless MCP process and composition root without GTK.
 - `crates/drivers/*`: one static crate per engine, implementing `core` traits, never depending on the app.
@@ -130,7 +138,7 @@ These apply to the GUI, the MCP server and `bookie-agentd`.
   blocked). `cargo check` alone is not done. Never hand-edit `Cargo.lock`; regenerate it.
 - No comments or doc comments, except the external-system rule above. A Rust file may not gain comment lines (`check-comment-lines.py`, baselines in `baselines/comment-line-baselines.txt`); after deleting comments run `python3 scripts/check-comment-lines.py --update` to lower them.
 - Early returns; at most three levels of indentation in a function body.
-- A function body is at most 60 lines (`check-function-size.py`, baselines in `baselines/function-size-baselines.txt`: lower a count when you split, never raise one). Rust files stay under 1,200 lines (`check-file-size.sh`, baselines in `baselines/file-size-baselines.txt`: split before growing a listed file).
+- A function body is at most 60 lines (`check-function-size.py`, baselines in `baselines/function-size-baselines.txt`: lower a count when you split, never raise one). Rust files stay under 2,000 lines (`check-file-size.sh`, baselines in `baselines/file-size-baselines.txt`: split before growing a listed file).
 - Small public APIs; private by default.
 - No `unwrap`, `expect`, `panic!`, `todo!` or `unimplemented!` in production paths. A new integration test file under `tests/` starts with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`.
 - Typed `thiserror` errors across crate boundaries, with context but no secrets.
@@ -186,7 +194,7 @@ Driver integration tests need Docker. If a prerequisite is missing, say which ch
 
 ## Changelog and commits
 
-- Release notes ([ADR 0022](docs/decisions/0022-release-notes-from-merge-commits.md)): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add `Fixed` for a defect introduced and fixed before release.
+- Release notes (ADR 0022, superseded by ADR 0053 once fragments land): do not edit `CHANGELOG.md`. Put one `Release-Note: <Category>: <text>` line per user-facing change (or `Release-Note: none`) in the PR body and the repository's squash-merge default uses the PR title and body, so the lines reach the commit; do not replace the body in the merge box. Categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/). Each line describes user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add `Fixed` for a defect introduced and fixed before release. `Release-Note: none` is only for tests, CI, docs and refactors with no user-visible effect; a new feature, a changed behaviour or a user-visible fix needs a real line, because the release notes are built from these lines and a `none` leaves the change out of the changelog. A change that only touches `apps/gpui` uses `none` until GPUI ships ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). [ADR 0053](docs/decisions/0053-changelog-fragments.md) replaces this trailer process with `changelog.d` fragments once its implementation merges.
 - Conventional Commits with a single-line subject and no body on branch commits (a squash commit's body is the PR description). Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`, `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`, `storage`, `ssh`, `drivers`, `driver-postgres`.
 - A public API change updates every caller and test in the same commit.
 

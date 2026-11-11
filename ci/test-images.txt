@@ -13,6 +13,9 @@ clickhouse clickhouse/clickhouse-server:24.8
 redis redis:5.0
 redis redis:7.4-alpine
 mongodb mongo:7
+oracle gvenzl/oracle-free:slim-faststart
+cassandra cassandra:5.0
+cassandra scylladb/scylla:2025.1
 app-server postgres:16-alpine
 app-server mysql:8.1
 app-server mariadb:11

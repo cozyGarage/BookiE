@@ -57,7 +57,7 @@ impl App {
                 request,
                 col_index,
                 column_name,
-                crate::tr!("No active connection.").to_string(),
+                bookie_app_services::tr!("No active connection.").to_string(),
             );
             return;
         };
@@ -112,6 +112,9 @@ impl App {
         open_mode: OpenMode,
         sender: ComponentSender<Self>,
     ) {
+        if self.split_view.is_collapsed() {
+            self.split_view.set_show_sidebar(false);
+        }
         self.dispatch_select_table(schema, name, open_mode, sender);
     }
 
@@ -504,7 +507,11 @@ impl App {
             None => {
                 tracing::warn!(error = %failure.message, "app-level load failed");
                 self.dismiss_loading_page();
-                self.set_status_page(super::StatusKind::Error, &crate::tr!("Failed"), &failure.message);
+                self.set_status_page(
+                    super::StatusKind::Error,
+                    &bookie_app_services::tr!("Failed"),
+                    &failure.message,
+                );
             }
         }
     }
@@ -524,7 +531,7 @@ impl App {
 
     pub(super) fn on_export_front_results(&self) {
         let Some(id) = self.selected_workspace_tab_id() else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return;
         };
         let export = {
@@ -557,17 +564,17 @@ impl App {
                 },
                 &self.preferences,
             ),
-            FrontExport::Empty => self.show_toast(&crate::tr!("Nothing to export")),
+            FrontExport::Empty => self.show_toast(&bookie_app_services::tr!("Nothing to export")),
         }
     }
 
     fn browse_export_request(&self) -> Option<crate::ui::export_dialog::ExportRequest> {
         let Some((schema, table)) = self.selected_browse_slot_table() else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return None;
         };
         let Some(active_id) = self.selected_browse_tab_id() else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return None;
         };
         let (result, has_unfetched_columns, filtered) = {
@@ -577,7 +584,7 @@ impl App {
                 .and_then(|tab| tab.browse_controller())
                 .map(|controller| controller.model())
             else {
-                self.show_toast(&crate::tr!("Nothing to export"));
+                self.show_toast(&bookie_app_services::tr!("Nothing to export"));
                 return None;
             };
             (
@@ -588,9 +595,9 @@ impl App {
         };
         let Some(result) = result else {
             let message = if has_unfetched_columns {
-                crate::tr!("Show hidden columns and reload before exporting this page.")
+                bookie_app_services::tr!("Show hidden columns and reload before exporting this page.")
             } else {
-                crate::tr!("Nothing to export")
+                bookie_app_services::tr!("Nothing to export")
             };
             self.show_toast(&message);
             return None;
@@ -610,7 +617,9 @@ impl App {
 
     pub(super) fn on_export_streamed_results(&self, request: crate::ui::export_dialog::StreamExportRequest) {
         let Some(spool) = request.spool else {
-            self.show_toast(&crate::tr!("The complete query result is no longer available."));
+            self.show_toast(&bookie_app_services::tr!(
+                "The complete query result is no longer available."
+            ));
             return;
         };
         let fetcher =
@@ -674,7 +683,7 @@ impl App {
             .and_then(|id| self.export_page_plan(id))
             .zip(self.window_connection());
         let Some(((plan, total_rows), conn)) = planned else {
-            self.show_toast(&crate::tr!("Nothing to export"));
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return;
         };
         let label = match &plan.schema {
@@ -716,7 +725,7 @@ impl App {
             return;
         }
         let Some(id) = self.selected_browse_tab_id() else {
-            self.show_toast(&crate::tr!("Open a table to filter rows."));
+            self.show_toast(&bookie_app_services::tr!("Open a table to filter rows."));
             return;
         };
         self.dispatch_to_tab(id, BrowseTabInput::ToggleFilterStrip);
@@ -743,18 +752,20 @@ impl App {
             }
             RefreshDecision::ConfirmDiscard => {}
             RefreshDecision::SaveInFlight => {
-                self.show_toast(&crate::tr!("Saving changes. Refresh after the save finishes."));
+                self.show_toast(&bookie_app_services::tr!(
+                    "Saving changes. Refresh after the save finishes."
+                ));
                 return;
             }
         }
         let dialog = adw::AlertDialog::new(
-            Some(&crate::tr!("Discard pending changes?")),
-            Some(&crate::tr!(
+            Some(&bookie_app_services::tr!("Discard pending changes?")),
+            Some(&bookie_app_services::tr!(
                 "Refreshing reloads the table from the database and drops every unsaved edit on this tab."
             )),
         );
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("discard", &crate::tr!("Discard and refresh"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("discard", &bookie_app_services::tr!("Discard and refresh"));
         dialog.set_response_appearance("discard", adw::ResponseAppearance::Destructive);
         dialog.set_default_response(Some("cancel"));
         dialog.set_close_response("cancel");
@@ -819,7 +830,9 @@ fn browse_cell_value_query(
     row_key: &[bookie_core::Value],
 ) -> Result<crate::services::browse_query::BoundQuery, String> {
     if columns.get(col_index).is_none_or(|column| column.name != column_name) {
-        return Err(crate::tr!("The table columns changed before the value could be fetched.").to_string());
+        return Err(
+            bookie_app_services::tr!("The table columns changed before the value could be fetched.").to_string(),
+        );
     }
     BrowseTarget {
         driver_id,
@@ -835,16 +848,16 @@ fn browse_cell_value_query(
 
 fn single_cell_value(result: QueryResult) -> Result<bookie_core::Value, String> {
     if result.columns.len() != 1 || result.truncated {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     }
     let Some(row) = result.rows.first() else {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     };
     if result.rows.len() != 1 {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     }
     let [value] = row else {
-        return Err(crate::tr!("The row key did not identify exactly one cell.").to_string());
+        return Err(bookie_app_services::tr!("The row key did not identify exactly one cell.").to_string());
     };
     Ok(value.clone())
 }

@@ -25,13 +25,13 @@ impl TransactionActions {
             .visible(false)
             .build();
         row.set_widget_name("editor-transaction-actions");
-        let label = gtk::Label::new(Some(&crate::tr!("Transaction active")));
+        let label = gtk::Label::new(Some(&bookie_app_services::tr!("Transaction active")));
         label.add_css_class("warning");
         row.insert(&label, -1);
         let id = Rc::new(Cell::new(None));
         for (label, commit) in [
-            (crate::tr!("Commit & close session"), true),
-            (crate::tr!("Roll back & close session"), false),
+            (bookie_app_services::tr!("Commit & close session"), true),
+            (bookie_app_services::tr!("Roll back & close session"), false),
         ] {
             let button = gtk::Button::with_label(&label);
             let active = id.clone();
@@ -64,7 +64,7 @@ impl SqlEditor {
             if let Some(text) = super::statement_at_cursor(&sql, self.lexing(&driver), cursor) {
                 self.begin_run(text, None, true, sender);
             } else {
-                self.status.set_label(&crate::tr!("No statement to run"));
+                self.status.set_label(&bookie_app_services::tr!("No statement to run"));
             }
             return;
         }
@@ -77,7 +77,7 @@ impl SqlEditor {
             (!sql.trim().is_empty()).then_some(start..start + sql.trim().len())
         };
         let Some(range) = range else {
-            self.status.set_label(&crate::tr!("No statement to run"));
+            self.status.set_label(&bookie_app_services::tr!("No statement to run"));
             return;
         };
         let anchor = super::SourceAnchor {
@@ -148,9 +148,10 @@ impl SqlEditor {
                             continue;
                         }
                         let name = format!("result-{statement}-{result_set}");
-                        let label = crate::tr!("Export loaded rows: statement {statement}, result {result}")
-                            .replace("{statement}", &(statement + 1).to_string())
-                            .replace("{result}", &(result_set + 1).to_string());
+                        let label =
+                            bookie_app_services::tr!("Export loaded rows: statement {statement}, result {result}")
+                                .replace("{statement}", &(statement + 1).to_string())
+                                .replace("{result}", &(result_set + 1).to_string());
                         let action = gtk::gio::SimpleAction::new(&name, None);
                         let result = result.clone();
                         let sender = self.grid_sender.clone();
@@ -172,7 +173,7 @@ impl SqlEditor {
                         });
                         actions.add_action(&action);
                         exports.append(
-                            Some(&crate::tr!("Export all rows from this result…")),
+                            Some(&bookie_app_services::tr!("Export all rows from this result…")),
                             Some("editor-export.all-query-rows"),
                         );
                     }
@@ -182,7 +183,7 @@ impl SqlEditor {
         }
         self.run_options.insert_action_group("editor-export", Some(&actions));
         if exports.n_items() > 0 {
-            menu.append_section(Some(&crate::tr!("File output")), &exports);
+            menu.append_section(Some(&bookie_app_services::tr!("File output")), &exports);
         }
         self.run_options.set_menu_model(Some(&menu));
     }
@@ -191,12 +192,12 @@ impl SqlEditor {
 pub(super) fn run_menu_items() -> [(String, &'static str, &'static str); 2] {
     [
         (
-            crate::tr!("Run selection or all statements"),
+            bookie_app_services::tr!("Run selection or all statements"),
             "editor-run.all",
             "<Primary>Return",
         ),
         (
-            crate::tr!("Run current statement"),
+            bookie_app_services::tr!("Run current statement"),
             "editor-run.current",
             "<Primary><Shift>Return",
         ),

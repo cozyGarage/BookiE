@@ -24,6 +24,7 @@ if bundle:
 if os.environ.get('BOOKIE_REQUIRE_PREBUILT') == '1' and not bundle:
     raise SystemExit('a source-matched prebuilt test bundle is required')
 for package, target, name in entries:
+    directory = root
     selection = [target] if target.startswith("--") else ["--test", target]
     command = ["cargo", "test", "--locked", "-p", package, *selection,
                "--", "--ignored", "--exact", name, "--test-threads=1"]
@@ -32,7 +33,10 @@ for package, target, name in entries:
         if len(selected) != 1:
             raise SystemExit('isolated test must select exactly one prebuilt executable')
         command = selected[0]
-    result = subprocess.run(command, cwd=root, text=True, capture_output=True)
+        directory = (root / index['package_directories'][package]).resolve()
+        if not directory.is_relative_to(root.resolve()):
+            raise SystemExit('package directory is outside the source checkout')
+    result = subprocess.run(command, cwd=directory, text=True, capture_output=True)
     print(result.stdout, flush=True)
     print(result.stderr, file=sys.stderr, flush=True)
     if result.returncode or not completed_tests(result.stdout, [name]):

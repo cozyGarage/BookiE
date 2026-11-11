@@ -12,6 +12,7 @@ path = "src/lib.rs"
 
 [dependencies]
 bookie-core = { path = "../core" }
+bookie-driver-cassandra = { path = "../drivers/cassandra" }
 bookie-driver-clickhouse = { path = "../drivers/clickhouse" }
 bookie-driver-duckdb = { path = "../drivers/duckdb" }
 bookie-driver-mongodb = { path = "../drivers/mongodb" }

@@ -48,7 +48,10 @@ fn triggers_sql() -> String {
 
 fn sequences_sql() -> String {
     format!(
-        "SELECT n.nspname, c.relname, pg_catalog.format_type(s.seqtypid, NULL)
+        "SELECT n.nspname, c.relname,
+                pg_catalog.format_type(s.seqtypid, NULL) || ' · '
+                    || COALESCE('last value ' || pg_catalog.pg_sequence_last_value(s.seqrelid)::text, 'not used yet')
+                    || ' · step ' || s.seqincrement::text
          FROM pg_catalog.pg_sequence s
          JOIN pg_catalog.pg_class c ON c.oid = s.seqrelid
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -91,6 +94,7 @@ const EXTENSIONS_SQL: &str = "SELECT n.nspname, e.extname, e.extversion
      JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
      WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.unnest($1::text[]) AS hidden_schema(schema_name) \
                        WHERE hidden_schema.schema_name = n.nspname)
+       AND pg_catalog.has_schema_privilege(n.oid, 'USAGE')
      ORDER BY 2 LIMIT $2";
 
 const ROLES_SQL: &str = "SELECT NULL::text, r.rolname,

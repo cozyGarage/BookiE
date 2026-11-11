@@ -14,6 +14,8 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
+mod preview_queue;
+
 /// Whether the rows go into a table that is already there, or into one
 /// the import creates first.
 pub(crate) enum ImportMode {
@@ -33,7 +35,7 @@ pub(crate) enum ImportMode {
 pub(crate) struct ImportRequest {
     pub schema: Option<String>,
     pub path: PathBuf,
-    pub bytes: Vec<u8>,
+    pub bytes: std::sync::Arc<[u8]>,
     pub format: CsvFormat,
     pub mode: ImportMode,
     pub mapping_store: Option<CsvMappingStore>,
@@ -46,7 +48,7 @@ pub(crate) struct ImportRequest {
 pub(crate) struct ImportChoice {
     pub schema: Option<String>,
     pub table: String,
-    pub bytes: Vec<u8>,
+    pub bytes: std::sync::Arc<[u8]>,
     pub options: CsvImportOptions,
     pub mapping: Vec<Option<usize>>,
     pub columns: Vec<ColumnInfo>,
@@ -67,30 +69,52 @@ pub(crate) fn present(
     let page = adw::PreferencesPage::new();
     let file = FileOptions::new(&request);
     page.add(&file.group);
+    let preview_status = gtk::Label::builder()
+        .label(bookie_app_services::tr!("Preparing CSV preview…"))
+        .halign(gtk::Align::Start)
+        .wrap(true)
+        .build();
+    let preview_group = adw::PreferencesGroup::new();
+    preview_group.add(&preview_status);
+    page.add(&preview_group);
     let columns = ColumnSection::new(&request);
     page.add(columns.group());
     let skip_rejected = adw::SwitchRow::builder()
-        .title(crate::tr!("Skip rows the database rejects"))
-        .subtitle(crate::tr!(
+        .title(bookie_app_services::tr!("Skip rows the database rejects"))
+        .subtitle(bookie_app_services::tr!(
             "Off: the first rejected row stops the import. On: rejected rows are skipped and listed when the import finishes."
         ))
         .build();
-    let errors = adw::PreferencesGroup::builder().title(crate::tr!("Errors")).build();
+    let errors = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Errors"))
+        .build();
     errors.add(&skip_rejected);
     page.add(&errors);
+    let start_button = gtk::Button::builder().label(bookie_app_services::tr!("Import")).build();
+    start_button.add_css_class("suggested-action");
+    start_button.set_sensitive(false);
     let state = std::rc::Rc::new(State {
         request,
         file,
         columns,
         skip_rejected,
+        preview_status,
+        start_button: start_button.downgrade(),
+        preview_queue: std::cell::RefCell::new(preview_queue::PreviewQueue::default()),
+        ready_generation: std::cell::Cell::new(None),
+        auto_detect_encoding: std::cell::Cell::new(true),
+        suppress_refresh: std::cell::Cell::new(false),
     });
-    state.refresh();
     connect_refresh(&state);
-
-    let start_button = gtk::Button::builder().label(crate::tr!("Import")).build();
-    start_button.add_css_class("suggested-action");
+    state.refresh();
     let dialog = build_dialog(&page, &start_button);
     let dialog_weak = dialog.downgrade();
+    let weak_state = std::rc::Rc::downgrade(&state);
+    dialog.connect_closed(move |_| {
+        if let Some(state) = weak_state.upgrade() {
+            state.close_preview();
+        }
+    });
     start_button.connect_clicked(move |_| {
         let Some(dialog) = dialog_weak.upgrade() else {
             return;
@@ -109,25 +133,55 @@ struct State {
     file: FileOptions,
     columns: ColumnSection,
     skip_rejected: adw::SwitchRow,
+    preview_status: gtk::Label,
+    start_button: gtk::glib::WeakRef<gtk::Button>,
+    preview_queue: std::cell::RefCell<preview_queue::PreviewQueue>,
+    ready_generation: std::cell::Cell<Option<u64>>,
+    auto_detect_encoding: std::cell::Cell<bool>,
+    suppress_refresh: std::cell::Cell<bool>,
 }
 
 impl State {
-    fn preview(&self) -> CsvSheet {
-        read_csv(
-            &self.request.bytes,
-            &self.file.options(),
-            Some(MAX_PREVIEW_ROWS.max(INFER_SAMPLE_ROWS)),
-        )
-        .unwrap_or_default()
+    fn refresh(self: &std::rc::Rc<Self>) {
+        if self.suppress_refresh.get() {
+            return;
+        }
+        let options = self.file.options();
+        self.ready_generation.set(None);
+        self.set_start_sensitive(false);
+        self.preview_status
+            .set_text(&bookie_app_services::tr!("Preparing CSV preview…"));
+        self.preview_status.remove_css_class("error");
+        self.preview_status.add_css_class("dim-label");
+        let auto_detect = self.auto_detect_encoding.get();
+        let work = self.preview_queue.borrow_mut().request(options, auto_detect);
+        if let Some(work) = work {
+            start_preview(self, work);
+        }
     }
 
-    fn refresh(&self) {
-        self.columns.refresh(&self.preview(), &self.file.options());
+    fn close_preview(&self) {
+        self.preview_queue.borrow_mut().close();
+        self.ready_generation.set(None);
+    }
+
+    fn set_start_sensitive(&self, sensitive: bool) {
+        if let Some(start_button) = self.start_button.upgrade() {
+            start_button.set_sensitive(sensitive);
+        }
     }
 
     /// The user's answer, or nothing when a name they typed cannot be an
     /// identifier. The rows say which; the import does not start.
     fn choice(&self) -> Option<ImportChoice> {
+        let generation = self.preview_queue.borrow().current_generation();
+        if !self
+            .ready_generation
+            .get()
+            .is_some_and(|ready| self.preview_queue.borrow().is_ready(ready) && ready == generation)
+        {
+            return None;
+        }
         let options = self.file.options();
         let (table, columns, mapping, create) = self.columns.resolve()?;
         Some(ImportChoice {
@@ -148,6 +202,87 @@ impl State {
     }
 }
 
+fn start_preview(state: &std::rc::Rc<State>, work: preview_queue::PreviewWork) {
+    let bytes = state.request.bytes.clone();
+    let weak_state = std::rc::Rc::downgrade(state);
+    let generation = work.generation;
+    let auto_detect = work.auto_detect;
+    let options = work.options;
+    let worker_options = options.clone();
+    gtk::glib::spawn_future_local(async move {
+        let result = gtk::gio::spawn_blocking(move || {
+            let encoding = auto_detect.then(|| starting_encoding(&bytes));
+            let mut options = worker_options;
+            if let Some(index) = encoding {
+                options.encoding = CsvImportEncoding::ALL[index as usize];
+            }
+            let sheet = read_csv(&bytes, &options, Some(MAX_PREVIEW_ROWS.max(INFER_SAMPLE_ROWS)));
+            (encoding, sheet)
+        })
+        .await;
+        let Some(state) = weak_state.upgrade() else {
+            return;
+        };
+        let result = result
+            .map_err(|_| ())
+            .map(|(encoding, sheet)| (encoding, sheet.map_err(|_| ())));
+        let completion = state.preview_queue.borrow_mut().finish(generation);
+        if completion.apply {
+            state.finish_preview(result, &options, auto_detect);
+        }
+        if let Some(next) = completion.next {
+            start_preview(&state, next);
+        }
+    });
+}
+
+impl State {
+    fn finish_preview(
+        &self,
+        result: Result<(Option<u32>, Result<CsvSheet, ()>), ()>,
+        options: &CsvImportOptions,
+        auto_detect: bool,
+    ) {
+        let Ok((encoding, sheet)) = result else {
+            self.show_preview_error();
+            return;
+        };
+        if auto_detect {
+            self.auto_detect_encoding.set(false);
+            if let Some(encoding) = encoding {
+                self.suppress_refresh.set(true);
+                self.file.encoding.set_selected(encoding);
+                self.suppress_refresh.set(false);
+            }
+        }
+        let Ok(sheet) = sheet else {
+            self.show_preview_error();
+            return;
+        };
+        let options = if auto_detect {
+            self.file.options()
+        } else {
+            options.clone()
+        };
+        self.columns.refresh(&sheet, &options);
+        let generation = self.preview_queue.borrow().current_generation();
+        self.ready_generation.set(Some(generation));
+        self.preview_status
+            .set_text(&bookie_app_services::tr!("CSV preview ready."));
+        self.preview_status.remove_css_class("dim-label");
+        self.set_start_sensitive(self.columns.resolve().is_some());
+    }
+
+    fn show_preview_error(&self) {
+        self.preview_status.set_text(&bookie_app_services::tr!(
+            "The CSV preview could not be read with these settings."
+        ));
+        self.preview_status.remove_css_class("dim-label");
+        self.preview_status.add_css_class("error");
+        self.set_start_sensitive(false);
+    }
+}
+
 fn connect_refresh(state: &std::rc::Rc<State>) {
     let for_delimiter = std::rc::Rc::downgrade(state);
     state.file.delimiter.connect_selected_notify(move |_| {
@@ -164,6 +299,7 @@ fn connect_refresh(state: &std::rc::Rc<State>) {
     let for_encoding = std::rc::Rc::downgrade(state);
     state.file.encoding.connect_selected_notify(move |_| {
         if let Some(state) = for_encoding.upgrade() {
+            state.auto_detect_encoding.set(false);
             state.refresh();
         }
     });
@@ -193,7 +329,7 @@ struct FileOptions {
 
 pub(crate) fn file_group(path: &std::path::Path) -> adw::PreferencesGroup {
     adw::PreferencesGroup::builder()
-        .title(crate::tr!("File"))
+        .title(bookie_app_services::tr!("File"))
         .description(crate::ui::plain_text::escape_markup(&path.display().to_string()))
         .build()
 }
@@ -203,24 +339,23 @@ impl FileOptions {
         let group = file_group(&request.path);
         let delimiter = delimiter_row(request.format.delimiter);
         let header = adw::SwitchRow::builder()
-            .title(crate::tr!("First row names the columns"))
+            .title(bookie_app_services::tr!("First row names the columns"))
             .active(request.format.has_header)
             .build();
         let null_marker = adw::EntryRow::builder()
-            .title(crate::tr!("Text that means NULL"))
+            .title(bookie_app_services::tr!("Text that means NULL"))
             .build();
         let quote = choice_row(
-            &crate::tr!("Quote character"),
+            &bookie_app_services::tr!("Quote character"),
             &["Double quote (\")", "Single quote (')", "None"],
         );
         let backslash = adw::SwitchRow::builder()
-            .title(crate::tr!("Backslash escapes a quote"))
+            .title(bookie_app_services::tr!("Backslash escapes a quote"))
             .build();
         let encoding = choice_row(
-            &crate::tr!("Encoding"),
+            &bookie_app_services::tr!("Encoding"),
             &["UTF-8", "Windows-1252", "UTF-16 LE", "UTF-16 BE"],
         );
-        encoding.set_selected(starting_encoding(&request.bytes));
         group.add(&delimiter);
         group.add(&quote);
         group.add(&backslash);
@@ -333,8 +468,8 @@ impl ExistingColumns {
         scope: Option<CsvMappingScope>,
     ) -> Self {
         let group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("Columns"))
-            .description(crate::tr!(
+            .title(bookie_app_services::tr!("Columns"))
+            .description(bookie_app_services::tr!(
                 "Generated columns stay on Skip and are filled by the database. Other columns left on Skip are not written, so their database defaults apply."
             ))
             .build();
@@ -430,9 +565,9 @@ struct MappingActionsParams {
 
 fn add_mapping_controls(group: &adw::PreferencesGroup, params: MappingActionsParams) {
     let actions = gtk::Box::builder().spacing(6).build();
-    let remember = gtk::Button::with_label(&crate::tr!("Remember mapping"));
-    let restore = gtk::Button::with_label(&crate::tr!("Restore mapping"));
-    let forget = gtk::Button::with_label(&crate::tr!("Forget mapping"));
+    let remember = gtk::Button::with_label(&bookie_app_services::tr!("Remember mapping"));
+    let restore = gtk::Button::with_label(&bookie_app_services::tr!("Restore mapping"));
+    let forget = gtk::Button::with_label(&bookie_app_services::tr!("Forget mapping"));
     let status = gtk::Label::builder().xalign(0.0).wrap(true).build();
     let available = params.store.is_some() && params.scope.is_some();
     for button in [&remember, &restore, &forget] {
@@ -440,7 +575,9 @@ fn add_mapping_controls(group: &adw::PreferencesGroup, params: MappingActionsPar
         actions.append(button);
     }
     if !available {
-        status.set_text(&crate::tr!("Saved mappings are unavailable for this connection."));
+        status.set_text(&bookie_app_services::tr!(
+            "Saved mappings are unavailable for this connection."
+        ));
     }
     group.add(&actions);
     group.add(&status);
@@ -488,7 +625,7 @@ impl MappingActions {
             );
             actions.status.set_text(
                 &result
-                    .map(|()| crate::tr!("Mapping saved for this table."))
+                    .map(|()| bookie_app_services::tr!("Mapping saved for this table."))
                     .unwrap_or_else(|error| error),
             );
         });
@@ -510,11 +647,13 @@ impl MappingActions {
                     for (row, source) in actions.rows.iter().zip(mapping) {
                         row.set_selected(source.map_or(0, |index| index as u32 + 1));
                     }
-                    actions
-                        .status
-                        .set_text(&crate::tr!("Saved mapping restored. Review it before importing."));
+                    actions.status.set_text(&bookie_app_services::tr!(
+                        "Saved mapping restored. Review it before importing."
+                    ));
                 }
-                Ok(None) => actions.status.set_text(&crate::tr!("No saved mapping for this table.")),
+                Ok(None) => actions
+                    .status
+                    .set_text(&bookie_app_services::tr!("No saved mapping for this table.")),
                 Err(error) => actions.status.set_text(&error),
             }
         });
@@ -527,8 +666,12 @@ impl MappingActions {
                 return;
             };
             match store.forget(scope) {
-                Ok(true) => actions.status.set_text(&crate::tr!("Saved mapping removed.")),
-                Ok(false) => actions.status.set_text(&crate::tr!("No saved mapping for this table.")),
+                Ok(true) => actions
+                    .status
+                    .set_text(&bookie_app_services::tr!("Saved mapping removed.")),
+                Ok(false) => actions
+                    .status
+                    .set_text(&bookie_app_services::tr!("No saved mapping for this table.")),
                 Err(error) => actions.status.set_text(&error),
             }
         });
@@ -573,13 +716,13 @@ fn column_subtitle(capabilities: DriverCapabilities, column: &ColumnInfo) -> Str
         format!(
             "{} · {}",
             column.data_type,
-            crate::tr!("Auto-increment values are inserted when mapped.")
+            bookie_app_services::tr!("Auto-increment values are inserted when mapped.")
         )
     } else if server_managed(capabilities, column) {
         format!(
             "{} · {}",
             column.data_type,
-            crate::tr!("Generated by database; CSV values are ignored.")
+            bookie_app_services::tr!("Generated by database; CSV values are ignored.")
         )
     } else {
         column.data_type.clone()
@@ -628,12 +771,14 @@ struct NewColumnRow {
 impl NewColumns {
     fn new(driver_id: &str, suggested_table: &str) -> Self {
         let group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("New table"))
-            .description(crate::tr!(
+            .title(bookie_app_services::tr!("New table"))
+            .description(bookie_app_services::tr!(
                 "The type of each column is a guess from the first rows of the file. Change any that is wrong before the table is created."
             ))
             .build();
-        let table = adw::EntryRow::builder().title(crate::tr!("Table name")).build();
+        let table = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Table name"))
+            .build();
         table.set_text(suggested_table);
         group.add(&table);
         Self {
@@ -651,7 +796,9 @@ impl NewColumns {
             self.group.remove(&existing.row);
         }
         for draft in infer_columns(sheet, options, &self.driver_id) {
-            let row = adw::EntryRow::builder().title(crate::tr!("Column")).build();
+            let row = adw::EntryRow::builder()
+                .title(bookie_app_services::tr!("Column"))
+                .build();
             row.set_text(&draft.name);
             let types = gtk::DropDown::from_strings(&self.type_names);
             types.set_valign(gtk::Align::Center);
@@ -773,7 +920,7 @@ fn delimiter_row(selected: CsvDelimiter) -> adw::ComboRow {
         .map(|delimiter| delimiter_label(*delimiter))
         .collect();
     let row = adw::ComboRow::builder()
-        .title(crate::tr!("Field separator"))
+        .title(bookie_app_services::tr!("Field separator"))
         .model(&gtk::StringList::new(&labels))
         .build();
     row.set_selected(
@@ -816,7 +963,7 @@ fn build_dialog(page: &adw::PreferencesPage, start_button: &gtk::Button) -> adw:
     toolbar.set_content(Some(page));
     toolbar.add_bottom_bar(&footer);
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Import CSV"))
+        .title(bookie_app_services::tr!("Import CSV"))
         .content_width(560)
         .content_height(680)
         .child(&toolbar)
@@ -867,18 +1014,18 @@ impl ImportProgress {
 }
 
 fn rows_label(committed: u64, total: u64) -> String {
-    crate::tr!("{done} of {total} rows")
+    bookie_app_services::tr!("{done} of {total} rows")
         .replace("{done}", &committed.to_string())
         .replace("{total}", &total.to_string())
 }
 
 pub(crate) fn present_preparing(parent: &adw::ApplicationWindow, table: &str) -> ImportProgress {
-    let label = gtk::Label::new(Some(&crate::tr!("Reading and planning the import…")));
+    let label = gtk::Label::new(Some(&bookie_app_services::tr!("Reading and planning the import…")));
     let spinner = gtk::Spinner::new();
     spinner.start();
     let bar = gtk::ProgressBar::new();
     bar.set_visible(false);
-    let title = crate::tr!("Preparing import into {table}").replace("{table}", table);
+    let title = bookie_app_services::tr!("Preparing import into {table}").replace("{table}", table);
     let window = CancellableDialog::present(
         parent,
         &title,

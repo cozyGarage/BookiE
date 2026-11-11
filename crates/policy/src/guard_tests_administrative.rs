@@ -89,8 +89,41 @@ async fn a_backup_on_a_read_only_connection_runs_without_approval_and_is_audited
 }
 
 #[tokio::test]
-async fn agents_cannot_back_up_or_restore() {
-    for operation in [AdministrativeOperation::Backup, AdministrativeOperation::Restore] {
+async fn a_subscription_on_a_read_only_connection_runs_without_approval_and_is_audited() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let calls = Arc::new(AtomicUsize::new(0));
+    let approval = Arc::new(CountingApprovalSink { calls: calls.clone() });
+    let guard = guard(
+        Principal::human_gui(),
+        true,
+        approval,
+        audit.clone(),
+        Arc::new(AuditState::new()),
+    );
+    let ran = Arc::new(AtomicUsize::new(0));
+
+    run(&guard, AdministrativeOperation::Subscribe, &ran)
+        .await
+        .expect("subscribe");
+
+    assert_eq!(ran.load(Ordering::SeqCst), 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        statuses(&audit),
+        [
+            (AuditRecordPhase::Intent, AuditTerminalStatus::Pending),
+            (AuditRecordPhase::Outcome, AuditTerminalStatus::Succeeded),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn agents_cannot_back_up_restore_or_subscribe() {
+    for operation in [
+        AdministrativeOperation::Backup,
+        AdministrativeOperation::Restore,
+        AdministrativeOperation::Subscribe,
+    ] {
         let audit = Arc::new(SequenceAuditSink::new(vec![]));
         let guard = guard(
             agent(),
@@ -450,4 +483,59 @@ async fn a_lost_outcome_fails_the_operation_and_disables_governed_writes() {
     assert!(matches!(error, DriverError::Internal(_)));
     assert_eq!(ran.load(Ordering::SeqCst), 1);
     assert!(audit_state.governed_writes_disabled());
+}
+
+#[tokio::test]
+async fn a_denied_cell_expression_never_reaches_the_driver_and_is_audited() {
+    use bookie_core::sql_dialect::{ColumnReset, build_keyed_column_reset};
+    let columns = [column("id", true), column("note", false)];
+    let (sql, _) = build_keyed_column_reset(
+        "postgres",
+        None,
+        "items",
+        &columns,
+        1,
+        &ColumnReset::Expression("pg_read_file('/etc/passwd')".into()),
+        &[bookie_core::Value::Int(1)],
+    )
+    .expect("statement");
+    let executes = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(crate::approval::DenyApprovalSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard.execute(&sql).await.expect_err("the expression must be refused");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+    let events = audit.events.lock().expect("audit events");
+    assert_eq!(
+        events.last().expect("terminal").terminal_status,
+        AuditTerminalStatus::Denied
+    );
+}
+
+fn column(name: &str, primary_key: bool) -> bookie_core::ColumnInfo {
+    bookie_core::ColumnInfo {
+        name: name.into(),
+        data_type: "text".into(),
+        nullable: !primary_key,
+        primary_key,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    }
 }

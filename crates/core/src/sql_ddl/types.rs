@@ -27,6 +27,9 @@ pub enum BuildDdlError {
     #[error("collation name is not safe to use: {0}")]
     UnsafeCollation(String),
 
+    #[error("this engine has no table-level default collation")]
+    TableCollationUnsupported,
+
     #[error("a partial index cannot be recreated from its catalog description")]
     PartialIndex,
 
@@ -374,9 +377,7 @@ impl DraftColumn {
     /// True when something other than the name differs, which is what
     /// decides whether an `AlterColumn` has any work to do. A rename is
     /// its own op, so a column that only changed name must not raise an
-    /// alter: SQLite refuses every alter and would fail the whole save,
-    /// and MySQL would restate the column definition from a model that
-    /// does not carry collation or character set.
+    /// alter: SQLite refuses every alter and would fail the whole save.
     pub fn differs_beyond_name(&self) -> bool {
         match &self.original {
             None => true,
@@ -387,6 +388,7 @@ impl DraftColumn {
                     || orig.is_auto_increment != self.auto_increment
                     || orig.default_value != self.default_value
                     || orig.comment != self.comment
+                    || orig.collation != self.collation
             }
         }
     }
@@ -409,6 +411,7 @@ pub enum StructureOp {
         columns: Vec<DraftColumn>,
         indexes: Vec<IndexInfo>,
         fks: Vec<ForeignKeyInfo>,
+        default_collation: Option<String>,
     },
     RenameTable {
         schema: Option<String>,

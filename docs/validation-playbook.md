@@ -85,6 +85,7 @@ Missing tools, nonzero exits, timeouts, cancellations and absent required test s
 | `quick` | Guards, formatting, non-GTK Clippy, units and sandbox | Rust 1.98 and native libraries |
 | `full` | Default workspace checks including app logic | GTK 4.24 development stack; no display automation or DuckDB |
 | `gtk-app` | GTK app Clippy and library/binary unit tests | GTK 4.24 development stack |
+| `gpui` | GPUI model and simulated interaction tests | GPUI native build libraries; no display |
 | `no-default-features` | The workspace and its test targets compile without the default Kerberos feature (`cargo check`, no tests run) | GTK 4.24 development stack; not yet run by any CI job |
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |
 | `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox, DuckDB has its own Build job |
@@ -215,15 +216,17 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/test_ci_workflow.py` in the same change.
 
+Forgejo branch pushes use the pull-request regression profile. The Debian floor package build and scenarios run only on `main`, scheduled runs and manual dispatches, matching the GitHub pull-request exclusion. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
+
 ### Pull request hygiene checks
 
 These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.
 
-`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. It is a readiness report, not a substitute for required check results; it blocks merging only if the repository ruleset is configured to require its stable check context.
+`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. The `protect main` ruleset does not require it: GitHub Actions is too slow to gate every pull request, so code changes are accepted through the Forgejo train and `scripts/forgejo-gate.sh`. A maintainer may still wait for the readiness report on a risky pull request. CodeQL and SonarCloud stay reference scans.
 
 | Check | What it enforces |
 |---|---|
 | `PR title` ([workflow](../.github/workflows/pr-title.yml), `scripts/check-pr-title.py`) | The title is a Conventional Commits subject, because it becomes the squash commit subject. Only a `chore(release)` pull request may edit the frozen `CHANGELOG.md`. |
 | `release-note` ([workflow](../.github/workflows/release-note-check.yml)) | The body has valid `Release-Note:` lines or `none` ([ADR 0022](decisions/0022-release-notes-from-merge-commits.md)). |
 | `unused-dependencies` ([workflow](../.github/workflows/linux-ci-contracts.yml)) | `cargo shear` 1.13.4: no unused or misplaced dependency. It cannot see a dependency kept only to switch on a feature, or a test file included by path from another crate; list those under `[package.metadata.cargo-shear] ignored` with the reason beside it. Its unlinked-file warnings are not failures: test modules pulled in with a path attribute look unlinked to a static scan. |
-| `workflow-lint` and `workflow-security` ([workflow](../.github/workflows/linux-ci-contracts.yml)) | `actionlint` and `zizmor` (offline, pinned, medium severity and confidence) over the GitHub workflows. Every checkout sets `persist-credentials: false`; a workflow value goes through `env`, not into a script. |
+| `workflow-lint` and `workflow-security` ([workflow](../.github/workflows/linux-ci-contracts.yml)) | `actionlint` and `zizmor` (offline, pinned, medium severity and confidence) over the GitHub and Forgejo workflows. Every checkout sets `persist-credentials: false`; a workflow value goes through `env`, not into a script. |

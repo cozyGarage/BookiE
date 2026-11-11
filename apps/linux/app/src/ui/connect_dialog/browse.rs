@@ -37,9 +37,9 @@ fn parent_window(button: &gtk::Button) -> Option<gtk::Window> {
 pub(super) fn attach_certificate_picker(row: &adw::EntryRow) {
     attach_path_picker(
         row,
-        &crate::tr!("Browse for certificate authority file"),
-        &crate::tr!("Select certificate authority"),
-        &crate::tr!("Certificates"),
+        &bookie_app_services::tr!("Browse for certificate authority file"),
+        &bookie_app_services::tr!("Select certificate authority"),
+        &bookie_app_services::tr!("Certificates"),
         &["*.pem", "*.crt", "*.cer"],
     );
 }
@@ -47,9 +47,9 @@ pub(super) fn attach_certificate_picker(row: &adw::EntryRow) {
 pub(super) fn attach_client_certificate_picker(row: &adw::EntryRow) {
     attach_path_picker(
         row,
-        &crate::tr!("Browse for client certificate file"),
-        &crate::tr!("Select client certificate"),
-        &crate::tr!("Certificates"),
+        &bookie_app_services::tr!("Browse for client certificate file"),
+        &bookie_app_services::tr!("Select client certificate"),
+        &bookie_app_services::tr!("Certificates"),
         &["*.pem", "*.crt", "*.cer"],
     );
 }
@@ -57,9 +57,9 @@ pub(super) fn attach_client_certificate_picker(row: &adw::EntryRow) {
 pub(super) fn attach_client_key_picker(row: &adw::EntryRow) {
     attach_path_picker(
         row,
-        &crate::tr!("Browse for client private key file"),
-        &crate::tr!("Select client private key"),
-        &crate::tr!("Private keys"),
+        &bookie_app_services::tr!("Browse for client private key file"),
+        &bookie_app_services::tr!("Select client private key"),
+        &bookie_app_services::tr!("Private keys"),
         &["*.pem", "*.key"],
     );
 }
@@ -91,12 +91,12 @@ pub(super) fn attach_database_file_picker(row: &adw::EntryRow) -> gtk::Box {
     let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     let open = picker_button(
         "document-open-symbolic",
-        &crate::tr!("Choose an existing database file"),
+        &bookie_app_services::tr!("Choose an existing database file"),
     );
     let entry = row.clone();
     open.connect_clicked(move |button| {
         let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Choose database file"))
+            .title(bookie_app_services::tr!("Choose database file"))
             .modal(true)
             .build();
         let entry = entry.clone();
@@ -106,11 +106,14 @@ pub(super) fn attach_database_file_picker(row: &adw::EntryRow) -> gtk::Box {
             move |result| set_entry_from_file(&entry, result),
         );
     });
-    let create = picker_button("document-new-symbolic", &crate::tr!("Create a new database file"));
+    let create = picker_button(
+        "document-new-symbolic",
+        &bookie_app_services::tr!("Create a new database file"),
+    );
     let entry = row.clone();
     create.connect_clicked(move |button| {
         let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Create database file"))
+            .title(bookie_app_services::tr!("Create database file"))
             .modal(true)
             .build();
         let entry = entry.clone();

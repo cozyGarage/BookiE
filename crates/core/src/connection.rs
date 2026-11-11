@@ -180,8 +180,23 @@ impl Default for ConnectOptions {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CollationInfo {
+    pub name: String,
+    pub charset: String,
+    pub is_default: bool,
+}
+
+pub const MAX_COLLATIONS: usize = 2000;
+
 #[async_trait]
 pub trait Connection: Send + Sync {
+    async fn list_collations(&self) -> Result<Vec<CollationInfo>, DriverError> {
+        Err(DriverError::Unsupported("listing collations".into()))
+    }
+    async fn list_collations_controlled(&self, control: &OperationControl) -> Result<Vec<CollationInfo>, DriverError> {
+        run_controlled(self.list_collations(), control).await
+    }
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         Err(DriverError::Unsupported("listing databases".into()))
     }
@@ -504,6 +519,9 @@ pub trait Connection: Send + Sync {
     async fn server_version(&self) -> Result<Option<String>, DriverError> {
         Ok(None)
     }
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        run_controlled(self.server_version(), control).await
+    }
     /// Whether an interrupted `*_controlled` call asks the server to
     /// stop the statement. When false the driver can only drop its own
     /// future, so the statement may still be running and the outcome is
@@ -515,6 +533,19 @@ pub trait Connection: Send + Sync {
     /// A driver that retires its connection without returning
     /// [`DriverError::Disconnected`] wakes that same sink from the retirement.
     fn attach_fault_notify(&self, _notify: Arc<Notify>) {}
+    async fn execute_controlled_with_token(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<(ExecResult, Option<crate::CommitToken>), (DriverError, Option<crate::CommitToken>)> {
+        self.execute_controlled(sql, control)
+            .await
+            .map(|rows| (rows, None))
+            .map_err(|error| (error, None))
+    }
+    async fn resolve_commit(&self, _token: &crate::CommitToken) -> Result<crate::CommitResolution, DriverError> {
+        Ok(crate::CommitResolution::Unresolvable)
+    }
     async fn ping(&self) -> Result<(), DriverError>;
     async fn close(self: Box<Self>) -> Result<(), DriverError>;
 }
@@ -614,6 +645,10 @@ mod controlled_default_tests {
             self.stall().await
         }
 
+        async fn server_version(&self) -> Result<Option<String>, DriverError> {
+            self.stall().await
+        }
+
         async fn ping(&self) -> Result<(), DriverError> {
             Ok(())
         }
@@ -644,6 +679,28 @@ mod controlled_default_tests {
     }
 
     #[tokio::test]
+    async fn a_silent_server_version_request_is_bounded_by_the_deadline() {
+        let dispatched = Arc::new(AtomicUsize::new(0));
+        let connection = SlowConnection {
+            dispatched: dispatched.clone(),
+            ..SlowConnection::default()
+        };
+        let control = OperationControl::new(
+            CancellationToken::new(),
+            Some(tokio::time::Instant::now() + Duration::from_millis(50)),
+        );
+        assert!(matches!(
+            connection.server_version_controlled(&control).await,
+            Err(DriverError::OperationOutcomeUnknown { source }) if matches!(*source, DriverError::TimedOut)
+        ));
+        assert_eq!(
+            dispatched.load(Ordering::SeqCst),
+            1,
+            "the request was dispatched and then bounded"
+        );
+    }
+
+    #[tokio::test]
     async fn a_cancelled_control_stops_every_metadata_read_before_dispatch() {
         let dispatched = Arc::new(AtomicUsize::new(0));
         let connection = SlowConnection {
@@ -653,6 +710,10 @@ mod controlled_default_tests {
         };
         let control = cancelled_control();
 
+        assert!(matches!(
+            connection.server_version_controlled(&control).await,
+            Err(DriverError::Cancelled)
+        ));
         assert!(matches!(
             connection.list_tables_controlled(&control).await,
             Err(DriverError::Cancelled)

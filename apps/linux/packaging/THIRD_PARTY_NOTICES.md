@@ -8,24 +8,24 @@ This file records the license expressions declared by package authors and the co
 
 Packages:
 
-- `bookie-agentd 0.2.5`
-- `bookie-app 0.2.5`
-- `bookie-app-services 0.2.5`
-- `bookie-core 0.2.5`
-- `bookie-driver-clickhouse 0.2.5`
-- `bookie-driver-duckdb 0.2.5`
-- `bookie-driver-mongodb 0.2.5`
-- `bookie-driver-mssql 0.2.5`
-- `bookie-driver-mysql 0.2.5`
-- `bookie-driver-postgres 0.2.5`
-- `bookie-driver-redis 0.2.5`
-- `bookie-driver-sqlite 0.2.5`
-- `bookie-dump 0.2.5`
-- `bookie-mcp 0.2.5`
-- `bookie-policy 0.2.5`
-- `bookie-ssh 0.2.5`
-- `bookie-storage 0.2.5`
-- `bookie-transport 0.2.5`
+- `bookie-agentd 0.2.7`
+- `bookie-app 0.2.7`
+- `bookie-app-services 0.2.7`
+- `bookie-core 0.2.7`
+- `bookie-driver-clickhouse 0.2.7`
+- `bookie-driver-duckdb 0.2.7`
+- `bookie-driver-mongodb 0.2.7`
+- `bookie-driver-mssql 0.2.7`
+- `bookie-driver-mysql 0.2.7`
+- `bookie-driver-postgres 0.2.7`
+- `bookie-driver-redis 0.2.7`
+- `bookie-driver-sqlite 0.2.7`
+- `bookie-dump 0.2.7`
+- `bookie-mcp 0.2.7`
+- `bookie-policy 0.2.7`
+- `bookie-ssh 0.2.7`
+- `bookie-storage 0.2.7`
+- `bookie-transport 0.2.7`
 
 ```text
 # License
@@ -41,9 +41,13 @@ Unless a file says otherwise, source code and documentation in this Linux reposi
 
 Packages:
 
-- `bookie-driver-oracle 0.2.5`
-- `bookie-driver-registry 0.2.5`
-- `bookie-results 0.2.5`
+- `bookie-checks 0.2.7`
+- `bookie-driver-cassandra 0.2.7`
+- `bookie-driver-oracle 0.2.7`
+- `bookie-driver-registry 0.2.7`
+- `bookie-kafka-browser 0.2.7`
+- `bookie-pg-sessions 0.2.7`
+- `bookie-results 0.2.7`
 
 ```text
 GNU AFFERO GENERAL PUBLIC LICENSE
@@ -2660,6 +2664,42 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 Packages:
 
+- `snap 1.1.2`
+
+```text
+Copyright 2011, The Snappy-Rust Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+    * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+    * Neither the name of the copyright holder nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## BSD-3-Clause
+
+Packages:
+
 - `encoding_rs 0.8.44`
 
 ```text
@@ -4143,6 +4183,41 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
+- `rand_pcg 0.9.0`
+
+```text
+Copyright (c) 2014-2017 Melissa O'Neill and PCG Project contributors
+Copyright 2018 Developers of the Rand project
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
 - `flate2 1.1.10`
 
 ```text
@@ -4206,6 +4281,7 @@ THE SOFTWARE.
 Packages:
 
 - `either 1.19.0`
+- `itertools 0.15.0`
 - `serde_with 3.24.0`
 - `serde_with_macros 3.24.0`
 
@@ -4573,6 +4649,7 @@ Packages:
 
 - `const-random 0.1.18`
 - `const-random-macro 0.1.16`
+- `hashbrown 0.14.5`
 - `hashbrown 0.15.5`
 - `hashbrown 0.16.1`
 - `hashbrown 0.17.1`
@@ -6672,6 +6749,40 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
+- `rskafka 0.6.0`
+
+```text
+Copyright (c) 2020 InfluxData
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
 - `arcstr 1.2.0`
 
 ```text
@@ -7962,8 +8073,11 @@ Packages:
 
 - `bnum 0.13.0`
 - `rand 0.10.3`
+- `rand 0.8.8`
 - `rand 0.9.5`
+- `rand_chacha 0.3.1`
 - `rand_chacha 0.9.0`
+- `rand_core 0.6.4`
 - `rand_core 0.9.5`
 
 ```text
@@ -8537,6 +8651,36 @@ SOFTWARE.
 
 Packages:
 
+- `dashmap 6.2.1`
+
+```text
+MIT License
+
+Copyright (c) 2019 Acrimon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
 - `crc-catalog 2.5.0`
 
 ```text
@@ -8875,6 +9019,36 @@ SOFTWARE.
 
 Packages:
 
+- `rsasl 2.3.1`
+
+```text
+MIT License
+
+Copyright (c) 2020–2022 Nadja Reitzenstein
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
 - `tagptr 0.2.0`
 
 ```text
@@ -9065,6 +9239,10 @@ Packages:
 - `libm 0.2.16`
 - `md5 0.8.1`
 - `rust_xlsxwriter 0.101.0`
+- `scylla 1.10.0`
+- `scylla-cql 3.0.0`
+- `scylla-cql-core 1.10.0`
+- `scylla-macros 1.10.0`
 - `sqlx-core 0.9.0`
 - `sqlx-postgres 0.9.0`
 - `sqlx-sqlite 0.9.0`
@@ -9258,11 +9436,18 @@ Packages:
 - `adler2 2.0.1`
 - `allocator-api2 0.2.21`
 - `async-channel 2.5.0`
+- `async-executor 1.14.1`
+- `async-fs 2.2.0`
+- `async-io 2.6.0`
 - `async-lock 3.4.2`
 - `async-native-tls 0.6.0`
+- `async-process 2.5.0`
 - `async-recursion 1.2.0`
+- `async-signal 0.2.14`
+- `async-task 4.7.1`
 - `async-trait 0.1.92`
 - `atomic-waker 1.1.2`
+- `blocking 1.7.0`
 - `clickhouse 0.15.3`
 - `concurrent-queue 2.5.0`
 - `curve25519-dalek-derive 0.1.1`
@@ -9289,6 +9474,8 @@ Packages:
 - `ordered-stream 0.2.0`
 - `parking 2.2.1`
 - `pin-project-lite 0.2.17`
+- `piper 0.2.5`
+- `polling 3.11.0`
 - `portable-atomic 1.15.0`
 - `proc-macro-crate 3.5.0`
 - `proc-macro2 1.0.107`
@@ -9310,7 +9497,9 @@ Packages:
 - `sqlformat 0.5.0`
 - `syn 2.0.119`
 - `syn 3.0.9`
+- `thiserror 1.0.69`
 - `thiserror 2.0.21`
+- `thiserror-impl 1.0.69`
 - `thiserror-impl 2.0.21`
 - `typed-builder 0.22.0`
 - `typed-builder-macro 0.22.0`
@@ -9600,6 +9789,37 @@ THE SOFTWARE.
 
 Packages:
 
+- `lz4 1.28.1`
+- `lz4-sys 1.11.1+lz4-1.10.0`
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2015 Artem V. Navrotskiy
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
 - `generic-array 0.14.7`
 - `generic-array 1.4.5`
 
@@ -9669,6 +9889,36 @@ The MIT License (MIT)
 Copyright (c) 2015 Danny Guo
 Copyright (c) 2016 Titus Wormer <tituswormer@gmail.com>
 Copyright (c) 2018 Akash Kurdekar
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
+- `twox-hash 2.1.5`
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2015 Jake Goulding
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9838,6 +10088,38 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
+- `integer-encoding 4.1.0`
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2016 Google Inc. (lewinb@google.com) -- though not an official
+Google product or in any way related!
+Copyright (c) 2018-2020 Lewin Bormann (lbo@spheniscida.de)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
 ```
 
 ## MIT
@@ -10033,6 +10315,36 @@ THE SOFTWARE.
 
 Packages:
 
+- `crc32c 0.6.9`
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2017-2025 Zack Owens
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
 - `bstr 1.13.1`
 
 ```text
@@ -10096,6 +10408,35 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
+- `lz4_flex 0.14.0`
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2020 Pascal Seitz
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 ## MIT

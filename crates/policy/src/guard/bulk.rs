@@ -456,7 +456,7 @@ impl PolicyGuard {
                 }
                 Ok(GrantedBulkDecision {
                     decision_rule: format!("{rule}:approved"),
-                    approval_outcome: AuditApprovalOutcome::Approved,
+                    approval_outcome: super::approved_audit_outcome(outcome),
                     preview_state: AuditPreviewState::Available(preview),
                 })
             }

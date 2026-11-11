@@ -105,6 +105,7 @@ fn hop() -> SshConfig {
         auth: SshAuth::Password {
             password: secrecy::SecretString::new("unused".to_string().into()),
         },
+        local_port: None,
     }
 }
 
@@ -212,6 +213,28 @@ async fn a_driver_without_client_tls_auth_refuses_configured_identity() {
     )
     .await;
     assert!(error.to_string().contains("does not support TLS client authentication"));
+}
+
+#[tokio::test]
+async fn a_driver_without_strict_encryption_refuses_the_setting() {
+    let error = refusal(
+        &FakeDriver::plain(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::VerifyFull,
+                strict_encryption: true,
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        None,
+        "a driver without strict encryption must not silently ignore the setting",
+    )
+    .await;
+    assert!(
+        error.to_string().contains("does not support strict encryption"),
+        "{error}"
+    );
 }
 
 #[tokio::test]

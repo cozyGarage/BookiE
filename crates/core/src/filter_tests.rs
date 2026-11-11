@@ -926,6 +926,25 @@ fn a_double_precision_column_and_other_drivers_are_left_alone() {
         .unwrap()
         .unwrap();
     assert!(!mysql.contains("::real"), "{mysql}");
+    let (_, duckdb_double) = build_filter_where("duckdb", &[col("v", "DOUBLE")], &set)
+        .unwrap()
+        .unwrap();
+    assert_eq!(duckdb_double, vec![Value::Float(0.1)]);
+}
+
+#[test]
+fn a_duckdb_float_filter_binds_the_single_precision_value() {
+    for data_type in ["FLOAT", "FLOAT4", "REAL"] {
+        let set = FilterSet {
+            rules: vec![rule("v", FilterOp::Eq, Some(FilterValue::Single("0.1".into())))],
+            ..Default::default()
+        };
+        let (_, params) = build_filter_where("duckdb", &[col("v", data_type)], &set)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(params, vec![Value::Float(f64::from(0.1_f32))], "{data_type}");
+    }
 }
 
 #[test]
@@ -1027,5 +1046,135 @@ fn a_trailing_line_comment_in_extra_sql_does_not_swallow_the_closing_parenthesis
         let closing = sql.rfind(')').unwrap();
         let last_line = sql[..closing].rsplit('\n').next().unwrap();
         assert!(!last_line.contains("--") && !last_line.contains('#'), "{sql}");
+    }
+}
+
+const SQL_DIALECTS: [&str; 7] = ["postgres", "mysql", "sqlite", "duckdb", "mssql", "clickhouse", "oracle"];
+
+fn placeholder_count(driver_id: &str, sql: &str) -> usize {
+    let marker = match driver_id {
+        "postgres" => "$",
+        "mssql" => "@P",
+        _ => "?",
+    };
+    sql.matches(marker).count()
+}
+
+#[test]
+fn hostile_filter_values_are_bound_and_never_spliced_into_the_sql() {
+    let shapes = [
+        "'",
+        "\\",
+        "x\\",
+        "it's",
+        "\\'",
+        "'; DROP TABLE note; --",
+        "' OR '1'='1",
+        "]",
+        "[a-z]",
+        "50%_|",
+        "\u{0}",
+    ];
+    let ops = [
+        FilterOp::Eq,
+        FilterOp::NotEq,
+        FilterOp::Lt,
+        FilterOp::LtEq,
+        FilterOp::Gt,
+        FilterOp::GtEq,
+        FilterOp::Contains,
+        FilterOp::StartsWith,
+        FilterOp::EndsWith,
+        FilterOp::Like,
+        FilterOp::NotLike,
+        FilterOp::Ilike,
+    ];
+    for driver_id in SQL_DIALECTS {
+        for shape in shapes {
+            let raw = format!("zq9{shape}zq9");
+            for op in ops {
+                let (sql, params) = like_where(driver_id, op, &raw);
+                assert!(
+                    !sql.contains("zq9"),
+                    "{driver_id} {op:?} {shape:?} spliced the value: {sql}"
+                );
+                assert_eq!(
+                    placeholder_count(driver_id, &sql),
+                    params.len(),
+                    "{driver_id} {op:?} {shape:?}: {sql}"
+                );
+                assert!(
+                    params.iter().any(|p| matches!(p, Value::Text(t) if t.contains("zq9"))),
+                    "{driver_id} {op:?} {shape:?} lost the value"
+                );
+            }
+            let cols = vec![col("note", "text")];
+            for (op, value) in [
+                (FilterOp::In, FilterValue::List(vec![raw.clone(), raw.clone()])),
+                (FilterOp::NotIn, FilterValue::List(vec![raw.clone()])),
+                (FilterOp::Between, FilterValue::Pair(raw.clone(), raw.clone())),
+            ] {
+                let set = FilterSet {
+                    rules: vec![rule("note", op, Some(value))],
+                    ..Default::default()
+                };
+                let (sql, params) = build_filter_where(driver_id, &cols, &set).unwrap().unwrap();
+                assert!(
+                    !sql.contains("zq9"),
+                    "{driver_id} {op:?} {shape:?} spliced the value: {sql}"
+                );
+                assert_eq!(
+                    placeholder_count(driver_id, &sql),
+                    params.len(),
+                    "{driver_id} {op:?}: {sql}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_breakout_typed_into_a_non_text_column_is_refused_not_spliced() {
+    for driver_id in SQL_DIALECTS {
+        for (data_type, hostile) in [
+            ("integer", "1; DROP TABLE note"),
+            ("integer", "1 OR 1=1"),
+            ("date", "2026-01-01'; --"),
+            ("boolean", "true) OR (1=1"),
+        ] {
+            let set = FilterSet {
+                rules: vec![rule("n", FilterOp::Eq, Some(FilterValue::Single(hostile.into())))],
+                ..Default::default()
+            };
+            assert!(
+                build_filter_where(driver_id, &[col("n", data_type)], &set).is_err(),
+                "{driver_id} {data_type}: {hostile:?} must be refused"
+            );
+        }
+    }
+}
+
+#[test]
+fn oracle_names_its_escape_character_because_it_has_no_default() {
+    for op in [FilterOp::Contains, FilterOp::StartsWith, FilterOp::EndsWith] {
+        let (sql, params) = like_where("oracle", op, "50%_\\x");
+        assert_eq!(sql, "\"note\" LIKE ? ESCAPE '\\'", "{op:?}");
+        assert!(
+            matches!(&params[0], Value::Text(t) if t.contains("50\\%\\_\\\\x")),
+            "{op:?}: {params:?}"
+        );
+    }
+}
+
+#[test]
+fn every_dialect_either_has_a_default_like_escape_or_names_one() {
+    for driver_id in SQL_DIALECTS {
+        let (sql, _) = like_where(driver_id, FilterOp::Contains, "x");
+        let names_one = sql.contains(" ESCAPE ");
+        let has_default = matches!(driver_id, "postgres" | "clickhouse");
+        assert!(
+            names_one != has_default,
+            "{driver_id}: backslash-escaped patterns need a default backslash escape or an ESCAPE clause: {sql}"
+        );
     }
 }

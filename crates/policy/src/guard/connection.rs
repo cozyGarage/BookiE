@@ -14,28 +14,23 @@ impl Connection for PolicyGuard {
         .unwrap_or(false)
     }
 
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.governed_list_collations().await
+    }
+
+    async fn list_collations_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.governed_list_collations_controlled(control).await
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
-        let operation = self.metadata_operation("LIST DATABASES", Vec::new());
-        self.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self.caught_read("LIST DATABASES", self.inner.list_databases()).await;
-        let rows = result.as_ref().ok().map(|databases| databases.len() as u64);
-        self.audit_read_result(&operation, start, &result, rows).await?;
-        result
+        self.governed_list_databases().await
     }
 
     async fn list_databases_controlled(&self, control: &OperationControl) -> Result<Vec<String>, DriverError> {
-        check_pre_dispatch(control)?;
-        let operation = self.metadata_operation("LIST DATABASES", Vec::new());
-        self.prepare_governed_read(&operation).await?;
-        let start = Instant::now();
-        let result = self
-            .caught_read("LIST DATABASES", self.inner.list_databases_controlled(control))
-            .await;
-        let rows = result.as_ref().ok().map(|databases| databases.len() as u64);
-        self.audit_controlled_read_result(&operation, start, &result, rows)
-            .await?;
-        result
+        self.governed_list_databases_controlled(control).await
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
@@ -370,6 +365,38 @@ impl Connection for PolicyGuard {
             .await
     }
 
+    async fn execute_controlled_with_token(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<(ExecResult, Option<bookie_core::CommitToken>), (DriverError, Option<bookie_core::CommitToken>)> {
+        let authorization = self
+            .authorize(sql, false, Some(control))
+            .await
+            .map_err(|error| (error, None))?;
+        let token = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let captured = token.clone();
+        let result = self
+            .execute_write(sql, None, authorization, move |inner| async move {
+                match inner.execute_controlled_with_token(sql, control).await {
+                    Ok((rows, found)) => {
+                        *captured.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = found;
+                        Ok(rows)
+                    }
+                    Err((error, found)) => {
+                        *captured.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = found;
+                        Err(error)
+                    }
+                }
+            })
+            .await;
+        let found = token.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
+        match result {
+            Ok(rows) => Ok((rows, found)),
+            Err(error) => Err((error, found)),
+        }
+    }
+
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
         let authorization = self.authorize(sql, true, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute_params(sql, params))
@@ -695,6 +722,27 @@ impl Connection for PolicyGuard {
         let result = self.caught_read("SERVER VERSION", self.inner.server_version()).await;
         self.audit_read_result(&operation, start, &result, None).await?;
         result
+    }
+
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.metadata_operation("SERVER VERSION", Vec::new());
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read("SERVER VERSION", self.inner.server_version_controlled(control))
+            .await;
+        self.audit_controlled_read_result(&operation, start, &result, None)
+            .await?;
+        result
+    }
+
+    async fn resolve_commit(
+        &self,
+        token: &bookie_core::CommitToken,
+    ) -> Result<bookie_core::CommitResolution, DriverError> {
+        self.caught_read("RESOLVE COMMIT", self.inner.resolve_commit(token))
+            .await
     }
 
     async fn ping(&self) -> Result<(), DriverError> {

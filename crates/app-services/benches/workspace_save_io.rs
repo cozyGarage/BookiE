@@ -78,6 +78,7 @@ fn run_case(connection_count: usize) -> Result<Measurement, Box<dyn std::error::
 fn record(query: String) -> ConnectionWorkspaceState {
     ConnectionWorkspaceState {
         tabs: vec![WorkspaceTabRecord::Editor {
+            mark: Default::default(),
             query,
             draft_id: None,
             file: None,

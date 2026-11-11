@@ -24,10 +24,10 @@ mod temporal;
 
 use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, EnumInputStyle, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch,
-    QueryResultBudget, QueryRows, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, EnumInputStyle,
+    ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
+    QueryResultBatch, QueryResultBudget, QueryRows, TableInfo, Transport, Value, check_pre_dispatch,
+    run_controlled_setup, run_server_cancellable,
 };
 
 /// Name of the SSH-forwarded rendezvous socket inside the private directory
@@ -44,6 +44,14 @@ pub struct MysqlDriver;
 
 #[async_trait]
 impl DatabaseDriver for MysqlDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            integer_range_validation: true,
+            spatial_edit_requires_native_value: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn enum_input_style(&self) -> EnumInputStyle {
         EnumInputStyle::DeclaredMemberList
     }
@@ -85,6 +93,10 @@ impl DatabaseDriver for MysqlDriver {
     }
 
     fn supports_client_tls_auth(&self) -> bool {
+        true
+    }
+
+    fn supports_table_default_collation(&self) -> bool {
         true
     }
 
@@ -148,6 +160,28 @@ struct MysqlConnection {
 
 #[async_trait]
 impl Connection for MysqlConnection {
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT CAST(collation_name AS CHAR), COALESCE(CAST(character_set_name AS CHAR), ''),
+                    COALESCE(is_default = 'Yes', 0)
+             FROM information_schema.collations
+             ORDER BY collation_name
+             LIMIT ?",
+        )
+        .bind(bookie_core::MAX_COLLATIONS as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows
+            .into_iter()
+            .map(|row| bookie_core::CollationInfo {
+                name: row.get(0),
+                charset: row.get(1),
+                is_default: row.get(2),
+            })
+            .collect())
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
             "SELECT CAST(schema_name AS CHAR) FROM information_schema.schemata

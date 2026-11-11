@@ -98,7 +98,7 @@ def scenarios(ui):
     def open_editor():
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.invoke_accessible_action("win.open-editor")
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 
     def find_steps(rows):

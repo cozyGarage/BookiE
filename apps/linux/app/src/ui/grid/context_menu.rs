@@ -2,6 +2,7 @@ mod keyboard_menu;
 mod pointer_menu;
 mod whole_result;
 
+use bookie_core::sql_dialect::ColumnReset;
 use bookie_core::sql_literal::RowStatement;
 use std::rc::Rc;
 
@@ -9,12 +10,12 @@ use bookie_core::{ColumnInfo, QueryResult, Value};
 use gtk4::prelude::*;
 use gtk4::{self as gtk, gio};
 
-use super::GridMsg;
 use super::display::{FULL_EDIT_KIND_SLOT, FULL_EDIT_TEXT_SLOT, IS_NULL_SLOT, POSITION_SLOT, ROW_KEY_SLOT};
 use super::editing::enter_edit_mode;
 use super::export;
 use super::local_filter::LocalResultView;
 use super::value_viewer;
+use super::{GridMsg, ResetCellRequest};
 
 const CELL_MENU_TRIGGER: &str = "Menu|<Shift>F10";
 
@@ -46,6 +47,35 @@ pub(super) struct GridMenuOptions {
     pub(super) snapshot_export: bool,
 }
 
+fn reset_cell_entry(
+    name: &str,
+    reset: Option<ColumnReset>,
+    context: &CellContextStore,
+    sender: &relm4::Sender<GridMsg>,
+) -> gio::ActionEntry<gio::SimpleActionGroup> {
+    let context = context.clone();
+    let sender = sender.clone();
+    gio::ActionEntry::builder(name)
+        .activate(move |_, _, _| {
+            let snapshot = context.snapshot();
+            let Some(slot) = snapshot.as_ref() else {
+                return;
+            };
+            let Some(row_position) = slot.row_position else { return };
+            if slot.draft_target.is_some() {
+                return;
+            }
+            let request = ResetCellRequest {
+                row_position,
+                col_index: slot.col_index,
+                row_key: slot.row_key.clone(),
+                reset: reset.clone(),
+            };
+            sender.send(GridMsg::ResetCell(request)).ok();
+        })
+        .build()
+}
+
 pub(super) fn install_grid_context_menus(
     column_view: &gtk::ColumnView,
     sender: relm4::Sender<GridMsg>,
@@ -75,11 +105,15 @@ pub(super) fn install_grid_context_menus(
     let edit_action = gio::SimpleAction::new("edit", None);
     {
         let context = context.clone();
+        let view = column_view.downgrade();
+        let columns = columns.clone();
         edit_action.connect_activate(move |_, _| {
             if let Some(slot) = context.snapshot().as_ref()
-                && let Ok(label) = slot.widget.clone().downcast::<crate::ui::cell_editor::CellEditor>()
+                && let Some(view) = view.upgrade()
+                && full_value_target(&view, slot, &columns).is_some()
+                && let Some(label) = slot.widget.downcast_ref::<crate::ui::cell_editor::CellEditor>()
             {
-                enter_edit_mode(&label);
+                enter_edit_mode(label);
             }
         });
     }
@@ -99,20 +133,17 @@ pub(super) fn install_grid_context_menus(
             if !super::full_value_editor::is_full_value_column(&column.data_type) {
                 return;
             }
-            let Some(row) = row_object_at(&view, position(slot)) else {
+            let Some((row_position, row)) = full_value_target(&view, slot, &columns) else {
                 return;
             };
-            let (_, row_key) = cell_row_identity(&slot.widget);
-            if row.draft_id().is_none() && !has_persisted_row_key(&row_key) {
-                return;
-            }
+            let row_key = slot.row_key.clone();
             if row.cell_is_partial(slot.col_index) {
                 sender
                     .send(GridMsg::FetchCellValue {
                         col_index: slot.col_index,
                         column_name: slot.column_name.clone(),
                         row_key,
-                        edit_row_position: Some(position(slot)),
+                        edit_row_position: Some(row_position),
                     })
                     .ok();
                 return;
@@ -130,9 +161,10 @@ pub(super) fn install_grid_context_menus(
                 &slot.column_name,
                 &initial_text,
                 super::full_value_editor::EditContext {
-                    row_position: position(slot),
+                    row_position,
                     col_index: slot.col_index,
                     row_key,
+                    draft_id: row.draft_id(),
                     nullable: column.nullable,
                     kind,
                     sender: sender.clone(),
@@ -147,7 +179,11 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("copy-value")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let row = view.upgrade().and_then(|view| row_object_at(&view, position(slot)));
+                    let Some(view) = view.upgrade() else { return };
+                    if !menu_target_matches(&view, slot) {
+                        return;
+                    }
+                    let row = row_object_at(&view, position(slot));
                     if row.as_ref().is_some_and(|row| row.cell_is_partial(slot.col_index)) {
                         let (_, row_key) = cell_row_identity(&slot.widget);
                         if !row_key.is_empty() {
@@ -270,11 +306,14 @@ pub(super) fn install_grid_context_menus(
                 };
                 let clause = export::render_in_clause(&driver_id, &rows, 0);
                 if clause.skipped > 0 {
-                    let message = crate::tr!("Skipped {n} NULL, binary or unsupported values.")
+                    let message = bookie_app_services::tr!("Skipped {n} NULL, binary or unsupported values.")
                         .replace("{n}", &clause.skipped.to_string());
-                    let alert = libadwaita::AlertDialog::new(Some(&crate::tr!("Copy as IN clause")), Some(&message));
+                    let alert = libadwaita::AlertDialog::new(
+                        Some(&bookie_app_services::tr!("Copy as IN clause")),
+                        Some(&message),
+                    );
                     use libadwaita::prelude::*;
-                    alert.add_response("close", &crate::tr!("Close"));
+                    alert.add_response("close", &bookie_app_services::tr!("Close"));
                     alert.set_close_response("close");
                     alert.present(Some(&view));
                 }
@@ -293,6 +332,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let row = row_object_at(&view, position(slot));
                 if let Some(value) = pending_cell_value(&slot.widget) {
                     let null_copy_text = matches!(&value, Value::Null)
@@ -339,6 +381,9 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
+                if !menu_target_matches(&view, slot) {
+                    return;
+                }
                 let Some(row) = complete_row_at(&view, position(slot)) else {
                     sender.send(GridMsg::IncompleteRowData).ok();
                     return;
@@ -399,26 +444,50 @@ pub(super) fn install_grid_context_menus(
         gio::ActionEntry::builder("set-null")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let (row_position, row_key) = cell_row_identity(&slot.widget);
+                    let Some(row_position) = slot.row_position else { return };
+                    let row_key = slot.row_key.clone();
+                    let draft_id = slot.draft_target.map(|(_, id)| id);
                     sender
                         .send(GridMsg::SetCellNull {
                             row_position,
                             col_index: slot.col_index,
                             row_key,
+                            draft_id,
                         })
                         .ok();
                 }
             })
             .build()
     };
+    let set_default_action = reset_cell_entry("set-default", Some(ColumnReset::Default), &context, &sender);
+    let set_expression_action = reset_cell_entry("set-expression", None, &context, &sender);
     let delete_row_action = {
         let context = context.clone();
         let sender = sender.clone();
+        let view = column_view.downgrade();
         gio::ActionEntry::builder("delete-row")
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
-                    let (row_position, row_key) = cell_row_identity(&slot.widget);
-                    sender.send(GridMsg::DeleteRowAt { row_position, row_key }).ok();
+                    let Some(current_position) = slot.row_position else {
+                        return;
+                    };
+                    let row_key = slot.row_key.clone();
+                    let current_draft = view
+                        .upgrade()
+                        .and_then(|view| row_object_at(&view, current_position))
+                        .and_then(|row| row.draft_id());
+                    let (row_position, draft_id) = match slot.draft_target {
+                        Some((position, id)) => (position, Some(id)),
+                        None if current_draft.is_some() => return,
+                        None => (current_position, None),
+                    };
+                    sender
+                        .send(GridMsg::DeleteRowAt {
+                            row_position,
+                            row_key,
+                            draft_id,
+                        })
+                        .ok();
                 }
             })
             .build()
@@ -459,13 +528,16 @@ pub(super) fn install_grid_context_menus(
             .activate(move |_, _, _| {
                 if let Some(slot) = context.snapshot().as_ref() {
                     let Some(view) = view.upgrade() else { return };
-                    if complete_row_at(&view, position(slot)).is_none() {
+                    let Some(row_position) = slot.row_position else { return };
+                    if complete_row_at(&view, row_position).is_none() {
                         sender.send(GridMsg::IncompleteRowData).ok();
                         return;
                     }
                     sender
                         .send(GridMsg::DuplicateRow {
-                            row_position: position(slot),
+                            row_position,
+                            row_key: slot.row_key.clone(),
+                            draft_id: slot.draft_target.map(|(_, id)| id),
                         })
                         .ok();
                 }
@@ -499,6 +571,8 @@ pub(super) fn install_grid_context_menus(
         copy_row_where_action,
         insert_row_action,
         set_null_action,
+        set_default_action,
+        set_expression_action,
         delete_row_action,
         duplicate_row_action,
         filter_action,
@@ -578,37 +652,117 @@ pub(super) fn install_grid_context_menus(
 fn empty_grid_menu(row_mutations_allowed: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     if row_mutations_allowed {
-        menu.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
+        menu.append(Some(&bookie_app_services::tr!("Insert row")), Some("cell.insert-row"));
     }
-    menu.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
+    menu.append(
+        Some(&bookie_app_services::tr!("Jump to Column…")),
+        Some("grid.jump-column"),
+    );
     menu
 }
 
 fn export_loaded_item() -> gio::MenuItem {
-    let item = gio::MenuItem::new(Some(&crate::tr!("Export All Loaded Rows…")), Some("cell.export-loaded"));
+    let item = gio::MenuItem::new(
+        Some(&bookie_app_services::tr!("Export All Loaded Rows…")),
+        Some("cell.export-loaded"),
+    );
     item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
     item
 }
 
 fn build_copy_as_menu(insert_copy: bool) -> gio::Menu {
     let copy_as = gio::Menu::new();
-    copy_as.append(Some(&crate::tr!("Rows")), Some("cell.copy-rows"));
-    copy_as.append(Some(&crate::tr!("With Headers")), Some("cell.copy-rows-headers"));
-    copy_as.append(Some(&crate::tr!("Text Table")), Some("cell.copy-text-table"));
-    copy_as.append(Some(&crate::tr!("JSON")), Some("cell.copy-json"));
-    copy_as.append(Some(&crate::tr!("JSON Lines")), Some("cell.copy-json-lines"));
-    copy_as.append(Some(&crate::tr!("CSV")), Some("cell.copy-csv"));
-    copy_as.append(Some(&crate::tr!("CSV with Headers")), Some("cell.copy-csv-headers"));
-    copy_as.append(Some(&crate::tr!("Markdown")), Some("cell.copy-markdown"));
-    copy_as.append(Some(&crate::tr!("IN Clause")), Some("cell.copy-in-clause"));
-    copy_as.append(Some(&crate::tr!("Values List")), Some("cell.copy-values-list"));
+    copy_as.append(Some(&bookie_app_services::tr!("Rows")), Some("cell.copy-rows"));
+    copy_as.append(
+        Some(&bookie_app_services::tr!("With Headers")),
+        Some("cell.copy-rows-headers"),
+    );
+    copy_as.append(
+        Some(&bookie_app_services::tr!("Text Table")),
+        Some("cell.copy-text-table"),
+    );
+    copy_as.append(Some(&bookie_app_services::tr!("JSON")), Some("cell.copy-json"));
+    copy_as.append(
+        Some(&bookie_app_services::tr!("JSON Lines")),
+        Some("cell.copy-json-lines"),
+    );
+    copy_as.append(Some(&bookie_app_services::tr!("CSV")), Some("cell.copy-csv"));
+    copy_as.append(
+        Some(&bookie_app_services::tr!("CSV with Headers")),
+        Some("cell.copy-csv-headers"),
+    );
+    copy_as.append(Some(&bookie_app_services::tr!("Markdown")), Some("cell.copy-markdown"));
+    copy_as.append(
+        Some(&bookie_app_services::tr!("IN Clause")),
+        Some("cell.copy-in-clause"),
+    );
+    copy_as.append(
+        Some(&bookie_app_services::tr!("Values List")),
+        Some("cell.copy-values-list"),
+    );
     if insert_copy {
-        copy_as.append(Some(&crate::tr!("INSERT Statement")), Some("cell.copy-row-insert"));
-        copy_as.append(Some(&crate::tr!("UPDATE Statement")), Some("cell.copy-row-update"));
-        copy_as.append(Some(&crate::tr!("DELETE Statement")), Some("cell.copy-row-delete"));
-        copy_as.append(Some(&crate::tr!("WHERE Clause")), Some("cell.copy-row-where"));
+        copy_as.append(
+            Some(&bookie_app_services::tr!("INSERT Statement")),
+            Some("cell.copy-row-insert"),
+        );
+        copy_as.append(
+            Some(&bookie_app_services::tr!("UPDATE Statement")),
+            Some("cell.copy-row-update"),
+        );
+        copy_as.append(
+            Some(&bookie_app_services::tr!("DELETE Statement")),
+            Some("cell.copy-row-delete"),
+        );
+        copy_as.append(
+            Some(&bookie_app_services::tr!("WHERE Clause")),
+            Some("cell.copy-row-where"),
+        );
     }
     copy_as
+}
+
+fn edit_section() -> gio::Menu {
+    let section = gio::Menu::new();
+    let item = gio::MenuItem::new(Some(&bookie_app_services::tr!("Edit cell")), Some("cell.edit"));
+    item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    section.append_item(&item);
+    let full_value = gio::MenuItem::new(
+        Some(&bookie_app_services::tr!("Edit Full Value…")),
+        Some("cell.edit-full-value"),
+    );
+    full_value.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    section.append_item(&full_value);
+    section
+}
+
+fn display_section(filterable: bool, local_result: bool) -> gio::Menu {
+    let display = gio::Menu::new();
+    if filterable || local_result {
+        display.append(
+            Some(&bookie_app_services::tr!("Filter by This Value")),
+            Some("cell.filter-by-value"),
+        );
+        display.append(
+            Some(&bookie_app_services::tr!("Exclude This Value")),
+            Some("cell.exclude-value"),
+        );
+    }
+    if filterable {
+        display.append(
+            Some(&bookie_app_services::tr!("Go to Referenced Row")),
+            Some("cell.go-to-reference"),
+        );
+        display.append(
+            Some(&bookie_app_services::tr!("Show Referencing Rows")),
+            Some("cell.show-referencing-rows"),
+        );
+    }
+    display.append(Some(&bookie_app_services::tr!("View Value…")), Some("cell.view-value"));
+    display.append(
+        Some(&bookie_app_services::tr!("Show Row as JSON")),
+        Some("cell.show-row-json"),
+    );
+    display
 }
 
 fn build_menu(
@@ -620,54 +774,59 @@ fn build_menu(
 ) -> gio::Menu {
     let menu = gio::Menu::new();
     if editable {
-        let section = gio::Menu::new();
-        let item = gio::MenuItem::new(Some(&crate::tr!("Edit cell")), Some("cell.edit"));
-        item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
-        section.append_item(&item);
-        let full_value = gio::MenuItem::new(Some(&crate::tr!("Edit Full Value…")), Some("cell.edit-full-value"));
-        full_value.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
-        section.append_item(&full_value);
-        menu.append_section(None, &section);
+        menu.append_section(None, &edit_section());
     }
     let copy = gio::Menu::new();
-    copy.append(Some(&crate::tr!("Copy value")), Some("cell.copy-value"));
-    copy.append_submenu(Some(&crate::tr!("Copy as")), &build_copy_as_menu(insert_copy));
-    copy.append(Some(&crate::tr!("Copy column name")), Some("cell.copy-column-name"));
+    copy.append(Some(&bookie_app_services::tr!("Copy value")), Some("cell.copy-value"));
+    copy.append_submenu(
+        Some(&bookie_app_services::tr!("Copy as")),
+        &build_copy_as_menu(insert_copy),
+    );
+    copy.append(
+        Some(&bookie_app_services::tr!("Copy column name")),
+        Some("cell.copy-column-name"),
+    );
     menu.append_section(None, &copy);
-    let display = gio::Menu::new();
-    if filterable || local_result {
-        display.append(Some(&crate::tr!("Filter by This Value")), Some("cell.filter-by-value"));
-        display.append(Some(&crate::tr!("Exclude This Value")), Some("cell.exclude-value"));
-    }
-    if filterable {
-        display.append(Some(&crate::tr!("Go to Referenced Row")), Some("cell.go-to-reference"));
-        display.append(
-            Some(&crate::tr!("Show Referencing Rows")),
-            Some("cell.show-referencing-rows"),
-        );
-    }
-    display.append(Some(&crate::tr!("View Value…")), Some("cell.view-value"));
-    display.append(Some(&crate::tr!("Show Row as JSON")), Some("cell.show-row-json"));
-    menu.append_section(None, &display);
+    menu.append_section(None, &display_section(filterable, local_result));
     let actions = gio::Menu::new();
     let export_label = if local_result {
-        crate::tr!("Export Visible Rows…")
+        bookie_app_services::tr!("Export Visible Rows…")
     } else {
-        crate::tr!("Export Results…")
+        bookie_app_services::tr!("Export Results…")
     };
     actions.append(Some(&export_label), Some("cell.export"));
     if local_result {
         actions.append_item(&export_loaded_item());
     }
-    actions.append(Some(&crate::tr!("Columns…")), Some("grid.columns"));
-    actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
-    actions.append(Some(&crate::tr!("Find in Loaded Rows…")), Some("grid.find-row"));
-    actions.append(Some(&crate::tr!("Highlight Rules…")), Some("grid.highlight-rules"));
+    actions.append(Some(&bookie_app_services::tr!("Columns…")), Some("grid.columns"));
+    actions.append(
+        Some(&bookie_app_services::tr!("Jump to Column…")),
+        Some("grid.jump-column"),
+    );
+    actions.append(
+        Some(&bookie_app_services::tr!("Find in Loaded Rows…")),
+        Some("grid.find-row"),
+    );
+    actions.append(
+        Some(&bookie_app_services::tr!("Highlight Rules…")),
+        Some("grid.highlight-rules"),
+    );
     if row_operations {
-        actions.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
-        actions.append(Some(&crate::tr!("Duplicate row")), Some("cell.duplicate-row"));
-        actions.append(Some(&crate::tr!("Set to NULL")), Some("cell.set-null"));
-        actions.append(Some(&crate::tr!("Delete row")), Some("cell.delete-row"));
+        actions.append(Some(&bookie_app_services::tr!("Insert row")), Some("cell.insert-row"));
+        actions.append(
+            Some(&bookie_app_services::tr!("Duplicate row")),
+            Some("cell.duplicate-row"),
+        );
+        actions.append(Some(&bookie_app_services::tr!("Set to NULL")), Some("cell.set-null"));
+        actions.append(
+            Some(&bookie_app_services::tr!("Set to Default")),
+            Some("cell.set-default"),
+        );
+        actions.append(
+            Some(&bookie_app_services::tr!("Set to Expression…")),
+            Some("cell.set-expression"),
+        );
+        actions.append(Some(&bookie_app_services::tr!("Delete row")), Some("cell.delete-row"));
     }
     menu.append_section(None, &actions);
     menu
@@ -686,6 +845,9 @@ fn go_to_reference_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -717,6 +879,9 @@ fn show_referencing_action(
         let context = context.snapshot();
         let Some(slot) = context.as_ref() else { return };
         let Some(view) = view.upgrade() else { return };
+        if !menu_target_matches(&view, slot) {
+            return;
+        }
         let Some(cells) = row_at(&view, position(slot)) else {
             return;
         };
@@ -745,6 +910,9 @@ fn filter_by_value_action(
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
             let Some(view) = view.upgrade() else { return };
+            if !menu_target_matches(&view, slot) {
+                return;
+            }
             let value = match &local_result_view {
                 Some(_) => source_value_at(&view, position(slot), slot.col_index),
                 None => row_at(&view, position(slot)).and_then(|row| row.get(slot.col_index).cloned()),
@@ -753,7 +921,7 @@ fn filter_by_value_action(
             if let Some(local_result_view) = &local_result_view {
                 if !local_result_view.filter_by_value(slot.col_index, value, exclude) {
                     sender
-                        .send(GridMsg::ShowToast(crate::tr!(
+                        .send(GridMsg::ShowToast(bookie_app_services::tr!(
                             "Values of this type can't be used as a filter"
                         )))
                         .ok();
@@ -848,7 +1016,15 @@ fn prepare_cell_menu(
 ) -> gtk::PopoverMenu {
     let position = POSITION_SLOT.get(widget).unwrap_or(0);
     select_row_for_menu(view, position);
-    menus.context.set(widget, options.idx, options.column_name.clone());
+    let row = row_object_at(view, position);
+    let draft_target = row.as_ref().and_then(|row| row.draft_id()).map(|id| (position, id));
+    menus.context.set(
+        widget,
+        options.idx,
+        options.column_name.clone(),
+        draft_target,
+        row.as_ref(),
+    );
     menus
         .edit_action
         .set_enabled(edit_enabled_for(widget, options.is_text_editable));
@@ -884,6 +1060,15 @@ fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {
 
 fn position(slot: &CellContext) -> u32 {
     POSITION_SLOT.get(&slot.widget).unwrap_or(0)
+}
+
+fn menu_target_matches(view: &gtk::ColumnView, slot: &CellContext) -> bool {
+    let Some(position) = slot.row_position else {
+        return false;
+    };
+    slot.row.is_some()
+        && POSITION_SLOT.get(&slot.widget) == Some(position)
+        && row_object_at(view, position).as_ref() == slot.row.as_ref()
 }
 
 enum TextSeed {
@@ -955,6 +1140,32 @@ fn row_has_full_text_value(view: &gtk::ColumnView, widget: &gtk::Widget, positio
 
 fn has_persisted_row_key(row_key: &[Value]) -> bool {
     crate::services::change_tracker::RowKey::from_pk_values(row_key).is_some()
+}
+
+fn full_value_target(
+    view: &gtk::ColumnView,
+    slot: &CellContext,
+    columns: &[ColumnInfo],
+) -> Option<(u32, crate::ui::row_object::RowObject)> {
+    let position = slot.row_position?;
+    if POSITION_SLOT.get(&slot.widget) != Some(position) || cell_row_identity(&slot.widget).1 != slot.row_key {
+        return None;
+    }
+    let row = row_object_at(view, position)?;
+    if row.draft_id() != slot.draft_target.map(|(_, id)| id) {
+        return None;
+    }
+    if row.draft_id().is_none() {
+        let keys: Vec<_> = columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| column.primary_key.then_some(index))
+            .collect();
+        if !has_persisted_row_key(&slot.row_key) || row.row_identity(&keys).pk_values.as_ref() != slot.row_key {
+            return None;
+        }
+    }
+    Some((position, row))
 }
 
 fn cell_row_identity(widget: &gtk::Widget) -> (u32, Vec<Value>) {
@@ -1097,6 +1308,7 @@ pub(crate) fn present_loaded_cell_editor(view: &gtk::ColumnView, edit: LoadedCel
             row_position: edit.row_position,
             col_index: edit.col_index,
             row_key: edit.row_key,
+            draft_id: row.draft_id(),
             nullable: edit.column.nullable,
             kind,
             sender: edit.sender,

@@ -55,6 +55,7 @@ fn saved(driver_id: &str, username: &str, auth_mode: AuthMode) -> SavedConnectio
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 

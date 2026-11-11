@@ -40,6 +40,7 @@ fn saved_connection(fixture: &Fixture, id: Uuid, cert: Option<&str>, key: Option
         connect_timeout_secs: None,
         query_timeout_secs: None,
         attached_databases: Vec::new(),
+        tls_strict_encryption: false,
     }
 }
 
@@ -147,6 +148,7 @@ async fn agentd_uses_a_saved_client_certificate_through_its_saved_ssh_route() {
         client: Default::default(),
         agent: false,
         agent_identity: None,
+        local_port: None,
     });
     save_connections(std::slice::from_ref(&saved))
         .await

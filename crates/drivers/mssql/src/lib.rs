@@ -12,8 +12,9 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use bookie_core::sql_dialect::build_order_and_pagination;
 use bookie_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
-    ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult,
-    QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch, run_server_cancellable,
+    DriverValueInputCapabilities, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS,
+    OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
+    run_server_cancellable,
 };
 
 mod catalog;
@@ -50,6 +51,13 @@ pub struct MssqlDriver;
 
 #[async_trait]
 impl DatabaseDriver for MssqlDriver {
+    fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
+        DriverValueInputCapabilities {
+            datetimeoffset_input: true,
+            ..DriverValueInputCapabilities::default()
+        }
+    }
+
     fn supports_database_listing(&self) -> bool {
         true
     }
@@ -94,6 +102,10 @@ impl DatabaseDriver for MssqlDriver {
         cfg!(feature = "kerberos")
     }
 
+    fn supports_strict_encryption(&self) -> bool {
+        true
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let client = open_for(&opts).await?;
         Ok(Box::new(MssqlConnection::new(client, opts)))
@@ -117,17 +129,11 @@ fn build_target(opts: &ConnectOptions) -> Result<MssqlTarget, DriverError> {
     config.database(&opts.database);
     config.authentication(auth_method(opts)?);
     use bookie_core::TlsMode;
+    let encryption = encryption_level(&opts.tls)?;
+    config.encryption(encryption);
     match opts.tls.mode {
-        TlsMode::Disabled => {
-            config.encryption(EncryptionLevel::Off);
-            config.trust_cert();
-        }
-        TlsMode::Prefer | TlsMode::Require => {
-            config.encryption(EncryptionLevel::Required);
-            config.trust_cert();
-        }
+        TlsMode::Disabled | TlsMode::Prefer | TlsMode::Require => config.trust_cert(),
         TlsMode::VerifyCa | TlsMode::VerifyFull => {
-            config.encryption(EncryptionLevel::Required);
             if let Some(root_cert) = &opts.tls.root_cert {
                 config.trust_cert_ca(root_cert.display().to_string());
             }
@@ -140,6 +146,18 @@ fn build_target(opts: &ConnectOptions) -> Result<MssqlTarget, DriverError> {
         dial_port: opts.port,
         plaintext_fallback: opts.tls.mode == TlsMode::Prefer,
     })
+}
+
+fn encryption_level(tls: &bookie_core::TlsConfig) -> Result<EncryptionLevel, DriverError> {
+    use bookie_core::TlsMode;
+    match (tls.mode, tls.strict_encryption) {
+        (TlsMode::Disabled | TlsMode::Prefer, true) => Err(DriverError::Tls(
+            "strict encryption cannot be combined with the Disabled or Prefer TLS mode".into(),
+        )),
+        (_, true) => Ok(EncryptionLevel::Strict),
+        (TlsMode::Disabled, false) => Ok(EncryptionLevel::Off),
+        (_, false) => Ok(EncryptionLevel::Required),
+    }
 }
 
 fn auth_method(opts: &ConnectOptions) -> Result<AuthMethod, DriverError> {
@@ -364,6 +382,31 @@ impl Connection for MssqlConnection {
 
     async fn open_session(&self) -> Result<Box<dyn bookie_core::Session>, DriverError> {
         session::open(&self.session_options).await
+    }
+
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        let sql = format!(
+            "SELECT TOP {} name, CAST(COLLATIONPROPERTY(name, 'CodePage') AS varchar(10)),
+                    CASE WHEN name = CAST(SERVERPROPERTY('Collation') AS nvarchar(128)) THEN '1' ELSE '0' END
+             FROM sys.fn_helpcollations()
+             ORDER BY CASE WHEN name = CAST(SERVERPROPERTY('Collation') AS nvarchar(128)) THEN 0 ELSE 1 END, name",
+            bookie_core::MAX_COLLATIONS
+        );
+        let mut client = self.client().await?;
+        let result = self
+            .query_result(&mut client, &sql, &[], bookie_core::MAX_COLLATIONS)
+            .await?;
+        Ok(result
+            .rows
+            .iter()
+            .filter_map(|row| {
+                Some(bookie_core::CollationInfo {
+                    name: as_text(row.first())?,
+                    charset: as_text(row.get(1)).unwrap_or_default(),
+                    is_default: as_text(row.get(2)).as_deref() == Some("1"),
+                })
+            })
+            .collect())
     }
 
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {

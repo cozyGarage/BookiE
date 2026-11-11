@@ -10,6 +10,7 @@ pub struct OpenSshConfig {
     pub destination: SshDestination,
     pub jump_hosts: Vec<SshDestination>,
     pub auth: OpenSshAuth,
+    pub local_port: Option<u16>,
 }
 
 #[derive(Debug, Clone)]

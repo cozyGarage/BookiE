@@ -9,14 +9,20 @@ import re
 import shutil
 import tarfile
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import urllib.parse
 import zipfile
+from datetime import datetime, timedelta, timezone
 
 MAX_ARCHIVE = 8 * 1024 ** 3
 MAX_EXTRACTED = 24 * 1024 ** 3
 UPLOAD_CHUNK_SIZE = 64 * 1024 ** 2
+PROGRESS_INTERVAL_SECONDS = 10
+BUNDLE_GROUPS = {'default', 'direct', 'unit', 'sandbox', 'gpui'} | set(
+    json.loads((Path(__file__).parent / 'ci-test-bundle-groups.json').read_text())['groups']
+)
 SPEC = importlib.util.spec_from_file_location('bundle', Path(__file__).with_name('ci-test-bundle.py'))
 bundle = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bundle)
@@ -82,6 +88,17 @@ def verify_manifest(manifest, revision, group):
         raise ValueError('registry bundle chunk sizes do not match the archive')
 
 
+def report_download_progress(group, downloaded, total, started, last_report):
+    now = time.monotonic()
+    if downloaded < total and now - last_report < PROGRESS_INTERVAL_SECONDS:
+        return last_report
+    elapsed = now - started
+    rate = downloaded / 1024 ** 2 / elapsed if elapsed else 0
+    print(f"bundle download progress: {group} {downloaded / 1024 ** 2:.1f}/"
+          f"{total / 1024 ** 2:.1f} MiB ({rate:.1f} MiB/s)", flush=True)
+    return now
+
+
 def publish(directory, revision, group, url):
     index = bundle.verify(directory, revision)
     if index['build_group'] != group:
@@ -142,34 +159,53 @@ def fetch(directory, revision, group, url):
         temporary = Path(temporary)
         archive = temporary / 'bundle.tar.gz'
         parts = manifest.get('chunks', [{'name': 'bundle.tar.gz', 'size': manifest['size'], 'sha256': manifest['sha256']}])
+        transfer_started = time.monotonic()
+        last_progress = transfer_started
+        downloaded = 0
+        response_seconds = 0.0
+        write_seconds = 0.0
         with archive.open('wb') as output:
             for part in parts:
                 digest = hashlib.sha256()
                 with request(url + part['name']) as response:
                     remaining = part['size']
                     while remaining:
+                        read_started = time.monotonic()
                         block = response.read(min(1024 * 1024, remaining))
+                        response_seconds += time.monotonic() - read_started
                         if not block:
                             raise ValueError('registry returned a truncated bundle chunk')
+                        write_started = time.monotonic()
                         output.write(block)
+                        write_seconds += time.monotonic() - write_started
                         digest.update(block)
                         remaining -= len(block)
+                        downloaded += len(block)
+                        last_progress = report_download_progress(
+                            group, downloaded, manifest['size'], transfer_started, last_progress)
                     if response.read(1):
                         raise ValueError('registry bundle chunk exceeds its declared size')
                 if digest.hexdigest() != part['sha256']:
                     raise ValueError('registry bundle chunk digest mismatch')
-        print('verifying bundle checksum', flush=True)
+        transfer_seconds = time.monotonic() - transfer_started
+        transfer_mib = manifest['size'] / 1024**2
+        transfer_rate = transfer_mib / transfer_seconds if transfer_seconds else 0
+        print(f"bundle response reads: {response_seconds:.1f}s; local write calls: {write_seconds:.1f}s", flush=True)
+        print(f"bundle receive/write total: {transfer_mib:.1f} MiB in {transfer_seconds:.1f}s ({transfer_rate:.1f} MiB/s)", flush=True)
+        checksum_started = time.monotonic()
         if bundle.digest(archive) != manifest['sha256']:
             raise ValueError('registry bundle digest mismatch')
+        print(f"bundle checksum: {time.monotonic() - checksum_started:.1f}s", flush=True)
         staging = temporary / 'verified'
         staging.mkdir()
-        print('extracting test bundle', flush=True)
+        extract_started = time.monotonic()
         extract(archive, staging)
         if bundle.digest(staging / 'index.json') != manifest['index_sha256']:
             raise ValueError('registry bundle index digest mismatch')
         index = bundle.verify(staging, revision)
         if index['build_group'] != group:
             raise ValueError('registry bundle build group mismatch')
+        print(f"bundle extract/verify: {time.monotonic() - extract_started:.1f}s", flush=True)
         shutil.move(staging, directory)
         os.utime(directory, None)
     print('test bundle ready', flush=True)
@@ -208,11 +244,15 @@ def github_fetch(directory, revision, group):
                 archive = temporary / 'bundle.zip'
                 with api('actions/artifacts/' + str(artifact['id']) + '/zip') as response, archive.open('wb') as output:
                     total = 0
+                    download_started = time.monotonic()
+                    last_progress = download_started
                     while block := response.read(1024 * 1024):
                         total += len(block)
                         if total > MAX_ARCHIVE:
                             raise ValueError('GitHub artifact exceeds download limit')
                         output.write(block)
+                        last_progress = report_download_progress(
+                            group, total, artifact['size_in_bytes'], download_started, last_progress)
                 expected_digest = artifact.get('digest', '')
                 if expected_digest != 'sha256:' + bundle.digest(archive):
                     raise ValueError('GitHub artifact digest is unavailable or mismatched')
@@ -239,13 +279,62 @@ def github_fetch(directory, revision, group):
     raise ValueError('no successful GitHub build supplies the exact requested artifact')
 
 
+def prune(revision, retention_days):
+    if not re.fullmatch(r'[0-9a-f]{40}', revision):
+        raise ValueError('a full source commit is required')
+    if not 1 <= retention_days <= 90:
+        raise ValueError('package retention must be between 1 and 90 days')
+    api = os.environ['BOOKIE_REGISTRY_API_URL'].rstrip('/')
+    package_name = 'bookie-test-bundles'
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    page = 1
+    packages = []
+    while True:
+        query = urllib.parse.urlencode({'type': 'generic', 'q': package_name, 'limit': 50, 'page': page})
+        with request(f'{api}?{query}') as response:
+            page_packages = json.load(response)
+        packages.extend(page_packages)
+        if len(page_packages) < 50:
+            break
+        page += 1
+    removed = 0
+    for package in packages:
+        version = package.get('version', '')
+        created = package.get('created_at', '')
+        if (package.get('type') != 'generic' or package.get('name') != package_name
+                or not re.fullmatch(r'[0-9a-f]{40}-[a-z0-9-]+', version)
+                or version.startswith(revision + '-') or not created):
+            continue
+        try:
+            created_at = datetime.fromisoformat(created.replace('Z', '+00:00'))
+        except ValueError:
+            continue
+        if created_at.tzinfo is None or created_at >= cutoff:
+            continue
+        path = '/'.join(urllib.parse.quote(segment, safe='')
+                        for segment in ('generic', package_name, version))
+        with request(f'{api}/{path}', 'DELETE') as response:
+            if response.status != 204:
+                raise ValueError('registry did not delete an expired test bundle')
+        removed += 1
+    print(f'removed {removed} expired test bundle versions; retained {retention_days} days', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('operation', choices=['publish', 'fetch', 'github-fetch'])
-    parser.add_argument('directory', type=Path)
-    parser.add_argument('revision')
-    parser.add_argument('group', choices=['default'])
+    commands = parser.add_subparsers(dest='operation', required=True)
+    for operation in ('publish', 'fetch', 'github-fetch'):
+        command = commands.add_parser(operation)
+        command.add_argument('directory', type=Path)
+        command.add_argument('revision')
+        command.add_argument('group', choices=sorted(BUNDLE_GROUPS))
+    prune_command = commands.add_parser('prune')
+    prune_command.add_argument('revision')
+    prune_command.add_argument('--retention-days', type=int, default=14)
     args = parser.parse_args()
+    if args.operation == 'prune':
+        prune(args.revision, args.retention_days)
+        return
     if not re.fullmatch('[0-9a-f]{40}', args.revision):
         parser.error('a full source commit is required')
     if args.operation == 'github-fetch':

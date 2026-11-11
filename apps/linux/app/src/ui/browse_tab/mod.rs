@@ -4,7 +4,7 @@ use relm4::prelude::*;
 use relm4::{adw, gtk};
 use uuid::Uuid;
 
-use bookie_core::{ColumnInfo, EnumInputStyle, ForeignKeyInfo, QueryResult, Value};
+use bookie_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 
@@ -66,7 +66,7 @@ pub struct BrowseTabInit {
     pub schema: Option<String>,
     pub table: String,
     pub driver_id: String,
-    pub enum_input_style: EnumInputStyle,
+    pub parse_hooks: ParseHooks,
     pub browse_filters: bool,
     pub connection_id: Option<Uuid>,
     pub read_only: bool,
@@ -83,7 +83,7 @@ pub struct BrowseTab {
     schema: Option<String>,
     table: String,
     driver_id: String,
-    enum_input_style: EnumInputStyle,
+    parse_hooks: ParseHooks,
     browse_filters: bool,
     connection_id: Option<Uuid>,
     read_only: bool,
@@ -215,6 +215,7 @@ mod paste;
 mod preview;
 pub(crate) mod reference;
 mod requests;
+mod reset_cell;
 mod row_ops;
 mod save_completion;
 #[cfg(test)]
@@ -227,13 +228,15 @@ mod tests;
 mod value_parse;
 mod value_view;
 
+use bookie_app_services::value_input::ParseHooks;
+pub(crate) use bookie_app_services::value_input::mysql_enum_set_labels;
 pub(crate) use choices::scalar_enum_columns;
 use chrome::*;
 pub use messages::{BrowseTabInput, BrowseTabOutput};
 pub use requests::{BrowseCellValueRequest, BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
 use requests::{CellValueRequestTracker, PageRequestTracker, RowCountRequestTracker};
 use selection::*;
-pub(crate) use value_parse::mysql_enum_set_labels;
+pub(crate) use value_parse::hooks_for;
 pub(in crate::ui) use value_parse::parse_grid_cell_input;
 use value_parse::*;
 
@@ -359,8 +362,8 @@ impl SimpleComponent for BrowseTab {
         inner_stack.add_named(&grid_holder, Some("grid"));
         // Initial state: loading. The first RowsLoaded swaps to "grid".
         let initial_loading = adw::StatusPage::builder()
-            .title(crate::tr!("Loading…"))
-            .description(crate::tr!("Fetching rows from {table}").replace(
+            .title(bookie_app_services::tr!("Loading…"))
+            .description(bookie_app_services::tr!("Fetching rows from {table}").replace(
                 "{table}",
                 &match init.schema.as_deref() {
                     Some(s) => format!("{s}.{}", init.table),
@@ -393,12 +396,12 @@ impl SimpleComponent for BrowseTab {
         // an additional banner would just duplicate that signal.
         let read_only_banner = adw::Banner::builder()
             .use_markup(false)
-            .title(crate::tr!("Read-only connection. Editing disabled."))
+            .title(bookie_app_services::tr!("Read-only connection. Editing disabled."))
             .revealed(init.read_only)
             .build();
         let no_pk_banner = adw::Banner::builder()
             .use_markup(false)
-            .title(crate::tr!(
+            .title(bookie_app_services::tr!(
                 "This table has no primary key. Row order is not stable; use the SQL editor to modify rows."
             ))
             .revealed(false)
@@ -549,6 +552,7 @@ impl SimpleComponent for BrowseTab {
                         row_position,
                         col_index,
                         row_key,
+                        draft_id: crate::ui::grid::focused_cell_draft_id(widget, row_position),
                     })
                     .ok();
                 glib::Propagation::Stop
@@ -649,7 +653,7 @@ impl SimpleComponent for BrowseTab {
             schema: init.schema,
             table: init.table,
             driver_id: init.driver_id,
-            enum_input_style: init.enum_input_style,
+            parse_hooks: init.parse_hooks,
             browse_filters: init.browse_filters,
             connection_id: init.connection_id,
             read_only: init.read_only,
@@ -755,7 +759,9 @@ impl SimpleComponent for BrowseTab {
                 let result = if self.rejected_edit_revision.get() == revision {
                     Ok(())
                 } else {
-                    Err(crate::tr!("Finish or cancel the current cell edit and try again."))
+                    Err(bookie_app_services::tr!(
+                        "Finish or cancel the current cell edit and try again."
+                    ))
                 };
                 let _ = reply.send(result);
             }
@@ -886,8 +892,8 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::Refresh => {
                 self.capture_focus_for_restore();
                 self.show_loading_inner(
-                    &crate::tr!("Loading…"),
-                    &crate::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
+                    &bookie_app_services::tr!("Loading…"),
+                    &bookie_app_services::tr!("Fetching rows from {table}").replace("{table}", &self.table_label()),
                 );
                 self.emit_fetch_page_and_count(&sender);
             }
@@ -1029,7 +1035,13 @@ impl SimpleComponent for BrowseTab {
                 self.emit_fetch_page(&sender);
                 let _ = sender.output(BrowseTabOutput::StateChanged);
             }
-            BrowseTabInput::DuplicateRow { row_position } => self.handle_duplicate_row(row_position, sender),
+            BrowseTabInput::GridDuplicateRow {
+                row_position,
+                row_key,
+                draft_id,
+            } => {
+                self.handle_grid_duplicate_row(row_position, row_key, draft_id, sender);
+            }
             BrowseTabInput::InsertRow => self.handle_insert_row(sender),
             BrowseTabInput::DeleteSelectedRow => self.handle_delete_selected_row(sender),
             BrowseTabInput::GridCellEdited {
@@ -1038,8 +1050,10 @@ impl SimpleComponent for BrowseTab {
                 new_value,
                 value,
                 row_key,
+                draft_id,
             } => {
                 let accepted = match value {
+                    Some(_) if self.row_object_at(row_position).and_then(|row| row.draft_id()) != draft_id => false,
                     Some(value) => self.handle_grid_cell_value_edited(row_position, col_index, value, row_key, sender),
                     None => self.handle_grid_cell_edited(row_position, col_index, new_value, row_key, sender),
                 };
@@ -1058,9 +1072,16 @@ impl SimpleComponent for BrowseTab {
                 row_position,
                 col_index,
                 row_key,
-            } => self.handle_grid_set_cell_null(row_position, col_index, row_key, sender),
-            BrowseTabInput::GridDeleteRowAt { row_position, row_key } => {
-                self.handle_grid_delete_row(row_position, row_key, sender)
+                draft_id,
+            } => self.handle_grid_set_cell_null(row_position, col_index, row_key, draft_id, sender),
+            BrowseTabInput::GridDeleteRowAt {
+                row_position,
+                row_key,
+                draft_id,
+            } => self.handle_grid_delete_row(row_position, row_key, draft_id, sender),
+            BrowseTabInput::GridResetCell(request) => self.handle_grid_reset_cell(request, sender),
+            BrowseTabInput::GridResetConfirmed { row_key, statement } => {
+                self.handle_grid_reset_confirmed(row_key, statement, sender)
             }
             BrowseTabInput::GridCopyRowAsStatement(row_positions, statement) => {
                 self.handle_grid_copy_row_as_statement(row_positions, statement, sender)
@@ -1084,7 +1105,7 @@ impl SimpleComponent for BrowseTab {
                 }
             }
             BrowseTabInput::IncompleteRowData => {
-                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                let _ = sender.output(BrowseTabOutput::ShowToast(bookie_app_services::tr!(
                     "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
                 )));
             }

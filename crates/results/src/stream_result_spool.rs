@@ -49,6 +49,7 @@ pub enum StreamResultSpoolError {
 #[derive(Clone)]
 pub struct StreamResultSpoolManager {
     budget: Arc<SpoolBudget>,
+    page_budget: crate::stream_page_budget::StreamPageBudget,
     directory: Option<PathBuf>,
 }
 
@@ -70,8 +71,11 @@ impl fmt::Debug for StreamResultSpool {
 
 struct SpoolInner {
     file: Mutex<SpoolFile>,
+    #[cfg(test)]
+    load_worker_started: std::sync::atomic::AtomicBool,
     key: SecretBox<[u8; 32]>,
     budget: Arc<SpoolBudget>,
+    page_budget: crate::stream_page_budget::StreamPageBudget,
     reserved: AtomicU64,
 }
 
@@ -252,6 +256,7 @@ impl StreamResultSpoolManager {
                 limit,
                 reserved: AtomicU64::new(0),
             }),
+            page_budget: crate::stream_page_budget::StreamPageBudget::default(),
             directory: None,
         }
     }
@@ -280,8 +285,11 @@ impl StreamResultSpoolManager {
                     pages: Vec::new(),
                     next_nonce: 0,
                 }),
+                #[cfg(test)]
+                load_worker_started: std::sync::atomic::AtomicBool::new(false),
                 key: SecretBox::new(Box::new(key)),
                 budget: self.budget.clone(),
+                page_budget: self.page_budget.clone(),
                 reserved: AtomicU64::new(0),
             }),
         })
@@ -319,6 +327,10 @@ fn usable_spool_directory(path: &Path) -> bool {
 }
 
 impl StreamResultSpool {
+    pub fn page_budget(&self) -> crate::stream_page_budget::StreamPageBudget {
+        self.inner.page_budget.clone()
+    }
+
     pub async fn append_page(&self, index: u64, page: Arc<QueryResult>) -> Result<(), StreamResultSpoolError> {
         let inner = self.inner.clone();
         tokio::task::spawn_blocking(move || append_page_blocking(&inner, index, &page))
@@ -335,6 +347,23 @@ impl StreamResultSpool {
         tokio::task::spawn_blocking(move || load_page_blocking(&inner, index, columns))
             .await
             .map_err(|_| StreamResultSpoolError::Worker)?
+    }
+
+    pub async fn load_page_retained(
+        &self,
+        index: u64,
+        columns: Vec<ColumnInfo>,
+        lease: crate::stream_page_budget::StreamPageLease,
+    ) -> Result<Arc<QueryResult>, StreamResultSpoolError> {
+        let inner = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let _lease = lease;
+            #[cfg(test)]
+            inner.load_worker_started.store(true, Ordering::Release);
+            load_page_blocking(&inner, index, columns)
+        })
+        .await
+        .map_err(|_| StreamResultSpoolError::Worker)?
     }
 
     pub fn page_count(&self) -> usize {

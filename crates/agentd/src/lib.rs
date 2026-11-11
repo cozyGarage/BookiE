@@ -206,6 +206,14 @@ impl Connection for SessionConnection {
         self.inner.execute_controlled(sql, control).await
     }
 
+    async fn execute_controlled_with_token(
+        &self,
+        sql: &str,
+        control: &OperationControl,
+    ) -> Result<(ExecResult, Option<bookie_core::CommitToken>), (DriverError, Option<bookie_core::CommitToken>)> {
+        self.inner.execute_controlled_with_token(sql, control).await
+    }
+
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
         self.inner.execute_params(sql, params).await
     }
@@ -312,6 +320,17 @@ impl Connection for SessionConnection {
             .await
     }
 
+    async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.inner.list_collations().await
+    }
+
+    async fn list_collations_controlled(
+        &self,
+        control: &OperationControl,
+    ) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
+        self.inner.list_collations_controlled(control).await
+    }
+
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         self.inner.list_databases().await
     }
@@ -362,6 +381,17 @@ impl Connection for SessionConnection {
 
     async fn server_version(&self) -> Result<Option<String>, DriverError> {
         self.inner.server_version().await
+    }
+
+    async fn server_version_controlled(&self, control: &OperationControl) -> Result<Option<String>, DriverError> {
+        self.inner.server_version_controlled(control).await
+    }
+
+    async fn resolve_commit(
+        &self,
+        token: &bookie_core::CommitToken,
+    ) -> Result<bookie_core::CommitResolution, DriverError> {
+        self.inner.resolve_commit(token).await
     }
 
     async fn ping(&self) -> Result<(), DriverError> {

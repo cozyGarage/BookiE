@@ -106,311 +106,50 @@ impl Component for HistoryDialog {
     fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let toolbar = adw::ToolbarView::new();
         let header = adw::HeaderBar::builder().show_end_title_buttons(false).build();
-        header.set_title_widget(Some(&adw::WindowTitle::new(&crate::tr!("Query History"), "")));
-        let close_button = gtk::Button::builder()
-            .label(crate::tr!("Close history"))
-            .tooltip_text(crate::tr!("Close history"))
-            .build();
-        let close_sender = sender.clone();
-        close_button.connect_clicked(move |_| {
-            let _ = close_sender.output(HistoryDialogOutput::Close);
-        });
-        header.pack_end(&close_button);
-
-        let filter_popover = gtk::Popover::new();
-        let filter_button = gtk::MenuButton::builder()
-            .label(crate::tr!("Filter"))
-            .always_show_arrow(true)
-            .tooltip_text(crate::tr!("Filter history"))
-            .popover(&filter_popover)
-            .build();
-        keep_inside_window(&filter_popover, &filter_button);
+        header.set_title_widget(Some(&adw::WindowTitle::new(
+            &bookie_app_services::tr!("Query History"),
+            "",
+        )));
+        header.pack_end(&build::close_button(&sender));
 
         let connections = init.database.all_connections();
-
-        let conn_strings: Vec<String> = std::iter::once(crate::tr!("All connections"))
-            .chain(connections.iter().map(|m| m.name.clone()))
-            .collect();
-        let conn_strings_ref: Vec<&str> = conn_strings.iter().map(String::as_str).collect();
-        let conn_model = gtk::StringList::new(&conn_strings_ref);
-        let filter_connection = adw::ComboRow::builder()
-            .title(crate::tr!("Connection"))
-            .model(&conn_model)
-            .build();
-
-        let status_strings = [
-            crate::tr!("Any"),
-            crate::tr!("Successful"),
-            crate::tr!("Failed"),
-            crate::tr!("Cancelled"),
-        ];
-        let status_strings_ref: Vec<&str> = status_strings.iter().map(String::as_str).collect();
-        let status_model = gtk::StringList::new(&status_strings_ref);
-        let filter_status = adw::ComboRow::builder()
-            .title(crate::tr!("Status"))
-            .model(&status_model)
-            .build();
-
-        let window_strings = [
-            crate::tr!("Any time"),
-            crate::tr!("Last 24 hours"),
-            crate::tr!("Last 7 days"),
-            crate::tr!("Last 30 days"),
-        ];
-        let window_strings_ref: Vec<&str> = window_strings.iter().map(String::as_str).collect();
-        let window_model = gtk::StringList::new(&window_strings_ref);
-        let filter_window = adw::ComboRow::builder()
-            .title(crate::tr!("Time window"))
-            .model(&window_model)
-            .build();
-
-        let source_strings = [
-            crate::tr!("Anywhere"),
-            crate::tr!("SQL editor"),
-            crate::tr!("Table structure"),
-            crate::tr!("Row edits"),
-        ];
-        let source_strings_ref: Vec<&str> = source_strings.iter().map(String::as_str).collect();
-        let source_model = gtk::StringList::new(&source_strings_ref);
-        let filter_source = adw::ComboRow::builder()
-            .title(crate::tr!("Ran from"))
-            .model(&source_model)
-            .build();
-
-        let reset_button = gtk::Button::builder()
-            .label(crate::tr!("Reset"))
-            .halign(gtk::Align::End)
-            .margin_top(6)
-            .build();
-        reset_button.add_css_class("flat");
-        let reset_conn = filter_connection.clone();
-        let reset_status = filter_status.clone();
-        let reset_window = filter_window.clone();
-        let reset_source = filter_source.clone();
-        reset_button.connect_clicked(move |_| {
-            reset_conn.set_selected(0);
-            reset_status.set_selected(0);
-            reset_window.set_selected(0);
-            reset_source.set_selected(0);
-        });
-
-        // Native popover content: a single AdwPreferencesGroup of
-        // AdwComboRow filters, with the Reset button below. Replaces
-        // the gtk::Grid + paired labels (the GTK3-era pattern) —
-        // ComboRows carry their own titles, so the Grid column of
-        // labels was redundant.
-        let filter_group = adw::PreferencesGroup::new();
-        filter_group.add(&filter_connection);
-        filter_group.add(&filter_status);
-        filter_group.add(&filter_window);
-        filter_group.add(&filter_source);
-
-        // Reset lives in the group's header-suffix slot so the
-        // popover content is just the AdwPreferencesGroup — no
-        // wrapper Box needed for layout.
-        filter_group.set_header_suffix(Some(&reset_button));
-        filter_popover.set_child(Some(&filter_group));
-
-        for combo in [&filter_connection, &filter_status, &filter_window, &filter_source] {
-            let s = sender.clone();
-            combo.connect_selected_notify(move |_| s.input(HistoryDialogInput::FiltersChanged));
-        }
-
+        let (filter_button, filters) = build::filter_button(&connections, &sender);
         header.pack_start(&filter_button);
+        header.pack_start(&build::select_button(&sender));
+        header.pack_end(&build::more_actions_button());
 
-        let select_button = gtk::ToggleButton::builder()
-            .label(crate::tr!("Select"))
-            .tooltip_text(crate::tr!("Toggle multi-select"))
-            .build();
-        let s_select = sender.clone();
-        select_button.connect_toggled(move |btn| {
-            s_select.input(HistoryDialogInput::ToggleSelectMode(btn.is_active()));
-        });
-        header.pack_start(&select_button);
-
-        let menu = gio::Menu::new();
-        let storage_section = gio::Menu::new();
-        storage_section.append(Some(&crate::tr!("Show storage location")), Some("history.show-storage"));
-        menu.append_section(None, &storage_section);
-        let danger_section = gio::Menu::new();
-        danger_section.append(Some(&crate::tr!("Clear all history…")), Some("history.clear-all"));
-        menu.append_section(None, &danger_section);
-        let menu_button = gtk::MenuButton::builder()
-            .icon_name("view-more-symbolic")
-            .menu_model(&menu)
-            .tooltip_text(crate::tr!("More actions"))
-            .build();
-        header.pack_end(&menu_button);
-
-        let action_group = gio::SimpleActionGroup::new();
-        let export_sql_sender = sender.clone();
-        let export_sql = gio::ActionEntry::builder("export-sql")
-            .activate(move |_, _, _| export_sql_sender.input(HistoryDialogInput::ExportSelectedSql))
-            .build();
-        let export_csv_sender = sender.clone();
-        let export_csv = gio::ActionEntry::builder("export-csv")
-            .activate(move |_, _, _| export_csv_sender.input(HistoryDialogInput::ExportSelectedCsv))
-            .build();
-        let delete_sender = sender.clone();
-        let delete = gio::ActionEntry::builder("delete-selected")
-            .activate(move |_, _, _| delete_sender.input(HistoryDialogInput::DeleteSelected))
-            .build();
-        let clear_sender = sender.clone();
-        let clear_all = gio::ActionEntry::builder("clear-all")
-            .activate(move |_, _, _| clear_sender.input(HistoryDialogInput::ClearAllRequested))
-            .build();
-        let storage_sender = sender.clone();
-        let show_storage = gio::ActionEntry::builder("show-storage")
-            .activate(move |_, _, _| storage_sender.input(HistoryDialogInput::OpenStorageLocation))
-            .build();
-        action_group.add_action_entries([export_sql, export_csv, delete, clear_all, show_storage]);
-
-        let search = gtk::SearchEntry::builder()
-            .placeholder_text(crate::tr!("Search queries…"))
-            .hexpand(true)
-            .build();
-        let s = sender.clone();
-        search.connect_search_changed(move |_| s.input(HistoryDialogInput::SearchChanged));
-
-        let search_bar = gtk::SearchBar::builder()
-            .child(&search)
-            .show_close_button(true)
-            .search_mode_enabled(false)
-            .build();
-        search_bar.connect_entry(&search);
-
-        let search_toggle = gtk::ToggleButton::builder()
-            .icon_name("system-search-symbolic")
-            .tooltip_text(crate::tr!("Search"))
-            .build();
-        let search_bar_for_toggle = search_bar.clone();
-        search_toggle.connect_toggled(move |btn| {
-            search_bar_for_toggle.set_search_mode(btn.is_active());
-        });
-        let toggle_for_close = search_toggle.clone();
-        search_bar.connect_search_mode_enabled_notify(move |bar| {
-            toggle_for_close.set_active(bar.is_search_mode());
-        });
+        let (search, search_bar, search_toggle) = build::search(&sender);
         header.pack_end(&search_toggle);
 
         let inner = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         inner.append(&search_bar);
-
-        // Each section is an AdwPreferencesGroup with a boxed-list
-        // ListBox. The group's `title` provides the section heading
-        // styling (matches Settings / Builder section dividers); we
-        // toggle the group's visibility instead of separate Label +
-        // ListBox visibility.
-        let pinned_listbox = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
-        pinned_listbox.add_css_class("boxed-list");
-        let pinned_group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("Pinned"))
-            .visible(false)
-            .build();
-        pinned_group.add(&pinned_listbox);
-
-        let listbox = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
-        listbox.add_css_class("boxed-list");
-        let list_group = adw::PreferencesGroup::builder()
-            .title(crate::tr!("All queries"))
-            .visible(false)
-            .build();
-        list_group.add(&listbox);
-
-        let list_box = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
-            .margin_top(12)
-            .margin_bottom(12)
-            .margin_start(12)
-            .margin_end(12)
-            .build();
-        list_box.append(&pinned_group);
-        list_box.append(&list_group);
-
-        let scroll = gtk::ScrolledWindow::builder()
-            .child(&list_box)
-            .hscrollbar_policy(gtk::PolicyType::Never)
-            .vexpand(true)
-            .build();
-
-        let status_page = adw::StatusPage::builder()
-            .icon_name("document-open-recent-symbolic")
-            .title(crate::tr!("No queries yet"))
-            .description(crate::tr!("Run a query in the SQL editor and it will appear here."))
-            .vexpand(true)
-            .build();
-
-        let stack = gtk::Stack::builder()
-            .vhomogeneous(false)
-            .vexpand(true)
-            .margin_top(12)
-            .build();
-        stack.add_named(&scroll, Some("list"));
-        stack.add_named(&status_page, Some("empty"));
-
+        let lists = build::list_area();
+        let (stack, status_page) = build::content_stack(&lists.scroll);
         inner.append(&stack);
         search_bar.set_key_capture_widget(Some(&inner));
 
-        let selection_label = gtk::Label::builder().xalign(0.0).hexpand(true).build();
-        selection_label.add_css_class("dim-label");
-
-        let export_menu = gio::Menu::new();
-        export_menu.append(Some(&crate::tr!("Export as SQL")), Some("history.export-sql"));
-        export_menu.append(Some(&crate::tr!("Export as CSV")), Some("history.export-csv"));
-        let export_button = gtk::MenuButton::builder()
-            .label(crate::tr!("Export"))
-            .always_show_arrow(true)
-            .menu_model(&export_menu)
-            .build();
-
-        let delete_button = gtk::Button::builder().label(crate::tr!("Delete")).build();
-        delete_button.add_css_class("destructive-action");
-        let s_del_bar = sender.clone();
-        delete_button.connect_clicked(move |_| s_del_bar.input(HistoryDialogInput::DeleteSelected));
-
-        let selection_bar_inner = gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .spacing(8)
-            .margin_top(6)
-            .margin_bottom(6)
-            .margin_start(12)
-            .margin_end(12)
-            .build();
-        selection_bar_inner.append(&selection_label);
-        selection_bar_inner.append(&export_button);
-        selection_bar_inner.append(&delete_button);
-        let selection_bar = gtk::Revealer::builder()
-            .child(&selection_bar_inner)
-            .transition_type(gtk::RevealerTransitionType::SlideUp)
-            .reveal_child(false)
-            .build();
-        toolbar.add_bottom_bar(&selection_bar);
-
-        toolbar.add_top_bar(&header);
-        toolbar.set_content(Some(&inner));
-        root.append(&toolbar);
-        root.insert_action_group("history", Some(&action_group));
+        let selection = build::selection_bar(&sender);
+        build::assemble(&root, &toolbar, &header, &inner, &selection.revealer, &sender);
 
         let model = Self {
             history: init.history,
             root: root.clone(),
             search,
-            pinned_group,
-            pinned_listbox,
-            list_group,
-            listbox,
+            pinned_group: lists.pinned_group,
+            pinned_listbox: lists.pinned_listbox,
+            list_group: lists.list_group,
+            listbox: lists.listbox,
             stack,
             status_page,
-            filter_connection,
-            filter_status,
-            filter_window,
-            filter_source,
+            filter_connection: filters.connection,
+            filter_status: filters.status,
+            filter_window: filters.window,
+            filter_source: filters.source,
             filter_debounce: std::rc::Rc::new(std::cell::RefCell::new(None)),
             search_generation: std::cell::Cell::new(0),
             mutation_order: std::sync::Arc::default(),
-            selection_bar,
-            selection_label,
+            selection_bar: selection.revealer,
+            selection_label: selection.label,
             connections,
             selected_ids: HashSet::new(),
             entries: Vec::new(),
@@ -459,28 +198,9 @@ impl Component for HistoryDialog {
                 }
             }
 
-            HistoryDialogInput::TogglePin(id) => {
-                let pinned = !self.is_pinned(id);
-                if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
-                    entry.pinned = pinned;
-                }
-                let history = self.history.clone();
-                self.run_search_after(sender, async move {
-                    if let Err(e) = history.set_pinned(id, pinned).await {
-                        tracing::warn!(error = %e, "history set_pinned failed");
-                    }
-                });
-            }
+            HistoryDialogInput::TogglePin(id) => self.toggle_pin(id, sender),
 
-            HistoryDialogInput::Delete(id) => {
-                self.selected_ids.remove(&id);
-                let history = self.history.clone();
-                self.run_search_after(sender, async move {
-                    if let Err(e) = history.delete(id).await {
-                        tracing::warn!(error = %e, "history delete failed");
-                    }
-                });
-            }
+            HistoryDialogInput::Delete(id) => self.delete_one(id, sender),
 
             HistoryDialogInput::ToggleSelected(id, on) => {
                 if on {
@@ -491,126 +211,20 @@ impl Component for HistoryDialog {
                 self.refresh_selection_bar();
             }
 
-            HistoryDialogInput::ToggleSelectMode(on) => {
-                self.select_mode = on;
-                if !on {
-                    self.selected_ids.clear();
-                    for cb in &self.row_checkboxes {
-                        cb.set_active(false);
-                    }
-                }
-                for cb in &self.row_checkboxes {
-                    cb.set_visible(on);
-                }
-                self.refresh_selection_bar();
-            }
+            HistoryDialogInput::ToggleSelectMode(on) => self.set_select_mode(on),
 
-            HistoryDialogInput::DeleteSelected => {
-                // Bulk deletion is irreversible and can wipe pinned
-                // entries the user marked as important; gate it
-                // behind an AdwAlertDialog confirmation before
-                // touching the database. Mirrors the Clear-All
-                // pattern below.
-                let n = self.selected_ids.len();
-                if n == 0 {
-                    return;
-                }
-                let dialog = adw::AlertDialog::new(None, None);
-                dialog.set_heading(Some(&if n == 1 {
-                    crate::tr!("Delete this query?")
-                } else {
-                    crate::tr!("Delete {n} queries?").replace("{n}", &n.to_string())
-                }));
-                dialog.set_body(&crate::tr!(
-                    "Selected entries will be permanently removed from history, including any pinned ones."
-                ));
-                dialog.add_response("cancel", &crate::tr!("Cancel"));
-                dialog.add_response("delete", &crate::tr!("Delete"));
-                dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
-                let s = sender;
-                dialog.connect_response(None, move |_, response| {
-                    if response == "delete" {
-                        s.input(HistoryDialogInput::DeleteSelectedConfirmed);
-                    }
-                });
-                dialog.present(Some(&self.root));
-            }
+            HistoryDialogInput::DeleteSelected => self.confirm_delete_selected(sender),
 
-            HistoryDialogInput::DeleteSelectedConfirmed => {
-                let ids: Vec<i64> = self.selected_ids.drain().collect();
-                if ids.is_empty() {
-                    return;
-                }
-                let history = self.history.clone();
-                self.run_search_after(sender, async move {
-                    if let Err(e) = history.delete_many(&ids).await {
-                        tracing::warn!(error = %e, "history delete_many failed");
-                    }
-                });
-            }
+            HistoryDialogInput::DeleteSelectedConfirmed => self.delete_selected(sender),
 
             HistoryDialogInput::ExportSelectedSql => self.export_selected("sql", sender),
             HistoryDialogInput::ExportSelectedCsv => self.export_selected("csv", sender),
 
-            HistoryDialogInput::ClearAllRequested => {
-                let dialog = adw::AlertDialog::new(
-                    Some(&crate::tr!("Clear all query history?")),
-                    Some(&crate::tr!(
-                        "This permanently deletes every saved query, including pinned ones."
-                    )),
-                );
-                dialog.add_response("cancel", &crate::tr!("Cancel"));
-                dialog.add_response("clear", &crate::tr!("Clear"));
-                dialog.set_response_appearance("clear", adw::ResponseAppearance::Destructive);
-                dialog.set_default_response(Some("cancel"));
-                dialog.set_close_response("cancel");
-                let s = sender;
-                dialog.connect_response(None, move |_, response| {
-                    if response == "clear" {
-                        s.input(HistoryDialogInput::ClearAllConfirmed);
-                    }
-                });
-                dialog.present(Some(&self.root));
-            }
+            HistoryDialogInput::ClearAllRequested => self.confirm_clear_all(sender),
 
-            HistoryDialogInput::ClearAllConfirmed => {
-                let s = sender.clone();
-                let history = self.history.clone();
-                sender.command(move |out, shutdown| {
-                    shutdown
-                        .register(async move {
-                            let _ = s;
-                            if let Err(e) = history.clear_all().await {
-                                tracing::warn!(error = %e, "history clear_all failed");
-                            }
-                            out.send(HistoryDialogCmd::Cleared).ok()
-                        })
-                        .drop_on_shutdown()
-                });
-            }
+            HistoryDialogInput::ClearAllConfirmed => self.clear_all(sender),
 
-            HistoryDialogInput::OpenStorageLocation => {
-                let path = self.history.path();
-                let parent = path
-                    .parent()
-                    .map(|p| p.to_path_buf())
-                    .unwrap_or_else(|| path.to_path_buf());
-                let file = gio::File::for_path(&parent);
-                let launcher = gtk::FileLauncher::new(Some(&file));
-                launcher.launch(
-                    Some(
-                        &self
-                            .root
-                            .root()
-                            .and_then(|r| r.downcast::<gtk::Window>().ok())
-                            .unwrap_or_default(),
-                    ),
-                    gio::Cancellable::NONE,
-                    |_| {},
-                );
-            }
+            HistoryDialogInput::OpenStorageLocation => self.open_storage_location(),
         }
     }
 
@@ -755,13 +369,14 @@ impl HistoryDialog {
             self.pinned_group.set_visible(false);
             self.list_group.set_visible(false);
             if self.has_narrowing_search() || self.has_narrowing_filter() {
-                self.status_page.set_title(&crate::tr!("No matches"));
-                self.status_page
-                    .set_description(Some(&crate::tr!("Try a different search term or change the filters.")));
+                self.status_page.set_title(&bookie_app_services::tr!("No matches"));
+                self.status_page.set_description(Some(&bookie_app_services::tr!(
+                    "Try a different search term or change the filters."
+                )));
                 self.status_page.set_icon_name(Some("system-search-symbolic"));
             } else {
-                self.status_page.set_title(&crate::tr!("No queries yet"));
-                self.status_page.set_description(Some(&crate::tr!(
+                self.status_page.set_title(&bookie_app_services::tr!("No queries yet"));
+                self.status_page.set_description(Some(&bookie_app_services::tr!(
                     "Run a query in the SQL editor and it will appear here."
                 )));
                 self.status_page.set_icon_name(Some("document-open-recent-symbolic"));
@@ -799,150 +414,164 @@ impl HistoryDialog {
         entry: &Entry,
         sender: ComponentSender<Self>,
     ) -> (adw::ActionRow, gtk::PopoverMenu, gtk::CheckButton) {
-        let title = preview_title(&entry.query);
-        let subtitle = format_subtitle(entry);
-        let row = adw::ActionRow::builder()
-            .use_markup(false)
-            .title(&title)
-            .subtitle(&subtitle)
-            .activatable(true)
-            .build();
-        row.add_css_class("monospace");
-
-        let icon_name = if entry.cancelled {
-            "process-stop-symbolic"
-        } else if entry.success {
-            "emblem-ok-symbolic"
-        } else {
-            "dialog-error-symbolic"
-        };
-        let icon = gtk::Image::from_icon_name(icon_name);
-        icon.add_css_class("dim-label");
-        row.add_prefix(&icon);
-
-        let select_check = gtk::CheckButton::builder()
-            .valign(gtk::Align::Center)
-            .visible(self.select_mode)
-            .build();
-        select_check.set_active(self.selected_ids.contains(&entry.id));
-        let id_for_check = entry.id;
-        let s_check = sender.clone();
-        select_check.connect_toggled(move |btn| {
-            s_check.input(HistoryDialogInput::ToggleSelected(id_for_check, btn.is_active()));
-        });
-        row.add_prefix(&select_check);
-
-        let pin_btn = gtk::Button::builder()
-            .icon_name("view-pin-symbolic")
-            .valign(gtk::Align::Center)
-            .tooltip_text(if entry.pinned {
-                crate::tr!("Unpin")
-            } else {
-                crate::tr!("Pin")
-            })
-            .build();
-        pin_btn.add_css_class("flat");
-        if entry.pinned {
-            pin_btn.add_css_class("accent");
-        }
         let id = entry.id;
-        let s = sender.clone();
-        pin_btn.connect_clicked(move |_| s.input(HistoryDialogInput::TogglePin(id)));
-        row.add_suffix(&pin_btn);
-
-        let delete_btn = gtk::Button::builder()
-            .icon_name("user-trash-symbolic")
-            .valign(gtk::Align::Center)
-            .tooltip_text(crate::tr!("Delete"))
-            .build();
-        delete_btn.add_css_class("flat");
-        delete_btn.add_css_class("destructive-action");
-        let s_del = sender.clone();
-        delete_btn.connect_clicked(move |_| s_del.input(HistoryDialogInput::Delete(id)));
-        row.add_suffix(&delete_btn);
+        let row = row::row_shell(entry);
+        let select_check = row::select_check(entry, self.select_mode, self.selected_ids.contains(&id), &sender);
+        row.add_prefix(&select_check);
+        row.add_suffix(&row::pin_button(entry, &sender));
+        row.add_suffix(&row::delete_button(entry, &sender));
 
         let s_act = sender.clone();
         row.connect_activated(move |_| s_act.input(HistoryDialogInput::Activate(id)));
 
-        let menu = gio::Menu::new();
-        let nav_section = gio::Menu::new();
-        nav_section.append(Some(&crate::tr!("Open in new tab")), Some("history-row.open"));
-        nav_section.append(Some(&crate::tr!("Replace current tab")), Some("history-row.replace"));
-        menu.append_section(None, &nav_section);
-        let util_section = gio::Menu::new();
-        util_section.append(
-            Some(&if entry.pinned {
-                crate::tr!("Unpin")
-            } else {
-                crate::tr!("Pin")
-            }),
-            Some("history-row.pin"),
-        );
-        util_section.append(Some(&crate::tr!("Copy SQL")), Some("history-row.copy"));
-        menu.append_section(None, &util_section);
-        let danger_section = gio::Menu::new();
-        danger_section.append(Some(&crate::tr!("Delete")), Some("history-row.delete"));
-        menu.append_section(None, &danger_section);
-
-        let popover_menu = gtk::PopoverMenu::from_model(Some(&menu));
+        let popover_menu = gtk::PopoverMenu::from_model(Some(&row::row_menu(entry)));
         popover_menu.set_has_arrow(true);
         popover_menu.set_parent(&row);
-
-        let row_actions = gio::SimpleActionGroup::new();
-        let s_open = sender.clone();
-        let act_open = gio::ActionEntry::builder("open")
-            .activate(move |_, _, _| s_open.input(HistoryDialogInput::Activate(id)))
-            .build();
-        let s_replace = sender.clone();
-        let act_replace = gio::ActionEntry::builder("replace")
-            .activate(move |_, _, _| s_replace.input(HistoryDialogInput::ReplaceCurrent(id)))
-            .build();
-        let s_pin = sender.clone();
-        let act_pin = gio::ActionEntry::builder("pin")
-            .activate(move |_, _, _| s_pin.input(HistoryDialogInput::TogglePin(id)))
-            .build();
-        let query_for_copy = entry.query.clone();
-        let row_for_copy = row.downgrade();
-        let act_copy = gio::ActionEntry::builder("copy")
-            .activate(move |_, _, _| {
-                if let Some(row) = row_for_copy.upgrade() {
-                    row.clipboard().set_text(&query_for_copy);
-                }
-            })
-            .build();
-        let s_del2 = sender.clone();
-        let act_del = gio::ActionEntry::builder("delete")
-            .activate(move |_, _, _| s_del2.input(HistoryDialogInput::Delete(id)))
-            .build();
-        row_actions.add_action_entries([act_open, act_replace, act_pin, act_copy, act_del]);
-        row.insert_action_group("history-row", Some(&row_actions));
-
-        let gesture = gtk::GestureClick::new();
-        gesture.set_button(gtk::gdk::BUTTON_SECONDARY);
-        let popover_for_gesture = popover_menu.clone();
-        gesture.connect_pressed(move |gesture, _n, x, y| {
-            popover_for_gesture.set_pointing_to(Some(&gtk::gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
-            popover_for_gesture.popup();
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-        });
-        row.add_controller(gesture);
-
-        let menu_shortcut = gtk::Shortcut::builder()
-            .trigger(&crate::ui::shortcut::parse("Menu"))
-            .action(&gtk::CallbackAction::new({
-                let popover = popover_menu.clone();
-                move |_, _| {
-                    popover.popup();
-                    glib::Propagation::Stop
-                }
-            }))
-            .build();
-        let controller = gtk::ShortcutController::new();
-        controller.set_scope(gtk::ShortcutScope::Local);
-        controller.add_shortcut(menu_shortcut);
-        row.add_controller(controller);
+        row.insert_action_group("history-row", Some(&row::row_actions(entry, &row, &sender)));
+        row::attach_context_menu(&row, &popover_menu);
 
         (row, popover_menu, select_check)
+    }
+
+    fn toggle_pin(&mut self, id: i64, sender: ComponentSender<Self>) {
+        let pinned = !self.is_pinned(id);
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            entry.pinned = pinned;
+        }
+        let history = self.history.clone();
+        self.run_search_after(sender, async move {
+            if let Err(e) = history.set_pinned(id, pinned).await {
+                tracing::warn!(error = %e, "history set_pinned failed");
+            }
+        });
+    }
+
+    fn delete_one(&mut self, id: i64, sender: ComponentSender<Self>) {
+        self.selected_ids.remove(&id);
+        let history = self.history.clone();
+        self.run_search_after(sender, async move {
+            if let Err(e) = history.delete(id).await {
+                tracing::warn!(error = %e, "history delete failed");
+            }
+        });
+    }
+
+    fn set_select_mode(&mut self, on: bool) {
+        self.select_mode = on;
+        if !on {
+            self.selected_ids.clear();
+            for cb in &self.row_checkboxes {
+                cb.set_active(false);
+            }
+        }
+        for cb in &self.row_checkboxes {
+            cb.set_visible(on);
+        }
+        self.refresh_selection_bar();
+    }
+
+    fn confirm_delete_selected(&self, sender: ComponentSender<Self>) {
+        // Bulk deletion is irreversible and can wipe pinned
+        // entries the user marked as important; gate it
+        // behind an AdwAlertDialog confirmation before
+        // touching the database. Mirrors the Clear-All
+        // pattern below.
+        let n = self.selected_ids.len();
+        if n == 0 {
+            return;
+        }
+        let dialog = adw::AlertDialog::new(None, None);
+        dialog.set_heading(Some(&if n == 1 {
+            bookie_app_services::tr!("Delete this query?")
+        } else {
+            bookie_app_services::tr!("Delete {n} queries?").replace("{n}", &n.to_string())
+        }));
+        dialog.set_body(&bookie_app_services::tr!(
+            "Selected entries will be permanently removed from history, including any pinned ones."
+        ));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("delete", &bookie_app_services::tr!("Delete"));
+        dialog.set_response_appearance("delete", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let s = sender;
+        dialog.connect_response(None, move |_, response| {
+            if response == "delete" {
+                s.input(HistoryDialogInput::DeleteSelectedConfirmed);
+            }
+        });
+        dialog.present(Some(&self.root));
+    }
+
+    fn delete_selected(&mut self, sender: ComponentSender<Self>) {
+        let ids: Vec<i64> = self.selected_ids.drain().collect();
+        if ids.is_empty() {
+            return;
+        }
+        let history = self.history.clone();
+        self.run_search_after(sender, async move {
+            if let Err(e) = history.delete_many(&ids).await {
+                tracing::warn!(error = %e, "history delete_many failed");
+            }
+        });
+    }
+
+    fn confirm_clear_all(&self, sender: ComponentSender<Self>) {
+        let dialog = adw::AlertDialog::new(
+            Some(&bookie_app_services::tr!("Clear all query history?")),
+            Some(&bookie_app_services::tr!(
+                "This permanently deletes every saved query, including pinned ones."
+            )),
+        );
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("clear", &bookie_app_services::tr!("Clear"));
+        dialog.set_response_appearance("clear", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let s = sender;
+        dialog.connect_response(None, move |_, response| {
+            if response == "clear" {
+                s.input(HistoryDialogInput::ClearAllConfirmed);
+            }
+        });
+        dialog.present(Some(&self.root));
+    }
+
+    fn clear_all(&self, sender: ComponentSender<Self>) {
+        let s = sender.clone();
+        let history = self.history.clone();
+        sender.command(move |out, shutdown| {
+            shutdown
+                .register(async move {
+                    let _ = s;
+                    if let Err(e) = history.clear_all().await {
+                        tracing::warn!(error = %e, "history clear_all failed");
+                    }
+                    out.send(HistoryDialogCmd::Cleared).ok()
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    fn open_storage_location(&self) {
+        let path = self.history.path();
+        let parent = path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| path.to_path_buf());
+        let file = gio::File::for_path(&parent);
+        let launcher = gtk::FileLauncher::new(Some(&file));
+        launcher.launch(
+            Some(
+                &self
+                    .root
+                    .root()
+                    .and_then(|r| r.downcast::<gtk::Window>().ok())
+                    .unwrap_or_default(),
+            ),
+            gio::Cancellable::NONE,
+            |_| {},
+        );
     }
 
     fn refresh_selection_bar(&self) {
@@ -952,7 +581,7 @@ impl HistoryDialog {
             return;
         }
         self.selection_label
-            .set_label(&crate::trn!("{n} selected", "{n} selected", n).replace("{n}", &n.to_string()));
+            .set_label(&bookie_app_services::trn!("{n} selected", "{n} selected", n).replace("{n}", &n.to_string()));
         self.selection_bar.set_reveal_child(true);
     }
 
@@ -1018,7 +647,7 @@ fn preview_title(query: &str) -> String {
     if collected.chars().count() < first_line.chars().count() {
         format!("{collected}…")
     } else if collected.is_empty() {
-        crate::tr!("Empty query")
+        bookie_app_services::tr!("Empty query")
     } else {
         collected
     }
@@ -1031,7 +660,7 @@ fn format_subtitle(entry: &Entry) -> String {
         parts.push(format!("{d} ms"));
     }
     if entry.cancelled {
-        parts.push(crate::tr!("cancelled"));
+        parts.push(bookie_app_services::tr!("cancelled"));
     } else if let Some(err) = &entry.error {
         let trimmed: String = err.chars().take(48).collect();
         parts.push(if trimmed.chars().count() < err.chars().count() {
@@ -1040,7 +669,7 @@ fn format_subtitle(entry: &Entry) -> String {
             trimmed
         });
     } else if let Some(rows) = entry.rows_affected {
-        parts.push(crate::tr!("{n} row(s)").replace("{n}", &rows.to_string()));
+        parts.push(bookie_app_services::tr!("{n} row(s)").replace("{n}", &rows.to_string()));
     }
     parts.join(" · ")
 }
@@ -1050,16 +679,16 @@ fn format_relative_time(when: SystemTime) -> String {
     let diff = now.duration_since(when).unwrap_or_default();
     let secs = diff.as_secs();
     if secs < 60 {
-        crate::tr!("just now")
+        bookie_app_services::tr!("just now")
     } else if secs < 3600 {
         let n = secs / 60;
-        crate::tr!("{n} min ago").replace("{n}", &n.to_string())
+        bookie_app_services::tr!("{n} min ago").replace("{n}", &n.to_string())
     } else if secs < 86_400 {
         let n = secs / 3600;
-        crate::tr!("{n} h ago").replace("{n}", &n.to_string())
+        bookie_app_services::tr!("{n} h ago").replace("{n}", &n.to_string())
     } else if secs < 30 * 86_400 {
         let n = secs / 86_400;
-        crate::tr!("{n} d ago").replace("{n}", &n.to_string())
+        bookie_app_services::tr!("{n} d ago").replace("{n}", &n.to_string())
     } else {
         let dt = chrono::DateTime::<chrono::Local>::from(when);
         dt.format("%Y-%m-%d").to_string()
@@ -1109,7 +738,9 @@ mod export_tests;
 #[cfg(test)]
 mod lifetime_tests;
 
+mod build;
 mod export;
+mod row;
 
 #[cfg(test)]
 mod confirmation_tests;

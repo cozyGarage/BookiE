@@ -4,7 +4,7 @@ use super::column::{build_add_column, build_alter_column, build_drop_column, bui
 use super::index_fk::{
     build_add_foreign_key, build_create_index, build_drop_constraint, build_drop_foreign_key, build_drop_index,
 };
-use super::table::{build_create_table, build_rename_table};
+use super::table::{build_create_table_with_default_collation, build_rename_table};
 use super::types::{BuildDdlError, DraftColumn, StructureOp, mssql_drop_default_constraint};
 
 /// Diff a loaded snapshot against the user's current edits and emit
@@ -195,7 +195,7 @@ pub fn diff_to_ops(
     ops
 }
 
-fn same_index(left: &IndexInfo, right: &IndexInfo) -> bool {
+pub(super) fn same_index(left: &IndexInfo, right: &IndexInfo) -> bool {
     left.name == right.name
         && left.columns == right.columns
         && left.unique == right.unique
@@ -216,10 +216,19 @@ pub fn materialize_ops(ops: &[StructureOp], driver_id: &str) -> Result<Vec<Strin
         columns,
         indexes,
         fks,
+        default_collation,
     }) = ops.first()
         && ops.len() == 1
     {
-        return build_create_table(driver_id, schema.as_deref(), table, columns, indexes, fks);
+        return build_create_table_with_default_collation(
+            driver_id,
+            schema.as_deref(),
+            table,
+            columns,
+            indexes,
+            fks,
+            default_collation.as_deref(),
+        );
     }
 
     let mut out: Vec<String> = Vec::new();

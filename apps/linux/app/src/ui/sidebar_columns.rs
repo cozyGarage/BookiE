@@ -50,11 +50,11 @@ impl ColumnSource {
             .loading
             .clone()
             .try_acquire_owned()
-            .map_err(|_| crate::tr!("Other fields are loading. Collapse and expand to retry."))?;
+            .map_err(|_| bookie_app_services::tr!("Other fields are loading. Collapse and expand to retry."))?;
         let connection = self
             .origin
             .connection(&self.database)
-            .ok_or_else(|| crate::tr!("The connection changed. Reopen the tables sidebar."))?;
+            .ok_or_else(|| bookie_app_services::tr!("The connection changed. Reopen the tables sidebar."))?;
         let control = crate::services::operation_control::bounded_with(self.timeout_secs, cancel);
         let columns = connection
             .fetch_columns_controlled(info.schema.as_deref(), &info.name, &control)
@@ -110,7 +110,7 @@ impl LoadedColumns {
         let retained = visible
             .clone()
             .try_acquire_many_owned(columns.len() as u32)
-            .map_err(|_| crate::tr!("Close another expanded table to show more fields."))?;
+            .map_err(|_| bookie_app_services::tr!("Close another expanded table to show more fields."))?;
         Ok(Self {
             columns,
             truncated,
@@ -147,13 +147,13 @@ impl SidebarColumns {
         Self {
             source,
             structure: gtk::Button::builder()
-                .label(crate::tr!("Structure…"))
+                .label(bookie_app_services::tr!("Structure…"))
                 .action_name("sidebar-row.edit-structure")
                 .css_classes(["flat"])
                 .build(),
             toggle: gtk::ToggleButton::builder()
                 .icon_name("pan-end-symbolic")
-                .tooltip_text(crate::tr!("Show columns"))
+                .tooltip_text(bookie_app_services::tr!("Show columns"))
                 .css_classes(["flat"])
                 .build(),
             reveal: gtk::Revealer::builder().child(&content).build(),
@@ -192,17 +192,17 @@ impl SidebarColumns {
             "pan-end-symbolic"
         });
         self.toggle.set_tooltip_text(Some(&if active {
-            crate::tr!("Hide columns")
+            bookie_app_services::tr!("Hide columns")
         } else {
-            crate::tr!("Show columns")
+            bookie_app_services::tr!("Show columns")
         }));
         if !active {
             return;
         }
         let Some(source) = self.source.clone() else {
-            return self.message(&crate::tr!("Connect to load the fields of this table."));
+            return self.message(&bookie_app_services::tr!("Connect to load the fields of this table."));
         };
-        self.message(&crate::tr!("Loading fields…"));
+        self.message(&bookie_app_services::tr!("Loading fields…"));
         let (info, serial, cancel) = (info.clone(), self.serial, self.cancel.clone());
         sender.oneshot_command(async move { source.fetch(info, serial, cancel).await });
     }
@@ -217,7 +217,9 @@ impl SidebarColumns {
             .as_ref()
             .is_none_or(|source| source.origin.connection(&source.database).is_none())
         {
-            return self.message(&crate::tr!("The connection changed. Reopen the tables sidebar."));
+            return self.message(&bookie_app_services::tr!(
+                "The connection changed. Reopen the tables sidebar."
+            ));
         }
         let loaded = match reply.result {
             Ok(loaded) => loaded,
@@ -225,13 +227,15 @@ impl SidebarColumns {
         };
         self.retained = Some(loaded.retained);
         if loaded.columns.is_empty() {
-            self.message(&crate::tr!("No fields were returned."));
+            self.message(&bookie_app_services::tr!("No fields were returned."));
         }
         for column in &loaded.columns {
             self.content.append(&field_row(column));
         }
         if loaded.truncated {
-            self.message(&crate::tr!("Showing the first 256 fields. Open Structure for more."));
+            self.message(&bookie_app_services::tr!(
+                "Showing the first 256 fields. Open Structure for more."
+            ));
         }
         self.content.append(&self.structure);
     }

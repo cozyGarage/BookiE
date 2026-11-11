@@ -18,7 +18,7 @@ pub(in crate::ui::editor) fn install(
     let Some(spool) = result.spool.clone() else { return };
     let counts = result.page_row_counts.clone();
     let columns = result.columns.clone();
-    let button = gtk::ToggleButton::with_label(&crate::tr!("Continuous scrolling"));
+    let button = gtk::ToggleButton::with_label(&bookie_app_services::tr!("Continuous scrolling"));
     let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
     container.set_vexpand(true);
     container.set_visible(false);
@@ -32,7 +32,7 @@ pub(in crate::ui::editor) fn install(
     let sender = target.grid_sender.clone();
     let connection_id = target.connection_id;
     let database = target.database.clone();
-    let initializing = std::rc::Rc::new(std::cell::Cell::new(false));
+    let generation = std::rc::Rc::new(std::cell::Cell::new(0_u64));
     button.connect_toggled(move |button| {
         let active = button.is_active();
         if let Some(pager) = pager.upgrade() {
@@ -42,10 +42,24 @@ pub(in crate::ui::editor) fn install(
             pages.set_visible(!active);
         }
         container.set_visible(active);
-        if !active || container.first_child().is_some() || initializing.replace(true) {
+        if !active {
+            generation.set(generation.get().wrapping_add(1));
+            while let Some(child) = container.first_child() {
+                container.remove(&child);
+            }
             return;
         }
-        let model = PagedModel::new(&counts, columns.len());
+        if container.first_child().is_some() {
+            return;
+        }
+        let request = generation.get().wrapping_add(1);
+        generation.set(request);
+        let model = PagedModel::with_budget(
+            &counts,
+            columns.len(),
+            bookie_core::MAX_QUERY_RESULT_BYTES,
+            spool.page_budget(),
+        );
         start_view(
             &container,
             model,
@@ -53,7 +67,7 @@ pub(in crate::ui::editor) fn install(
             columns.clone(),
             sender.clone(),
             (connection_id, database.clone()),
-            initializing.clone(),
+            (generation.clone(), request),
         );
     });
 }
@@ -68,8 +82,9 @@ fn start_view(
         Option<uuid::Uuid>,
         Arc<crate::services::database_service::DatabaseService>,
     ),
-    initializing: std::rc::Rc<std::cell::Cell<bool>>,
+    activation: (std::rc::Rc<std::cell::Cell<u64>>, u64),
 ) {
+    let (generation, request) = activation;
     let (connection_id, database) = connection;
     let empty = Arc::new(bookie_core::QueryResult {
         columns: columns.clone(),
@@ -80,9 +95,11 @@ fn start_view(
     let runtime = relm4::spawn(async { tokio::runtime::Handle::current() });
     gtk::glib::MainContext::default().spawn_local(async move {
         let (Some(container), Ok(runtime)) = (container.upgrade(), runtime.await) else {
-            initializing.set(false);
             return;
         };
+        if generation.get() != request {
+            return;
+        }
         let callback = model.visibility_callback(&runtime, &spool, &columns);
         let (view, selection) = build_column_view(
             &empty,
@@ -111,7 +128,7 @@ fn start_view(
         let status = gtk::Label::new(None);
         status.set_wrap(true);
         model.attach_status(&status);
-        let retry = gtk::Button::with_label(&crate::tr!("Retry loading pages"));
+        let retry = gtk::Button::with_label(&bookie_app_services::tr!("Retry loading pages"));
         let weak_model = model.downgrade();
         retry.connect_clicked(move |_| {
             if let Some(model) = weak_model.upgrade() {
@@ -201,13 +218,33 @@ mod tests {
         wait_for_text(holder.upcast_ref(), "0");
         assert_eq!(count_views(holder.upcast_ref()), 1);
         let view = find_view(holder.upcast_ref()).unwrap();
+        let model = view
+            .model()
+            .unwrap()
+            .downcast::<gtk::MultiSelection>()
+            .unwrap()
+            .model()
+            .unwrap()
+            .downcast::<PagedModel>()
+            .unwrap();
+        let model_weak = model.downgrade();
+        drop(model);
         view.scroll_to(190, None, gtk::ListScrollFlags::FOCUS, None);
         wait_for_text(holder.upcast_ref(), "190");
         view.scroll_to(0, None, gtk::ListScrollFlags::FOCUS, None);
         wait_for_text(holder.upcast_ref(), "0");
+        drop(view);
         assert!(!pager.is_visible());
         toggle.set_active(false);
         assert!(pager.is_visible());
+        assert_eq!(count_views(holder.upcast_ref()), 0);
+        assert!(model_weak.upgrade().is_none());
+        toggle.set_active(true);
+        wait_for_text(holder.upcast_ref(), "0");
+        assert_eq!(count_views(holder.upcast_ref()), 1);
+        toggle.set_active(false);
+        assert_eq!(count_views(holder.upcast_ref()), 0);
+        assert!(model_weak.upgrade().is_none());
         window.destroy();
     }
 

@@ -11,6 +11,10 @@ members = [
     "crates/mcp",
     "crates/agentd",
     "crates/ssh",
+    "crates/checks",
+    "crates/pg-sessions",
+    "crates/kafka-browser",
+    "crates/avro-container",
     "crates/dump",
     "crates/storage",
     "crates/transport",
@@ -21,12 +25,13 @@ members = [
     "crates/drivers/mssql",
     "crates/drivers/mysql",
     "crates/drivers/oracle",
+    "crates/drivers/cassandra",
     "crates/drivers/postgres",
     "crates/drivers/redis",
     "crates/drivers/sqlite",
 ]
 [workspace.package]
-version = "0.2.5"
+version = "0.2.7"
 edition = "2024"
 rust-version = "1.98"
 license = "AGPL-3.0-or-later"
@@ -52,7 +57,7 @@ clickhouse = { version = "0.15", default-features = false, features = ["rustls-t
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "chrono", "rust_decimal", "uuid", "json"] }
 sqlx-core = { version = "0.9", default-features = false }
 # Tiberius 0.13 supports SQL Server's full DECIMAL scale of 38.
-tiberius = { version = "0.13", default-features = false, features = ["tds73", "native-tls", "chrono", "rust_decimal"] }
+tiberius = { version = "0.13", default-features = false, features = ["tds73", "tds80", "native-tls", "chrono", "rust_decimal"] }
 csv = "1"
 calamine = { version = "0.38", default-features = false, features = ["dates"] }
 encoding_rs = "0.8"
@@ -70,7 +75,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 tempfile = "3"
 testcontainers = { version = "0.27", default-features = false, features = ["aws-lc-rs"] }
 testcontainers-modules = { version = "0.15", default-features = false, features = ["aws-lc-rs"] }
-oo7 = { version = "0.6", default-features = false, features = ["tokio", "native_crypto"] }
+oo7 = { version = "0.6", default-features = false, features = ["async-std", "native_crypto"] }
 relm4 = { version = "0.11", default-features = false, features = ["macros", "libadwaita"] }
 sqlparser = "0.63"
 toml = "1"

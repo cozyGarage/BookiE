@@ -373,3 +373,45 @@ async fn catalog_deadline_applies_while_waiting_for_the_shared_client() {
     assert!(matches!(result, Err(DriverError::TimedOut)));
     assert!(connection.usable.load(Ordering::Acquire));
 }
+
+fn tls_options(mode: bookie_core::TlsMode, strict_encryption: bool) -> ConnectOptions {
+    ConnectOptions {
+        tls: bookie_core::TlsConfig {
+            mode,
+            strict_encryption,
+            ..bookie_core::TlsConfig::default()
+        },
+        ..direct_options()
+    }
+}
+
+#[test]
+fn strict_encryption_selects_the_tds_8_level_for_the_verifying_modes() {
+    for mode in [
+        bookie_core::TlsMode::Require,
+        bookie_core::TlsMode::VerifyCa,
+        bookie_core::TlsMode::VerifyFull,
+    ] {
+        let options = tls_options(mode, true);
+        assert_eq!(
+            encryption_level(&options.tls).unwrap(),
+            EncryptionLevel::Strict,
+            "{mode:?}"
+        );
+        assert!(!build_target(&options).unwrap().plaintext_fallback, "{mode:?}");
+    }
+}
+
+#[test]
+fn without_strict_encryption_the_level_stays_required() {
+    let options = tls_options(bookie_core::TlsMode::VerifyFull, false);
+    assert_eq!(encryption_level(&options.tls).unwrap(), EncryptionLevel::Required);
+}
+
+#[test]
+fn strict_encryption_is_refused_with_modes_that_allow_plaintext() {
+    for mode in [bookie_core::TlsMode::Disabled, bookie_core::TlsMode::Prefer] {
+        let error = build_target(&tls_options(mode, true)).err().unwrap();
+        assert!(matches!(error, DriverError::Tls(_)), "{mode:?}: {error:?}");
+    }
+}

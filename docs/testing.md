@@ -97,7 +97,7 @@ A guardrail test pins a contract that other code relies on but that no feature t
 | The MCP HTTP body is bounded by the same limit as stdio | `an_http_body_over_the_request_limit_is_refused` | `crates/mcp/src/server.rs` |
 | Every audited read ends in exactly one terminal outcome, on success and failure, controlled or not | `every_audited_read_ends_in_exactly_one_terminal_outcome`, `no_read_under_a_cancelled_control_writes_two_outcomes` | `crates/policy/src/guard_tests_passthrough.rs` |
 | An undecodable value stays visible and distinct from NULL in every export format and in copy; SQL export refuses it | `value_contract_every_export_keeps_undecodable_distinct_from_null` | `crates/core/src/export/stream_tests.rs` |
-| Every driver that joins the shared suite refuses writes on a read-only connection and keeps its rows, and returns NULL, empty text and integers beyond 2^53 unchanged | `conformance_*` | `crates/drivers/shared/tests/conformance.rs`, run by `crates/drivers/sqlite/tests/conformance.rs` and `crates/drivers/duckdb/tests/conformance.rs`, and on a real PostgreSQL 16 container by `crates/drivers/postgres/tests/conformance.rs` (docker) |
+| Every driver that joins the shared suite refuses writes on a read-only connection and keeps its rows, and returns NULL, empty text and integers beyond 2^53 unchanged | `conformance_*` | `crates/drivers/shared/tests/conformance.rs`, run by `crates/drivers/sqlite/tests/conformance.rs` and `crates/drivers/duckdb/tests/conformance.rs`, and on real PostgreSQL 16, MySQL, ClickHouse and SQL Server containers by `crates/drivers/{postgres,mysql,clickhouse,mssql}/tests/conformance.rs` (docker) |
 
 Add a row here when you add a guardrail.
 
@@ -188,7 +188,7 @@ BOOKIE_SIDEBAR_PROFILE_OUTPUT="$PWD/target/quality/sidebar-search-50000.jsonl" \
 
 It runs 101 samples for a specific match, a schema-prefix match, and a broad match. The output includes the number of visible nodes and median/p95 time in nanoseconds. It measures the tree algorithm only; use the GTK profile below to measure widget construction and accessibility costs.
 
-The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connection-to-catalog visibility, accessible sidebar filtering, and the app process memory before and after loading a synthetic catalog. Start a disposable PostgreSQL database containing the named target table, then run:
+The opt-in GTK scenario `postgres_sidebar_catalog_profile` measures connected-window availability, target-row accessibility, accessible sidebar filtering, GTK row-construction time, UI-thread stalls, and app process memory before and after loading a synthetic catalog. It enables the existing 16 ms UI-stall monitor and records the stall count and maximum duration through completion of sidebar row construction, before the search measurement. Start a disposable PostgreSQL database containing the named target table, then run:
 
 ```bash
 BOOKIE_GTK_POSTGRES_PORT=15432 \
@@ -199,7 +199,7 @@ BOOKIE_GTK_SCENARIO=postgres_sidebar_catalog_profile \
 bash scripts/test-gtk-safety.sh
 ```
 
-`BOOKIE_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
+`BOOKIE_GTK_CATALOG_TARGET` must use the schema-qualified accessible row name. The memory sample is the BookiE process RSS/PSS and private pages; the GTK scenario runs with AT-SPI enabled, so compare runs under the same test environment. The connected-window timing is an accessibility-observed window-title milestone, not a native presentation timestamp. This is an end-to-end GTK measurement and is separate from the driver-only catalog benchmark above.
 The app also logs the number of sidebar nodes and the time spent constructing their GTK rows at debug level; the GTK scenario records this value in its JSON output.
 
 ## Local PostgreSQL smoke test
@@ -232,7 +232,7 @@ It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through w
 
 The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Keep run results in private verification records.
 
-The isolated [frontend experiment](../experiments/tauri-grid-prototype/README.md) has separate Rust and JavaScript tests. Run those commands when changing the experiment; they do not replace the product's GTK or database acceptance tests.
+The [GPUI app](../apps/gpui/README.md) has its own tests. Run them when changing it; they do not replace the product's GTK or database acceptance tests.
 
 ## Regression case selection
 
@@ -244,13 +244,12 @@ Select regressions from the changed behavior and current known defects. Failure 
 
 | Limit | Lines | Result |
 |---|---:|---|
-| Soft | 1200 | Split the file or record an approved baseline |
-| Hard | 1800 | Unlisted files fail |
+| Limit | 2000 | Unlisted files fail |
 | Ratchet | Recorded maximum | A listed oversized file may not grow past its baseline |
 
 Lower a baseline in the same change when an oversized file shrinks.
 
-When inline unit tests push a production module over the soft limit, move them to a sibling `tests.rs` and declare it with `#[cfg(test)] mod tests;`. Import the parent with `use super::*;` so private behavior stays directly testable without carrying the test bodies in the production file.
+When inline unit tests push a production module over the limit, move them to a sibling `tests.rs` and declare it with `#[cfg(test)] mod tests;`. Import the parent with `use super::*;` so private behavior stays directly testable without carrying the test bodies in the production file.
 
 ## Other test documents
 

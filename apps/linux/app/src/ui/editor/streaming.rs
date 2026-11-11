@@ -4,30 +4,47 @@ use relm4::ComponentSender;
 
 pub(in crate::ui) enum Input {
     Started(StreamStart),
-    Page {
-        generation: u64,
-        sequence: u64,
-        page: std::sync::Arc<QueryResult>,
-        spooled: bool,
-        accepted: tokio::sync::oneshot::Sender<bool>,
-    },
+    Page(StreamPageUpdate),
     LoadPage {
         generation: u64,
         index: u64,
         identity: StatementIdentity,
         spool: bookie_app_services::stream_result_spool::StreamResultSpool,
         columns: Vec<bookie_core::ColumnInfo>,
+        resident_pages: super::stream_pages::ResidentPageStore,
+        lease: bookie_results::stream_page_budget::StreamPageLease,
     },
     PageLoaded {
         generation: u64,
         index: u64,
         identity: StatementIdentity,
         result: Result<std::sync::Arc<QueryResult>, String>,
+        resident_pages: super::stream_pages::ResidentPageStore,
+        lease: Option<bookie_results::stream_page_budget::StreamPageLease>,
     },
     Finished {
         generation: u64,
         terminal: StreamTerminal,
     },
+}
+
+pub(in crate::ui) struct StreamPageUpdate {
+    pub(super) generation: u64,
+    pub(super) sequence: u64,
+    pub(super) page: std::sync::Arc<QueryResult>,
+    pub(super) spooled: bool,
+    pub(super) lease: bookie_results::stream_page_budget::StreamPageLease,
+    pub(super) accepted: tokio::sync::oneshot::Sender<bool>,
+}
+
+struct SpoolPageLoad {
+    generation: u64,
+    index: u64,
+    identity: StatementIdentity,
+    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
+    columns: Vec<bookie_core::ColumnInfo>,
+    resident_pages: super::stream_pages::ResidentPageStore,
+    lease: bookie_results::stream_page_budget::StreamPageLease,
 }
 
 pub(in crate::ui) struct StreamStart {
@@ -86,26 +103,35 @@ impl SqlEditor {
     pub(super) fn on_stream_input(&mut self, input: Input, sender: &ComponentSender<Self>) {
         match input {
             Input::Started(start) => self.on_stream_started(start, sender),
-            Input::Page {
-                generation,
-                sequence,
-                page,
-                spooled,
-                accepted,
-            } => self.on_stream_page(generation, sequence, page, spooled, accepted, sender),
+            Input::Page(page) => self.on_stream_page(page, sender),
             Input::LoadPage {
                 generation,
                 index,
                 identity,
                 spool,
                 columns,
-            } => load_stream_page(sender, generation, index, identity, spool, columns),
+                resident_pages,
+                lease,
+            } => load_stream_page(
+                sender,
+                SpoolPageLoad {
+                    generation,
+                    index,
+                    identity,
+                    spool,
+                    columns,
+                    resident_pages,
+                    lease,
+                },
+            ),
             Input::PageLoaded {
                 generation,
                 index,
                 identity,
                 result,
-            } => super::stream_view::complete_page_load(
+                resident_pages,
+                lease,
+            } => super::stream_view::complete_page_load_retained(
                 super::stream_view::PageLoadContext {
                     holder: self.results_surface(),
                     generation,
@@ -117,6 +143,8 @@ impl SqlEditor {
                     settings_store: self.result_view_settings.clone(),
                 },
                 result,
+                resident_pages,
+                lease,
             ),
             Input::Finished { generation, terminal } => self.on_stream_finished(generation, terminal, sender),
         }
@@ -132,6 +160,7 @@ impl SqlEditor {
             spool,
             accepted,
         } = start;
+        let page_budget = spool.page_budget();
         if !self.run_generation.accepts(generation) {
             let _ = accepted.send(false);
             return;
@@ -143,7 +172,7 @@ impl SqlEditor {
             sql,
             export_query,
             spool,
-            cache: StreamPageCache::default(),
+            cache: StreamPageCache::with_budget(page_budget),
             error: None,
         });
         self.stream_eviction_cursor = Default::default();
@@ -154,15 +183,15 @@ impl SqlEditor {
         let _ = accepted.send(true);
     }
 
-    pub(super) fn on_stream_page(
-        &mut self,
-        generation: u64,
-        sequence: u64,
-        page: std::sync::Arc<QueryResult>,
-        spooled: bool,
-        accepted: tokio::sync::oneshot::Sender<bool>,
-        sender: &ComponentSender<Self>,
-    ) {
+    pub(super) fn on_stream_page(&mut self, page: StreamPageUpdate, sender: &ComponentSender<Self>) {
+        let StreamPageUpdate {
+            generation,
+            sequence,
+            page,
+            spooled,
+            lease,
+            accepted,
+        } = page;
         if !self.run_generation.accepts(generation) {
             let _ = accepted.send(false);
             return;
@@ -172,16 +201,21 @@ impl SqlEditor {
                 let _ = accepted.send(false);
                 return;
             };
-            if let Err(error) = stream.cache.append_with_storage_status(sequence, page, spooled) {
+            if let Err(error) = stream.cache.append_with_lease(sequence, page, spooled, lease) {
                 let message = match error {
                     stream_pages::PageAppendError::OutOfOrder => {
-                        crate::tr!("A streamed result page arrived out of order.")
+                        bookie_app_services::tr!("A streamed result page arrived out of order.")
                     }
                     stream_pages::PageAppendError::SchemaChanged => {
-                        crate::tr!("The result columns changed between pages.")
+                        bookie_app_services::tr!("The result columns changed between pages.")
                     }
                     stream_pages::PageAppendError::InvalidRowWidth => {
-                        crate::tr!("A result page did not match its columns.")
+                        bookie_app_services::tr!("A result page did not match its columns.")
+                    }
+                    stream_pages::PageAppendError::RetentionLimit => {
+                        bookie_app_services::tr!(
+                            "The result memory budget is full and temporary storage is unavailable."
+                        )
                     }
                 };
                 stream.error = Some(message);
@@ -189,7 +223,7 @@ impl SqlEditor {
                 return;
             }
             if !spooled {
-                stream.error = Some(crate::tr!(
+                stream.error = Some(bookie_app_services::tr!(
                     "BookiE could not keep the complete result in temporary storage. The received rows remain available."
                 ));
             }
@@ -237,7 +271,7 @@ impl SqlEditor {
             );
         }
         self.status.set_label(
-            &crate::tr!("Received {n} rows")
+            &bookie_app_services::tr!("Received {n} rows")
                 .replace("{n}", &crate::ui::count_format::format_thousands(total_rows as u128)),
         );
     }
@@ -296,9 +330,9 @@ impl SqlEditor {
         let history_outcome = match terminal {
             StreamTerminal::Complete => Outcome::Success,
             StreamTerminal::Cancelled => Outcome::Cancelled,
-            StreamTerminal::TimedOut => Outcome::Error(crate::tr!("Query timed out")),
+            StreamTerminal::TimedOut => Outcome::Error(bookie_app_services::tr!("Query timed out")),
             StreamTerminal::Failed(message) => Outcome::Error(message.to_string()),
-            StreamTerminal::Loading => Outcome::Error(crate::tr!("Stream ended before completion")),
+            StreamTerminal::Loading => Outcome::Error(bookie_app_services::tr!("Stream ended before completion")),
         };
         if self.ends_quiet_run() {
             let _ = context;
@@ -311,14 +345,14 @@ impl SqlEditor {
         match terminal {
             StreamTerminal::Complete => self
                 .status
-                .set_label(&crate::tr!("done in {ms} ms").replace("{ms}", &elapsed.max(0).to_string())),
-            StreamTerminal::Cancelled => self.status.set_label(&crate::tr!("cancelled")),
+                .set_label(&bookie_app_services::tr!("done in {ms} ms").replace("{ms}", &elapsed.max(0).to_string())),
+            StreamTerminal::Cancelled => self.status.set_label(&bookie_app_services::tr!("cancelled")),
             StreamTerminal::TimedOut => {
-                self.status.set_label(&crate::tr!("timed out"));
+                self.status.set_label(&bookie_app_services::tr!("timed out"));
                 self.offer_longer_timeout(timed_out.0, timed_out.1);
             }
             StreamTerminal::Failed(message) => self.status.set_label(message),
-            StreamTerminal::Loading => self.status.set_label(&crate::tr!("error")),
+            StreamTerminal::Loading => self.status.set_label(&bookie_app_services::tr!("error")),
         }
     }
 
@@ -351,27 +385,39 @@ fn finish_stream_outcomes(
     (terminal, rows, outcome.into_iter().collect())
 }
 
-fn load_stream_page(
-    sender: &ComponentSender<SqlEditor>,
-    generation: u64,
-    index: u64,
-    identity: StatementIdentity,
-    spool: bookie_app_services::stream_result_spool::StreamResultSpool,
-    columns: Vec<bookie_core::ColumnInfo>,
-) {
+fn load_stream_page(sender: &ComponentSender<SqlEditor>, request: SpoolPageLoad) {
+    let SpoolPageLoad {
+        generation,
+        index,
+        identity,
+        spool,
+        columns,
+        resident_pages,
+        mut lease,
+    } = request;
     let loader = sender.clone();
     sender.command(move |_, shutdown| {
         shutdown
             .register(async move {
                 let result = spool
-                    .load_page(index, columns)
+                    .load_page_retained(index, columns, lease.clone())
                     .await
-                    .map_err(|_| crate::tr!("The saved result page could not be read.").to_string());
+                    .map_err(|_| bookie_app_services::tr!("The saved result page could not be read.").to_string())
+                    .and_then(|page| {
+                        if lease.resize_page(&page) {
+                            Ok(page)
+                        } else {
+                            Err(bookie_app_services::tr!("The result memory budget is full.").to_string())
+                        }
+                    });
+                let lease = result.as_ref().ok().map(|_| lease);
                 loader.input(SqlEditorInput::Stream(Input::PageLoaded {
                     generation,
                     index,
                     identity,
                     result,
+                    resident_pages,
+                    lease,
                 }));
             })
             .drop_on_shutdown()
@@ -380,7 +426,7 @@ fn load_stream_page(
 
 fn waiting_for_stream_page() -> adw::StatusPage {
     adw::StatusPage::builder()
-        .title(crate::tr!("Waiting for result pages"))
+        .title(bookie_app_services::tr!("Waiting for result pages"))
         .icon_name("content-loading-symbolic")
         .vexpand(true)
         .build()

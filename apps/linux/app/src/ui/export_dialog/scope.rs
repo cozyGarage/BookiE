@@ -16,21 +16,25 @@ pub(super) fn build(
     result: &QueryResult,
     paged: Option<&PagedExport>,
 ) -> (adw::PreferencesGroup, Option<adw::ComboRow>) {
-    let group = adw::PreferencesGroup::builder().title(crate::tr!("Scope")).build();
+    let group = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Scope"))
+        .build();
     if let ExportScope::TablePage { filtered } = scope {
         let labels = [
-            crate::tr!("Current table page"),
-            crate::tr!("All matching table rows (unavailable)"),
+            bookie_app_services::tr!("Current table page"),
+            bookie_app_services::tr!("All matching table rows (unavailable)"),
         ];
         let choices = gtk::StringList::new(&labels.iter().map(String::as_str).collect::<Vec<_>>());
         let choice = adw::ComboRow::builder()
-            .title(crate::tr!("Rows to export"))
+            .title(bookie_app_services::tr!("Rows to export"))
             .model(&choices)
             .build();
         let page_description = if filtered {
-            crate::tr!("{n} loaded rows from the active table filter").replace("{n}", &result.rows.len().to_string())
+            bookie_app_services::tr!("{n} loaded rows from the active table filter")
+                .replace("{n}", &result.rows.len().to_string())
         } else {
-            crate::tr!("{n} loaded rows from the current page").replace("{n}", &result.rows.len().to_string())
+            bookie_app_services::tr!("{n} loaded rows from the current page")
+                .replace("{n}", &result.rows.len().to_string())
         };
         choice.set_subtitle(&page_description);
         choice.connect_selected_notify(move |choice| {
@@ -44,8 +48,8 @@ pub(super) fn build(
         return (group, Some(choice));
     }
     let title = match scope {
-        ExportScope::QueryStored => crate::tr!("All rows from this query result"),
-        _ => crate::tr!("Loaded query result"),
+        ExportScope::QueryStored => bookie_app_services::tr!("All rows from this query result"),
+        _ => bookie_app_services::tr!("Loaded query result"),
     };
     let subtitle = super::format_subtitle(result, paged);
     group.add(

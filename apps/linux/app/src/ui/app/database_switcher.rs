@@ -10,6 +10,10 @@ pub(super) struct DatabaseChoice {
     pub current: bool,
 }
 
+pub(super) fn effective_database_name(connected: Option<&str>, saved: Option<&str>) -> String {
+    connected.or(saved).unwrap_or("database").to_owned()
+}
+
 pub(super) fn database_choices(names: &[String], current: &str) -> Vec<DatabaseChoice> {
     let mut choices: Vec<DatabaseChoice> = names
         .iter()
@@ -65,7 +69,7 @@ pub(super) fn build_database_popover(popover: &gtk::Popover, sender: &ComponentS
         .build();
     content.append(&scroll);
     let create = gtk::Button::builder()
-        .label(crate::tr!("New Database\u{2026}"))
+        .label(bookie_app_services::tr!("New Database\u{2026}"))
         .css_classes(["flat"])
         .halign(gtk::Align::Start)
         .build();
@@ -116,7 +120,7 @@ fn choice_row(choice: &DatabaseChoice, current: &str, driver_id: &str, sender: &
     if super::catalog_ddl::droppable_database(&choice.name, current, driver_id) {
         let drop = gtk::Button::builder()
             .icon_name("user-trash-symbolic")
-            .tooltip_text(crate::tr!("Drop {database}\u{2026}").replace("{database}", &choice.name))
+            .tooltip_text(bookie_app_services::tr!("Drop {database}\u{2026}").replace("{database}", &choice.name))
             .css_classes(["flat"])
             .build();
         let drop_sender = sender.clone();
@@ -164,7 +168,8 @@ impl App {
             return;
         };
         clear(&self.databases_list);
-        self.databases_list.append(&message_row(&crate::tr!("Loading…"), ""));
+        self.databases_list
+            .append(&message_row(&bookie_app_services::tr!("Loading…"), ""));
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let cancel = crate::services::request_generation::replace_in_flight(&self.database_list_cancel);
@@ -200,8 +205,10 @@ impl App {
         let names = match result {
             Ok(names) => names,
             Err(message) => {
-                self.databases_list
-                    .append(&message_row(&crate::tr!("Could not list databases"), &message));
+                self.databases_list.append(&message_row(
+                    &bookie_app_services::tr!("Could not list databases"),
+                    &message,
+                ));
                 return;
             }
         };
@@ -232,7 +239,7 @@ impl App {
             return;
         };
         let Some(mut saved) = self.saved_connections.iter().find(|saved| saved.id == id).cloned() else {
-            self.show_toast(&crate::tr!(
+            self.show_toast(&bookie_app_services::tr!(
                 "This connection is not saved, so its database cannot be switched."
             ));
             return;
@@ -353,5 +360,22 @@ mod tests {
             "next".to_owned()
         ));
         assert_eq!(pending, Some((requested_connection_id, "next".to_owned())));
+    }
+
+    #[test]
+    fn active_session_database_takes_precedence_over_saved_connection_value() {
+        let active = effective_database_name(Some("session_db"), Some("stale_saved_db"));
+        assert_eq!(active, "session_db");
+        assert!(!super::super::catalog_ddl::droppable_database(
+            "session_db",
+            &active,
+            "postgres"
+        ));
+    }
+
+    #[test]
+    fn saved_database_and_generic_name_are_fallbacks_without_session_identity() {
+        assert_eq!(effective_database_name(None, Some("saved_db")), "saved_db");
+        assert_eq!(effective_database_name(None, None), "database");
     }
 }

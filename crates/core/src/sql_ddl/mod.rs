@@ -16,6 +16,8 @@ mod catalog;
 mod column;
 mod diff;
 mod index_fk;
+mod review;
+mod sequence;
 mod table;
 mod types;
 
@@ -30,11 +32,17 @@ mod collation_tests;
 #[cfg(test)]
 mod comment_tests;
 #[cfg(test)]
+mod default_collation_tests;
+#[cfg(test)]
 mod default_tests;
 #[cfg(test)]
 mod diff_replacement_tests;
 #[cfg(test)]
 mod rename_order_tests;
+#[cfg(test)]
+mod review_tests;
+#[cfg(test)]
+mod sequence_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
@@ -49,7 +57,12 @@ pub use diff::{TableState, diff_to_ops, materialize_ops};
 pub use index_fk::{
     build_add_foreign_key, build_create_index, build_drop_constraint, build_drop_foreign_key, build_drop_index,
 };
-pub use table::{build_create_table, build_drop_table, build_rename_table, build_truncate_table};
+pub use review::{DestructiveChange, review_changes};
+pub use sequence::build_restart_sequence;
+pub use table::{
+    build_create_table, build_create_table_with_default_collation, build_drop_table, build_rename_table,
+    build_truncate_table,
+};
 pub use types::{
     BuildDdlError, ColumnCommentCapability, CommentPlacement, DraftColumn, StructureOp, column_comment_capability,
     column_comment_placement, identifiers_fold_case, supported_fk_actions,

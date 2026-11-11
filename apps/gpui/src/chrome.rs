@@ -1,0 +1,999 @@
+use bookie_gpui::font_settings;
+use bookie_gpui::messages::MessageKind;
+use bookie_gpui::shell::{ResultView, Tab, TreeRow, table_label, tree_rows_in};
+const SQL: [&str; 3] = [
+    "SELECT value, label, state, typed",
+    "FROM synthetic_rows",
+    "ORDER BY value;",
+];
+use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
+
+use crate::assets::icon;
+use crate::ui_theme::ThemeExt;
+use crate::{GridView, thousands};
+use bookie_gpui::theme::Theme;
+
+const TOOLBAR_HEIGHT: f32 = 40.0;
+const TAB_HEIGHT: f32 = 32.0;
+const STATUS_HEIGHT: f32 = 24.0;
+
+fn ghost(id: impl Into<gpui::ElementId>, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .h(px(28.0))
+        .px_2()
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(label.into())
+}
+
+fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
+    div()
+        .id("sidebar-open-top-left")
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(32.0))
+        .h(px(28.0))
+        .cursor_pointer()
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon("chevrons-right", theme.muted_foreground))
+        .on_click(cx.listener(|this, _, _, cx| {
+            this.sidebar_open = true;
+            cx.notify();
+        }))
+}
+
+fn import_menu(theme: Theme) -> Div {
+    let item = |label: &'static str| div().px_3().py_1().text_color(rgb(theme.foreground)).child(label);
+    div()
+        .absolute()
+        .top(px(40.0))
+        .left(px(8.0))
+        .w(px(220.0))
+        .flex()
+        .flex_col()
+        .py_1()
+        .rounded(px(theme.radius))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .bg(rgb(theme.background))
+        .shadow_lg()
+        .occlude()
+        .child(item("Import DBX Config"))
+        .child(item("Import Navicat NCX"))
+        .child(item("Import DBeaver"))
+        .child(item("Import DataGrip"))
+        .child(item("Import RDM"))
+        .child(item("Import AnotherRDM"))
+        .child(item("Export Connections"))
+}
+
+fn header_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(24.0))
+        .h(px(24.0))
+        .cursor_pointer()
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
+}
+
+fn window_button(id: &'static str, glyph: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(32.0))
+        .h(px(28.0))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(glyph)
+}
+
+fn ghost_icon(id: &'static str, name: &'static str, label: impl Into<String>, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .group(id)
+        .flex()
+        .items_center()
+        .gap_1()
+        .h(px(28.0))
+        .px_2()
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .text_color(rgb(theme.foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
+        .child(
+            div()
+                .invisible()
+                .group_hover(id, |style| style.visible())
+                .child(label.into()),
+        )
+}
+
+fn toolbar_icon(id: &'static str, name: &'static str, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .justify_center()
+        .w(px(32.0))
+        .h(px(28.0))
+        .rounded(px(theme.radius))
+        .cursor_pointer()
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .child(icon(name, theme.muted_foreground))
+}
+
+fn card(theme: Theme) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .rounded(px(6.0))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .bg(rgb(theme.background))
+}
+
+fn card_title(text: &str, theme: Theme) -> Div {
+    div()
+        .px_4()
+        .py_3()
+        .border_b_1()
+        .border_color(rgb(theme.border))
+        .font_weight(gpui::FontWeight::SEMIBOLD)
+        .child(text.to_string())
+}
+
+impl GridView {
+    pub fn toolbar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let inert = |id: &'static str, name: &'static str, cx: &mut Context<Self>| {
+            toolbar_icon(id, name, theme).on_click(cx.listener(|this, _, _, cx| {
+                this.status = "Synthetic prototype: nothing to open here.".into();
+                cx.notify();
+            }))
+        };
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .h(px(TOOLBAR_HEIGHT))
+            .px_2()
+            .flex_none()
+            .bg(rgb(theme.background))
+            .border_b_1()
+            .border_color(rgb(theme.border))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .children((!self.sidebar_open).then(|| expand_sidebar_button(theme, cx)))
+                    .child(inert("new-connection", "database", cx))
+                    .child(inert("new-query", "file-plus", cx))
+                    .child(inert("data-transfer", "arrow-left-right", cx))
+                    .child(inert("driver-manager", "package", cx))
+                    .child(inert("plugin-center", "puzzle", cx))
+                    .child(inert("more", "chevron-down", cx)),
+            )
+            .child(self.toolbar_right(theme, cx))
+    }
+
+    fn toolbar_right(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .child(
+                toolbar_icon("palette", "command", theme)
+                    .on_click(cx.listener(|this, _, window, cx| this.open_palette(window, cx))),
+            )
+            .child(
+                toolbar_icon("theme-toggle", if theme.dark { "sun" } else { "moon" }, theme).on_click(cx.listener(
+                    |this, _, window, cx| {
+                        this.dark_mode = !this.dark_mode;
+                        Theme::current(cx).toggled().install(cx);
+                        window.refresh();
+                    },
+                )),
+            )
+            .child(
+                window_button("win-min", "\u{2013}", theme).on_click(cx.listener(|_, _, window, _| {
+                    window.minimize_window();
+                })),
+            )
+            .child(
+                window_button("win-max", "\u{25a1}", theme).on_click(cx.listener(|_, _, window, _| {
+                    window.zoom_window();
+                })),
+            )
+            .child(
+                window_button("win-close", "\u{00d7}", theme).on_click(cx.listener(|_, _, window, _| {
+                    window.remove_window();
+                })),
+            )
+    }
+
+    pub fn sidebar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let search = self.sidebar_search.read(cx).content().to_string();
+        let rows = tree_rows_in(&self.catalog, &search, self.connection_open, self.database_open);
+        let open_table = self.tabs.current().clone();
+        let tree = rows.into_iter().enumerate().map(|(index, (depth, row))| {
+            let (label, chevron) = match &row {
+                TreeRow::Connection { open } => (self.catalog.connection.clone(), Some(*open)),
+                TreeRow::Database { open } => (self.catalog.database.clone(), Some(*open)),
+                TreeRow::Table(table) => (table_label(table), None),
+            };
+            let current = matches!(&row, TreeRow::Table(table) if open_table == Tab::Table(table.clone()));
+            let line = div()
+                .id(("tree", index))
+                .flex()
+                .items_center()
+                .h(px(26.0))
+                .pl(px(8.0 + 14.0 * depth as f32))
+                .gap_1()
+                .rounded(px(theme.radius))
+                .cursor_pointer()
+                .child(div().w(px(15.0)).flex_none().children(chevron.map(|open| {
+                    icon(
+                        if open { "chevron-down" } else { "chevron-right" },
+                        theme.muted_foreground,
+                    )
+                })))
+                .child(icon(
+                    match &row {
+                        TreeRow::Connection { .. } => "database",
+                        TreeRow::Database { .. } => "folder",
+                        TreeRow::Table(_) => "table",
+                    },
+                    theme.muted_foreground,
+                ))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .child(label),
+                );
+            let line = if current {
+                line.bg(rgb(theme.accent)).font_weight(gpui::FontWeight::MEDIUM)
+            } else {
+                line.hover(move |style| style.bg(rgb(theme.accent)))
+            };
+            line.on_click(cx.listener(move |this, _, window, cx| {
+                match &row {
+                    TreeRow::Connection { .. } => this.connection_open = !this.connection_open,
+                    TreeRow::Database { .. } => this.database_open = !this.database_open,
+                    TreeRow::Table(table) => this.open_table_named(table, window, cx),
+                }
+                cx.notify();
+            }))
+        });
+        let empty = (!search.trim().is_empty() && self.sidebar_matches(&search) == 0).then(|| {
+            div()
+                .p_3()
+                .text_color(rgb(theme.muted_foreground))
+                .child("No matching table")
+        });
+        div()
+            .relative()
+            .flex()
+            .flex_col()
+            .flex_none()
+            .w(px(self.sidebar_width))
+            .h_full()
+            .bg(rgb(theme.chrome))
+            .border_r_1()
+            .border_color(rgb(theme.border))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .min_h(px(36.0))
+                    .py_1()
+                    .px_2()
+                    .border_b_1()
+                    .border_color(rgb(theme.border))
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(
+                        div()
+                            .id("import-export-menu")
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_wrap()
+                            .items_center()
+                            .gap_1()
+                            .cursor_pointer()
+                            .child(icon("arrow-down-up", theme.muted_foreground).flex_none())
+                            .children(
+                                (self.sidebar_width >= 320.0)
+                                    .then(|| div().flex_1().min_w_0().child("Import / Export")),
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.import_menu_open = !this.import_menu_open;
+                                cx.notify();
+                            })),
+                    )
+                    .child(
+                        div()
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .child(header_icon("header-collapse-all", "chevrons-down-up", theme))
+                            .child(header_icon("header-new-folder", "folder-plus", theme))
+                            .child(header_icon("header-refresh", "refresh-cw", theme))
+                            .child(
+                                header_icon("collapse-sidebar", "chevrons-left", theme).on_click(cx.listener(
+                                    |this, _, _, cx| {
+                                        this.sidebar_open = false;
+                                        cx.notify();
+                                    },
+                                )),
+                            ),
+                    ),
+            )
+            .children(self.import_menu_open.then(|| import_menu(theme)))
+            .child(
+                div()
+                    .p_2()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .child(div().flex_1().min_w_0().child(self.sidebar_search.clone()))
+                    .child(header_icon("sidebar-locate", "crosshair", theme))
+                    .child(header_icon("sidebar-filter", "sliders-horizontal", theme))
+                    .child(header_icon("sidebar-active-only", "circle", theme)),
+            )
+            .child(div().flex().flex_col().px_2().children(tree).children(empty))
+            .child(
+                div()
+                    .id("sidebar-resize")
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .h_full()
+                    .w(px(5.0))
+                    .cursor_col_resize()
+                    .hover(move |style| style.bg(rgb(theme.info)))
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                            this.resizing_sidebar = true;
+                            cx.stop_propagation();
+                            cx.notify();
+                        }),
+                    ),
+            )
+    }
+
+    fn sidebar_matches(&self, search: &str) -> usize {
+        tree_rows_in(&self.catalog, search, true, true)
+            .iter()
+            .filter(|(_, row)| matches!(row, TreeRow::Table(_)))
+            .count()
+    }
+
+    pub fn tab_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        let active = self.tabs.active;
+        let tabs = self.tabs.items.iter().enumerate().map(|(index, tab)| {
+            let selected = index == active;
+            let mut item = div()
+                .id(("tab", index))
+                .flex()
+                .flex_none()
+                .items_center()
+                .gap_2()
+                .h_full()
+                .px_3()
+                .border_r_1()
+                .border_color(rgb(theme.border))
+                .cursor_pointer()
+                .child(icon(
+                    match tab {
+                        Tab::Home => "house",
+                        Tab::Settings => "settings",
+                        Tab::Query => "play",
+                        Tab::Table(_) => "table",
+                    },
+                    if selected { theme.info } else { theme.muted_foreground },
+                ))
+                .child(tab.title());
+            item = if selected {
+                item.bg(rgb(theme.background))
+                    .text_color(rgb(theme.foreground))
+                    .border_b_2()
+                    .border_color(rgb(theme.info))
+            } else {
+                item.text_color(rgb(theme.muted_foreground))
+                    .hover(move |style| style.bg(rgb(theme.accent)))
+            };
+            if index > 0 {
+                item = item.child(
+                    div()
+                        .id(("close", index))
+                        .px_1()
+                        .rounded(px(theme.radius))
+                        .text_color(rgb(theme.muted_foreground))
+                        .hover(move |style| style.bg(rgb(theme.muted)))
+                        .on_mouse_down(
+                            gpui::MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                                this.close_tab(index);
+                                cx.stop_propagation();
+                                cx.notify();
+                            }),
+                        )
+                        .child(icon("x", theme.muted_foreground)),
+                );
+            }
+            item.on_click(cx.listener(move |this, _, window, cx| {
+                this.tabs.active = index;
+                if let Tab::Table(name) = this.tabs.current().clone()
+                    && this.live.is_some()
+                    && name != this.catalog.grid_table
+                {
+                    this.open_table_named(&name, window, cx);
+                    cx.notify();
+                    return;
+                }
+                this.sync_grid_owner();
+                if this.tabs.shows_grid_for(&this.catalog.grid_table) {
+                    window.focus(&this.focus, cx);
+                }
+                cx.notify();
+            }))
+        });
+        div()
+            .id("workspace-tabs")
+            .flex()
+            .items_center()
+            .flex_none()
+            .w_full()
+            .min_w_0()
+            .h(px(TAB_HEIGHT))
+            .overflow_x_scroll()
+            .track_scroll(&self.tab_scroll)
+            .bg(rgb(theme.chrome))
+            .border_b_1()
+            .border_color(rgb(theme.border))
+            .children(tabs)
+    }
+
+    pub fn settings_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let view = cx.entity();
+        let fonts = self.font_group(view.clone());
+        let dark_mode = gpui_kit::component::setting::SettingField::switch(
+            |cx| Theme::current(cx).dark,
+            move |on, cx| {
+                if Theme::current(cx).dark != on {
+                    Theme::current(cx).toggled().install(cx);
+                }
+                view.update(cx, |this, _| this.dark_mode = on);
+            },
+        );
+        let page = gpui_kit::component::setting::SettingPage::new("Appearance")
+            .default_open(true)
+            .group(
+                gpui_kit::component::setting::SettingGroup::new()
+                    .item(gpui_kit::component::setting::SettingItem::new("Dark theme", dark_mode)),
+            )
+            .group(fonts);
+        div()
+            .flex_1()
+            .min_h_0()
+            .bg(rgb(theme.background))
+            .child(gpui_kit::component::setting::Settings::new("bookie-settings").page(page))
+    }
+
+    fn font_group(&self, view: gpui::Entity<Self>) -> gpui_kit::component::setting::SettingGroup {
+        use gpui_kit::component::setting::{NumberFieldOptions, SettingField, SettingGroup, SettingItem};
+        let size_options = || NumberFieldOptions {
+            min: f64::from(font_settings::MIN_SIZE),
+            max: f64::from(font_settings::MAX_SIZE),
+            step: 1.0,
+        };
+        let family = |get: fn(&font_settings::FontSettings) -> &String,
+                      set: fn(&mut font_settings::FontSettings, String)| {
+            let (read, write) = (view.clone(), view.clone());
+            SettingField::input(
+                move |cx| get(&read.read(cx).fonts).clone().into(),
+                move |value: gpui::SharedString, cx| {
+                    write.update(cx, |this, cx| {
+                        this.edit_fonts(|fonts| set(fonts, value.to_string()), cx)
+                    });
+                },
+            )
+        };
+        let size = |get: fn(&font_settings::FontSettings) -> f32, set: fn(&mut font_settings::FontSettings, f32)| {
+            let (read, write) = (view.clone(), view.clone());
+            SettingField::number_input(
+                size_options(),
+                move |cx| f64::from(get(&read.read(cx).fonts)),
+                move |value: f64, cx| {
+                    write.update(cx, |this, cx| {
+                        this.edit_fonts(|fonts| set(fonts, font_settings::clamp_size(value)), cx)
+                    });
+                },
+            )
+        };
+        SettingGroup::new()
+            .item(SettingItem::new(
+                "UI font",
+                family(|f| &f.ui_family, |f, v| f.ui_family = v),
+            ))
+            .item(SettingItem::new(
+                "UI font size",
+                size(|f| f.ui_size, |f, v| f.ui_size = v),
+            ))
+            .item(SettingItem::new(
+                "Editor font",
+                family(|f| &f.editor_family, |f, v| f.editor_family = v),
+            ))
+            .item(SettingItem::new(
+                "Editor font size",
+                size(|f| f.editor_size, |f, v| f.editor_size = v),
+            ))
+    }
+
+    pub fn edit_fonts(&mut self, edit: impl FnOnce(&mut font_settings::FontSettings), cx: &mut Context<Self>) {
+        edit(&mut self.fonts);
+        if let Err(error) = font_settings::save(&self.fonts) {
+            self.status = format!("Could not save font settings: {error}");
+        }
+        cx.notify();
+    }
+
+    pub fn home_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let stat = |label: &str, icon_name: &'static str, value: &str| {
+            card(theme)
+                .flex_1()
+                .p_4()
+                .gap_1()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(icon(icon_name, theme.muted_foreground))
+                        .child(label.to_string()),
+                )
+                .child(
+                    div()
+                        .text_size(px(22.0))
+                        .font_weight(gpui::FontWeight::SEMIBOLD)
+                        .child(value.to_string()),
+                )
+        };
+        let shortcut = |id: &'static str, icon_name: &'static str, label: &'static str, cx: &mut Context<Self>| {
+            ghost_icon(id, icon_name, label, theme).on_click(cx.listener(|this, _, _, cx| {
+                this.status = "Synthetic prototype: nothing to open here.".into();
+                cx.notify();
+            }))
+        };
+        div()
+            .flex_1()
+            .flex()
+            .justify_center()
+            .p_6()
+            .bg(rgb(theme.background))
+            .child(
+                div()
+                    .pt(px(96.0))
+                    .w(px(980.0))
+                    .max_w_full()
+                    .flex()
+                    .flex_col()
+                    .gap_4()
+                    .child(
+                        div()
+                            .flex()
+                            .gap_4()
+                            .child(stat(
+                                "Connections",
+                                "database",
+                                &self.connections.len().max(1).to_string(),
+                            ))
+                            .child(stat(
+                                "Connected",
+                                "play",
+                                &usize::from(self.live.is_some() || self.connections.is_empty()).to_string(),
+                            ))
+                            .child(stat("Database Types", "package", "1")),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .gap_4()
+                            .child(
+                                card(theme).flex_1().child(card_title("Quick Start", theme)).child(
+                                    div()
+                                        .p_2()
+                                        .flex()
+                                        .flex_col()
+                                        .children(self.connections.iter().enumerate().map(|(index, saved)| {
+                                            let name = saved.name.clone();
+                                            ghost(
+                                                ("saved-connection", index),
+                                                format!("{} · {}", saved.name, saved.driver_id),
+                                                theme,
+                                            )
+                                            .on_click(cx.listener(
+                                                move |this, _, _, cx| {
+                                                    this.connect(bookie_gpui::live::Origin::Saved(name.clone()), cx);
+                                                    cx.notify();
+                                                },
+                                            ))
+                                        }))
+                                        .when(!self.catalog.tables.is_empty(), |section| {
+                                            section.child(
+                                                ghost(
+                                                    "quick-open",
+                                                    format!(
+                                                        "{} → {}",
+                                                        self.catalog.connection,
+                                                        table_label(&self.catalog.grid_table)
+                                                    ),
+                                                    theme,
+                                                )
+                                                .on_click(cx.listener(
+                                                    |this, _, window, cx| {
+                                                        let name = this.catalog.grid_table.clone();
+                                                        this.open_table_named(&name, window, cx);
+                                                        cx.notify();
+                                                    },
+                                                )),
+                                            )
+                                        }),
+                                ),
+                            )
+                            .child(
+                                card(theme).w(px(300.0)).child(card_title("Shortcuts", theme)).child(
+                                    div()
+                                        .p_2()
+                                        .flex()
+                                        .flex_col()
+                                        .child(shortcut("s-new", "plus", "New Connection", cx))
+                                        .child(shortcut("s-history", "clock", "History", cx))
+                                        .child(shortcut("s-import", "download", "Import Connections", cx)),
+                                ),
+                            ),
+                    )
+                    .child(
+                        card(theme).child(card_title("Query History", theme)).child(
+                            div()
+                                .p_4()
+                                .text_color(rgb(theme.muted_foreground))
+                                .child("No SQL Library records yet"),
+                        ),
+                    )
+                    .child(div().w_full().text_color(rgb(theme.muted_foreground)).child(
+                        "Layout prototype with synthetic data only. Open the synthetic_rows table in the sidebar.",
+                    )),
+            )
+    }
+
+    pub fn placeholder_page(&self, name: &str, theme: Theme) -> Div {
+        div()
+            .flex_1()
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(rgb(theme.muted_foreground))
+            .child(format!(
+                "{name} has no data in this prototype. Only synthetic_rows is populated."
+            ))
+    }
+
+    pub fn status_bar(&self, theme: Theme) -> Div {
+        let right = if self.tabs.shows_grid_for(&self.catalog.grid_table) {
+            format!(
+                "{} rows · {}",
+                thousands(self.dataset_count()),
+                if theme.dark { "dark" } else { "light" }
+            )
+        } else {
+            if theme.dark { "dark".into() } else { "light".into() }
+        };
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .flex_none()
+            .h(px(STATUS_HEIGHT))
+            .px_3()
+            .bg(rgb(theme.chrome))
+            .border_t_1()
+            .border_color(rgb(theme.border))
+            .text_size(px(12.0))
+            .text_color(rgb(theme.muted_foreground))
+            .child(self.source.origin())
+            .child(right)
+    }
+
+    pub fn query_page(&mut self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
+        let editor = div()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .when(self.result_open, |pane| pane.h(gpui::relative(1.0 - self.result_ratio)))
+            .when(!self.result_open, |pane| pane.flex_1())
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .h(px(32.0))
+                    .px_2()
+                    .flex_none()
+                    .bg(rgb(theme.chrome))
+                    .border_b_1()
+                    .border_color(rgb(theme.border))
+                    .child(
+                        ghost_icon("run-query", "play", "Run  Ctrl+Enter", theme).on_click(cx.listener(
+                            |this, _, _, cx| {
+                                this.run_query(cx);
+                                cx.notify();
+                            },
+                        )),
+                    )
+                    .child(
+                        div()
+                            .text_color(rgb(theme.muted_foreground))
+                            .child(self.catalog.connection.clone()),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .min_h_0()
+                    .p_2()
+                    .gap_3()
+                    .overflow_hidden()
+                    .children(self.live.is_none().then(|| {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .text_color(rgb(theme.muted_foreground))
+                            .children((1..=SQL.len()).map(|number| div().h(px(20.0)).child(number.to_string())))
+                    }))
+                    .children(self.live.is_none().then(|| {
+                        div()
+                            .flex()
+                            .flex_col()
+                            .children(SQL.iter().map(|line| div().h(px(20.0)).child((*line).to_string())))
+                    }))
+                    .children(self.live.is_some().then(|| {
+                        div()
+                            .flex_1()
+                            .when(!self.fonts.editor_family.is_empty(), |pane| {
+                                pane.font_family(self.fonts.editor_family.clone())
+                            })
+                            .text_size(px(self.fonts.editor_size))
+                            .child(gpui_kit::component::input::Editor::new(&self.sql_input).h(gpui::relative(1.0)))
+                    })),
+            );
+        let divider = div()
+            .id("split-divider")
+            .h(px(6.0))
+            .w_full()
+            .flex_none()
+            .cursor_row_resize()
+            .bg(rgb(theme.border))
+            .hover(move |style| style.bg(rgb(theme.info)))
+            .on_mouse_down(
+                gpui::MouseButton::Left,
+                cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                    this.resizing_split = true;
+                    cx.stop_propagation();
+                    cx.notify();
+                }),
+            );
+        let result = self.result_pane(theme, grid, cx);
+        div()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .child(editor)
+            .children(self.result_open.then_some(divider))
+            .child(result)
+    }
+
+    fn result_pane(&mut self, theme: Theme, grid: Div, cx: &mut Context<Self>) -> Div {
+        let run_tabs = self.runs.iter().enumerate().map(|(index, run)| {
+            let active = index == self.active_run;
+            let tab = div()
+                .id(("run", index))
+                .flex()
+                .items_center()
+                .flex_none()
+                .h(px(28.0))
+                .px_2()
+                .rounded(px(theme.radius))
+                .border_1()
+                .cursor_pointer()
+                .child(match run.measured() {
+                    Some(took) => format!("{} · {} rows · {took}", run.label(), thousands(run.rows)),
+                    None => format!("{} · {} rows", run.label(), thousands(run.rows)),
+                })
+                .child(
+                    div()
+                        .id(("close-run", index))
+                        .px_1()
+                        .rounded(px(theme.radius))
+                        .hover(move |style| style.bg(rgb(theme.muted)))
+                        .on_mouse_down(
+                            gpui::MouseButton::Left,
+                            cx.listener(move |this, _: &MouseDownEvent, _, cx| {
+                                this.close_run(index);
+                                cx.stop_propagation();
+                                cx.notify();
+                            }),
+                        )
+                        .child(icon("x", theme.muted_foreground)),
+                );
+            let tab = if active {
+                tab.border_color(rgb(theme.border))
+                    .bg(rgb(theme.background))
+                    .shadow_sm()
+            } else {
+                tab.border_color(rgb(theme.muted))
+                    .text_color(rgb(theme.muted_foreground))
+                    .hover(move |style| style.bg(rgb(theme.accent)))
+            };
+            tab.on_click(cx.listener(move |this, _, _, cx| {
+                this.select_run(index);
+                cx.notify();
+            }))
+        });
+        let switch = |id: &'static str, label: &'static str, view: ResultView, cx: &mut Context<Self>| {
+            let selected = self.result_view == view;
+            let button = div()
+                .id(id)
+                .flex()
+                .items_center()
+                .h(px(24.0))
+                .px_2()
+                .rounded(px(theme.radius))
+                .cursor_pointer()
+                .child(label);
+            let button = if selected {
+                button.bg(rgb(theme.accent)).text_color(rgb(theme.foreground))
+            } else {
+                button.text_color(rgb(theme.muted_foreground))
+            };
+            button.on_click(cx.listener(move |this, _, _, cx| {
+                this.result_view = view;
+                cx.notify();
+            }))
+        };
+        let header = div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .h(px(40.0))
+            .px_2()
+            .flex_none()
+            .bg(rgb(theme.chrome))
+            .border_y_1()
+            .border_color(rgb(theme.border))
+            .child(icon("pin", theme.muted_foreground))
+            .child(div().w(px(1.0)).h(px(16.0)).bg(rgb(theme.border)))
+            .child(
+                div()
+                    .id("result-runs")
+                    .flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_1()
+                    .overflow_x_scroll()
+                    .track_scroll(&self.run_scroll)
+                    .children(run_tabs),
+            )
+            .child(switch("view-table", "Table Data", ResultView::Table, cx))
+            .child(switch("view-summary", "Summary", ResultView::Summary, cx))
+            .child(switch("view-messages", "Messages", ResultView::Messages, cx))
+            .child(
+                ghost("toggle-results", "", theme)
+                    .child(icon(
+                        if self.result_open {
+                            "chevron-down"
+                        } else {
+                            "chevron-right"
+                        },
+                        theme.muted_foreground,
+                    ))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.result_open = !this.result_open;
+                        cx.notify();
+                    })),
+            );
+        let body = if self.result_view == ResultView::Messages {
+            div().flex_1().min_h_0().flex().flex_col().child(
+                div()
+                    .id("messages")
+                    .flex_1()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .p_4()
+                    .overflow_y_scroll()
+                    .children(if self.messages.entries().is_empty() {
+                        vec![div().text_color(rgb(theme.muted_foreground)).child("No messages yet")]
+                    } else {
+                        self.messages
+                            .entries()
+                            .iter()
+                            .rev()
+                            .map(|message| {
+                                let line = div().child(message.text.clone());
+                                match message.kind {
+                                    MessageKind::Error => line.text_color(rgb(theme.warning)),
+                                    MessageKind::Info => line.text_color(rgb(theme.muted_foreground)),
+                                    MessageKind::Success => line,
+                                }
+                            })
+                            .collect()
+                    }),
+            )
+        } else if let Some(run) = self
+            .runs
+            .get(self.active_run)
+            .filter(|_| self.result_view == ResultView::Summary)
+        {
+            div()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .p_4()
+                .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child("Execution summary"))
+                .children(self.live.is_none().then(|| format!("Statement: {}", SQL.join(" "))))
+                .child(format!("Rows returned: {}", thousands(run.rows)))
+                .child(match run.measured() {
+                    Some(took) => format!("Elapsed: {took}"),
+                    None => format!("Elapsed: {} ms (synthetic)", run.millis()),
+                })
+                .children(
+                    self.live
+                        .is_none()
+                        .then_some("Source: synthetic generator, no database"),
+                )
+        } else if self.runs.is_empty() {
+            div().flex_1().p_4().child("No results")
+        } else {
+            grid
+        };
+        div()
+            .flex()
+            .flex_col()
+            .min_h_0()
+            .when(self.result_open, |pane| pane.flex_1())
+            .child(header)
+            .children(self.result_open.then_some(body))
+    }
+
+    pub fn viewport_rows_for(&self, window: &Window) -> usize {
+        ((f32::from(window.viewport_size().height) - 250.0) / crate::ROW_HEIGHT)
+            .floor()
+            .max(1.0) as usize
+    }
+}

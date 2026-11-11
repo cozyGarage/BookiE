@@ -31,7 +31,7 @@ impl App {
         sender: ComponentSender<App>,
     ) {
         let Some(conn) = self.window_connection() else {
-            self.finish_browse_save_failure(tab_id, save_id, crate::tr!("No active connection"));
+            self.finish_browse_save_failure(tab_id, save_id, bookie_app_services::tr!("No active connection"));
             return;
         };
         self.active_browse_saves.insert(tab_id, save_id);
@@ -170,21 +170,21 @@ impl App {
         };
         self.window.clipboard().set_text(&sql);
         self.show_toast(&match statement {
-            RowStatement::Insert => crate::tr!("INSERT statement copied"),
-            RowStatement::Update => crate::tr!("UPDATE statement copied"),
-            RowStatement::Delete => crate::tr!("DELETE statement copied"),
-            RowStatement::Where => crate::tr!("WHERE clause copied"),
+            RowStatement::Insert => bookie_app_services::tr!("INSERT statement copied"),
+            RowStatement::Update => bookie_app_services::tr!("UPDATE statement copied"),
+            RowStatement::Delete => bookie_app_services::tr!("DELETE statement copied"),
+            RowStatement::Where => bookie_app_services::tr!("WHERE clause copied"),
         });
     }
 
     pub(super) fn on_copy_to_clipboard(&self, text: String) {
         self.window.clipboard().set_text(&text);
-        self.show_toast(&crate::tr!("Copied to clipboard"));
+        self.show_toast(&bookie_app_services::tr!("Copied to clipboard"));
     }
 }
 
 fn copy_limit_refusal(rows: usize) -> Option<String> {
-    (rows > MAX_COPIED_STATEMENT_ROWS).then(|| crate::tr!("Select fewer rows to copy as statements."))
+    (rows > MAX_COPIED_STATEMENT_ROWS).then(|| bookie_app_services::tr!("Select fewer rows to copy as statements."))
 }
 
 fn copied_statements(
@@ -196,7 +196,7 @@ fn copied_statements(
     rows: Option<Vec<Vec<Value>>>,
 ) -> Result<String, String> {
     let Some(rows) = rows else {
-        return Err(crate::tr!(
+        return Err(bookie_app_services::tr!(
             "Some row values were not fetched. Show hidden columns and reload before copying or exporting."
         ));
     };
@@ -236,8 +236,10 @@ fn compute_concurrency_warning(statements: &[(String, Vec<Value>)], affected: &[
     }
     let total = zero_updates + zero_deletes;
     Some(
-        crate::tr!("{n} rows could not be located. They may have been changed by another session. Refresh and review.")
-            .replace("{n}", &total.to_string()),
+        bookie_app_services::tr!(
+            "{n} rows could not be located. They may have been changed by another session. Refresh and review."
+        )
+        .replace("{n}", &total.to_string()),
     )
 }
 

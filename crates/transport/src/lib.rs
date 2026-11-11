@@ -171,6 +171,7 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
             root_cert: saved.tls_root_cert.clone(),
             client_cert: saved.tls_client_cert.clone(),
             client_key: saved.tls_client_key.clone(),
+            strict_encryption: saved.tls_strict_encryption,
             ..Default::default()
         },
         auth_mode: saved.auth_mode,
@@ -257,6 +258,7 @@ async fn establish_inner(
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), TransportError> {
     check_auth_mode(opts.auth_mode, driver.supports_integrated_auth(), driver.display_name())?;
     validate_client_tls_auth(driver, &opts)?;
+    validate_strict_encryption(driver, &opts)?;
     validate_local_socket(&opts, driver, ssh.is_some())?;
     opts.forwarded_socket_dir = None;
     let tunnel = match ssh {
@@ -266,6 +268,15 @@ async fn establish_inner(
     let timeout = connect_timeout(&opts);
     let raw = connect_with_timeout(driver, opts, timeout).await?;
     Ok((raw, tunnel))
+}
+
+fn validate_strict_encryption(driver: &dyn DatabaseDriver, opts: &ConnectOptions) -> Result<(), TransportError> {
+    if opts.tls.strict_encryption && !driver.supports_strict_encryption() {
+        return Err(
+            DriverError::Unsupported(format!("{} does not support strict encryption", driver.display_name())).into(),
+        );
+    }
+    Ok(())
 }
 
 fn validate_client_tls_auth(driver: &dyn DatabaseDriver, opts: &ConnectOptions) -> Result<(), TransportError> {
@@ -367,6 +378,13 @@ async fn open_builtin(
         return Err(TransportError::Ssh("jump chain is empty".into()));
     }
     let unknown = environment.unknown_host_key;
+    let local_port = hops.last().and_then(|hop| hop.local_port);
+    if let (Some(_), Some(port)) = (&socket_name, local_port) {
+        return Err(route::fixed_port_needs_tcp(port));
+    }
+    if let Some(port) = local_port {
+        return open_builtin_on_port(hops, remote, port, environment).await;
+    }
     match (&socket_name, &environment.builtin_prompter) {
         (Some(name), Some(prompter)) => {
             SshTunnel::open_chain_socket_prompted(hops, remote.0.clone(), remote.1, name, unknown, prompter.clone())
@@ -378,12 +396,33 @@ async fn open_builtin(
         (Some(name), None) => SshTunnel::open_chain_socket(hops, remote.0.clone(), remote.1, name, unknown).await,
         (None, None) => SshTunnel::open_chain(hops, remote.0.clone(), remote.1, unknown).await,
     }
-    .map_err(|error| match error {
+    .map_err(map_ssh_error)
+}
+
+async fn open_builtin_on_port(
+    hops: &[SshConfig],
+    remote: &(String, u16),
+    port: u16,
+    environment: &SshEnvironment,
+) -> Result<SshTunnel, TransportError> {
+    let unknown = environment.unknown_host_key;
+    match &environment.builtin_prompter {
+        Some(prompter) => {
+            SshTunnel::open_chain_on_port_prompted(hops, remote.0.clone(), remote.1, port, unknown, prompter.clone())
+                .await
+        }
+        None => SshTunnel::open_chain_on_port(hops, remote.0.clone(), remote.1, port, unknown).await,
+    }
+    .map_err(map_ssh_error)
+}
+
+fn map_ssh_error(error: bookie_ssh::SshError) -> TransportError {
+    match error {
         error @ bookie_ssh::SshError::UnknownHostKey { .. } => TransportError::HostKeyRefused(error.to_string()),
         error @ bookie_ssh::SshError::HostKeyMismatch { .. } => TransportError::HostKeyChanged(error.to_string()),
         error @ bookie_ssh::SshError::Timeout { .. } => TransportError::SshTimeout(error.to_string()),
         error => TransportError::Ssh(error.to_string()),
-    })
+    }
 }
 
 async fn connect_with_timeout(
@@ -444,6 +483,9 @@ async fn resolve_saved_ssh_chain(id: Uuid, saved: &SavedSshConfig) -> Result<Vec
     for (index, hop) in hops.into_iter().enumerate() {
         out.push(resolve_saved_ssh_hop(id, hop, index).await?);
     }
+    if let Some(last) = out.last_mut() {
+        last.local_port = saved.local_port;
+    }
     Ok(out)
 }
 
@@ -475,6 +517,7 @@ pub(crate) async fn resolve_saved_ssh_hop(
         port: saved.port,
         username: saved.username.clone(),
         auth,
+        local_port: None,
     })
 }
 

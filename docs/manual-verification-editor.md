@@ -16,6 +16,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Saving a file that is a symlink updates its target and keeps the link.
 - [ ] Restart with a file tab open: the tab is titled by the file again, unsaved edits still show `•`, and Ctrl+S saves to the same file.
 - [ ] Restart with a saved connection, an active editor draft, a kept table tab and a preview table tab: restore the connection, draft and kept tab, omit the preview tab, and do not execute the draft until Run.
+- [ ] In a native Wayland session with a working preedit-capable input method, restore a workspace with at least three SQL editor tabs and the second tab selected. Focus its editor, compose and commit a multi-keystroke Unicode character, and confirm the committed text appears at the caret in that tab while both background tabs remain unchanged. Repeat immediately after another restart, cancel one composition before committing, and confirm cancellation inserts no text. Record the input method and package identity in the private verification record. The automated first-key restore test checks keyboard focus under Xvfb; it does not establish this IME behavior.
 - [ ] Delete that file, then restart: the tab keeps its text and a toast says it is no longer linked.
 - [ ] Ctrl+S on a browse or structure tab still saves pending edits there.
 - [ ] A `.sql` file above the size limit is refused with an explanation, not truncated.
