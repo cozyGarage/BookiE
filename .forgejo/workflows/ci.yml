@@ -65,12 +65,13 @@ jobs:
       - name: Check out requested revision
         shell: bash
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
           REQUESTED_REF: ${{ inputs.ref }}
           EVENT_SHA: ${{ github.sha }}
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -117,11 +118,12 @@ jobs:
       - name: Check out
         shell: bash
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -165,10 +167,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -227,13 +230,14 @@ jobs:
       - name: Check out
         shell: bash
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -305,13 +309,14 @@ jobs:
       - name: Check out
         shell: bash
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -372,13 +377,14 @@ jobs:
       - name: Check out
         shell: bash
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -446,10 +452,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -503,10 +510,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -544,10 +552,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -599,13 +608,14 @@ jobs:
       - name: Check out
         shell: bash
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           touch "$CARGO_TARGET_DIR/.bookie-last-used" /target/.bookie-build-cache.lock
           sccache --start-server
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -672,10 +682,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -736,10 +747,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -787,11 +799,12 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$TMPDIR"
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -840,10 +853,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -891,10 +905,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -930,10 +945,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -985,10 +1001,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -1040,10 +1057,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -1091,10 +1109,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -1158,10 +1177,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -1211,10 +1231,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -1257,10 +1278,11 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -1303,11 +1325,12 @@ jobs:
       - name: Check out
         shell: bash
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
           mkdir -p "$CARGO_TARGET_DIR" "$TMPDIR"
           rm -rf src
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
@@ -1371,9 +1394,10 @@ jobs:
       - name: Check out
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
         env:
-          TOKEN: ${{ github.token }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           SERVER: ${{ github.server_url }}
         run: |
+          : "${TOKEN:?Forgejo checkout token is missing}"
           auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
           GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \

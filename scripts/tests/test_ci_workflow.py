@@ -670,6 +670,8 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertRegex(block, r"(?m)^    timeout-minutes: [1-9][0-9]*$", heading.group(1))
 
             self.assertNotRegex(workflow, r"https?://oauth2:\$\{TOKEN\}@")
+            self.assertIn("TOKEN: ${{ secrets.FORGEJO_TOKEN }}", workflow)
+            self.assertNotIn("TOKEN: ${{ github.token }}", workflow)
             lines = workflow.splitlines()
             clone_lines = [index for index, line in enumerate(lines) if "git clone --quiet" in line]
             self.assertTrue(clone_lines, name)
