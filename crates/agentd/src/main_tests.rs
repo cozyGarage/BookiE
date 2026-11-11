@@ -1,10 +1,14 @@
 #[test]
-fn only_a_single_y_allows_a_terminal_approval() {
-    for allowed in ["y", "Y", "y\n", " y \r\n", "\ty"] {
-        assert_eq!(outcome_for_answer(allowed), ApprovalOutcome::AllowOnce, "{allowed:?}");
+fn only_the_current_prompt_answer_allows_a_terminal_approval() {
+    for allowed in ["approve 8b7d", " approve 8b7d \r\n"] {
+        assert_eq!(
+            outcome_for_answer(allowed, "8b7d"),
+            ApprovalOutcome::AllowOnce,
+            "{allowed:?}"
+        );
     }
     for denied in ["", "\n", "n", "yes", "yy", "ny", "y n", "1", "ok", "\u{ff59}"] {
-        assert_eq!(outcome_for_answer(denied), ApprovalOutcome::Deny, "{denied:?}");
+        assert_eq!(outcome_for_answer(denied, "8b7d"), ApprovalOutcome::Deny, "{denied:?}");
     }
 }
 
@@ -231,4 +235,119 @@ fn every_registered_driver_is_listed_in_the_feature_table_with_its_declared_matu
             driver.display_name()
         );
     }
+}
+#[test]
+fn an_approval_answer_must_match_the_current_prompt() {
+    assert_eq!(outcome_for_answer("approve 8b7d", "8b7d"), ApprovalOutcome::AllowOnce);
+    assert_eq!(outcome_for_answer("approve 8b7d", "other"), ApprovalOutcome::Deny);
+}
+
+#[tokio::test]
+async fn cancelling_a_prompt_keeps_the_terminal_locked_until_the_reader_exits() {
+    use std::sync::atomic::Ordering;
+    use std::time::Duration;
+
+    let (started, wait_started) = tokio::sync::oneshot::channel();
+    let (stopping, wait_stopping) = tokio::sync::oneshot::channel();
+    let (release, wait_release) = std::sync::mpsc::channel();
+    let first = tokio::spawn(terminal_approval(move |cancelled| {
+        let _ = started.send(());
+        while !cancelled.load(Ordering::Acquire) {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let _ = stopping.send(());
+        let _ = wait_release.recv_timeout(Duration::from_secs(2));
+        ApprovalOutcome::Deny
+    }));
+    tokio::time::timeout(Duration::from_secs(2), wait_started)
+        .await
+        .unwrap()
+        .unwrap();
+    first.abort();
+    let _ = first.await;
+    tokio::time::timeout(Duration::from_secs(2), wait_stopping)
+        .await
+        .unwrap()
+        .unwrap();
+    let (entered, mut wait_entered) = tokio::sync::oneshot::channel();
+    let second = tokio::spawn(terminal_approval(move |_| {
+        let _ = entered.send(());
+        ApprovalOutcome::Deny
+    }));
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), &mut wait_entered)
+            .await
+            .is_err()
+    );
+    release.send(()).unwrap();
+    tokio::time::timeout(Duration::from_secs(2), wait_entered)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(second.await.unwrap(), ApprovalOutcome::Deny);
+}
+
+#[tokio::test]
+async fn a_late_terminal_answer_cannot_approve_the_next_request() {
+    use std::io::Write;
+    use std::os::fd::FromRawFd;
+    use std::sync::atomic::Ordering;
+    use std::time::{Duration, Instant};
+
+    let (mut master_fd, mut slave_fd) = (-1, -1);
+    let result = unsafe {
+        libc::openpty(
+            &mut master_fd,
+            &mut slave_fd,
+            std::ptr::null_mut(),
+            std::ptr::null(),
+            std::ptr::null(),
+        )
+    };
+    assert_eq!(result, 0);
+    let mut master = unsafe { std::fs::File::from_raw_fd(master_fd) };
+    let mut first_terminal = unsafe { std::fs::File::from_raw_fd(slave_fd) };
+    let mut second_terminal = first_terminal.try_clone().unwrap();
+    let (first_ready, wait_first) = tokio::sync::oneshot::channel();
+    let first = tokio::spawn(terminal_approval(move |cancelled| {
+        tty_answer::discard_pending_input(&first_terminal);
+        let _ = first_ready.send(());
+        tty_answer::read_answer(
+            &mut first_terminal,
+            Instant::now() + Duration::from_secs(5),
+            &|| cancelled.load(Ordering::Acquire),
+            "old",
+        )
+        .unwrap_or(ApprovalOutcome::Deny)
+    }));
+    tokio::time::timeout(Duration::from_secs(2), wait_first)
+        .await
+        .unwrap()
+        .unwrap();
+    first.abort();
+    let _ = first.await;
+    let (second_ready, wait_second) = tokio::sync::oneshot::channel();
+    let second = tokio::spawn(terminal_approval(move |cancelled| {
+        tty_answer::discard_pending_input(&second_terminal);
+        let _ = second_ready.send(());
+        tty_answer::read_answer(
+            &mut second_terminal,
+            Instant::now() + Duration::from_secs(5),
+            &|| cancelled.load(Ordering::Acquire),
+            "new",
+        )
+        .unwrap_or(ApprovalOutcome::Deny)
+    }));
+    tokio::time::timeout(Duration::from_secs(2), wait_second)
+        .await
+        .unwrap()
+        .unwrap();
+    master.write_all(b"approve old\n").unwrap();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), second)
+            .await
+            .unwrap()
+            .unwrap(),
+        ApprovalOutcome::Deny
+    );
 }
