@@ -984,6 +984,24 @@ class CiWorkflowTests(unittest.TestCase):
             commands[1],
         )
 
+    def test_b4_rollback_runs_in_both_hosted_gates(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(r"(?ms)^  b4-rollback:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", github)
+        forgejo_job = re.search(r"(?ms)^  b4-rollback:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo)
+        self.assertIsNotNone(github_job)
+        self.assertIsNotNone(forgejo_job)
+        self.assertIn("python3 scripts/run-test-layer.py b4-rollback", github_job.group(1))
+        self.assertIn("python3 scripts/run-test-layer.py b4-rollback", forgejo_job.group(1))
+
+        layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
+        self.assertEqual(
+            layers["b4-rollback"]["hosted_gate"],
+            "Build Linux / Policy rollback acceptance; lab-ci / b4-rollback",
+        )
+        gate = re.search(r"(?ms)^  regression-gate:\n(.*?)(?=\Z)", forgejo).group(1)
+        self.assertRegex(gate, r"(?m)^      - b4-rollback$")
+
     def test_mysql_approval_dialog_runs_in_hosted_installed_gtk_acceptance(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
