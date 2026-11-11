@@ -696,11 +696,7 @@ jobs:
         run: bash src/scripts/prepull-test-images.sh pg-dump
       - name: PostgreSQL dump and restore
         if: matrix.driver == 'core'
-        env:
-          TMPDIR: ${{ github.workspace }}/.tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}
-        run: |
-          mkdir -p "$TMPDIR"
-          cd src && python3 scripts/run-test-layer.py pg-dump
+        run: cd src && python3 scripts/run-test-layer.py pg-dump
 
       - name: Finalize runner job
         if: always()

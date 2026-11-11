@@ -27,12 +27,15 @@ if [[ "${GITHUB_RUN_ID:-}" =~ ^[0-9]+$ ]]; then
   if [[ "${TMPDIR:-}" == "/var/cache/ci/tmp/bookie-guards-$GITHUB_RUN_ID" ]]; then
     rm -rf -- "$TMPDIR" || status=$?
   fi
-  if [[ "${TMPDIR:-}" == "$workspace/.tmp-pg-dump-$GITHUB_RUN_ID-${GITHUB_RUN_ATTEMPT:-1}" ]]; then
-    rm -rf -- "$TMPDIR" || status=$?
+  if [[ "${GITHUB_JOB:-}" == driver ]]; then
+    pg_dump_tmp="$workspace/.tmp-pg-dump-$GITHUB_RUN_ID-${GITHUB_RUN_ATTEMPT:-1}"
+    if [[ -d "$pg_dump_tmp" && ! -L "$pg_dump_tmp" ]]; then
+      rm -rf -- "$pg_dump_tmp" || status=$?
+    fi
   fi
 fi
 
-if [[ "${GITHUB_JOB:-}" == driver && "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/bookie-driver-[0-9]+-[0-9]+-(postgres|mysql|mssql|clickhouse|redis|mongodb|oracle|duckdb)$ ]]; then
+if [[ "${GITHUB_JOB:-}" == driver && "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/bookie-driver-[0-9]+-[0-9]+-(core|analytics|extended|postgres|mysql|mssql|clickhouse|redis|mongodb|oracle|duckdb)$ ]]; then
   rm -rf -- "$TMPDIR" || status=$?
 fi
 
