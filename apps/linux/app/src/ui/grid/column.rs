@@ -360,7 +360,8 @@ fn row_key_is_ambiguous(context: &TabGridContext, key: Option<&crate::services::
 }
 
 fn mark_ambiguous_key(child: &gtk4::Widget, ambiguous: bool) {
-    let reason = bookie_app_services::tr!("Another loaded row has the same key, so this row cannot be edited on its own.");
+    let reason =
+        bookie_app_services::tr!("Another loaded row has the same key, so this row cannot be edited on its own.");
     if ambiguous {
         child.set_tooltip_text(Some(&reason));
     } else if child.tooltip_text().is_some_and(|tooltip| tooltip == reason) {
@@ -579,6 +580,15 @@ fn bind_bool_cell(
     ROW_KEY_SLOT.set(checkbox, binding.pk_values);
 }
 
+/// Numbers, and NULLs in a numeric column, line up on the right so their digits share one edge.
+pub(super) fn right_aligned_column(column: &ColumnInfo) -> bool {
+    use bookie_core::FilterValueKind;
+    matches!(
+        bookie_core::filter_value_kind(column),
+        FilterValueKind::Int | FilterValueKind::Float | FilterValueKind::Decimal
+    )
+}
+
 fn bind_readonly_label(
     label: &gtk4::Label,
     position: u32,
@@ -589,6 +599,7 @@ fn bind_readonly_label(
     highlight: Option<bookie_app_services::highlight_match::HighlightPaint>,
 ) {
     label.set_text(text);
+    label.set_xalign(if right_aligned_column(binding.column) { 1.0 } else { 0.0 });
     apply_cell_tooltip(label.upcast_ref(), text, is_null, truncated);
     set_class(label.upcast_ref(), "dim-label", is_null);
     apply_cell_state(label.upcast_ref(), &binding.pending_classes);
@@ -720,5 +731,35 @@ mod expression_column_tests {
         assert_eq!(column_header_title(&info(""), false), "count(*)");
         assert_eq!(column_header_title(&info("integer"), false), "count(*)\ninteger");
         assert_eq!(shown_type(&info("null")), None);
+    }
+}
+
+#[cfg(test)]
+mod numeric_alignment_tests {
+    use super::*;
+
+    fn column(data_type: &str) -> ColumnInfo {
+        ColumnInfo {
+            name: "n".into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        }
+    }
+
+    #[test]
+    fn integer_and_decimal_columns_align_right_and_text_does_not() {
+        assert!(right_aligned_column(&column("integer")));
+        assert!(right_aligned_column(&column("NUMERIC(10,2)")));
+        assert!(right_aligned_column(&column("double precision")));
+        assert!(!right_aligned_column(&column("text")));
+        assert!(!right_aligned_column(&column("varchar(20)")));
     }
 }
