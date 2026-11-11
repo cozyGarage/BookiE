@@ -29,6 +29,8 @@ mod result_sets;
 mod server_owned_columns;
 #[path = "support/shared_container.rs"]
 mod shared_container;
+#[path = "support/single_precision.rs"]
+mod single_precision;
 #[path = "support/sql_variant.rs"]
 mod sql_variant;
 #[path = "support/temporal_boundaries.rs"]
