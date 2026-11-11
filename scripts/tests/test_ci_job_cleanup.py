@@ -305,6 +305,8 @@ class CiJobCleanupTests(unittest.TestCase):
                     **os.environ,
                     "PATH": f"{bin_dir}:{os.environ['PATH']}",
                     "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "GITHUB_JOB": "b4-rollback",
                     "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-123-2",
                     "RM_CALLS": str(calls),
                 },
@@ -317,6 +319,70 @@ class CiJobCleanupTests(unittest.TestCase):
                 ["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-123-2"],
                 [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()],
             )
+
+    def test_another_job_cannot_remove_the_b4_rollback_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_JOB": "driver",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-123-2",
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertNotIn(["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-123-2"], rm_calls)
+
+    def test_b4_rollback_finalizer_cannot_remove_another_run_temp_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bin_dir = Path(temporary) / "bin"
+            bin_dir.mkdir()
+            calls = Path(temporary) / "calls"
+            rm = bin_dir / "rm"
+            rm.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, sys\n"
+                "with open(os.environ['RM_CALLS'], 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+                encoding="utf-8",
+            )
+            rm.chmod(0o755)
+            result = subprocess.run(
+                ["bash", str(CLEANUP)],
+                env={
+                    **os.environ,
+                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                    "GITHUB_JOB": "b4-rollback",
+                    "GITHUB_RUN_ID": "123",
+                    "GITHUB_RUN_ATTEMPT": "2",
+                    "TMPDIR": "/var/cache/ci/tmp/bookie-b4-rollback-456-2",
+                    "RM_CALLS": str(calls),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+            self.assertNotIn(["-rf", "--", "/var/cache/ci/tmp/bookie-b4-rollback-456-2"], rm_calls)
 
     def test_driver_finalizer_removes_only_its_scoped_scratch_path(self):
         with tempfile.TemporaryDirectory() as temporary:
