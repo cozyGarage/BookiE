@@ -107,310 +107,50 @@ impl Component for HistoryDialog {
         let toolbar = adw::ToolbarView::new();
         let header = adw::HeaderBar::builder().show_end_title_buttons(false).build();
         header.set_title_widget(Some(&adw::WindowTitle::new(&bookie_app_services::tr!("Query History"), "")));
-        let close_button = gtk::Button::builder()
-            .label(bookie_app_services::tr!("Close history"))
-            .tooltip_text(bookie_app_services::tr!("Close history"))
-            .build();
-        let close_sender = sender.clone();
-        close_button.connect_clicked(move |_| {
-            let _ = close_sender.output(HistoryDialogOutput::Close);
-        });
-        header.pack_end(&close_button);
-
-        let filter_popover = gtk::Popover::new();
-        let filter_button = gtk::MenuButton::builder()
-            .label(bookie_app_services::tr!("Filter"))
-            .always_show_arrow(true)
-            .tooltip_text(bookie_app_services::tr!("Filter history"))
-            .popover(&filter_popover)
-            .build();
-        keep_inside_window(&filter_popover, &filter_button);
+        header.pack_end(&build::close_button(&sender));
 
         let connections = init.database.all_connections();
-
-        let conn_strings: Vec<String> = std::iter::once(bookie_app_services::tr!("All connections"))
-            .chain(connections.iter().map(|m| m.name.clone()))
-            .collect();
-        let conn_strings_ref: Vec<&str> = conn_strings.iter().map(String::as_str).collect();
-        let conn_model = gtk::StringList::new(&conn_strings_ref);
-        let filter_connection = adw::ComboRow::builder()
-            .title(bookie_app_services::tr!("Connection"))
-            .model(&conn_model)
-            .build();
-
-        let status_strings = [
-            bookie_app_services::tr!("Any"),
-            bookie_app_services::tr!("Successful"),
-            bookie_app_services::tr!("Failed"),
-            bookie_app_services::tr!("Cancelled"),
-        ];
-        let status_strings_ref: Vec<&str> = status_strings.iter().map(String::as_str).collect();
-        let status_model = gtk::StringList::new(&status_strings_ref);
-        let filter_status = adw::ComboRow::builder()
-            .title(bookie_app_services::tr!("Status"))
-            .model(&status_model)
-            .build();
-
-        let window_strings = [
-            bookie_app_services::tr!("Any time"),
-            bookie_app_services::tr!("Last 24 hours"),
-            bookie_app_services::tr!("Last 7 days"),
-            bookie_app_services::tr!("Last 30 days"),
-        ];
-        let window_strings_ref: Vec<&str> = window_strings.iter().map(String::as_str).collect();
-        let window_model = gtk::StringList::new(&window_strings_ref);
-        let filter_window = adw::ComboRow::builder()
-            .title(bookie_app_services::tr!("Time window"))
-            .model(&window_model)
-            .build();
-
-        let source_strings = [
-            bookie_app_services::tr!("Anywhere"),
-            bookie_app_services::tr!("SQL editor"),
-            bookie_app_services::tr!("Table structure"),
-            bookie_app_services::tr!("Row edits"),
-        ];
-        let source_strings_ref: Vec<&str> = source_strings.iter().map(String::as_str).collect();
-        let source_model = gtk::StringList::new(&source_strings_ref);
-        let filter_source = adw::ComboRow::builder()
-            .title(bookie_app_services::tr!("Ran from"))
-            .model(&source_model)
-            .build();
-
-        let reset_button = gtk::Button::builder()
-            .label(bookie_app_services::tr!("Reset"))
-            .halign(gtk::Align::End)
-            .margin_top(6)
-            .build();
-        reset_button.add_css_class("flat");
-        let reset_conn = filter_connection.clone();
-        let reset_status = filter_status.clone();
-        let reset_window = filter_window.clone();
-        let reset_source = filter_source.clone();
-        reset_button.connect_clicked(move |_| {
-            reset_conn.set_selected(0);
-            reset_status.set_selected(0);
-            reset_window.set_selected(0);
-            reset_source.set_selected(0);
-        });
-
-        // Native popover content: a single AdwPreferencesGroup of
-        // AdwComboRow filters, with the Reset button below. Replaces
-        // the gtk::Grid + paired labels (the GTK3-era pattern) —
-        // ComboRows carry their own titles, so the Grid column of
-        // labels was redundant.
-        let filter_group = adw::PreferencesGroup::new();
-        filter_group.add(&filter_connection);
-        filter_group.add(&filter_status);
-        filter_group.add(&filter_window);
-        filter_group.add(&filter_source);
-
-        // Reset lives in the group's header-suffix slot so the
-        // popover content is just the AdwPreferencesGroup — no
-        // wrapper Box needed for layout.
-        filter_group.set_header_suffix(Some(&reset_button));
-        filter_popover.set_child(Some(&filter_group));
-
-        for combo in [&filter_connection, &filter_status, &filter_window, &filter_source] {
-            let s = sender.clone();
-            combo.connect_selected_notify(move |_| s.input(HistoryDialogInput::FiltersChanged));
-        }
-
+        let (filter_button, filters) = build::filter_button(&connections, &sender);
         header.pack_start(&filter_button);
+        header.pack_start(&build::select_button(&sender));
+        header.pack_end(&build::more_actions_button());
 
-        let select_button = gtk::ToggleButton::builder()
-            .label(bookie_app_services::tr!("Select"))
-            .tooltip_text(bookie_app_services::tr!("Toggle multi-select"))
-            .build();
-        let s_select = sender.clone();
-        select_button.connect_toggled(move |btn| {
-            s_select.input(HistoryDialogInput::ToggleSelectMode(btn.is_active()));
-        });
-        header.pack_start(&select_button);
-
-        let menu = gio::Menu::new();
-        let storage_section = gio::Menu::new();
-        storage_section.append(Some(&bookie_app_services::tr!("Show storage location")), Some("history.show-storage"));
-        menu.append_section(None, &storage_section);
-        let danger_section = gio::Menu::new();
-        danger_section.append(Some(&bookie_app_services::tr!("Clear all history…")), Some("history.clear-all"));
-        menu.append_section(None, &danger_section);
-        let menu_button = gtk::MenuButton::builder()
-            .icon_name("view-more-symbolic")
-            .menu_model(&menu)
-            .tooltip_text(bookie_app_services::tr!("More actions"))
-            .build();
-        header.pack_end(&menu_button);
-
-        let action_group = gio::SimpleActionGroup::new();
-        let export_sql_sender = sender.clone();
-        let export_sql = gio::ActionEntry::builder("export-sql")
-            .activate(move |_, _, _| export_sql_sender.input(HistoryDialogInput::ExportSelectedSql))
-            .build();
-        let export_csv_sender = sender.clone();
-        let export_csv = gio::ActionEntry::builder("export-csv")
-            .activate(move |_, _, _| export_csv_sender.input(HistoryDialogInput::ExportSelectedCsv))
-            .build();
-        let delete_sender = sender.clone();
-        let delete = gio::ActionEntry::builder("delete-selected")
-            .activate(move |_, _, _| delete_sender.input(HistoryDialogInput::DeleteSelected))
-            .build();
-        let clear_sender = sender.clone();
-        let clear_all = gio::ActionEntry::builder("clear-all")
-            .activate(move |_, _, _| clear_sender.input(HistoryDialogInput::ClearAllRequested))
-            .build();
-        let storage_sender = sender.clone();
-        let show_storage = gio::ActionEntry::builder("show-storage")
-            .activate(move |_, _, _| storage_sender.input(HistoryDialogInput::OpenStorageLocation))
-            .build();
-        action_group.add_action_entries([export_sql, export_csv, delete, clear_all, show_storage]);
-
-        let search = gtk::SearchEntry::builder()
-            .placeholder_text(bookie_app_services::tr!("Search queries…"))
-            .hexpand(true)
-            .build();
-        let s = sender.clone();
-        search.connect_search_changed(move |_| s.input(HistoryDialogInput::SearchChanged));
-
-        let search_bar = gtk::SearchBar::builder()
-            .child(&search)
-            .show_close_button(true)
-            .search_mode_enabled(false)
-            .build();
-        search_bar.connect_entry(&search);
-
-        let search_toggle = gtk::ToggleButton::builder()
-            .icon_name("system-search-symbolic")
-            .tooltip_text(bookie_app_services::tr!("Search"))
-            .build();
-        let search_bar_for_toggle = search_bar.clone();
-        search_toggle.connect_toggled(move |btn| {
-            search_bar_for_toggle.set_search_mode(btn.is_active());
-        });
-        let toggle_for_close = search_toggle.clone();
-        search_bar.connect_search_mode_enabled_notify(move |bar| {
-            toggle_for_close.set_active(bar.is_search_mode());
-        });
+        let (search, search_bar, search_toggle) = build::search(&sender);
         header.pack_end(&search_toggle);
 
         let inner = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         inner.append(&search_bar);
-
-        // Each section is an AdwPreferencesGroup with a boxed-list
-        // ListBox. The group's `title` provides the section heading
-        // styling (matches Settings / Builder section dividers); we
-        // toggle the group's visibility instead of separate Label +
-        // ListBox visibility.
-        let pinned_listbox = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
-        pinned_listbox.add_css_class("boxed-list");
-        let pinned_group = adw::PreferencesGroup::builder()
-            .title(bookie_app_services::tr!("Pinned"))
-            .visible(false)
-            .build();
-        pinned_group.add(&pinned_listbox);
-
-        let listbox = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
-        listbox.add_css_class("boxed-list");
-        let list_group = adw::PreferencesGroup::builder()
-            .title(bookie_app_services::tr!("All queries"))
-            .visible(false)
-            .build();
-        list_group.add(&listbox);
-
-        let list_box = gtk::Box::builder()
-            .orientation(gtk::Orientation::Vertical)
-            .spacing(12)
-            .margin_top(12)
-            .margin_bottom(12)
-            .margin_start(12)
-            .margin_end(12)
-            .build();
-        list_box.append(&pinned_group);
-        list_box.append(&list_group);
-
-        let scroll = gtk::ScrolledWindow::builder()
-            .child(&list_box)
-            .hscrollbar_policy(gtk::PolicyType::Never)
-            .vexpand(true)
-            .build();
-
-        let status_page = adw::StatusPage::builder()
-            .icon_name("document-open-recent-symbolic")
-            .title(bookie_app_services::tr!("No queries yet"))
-            .description(bookie_app_services::tr!("Run a query in the SQL editor and it will appear here."))
-            .vexpand(true)
-            .build();
-
-        let stack = gtk::Stack::builder()
-            .vhomogeneous(false)
-            .vexpand(true)
-            .margin_top(12)
-            .build();
-        stack.add_named(&scroll, Some("list"));
-        stack.add_named(&status_page, Some("empty"));
-
+        let lists = build::list_area();
+        let (stack, status_page) = build::content_stack(&lists.scroll);
         inner.append(&stack);
         search_bar.set_key_capture_widget(Some(&inner));
 
-        let selection_label = gtk::Label::builder().xalign(0.0).hexpand(true).build();
-        selection_label.add_css_class("dim-label");
-
-        let export_menu = gio::Menu::new();
-        export_menu.append(Some(&bookie_app_services::tr!("Export as SQL")), Some("history.export-sql"));
-        export_menu.append(Some(&bookie_app_services::tr!("Export as CSV")), Some("history.export-csv"));
-        let export_button = gtk::MenuButton::builder()
-            .label(bookie_app_services::tr!("Export"))
-            .always_show_arrow(true)
-            .menu_model(&export_menu)
-            .build();
-
-        let delete_button = gtk::Button::builder().label(bookie_app_services::tr!("Delete")).build();
-        delete_button.add_css_class("destructive-action");
-        let s_del_bar = sender.clone();
-        delete_button.connect_clicked(move |_| s_del_bar.input(HistoryDialogInput::DeleteSelected));
-
-        let selection_bar_inner = gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .spacing(8)
-            .margin_top(6)
-            .margin_bottom(6)
-            .margin_start(12)
-            .margin_end(12)
-            .build();
-        selection_bar_inner.append(&selection_label);
-        selection_bar_inner.append(&export_button);
-        selection_bar_inner.append(&delete_button);
-        let selection_bar = gtk::Revealer::builder()
-            .child(&selection_bar_inner)
-            .transition_type(gtk::RevealerTransitionType::SlideUp)
-            .reveal_child(false)
-            .build();
-        toolbar.add_bottom_bar(&selection_bar);
-
+        let selection = build::selection_bar(&sender);
+        toolbar.add_bottom_bar(&selection.revealer);
         toolbar.add_top_bar(&header);
         toolbar.set_content(Some(&inner));
         root.append(&toolbar);
-        root.insert_action_group("history", Some(&action_group));
+        root.insert_action_group("history", Some(&build::action_group(&sender)));
 
         let model = Self {
             history: init.history,
             root: root.clone(),
             search,
-            pinned_group,
-            pinned_listbox,
-            list_group,
-            listbox,
+            pinned_group: lists.pinned_group,
+            pinned_listbox: lists.pinned_listbox,
+            list_group: lists.list_group,
+            listbox: lists.listbox,
             stack,
             status_page,
-            filter_connection,
-            filter_status,
-            filter_window,
-            filter_source,
+            filter_connection: filters.connection,
+            filter_status: filters.status,
+            filter_window: filters.window,
+            filter_source: filters.source,
             filter_debounce: std::rc::Rc::new(std::cell::RefCell::new(None)),
             search_generation: std::cell::Cell::new(0),
             mutation_order: std::sync::Arc::default(),
-            selection_bar,
-            selection_label,
+            selection_bar: selection.revealer,
+            selection_label: selection.label,
             connections,
             selected_ids: HashSet::new(),
             entries: Vec::new(),
@@ -1109,6 +849,7 @@ mod export_tests;
 #[cfg(test)]
 mod lifetime_tests;
 
+mod build;
 mod export;
 
 #[cfg(test)]
