@@ -142,14 +142,14 @@ impl ConnectDialog {
             self.password.grab_focus();
         }
         let title = if prefill.prompt_for_password {
-            crate::tr!("Enter password for {name}").replace("{name}", &saved.name)
+            bookie_app_services::tr!("Enter password for {name}").replace("{name}", &saved.name)
         } else {
-            crate::tr!("Edit {name}").replace("{name}", &saved.name)
+            bookie_app_services::tr!("Edit {name}").replace("{name}", &saved.name)
         };
         root.set_title(&title);
         self.header_title.set_text(&title);
         if prefill.unreadable_secrets {
-            self.show_toast(&crate::tr!(
+            self.show_toast(&bookie_app_services::tr!(
                 "The saved password could not be read from the keyring. Enter it again to keep password sign-in."
             ));
         }

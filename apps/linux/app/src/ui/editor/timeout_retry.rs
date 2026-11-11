@@ -1,7 +1,7 @@
 use crate::services::operation_control::longer_timeout_secs;
 
 pub(super) fn label(secs: u32) -> String {
-    crate::tr!("Run again ({n}s timeout)").replace("{n}", &secs.to_string())
+    bookie_app_services::tr!("Run again ({n}s timeout)").replace("{n}", &secs.to_string())
 }
 
 struct Offer {

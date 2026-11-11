@@ -39,15 +39,15 @@ pub fn build(
     let selector = gtk::DropDown::new(Some(model), None::<gtk::Expression>);
     selector.set_hexpand(true);
     let name = gtk::Entry::builder()
-        .placeholder_text(crate::tr!("Name this filter"))
+        .placeholder_text(bookie_app_services::tr!("Name this filter"))
         .max_length(48)
         .hexpand(true)
         .build();
-    name.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Filter name"))]);
-    let save = gtk::Button::with_label(&crate::tr!("Save as"));
-    let apply = gtk::Button::with_label(&crate::tr!("Apply saved"));
-    let rename = gtk::Button::with_label(&crate::tr!("Rename"));
-    let delete = gtk::Button::with_label(&crate::tr!("Delete"));
+    name.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Filter name"))]);
+    let save = gtk::Button::with_label(&bookie_app_services::tr!("Save as"));
+    let apply = gtk::Button::with_label(&bookie_app_services::tr!("Apply saved"));
+    let rename = gtk::Button::with_label(&bookie_app_services::tr!("Rename"));
+    let delete = gtk::Button::with_label(&bookie_app_services::tr!("Delete"));
     let status = gtk::Label::new(None);
     status.set_xalign(0.0);
     status.add_css_class("dim-label");
@@ -91,7 +91,7 @@ pub fn build(
             Ok(()) => {
                 let updated = store.list(connection, schema.as_deref(), &table);
                 replace_names(&selector_for_save, &names_for_save, updated);
-                status_for_save.set_text(&crate::tr!("Filter saved"));
+                status_for_save.set_text(&bookie_app_services::tr!("Filter saved"));
                 name_for_save.set_text("");
             }
             Err(error) => status_for_save.set_text(&error),
@@ -110,7 +110,7 @@ pub fn build(
     let driver_for_apply = context.driver_id.clone();
     apply.connect_clicked(move |_| {
         let Some(selected) = selected_name(&selector_for_apply, &names_for_apply) else {
-            status_for_apply.set_text(&crate::tr!("Select a saved filter first"));
+            status_for_apply.set_text(&bookie_app_services::tr!("Select a saved filter first"));
             return;
         };
         let Some(filter) = store.load(connection, schema.as_deref(), &table, &selected) else {
@@ -119,11 +119,11 @@ pub fn build(
                 &names_for_apply,
                 store.list(connection, schema.as_deref(), &table),
             );
-            status_for_apply.set_text(&crate::tr!("That saved filter is no longer available"));
+            status_for_apply.set_text(&bookie_app_services::tr!("That saved filter is no longer available"));
             return;
         };
         if bookie_core::build_filter_where(&driver_for_apply, &columns_for_apply.borrow(), &filter).is_err() {
-            status_for_apply.set_text(&crate::tr!(
+            status_for_apply.set_text(&bookie_app_services::tr!(
                 "This saved filter no longer matches the table columns or types. Edit and save it again."
             ));
             return;
@@ -143,7 +143,7 @@ pub fn build(
     let status_for_rename = status.clone();
     rename.connect_clicked(move |_| {
         let Some(selected) = selected_name(&selector_for_rename, &names_for_rename) else {
-            status_for_rename.set_text(&crate::tr!("Select a saved filter first"));
+            status_for_rename.set_text(&bookie_app_services::tr!("Select a saved filter first"));
             return;
         };
         match store.rename(
@@ -159,7 +159,7 @@ pub fn build(
                     &names_for_rename,
                     store.list(connection, schema.as_deref(), &table),
                 );
-                status_for_rename.set_text(&crate::tr!("Filter renamed"));
+                status_for_rename.set_text(&bookie_app_services::tr!("Filter renamed"));
                 name_for_rename.set_text("");
             }
             Err(error) => status_for_rename.set_text(&error),
@@ -175,7 +175,7 @@ pub fn build(
     let status_for_delete = status.clone();
     delete.connect_clicked(move |_| {
         let Some(selected) = selected_name(&selector_for_delete, &names_for_delete) else {
-            status_for_delete.set_text(&crate::tr!("Select a saved filter first"));
+            status_for_delete.set_text(&bookie_app_services::tr!("Select a saved filter first"));
             return;
         };
         match store.delete(connection, schema.as_deref(), &table, &selected) {
@@ -185,7 +185,7 @@ pub fn build(
                     &names_for_delete,
                     store.list(connection, schema.as_deref(), &table),
                 );
-                status_for_delete.set_text(&crate::tr!("Filter deleted"));
+                status_for_delete.set_text(&bookie_app_services::tr!("Filter deleted"));
             }
             Err(error) => status_for_delete.set_text(&error),
         }
@@ -210,7 +210,7 @@ pub fn build(
 }
 
 fn model(names: &[String]) -> gtk::StringList {
-    let model = gtk::StringList::new(&[&crate::tr!("Saved filters")]);
+    let model = gtk::StringList::new(&[&bookie_app_services::tr!("Saved filters")]);
     for name in names {
         model.append(name);
     }

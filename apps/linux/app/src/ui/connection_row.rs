@@ -157,9 +157,9 @@ impl FactoryComponent for ConnectionRow {
 
 fn favorite_button(favorite: bool, sender: FactorySender<ConnectionRow>) -> gtk::Button {
     let label = if favorite {
-        crate::tr!("Remove from favourites")
+        bookie_app_services::tr!("Remove from favourites")
     } else {
-        crate::tr!("Add to favourites")
+        bookie_app_services::tr!("Add to favourites")
     };
     let button = gtk::Button::builder()
         .icon_name(if favorite {
@@ -177,7 +177,7 @@ fn favorite_button(favorite: bool, sender: FactorySender<ConnectionRow>) -> gtk:
 }
 
 fn open_button(sender: FactorySender<ConnectionRow>) -> gtk::Button {
-    let label = crate::tr!("Open connection");
+    let label = bookie_app_services::tr!("Open connection");
     let button = gtk::Button::builder()
         .icon_name("go-next-symbolic")
         .valign(gtk::Align::Center)
@@ -193,17 +193,17 @@ fn connection_actions(sender: FactorySender<ConnectionRow>) -> gtk::MenuButton {
     let button = gtk::MenuButton::builder()
         .icon_name("view-more-symbolic")
         .valign(gtk::Align::Center)
-        .tooltip_text(crate::tr!("Connection actions"))
+        .tooltip_text(bookie_app_services::tr!("Connection actions"))
         .css_classes(["flat"])
         .build();
-    button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Connection actions"))]);
+    button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Connection actions"))]);
     let popover = gtk::Popover::new();
     let content = gtk::Box::new(gtk::Orientation::Vertical, 2);
     for (label, message) in [
-        (crate::tr!("Group and tags"), ConnectionRowMsg::Organize),
-        (crate::tr!("Edit connection"), ConnectionRowMsg::Edit),
-        (crate::tr!("Duplicate connection"), ConnectionRowMsg::Duplicate),
-        (crate::tr!("Remove connection"), ConnectionRowMsg::RequestDelete),
+        (bookie_app_services::tr!("Group and tags"), ConnectionRowMsg::Organize),
+        (bookie_app_services::tr!("Edit connection"), ConnectionRowMsg::Edit),
+        (bookie_app_services::tr!("Duplicate connection"), ConnectionRowMsg::Duplicate),
+        (bookie_app_services::tr!("Remove connection"), ConnectionRowMsg::RequestDelete),
     ] {
         let action = gtk::Button::with_label(&label);
         action.add_css_class("flat");

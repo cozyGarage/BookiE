@@ -18,7 +18,7 @@ pub(in crate::ui::editor) fn install(
     let Some(spool) = result.spool.clone() else { return };
     let counts = result.page_row_counts.clone();
     let columns = result.columns.clone();
-    let button = gtk::ToggleButton::with_label(&crate::tr!("Continuous scrolling"));
+    let button = gtk::ToggleButton::with_label(&bookie_app_services::tr!("Continuous scrolling"));
     let container = gtk::Box::new(gtk::Orientation::Vertical, 0);
     container.set_vexpand(true);
     container.set_visible(false);
@@ -111,7 +111,7 @@ fn start_view(
         let status = gtk::Label::new(None);
         status.set_wrap(true);
         model.attach_status(&status);
-        let retry = gtk::Button::with_label(&crate::tr!("Retry loading pages"));
+        let retry = gtk::Button::with_label(&bookie_app_services::tr!("Retry loading pages"));
         let weak_model = model.downgrade();
         retry.connect_clicked(move |_| {
             if let Some(model) = weak_model.upgrade() {

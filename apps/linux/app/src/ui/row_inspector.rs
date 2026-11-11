@@ -28,9 +28,9 @@ fn inspector_field(column: &ColumnInfo, value: Option<&Value>) -> InspectorField
         name: column.name.clone(),
         data_type: column.data_type.clone(),
         text: match value {
-            None => crate::tr!("Not fetched"),
-            Some(Value::Undecodable(kind)) if kind == "not fetched" => crate::tr!("Not fetched"),
-            Some(value) if value.is_missing_field() => crate::tr!("Absent from this document"),
+            None => bookie_app_services::tr!("Not fetched"),
+            Some(Value::Undecodable(kind)) if kind == "not fetched" => bookie_app_services::tr!("Not fetched"),
+            Some(value) if value.is_missing_field() => bookie_app_services::tr!("Absent from this document"),
             Some(value) => value_to_display_text(value),
         },
         is_null: matches!(value, Some(Value::Null)),
@@ -77,8 +77,8 @@ impl RowInspector {
             .margin_end(12)
             .build();
         let placeholder = adw::StatusPage::builder()
-            .title(crate::tr!("No row selected"))
-            .description(crate::tr!("Select one row to see every column."))
+            .title(bookie_app_services::tr!("No row selected"))
+            .description(bookie_app_services::tr!("Select one row to see every column."))
             .icon_name("view-list-symbolic")
             .build();
         let stack = gtk::Stack::new();
@@ -287,7 +287,7 @@ mod tests {
             }
             assert!(fields[3].is_null);
             assert!(!fields[4].is_null);
-            assert_eq!(fields[4].text, crate::tr!("Not fetched"));
+            assert_eq!(fields[4].text, bookie_app_services::tr!("Not fetched"));
         }
         assert_eq!(
             row.with_cell_value(1, |value| match value {

@@ -58,7 +58,7 @@ pub(super) fn present(parent: &impl IsA<gtk::Widget>, text: &str) {
     toolbar.add_top_bar(&adw::HeaderBar::new());
     toolbar.set_content(Some(&scrolled));
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Pending SQL"))
+        .title(bookie_app_services::tr!("Pending SQL"))
         .content_width(640)
         .content_height(420)
         .child(&toolbar)

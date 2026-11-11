@@ -65,7 +65,7 @@ fn build_page_stack(
     if stream_terminal_notice(result).is_none()
         && let Some(page) = stream_terminal_page(result, outcome.identity.statement_index)
     {
-        page_switcher.add_titled(&page, Some("status"), &crate::tr!("Status"));
+        page_switcher.add_titled(&page, Some("status"), &bookie_app_services::tr!("Status"));
     }
     let initial = if matches!(result.terminal, StreamTerminal::Loading | StreamTerminal::Complete) {
         page_switcher.first_child()
@@ -104,7 +104,7 @@ fn append_result_tools(
 
 fn append_stream_export(holder: &adw::WrapBox, result: &StreamedResult, grid_sender: &relm4::Sender<GridMsg>) {
     if matches!(result.terminal, StreamTerminal::Loading) {
-        let notice = gtk::Label::new(Some(&crate::tr!(
+        let notice = gtk::Label::new(Some(&bookie_app_services::tr!(
             "Export all rows is available when the query completes."
         )));
         notice.set_ellipsize(gtk::pango::EllipsizeMode::End);
@@ -114,7 +114,7 @@ fn append_stream_export(holder: &adw::WrapBox, result: &StreamedResult, grid_sen
     if matches!(result.terminal, StreamTerminal::Complete)
         && let Some(request) = result.export.clone().filter(|request| request.spool.is_some())
     {
-        let export = gtk::Button::with_label(&crate::tr!("Export all rows…"));
+        let export = gtk::Button::with_label(&bookie_app_services::tr!("Export all rows…"));
         export.add_css_class("flat");
         export.connect_clicked({
             let grid_sender = grid_sender.clone();
@@ -172,7 +172,7 @@ pub(in crate::ui::editor) fn stream_page_placeholder(result: &StreamedResult, pa
 pub(in crate::ui::editor) fn stream_page_placeholder_with_title(title: String) -> gtk::Widget {
     let page = adw::StatusPage::builder()
         .title(title)
-        .description(crate::tr!("Select this page to load it from temporary storage."))
+        .description(bookie_app_services::tr!("Select this page to load it from temporary storage."))
         .icon_name("document-open-recent-symbolic")
         .vexpand(true)
         .build();
@@ -181,26 +181,26 @@ pub(in crate::ui::editor) fn stream_page_placeholder_with_title(title: String) -
 }
 
 pub(in crate::ui::editor) fn stream_progress_text(result: &StreamedResult) -> String {
-    let rows = crate::trn!("Received {rows} row", "Received {rows} rows", result.total_rows).replace(
+    let rows = bookie_app_services::trn!("Received {rows} row", "Received {rows} rows", result.total_rows).replace(
         "{rows}",
         &crate::ui::count_format::format_thousands(result.total_rows as u128),
     );
-    let pages = crate::trn!("{pages} page", "{pages} pages", result.total_pages).replace(
+    let pages = bookie_app_services::trn!("{pages} page", "{pages} pages", result.total_pages).replace(
         "{pages}",
         &crate::ui::count_format::format_thousands(u128::from(result.total_pages)),
     );
     let status = match result.terminal {
-        StreamTerminal::Loading => crate::tr!("Receiving…"),
-        StreamTerminal::Complete => crate::tr!("Complete"),
-        StreamTerminal::Cancelled => crate::tr!("Cancelled"),
-        StreamTerminal::TimedOut => crate::tr!("Timed out"),
-        StreamTerminal::Failed(_) => crate::tr!("Incomplete"),
+        StreamTerminal::Loading => bookie_app_services::tr!("Receiving…"),
+        StreamTerminal::Complete => bookie_app_services::tr!("Complete"),
+        StreamTerminal::Cancelled => bookie_app_services::tr!("Cancelled"),
+        StreamTerminal::TimedOut => bookie_app_services::tr!("Timed out"),
+        StreamTerminal::Failed(_) => bookie_app_services::tr!("Incomplete"),
     };
     let received = format!("{status} · {rows} · {pages}");
     if stream_retained_rows(result) == result.total_rows {
         return received;
     }
-    let notice = crate::tr!("Earlier pages can be loaded from temporary storage.");
+    let notice = bookie_app_services::tr!("Earlier pages can be loaded from temporary storage.");
     format!("{received}\n{notice}")
 }
 
@@ -217,13 +217,13 @@ thread_local! {
 
 pub(in crate::ui::editor) fn stream_page_label(result: &StreamedResult, page_index: usize) -> String {
     let Some(count) = stream_page_row_count(result, page_index).filter(|count| *count > 0) else {
-        return crate::tr!("Rows 0");
+        return bookie_app_services::tr!("Rows 0");
     };
     let Some(start) = stream_page_row_start(result, page_index) else {
-        return crate::tr!("Rows 0");
+        return bookie_app_services::tr!("Rows 0");
     };
     let end = start.saturating_add(count.saturating_sub(1));
-    crate::tr!("Rows {start}-{end}")
+    bookie_app_services::tr!("Rows {start}-{end}")
         .replace("{start}", &crate::ui::count_format::format_thousands(start as u128))
         .replace("{end}", &crate::ui::count_format::format_thousands(end as u128))
 }
@@ -245,8 +245,8 @@ fn stream_terminal_notice(result: &StreamedResult) -> Option<String> {
         return None;
     }
     match result.terminal {
-        StreamTerminal::TimedOut => Some(crate::tr!("Query timed out. All received pages remain available.")),
-        StreamTerminal::Cancelled => Some(crate::tr!("Query cancelled. All received pages remain available.")),
+        StreamTerminal::TimedOut => Some(bookie_app_services::tr!("Query timed out. All received pages remain available.")),
+        StreamTerminal::Cancelled => Some(bookie_app_services::tr!("Query cancelled. All received pages remain available.")),
         _ => None,
     }
 }
@@ -257,8 +257,8 @@ fn stream_terminal_page(result: &StreamedResult, statement_index: usize) -> Opti
         StreamTerminal::Failed(message) => Some(error_page(statement_index, message).upcast()),
         StreamTerminal::Cancelled => Some(
             adw::StatusPage::builder()
-                .title(crate::tr!("Query cancelled"))
-                .description(crate::tr!("All received pages remain available."))
+                .title(bookie_app_services::tr!("Query cancelled"))
+                .description(bookie_app_services::tr!("All received pages remain available."))
                 .icon_name("process-stop-symbolic")
                 .vexpand(true)
                 .build()
@@ -266,8 +266,8 @@ fn stream_terminal_page(result: &StreamedResult, statement_index: usize) -> Opti
         ),
         StreamTerminal::TimedOut => Some(
             adw::StatusPage::builder()
-                .title(crate::tr!("Query timed out"))
-                .description(crate::tr!("All received pages remain available."))
+                .title(bookie_app_services::tr!("Query timed out"))
+                .description(bookie_app_services::tr!("All received pages remain available."))
                 .icon_name("dialog-warning-symbolic")
                 .vexpand(true)
                 .build()

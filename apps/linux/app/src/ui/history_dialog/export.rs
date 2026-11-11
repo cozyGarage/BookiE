@@ -5,12 +5,12 @@ impl HistoryDialog {
     pub(super) fn export_failed(&self, message: &str) {
         tracing::warn!(error = %message, "history export failed");
         let dialog = adw::AlertDialog::builder()
-            .heading(crate::tr!("Could not export query history"))
-            .body(crate::tr!(
+            .heading(bookie_app_services::tr!("Could not export query history"))
+            .body(bookie_app_services::tr!(
                 "The history export was not saved. Choose a writable local destination and try again."
             ))
             .build();
-        dialog.add_response("close", &crate::tr!("Close"));
+        dialog.add_response("close", &bookie_app_services::tr!("Close"));
         dialog.set_default_response(Some("close"));
         dialog.set_close_response("close");
         dialog.present(Some(&self.root));
@@ -19,18 +19,18 @@ impl HistoryDialog {
     pub(super) fn save_export(&self, content: String, suggested_name: String, sender: ComponentSender<Self>) {
         let filter = gtk::FileFilter::new();
         if suggested_name.ends_with(".sql") {
-            filter.set_name(Some(&crate::tr!("SQL files")));
+            filter.set_name(Some(&bookie_app_services::tr!("SQL files")));
             filter.add_mime_type("text/x-sql");
             filter.add_suffix("sql");
         } else {
-            filter.set_name(Some(&crate::tr!("CSV files")));
+            filter.set_name(Some(&bookie_app_services::tr!("CSV files")));
             filter.add_mime_type("text/csv");
             filter.add_suffix("csv");
         }
         let filters = gio::ListStore::new::<gtk::FileFilter>();
         filters.append(&filter);
         let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Export query history"))
+            .title(bookie_app_services::tr!("Export query history"))
             .modal(true)
             .initial_name(&suggested_name)
             .default_filter(&filter)
@@ -58,7 +58,7 @@ fn export_destination(outcome: Result<gio::File, glib::Error>) -> Result<Option<
         Ok(file) => file
             .path()
             .map(Some)
-            .ok_or_else(|| crate::tr!("Choose a local file for history export.")),
+            .ok_or_else(|| bookie_app_services::tr!("Choose a local file for history export.")),
         Err(error) if error.matches(gtk::DialogError::Dismissed) || error.matches(gtk::DialogError::Cancelled) => {
             Ok(None)
         }
