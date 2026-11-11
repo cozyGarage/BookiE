@@ -170,7 +170,6 @@ impl App {
         inner.add_controller(rename_shortcut(&tab_view, &sender));
 
         let tab_overview = build_workspace_tab_overview(&tab_view, &inner);
-        super::workspace_overview::watch_overview_tags(&tab_view, &tab_overview);
         // Overview "+" button must return a real TabPage synchronously —
         // we build an SqlEditor inline, register the slot, and return
         // the page. Browse tabs aren't creatable from the overview
