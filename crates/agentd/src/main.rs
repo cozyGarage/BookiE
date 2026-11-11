@@ -4,6 +4,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
 use bookie_agentd::DaemonProvider;
@@ -70,6 +71,16 @@ enum ApprovalMode {
 
 struct TtyApprovalSink;
 
+/// Raises the reader's stop flag when the request ends for any reason: an
+/// answer, the timeout, a cancelled operation or a dropped future.
+struct StopOnDrop(Arc<AtomicBool>);
+
+impl Drop for StopOnDrop {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
+    }
+}
+
 /// How long a human has to answer one prompt before it is treated as a
 /// denial. Without this, one unanswered prompt would block every later
 /// tool call forever, since the stdio server processes requests serially.
@@ -87,10 +98,19 @@ impl ApprovalSink for TtyApprovalSink {
             sanitize_for_terminal(&req.sql),
         );
         let deadline = std::time::Instant::now() + APPROVAL_TIMEOUT;
-        approval_with_timeout(APPROVAL_TIMEOUT + APPROVAL_GRACE, move || {
-            ask_on_controlling_terminal(&prompt, deadline)
-        })
-        .await
+        let stop = Arc::new(AtomicBool::new(false));
+        let _stop_on_end = StopOnDrop(stop.clone());
+        let reader_stop = stop.clone();
+        let asking = approval_with_timeout(APPROVAL_TIMEOUT + APPROVAL_GRACE, move || {
+            ask_on_controlling_terminal(&prompt, deadline, &reader_stop)
+        });
+        match req.cancellation {
+            Some(token) => tokio::select! {
+                outcome = asking => outcome,
+                () = token.cancelled() => ApprovalOutcome::Deny,
+            },
+            None => asking.await,
+        }
     }
 }
 
@@ -141,7 +161,7 @@ fn is_invisible_format(c: char) -> bool {
     )
 }
 
-fn ask_on_controlling_terminal(prompt: &str, deadline: std::time::Instant) -> ApprovalOutcome {
+fn ask_on_controlling_terminal(prompt: &str, deadline: std::time::Instant, stop: &AtomicBool) -> ApprovalOutcome {
     use std::io::Write;
 
     let terminal = match std::fs::OpenOptions::new().read(true).write(true).open("/dev/tty") {
@@ -164,7 +184,7 @@ fn ask_on_controlling_terminal(prompt: &str, deadline: std::time::Instant) -> Ap
     }
 
     let mut terminal = terminal;
-    match tty_answer::read_answer(&mut terminal, deadline) {
+    match tty_answer::read_answer(&mut terminal, deadline, stop) {
         Some(outcome) => outcome,
         None => {
             tracing::warn!("approval prompt unanswered; denying");

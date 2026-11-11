@@ -232,3 +232,12 @@ fn every_registered_driver_is_listed_in_the_feature_table_with_its_declared_matu
         );
     }
 }
+
+#[test]
+fn ending_a_request_raises_the_reader_stop_flag() {
+    let stop = Arc::new(AtomicBool::new(false));
+    let guard = StopOnDrop(stop.clone());
+    assert!(!stop.load(Ordering::Acquire));
+    drop(guard);
+    assert!(stop.load(Ordering::Acquire));
+}
