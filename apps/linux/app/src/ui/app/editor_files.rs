@@ -124,7 +124,7 @@ impl App {
         let Some(file) = slot.file.as_ref() else {
             return;
         };
-        slot.page.set_title(&file.title(&slot.query));
+        super::tab_title::set_tab_title(&slot.page, &file.title(&slot.query));
         slot.page.set_tooltip(&file.path.display().to_string());
     }
 

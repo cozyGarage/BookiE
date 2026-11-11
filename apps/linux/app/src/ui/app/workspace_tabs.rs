@@ -138,6 +138,10 @@ impl App {
         });
         let action_group = gio::SimpleActionGroup::new();
         action_group.add_action(&keep_tab_action);
+        let mark_sender = sender.clone();
+        super::tab_title::add_mark_actions(&action_group, menu_target.clone(), &tab_view, move || {
+            mark_sender.input(AppMsg::WorkspaceTabsChanged)
+        });
         let sender_for_bulk_close = sender.clone();
         add_bulk_close_actions(&action_group, menu_target, move |message| {
             sender_for_bulk_close.input(message);
@@ -163,6 +167,7 @@ impl App {
         let inner = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
         inner.append(&tab_bar);
         inner.append(&tab_view);
+        inner.add_controller(rename_shortcut(&tab_view, &sender));
 
         let tab_overview = build_workspace_tab_overview(&tab_view, &inner);
         // Overview "+" button must return a real TabPage synchronously —
@@ -200,7 +205,7 @@ impl App {
                 .forward(sender_for_create.input_sender(), move |out| editor_output(tab_id, out));
             let page = tab_view_for_create.append(editor.widget());
             let label = first_free_editor_label(editor_titles(&workspace_tabs_for_create.borrow()));
-            page.set_title(&label);
+            super::tab_title::set_tab_title(&page, &label);
             // Empty query → no tooltip; tooltip will be set on first edit
             // via on_editor_tab_query_changed.
             write_workspace_tab_id(&page, tab_id);
@@ -237,19 +242,22 @@ impl App {
         let saved = self
             .connected_database
             .as_deref()
-            .and_then(|database| self.workspace.load_database(connection_id, database));
+            .and_then(|database| self.workspace.load_database(connection_id, database))
+            .filter(|saved| !saved.tabs.is_empty());
         let Some(saved) = saved else {
             self.workspace_outer_stack.set_visible_child_name("empty");
             return;
         };
-        if saved.tabs.is_empty() {
-            self.workspace_outer_stack.set_visible_child_name("empty");
-            return;
-        }
         for record in &saved.tabs {
             match workspace_state::restored_workspace_tab(record) {
-                Some(workspace_state::RestoredWorkspaceTab::Editor { query, draft_id, file }) => {
+                Some(workspace_state::RestoredWorkspaceTab::Editor {
+                    query,
+                    draft_id,
+                    file,
+                    mark,
+                }) => {
                     self.append_editor_draft(Some(query), draft_id, sender.clone());
+                    self.restore_tab_mark(mark);
                     if let (Some(path), Some(tab)) = (file, self.selected_editor_tab_id()) {
                         self.restore_editor_file(tab, path, sender.clone());
                     }
@@ -261,6 +269,7 @@ impl App {
                     page_size,
                     sort,
                     preview,
+                    mark,
                 }) => {
                     self.append_table_tab(
                         schema,
@@ -268,8 +277,9 @@ impl App {
                         TableTabStart::new(offset, page_size, sort, preview),
                         sender.clone(),
                     );
+                    self.restore_tab_mark(mark);
                 }
-                Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table }) => {
+                Some(workspace_state::RestoredWorkspaceTab::Structure { schema, table, .. }) => {
                     self.append_existing_structure_tab(schema, table, sender.clone());
                 }
                 None => {}
@@ -318,7 +328,7 @@ impl App {
                 .forward(sender.input_sender(), move |out| structure_output_message(tab_id, out));
 
         let page = tab_view.append(controller.widget());
-        page.set_title(&bookie_app_services::tr!("New Table"));
+        super::tab_title::set_tab_title(&page, &bookie_app_services::tr!("New Table"));
         write_workspace_tab_id(&page, tab_id);
 
         let slot = super::StructureTabSlot {
@@ -439,7 +449,7 @@ impl App {
 
         let page = tab_view.append(browse.widget());
         let label = qualified_browse_tab_label(self.sidebar_schemas_distinct(), schema.as_deref(), &table);
-        page.set_title(&label);
+        super::tab_title::set_tab_title(&page, &label);
         if let Some(tip) = browse_tab_tooltip(schema.as_deref(), &table, &label) {
             page.set_tooltip(&tip);
         }
@@ -501,7 +511,7 @@ impl App {
 
         let page = tab_view.append(controller.widget());
         let title = structure_tab_title(self.sidebar_schemas_distinct(), schema.as_deref(), &table);
-        page.set_title(&title);
+        super::tab_title::set_tab_title(&page, &title);
         write_workspace_tab_id(&page, tab_id);
 
         let slot = super::StructureTabSlot {
@@ -559,7 +569,7 @@ impl App {
             })
             .forward(sender.input_sender(), move |out| editor_output(tab_id, out));
         let page = tab_view.append(editor.widget());
-        page.set_title(&label);
+        super::tab_title::set_tab_title(&page, &label);
         if let Some(tip) = editor_tab_tooltip(&query, &label) {
             page.set_tooltip(&tip);
         }
@@ -681,6 +691,12 @@ impl App {
 }
 
 impl App {
+    fn restore_tab_mark(&self, mark: bookie_app_services::tab_mark::TabMark) {
+        if let Some(page) = self.workspace_tab_view.as_ref().and_then(|view| view.selected_page()) {
+            super::tab_title::apply_tab_mark(&page, mark);
+        }
+    }
+
     pub(super) fn selected_workspace_tab_id(&self) -> Option<Uuid> {
         let tab_view = self.workspace_tab_view.as_ref()?;
         let page = tab_view.selected_page()?;
@@ -830,7 +846,7 @@ impl App {
             return;
         };
         if let Some((title, tooltip)) = file_details {
-            page.set_title(&title);
+            super::tab_title::set_tab_title(&page, &title);
             page.set_tooltip(&tooltip);
             return;
         }
@@ -840,7 +856,7 @@ impl App {
             derive_tab_label(&query)
         };
         let title = if rows_dirty { format!("• {label}") } else { label };
-        page.set_title(&title);
+        super::tab_title::set_tab_title(&page, &title);
         let is_selected = self
             .workspace_tab_view
             .as_ref()
@@ -858,7 +874,7 @@ impl App {
             derive_tab_label(&query)
         };
         if let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow_mut().get_mut(&id) {
-            slot.page.set_title(&label);
+            super::tab_title::set_tab_title(&slot.page, &label);
             // Pass empty when no extra info to clear any prior tooltip;
             // libadwaita treats empty-string as no tooltip.
             let tooltip = editor_tab_tooltip(&query, &label).unwrap_or_default();
@@ -1121,4 +1137,28 @@ mod default_label_tests {
         with_named.push("SELECT orders".into());
         assert_eq!(first_free_editor_label(with_named), "Query 2");
     }
+}
+
+fn rename_workspace_tab(view: &adw::TabView, page: &adw::TabPage, sender: &ComponentSender<App>) {
+    let sender = sender.clone();
+    super::tab_title::present_rename_dialog(view, page, move |_| sender.input(AppMsg::WorkspaceTabsChanged));
+}
+
+fn rename_shortcut(view: &adw::TabView, sender: &ComponentSender<App>) -> gtk::ShortcutController {
+    let view = view.clone();
+    let sender = sender.clone();
+    let action = gtk::CallbackAction::new(move |_, _| {
+        let Some(page) = view.selected_page() else {
+            return glib::Propagation::Proceed;
+        };
+        rename_workspace_tab(&view, &page, &sender);
+        glib::Propagation::Stop
+    });
+    let controller = gtk::ShortcutController::new();
+    controller.set_propagation_phase(gtk::PropagationPhase::Bubble);
+    controller.add_shortcut(gtk::Shortcut::new(
+        gtk::ShortcutTrigger::parse_string("F2"),
+        Some(action),
+    ));
+    controller
 }

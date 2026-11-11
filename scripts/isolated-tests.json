@@ -360,6 +360,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::tab_title::tests::renaming_survives_later_automatic_titles_and_an_empty_name_restores_them"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::tab_title::tests::the_colour_mark_shows_as_the_tab_icon_and_clears_with_no_colour"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::browse_tab::chrome_tests::focus_grid_targets_the_current_browse_view"
     ],
     [

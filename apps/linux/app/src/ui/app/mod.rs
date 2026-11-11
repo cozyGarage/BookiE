@@ -32,6 +32,7 @@ mod sidebar_population;
 mod sidebar_state;
 mod status_pages;
 mod structure;
+mod tab_title;
 mod types;
 mod workspace_chrome;
 mod workspace_close;

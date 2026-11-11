@@ -60,6 +60,7 @@ pub mod structure_metadata;
 pub mod structure_tracker;
 pub mod window_sessions;
 pub mod window_state;
+pub mod tab_mark;
 pub mod workspace;
 
 mod workspace_disk;
