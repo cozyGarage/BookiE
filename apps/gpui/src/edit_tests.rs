@@ -14,7 +14,7 @@ fn ok(kind: &str, text: &str, expected: &str) {
 }
 
 #[test]
-fn an_edit_is_parsed_and_shown_in_the_same_canonical_form_as_the_tauri_prototype() {
+fn an_edit_is_parsed_and_shown_in_the_same_canonical_form() {
     ok("integer", " 42 ", "42");
     ok("boolean", "Yes", "true");
     ok("decimal", "1.50", "1.50");
@@ -30,7 +30,7 @@ fn an_edit_is_parsed_and_shown_in_the_same_canonical_form_as_the_tauri_prototype
 }
 
 #[test]
-fn an_invalid_edit_names_the_problem_in_the_same_words_as_the_tauri_prototype() {
+fn an_invalid_edit_names_the_problem_in_the_same_words() {
     for (kind, text, reason) in [
         ("integer", "4x2", "not a whole number"),
         ("boolean", "maybe", "not true or false"),

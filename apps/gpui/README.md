@@ -1,12 +1,12 @@
 # BookiE GPUI app
 
-The GPUI frontend for BookiE, built with `gpui-pre` 0.3.11. By default it shows a synthetic result grid, the same one as `experiments/tauri-grid-prototype`, so the two can be compared. With `BOOKIE_PROTOTYPE_FILE` (a SQLite or DuckDB file) or `BOOKIE_PROTOTYPE_CONNECTION` (a saved connection name or id) plus `BOOKIE_PROTOTYPE_TABLE` it reads a real table, read-only, through `bookie-app-services` ([ADR 0043](../../docs/decisions/0043-gpui-frontend-may-read-real-data-through-app-services.md)). It is **not shipped**: no package or release includes it, and the GTK application stays the product ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)). Its location is [ADR 0044](../../docs/decisions/0044-gpui-app-lives-under-apps.md).
+The GPUI frontend for BookiE, built with `gpui-pre` 0.3.11. By default it shows a synthetic result grid. With `BOOKIE_PROTOTYPE_FILE` (a SQLite or DuckDB file) or `BOOKIE_PROTOTYPE_CONNECTION` (a saved connection name or id) plus `BOOKIE_PROTOTYPE_TABLE` it reads a real table, read-only, through `bookie-app-services` ([ADR 0043](../../docs/decisions/0043-gpui-frontend-may-read-real-data-through-app-services.md)). It is **not shipped**: no package or release includes it, and the GTK application stays the product ([ADR 0002](../../docs/decisions/0002-rust-gtk4-libadwaita.md)). Its location is [ADR 0044](../../docs/decisions/0044-gpui-app-lives-under-apps.md).
 
 It has its own `Cargo.toml` with an empty `[workspace]` table, so it is not a member of the BookiE workspace, and its own `Cargo.lock`. It depends on `bookie-core` for typed values and `bookie-results` for bounded scanning and text search. Equality filters are typed and exact through `bookie-results` when the column's declared type is a known edit kind (core's filter classifier decides); other columns compare the displayed text exactly and case-sensitively. A text filter such as `label = Sample 1` therefore matches only that exact case.
 
 ## Scope
 
-The model in `src/model.rs` has no GPU dependency and is unit tested without a display. It reproduces the Tauri prototype's generator exactly (`value` is 9007199254740993 + row, `label` is `Sample N`, `state` is NULL for every third row and alternates true/false otherwise), Find with a 10,000-match cap, the filter predicates (`contains`, `=`, `!=`; `!=` keeps NULL), whole-row and keyed compare with exact counts and 200 shown differences, and the 5,000-row pager.
+The model in `src/model.rs` has no GPU dependency and is unit tested without a display. Its generator is deterministic (`value` is 9007199254740993 + row, `label` is `Sample N`, `state` is NULL for every third row and alternates true/false otherwise), Find with a 10,000-match cap, the filter predicates (`contains`, `=`, `!=`; `!=` keeps NULL), whole-row and keyed compare with exact counts and 200 shown differences, and the 5,000-row pager.
 
 The window (`src/main.rs`) has:
 
@@ -22,7 +22,7 @@ The grid has a keyboard cell cursor (the `grid_cursor` module of `bookie-results
 
 Ctrl+Shift+P opens a command palette (`src/palette.rs` and an overlay in `src/main.rs`), as in Zed: type letters of a command, Up and Down choose, Enter runs, Escape closes. It lists page navigation, Find, Filter, Clear filter, Compare, the paged and continuous modes, Copy, Clear selection and Edit the active cell, and hides commands that do not apply. It reuses the same `TextInput` as Find, so it also checks that component's keyboard and IME handling in a second place.
 
-Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as the Tauri prototype (and so as `bookie_core::import::parse_cell`), through `bookie-core`'s cell parser. Opening a value containing a newline is refused with a single-line editor notice, preserving its full value. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere. Copy includes the full pending values.
+Double-click a label, state or typed cell to edit it. Enter applies, Escape cancels. The text is validated by `src/edit.rs`, which follows the same rules and error words as `bookie_core::import::parse_cell`, through `bookie-core`'s cell parser. Opening a value containing a newline is refused with a single-line editor notice, preserving its full value. Edits live in the view only and mark the cell with an amber underline; nothing is written anywhere. Copy includes the full pending values.
 
 Connection and table changes are refused while view-only edits are pending. Closing a result or query tab with pending edits is also refused, and an open cell editor cannot be replaced by switching grids or results. **Commands → Discard all view-only edits** discards all such edits and allows the change.
 
@@ -44,7 +44,7 @@ Visible cell text is limited to 512 Unicode characters before layout. Line break
 
 ## Renderer boundary
 
-The formatter tests expand the [shared large-cell inputs](../../experiments/fixtures/README.md), also used by the Tauri frontend tests. They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
+The formatter tests expand the [shared large-cell inputs](../../experiments/fixtures/README.md). They check bounded previews and exact typed-value round trips. They do not measure native rendering or process memory.
 
 The planned modularisation puts application logic in app-services and leaves the application as a renderer. This prototype already splits that way, so it shows what a renderer would need. The library half (`src/lib.rs`) has no `gpui` import and is tested without a display:
 
@@ -58,7 +58,7 @@ The planned modularisation puts application logic in app-services and leaves the
 | `shell` | sidebar tree and tab model | workspace view-model |
 | `theme` | colour and size tokens | design tokens (CSS variables for a web renderer too) |
 
-The binary half is the frontend: `main.rs` owns `GridView` state and actions, `render.rs` renders that state, and `chrome.rs`, `grid_edit.rs`, `text_input.rs`, `ui_theme.rs` and `assets.rs` provide the surrounding UI. `GridView` still owns both state and layout decisions; the next step is to move its state fields behind the library types so the renderer reads them and sends intents (a key press, a click) back. The Tauri prototype follows the same split with `frontend/*.mjs` logic and `main.mjs` rendering.
+The binary half is the frontend: `main.rs` owns `GridView` state and actions, `render.rs` renders that state, and `chrome.rs`, `grid_edit.rs`, `text_input.rs`, `ui_theme.rs` and `assets.rs` provide the surrounding UI. `GridView` still owns both state and layout decisions; the next step is to move its state fields behind the library types so the renderer reads them and sends intents (a key press, a click) back.
 
 The result area follows DBX's query-tab structure (`src/chrome.rs`, model in `src/shell.rs`): **Ctrl+T** opens a Query tab with a multiline SQL editor on top, a draggable divider (the result keeps 20 to 80 percent of the height, 68 percent by default) and a result pane below. The pane header has closable run tabs (**Ctrl+Enter** adds a run with its own row count: 150,000, then 1,000,000, 5,000, 40, and so on), a **Table Data / Summary** switcher and a chevron that hides the pane. Selecting a run swaps its result in and clears the cursor and selection. Applied edits remain with their run until it is closed, separately from synthetic table edits; an open editor is dismissed when switching. The command palette offers **Close current result**, **Previous result** and **Next result** as keyboard paths; the run strip can scroll horizontally. Enter inserts a line in the SQL editor; Ctrl+Enter runs the statement. Live sessions execute through app-services and remain read-only.
 
@@ -84,7 +84,7 @@ The window needs a Wayland or X11 session with a Vulkan driver that can present.
 
 ## Scroll and memory measurement
 
-To measure both prototypes the same way, run `experiments/profile.sh` from a desktop session (`ROWS=500000 RUNS=5 experiments/profile.sh` changes the size). It builds both in release mode and prints one JSON line per run: scroll time, and resident and proportional memory (for Tauri, the app plus the WebKit processes). Compare `elapsed_ms` and the `pss_kib` peaks, and the GPUI frame-paced `frame_p95_ms`. Close other heavy applications first and repeat a run; one machine and one GPU driver is all this shows.
+To measure scrolling, run `experiments/profile.sh` from a desktop session (`ROWS=500000 RUNS=5 experiments/profile.sh` changes the size). It builds the app in release mode and prints one JSON line per run: scroll time, and resident and proportional memory. Compare `elapsed_ms` and the `pss_kib` peaks, and the GPUI frame-paced `frame_p95_ms`. Close other heavy applications first and repeat a run; one machine and one GPU driver is all this shows.
 
 
 ```bash
@@ -92,7 +92,7 @@ cargo build --release --locked --manifest-path apps/gpui/Cargo.toml
 node apps/gpui/measure.mjs --rows=150000 --steps=120 --runs=3
 ```
 
-The script starts the release binary on the current display, waits for the application to report its first frame, scrolls the first 5,000-row page from top to bottom in the requested number of steps, samples resident and proportional memory of the process every 400 ms, and prints one JSON line per run. It uses the same cadence as the Tauri script (a step, then a short wait) so total elapsed time is comparable.
+The script starts the release binary on the current display, waits for the application to report its first frame, scrolls the first 5,000-row page from top to bottom in the requested number of steps, samples resident and proportional memory of the process every 400 ms, and prints one JSON line per run. It steps, then waits briefly so total elapsed time is comparable.
 
 `--pacing=frame` instead advances the scroll on every frame and requests the next one, so the recorded frame intervals show the real frame time. `--scope=continuous` scrolls the whole result instead of one page.
 The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=… elapsed_ms=…` and, in frame mode, `frame_p50_ms`, `frame_p95_ms`, `frame_p99_ms` and `frame_max_ms`.
