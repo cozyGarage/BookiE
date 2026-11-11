@@ -46,7 +46,9 @@ fn validate_column(col: &DraftColumn) -> Result<(), String> {
         return Err(bookie_app_services::tr!("Column {name} needs a type.").replace("{name}", &col.name));
     }
     if col.primary_key && col.nullable {
-        return Err(bookie_app_services::tr!("Primary key columns must be NOT NULL: {name}").replace("{name}", &col.name));
+        return Err(
+            bookie_app_services::tr!("Primary key columns must be NOT NULL: {name}").replace("{name}", &col.name)
+        );
     }
     Ok(())
 }

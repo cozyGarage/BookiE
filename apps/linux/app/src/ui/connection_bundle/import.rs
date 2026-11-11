@@ -19,7 +19,9 @@ pub(crate) fn present_import_passphrase_dialog(
         Some(&bookie_app_services::tr!("This file is protected")),
         Some(&bookie_app_services::tr!("Enter the passphrase it was exported with.")),
     );
-    let entry = adw::PasswordEntryRow::builder().title(bookie_app_services::tr!("Passphrase")).build();
+    let entry = adw::PasswordEntryRow::builder()
+        .title(bookie_app_services::tr!("Passphrase"))
+        .build();
     let list = boxed_list();
     list.append(&entry);
     dialog.set_extra_child(Some(&list));
@@ -41,7 +43,9 @@ pub(crate) fn present_import_passphrase_dialog(
 fn build_replace_switch(carries_secrets: bool) -> adw::SwitchRow {
     adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Replace saved passwords"))
-        .subtitle(bookie_app_services::tr!("Off keeps the passwords already on this device."))
+        .subtitle(bookie_app_services::tr!(
+            "Off keeps the passwords already on this device."
+        ))
         .active(false)
         .visible(carries_secrets)
         .build()

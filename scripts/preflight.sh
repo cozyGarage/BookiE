@@ -75,6 +75,7 @@ python3 scripts/check-function-size.py
 
 echo "==> comment lines"
 python3 scripts/check-comment-lines.py
+python3 scripts/release-notes.py fragments
 
 echo "==> cargo fmt --check (workspace)"
 cargo fmt --all -- --check

@@ -47,7 +47,9 @@ pub enum SshSecretToStore {
 
 impl SshSection {
     pub fn build() -> Self {
-        let group = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("SSH tunnel")).build();
+        let group = adw::PreferencesGroup::builder()
+            .title(bookie_app_services::tr!("SSH tunnel"))
+            .build();
 
         let expander = adw::ExpanderRow::builder()
             .title(bookie_app_services::tr!("Use SSH tunnel"))
@@ -66,7 +68,9 @@ impl SshSection {
         let local_port = adw::SpinRow::with_range(0.0, 65535.0, 1.0);
         local_port.set_title(&bookie_app_services::tr!("Local port"));
         local_port.set_subtitle(&bookie_app_services::tr!("0 picks a free port"));
-        let user = adw::EntryRow::builder().title(bookie_app_services::tr!("Username")).build();
+        let user = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Username"))
+            .build();
 
         let auth_pwd = bookie_app_services::tr!("Password");
         let auth_key = bookie_app_services::tr!("Private key");
@@ -78,7 +82,9 @@ impl SshSection {
             .selected(SSH_AUTH_PASSWORD)
             .build();
 
-        let password = adw::PasswordEntryRow::builder().title(bookie_app_services::tr!("Password")).build();
+        let password = adw::PasswordEntryRow::builder()
+            .title(bookie_app_services::tr!("Password"))
+            .build();
         let key_path = adw::EntryRow::builder()
             .title(bookie_app_services::tr!("Private key path"))
             .text(default_ssh_key_path())
@@ -98,7 +104,9 @@ impl SshSection {
             &bookie_app_services::tr!("Select SSH public key"),
             &["*.pub"],
         );
-        let passphrase = adw::PasswordEntryRow::builder().title(bookie_app_services::tr!("Passphrase")).build();
+        let passphrase = adw::PasswordEntryRow::builder()
+            .title(bookie_app_services::tr!("Passphrase"))
+            .build();
         let system_client = system_client_row();
 
         expander.add_row(&host);

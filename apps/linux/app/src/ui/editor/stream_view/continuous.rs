@@ -54,7 +54,12 @@ pub(in crate::ui::editor) fn install(
         }
         let request = generation.get().wrapping_add(1);
         generation.set(request);
-        let model = PagedModel::new(&counts, columns.len());
+        let model = PagedModel::with_budget(
+            &counts,
+            columns.len(),
+            bookie_core::MAX_QUERY_RESULT_BYTES,
+            spool.page_budget(),
+        );
         start_view(
             &container,
             model,
@@ -89,7 +94,9 @@ fn start_view(
     let container = container.downgrade();
     let runtime = relm4::spawn(async { tokio::runtime::Handle::current() });
     gtk::glib::MainContext::default().spawn_local(async move {
-        let (Some(container), Ok(runtime)) = (container.upgrade(), runtime.await) else { return };
+        let (Some(container), Ok(runtime)) = (container.upgrade(), runtime.await) else {
+            return;
+        };
         if generation.get() != request {
             return;
         }

@@ -176,7 +176,9 @@ pub(super) fn paste_plan(
         return Err(bookie_app_services::tr!("The pasted rows run past the last loaded row"));
     }
     let Some(start) = displayed.iter().position(|col| *col == anchor_col) else {
-        return Err(bookie_app_services::tr!("The column you clicked is hidden, so nothing was pasted"));
+        return Err(bookie_app_services::tr!(
+            "The column you clicked is hidden, so nothing was pasted"
+        ));
     };
     if start.saturating_add(width) > displayed.len() {
         return Err(bookie_app_services::tr!("The pasted columns run past the last column"));
@@ -267,18 +269,14 @@ impl BrowseTab {
             );
         }
         let current = row.as_ref().map(|row| row.cell_value(cell.col));
-        parse_pasted_cell_with_style(
-            cell.text.as_deref(),
-            column,
-            &self.parse_hooks,
-            current.as_ref(),
+        parse_pasted_cell_with_style(cell.text.as_deref(), column, &self.parse_hooks, current.as_ref()).map_err(
+            |message| {
+                bookie_app_services::tr!("{column} on row {row}: {message}. Nothing was pasted.")
+                    .replace("{column}", name)
+                    .replace("{row}", &(cell.row + 1).to_string())
+                    .replace("{message}", &message)
+            },
         )
-        .map_err(|message| {
-            bookie_app_services::tr!("{column} on row {row}: {message}. Nothing was pasted.")
-                .replace("{column}", name)
-                .replace("{row}", &(cell.row + 1).to_string())
-                .replace("{message}", &message)
-        })
     }
 
     pub(super) fn handle_paste_text(&mut self, input: PasteTextInput, sender: ComponentSender<Self>) {

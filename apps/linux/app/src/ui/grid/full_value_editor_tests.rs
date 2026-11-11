@@ -351,7 +351,11 @@ fn set_null_stages_null_and_cancel_stages_nothing() {
             sender,
         },
     );
-    button(dialog.child().unwrap().upcast_ref(), &bookie_app_services::tr!("Set to NULL")).emit_clicked();
+    button(
+        dialog.child().unwrap().upcast_ref(),
+        &bookie_app_services::tr!("Set to NULL"),
+    )
+    .emit_clicked();
     assert!(matches!(
         receiver.recv().now_or_never().flatten(),
         Some(super::super::GridMsg::SetCellNull {
@@ -376,7 +380,11 @@ fn set_null_stages_null_and_cancel_stages_nothing() {
             sender,
         },
     );
-    button(dialog.child().unwrap().upcast_ref(), &bookie_app_services::tr!("Set to NULL")).emit_clicked();
+    button(
+        dialog.child().unwrap().upcast_ref(),
+        &bookie_app_services::tr!("Set to NULL"),
+    )
+    .emit_clicked();
     assert!(matches!(
         receiver.recv().now_or_never().flatten(),
         Some(super::super::GridMsg::SetCellNull { draft_id: Some(42), .. })
@@ -396,7 +404,11 @@ fn set_null_stages_null_and_cancel_stages_nothing() {
             sender,
         },
     );
-    button(dialog.child().unwrap().upcast_ref(), &bookie_app_services::tr!("Cancel")).emit_clicked();
+    button(
+        dialog.child().unwrap().upcast_ref(),
+        &bookie_app_services::tr!("Cancel"),
+    )
+    .emit_clicked();
     assert!(receiver.recv().now_or_never().flatten().is_none());
     parent.close();
 }

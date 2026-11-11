@@ -165,7 +165,8 @@ impl App {
         if bookie_core::sql_ddl::protects_schema(driver_id, &schema) {
             self.show_error_alert(
                 &bookie_app_services::tr!("Cannot drop schema"),
-                &bookie_app_services::tr!("\"{schema}\" is a system schema and cannot be dropped.").replace("{schema}", &schema),
+                &bookie_app_services::tr!("\"{schema}\" is a system schema and cannot be dropped.")
+                    .replace("{schema}", &schema),
             );
             return;
         }

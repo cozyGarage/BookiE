@@ -19,4 +19,10 @@ pub enum BuildSqlError {
 
     #[error("optimistic updates are unsupported for driver {0}")]
     UnsupportedDriver(String),
+
+    #[error("driver {0} cannot set a column to its DEFAULT")]
+    DefaultUnsupported(String),
+
+    #[error("an expression must not be empty")]
+    EmptyExpression,
 }

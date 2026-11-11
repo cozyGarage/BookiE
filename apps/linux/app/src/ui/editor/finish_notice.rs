@@ -22,13 +22,12 @@ pub(super) fn notify_if_unattended(widget: &impl IsA<gtk::Widget>, elapsed: Dura
     };
     let notification = gio::Notification::new(&bookie_app_services::tr!("Query finished"));
     notification.set_body(Some(
-        &bookie_app_services::tr!("The query ran for {seconds} seconds.").replace("{seconds}", &elapsed.as_secs().to_string()),
+        &bookie_app_services::tr!("The query ran for {seconds} seconds.")
+            .replace("{seconds}", &elapsed.as_secs().to_string()),
     ));
     application.send_notification(Some("query-finished"), &notification);
 }
 
-/// The status label keeps a fixed width and ellipsises long text, so a new status ("done in 414 ms",
-/// "cancelled") does not move the Run button beside it.
 pub(super) fn fit_status(status: &gtk::Label) {
     status.set_width_chars(18);
     status.set_max_width_chars(18);

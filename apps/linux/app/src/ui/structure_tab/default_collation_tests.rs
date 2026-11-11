@@ -56,8 +56,16 @@ fn a_new_table_tab_offers_a_default_collation_when_the_driver_supports_one() {
     let model = controller.model();
     assert!(model.table_collation_row.is_visible());
     let items = model.table_collation_row.model().expect("a model of choices").n_items();
-    assert_eq!(items as usize, COLLATIONS.len() + 1, "the server default plus every collation");
-    assert_eq!(model.table_collation_row.selected(), 0, "the server default is preselected");
+    assert_eq!(
+        items as usize,
+        COLLATIONS.len() + 1,
+        "the server default plus every collation"
+    );
+    assert_eq!(
+        model.table_collation_row.selected(),
+        0,
+        "the server default is preselected"
+    );
     assert_eq!(*model.default_collation.borrow(), None);
 }
 
@@ -98,7 +106,11 @@ fn choosing_a_default_collation_puts_it_in_the_create_table_statement() {
     controller.model().table_collation_row.set_selected(0);
     drain();
     assert_eq!(*controller.model().default_collation.borrow(), None);
-    assert!(!preview(&controller).contains("DEFAULT COLLATE"), "{}", preview(&controller));
+    assert!(
+        !preview(&controller).contains("DEFAULT COLLATE"),
+        "{}",
+        preview(&controller)
+    );
 }
 
 #[test]

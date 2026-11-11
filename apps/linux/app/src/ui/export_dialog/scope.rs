@@ -16,7 +16,9 @@ pub(super) fn build(
     result: &QueryResult,
     paged: Option<&PagedExport>,
 ) -> (adw::PreferencesGroup, Option<adw::ComboRow>) {
-    let group = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("Scope")).build();
+    let group = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Scope"))
+        .build();
     if let ExportScope::TablePage { filtered } = scope {
         let labels = [
             bookie_app_services::tr!("Current table page"),
@@ -28,9 +30,11 @@ pub(super) fn build(
             .model(&choices)
             .build();
         let page_description = if filtered {
-            bookie_app_services::tr!("{n} loaded rows from the active table filter").replace("{n}", &result.rows.len().to_string())
+            bookie_app_services::tr!("{n} loaded rows from the active table filter")
+                .replace("{n}", &result.rows.len().to_string())
         } else {
-            bookie_app_services::tr!("{n} loaded rows from the current page").replace("{n}", &result.rows.len().to_string())
+            bookie_app_services::tr!("{n} loaded rows from the current page")
+                .replace("{n}", &result.rows.len().to_string())
         };
         choice.set_subtitle(&page_description);
         choice.connect_selected_notify(move |choice| {

@@ -37,8 +37,13 @@ fn spool_export_factory_with_runner(
         let page_count = spool.page_count();
         let mut index = 0_usize;
         let mut rows_read = 0_usize;
+        let page_lease = Arc::new(std::sync::Mutex::new(None));
         PageFetcher::new(
             move || {
+                page_lease
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take();
                 if cancel.is_cancelled() {
                     return Err(ExportError::Cancelled);
                 }
@@ -52,15 +57,28 @@ fn spool_export_factory_with_runner(
                 let spool = spool.clone();
                 let columns = columns.clone();
                 let page_index = index as u64;
+                let lease_holder = page_lease.clone();
                 let rows = runner(Box::pin(async move {
+                    let mut lease = spool
+                        .page_budget()
+                        .reserve(bookie_core::MAX_QUERY_RESULT_BYTES)
+                        .ok_or_else(|| ExportError::Source("the result memory budget is full".into()))?;
                     let page = spool
-                        .load_page(page_index, columns)
+                        .load_page_retained(page_index, columns, lease.clone())
                         .await
                         .map_err(|_| ExportError::Source("a saved result page could not be read".into()))?;
+                    if !lease.resize_detached_page(&page) {
+                        return Err(ExportError::Source("the result memory budget is full".into()));
+                    }
+                    *lease_holder.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(lease);
                     let page = Arc::try_unwrap(page).unwrap_or_else(|page| (*page).clone());
                     Ok(page.rows.into_rows())
                 }))?;
                 if cancel.is_cancelled() {
+                    page_lease
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .take();
                     return Err(ExportError::Cancelled);
                 }
                 rows_read = rows_read

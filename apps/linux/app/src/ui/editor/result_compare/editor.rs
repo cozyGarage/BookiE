@@ -117,7 +117,9 @@ fn is_cancellation(failure: &CompareFailure) -> bool {
 
 fn failure_text(failure: &CompareFailure) -> String {
     match failure {
-        CompareFailure::Audit => bookie_app_services::tr!("The comparison needs the audit journal, which is unavailable"),
+        CompareFailure::Audit => {
+            bookie_app_services::tr!("The comparison needs the audit journal, which is unavailable")
+        }
         CompareFailure::Compare(error) => failure_message(error),
     }
 }

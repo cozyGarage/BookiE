@@ -37,7 +37,7 @@ fn retains_all_small_pages_within_the_byte_budget_and_counts_all_delivered_rows(
     assert_eq!(cache.first_page(), 0);
     assert_eq!(cache.total_rows(), 20);
     assert_eq!(
-        cache.pages().iter().map(|(index, _, _)| *index).collect::<Vec<_>>(),
+        cache.pages().iter().map(|(index, _, _, _)| *index).collect::<Vec<_>>(),
         (0..20).collect::<Vec<_>>()
     );
     let snapshot = cache.snapshot(StreamTerminal::Complete, None);
@@ -45,6 +45,150 @@ fn retains_all_small_pages_within_the_byte_budget_and_counts_all_delivered_rows(
     assert_eq!(snapshot.page_indices, (0..20).collect::<Vec<_>>());
     assert_eq!(snapshot.page_row_starts, (1..=20).collect::<Vec<_>>());
     assert_eq!(snapshot.retained_rows, 20);
+}
+
+#[test]
+fn spooled_pages_stay_indexed_when_the_shared_resident_budget_is_full() {
+    let mut cache = StreamPageCache::with_budget(bookie_results::stream_page_budget::StreamPageBudget::new(0));
+    cache
+        .append_with_storage_status(0, page(&["id"], &[1]), true)
+        .expect("spooled page remains part of the result");
+
+    let snapshot = cache.snapshot(StreamTerminal::Complete, None);
+    assert_eq!(snapshot.total_pages, 1);
+    assert_eq!(snapshot.total_rows, 1);
+    assert!(snapshot.page_indices.is_empty());
+    assert_eq!(snapshot.retained_rows, 0);
+}
+
+#[test]
+fn two_streams_share_page_capacity_and_release_it_with_the_last_owner() {
+    let first_page = page(&["id"], &[1]);
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(first_page.estimated_row_bytes());
+    let mut first = StreamPageCache::with_budget(budget.clone());
+    let mut second = StreamPageCache::with_budget(budget.clone());
+    first
+        .append_with_storage_status(0, first_page, true)
+        .expect("first page");
+    second
+        .append_with_storage_status(0, page(&["id"], &[2]), true)
+        .expect("second page stays spooled");
+
+    assert_eq!(budget.used_bytes(), budget.limit_bytes());
+    assert_eq!(budget.used_cells(), 1);
+    assert_eq!(second.total_rows(), 1);
+    assert!(second.pages().is_empty());
+    drop(first);
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_cells(), 0);
+}
+
+#[test]
+fn retained_snapshot_keeps_page_budget_until_its_last_owner_closes() {
+    let result = page(&["id"], &[1]);
+    let bytes = result.estimated_row_bytes();
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(bytes);
+    let mut cache = StreamPageCache::with_budget(budget.clone());
+    cache.append(0, result).unwrap();
+    let snapshot = cache.snapshot(StreamTerminal::Complete, None);
+    let second_owner = snapshot.clone();
+
+    drop(cache);
+    assert_eq!(budget.used_bytes(), bytes);
+    assert_eq!(snapshot.resident_pages.get(0).unwrap().rows[0][0], Value::Int(1));
+    drop(snapshot);
+    assert_eq!(budget.used_bytes(), bytes);
+    drop(second_owner);
+    assert_eq!(budget.used_bytes(), 0);
+    assert_eq!(budget.used_pages(), 0);
+}
+
+#[test]
+fn spools_from_one_manager_share_the_page_budget() {
+    let manager = bookie_app_services::stream_result_spool::StreamResultSpoolManager::default();
+    let first = manager.create().expect("first spool");
+    let second = manager.create().expect("second spool");
+    let budget = first.page_budget();
+    let reservation = budget.reserve(budget.limit_bytes()).expect("whole budget");
+
+    assert!(second.page_budget().reserve(1).is_none());
+    drop(reservation);
+    assert!(second.page_budget().reserve(1).is_some());
+}
+
+#[test]
+fn an_unspooled_page_is_rejected_when_the_shared_budget_cannot_retain_it() {
+    let mut cache = StreamPageCache::with_budget(bookie_results::stream_page_budget::StreamPageBudget::new(0));
+    let error = cache
+        .append_with_storage_status(0, page(&["id"], &[1]), false)
+        .expect_err("unspooled data must not be silently discarded");
+
+    assert_eq!(error, PageAppendError::RetentionLimit);
+    assert_eq!(cache.total_rows(), 0);
+    assert_eq!(cache.first_page(), 0);
+    assert!(cache.pages().is_empty());
+}
+
+#[test]
+fn a_visible_page_keeps_its_budget_lease_after_cache_eviction() {
+    let page = page(&["id"], &[1]);
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(page.estimated_row_bytes());
+    let store = ResidentPageStore::with_budget(budget.clone());
+    store.insert(0, page.clone(), budget.retain(&page).expect("page lease"), true);
+    store.protect(0);
+    store.remove(0);
+
+    assert_eq!(budget.used_bytes(), page.estimated_row_bytes());
+    assert!(store.get(0).is_some());
+    store.unprotect(0);
+    assert!(store.get(0).is_none());
+}
+
+#[test]
+fn restoring_a_cached_page_preserves_cache_ownership_after_the_view_closes() {
+    let page = page(&["id"], &[1]);
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(page.estimated_row_bytes());
+    let store = ResidentPageStore::with_budget(budget.clone());
+    store.insert(0, page.clone(), budget.retain(&page).expect("cache lease"), true);
+    store.protect(0);
+    store.insert(0, page.clone(), budget.retain(&page).expect("view lease"), false);
+    store.protect(0);
+    store.unprotect(0);
+    assert!(store.get(0).is_some());
+    store.remove(0);
+    assert!(store.get(0).is_some());
+    store.unprotect(0);
+    assert!(store.get(0).is_none());
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
+fn restored_cached_page_remains_available_after_its_last_view_closes() {
+    let page = page(&["id"], &[1]);
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(page.estimated_row_bytes());
+    let store = ResidentPageStore::with_budget(budget.clone());
+    store.insert(0, page.clone(), budget.retain(&page).unwrap(), true);
+    store.insert(0, page.clone(), budget.retain(&page).unwrap(), false);
+    store.protect(0);
+    store.unprotect(0);
+    assert!(store.get(0).is_some());
+    store.remove(0);
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
+fn a_second_decode_does_not_replace_a_page_held_by_an_existing_view() {
+    let first = page(&["id"], &[1]);
+    let second = page(&["id"], &[1]);
+    let budget = bookie_results::stream_page_budget::StreamPageBudget::new(first.estimated_row_bytes() * 2);
+    let store = ResidentPageStore::with_budget(budget.clone());
+    store.insert(0, first.clone(), budget.retain(&first).unwrap(), false);
+    store.protect(0);
+    store.insert(0, second.clone(), budget.retain(&second).unwrap(), false);
+    assert!(Arc::ptr_eq(&store.get(0).unwrap(), &first));
+    assert_eq!(budget.used_bytes(), first.estimated_row_bytes());
+    store.unprotect(0);
+    assert_eq!(budget.used_bytes(), 0);
 }
 
 #[test]

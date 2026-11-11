@@ -209,7 +209,9 @@ impl Component for ConnectDialog {
 
         let (endpoint_row, endpoint_combo) = choice_row(
             bookie_app_services::tr!("Endpoint"),
-            Some(bookie_app_services::tr!("Connect over the network or a local Unix socket")),
+            Some(bookie_app_services::tr!(
+                "Connect over the network or a local Unix socket"
+            )),
             vec!["Network".to_string(), "Unix socket".to_string()],
         );
         let sender_for_endpoint = sender.clone();
@@ -217,12 +219,16 @@ impl Component for ConnectDialog {
             sender_for_endpoint.input(ConnectDialogInput::EndpointChanged);
         });
 
-        let name = adw::EntryRow::builder().title(bookie_app_services::tr!("Name (optional)")).build();
+        let name = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Name (optional)"))
+            .build();
         let host = adw::EntryRow::builder()
             .title(bookie_app_services::tr!("Host"))
             .text("localhost")
             .build();
-        let port_row = adw::ActionRow::builder().title(bookie_app_services::tr!("Port")).build();
+        let port_row = adw::ActionRow::builder()
+            .title(bookie_app_services::tr!("Port"))
+            .build();
         let port = controls::port_input();
         controls::center_in_row(&port);
         port.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Port"))]);
@@ -238,16 +244,24 @@ impl Component for ConnectDialog {
             .use_markup(false)
             .title(bookie_app_services::tr!("Resolved socket"))
             .build();
-        let database = adw::EntryRow::builder().title(bookie_app_services::tr!("Database")).build();
+        let database = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Database"))
+            .build();
         let database_file_picker = browse::attach_database_file_picker(&database);
         database_file_picker.set_visible(false);
         let auth_source = auth_source::row();
-        let username = adw::EntryRow::builder().title(bookie_app_services::tr!("Username")).build();
-        let password = adw::PasswordEntryRow::builder().title(bookie_app_services::tr!("Password")).build();
+        let username = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Username"))
+            .build();
+        let password = adw::PasswordEntryRow::builder()
+            .title(bookie_app_services::tr!("Password"))
+            .build();
         let tls_choices = TlsMode::ALL.iter().map(|mode| mode.label().to_string()).collect();
         let (tls_row, tls_mode) = choice_row(
             bookie_app_services::tr!("TLS"),
-            Some(bookie_app_services::tr!("How the client encrypts and verifies the server")),
+            Some(bookie_app_services::tr!(
+                "How the client encrypts and verifies the server"
+            )),
             tls_choices,
         );
         tls_mode.set_selected(TlsMode::VerifyFull.index());
@@ -261,9 +275,13 @@ impl Component for ConnectDialog {
                 "Encrypt before any SQL Server handshake; the connection fails if the server cannot"
             ))
             .build();
-        let tls_client_cert = adw::EntryRow::builder().title(bookie_app_services::tr!("Client certificate")).build();
+        let tls_client_cert = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Client certificate"))
+            .build();
         browse::attach_client_certificate_picker(&tls_client_cert);
-        let tls_client_key = adw::EntryRow::builder().title(bookie_app_services::tr!("Client private key")).build();
+        let tls_client_key = adw::EntryRow::builder()
+            .title(bookie_app_services::tr!("Client private key"))
+            .build();
         browse::attach_client_key_picker(&tls_client_key);
         let sender_for_tls = sender.clone();
         tls_mode.connect_selected_notify(move |_| {
@@ -304,7 +322,9 @@ impl Component for ConnectDialog {
         // Semantic preferences groups: Connection / Authentication /
         // Options / SSH. AdwPreferencesPage renders them with the
         // standard Adwaita section spacing & headers.
-        let connection_group = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("Connection")).build();
+        let connection_group = adw::PreferencesGroup::builder()
+            .title(bookie_app_services::tr!("Connection"))
+            .build();
         connection_group.add(&driver_row);
         connection_group.add(&name);
         connection_group.add(&endpoint_row);
@@ -329,7 +349,9 @@ impl Component for ConnectDialog {
         auth_group.add(&username);
         auth_group.add(&password);
 
-        let options_group = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("Options")).build();
+        let options_group = adw::PreferencesGroup::builder()
+            .title(bookie_app_services::tr!("Options"))
+            .build();
         options_group.add(&tls_row);
         options_group.add(&tls_root_cert);
         options_group.add(&tls_strict);
@@ -347,7 +369,9 @@ impl Component for ConnectDialog {
             sender_for_test.input(ConnectDialogInput::TestConnection);
         });
 
-        let submit = gtk::Button::builder().label(bookie_app_services::tr!("Connect")).build();
+        let submit = gtk::Button::builder()
+            .label(bookie_app_services::tr!("Connect"))
+            .build();
         submit.add_css_class("suggested-action");
         let sender_for_submit = sender.clone();
         submit.connect_clicked(move |_| {
@@ -493,7 +517,9 @@ impl Component for ConnectDialog {
                     Some(d) => d,
                     None => {
                         self.set_busy(BusyKind::None);
-                        self.show_toast(&bookie_app_services::tr!("Driver {id} not registered").replace("{id}", &entry.id));
+                        self.show_toast(
+                            &bookie_app_services::tr!("Driver {id} not registered").replace("{id}", &entry.id),
+                        );
                         return;
                     }
                 };
@@ -880,7 +906,8 @@ impl ConnectDialog {
         if socket {
             self.tls_mode.set_selected(TlsMode::Disabled.index());
             self.ssh.expander.set_enable_expansion(false);
-            self.password.set_title(&bookie_app_services::tr!("Password (optional)"));
+            self.password
+                .set_title(&bookie_app_services::tr!("Password (optional)"));
         } else {
             self.password.set_title(&bookie_app_services::tr!("Password"));
         }
@@ -902,7 +929,9 @@ impl ConnectDialog {
         let idx = self.driver_combo.selected() as usize;
         let subtitle = match self.drivers.get(idx).map(|d| d.maturity) {
             Some(DriverMaturity::Experimental) => {
-                bookie_app_services::tr!("Experimental: connect and browse work; some writes and transactions are limited")
+                bookie_app_services::tr!(
+                    "Experimental: connect and browse work; some writes and transactions are limited"
+                )
             }
             _ => String::new(),
         };

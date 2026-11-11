@@ -98,6 +98,7 @@ pub(crate) enum StreamUpdate {
         sequence: u64,
         page: std::sync::Arc<QueryResult>,
         spooled: bool,
+        lease: bookie_results::stream_page_budget::StreamPageLease,
     },
 }
 
@@ -352,7 +353,9 @@ where
             sql_preview: attempt.preview.clone(),
             sql: attempt.sql.to_owned(),
             elapsed_ms: attempt.started.elapsed().as_millis(),
-            kind: StatementOutcomeKind::Error(bookie_app_services::tr!("Temporary result storage is unavailable.").into()),
+            kind: StatementOutcomeKind::Error(
+                bookie_app_services::tr!("Temporary result storage is unavailable.").into(),
+            ),
             pinned: false,
         })
     })?;
@@ -472,32 +475,21 @@ where
 {
     let mut sequence = 0;
     loop {
-        let fetched = cursor.fetch_page_with_audit(control).await;
-        merge_audit_receipts(&mut audit_receipts, fetched.audit_receipts);
-        let page = match fetched.result {
-            Ok(page) => page,
-            Err(DriverError::Cancelled) => {
-                finish_stream_cursor(cursor, false).await;
-                return ScriptRunResult::Streamed(StreamTerminal::Cancelled);
-            }
-            Err(DriverError::TimedOut) => {
-                finish_stream_cursor(cursor, false).await;
-                return ScriptRunResult::Streamed(StreamTerminal::TimedOut);
-            }
-            Err(error) => {
-                let message = failure_message(&error, sql, sent).with_audit_receipts(audit_receipts);
-                finish_stream_cursor(cursor, false).await;
-                return ScriptRunResult::Streamed(StreamTerminal::Failed(message));
-            }
-        };
-        let has_next_page = page.has_next_page;
-        let page = std::sync::Arc::new(page.result);
+        let (page, has_next_page, lease) =
+            match fetch_stream_page(&cursor, &spool, &mut audit_receipts, (sql, sent), control).await {
+                Ok(page) => page,
+                Err(terminal) => {
+                    finish_stream_cursor(cursor, false).await;
+                    return ScriptRunResult::Streamed(terminal);
+                }
+            };
         let truncated = page.truncated;
         let spooled = spool.append_page(sequence, page.clone()).await.is_ok();
         if !stream_update(StreamUpdate::Page {
             sequence,
             page,
             spooled,
+            lease,
         })
         .await
         {
@@ -515,7 +507,8 @@ where
         if truncated {
             finish_stream_cursor(cursor, true).await;
             return ScriptRunResult::Streamed(StreamTerminal::Failed(
-                bookie_app_services::tr!("A result page exceeded the query result limit. The result is incomplete.").into(),
+                bookie_app_services::tr!("A result page exceeded the query result limit. The result is incomplete.")
+                    .into(),
             ));
         }
         if !has_next_page {
@@ -530,6 +523,48 @@ where
             return ScriptRunResult::Streamed(StreamTerminal::Complete);
         }
     }
+}
+
+async fn fetch_stream_page(
+    cursor: &super::session_mode::StatementCursor,
+    spool: &StreamResultSpool,
+    audit_receipts: &mut Vec<AuditReceipt>,
+    (sql, sent): (&str, &str),
+    control: &OperationControl,
+) -> Result<
+    (
+        std::sync::Arc<QueryResult>,
+        bool,
+        bookie_results::stream_page_budget::StreamPageLease,
+    ),
+    StreamTerminal,
+> {
+    let Some(mut lease) = spool.page_budget().reserve(bookie_core::MAX_QUERY_RESULT_BYTES) else {
+        return Err(StreamTerminal::Failed(
+            bookie_app_services::tr!("The result memory budget is full. Close or release other large results before running this query again.")
+                .into(),
+        ));
+    };
+    let fetched = cursor.fetch_page_with_audit(control).await;
+    merge_audit_receipts(audit_receipts, fetched.audit_receipts);
+    let page = match fetched.result {
+        Ok(page) => page,
+        Err(DriverError::Cancelled) => return Err(StreamTerminal::Cancelled),
+        Err(DriverError::TimedOut) => return Err(StreamTerminal::TimedOut),
+        Err(error) => {
+            let receipts = std::mem::take(audit_receipts);
+            let message = failure_message(&error, sql, sent).with_audit_receipts(receipts);
+            return Err(StreamTerminal::Failed(message));
+        }
+    };
+    let has_next_page = page.has_next_page;
+    let page = std::sync::Arc::new(page.result);
+    if !lease.resize_page(&page) {
+        return Err(StreamTerminal::Failed(
+            bookie_app_services::tr!("This result page exceeds the available memory budget.").into(),
+        ));
+    }
+    Ok((page, has_next_page, lease))
 }
 
 async fn finish_stream_cursor(cursor: super::session_mode::StatementCursor, close_cursor: bool) {
@@ -615,7 +650,10 @@ fn build_outcome_widget(
         }
         StatementOutcomeKind::Error(msg) => error_page(o.identity.statement_index, msg).upcast(),
         StatementOutcomeKind::NotRun => adw::StatusPage::builder()
-            .title(bookie_app_services::tr!("Statement {n} not run").replace("{n}", &(o.identity.statement_index + 1).to_string()))
+            .title(
+                bookie_app_services::tr!("Statement {n} not run")
+                    .replace("{n}", &(o.identity.statement_index + 1).to_string()),
+            )
             .description(bookie_app_services::tr!("Skipped because an earlier statement failed."))
             .icon_name("media-playback-stop-symbolic")
             .vexpand(true)
@@ -655,7 +693,9 @@ fn build_multi_result_widget(
         stack.add_titled(&widget, Some(&format!("set{index}")), &labels[index]);
     }
     let dropdown = gtk::DropDown::from_strings(&labels.iter().map(String::as_str).collect::<Vec<_>>());
-    dropdown.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Result set"))]);
+    dropdown.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Result set"
+    ))]);
     dropdown.connect_selected_notify({
         let stack = stack.downgrade();
         move |dropdown| {
@@ -980,7 +1020,9 @@ fn build_result_drop_down(stack: &adw::ViewStack, outcomes: &[StatementOutcome])
     let labels: Vec<String> = outcomes.iter().map(outcome_tab_label).collect();
     let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
     let drop_down = gtk::DropDown::from_strings(&label_refs);
-    drop_down.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Statement result"))]);
+    drop_down.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Statement result"
+    ))]);
     let first_error = first_failure(outcomes).unwrap_or(0);
     drop_down.set_selected(first_error as u32);
     drop_down.connect_selected_notify({

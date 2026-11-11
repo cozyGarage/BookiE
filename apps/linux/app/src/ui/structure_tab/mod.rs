@@ -495,7 +495,8 @@ impl StructureTab {
             );
         });
         if !fks::can_add_foreign_key(&driver_id, &self.mode.borrow()) {
-            let reason = bookie_app_services::tr!("Adding a foreign key to an existing table isn't supported by SQLite.");
+            let reason =
+                bookie_app_services::tr!("Adding a foreign key to an existing table isn't supported by SQLite.");
             add_row.set_sensitive(false);
             add_row.set_subtitle(&reason);
             add_row.set_tooltip_text(Some(&reason));
@@ -674,7 +675,9 @@ impl SimpleComponent for StructureTab {
             .width_request(48)
             .height_request(48)
             .build();
-        let loading_title = gtk::Label::builder().label(bookie_app_services::tr!("Loading structure…")).build();
+        let loading_title = gtk::Label::builder()
+            .label(bookie_app_services::tr!("Loading structure…"))
+            .build();
         loading_title.add_css_class("title-2");
         let loading_subtitle = gtk::Label::builder()
             .label(bookie_app_services::tr!("Reading columns, indexes, and foreign keys…"))
@@ -1105,12 +1108,15 @@ impl SimpleComponent for StructureTab {
                         let _ = sender.output(StructureTabOutput::ExecuteTransaction { statements });
                     }
                     Ok(_) => {
-                        let _ = sender.output(StructureTabOutput::ShowToast(bookie_app_services::tr!("Nothing to save.")));
+                        let _ = sender.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
+                            "Nothing to save."
+                        )));
                     }
                     Err(BuildDdlError::SqliteNotSupported(detail)) => {
                         let _ = sender.output(StructureTabOutput::ShowAlert {
                             title: bookie_app_services::tr!("Cannot save"),
-                            body: bookie_app_services::tr!("SQLite doesn't support: {detail}").replace("{detail}", detail),
+                            body: bookie_app_services::tr!("SQLite doesn't support: {detail}")
+                                .replace("{detail}", detail),
                         });
                     }
                     Err(e) => {

@@ -441,7 +441,9 @@ fn connect_apply(
 
 fn show_payload_error(label: &gtk::Label, error: PayloadError) {
     match error {
-        PayloadError::TooLarge => label.set_text(&bookie_app_services::tr!("Values over 1 MiB cannot be edited in this dialog.")),
+        PayloadError::TooLarge => label.set_text(&bookie_app_services::tr!(
+            "Values over 1 MiB cannot be edited in this dialog."
+        )),
         PayloadError::InvalidJson { line, column } => show_json_error(label, line, column),
     }
     label.set_visible(true);
@@ -461,7 +463,9 @@ fn show_json_error(label: &gtk::Label, line: usize, column: usize) {
 pub(super) fn present_too_large(parent: &impl IsA<gtk::Widget>) {
     let dialog = adw::AlertDialog::new(
         Some(&bookie_app_services::tr!("Value is too large to edit")),
-        Some(&bookie_app_services::tr!("Values over 1 MiB cannot be edited in this dialog.")),
+        Some(&bookie_app_services::tr!(
+            "Values over 1 MiB cannot be edited in this dialog."
+        )),
     );
     dialog.add_response("close", &bookie_app_services::tr!("Close"));
     dialog.set_close_response("close");

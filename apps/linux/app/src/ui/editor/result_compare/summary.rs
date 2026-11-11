@@ -37,13 +37,16 @@ pub(super) fn notes(report: &CompareReport) -> Vec<String> {
         ));
     }
     if !report.columns_only_left.is_empty() || !report.columns_only_right.is_empty() {
-        notes.push(bookie_app_services::tr!("Columns that are not in both results were not compared."));
+        notes.push(bookie_app_services::tr!(
+            "Columns that are not in both results were not compared."
+        ));
     }
     notes
 }
 
 pub(super) fn no_difference_message(report: &CompareReport) -> String {
-    let mut message = bookie_app_services::tr!("No differences · {summary}").replace("{summary}", &summary_text(&report.summary));
+    let mut message =
+        bookie_app_services::tr!("No differences · {summary}").replace("{summary}", &summary_text(&report.summary));
     for note in notes(report) {
         message = format!("{message} · {note}");
     }
@@ -89,7 +92,9 @@ pub(super) fn failure_message(error: &CompareError) -> String {
         CompareError::AmbiguousColumns => bookie_app_services::tr!("A result has two columns with the same name"),
         CompareError::UnknownKeyColumn => bookie_app_services::tr!("The key column is not in both results"),
         CompareError::UnreadableKey => bookie_app_services::tr!("A key value is NULL or could not be read"),
-        CompareError::DuplicateKey => bookie_app_services::tr!("A key value appears more than once; choose a unique key"),
+        CompareError::DuplicateKey => {
+            bookie_app_services::tr!("A key value appears more than once; choose a unique key")
+        }
         CompareError::TooManyRows => bookie_app_services::tr!("The results are too large to compare"),
         CompareError::Source => bookie_app_services::tr!("A saved result could not be read"),
     }

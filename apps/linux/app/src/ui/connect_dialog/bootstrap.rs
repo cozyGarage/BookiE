@@ -52,8 +52,6 @@ pub(super) async fn open_candidate(
         .guard(conn.clone(), bootstrap.metadata, bookie_policy::Principal::human_gui())
         .map_err(|failure| crate::services::error_text::open_failure_message(&failure))?;
     let control = crate::services::operation_control::bounded_with(timeout_secs, cancellation);
-    // The version request is bounded like the catalog requests below: a server that never answers
-    // ends the attempt at the deadline, and a cancellation reaches it.
     let server_version = match guarded.server_version_controlled(&control).await {
         Ok(version) => version,
         Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),

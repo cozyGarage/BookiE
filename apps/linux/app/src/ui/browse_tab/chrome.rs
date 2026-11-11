@@ -21,7 +21,9 @@ impl BrowseTab {
             .sensitive(false)
             .build();
         insert_button.add_css_class("flat");
-        insert_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Insert row"))]);
+        insert_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Insert row"
+        ))]);
         let sender_for_insert = sender.clone();
         insert_button.connect_clicked(move |_| sender_for_insert.input(BrowseTabInput::InsertRow));
 
@@ -148,7 +150,9 @@ impl BrowseTab {
             .action_name("win.export-csv")
             .build();
         export_button.add_css_class("flat");
-        export_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Export results"))]);
+        export_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Export results"
+        ))]);
 
         // Filter button — opens the rule editor for server-side WHERE.
         // Action `win.open-filter` is registered in app/mod.rs and
@@ -181,7 +185,9 @@ impl BrowseTab {
             filter_button.set_tooltip_text(Some(&bookie_app_services::tr!("Filter rows (Ctrl+F)")));
             filter_button.set_action_name(Some("win.open-filter"));
         } else {
-            filter_button.set_tooltip_text(Some(&bookie_app_services::tr!("This database cannot filter a table view")));
+            filter_button.set_tooltip_text(Some(&bookie_app_services::tr!(
+                "This database cannot filter a table view"
+            )));
             filter_button.set_sensitive(false);
         }
 
@@ -216,7 +222,9 @@ impl BrowseTab {
             .tooltip_text(bookie_app_services::tr!("Row inspector"))
             .build();
         inspector_button.add_css_class("flat");
-        inspector_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Row inspector"))]);
+        inspector_button.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+            "Row inspector"
+        ))]);
         paginator_bar.pack_end(&inspector_button);
         paginator_bar.pack_end(&export_button);
         paginator_bar.pack_end(&filter_button);
@@ -307,8 +315,8 @@ impl BrowseTab {
     pub(super) fn refresh_pending_bar(&self, count: usize) {
         let visible = count > 0;
         if visible {
-            let label =
-                bookie_app_services::trn!("{n} unsaved change", "{n} unsaved changes", count).replace("{n}", &count.to_string());
+            let label = bookie_app_services::trn!("{n} unsaved change", "{n} unsaved changes", count)
+                .replace("{n}", &count.to_string());
             self.pending_label.set_label(&label);
         }
         // Slide the whole footer in/out as one unit instead of

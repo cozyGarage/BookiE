@@ -51,6 +51,9 @@ env:
   CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.job }}
   TMPDIR: /var/cache/ci/target
 
+permissions:
+  contents: read
+
 jobs:
   pin-revision:
     name: Pin tested revision

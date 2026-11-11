@@ -2,7 +2,12 @@ pub use bookie_app_services::quick_switcher::{QuickItem, QuickTarget, favorite_i
 use bookie_core::TableInfo;
 
 pub fn relation_items(tables: &[TableInfo], views: &[TableInfo]) -> Vec<QuickItem> {
-    bookie_app_services::quick_switcher::relation_items(tables, views, &bookie_app_services::tr!("Table"), &bookie_app_services::tr!("View"))
+    bookie_app_services::quick_switcher::relation_items(
+        tables,
+        views,
+        &bookie_app_services::tr!("Table"),
+        &bookie_app_services::tr!("View"),
+    )
 }
 
 fn commands() -> Vec<(&'static str, String)> {

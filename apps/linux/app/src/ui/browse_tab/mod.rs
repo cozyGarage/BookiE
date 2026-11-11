@@ -227,17 +227,17 @@ mod tests;
 mod value_parse;
 mod value_view;
 
+use bookie_app_services::value_input::ParseHooks;
+pub(crate) use bookie_app_services::value_input::mysql_enum_set_labels;
 pub(crate) use choices::scalar_enum_columns;
 use chrome::*;
 pub use messages::{BrowseTabInput, BrowseTabOutput};
 pub use requests::{BrowseCellValueRequest, BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest};
 use requests::{CellValueRequestTracker, PageRequestTracker, RowCountRequestTracker};
 use selection::*;
-pub(crate) use bookie_app_services::value_input::mysql_enum_set_labels;
+pub(crate) use value_parse::hooks_for;
 pub(in crate::ui) use value_parse::parse_grid_cell_input;
 use value_parse::*;
-pub(crate) use value_parse::hooks_for;
-use bookie_app_services::value_input::ParseHooks;
 
 impl BrowseTab {
     fn reset_keyset_navigation(&mut self) {
@@ -758,7 +758,9 @@ impl SimpleComponent for BrowseTab {
                 let result = if self.rejected_edit_revision.get() == revision {
                     Ok(())
                 } else {
-                    Err(bookie_app_services::tr!("Finish or cancel the current cell edit and try again."))
+                    Err(bookie_app_services::tr!(
+                        "Finish or cancel the current cell edit and try again."
+                    ))
                 };
                 let _ = reply.send(result);
             }

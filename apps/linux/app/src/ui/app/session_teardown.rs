@@ -51,7 +51,10 @@ fn close_anyway_dialog(message: &str, on_close_anyway: impl Fn() + 'static) -> a
         "{message}\n\nIf you close anyway, the database rolls back any transaction that was not committed when its connection drops."
     )
     .replace("{message}", message);
-    let dialog = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Could not close database sessions")), Some(&body));
+    let dialog = adw::AlertDialog::new(
+        Some(&bookie_app_services::tr!("Could not close database sessions")),
+        Some(&body),
+    );
     dialog.add_response("keep", &bookie_app_services::tr!("Keep Open"));
     dialog.add_response("close-anyway", &bookie_app_services::tr!("Close Anyway"));
     dialog.set_response_appearance("close-anyway", adw::ResponseAppearance::Destructive);

@@ -4,7 +4,9 @@ use bookie_core::sql_dialect::BuildSqlError;
 
 pub fn build_sql_message(error: &BuildSqlError) -> String {
     match error {
-        BuildSqlError::NoPrimaryKey => bookie_app_services::tr!("This table has no primary key. Use the modal Edit dialog instead."),
+        BuildSqlError::NoPrimaryKey => {
+            bookie_app_services::tr!("This table has no primary key. Use the modal Edit dialog instead.")
+        }
         BuildSqlError::NothingToUpdate => bookie_app_services::tr!("No changes to save."),
         BuildSqlError::LengthMismatch { expected, got } => {
             bookie_app_services::tr!("Internal column count mismatch (expected {expected}, got {got}).")
@@ -16,7 +18,8 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
                 .replace("{column}", column)
         }
         BuildSqlError::UnsupportedDriver(driver) => {
-            bookie_app_services::tr!("Optimistic grid updates are not supported for {driver}.").replace("{driver}", driver)
+            bookie_app_services::tr!("Optimistic grid updates are not supported for {driver}.")
+                .replace("{driver}", driver)
         }
         BuildSqlError::StaleColumns => bookie_app_services::tr!(
             "This table's columns changed after you started editing (for example, in a Structure tab). \

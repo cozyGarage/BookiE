@@ -92,7 +92,9 @@ fn build_widgets(names: &[String], can_replace: bool) -> FindWidgets {
         .margin_end(12)
         .hexpand(true)
         .build();
-    search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Search the loaded rows"))]);
+    search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Search the loaded rows"
+    ))]);
     let match_case = flat_toggle("Aa", &bookie_app_services::tr!("Match case"));
     let whole_words = flat_toggle("W", &bookie_app_services::tr!("Whole words"));
     let regex = flat_toggle(".*", &bookie_app_services::tr!("Regular expression"));
@@ -330,7 +332,9 @@ fn wire_search_controls(
         let (operation, widgets) = (operation, widgets.clone());
         move || {
             if cancel_replace_operation(&operation) {
-                widgets.status.set_text(&bookie_app_services::tr!("Replacement cancelled"));
+                widgets
+                    .status
+                    .set_text(&bookie_app_services::tr!("Replacement cancelled"));
             }
             set_replace_running(&widgets, false);
         }
@@ -431,7 +435,9 @@ fn connect_replace(
         move |_| {
             cancel_replace_operation(&operation);
             set_replace_running(&widgets, false);
-            widgets.status.set_text(&bookie_app_services::tr!("Replacement cancelled"));
+            widgets
+                .status
+                .set_text(&bookie_app_services::tr!("Replacement cancelled"));
         }
     });
     let operation = operation.clone();
@@ -508,7 +514,9 @@ fn start_replace(
         .map(|(_, cancel)| cancel.clone())
         .unwrap_or_default();
     set_replace_running(widgets, true);
-    widgets.status.set_text(&bookie_app_services::tr!("Preparing replacement…"));
+    widgets
+        .status
+        .set_text(&bookie_app_services::tr!("Preparing replacement…"));
     let total = only.map_or(model.n_items(), |(position, _)| position.saturating_add(1));
     let start_position = only.map_or(0, |(position, _)| position);
     let capture = ReplaceCapture {
@@ -653,7 +661,12 @@ fn plan_and_apply_replacements(plan: ReplacePlan) {
             })
             .is_err()
         {
-            finish_replace_ui(&widgets, &operation, id, bookie_app_services::tr!("Replacement could not be applied"));
+            finish_replace_ui(
+                &widgets,
+                &operation,
+                id,
+                bookie_app_services::tr!("Replacement could not be applied"),
+            );
             return;
         }
         finish_replace_apply(&widgets, &operation, id, result.await);
@@ -680,7 +693,12 @@ fn finish_replace_apply(
             finish_replace_ui(widgets, operation, id, replace_status(ack.replacements, ack.skipped));
         }
         Ok(Err(error)) => finish_replace_ui(widgets, operation, id, replace_apply_error_text(error)),
-        Err(_) => finish_replace_ui(widgets, operation, id, bookie_app_services::tr!("Replacement could not be applied")),
+        Err(_) => finish_replace_ui(
+            widgets,
+            operation,
+            id,
+            bookie_app_services::tr!("Replacement could not be applied"),
+        ),
     }
 }
 

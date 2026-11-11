@@ -20,6 +20,11 @@ fn automatic_title_quark() -> gtk::glib::Quark {
     *QUARK.get_or_init(|| gtk::glib::Quark::from_str("tp-workspace-tab-automatic-title"))
 }
 
+fn overview_tags_visible_quark() -> gtk::glib::Quark {
+    static QUARK: std::sync::OnceLock<gtk::glib::Quark> = std::sync::OnceLock::new();
+    *QUARK.get_or_init(|| gtk::glib::Quark::from_str("bookie-workspace-tab-overview-tags-visible"))
+}
+
 pub(super) fn read_tab_mark(page: &adw::TabPage) -> TabMark {
     unsafe {
         page.qdata::<TabMark>(mark_quark())
@@ -43,17 +48,53 @@ fn displayed_title(mark: &TabMark, automatic: &str) -> String {
     }
 }
 
+fn overview_title(mark: &TabMark, automatic: &str, tags_visible: bool) -> String {
+    let title = displayed_title(mark, automatic);
+    if !tags_visible || mark.tags().is_empty() {
+        return title;
+    }
+    format!("{title} · {}", mark.tags().join(", "))
+}
+
+fn refresh_page_title(page: &adw::TabPage) {
+    let Some(automatic) = read_automatic_title(page) else {
+        return;
+    };
+    let title = overview_title(&read_tab_mark(page), &automatic, overview_tags_visible(page));
+    page.set_title(&title);
+}
+
+fn overview_tags_visible(page: &adw::TabPage) -> bool {
+    unsafe {
+        page.qdata::<bool>(overview_tags_visible_quark())
+            .is_some_and(|visible| *visible.as_ref())
+    }
+}
+
+pub(super) fn set_overview_tags_visible(page: &adw::TabPage, visible: bool) {
+    unsafe {
+        page.set_qdata(overview_tags_visible_quark(), visible);
+    }
+    refresh_page_title(page);
+}
+
+pub(super) fn sync_overview_tag_titles(view: &adw::TabView, visible: bool) {
+    let pages = view.pages();
+    for position in 0..pages.n_items() {
+        if let Some(page) = pages.item(position).and_downcast::<adw::TabPage>() {
+            set_overview_tags_visible(&page, visible);
+        }
+    }
+}
+
 pub(super) fn set_tab_title(page: &adw::TabPage, automatic: &str) {
     unsafe {
         page.set_qdata(automatic_title_quark(), automatic.to_owned());
     }
-    page.set_title(&displayed_title(&read_tab_mark(page), automatic));
+    refresh_page_title(page);
 }
 
 pub(super) fn apply_tab_mark(page: &adw::TabPage, mark: TabMark) {
-    if let Some(automatic) = read_automatic_title(page) {
-        page.set_title(&displayed_title(&mark, &automatic));
-    }
     let keywords = mark.tags().join(" ");
     page.set_keyword(&keywords);
     page.set_icon(
@@ -65,6 +106,7 @@ pub(super) fn apply_tab_mark(page: &adw::TabPage, mark: TabMark) {
     unsafe {
         page.set_qdata(mark_quark(), mark);
     }
+    refresh_page_title(page);
 }
 
 fn color_rgb(color: TabColor) -> [u8; 3] {
@@ -255,6 +297,16 @@ mod tests {
             1
         );
         assert!(bookie_app_services::quick_switcher::filter(&[item], "zzz").is_empty());
+    }
+
+    #[test]
+    fn overview_titles_show_tags_only_while_the_overview_is_open() {
+        let mark = TabMark::default().with_name("Orders").with_tags(["audit", "q4"]);
+        assert_eq!(overview_title(&mark, "SELECT 1", true), "Orders · audit, q4");
+        assert_eq!(overview_title(&mark, "• SELECT 1", true), "• Orders · audit, q4");
+        assert_eq!(overview_title(&mark, "SELECT 1", false), "Orders");
+        assert_eq!(overview_title(&TabMark::default(), "SELECT 1", false), "SELECT 1");
+        assert_eq!(overview_title(&TabMark::default(), "• SELECT 1", true), "• SELECT 1");
     }
 
     #[test]

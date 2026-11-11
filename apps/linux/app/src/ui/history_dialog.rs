@@ -106,7 +106,10 @@ impl Component for HistoryDialog {
     fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let toolbar = adw::ToolbarView::new();
         let header = adw::HeaderBar::builder().show_end_title_buttons(false).build();
-        header.set_title_widget(Some(&adw::WindowTitle::new(&bookie_app_services::tr!("Query History"), "")));
+        header.set_title_widget(Some(&adw::WindowTitle::new(
+            &bookie_app_services::tr!("Query History"),
+            "",
+        )));
         header.pack_end(&build::close_button(&sender));
 
         let connections = init.database.all_connections();
@@ -371,8 +374,9 @@ impl HistoryDialog {
             self.list_group.set_visible(false);
             if self.has_narrowing_search() || self.has_narrowing_filter() {
                 self.status_page.set_title(&bookie_app_services::tr!("No matches"));
-                self.status_page
-                    .set_description(Some(&bookie_app_services::tr!("Try a different search term or change the filters.")));
+                self.status_page.set_description(Some(&bookie_app_services::tr!(
+                    "Try a different search term or change the filters."
+                )));
                 self.status_page.set_icon_name(Some("system-search-symbolic"));
             } else {
                 self.status_page.set_title(&bookie_app_services::tr!("No queries yet"));
@@ -739,8 +743,8 @@ mod export_tests;
 mod lifetime_tests;
 
 mod build;
-mod row;
 mod export;
+mod row;
 
 #[cfg(test)]
 mod confirmation_tests;

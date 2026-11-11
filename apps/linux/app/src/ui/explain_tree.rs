@@ -131,7 +131,10 @@ pub(crate) fn build_tree(nodes: &[PlanNode]) -> gtk::Widget {
                 .fraction((cost / max_cost).clamp(0.0, 1.0))
                 .build();
             let rows = node.rows.map(|rows| format!(", ~{rows:.0} rows")).unwrap_or_default();
-            bar.set_tooltip_text(Some(&format!("{} {cost:.2}{rows}", bookie_app_services::tr!("Estimated cost"))));
+            bar.set_tooltip_text(Some(&format!(
+                "{} {cost:.2}{rows}",
+                bookie_app_services::tr!("Estimated cost")
+            )));
             row.append(&bar);
         }
         for detail in &node.details {

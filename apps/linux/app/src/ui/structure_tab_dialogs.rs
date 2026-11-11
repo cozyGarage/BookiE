@@ -129,7 +129,8 @@ pub(super) fn present_index_dialog(
     columns: &[DraftColumn],
     sender: ComponentSender<StructureTab>,
 ) {
-    let (dialog, body, submit_btn) = build_form_dialog(&bookie_app_services::tr!("Add Index"), &bookie_app_services::tr!("Add"));
+    let (dialog, body, submit_btn) =
+        build_form_dialog(&bookie_app_services::tr!("Add Index"), &bookie_app_services::tr!("Add"));
 
     // Name + Unique inside one AdwPreferencesGroup. AdwEntryRow's
     // title slot doubles as the placeholder when empty (floats up
@@ -139,7 +140,9 @@ pub(super) fn present_index_dialog(
     detail_group.add(&name_row);
     let unique_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Unique"))
-        .subtitle(bookie_app_services::tr!("Reject inserts that duplicate the indexed columns"))
+        .subtitle(bookie_app_services::tr!(
+            "Reject inserts that duplicate the indexed columns"
+        ))
         .build();
     detail_group.add(&unique_row);
     body.append(&detail_group);
@@ -159,7 +162,9 @@ pub(super) fn present_index_dialog(
         if name.trim().is_empty() {
             // Toast instead of silent no-op so the user knows why
             // their click didn't land.
-            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!("Index name is required.")));
+            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
+                "Index name is required."
+            )));
             return;
         }
         let cols: Vec<String> = column_checks_for_resp
@@ -168,7 +173,9 @@ pub(super) fn present_index_dialog(
             .filter_map(|(n, c)| if c.is_active() { Some(n.clone()) } else { None })
             .collect();
         if cols.is_empty() {
-            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!("Select at least one column.")));
+            let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
+                "Select at least one column."
+            )));
             return;
         }
         sender_for_resp.input(StructureTabInput::AddIndex(IndexInfo {
@@ -193,7 +200,10 @@ pub(super) fn present_fk_dialog(
     sender: ComponentSender<StructureTab>,
 ) {
     let fk_actions = bookie_core::sql_ddl::supported_fk_actions(driver_id);
-    let (dialog, body, submit_btn) = build_form_dialog(&bookie_app_services::tr!("Add Foreign Key"), &bookie_app_services::tr!("Add"));
+    let (dialog, body, submit_btn) = build_form_dialog(
+        &bookie_app_services::tr!("Add Foreign Key"),
+        &bookie_app_services::tr!("Add"),
+    );
 
     // Name in its own AdwPreferencesGroup at the top — matches the
     // shape of the column-edit drawer + every other GNOME form.
@@ -209,10 +219,16 @@ pub(super) fn present_fk_dialog(
     // Reference target + ON DELETE / ON UPDATE in a second group.
     // Reference columns stay free-text — wiring up an async fetch of
     // the referenced table's columns is out of scope for an MVP.
-    let ref_group = adw::PreferencesGroup::builder().title(bookie_app_services::tr!("References")).build();
-    let ref_table_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Table")).build();
+    let ref_group = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("References"))
+        .build();
+    let ref_table_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Table"))
+        .build();
     ref_group.add(&ref_table_row);
-    let ref_cols_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Columns")).build();
+    let ref_cols_row = adw::EntryRow::builder()
+        .title(bookie_app_services::tr!("Columns"))
+        .build();
     ref_group.add(&ref_cols_row);
     let on_delete_row = adw::ComboRow::builder()
         .title(bookie_app_services::tr!("On delete"))

@@ -217,7 +217,9 @@ impl SidebarColumns {
             .as_ref()
             .is_none_or(|source| source.origin.connection(&source.database).is_none())
         {
-            return self.message(&bookie_app_services::tr!("The connection changed. Reopen the tables sidebar."));
+            return self.message(&bookie_app_services::tr!(
+                "The connection changed. Reopen the tables sidebar."
+            ));
         }
         let loaded = match reply.result {
             Ok(loaded) => loaded,
@@ -231,7 +233,9 @@ impl SidebarColumns {
             self.content.append(&field_row(column));
         }
         if loaded.truncated {
-            self.message(&bookie_app_services::tr!("Showing the first 256 fields. Open Structure for more."));
+            self.message(&bookie_app_services::tr!(
+                "Showing the first 256 fields. Open Structure for more."
+            ));
         }
         self.content.append(&self.structure);
     }

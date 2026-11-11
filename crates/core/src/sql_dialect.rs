@@ -18,8 +18,8 @@ pub(crate) use pg_native_text::{
 pub use error::BuildSqlError;
 pub use inserts::{build_insert_from_draft, build_insert_from_draft_touched};
 pub use updates::{
-    build_keyed_update, build_keyed_value_select, build_mongodb_keyed_delete, build_mongodb_keyed_update,
-    build_optimistic_keyed_update,
+    ColumnReset, build_keyed_column_reset, build_keyed_update, build_keyed_value_select, build_mongodb_keyed_delete,
+    build_mongodb_keyed_update, build_optimistic_keyed_update,
 };
 
 pub const MAX_IDENT_BYTES: usize = 256;

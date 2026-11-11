@@ -21,6 +21,9 @@ env:
   SCCACHE_DIR: /var/cache/ci/sccache
   SCCACHE_CACHE_SIZE: 40G
 
+permissions:
+  contents: read
+
 jobs:
   coverage:
     runs-on: any-host

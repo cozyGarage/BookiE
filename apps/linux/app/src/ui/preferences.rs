@@ -100,7 +100,9 @@ fn appearance_page(preferences: &PreferencesStore, current: &Preferences) -> adw
 
     let scheme_row = adw::ComboRow::new();
     scheme_row.set_title(&bookie_app_services::tr!("Appearance"));
-    scheme_row.set_subtitle(&bookie_app_services::tr!("Follow the system, or always use the light or dark style"));
+    scheme_row.set_subtitle(&bookie_app_services::tr!(
+        "Follow the system, or always use the light or dark style"
+    ));
     scheme_row.set_model(Some(&gtk::StringList::new(&[
         &bookie_app_services::tr!("System"),
         &bookie_app_services::tr!("Light"),
@@ -171,10 +173,11 @@ fn browse_group(parent: &impl IsA<gtk::Widget>, preferences: &PreferencesStore, 
 }
 
 fn page_size_row(current: &Preferences) -> adw::ComboRow {
-
     let page_size_row = adw::ComboRow::new();
     page_size_row.set_title(&bookie_app_services::tr!("Default page size"));
-    page_size_row.set_subtitle(&bookie_app_services::tr!("Rows fetched per request when browsing a table"));
+    page_size_row.set_subtitle(&bookie_app_services::tr!(
+        "Rows fetched per request when browsing a table"
+    ));
     let page_size_labels: Vec<String> = PAGE_SIZE_OPTIONS
         .iter()
         .map(|n| format_thousands(u128::from(*n)))
@@ -190,10 +193,11 @@ fn page_size_row(current: &Preferences) -> adw::ComboRow {
 }
 
 fn confirmation_rows(current: &Preferences) -> (adw::SwitchRow, adw::SwitchRow) {
-
     let confirm_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Confirm before deleting rows"))
-        .subtitle(bookie_app_services::tr!("Show a confirmation dialog before each destructive action"))
+        .subtitle(bookie_app_services::tr!(
+            "Show a confirmation dialog before each destructive action"
+        ))
         .build();
     confirm_row.set_active(current.confirm_destructive);
 
@@ -208,7 +212,6 @@ fn confirmation_rows(current: &Preferences) -> (adw::SwitchRow, adw::SwitchRow) 
 }
 
 fn null_display_row(preferences: &PreferencesStore, current: &Preferences) -> adw::ComboRow {
-
     let null_row = adw::ComboRow::new();
     null_row.set_title(&bookie_app_services::tr!("NULL display"));
     null_row.set_subtitle(&bookie_app_services::tr!(
@@ -239,7 +242,6 @@ fn date_format_row(
     preferences: &PreferencesStore,
     current: &Preferences,
 ) -> adw::ComboRow {
-
     let date_row = adw::ComboRow::new();
     date_row.set_title(&bookie_app_services::tr!("Date format"));
     date_row.set_subtitle(&bookie_app_services::tr!(
@@ -266,7 +268,6 @@ fn date_format_row(
 }
 
 fn invisibles_row(preferences: &PreferencesStore, current: &Preferences) -> adw::SwitchRow {
-
     let invisibles_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Mark spaces, tabs and line breaks"))
         .subtitle(bookie_app_services::tr!(
@@ -292,15 +293,18 @@ fn history_group(
     history: Option<bookie_storage::query_history::HistoryStore>,
     current: &Preferences,
 ) -> (adw::PreferencesGroup, adw::SpinRow) {
-
     let history_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Query history"))
-        .description(bookie_app_services::tr!("Persistent record of every SQL query you run."))
+        .description(bookie_app_services::tr!(
+            "Persistent record of every SQL query you run."
+        ))
         .build();
 
     let retention_row = adw::SpinRow::with_range(0.0, 365.0, 1.0);
     retention_row.set_title(&bookie_app_services::tr!("Retention (days)"));
-    retention_row.set_subtitle(&bookie_app_services::tr!("0 keeps history forever; pinned entries are never pruned."));
+    retention_row.set_subtitle(&bookie_app_services::tr!(
+        "0 keeps history forever; pinned entries are never pruned."
+    ));
     retention_row.set_value(current.history_retention_days as f64);
     history_group.add(&retention_row);
     history_group.add(&clear_history_row(window, history.clone()));
@@ -312,7 +316,6 @@ fn clear_history_row(
     window: &adw::PreferencesDialog,
     history: Option<bookie_storage::query_history::HistoryStore>,
 ) -> adw::ActionRow {
-
     // Trigger button uses `.flat`, NOT `.destructive-action`. GNOME
     // Settings convention: the trigger that opens a destructive
     // confirmation dialog is a regular/flat button — the confirmation
@@ -329,7 +332,9 @@ fn clear_history_row(
     clear_button.add_css_class("flat");
     let clear_row = adw::ActionRow::builder()
         .title(bookie_app_services::tr!("Clear query history"))
-        .subtitle(bookie_app_services::tr!("Removes every saved query, including pinned ones."))
+        .subtitle(bookie_app_services::tr!(
+            "Removes every saved query, including pinned ones."
+        ))
         .build();
     clear_row.add_suffix(&clear_button);
     let dialog_root = window.downgrade();
@@ -370,7 +375,6 @@ fn storage_location_row(
     window: &adw::PreferencesDialog,
     history: Option<bookie_storage::query_history::HistoryStore>,
 ) -> adw::ActionRow {
-
     let storage_button = gtk::Button::builder()
         .label(bookie_app_services::tr!("Show in Files"))
         .valign(gtk::Align::Center)
@@ -409,7 +413,6 @@ fn storage_location_row(
 }
 
 fn editor_page(current: &Preferences) -> EditorPage {
-
     let editor = adw::PreferencesPage::builder()
         .title(bookie_app_services::tr!("Editor"))
         .icon_name("text-editor-symbolic")
@@ -417,7 +420,9 @@ fn editor_page(current: &Preferences) -> EditorPage {
 
     let editor_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("SQL editor"))
-        .description(bookie_app_services::tr!("Set the editor font, key bindings and query timeout."))
+        .description(bookie_app_services::tr!(
+            "Set the editor font, key bindings and query timeout."
+        ))
         .build();
 
     let font_size_row = adw::SpinRow::with_range(8.0, 32.0, 1.0);

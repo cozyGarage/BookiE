@@ -236,8 +236,10 @@ fn compute_concurrency_warning(statements: &[(String, Vec<Value>)], affected: &[
     }
     let total = zero_updates + zero_deletes;
     Some(
-        bookie_app_services::tr!("{n} rows could not be located. They may have been changed by another session. Refresh and review.")
-            .replace("{n}", &total.to_string()),
+        bookie_app_services::tr!(
+            "{n} rows could not be located. They may have been changed by another session. Refresh and review."
+        )
+        .replace("{n}", &total.to_string()),
     )
 }
 

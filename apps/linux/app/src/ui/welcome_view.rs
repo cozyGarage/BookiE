@@ -169,8 +169,14 @@ impl SimpleComponent for WelcomeView {
             .build();
         bundle_btn.add_css_class("flat");
         let bundle_menu = gtk::gio::Menu::new();
-        bundle_menu.append(Some(&bookie_app_services::tr!("Export connections…")), Some("welcome.export-bundle"));
-        bundle_menu.append(Some(&bookie_app_services::tr!("Import connections…")), Some("welcome.import-bundle"));
+        bundle_menu.append(
+            Some(&bookie_app_services::tr!("Export connections…")),
+            Some("welcome.export-bundle"),
+        );
+        bundle_menu.append(
+            Some(&bookie_app_services::tr!("Import connections…")),
+            Some("welcome.import-bundle"),
+        );
         bundle_btn.set_menu_model(Some(&bundle_menu));
 
         let actions = gtk::gio::SimpleActionGroup::new();
@@ -512,10 +518,14 @@ fn empty_page(sender: &ComponentSender<WelcomeView>) -> adw::StatusPage {
     add.add_css_class("pill");
     let s_add = sender.clone();
     add.connect_clicked(move |_| s_add.input(WelcomeViewInput::OpenConnect));
-    let import_bundle = gtk::Button::builder().label(bookie_app_services::tr!("Import connections…")).build();
+    let import_bundle = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Import connections…"))
+        .build();
     let s_bundle = sender.clone();
     import_bundle.connect_clicked(move |_| s_bundle.input(WelcomeViewInput::ImportBundle));
-    let import_url = gtk::Button::builder().label(bookie_app_services::tr!("Import from URL…")).build();
+    let import_url = gtk::Button::builder()
+        .label(bookie_app_services::tr!("Import from URL…"))
+        .build();
     let s_url = sender.clone();
     import_url.connect_clicked(move |_| s_url.input(WelcomeViewInput::ImportUrl));
     let imports = gtk::Box::builder()

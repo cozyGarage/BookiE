@@ -13,7 +13,7 @@ fn row_count_selection_accepts_only_the_three_sizes() {
 }
 
 #[test]
-fn the_generator_matches_the_tauri_prototype() {
+fn the_generator_is_deterministic() {
     assert_eq!(value_of(0), 9_007_199_254_740_993);
     assert_eq!(value_of(5), 9_007_199_254_740_998);
     assert_eq!(label_of(41), "Sample 41");
@@ -243,7 +243,7 @@ fn the_match_cursor_wraps_both_ways_and_names_its_position() {
 }
 
 #[test]
-fn the_typed_column_cycles_through_the_same_kinds_as_the_tauri_prototype() {
+fn the_typed_column_cycles_through_the_same_kinds() {
     let kinds: Vec<&str> = (0..TYPED_KINDS).map(|index| typed_of(index).kind()).collect();
     assert_eq!(
         kinds,
@@ -267,7 +267,7 @@ fn the_typed_column_cycles_through_the_same_kinds_as_the_tauri_prototype() {
 }
 
 #[test]
-fn every_kind_displays_the_same_exact_text_as_the_tauri_prototype() {
+fn every_kind_displays_the_same_exact_text() {
     let shown: Vec<String> = (0..TYPED_KINDS).map(|index| typed_of(index).display()).collect();
     assert_eq!(
         shown,

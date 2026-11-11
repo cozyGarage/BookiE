@@ -43,7 +43,9 @@ pub fn build(
         .max_length(48)
         .hexpand(true)
         .build();
-    name.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Filter name"))]);
+    name.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
+        "Filter name"
+    ))]);
     let save = gtk::Button::with_label(&bookie_app_services::tr!("Save as"));
     let apply = gtk::Button::with_label(&bookie_app_services::tr!("Apply saved"));
     let rename = gtk::Button::with_label(&bookie_app_services::tr!("Rename"));
