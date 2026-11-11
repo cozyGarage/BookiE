@@ -705,6 +705,49 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
+  b4-rollback:
+    runs-on: any-host
+    timeout-minutes: 45
+    env:
+      TMPDIR: /var/cache/ci/tmp/bookie-b4-rollback-${{ github.run_id }}-${{ github.run_attempt }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-b4-rollback
+    steps:
+      - name: Check out
+        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          mkdir -p "$TMPDIR"
+          rm -rf src
+          auth="$(printf 'oauth2:%s' "$TOKEN" | base64 -w0)"
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.${SERVER}/.extraheader" \
+            GIT_CONFIG_VALUE_0="Authorization: Basic $auth" \
+            git clone --quiet "http://${SERVER#http://}/${{ github.repository }}.git" src
+          unset TOKEN auth
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Docker Hub login
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull MySQL and PostgreSQL fixtures
+        run: |
+          bash src/scripts/prepull-test-images.sh mysql
+          bash src/scripts/prepull-test-images.sh postgres
+      - name: Focused MySQL and PostgreSQL rollback cases
+        run: cd src && python3 scripts/run-test-layer.py b4-rollback
+
+      - name: Finalize runner job
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
+            bash src/scripts/cleanup-ci-job.sh
+          else
+            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
+          fi
   e2e:
     runs-on: any-host
     needs: [guards, clippy, gtk-build]
@@ -1241,6 +1284,7 @@ jobs:
       - gtk-build
       - clippy
       - test-build
+      - b4-rollback
       - unit
       - sandbox
       - widgets

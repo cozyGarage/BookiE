@@ -38,6 +38,9 @@ fi
 if [[ "${GITHUB_JOB:-}" == driver && "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/bookie-driver-[0-9]+-[0-9]+-(core|analytics|extended|postgres|mysql|mssql|clickhouse|redis|mongodb|oracle|duckdb)$ ]]; then
   rm -rf -- "$TMPDIR" || status=$?
 fi
+if [[ "${TMPDIR:-}" =~ ^/var/cache/ci/tmp/bookie-b4-rollback-[0-9]+-[0-9]+$ ]]; then
+  rm -rf -- "$TMPDIR" || status=$?
+fi
 
 for entry in src gtk-artifact test-bundles floor-artifact floor-package floor-package-path; do
   rm -rf -- "$workspace/$entry" || status=$?
