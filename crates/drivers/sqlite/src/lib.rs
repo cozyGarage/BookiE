@@ -570,18 +570,23 @@ impl Connection for SqliteConnection {
 
     async fn fetch_inbound_foreign_keys(
         &self,
-        _schema: Option<&str>,
+        schema: Option<&str>,
         table: &str,
     ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
+        let target_schema = schema.unwrap_or("main");
         let tables = self.list_tables().await?;
         let mut inbound = Vec::new();
         for t in tables {
-            let fks = self.fetch_foreign_keys(None, &t.name).await?;
+            let source_schema = t.schema.as_deref().unwrap_or("main");
+            if !source_schema.eq_ignore_ascii_case(target_schema) {
+                continue;
+            }
+            let fks = self.fetch_foreign_keys(Some(source_schema), &t.name).await?;
             for fk in fks {
                 if fk.ref_table.eq_ignore_ascii_case(table) {
                     inbound.push(InboundForeignKeyInfo {
                         name: fk.name,
-                        source_schema: None,
+                        source_schema: t.schema.clone(),
                         source_table: t.name.clone(),
                         source_columns: fk.columns,
                         target_columns: fk.ref_columns,
