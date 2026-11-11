@@ -281,6 +281,9 @@ pub fn filter_in(
     })
     .map_err(|error| match error {
         bookie_results::result_scan::ScanError::Cancelled => "filter cancelled",
+        bookie_results::result_scan::ScanError::PageBudget => {
+            "not enough memory to scan this result; close other large results and retry"
+        }
         _ => "the scan did not finish",
     })?;
     Ok(kept)
@@ -289,6 +292,7 @@ pub fn filter_in(
 fn compare_message(error: CompareError) -> &'static str {
     match error {
         CompareError::Cancelled => "comparison cancelled",
+        CompareError::PageMemoryBusy => "not enough memory to compare this result; close other large results and retry",
         _ => "the comparison did not finish",
     }
 }
@@ -327,6 +331,9 @@ fn find_message(error: FindError) -> &'static str {
     match error {
         FindError::Predicate(_) => "invalid search text",
         FindError::Scan(bookie_results::result_scan::ScanError::Cancelled) => "search cancelled",
+        FindError::Scan(bookie_results::result_scan::ScanError::PageBudget) => {
+            "not enough memory to search this result; close other large results and retry"
+        }
         FindError::Scan(_) => "the scan did not finish",
     }
 }
@@ -359,5 +366,12 @@ mod tests {
         assert_eq!(source.filter(&folded, &CancellationToken::new()), Ok(vec![]));
         let bad = crate::model::parse_predicate("value = many", &columns).unwrap();
         assert_eq!(source.filter(&bad, &CancellationToken::new()), Ok(vec![]));
+    }
+
+    #[test]
+    fn a_shared_scan_budget_refusal_is_actionable_for_each_consumer() {
+        let scan_error = bookie_results::result_scan::ScanError::PageBudget;
+        assert!(find_message(FindError::Scan(scan_error)).contains("memory"));
+        assert!(compare_message(CompareError::PageMemoryBusy).contains("memory"));
     }
 }
