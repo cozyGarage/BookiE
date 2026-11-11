@@ -93,7 +93,7 @@ class GtkArtifactTests(unittest.TestCase):
 
     def compile_schemas(self, command, check):
         destination = Path(command[command.index("--targetdir") + 1])
-        destination.mkdir(parents=True, exist_ok=True)
+        self.assertTrue(destination.is_dir())
         (destination / "gschemas.compiled").write_bytes(b"compiled schemas")
 
     def verify(self, expected_sha=SHA, *, package=False, features=FEATURES, toolkit=TOOLKIT):
