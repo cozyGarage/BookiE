@@ -12,7 +12,6 @@ mod text_input;
 mod ui_theme;
 
 use bookie_gpui::copy_format::{self, CopyContext, CopyFormat};
-use bookie_results::grid_cursor::Cursor;
 use bookie_gpui::font_settings;
 use bookie_gpui::keymap::Keymap;
 use bookie_gpui::messages::{MessageKind, MessageLog};
@@ -24,6 +23,7 @@ use bookie_gpui::shell::{
 };
 use bookie_gpui::source::{Source, Synthetic};
 use bookie_gpui::theme::{Style, Theme};
+use bookie_results::grid_cursor::Cursor;
 use gpui::{
     App, Bounds, ClipboardItem, Context, Div, Entity, FocusHandle, Focusable, MouseButton, ScrollHandle,
     ScrollStrategy, Stateful, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb,

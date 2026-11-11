@@ -21,7 +21,6 @@ fn column_kind(kind: &str) -> Option<ColumnKind> {
     })
 }
 
-/// The edit-kind name that `parse_edit` understands for a core filter kind.
 pub fn edit_kind(kind: FilterValueKind) -> &'static str {
     match kind {
         FilterValueKind::Text => "text",

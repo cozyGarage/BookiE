@@ -251,9 +251,9 @@ pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_results::grid_cu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bookie_results::grid_cursor::Cursor;
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
+    use bookie_results::grid_cursor::Cursor;
 
     #[test]
     fn a_cell_reads_the_source_row_it_maps_to_and_keeps_that_row_cached() {

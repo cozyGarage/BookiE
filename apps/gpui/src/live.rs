@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bookie_app_services::read_session::{ReadSession, list_saved_connections};
-use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, TableInfo};
+use bookie_core::{ColumnInfo, OperationControl, QueryResult, QueryResultBudget, QueryRows, TableInfo};
 use bookie_results::result_scan::ScanSource;
 use bookie_results::stream_result_spool::StreamResultSpoolManager;
 use tokio_util::sync::CancellationToken;
@@ -145,7 +145,7 @@ impl Drop for LiveSession {
 pub struct LiveTable {
     session: Arc<LiveSession>,
     columns: Vec<ColumnMeta>,
-    rows: Vec<Vec<Cell>>,
+    rows: QueryRows,
     scan: ScanSource,
     pub truncated: bool,
     table: Option<TableInfo>,
@@ -190,7 +190,7 @@ async fn open_session(origin: &Origin, cancellation: CancellationToken) -> Resul
     Ok((opened.map_err(|failure| format!("{failure:?}"))?, label))
 }
 
-type Pages = (Vec<ColumnMeta>, Vec<Vec<Cell>>, ScanSource, bool);
+type Pages = (Vec<ColumnMeta>, QueryRows, ScanSource, bool);
 
 async fn read_pages(
     session: &ReadSession,
@@ -203,7 +203,7 @@ async fn read_pages(
         .create()
         .map_err(|error| error.to_string())?;
     let mut infos: Vec<ColumnInfo> = Vec::new();
-    let mut rows: Vec<Vec<Cell>> = Vec::new();
+    let mut rows = QueryRows::new();
     let mut truncated = false;
     let mut page_index = 0;
     let mut budget = QueryResultBudget::default();
@@ -222,7 +222,9 @@ async fn read_pages(
         }
         let incomplete = bound_page(&mut page, &mut budget);
         let count = page.rows.len() as u64;
-        rows.extend(page.rows.iter().map(|row| row.to_vec()));
+        for row in page.rows.iter() {
+            rows.push(row.to_vec());
+        }
         spool
             .append_page(page_index, Arc::new(page))
             .await
@@ -264,30 +266,42 @@ async fn query_pages(
         .map_err(|error| error.to_string())?;
     let infos: Vec<ColumnInfo> = result.columns.clone();
     let cap = usize::try_from(max_rows).unwrap_or(usize::MAX);
-    let mut truncated = result.truncated || result.rows.len() > cap;
-    let mut all: Vec<Vec<bookie_core::Value>> = result.rows.iter().take(cap).map(|row| row.to_vec()).collect();
-    result.rows = bookie_core::QueryRows::from_rows(Vec::new());
     let mut budget = QueryResultBudget::default();
-    let admitted = all.iter().take_while(|row| budget.admit(row)).count();
-    if admitted < all.len() {
-        all.truncate(admitted);
-        truncated = true;
-    }
-    let rows: Vec<Vec<Cell>> = all.iter().map(|row| row.to_vec()).collect();
-    for (index, chunk) in all.chunks(PAGE_ROWS as usize).enumerate() {
+    let truncated = bound_query_result(&mut result, cap, &mut budget);
+    let page_size = PAGE_ROWS as usize;
+    for page_index in 0..result.rows.len().div_ceil(page_size) {
+        let start = page_index * page_size;
+        let page_rows = result
+            .rows
+            .iter()
+            .skip(start)
+            .take(page_size)
+            .map(|row| row.to_vec())
+            .collect();
         let page = QueryResult {
             columns: infos.clone(),
-            rows: bookie_core::QueryRows::from_rows(chunk.to_vec()),
+            rows: QueryRows::from_rows(page_rows),
             truncated: false,
         };
         spool
-            .append_page(index as u64, Arc::new(page))
+            .append_page(page_index as u64, Arc::new(page))
             .await
             .map_err(|error| error.to_string())?;
     }
-    let total = all.len() as u64;
+    let total = result.rows.len() as u64;
     let columns = infos.iter().map(column_meta).collect();
-    Ok((columns, rows, ScanSource::new(spool, infos, total), truncated))
+    Ok((columns, result.rows, ScanSource::new(spool, infos, total), truncated))
+}
+
+fn bound_query_result(result: &mut QueryResult, cap: usize, budget: &mut QueryResultBudget) -> bool {
+    let mut truncated = result.truncated || result.rows.len() > cap;
+    result.rows.truncate(cap);
+    let admitted = result.rows.iter().take_while(|row| budget.admit(row)).count();
+    if admitted < result.rows.len() {
+        result.rows.truncate(admitted);
+        truncated = true;
+    }
+    truncated
 }
 
 fn bound_page(page: &mut QueryResult, budget: &mut QueryResultBudget) -> bool {
@@ -356,7 +370,7 @@ impl ResultSource for LiveTable {
         usize::try_from(index)
             .ok()
             .and_then(|index| self.rows.get(index))
-            .cloned()
+            .map(<[Cell]>::to_vec)
             .unwrap_or_default()
     }
 
@@ -519,6 +533,39 @@ mod tests {
         for (index, row) in second.rows.iter().enumerate() {
             assert_eq!(row[0], bookie_core::Value::Int(index as i64));
         }
+    }
+
+    #[test]
+    fn a_query_result_is_bounded_in_place_and_keeps_its_typed_prefix() {
+        let row = |index| {
+            vec![
+                bookie_core::Value::Int(index),
+                bookie_core::Value::Text("x".repeat(1024 * 1024)),
+            ]
+        };
+        let mut result = QueryResult {
+            columns: Vec::new(),
+            rows: QueryRows::from_rows((0..70).map(row).collect()),
+            truncated: false,
+        };
+        let mut budget = QueryResultBudget::default();
+        assert!(bound_query_result(&mut result, 100, &mut budget));
+        assert!((1..70).contains(&result.rows.len()));
+        for (index, retained) in result.rows.iter().enumerate() {
+            assert_eq!(retained[0], bookie_core::Value::Int(index as i64));
+        }
+    }
+
+    #[test]
+    fn a_query_result_row_cap_keeps_only_the_prefix_and_marks_it_incomplete() {
+        let mut result = QueryResult {
+            columns: Vec::new(),
+            rows: QueryRows::from_rows((0..3).map(|index| vec![bookie_core::Value::Int(index)]).collect()),
+            truncated: false,
+        };
+        assert!(bound_query_result(&mut result, 2, &mut QueryResultBudget::default()));
+        assert_eq!(result.rows.len(), 2);
+        assert_eq!(result.rows.last(), Some([bookie_core::Value::Int(1)].as_slice()));
     }
 
     fn fixture() -> Origin {
