@@ -419,6 +419,13 @@ fn delete_action_preserves_the_stored_row_selected_when_menu_opened() {
     view.activate_action("cell.set-null", None).unwrap();
     let message = runtime.block_on(async { receiver.recv().await }).unwrap();
     assert!(matches!(message, GridMsg::SetCellNull { row_position: 0, row_key, .. } if row_key == vec![Value::Int(1)]));
+    view.activate_action("cell.set-default", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::ResetCell(request)
+        if request.row_position == 0 && request.row_key == vec![Value::Int(1)] && request.reset == Some(ColumnReset::Default)));
+    view.activate_action("cell.set-expression", None).unwrap();
+    let message = runtime.block_on(async { receiver.recv().await }).unwrap();
+    assert!(matches!(message, GridMsg::ResetCell(request) if request.reset.is_none()));
     view.activate_action("cell.duplicate-row", None).unwrap();
     let message = runtime.block_on(async { receiver.recv().await }).unwrap();
     assert!(

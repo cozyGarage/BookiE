@@ -61,6 +61,14 @@ pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
     editing::enter_edit_mode(label);
 }
 
+#[derive(Debug, Clone)]
+pub struct ResetCellRequest {
+    pub row_position: u32,
+    pub col_index: usize,
+    pub row_key: Vec<bookie_core::Value>,
+    pub reset: Option<bookie_core::sql_dialect::ColumnReset>,
+}
+
 #[derive(Debug)]
 pub enum GridMsg {
     SortChanged(Vec<(usize, bool)>),
@@ -114,6 +122,7 @@ pub enum GridMsg {
         row_key: Vec<bookie_core::Value>,
         draft_id: Option<u64>,
     },
+    ResetCell(ResetCellRequest),
     DeleteRowAt {
         row_position: u32,
         row_key: Vec<bookie_core::Value>,

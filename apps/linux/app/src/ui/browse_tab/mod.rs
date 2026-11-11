@@ -215,6 +215,7 @@ mod paste;
 mod preview;
 pub(crate) mod reference;
 mod requests;
+mod reset_cell;
 mod row_ops;
 mod save_completion;
 #[cfg(test)]
@@ -1078,6 +1079,10 @@ impl SimpleComponent for BrowseTab {
                 row_key,
                 draft_id,
             } => self.handle_grid_delete_row(row_position, row_key, draft_id, sender),
+            BrowseTabInput::GridResetCell(request) => self.handle_grid_reset_cell(request, sender),
+            BrowseTabInput::GridResetConfirmed { row_key, statement } => {
+                self.handle_grid_reset_confirmed(row_key, statement, sender)
+            }
             BrowseTabInput::GridCopyRowAsStatement(row_positions, statement) => {
                 self.handle_grid_copy_row_as_statement(row_positions, statement, sender)
             }

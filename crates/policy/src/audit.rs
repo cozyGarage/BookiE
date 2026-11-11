@@ -69,6 +69,8 @@ impl AuditOperationClass {
 pub enum AuditApprovalOutcome {
     NotRequired,
     Approved,
+    ApprovedAndRemembered,
+    ApprovedByGrant,
     Denied,
     Cancelled,
     TimedOut,

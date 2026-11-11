@@ -30,7 +30,10 @@ mod transaction_control;
 mod tsql_transaction;
 mod verdict;
 
-pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
+pub use approval::{
+    ApprovalGrant, ApprovalGrants, ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink,
+    RememberingApprovalSink,
+};
 pub use audit::{
     AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditConnectionContext,
     AuditConnectionIdentity, AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState,
