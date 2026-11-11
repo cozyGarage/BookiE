@@ -4,6 +4,25 @@ use relm4::{ComponentSender, adw, gtk};
 
 use super::{App, AppMsg};
 
+fn history_menu_section() -> gio::Menu {
+    let history_section = gio::Menu::new();
+    history_section.append(
+        Some(&bookie_app_services::tr!("Query History")),
+        Some("win.show-history"),
+    );
+    history_section.append(
+        Some(&bookie_app_services::tr!("Server Activity")),
+        Some("win.show-activity"),
+    );
+    history_section.append(Some(&bookie_app_services::tr!("Audit Log")), Some("win.show-audit"));
+    history_section.append(Some(&bookie_app_services::tr!("Catalog")), Some("win.show-catalog"));
+    history_section.append(
+        Some(&bookie_app_services::tr!("Explain query")),
+        Some("win.explain-query"),
+    );
+    history_section
+}
+
 pub(super) fn primary_menu_model() -> gio::Menu {
     let menu = gio::Menu::new();
     let connection_section = gio::Menu::new();
@@ -37,21 +56,7 @@ pub(super) fn primary_menu_model() -> gio::Menu {
         Some("win.save-favorite"),
     );
     menu.append_section(None, &query_section);
-    let history_section = gio::Menu::new();
-    history_section.append(
-        Some(&bookie_app_services::tr!("Query History")),
-        Some("win.show-history"),
-    );
-    history_section.append(
-        Some(&bookie_app_services::tr!("Server Activity")),
-        Some("win.show-activity"),
-    );
-    history_section.append(Some(&bookie_app_services::tr!("Audit Log")), Some("win.show-audit"));
-    history_section.append(Some(&bookie_app_services::tr!("Catalog")), Some("win.show-catalog"));
-    history_section.append(
-        Some(&bookie_app_services::tr!("Explain query")),
-        Some("win.explain-query"),
-    );
+    let history_section = history_menu_section();
     menu.append_section(None, &history_section);
     let prefs_section = gio::Menu::new();
     prefs_section.append(Some(&bookie_app_services::tr!("Preferences")), Some("win.preferences"));

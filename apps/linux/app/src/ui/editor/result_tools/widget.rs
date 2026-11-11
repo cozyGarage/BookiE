@@ -115,11 +115,7 @@ fn column_dropdown(names: &[String]) -> gtk::DropDown {
     dropdown
 }
 
-fn build_widgets(column_names: &[String]) -> Widgets {
-    let find = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-    find.set_widget_name("tp-result-tools");
-    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-    actions.set_widget_name("tp-result-actions");
+fn find_entry() -> gtk::SearchEntry {
     let entry = gtk::SearchEntry::new();
     entry.set_widget_name("tp-result-find-entry");
     entry.set_width_chars(18);
@@ -128,16 +124,29 @@ fn build_widgets(column_names: &[String]) -> Widgets {
     entry.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!(
         "Find in all rows"
     ))]);
-    let previous = labelled_button(
-        "go-up-symbolic",
-        "tp-result-find-previous",
-        &bookie_app_services::tr!("Previous match"),
-    );
-    let next = labelled_button(
-        "go-down-symbolic",
-        "tp-result-find-next",
-        &bookie_app_services::tr!("Next match"),
-    );
+    entry
+}
+
+fn status_label() -> gtk::Label {
+    let status = gtk::Label::new(None);
+    status.set_widget_name("tp-result-find-status");
+    status.set_xalign(0.0);
+    status.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    status.set_max_width_chars(30);
+    status
+}
+
+fn action_buttons() -> (gtk::Button, gtk::Button) {
+    let filter = gtk::Button::with_label(&bookie_app_services::tr!("Show matching rows"));
+    filter.set_widget_name("tp-result-filter-button");
+    filter.add_css_class("flat");
+    let stop = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
+    stop.set_widget_name("tp-result-find-stop");
+    stop.set_visible(false);
+    (filter, stop)
+}
+
+fn search_toggles() -> (gtk::ToggleButton, gtk::ToggleButton, gtk::ToggleButton) {
     let match_case = flat_toggle(
         "Aa",
         &bookie_app_services::tr!("Match case"),
@@ -153,18 +162,29 @@ fn build_widgets(column_names: &[String]) -> Widgets {
         &bookie_app_services::tr!("Regular expression"),
         "tp-result-find-regex",
     );
+    (match_case, whole_words, regex)
+}
+
+fn build_widgets(column_names: &[String]) -> Widgets {
+    let find = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    find.set_widget_name("tp-result-tools");
+    let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+    actions.set_widget_name("tp-result-actions");
+    let entry = find_entry();
+    let previous = labelled_button(
+        "go-up-symbolic",
+        "tp-result-find-previous",
+        &bookie_app_services::tr!("Previous match"),
+    );
+    let next = labelled_button(
+        "go-down-symbolic",
+        "tp-result-find-next",
+        &bookie_app_services::tr!("Next match"),
+    );
+    let (match_case, whole_words, regex) = search_toggles();
     let columns = column_dropdown(column_names);
-    let status = gtk::Label::new(None);
-    status.set_widget_name("tp-result-find-status");
-    status.set_xalign(0.0);
-    status.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    status.set_max_width_chars(30);
-    let filter = gtk::Button::with_label(&bookie_app_services::tr!("Show matching rows"));
-    filter.set_widget_name("tp-result-filter-button");
-    filter.add_css_class("flat");
-    let stop = gtk::Button::with_label(&bookie_app_services::tr!("Cancel"));
-    stop.set_widget_name("tp-result-find-stop");
-    stop.set_visible(false);
+    let status = status_label();
+    let (filter, stop) = action_buttons();
     for widget in [
         entry.upcast_ref::<gtk::Widget>(),
         previous.upcast_ref(),

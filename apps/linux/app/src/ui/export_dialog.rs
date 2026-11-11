@@ -476,6 +476,18 @@ struct SaveRequest {
     sql_target: String,
 }
 
+fn export_filters(format: ExportFormat) -> (gtk::FileFilter, gio::ListStore) {
+    let filter = gtk::FileFilter::new();
+    filter.set_name(Some(
+        &bookie_app_services::tr!("{format} files").replace("{format}", format.label()),
+    ));
+    filter.add_mime_type(format.mime_type());
+    filter.add_suffix(format.extension());
+    let filters = gio::ListStore::new::<gtk::FileFilter>();
+    filters.append(&filter);
+    (filter, filters)
+}
+
 fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::ToastOverlay, request: SaveRequest) {
     let SaveRequest {
         format,
@@ -489,14 +501,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         null_marker,
         sql_target,
     } = request;
-    let filter = gtk::FileFilter::new();
-    filter.set_name(Some(
-        &bookie_app_services::tr!("{format} files").replace("{format}", format.label()),
-    ));
-    filter.add_mime_type(format.mime_type());
-    filter.add_suffix(format.extension());
-    let filters = gio::ListStore::new::<gtk::FileFilter>();
-    filters.append(&filter);
+    let (filter, filters) = export_filters(format);
     let file_dialog = gtk::FileDialog::builder()
         .title(bookie_app_services::tr!("Export Results"))
         .modal(true)

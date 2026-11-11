@@ -21,6 +21,10 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
             bookie_app_services::tr!("Optimistic grid updates are not supported for {driver}.")
                 .replace("{driver}", driver)
         }
+        BuildSqlError::DefaultUnsupported(driver) => {
+            bookie_app_services::tr!("{driver} cannot set a column to its default value.").replace("{driver}", driver)
+        }
+        BuildSqlError::EmptyExpression => bookie_app_services::tr!("Type an expression first."),
         BuildSqlError::StaleColumns => bookie_app_services::tr!(
             "This table's columns changed after you started editing (for example, in a Structure tab). \
              Reload the page and reapply your changes."
