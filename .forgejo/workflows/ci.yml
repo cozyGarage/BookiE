@@ -231,7 +231,6 @@ jobs:
           flock --exclusive 9
           cd src
           cargo build --profile ci --locked -p bookie-app --bin bookie-app
-          mkdir -p "$GITHUB_WORKSPACE/gtk-artifact/schemas"
           python3 scripts/ci-gtk-artifact.py create "$CARGO_TARGET_DIR/ci/bookie-app" "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}"
       - name: Upload the source-pinned GTK binary
         uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5

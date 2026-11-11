@@ -481,7 +481,7 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         gtk_build = re.search(r"(?ms)^  gtk-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
         self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)
-        self.assertIn('mkdir -p "$GITHUB_WORKSPACE/gtk-artifact/schemas"', gtk_build)
+        self.assertNotIn('mkdir -p "$GITHUB_WORKSPACE/gtk-artifact/schemas"', gtk_build)
 
     def test_forgejo_gpui_test_builder_installs_linker_dependency(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -1273,7 +1273,7 @@ class CiWorkflowTests(unittest.TestCase):
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
         gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
         self.assertIn("cargo build --profile ci --locked -p bookie-app --bin bookie-app", fast)
-        self.assertIn("mkdir -p target/gtk-safety/schemas", fast)
+        self.assertNotIn("mkdir -p target/gtk-safety/schemas", fast)
         self.assertIn("ci-gtk-artifact.py create target/ci/bookie-app target/gtk-safety", fast)
         self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", fast)
         self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, fast]", gtk_safety)
