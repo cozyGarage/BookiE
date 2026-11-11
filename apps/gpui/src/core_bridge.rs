@@ -74,8 +74,6 @@ pub fn column_infos() -> Vec<ColumnInfo> {
         .collect()
 }
 
-/// The core column description for a result's columns. Types are not carried by the grid's
-/// columns, so the declared type is left empty.
 pub fn column_infos_for(columns: &[ColumnMeta]) -> Vec<ColumnInfo> {
     columns
         .iter()
