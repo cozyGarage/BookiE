@@ -15,23 +15,23 @@ pub(super) fn build(sender: &ComponentSender<SqlEditor>) -> gtk::MenuButton {
         .build();
     content.append(&action(
         sender,
-        crate::tr!("Fold block"),
-        crate::tr!("Fold the SQL block at the cursor"),
+        bookie_app_services::tr!("Fold block"),
+        bookie_app_services::tr!("Fold the SQL block at the cursor"),
         || SqlEditorInput::ToggleFold,
     ));
     content.append(&action(
         sender,
-        crate::tr!("Unfold all"),
-        crate::tr!("Show all folded SQL blocks"),
+        bookie_app_services::tr!("Unfold all"),
+        bookie_app_services::tr!("Show all folded SQL blocks"),
         || SqlEditorInput::UnfoldAll,
     ));
     let menu = gtk::MenuButton::builder()
         .icon_name("view-more-symbolic")
-        .tooltip_text(crate::tr!("Fold or unfold SQL blocks"))
+        .tooltip_text(bookie_app_services::tr!("Fold or unfold SQL blocks"))
         .popover(&gtk::Popover::builder().child(&content).build())
         .build();
     menu.add_css_class("flat");
-    menu.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Fold SQL blocks"))]);
+    menu.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Fold SQL blocks"))]);
     menu
 }
 

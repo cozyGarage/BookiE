@@ -37,6 +37,7 @@ pub mod er_diagram;
 pub mod export_pages;
 pub mod filter_settings;
 pub mod highlight_settings;
+pub mod i18n;
 pub mod image_preview;
 pub mod open_failure;
 pub mod ordered_refresh;
@@ -64,6 +65,7 @@ pub mod workspace_state;
 pub mod browse_query;
 
 pub mod change_tracker;
+pub mod result_copy;
 pub mod result_editability;
 
 pub mod csv_import_mappings;

@@ -238,9 +238,9 @@ impl PagedModel {
         let pages = self.imp().pages.borrow();
         let Some(pages) = pages.as_ref() else { return };
         let message = if pages.has_failed() {
-            crate::tr!("A saved result page could not be loaded. Retry or use the page view.")
+            bookie_app_services::tr!("A saved result page could not be loaded. Retry or use the page view.")
         } else if pages.has_deferred() {
-            crate::tr!("Some visible pages exceed the memory limit. Use the page view to see all rows.")
+            bookie_app_services::tr!("Some visible pages exceed the memory limit. Use the page view to see all rows.")
         } else {
             String::new()
         };

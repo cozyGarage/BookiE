@@ -64,7 +64,7 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
 }
 
 fn whole_result_unavailable() -> BrowseTabInput {
-    BrowseTabInput::ShowToast(crate::tr!("Whole-result filters apply to query results"))
+    BrowseTabInput::ShowToast(bookie_app_services::tr!("Whole-result filters apply to query results"))
 }
 
 fn delete_row_input(row_position: u32, row_key: Vec<bookie_core::Value>, draft_id: Option<u64>) -> BrowseTabInput {

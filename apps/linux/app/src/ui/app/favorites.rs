@@ -33,16 +33,16 @@ impl App {
 
     pub(super) fn on_save_query_as_favorite(&self, sender: ComponentSender<Self>) {
         let Some(query) = self.selected_editor_query() else {
-            self.show_toast(&crate::tr!("Open a SQL editor tab to save a favorite."));
+            self.show_toast(&bookie_app_services::tr!("Open a SQL editor tab to save a favorite."));
             return;
         };
         if query.trim().is_empty() {
-            self.show_toast(&crate::tr!("The editor is empty."));
+            self.show_toast(&bookie_app_services::tr!("The editor is empty."));
             return;
         }
 
-        let dialog = adw::AlertDialog::new(Some(&crate::tr!("Save as favorite")), None);
-        let entry = adw::EntryRow::builder().title(crate::tr!("Name")).build();
+        let dialog = adw::AlertDialog::new(Some(&bookie_app_services::tr!("Save as favorite")), None);
+        let entry = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
         entry.set_text(&crate::ui::editor::derive_tab_label(&query));
         let list = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
@@ -50,8 +50,8 @@ impl App {
             .build();
         list.append(&entry);
         dialog.set_extra_child(Some(&list));
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("save", &crate::tr!("Save"));
+        dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+        dialog.add_response("save", &bookie_app_services::tr!("Save"));
         dialog.set_response_appearance("save", adw::ResponseAppearance::Suggested);
         dialog.set_default_response(Some("save"));
         dialog.set_close_response("cancel");
@@ -174,7 +174,7 @@ impl App {
             items.push(QuickItem {
                 target: QuickTarget::Tab(id),
                 title: page.title().to_string(),
-                subtitle: crate::tr!("Open tab"),
+                subtitle: bookie_app_services::tr!("Open tab"),
             });
         }
         items
@@ -186,7 +186,7 @@ impl App {
             .map(|connection| QuickItem {
                 target: QuickTarget::Connection(connection.id),
                 title: connection.name.clone(),
-                subtitle: crate::tr!("Saved connection"),
+                subtitle: bookie_app_services::tr!("Saved connection"),
             })
             .collect()
     }

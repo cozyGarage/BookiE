@@ -16,15 +16,15 @@ pub(crate) fn present_import_passphrase_dialog(
     on_passphrase: impl Fn(String) + 'static,
 ) {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("This file is protected")),
-        Some(&crate::tr!("Enter the passphrase it was exported with.")),
+        Some(&bookie_app_services::tr!("This file is protected")),
+        Some(&bookie_app_services::tr!("Enter the passphrase it was exported with.")),
     );
-    let entry = adw::PasswordEntryRow::builder().title(crate::tr!("Passphrase")).build();
+    let entry = adw::PasswordEntryRow::builder().title(bookie_app_services::tr!("Passphrase")).build();
     let list = boxed_list();
     list.append(&entry);
     dialog.set_extra_child(Some(&list));
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
-    dialog.add_response("unlock", &crate::tr!("Unlock"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+    dialog.add_response("unlock", &bookie_app_services::tr!("Unlock"));
     dialog.set_response_appearance("unlock", adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some("unlock"));
     dialog.set_close_response("cancel");
@@ -40,8 +40,8 @@ pub(crate) fn present_import_passphrase_dialog(
 
 fn build_replace_switch(carries_secrets: bool) -> adw::SwitchRow {
     adw::SwitchRow::builder()
-        .title(crate::tr!("Replace saved passwords"))
-        .subtitle(crate::tr!("Off keeps the passwords already on this device."))
+        .title(bookie_app_services::tr!("Replace saved passwords"))
+        .subtitle(bookie_app_services::tr!("Off keeps the passwords already on this device."))
         .active(false)
         .visible(carries_secrets)
         .build()
@@ -84,8 +84,8 @@ pub(crate) fn present_import_plan_dialog(
     on_confirm: impl Fn(ImportChoice) + 'static,
 ) {
     let dialog = adw::AlertDialog::new(
-        Some(&crate::tr!("Import connections")),
-        Some(&crate::tr!(
+        Some(&bookie_app_services::tr!("Import connections")),
+        Some(&bookie_app_services::tr!(
             "These changes have not been made yet. Connections already on this device that the file does not mention are left alone."
         )),
     );
@@ -104,7 +104,7 @@ pub(crate) fn present_import_plan_dialog(
         row.set_use_markup(false);
         row.set_selectable(false);
         row.set_title(name);
-        row.set_subtitle(&crate::tr!("Skipped: unsupported connection"));
+        row.set_subtitle(&bookie_app_services::tr!("Skipped: unsupported connection"));
         row.set_title_lines(2);
         list.append(&row);
     }
@@ -112,8 +112,8 @@ pub(crate) fn present_import_plan_dialog(
     let replace = build_replace_switch(carries_secrets);
     dialog.set_extra_child(Some(&build_plan_body(&list, &replace, carries_secrets)));
 
-    dialog.add_response("cancel", &crate::tr!("Cancel"));
-    dialog.add_response("import", &crate::tr!("Import"));
+    dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
+    dialog.add_response("import", &bookie_app_services::tr!("Import"));
     dialog.set_response_appearance("import", adw::ResponseAppearance::Suggested);
     dialog.set_default_response(Some("cancel"));
     dialog.set_close_response("cancel");

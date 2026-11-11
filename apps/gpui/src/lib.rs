@@ -1,4 +1,3 @@
-pub mod copy_format;
 pub mod core_bridge;
 pub mod detail;
 pub mod edit;

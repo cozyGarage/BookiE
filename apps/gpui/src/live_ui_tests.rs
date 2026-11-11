@@ -200,7 +200,7 @@ fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut Te
         cx.write_to_clipboard(gpui::ClipboardItem::new_string("unchanged".into()));
         view.update(cx, |view, cx| {
             view.click_row(0, false);
-            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::Insert, cx);
+            view.copy_selection_as(bookie_app_services::result_copy::CopyFormat::Insert, cx);
         });
     });
     let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
@@ -243,7 +243,7 @@ fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext)
         view.update(cx, |view, cx| {
             view.click_row(0, false);
             view.click_row(1, true);
-            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::Insert, cx);
+            view.copy_selection_as(bookie_app_services::result_copy::CopyFormat::Insert, cx);
         })
     });
     let insert = copied(cx).expect("clipboard text");
@@ -262,7 +262,7 @@ fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext)
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
-            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::InList, cx);
+            view.copy_selection_as(bookie_app_services::result_copy::CopyFormat::InList, cx);
         })
     });
     assert_eq!(copied(cx).as_deref(), Some("('Ada', 'Grace')"));
@@ -427,7 +427,7 @@ fn an_empty_database_opens_a_query_without_synthetic_rows(cx: &mut TestAppContex
         cx.write_to_clipboard(gpui::ClipboardItem::new_string("unchanged".into()));
         view.update(cx, |view, cx| {
             view.click_row(0, false);
-            view.copy_selection_as(bookie_gpui::copy_format::CopyFormat::Insert, cx);
+            view.copy_selection_as(bookie_app_services::result_copy::CopyFormat::Insert, cx);
         });
     });
     let clipboard = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
@@ -969,3 +969,39 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
         );
     });
 }
+
+#[gpui::test]
+fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    cx.simulate_input("select 1");
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_input.read(cx).value(), "select 1");
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    view.read_with(cx, |view, _| assert!(view.palette_open, "global shortcuts still work in the editor"));
+}
+

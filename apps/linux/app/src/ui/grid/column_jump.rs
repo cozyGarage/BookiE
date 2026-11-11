@@ -48,18 +48,18 @@ fn present(
     database: Arc<DatabaseService>,
 ) {
     let dialog = adw::Dialog::builder()
-        .title(crate::tr!("Jump to Column"))
+        .title(bookie_app_services::tr!("Jump to Column"))
         .content_width(420)
         .content_height(420)
         .build();
     let content = gtk::Box::new(gtk::Orientation::Vertical, 8);
     content.append(&adw::HeaderBar::new());
     let search = gtk::SearchEntry::builder()
-        .placeholder_text(crate::tr!("Search columns"))
+        .placeholder_text(bookie_app_services::tr!("Search columns"))
         .margin_start(12)
         .margin_end(12)
         .build();
-    search.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Search columns"))]);
+    search.update_property(&[gtk::accessible::Property::Label(&bookie_app_services::tr!("Search columns"))]);
     content.append(&search);
     let list = gtk::ListBox::builder()
         .selection_mode(gtk::SelectionMode::Single)
@@ -87,7 +87,7 @@ fn present(
         })
         .collect::<Vec<_>>();
     list.select_row(list.row_at_index(0).as_ref());
-    let empty = gtk::Label::new(Some(&crate::tr!("No matching columns")));
+    let empty = gtk::Label::new(Some(&bookie_app_services::tr!("No matching columns")));
     empty.set_visible(false);
     content.append(&empty);
     content.append(

@@ -259,7 +259,7 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
     }
     if let Some(page) = context.resident_pages.get(index) {
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-            status.set_description(Some(&crate::tr!("Restoring this result page from memory…")));
+            status.set_description(Some(&bookie_app_services::tr!("Restoring this result page from memory…")));
         }
         let _ = context
             .sender
@@ -273,13 +273,13 @@ fn load_visible_placeholder(pages: &gtk::Stack, context: &VisiblePageLoadContext
     }
     let Some(spool) = context.spool.cloned() else {
         if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-            status.set_title(&crate::tr!("This result page is no longer available"));
+            status.set_title(&bookie_app_services::tr!("This result page is no longer available"));
         }
         placeholder.remove_css_class("tp-stream-page-loading");
         return;
     };
     if let Some(status) = placeholder.downcast_ref::<relm4::adw::StatusPage>() {
-        status.set_description(Some(&crate::tr!("Loading this page from temporary storage…")));
+        status.set_description(Some(&bookie_app_services::tr!("Loading this page from temporary storage…")));
     }
     let _ = context
         .sender
@@ -364,10 +364,10 @@ pub(super) fn complete_page_load(context: PageLoadContext<'_>, result: Result<Ar
         }
         Err(message) => {
             if let Some(status) = current.downcast_ref::<relm4::adw::StatusPage>() {
-                status.set_title(&crate::tr!("Could not load this result page"));
+                status.set_title(&bookie_app_services::tr!("Could not load this result page"));
                 status.set_description(Some(&crate::ui::plain_text::escape_markup(&message)));
                 if let Some(pages) = container.parent().and_downcast::<gtk::Stack>() {
-                    let retry = gtk::Button::with_label(&crate::tr!("Retry loading page"));
+                    let retry = gtk::Button::with_label(&bookie_app_services::tr!("Retry loading page"));
                     let pages = pages.downgrade();
                     retry.connect_clicked(move |_| {
                         if let Some(pages) = pages.upgrade() {

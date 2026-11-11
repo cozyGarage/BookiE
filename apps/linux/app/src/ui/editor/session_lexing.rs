@@ -64,7 +64,7 @@ impl SqlEditor {
         }
         let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);
         let Some(guard) = origin.as_ref().and_then(|origin| origin.guard(&self.database)) else {
-            self.status.set_label(&crate::tr!("no active connection"));
+            self.status.set_label(&bookie_app_services::tr!("no active connection"));
             return;
         };
         let conn: std::sync::Arc<dyn bookie_core::Connection> = guard.clone();
@@ -103,7 +103,7 @@ impl SqlEditor {
     ) {
         self.reading_lexing = false;
         if source != self.lexing_source() {
-            self.status.set_label(&crate::tr!(
+            self.status.set_label(&bookie_app_services::tr!(
                 "The connection changed before the script ran. Run it again."
             ));
             return;
@@ -114,7 +114,7 @@ impl SqlEditor {
                 self.plan_and_run(sql, anchor, sender);
             }
             Err(message) => self.status.set_label(
-                &crate::tr!("Could not read the session's string settings: {message}").replace("{message}", &message),
+                &bookie_app_services::tr!("Could not read the session's string settings: {message}").replace("{message}", &message),
             ),
         }
     }

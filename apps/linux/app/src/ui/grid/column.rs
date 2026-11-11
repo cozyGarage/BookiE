@@ -59,32 +59,32 @@ fn shown_type(info: &ColumnInfo) -> Option<&str> {
 fn header_details(info: &ColumnInfo, foreign_key: bool, sort_enabled: bool) -> gtk4::gio::Menu {
     let details = gtk4::gio::Menu::new();
     for text in [
-        crate::tr!("Column: {name}").replace("{name}", &info.name),
-        crate::tr!("Type: {type}").replace("{type}", shown_type(info).unwrap_or("\u{2014}")),
+        bookie_app_services::tr!("Column: {name}").replace("{name}", &info.name),
+        bookie_app_services::tr!("Type: {type}").replace("{type}", shown_type(info).unwrap_or("\u{2014}")),
         if info.nullable {
-            crate::tr!("NULL allowed")
+            bookie_app_services::tr!("NULL allowed")
         } else {
-            crate::tr!("NULL not allowed")
+            bookie_app_services::tr!("NULL not allowed")
         },
     ] {
         details.append(Some(&text), None);
     }
     if info.primary_key {
-        details.append(Some(&crate::tr!("Primary key")), None);
+        details.append(Some(&bookie_app_services::tr!("Primary key")), None);
     }
     if foreign_key {
-        details.append(Some(&crate::tr!("Foreign key")), None);
+        details.append(Some(&bookie_app_services::tr!("Foreign key")), None);
     }
     if let Some(comment) = info.comment.as_deref().filter(|comment| !comment.trim().is_empty()) {
         let text: String = comment.chars().take(1024).collect();
         details.append(Some(&text), None);
     }
     let menu = gtk4::gio::Menu::new();
-    menu.append_section(Some(&crate::tr!("Column details")), &details);
+    menu.append_section(Some(&bookie_app_services::tr!("Column details")), &details);
     if sort_enabled {
         let sort_actions = gtk4::gio::Menu::new();
-        sort_actions.append(Some(&crate::tr!("Clear sort")), Some("grid.clear-sort"));
-        menu.append_section(Some(&crate::tr!("Sort")), &sort_actions);
+        sort_actions.append(Some(&bookie_app_services::tr!("Clear sort")), Some("grid.clear-sort"));
+        menu.append_section(Some(&bookie_app_services::tr!("Sort")), &sort_actions);
     }
     menu
 }
@@ -305,7 +305,7 @@ fn bind_row_cell(
     } = bound;
     if !row.cell_is_loaded(index) && !row.cell_is_partial(index) {
         if let Some(label) = item.child().and_downcast::<gtk4::Label>() {
-            label.set_text(&crate::tr!("Loading…"));
+            label.set_text(&bookie_app_services::tr!("Loading…"));
             POSITION_SLOT.set(&label, item.position());
         }
         return;
@@ -360,7 +360,7 @@ fn row_key_is_ambiguous(context: &TabGridContext, key: Option<&crate::services::
 }
 
 fn mark_ambiguous_key(child: &gtk4::Widget, ambiguous: bool) {
-    let reason = crate::tr!("Another loaded row has the same key, so this row cannot be edited on its own.");
+    let reason = bookie_app_services::tr!("Another loaded row has the same key, so this row cannot be edited on its own.");
     if ambiguous {
         child.set_tooltip_text(Some(&reason));
     } else if child.tooltip_text().is_some_and(|tooltip| tooltip == reason) {
@@ -622,18 +622,18 @@ fn clear_pending_classes(widget: &gtk4::Widget) {
 
 fn pending_description(classes: &[&str]) -> Option<String> {
     if classes.contains(&"tp-row-pending-delete") {
-        return Some(crate::tr!("Pending deletion").to_string());
+        return Some(bookie_app_services::tr!("Pending deletion").to_string());
     }
     if classes.contains(&"tp-row-pending-insert") {
-        return Some(crate::tr!("New row").to_string());
+        return Some(bookie_app_services::tr!("New row").to_string());
     }
     classes
         .contains(&"tp-cell-modified")
-        .then(|| crate::tr!("Modified").to_string())
+        .then(|| bookie_app_services::tr!("Modified").to_string())
         .or_else(|| {
             classes
                 .contains(&"tp-cell-changed")
-                .then(|| crate::tr!("Changed").to_string())
+                .then(|| bookie_app_services::tr!("Changed").to_string())
         })
 }
 
@@ -649,7 +649,7 @@ fn apply_cell_tooltip(widget: &gtk4::Widget, text: &str, is_null: bool, truncate
     if is_null || text.chars().take(TOOLTIP_MIN_CHARS + 1).count() <= TOOLTIP_MIN_CHARS {
         widget.set_tooltip_text(None);
     } else if truncated {
-        widget.set_tooltip_text(Some(&crate::tr!(
+        widget.set_tooltip_text(Some(&bookie_app_services::tr!(
             "This cell is truncated. Choose View Value to see the full value."
         )));
     } else {

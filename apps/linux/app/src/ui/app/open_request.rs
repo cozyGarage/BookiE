@@ -27,7 +27,7 @@ impl App {
         let mut arguments = arguments.into_iter();
         let Some(first) = arguments.next() else { return };
         if arguments.next().is_some() {
-            self.show_toast(&crate::tr!("BookiE opens one file at a time. Opening the first."));
+            self.show_toast(&bookie_app_services::tr!("BookiE opens one file at a time. Opening the first."));
         }
         match first {
             LaunchArgument::Uri(uri) => self.present_connection_url_dialog(sender, Some(&uri)),
@@ -35,12 +35,12 @@ impl App {
                 Ok(OpenablePath::Database(file)) => self.open_database_file(file, sender),
                 Ok(OpenablePath::SqlScript(path)) => Self::open_sql_script_path(path, sender),
                 Err(OpenRejection::Missing(path)) => self
-                    .show_toast(&crate::tr!("{path} does not exist.").replace("{path}", &path.display().to_string())),
+                    .show_toast(&bookie_app_services::tr!("{path} does not exist.").replace("{path}", &path.display().to_string())),
                 Err(OpenRejection::NotADatabase(path)) => self.show_toast(
-                    &crate::tr!("{path} is not a SQLite or DuckDB database file.")
+                    &bookie_app_services::tr!("{path} is not a SQLite or DuckDB database file.")
                         .replace("{path}", &path.display().to_string()),
                 ),
-                Err(OpenRejection::NonUtf8Path(_)) => self.show_toast(&crate::tr!(
+                Err(OpenRejection::NonUtf8Path(_)) => self.show_toast(&bookie_app_services::tr!(
                     "BookiE cannot open this path because it contains non-UTF-8 bytes."
                 )),
             },
@@ -59,7 +59,7 @@ impl App {
     fn open_database_file(&self, file: crate::services::open_request::DatabaseFile, sender: ComponentSender<Self>) {
         if self.registry.get(file.driver_id()).is_none() {
             self.show_toast(
-                &crate::tr!("This BookiE build has no {driver} driver.").replace("{driver}", file.driver_id()),
+                &bookie_app_services::tr!("This BookiE build has no {driver} driver.").replace("{driver}", file.driver_id()),
             );
             return;
         }

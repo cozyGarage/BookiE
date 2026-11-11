@@ -61,10 +61,10 @@ pub fn script_statements<'a>(text: &str, lexing: impl Into<Lexing<'a>>) -> Resul
     let settings = lexing.settings_for(grammar);
     let plan = ScriptPlan::build(text, grammar, settings);
     if !plan.diagnostics().is_empty() {
-        return Err(crate::tr!("The script contains an unterminated quote or comment."));
+        return Err(bookie_app_services::tr!("The script contains an unterminated quote or comment."));
     }
     if plan.batches().iter().any(|batch| batch.repeat.get() != 1) {
-        return Err(crate::tr!(
+        return Err(bookie_app_services::tr!(
             "GO repetition is not supported. Expand repeated batches explicitly before running."
         ));
     }
