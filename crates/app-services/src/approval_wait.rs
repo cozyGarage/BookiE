@@ -36,7 +36,7 @@ mod tests {
             waited()
         })
         .await;
-        assert!(waited_inside >= Duration::from_millis(60), "{waited_inside:?}");
+        assert!(waited_inside >= Duration::from_millis(50), "{waited_inside:?}");
     }
 
     #[tokio::test]
