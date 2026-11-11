@@ -77,6 +77,11 @@ pub enum BrowseTabInput {
         row_key: Vec<Value>,
         draft_id: Option<u64>,
     },
+    GridResetCell(crate::ui::grid::ResetCellRequest),
+    GridResetConfirmed {
+        row_key: crate::services::change_tracker::RowKey,
+        statement: (String, Vec<Value>),
+    },
     GridDeleteRowAt {
         row_position: u32,
         row_key: Vec<Value>,

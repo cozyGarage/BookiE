@@ -43,6 +43,7 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
             row_key,
             draft_id,
         } => set_null_input(row_position, col_index, row_key, draft_id),
+        GridMsg::ResetCell(request) => BrowseTabInput::GridResetCell(request),
         GridMsg::DeleteRowAt {
             row_position,
             row_key,
