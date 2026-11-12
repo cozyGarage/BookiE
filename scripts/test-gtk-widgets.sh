@@ -31,7 +31,8 @@ if ! python3 -c 'import locale; locale.setlocale(locale.LC_ALL, "en_US.UTF-8")' 
 fi
 export G_DEBUG=fatal-criticals GDK_BACKEND=x11 GSK_RENDERER=cairo GTK_A11Y=test GIO_USE_VFS=local
 xvfb_server_num=$((1000 + RANDOM))
-if dbus-run-session -- xvfb-run --auto-servernum --server-num="$xvfb_server_num" -e "$xvfb_error_log" -s "-screen 0 1600x1200x24" bash -c '
+xvfb_screen="$(bash "$ROOT/scripts/gtk-widget-screen.sh")"
+if dbus-run-session -- xvfb-run --auto-servernum --server-num="$xvfb_server_num" -e "$xvfb_error_log" -s "-screen 0 $xvfb_screen" bash -c '
   python3 "$1" gtk
   test_status=$?
   if command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo -display "${DISPLAY:-}" >/dev/null 2>&1; then
