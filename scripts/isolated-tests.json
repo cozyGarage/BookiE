@@ -199,6 +199,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::pinned::tests::evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest"
+    ],
+    [
+      "bookie-app",
+      "postgres_mcp_catalog",
+      "mcp_catalog_tools_follow_restricted_postgres_role_visibility"
     ]
   ],
   "gtk": [

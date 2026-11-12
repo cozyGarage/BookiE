@@ -683,6 +683,33 @@ def database_tables(path):
         }
 
 
+def seed_catalog_hidden_schemas(bookie_config):
+    encoded = os.environ.get("BOOKIE_GTK_CATALOG_HIDDEN_SCHEMAS_JSON")
+    if encoded is None:
+        return
+    if "BOOKIE_GTK_POSTGRES_PORT" not in os.environ:
+        raise ValueError("catalog hidden-schema profiles require a PostgreSQL connection")
+    hidden_schemas = json.loads(encoded)
+    if not isinstance(hidden_schemas, list) or any(not isinstance(schema, str) or not schema for schema in hidden_schemas):
+        raise ValueError("catalog hidden schemas must be a JSON array of non-empty strings")
+    path = bookie_config / "workspace_state.json"
+    path.write_text(
+        json.dumps(
+            {
+                "connections": {
+                    POSTGRES_CONNECTION_ID: {
+                        "tabs": [],
+                        "database": "bookie_test",
+                        "hidden_schemas": hidden_schemas,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+
+
 def write_fixture(base, audit_available=True, environment="prod", mcp_token=False):
     home = base / "home"
     config = base / "config"
@@ -978,6 +1005,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 capture_output=True,
             )
     (bookie_config / "connections.json").write_text(json.dumps(connections), encoding="utf-8")
+    seed_catalog_hidden_schemas(bookie_config)
     (bookie_config / "preferences.json").write_text(
         json.dumps(
             {
@@ -1781,9 +1809,13 @@ def postgres_sidebar_catalog_profile(_database, base):
     open_saved_connection(POSTGRES_CONNECTION_NAME)
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
+    minimum_nodes = int(os.environ.get("BOOKIE_GTK_CATALOG_MINIMUM_NODES", os.environ["BOOKIE_GTK_CATALOG_TABLES"]))
     sidebar_nodes, tree_model_build_ms, created_list_items, ui_stall_count, ui_stall_max_ms = (
-        application_sidebar_model_metrics(int(os.environ["BOOKIE_GTK_CATALOG_TABLES"]))
+        application_sidebar_model_metrics(minimum_nodes)
     )
+    hidden_schemas = json.loads(os.environ.get("BOOKIE_GTK_CATALOG_HIDDEN_SCHEMAS_JSON", "[]"))
+    if hidden_schemas:
+        wait_for_node(name=hidden_schemas[0], role=pyatspi.ROLE_LIST_ITEM, present=False)
     catalog_ready = time.monotonic()
     search_toggle = wait_for_sidebar_control("Search tables", pyatspi.ROLE_TOGGLE_BUTTON)
     if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
