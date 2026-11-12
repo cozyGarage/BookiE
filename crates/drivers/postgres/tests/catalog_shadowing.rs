@@ -140,3 +140,104 @@ async fn catalog_queries_ignore_objects_that_shadow_catalog_names_on_the_search_
         assert_eq!(with_aggregate[position], baseline[index], "foreign key fact {index}");
     }
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn sqlx_type_resolution_ignores_a_shadowed_array_agg() {
+    let container = PostgresImage::default().with_tag("16-alpine").start().await.unwrap();
+    let options = options(
+        &container.get_host().await.unwrap().to_string(),
+        container.get_host_port_ipv4(5432).await.unwrap(),
+        "postgres",
+    );
+    let setup = PgDriver.connect(options.clone()).await.unwrap();
+    setup.execute("CREATE SCHEMA shadow").await.unwrap();
+    setup.execute("CREATE SCHEMA shop").await.unwrap();
+    setup
+        .execute(
+            "CREATE FUNCTION shadow.to_regtype(pg_catalog.text) RETURNS pg_catalog.regtype \
+             LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'shadow type lookup invoked'; END $$",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE TYPE shop.mood AS ENUM ('happy', 'sad')")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE TABLE shop.records (id integer PRIMARY KEY)")
+        .await
+        .unwrap();
+    setup.execute("INSERT INTO shop.records VALUES (1)").await.unwrap();
+    setup
+        .execute(
+            "CREATE FUNCTION shadow.array_step(text, anynonarray) RETURNS text \
+             LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'shadow aggregate invoked'; END $$",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE AGGREGATE shadow.array_agg(anynonarray) \
+             (SFUNC = shadow.array_step, STYPE = text)",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute("ALTER ROLE postgres SET search_path TO shadow, pg_catalog")
+        .await
+        .unwrap();
+    drop(setup);
+
+    let connection = PgDriver.connect(options).await.unwrap();
+    let path_before = search_path(connection.as_ref()).await;
+
+    let type_result = connection.query("SELECT 'happy'::shop.mood").await.unwrap();
+
+    assert_eq!(type_result.rows[0][0], bookie_core::Value::Text("happy".into()));
+    let column_result = connection.query("SELECT id FROM shop.records").await.unwrap();
+    assert_eq!(column_result.rows[0][0], bookie_core::Value::Int(1));
+    assert_eq!(search_path(connection.as_ref()).await, path_before);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn sqlx_column_resolution_ignores_a_shadowed_array_agg() {
+    let container = PostgresImage::default().with_tag("16-alpine").start().await.unwrap();
+    let options = options(
+        &container.get_host().await.unwrap().to_string(),
+        container.get_host_port_ipv4(5432).await.unwrap(),
+        "postgres",
+    );
+    let setup = PgDriver.connect(options.clone()).await.unwrap();
+    setup.execute("CREATE SCHEMA shadow").await.unwrap();
+    setup.execute("CREATE SCHEMA shop").await.unwrap();
+    setup
+        .execute("CREATE TABLE shop.records (id integer PRIMARY KEY)")
+        .await
+        .unwrap();
+    setup.execute("INSERT INTO shop.records VALUES (1)").await.unwrap();
+    setup
+        .execute(
+            "CREATE FUNCTION shadow.array_step(text, anynonarray) RETURNS text \
+             LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'shadow aggregate invoked'; END $$",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE AGGREGATE shadow.array_agg(anynonarray) (SFUNC = shadow.array_step, STYPE = text)")
+        .await
+        .unwrap();
+    setup
+        .execute("ALTER ROLE postgres SET search_path TO shadow, pg_catalog")
+        .await
+        .unwrap();
+    drop(setup);
+
+    let connection = PgDriver.connect(options).await.unwrap();
+    let path_before = search_path(connection.as_ref()).await;
+    let result = connection.query("SELECT id FROM shop.records").await.unwrap();
+
+    assert_eq!(result.rows[0][0], bookie_core::Value::Int(1));
+    assert_eq!(search_path(connection.as_ref()).await, path_before);
+}
