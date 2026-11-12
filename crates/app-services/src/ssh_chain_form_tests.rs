@@ -236,7 +236,7 @@ fn a_password_hop_needs_a_new_or_stored_password() {
         ..hop("x")
     };
     assert_eq!(
-        plan_chain(head(), &[form.clone()], None).unwrap_err(),
+        plan_chain(head(), std::slice::from_ref(&form), None).unwrap_err(),
         ChainFormError::PasswordRequired { position: 2 }
     );
     let stored = JumpHopForm {

@@ -38,12 +38,6 @@ impl App {
         prompt_for_password: bool,
         sender: ComponentSender<Self>,
     ) {
-        if crate::ui::connect_dialog::has_jump_chain(&saved) {
-            self.show_toast(&bookie_app_services::tr!(
-                "This connection uses an SSH jump chain, which the form cannot edit yet. Edit ssh.jump in the saved connection file."
-            ));
-            return;
-        }
         let reply = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -789,11 +783,7 @@ impl App {
                             let file_based = registry
                                 .get(&source.driver_id)
                                 .is_some_and(|driver| driver.capabilities().is_file_based);
-                            let eligible = duplicate_connection_prompt_eligible(
-                                source.auth_mode,
-                                file_based,
-                                crate::ui::connect_dialog::has_jump_chain(&source),
-                            );
+                            let eligible = duplicate_connection_prompt_eligible(source.auth_mode, file_based);
                             if !eligible {
                                 false
                             } else {
@@ -856,12 +846,8 @@ fn prompt_for_stored_password(stored: Result<Option<secrecy::SecretString>, book
     }
 }
 
-fn duplicate_connection_prompt_eligible(
-    auth_mode: bookie_core::AuthMode,
-    file_based: bool,
-    has_jump_chain: bool,
-) -> bool {
-    auth_mode == bookie_core::AuthMode::Password && !file_based && !has_jump_chain
+fn duplicate_connection_prompt_eligible(auth_mode: bookie_core::AuthMode, file_based: bool) -> bool {
+    auth_mode == bookie_core::AuthMode::Password && !file_based
 }
 
 /// Performs the actual disk + keyring teardown for a saved connection.
@@ -943,22 +929,14 @@ mod tests {
     fn duplicate_prompts_only_for_editable_password_authenticated_connections() {
         assert!(duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Password,
-            false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Kerberos,
-            false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Password,
-            true,
-            false
-        ));
-        assert!(!duplicate_connection_prompt_eligible(
-            bookie_core::AuthMode::Password,
-            false,
             true
         ));
     }

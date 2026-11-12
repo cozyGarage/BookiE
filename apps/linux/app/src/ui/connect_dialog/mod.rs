@@ -3,15 +3,13 @@ use std::sync::Arc;
 use relm4::adw::prelude::*;
 use relm4::prelude::*;
 use relm4::{adw, gtk};
-use secrecy::{ExposeSecret, SecretString};
+use secrecy::SecretString;
 use uuid::Uuid;
 
 use bookie_core::{AuthMode, ConnectOptions, Connection, DriverMaturity, DriverRegistry, Environment, TlsMode};
-use bookie_storage::{
-    SavedConnection, delete_password, save_connections, store_password, store_ssh_passphrase, store_ssh_password,
-};
+use bookie_storage::SavedConnection;
 
-use super::ssh_section::{SshInputs, SshSecretToStore, SshSection};
+use super::ssh_section::{SshInputs, SshSection};
 use crate::services::connection_form::{ConnectFormState, socket_path_is_absolute};
 use crate::services::connection_service;
 use crate::services::database_service::ReconnectParams;
@@ -94,6 +92,7 @@ mod controls;
 mod entry_activation;
 mod form;
 mod identity;
+mod persist;
 mod prefill;
 mod socket_endpoint;
 
@@ -106,7 +105,7 @@ pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
 use identity::{ConnectionIdentity, find_existing, preserve_attached_databases, saved_connection_name};
-pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
+pub use prefill::{ConnectionPrefill, load_prefill};
 
 pub struct ConnectDialogInit {
     pub registry: Arc<DriverRegistry>,
@@ -317,6 +316,9 @@ impl Component for ConnectDialog {
         ssh.auth_combo.connect_selected_notify(move |_| {
             sender_for_auth.input(ConnectDialogInput::SshAuthChanged);
         });
+        let sender_for_jumps = sender.clone();
+        ssh.jumps
+            .connect_changed(move || sender_for_jumps.input(ConnectDialogInput::SshToggled));
 
         for entry in [&host, &socket_dir, &database, &username] {
             let s = sender.clone();
@@ -658,7 +660,7 @@ impl Component for ConnectDialog {
                     shutdown
                         .register(async move {
                             let control = crate::services::operation_control::bounded(timeout_secs);
-                            let ssh = ssh_inputs.as_ref().map(SshInputs::route).transpose();
+                            let ssh = SshInputs::optional_route(ssh_inputs.as_ref(), bound_id).await;
                             let result = match ssh {
                                 Err(error) => Err(error),
                                 Ok(ssh) => {
@@ -1042,7 +1044,7 @@ async fn run_connect(
     } = request;
     let mut opts = opts;
     let stored_password: SecretString = opts.password.clone();
-    let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
+    let ssh_for_establish = SshInputs::optional_route(ssh.as_ref(), bound_id).await?;
     let opts_clone = opts.clone();
 
     let identity = ConnectionIdentity {
@@ -1137,59 +1139,14 @@ async fn run_connect(
         tls_strict_encryption: opts_clone.tls.strict_encryption,
     };
 
-    save_one(&saved).await.map_err(|e| format!("save: {e}"))?;
-    match saved.auth_mode {
-        AuthMode::Password if stored_password.expose_secret().is_empty() => {
-            if let Err(error) = delete_password(saved.id).await {
-                rollback_saved_connection(existing.as_ref(), saved.id)
-                    .await
-                    .map_err(|rollback_error| {
-                        format!("delete obsolete stored password: {error}; restore saved connection: {rollback_error}")
-                    })?;
-                return Err(format!("delete obsolete stored password: {error}").into());
-            }
-        }
-        AuthMode::Password => {
-            if let Err(error) = store_password(saved.id, stored_password.expose_secret(), &label).await {
-                rollback_saved_connection(existing.as_ref(), saved.id)
-                    .await
-                    .map_err(|rollback_error| {
-                        format!("store password: {error}; restore saved connection: {rollback_error}")
-                    })?;
-                return Err(format!("store password: {error}").into());
-            }
-        }
-        AuthMode::Kerberos
-            if existing
-                .as_ref()
-                .is_some_and(|connection| connection.auth_mode == AuthMode::Password) =>
-        {
-            if let Err(error) = delete_password(saved.id).await {
-                rollback_saved_connection(existing.as_ref(), saved.id)
-                    .await
-                    .map_err(|rollback_error| {
-                        format!("delete stored password: {error}; restore saved connection: {rollback_error}")
-                    })?;
-                return Err(format!("delete stored password: {error}").into());
-            }
-        }
-        AuthMode::Kerberos => {}
-    }
-    if let Some(s) = &ssh {
-        match &s.secret_to_store {
-            SshSecretToStore::Password(p) => {
-                store_ssh_password(saved.id, p.expose_secret(), &label).await.map_err(|error| {
-                    format!("Connection settings were saved, but the SSH password was not saved: {error}. Re-enter the SSH password and connect again.")
-                })?;
-            }
-            SshSecretToStore::Passphrase(p) => {
-                store_ssh_passphrase(saved.id, p.expose_secret(), &label).await.map_err(|error| {
-                    format!("Connection settings were saved, but the SSH key passphrase was not saved: {error}. Re-enter the passphrase and connect again.")
-                })?;
-            }
-            SshSecretToStore::None => {}
-        }
-    }
+    persist::persist_connection(persist::PersistRequest {
+        saved: &saved,
+        existing: existing.as_ref(),
+        stored_password: &stored_password,
+        label: &label,
+        ssh: ssh.as_ref(),
+    })
+    .await?;
 
     let params = ReconnectParams {
         driver: driver.clone(),
@@ -1215,18 +1172,4 @@ async fn run_connect(
         tunnel,
         params,
     )))
-}
-
-async fn save_one(connection: &SavedConnection) -> Result<(), bookie_storage::StorageError> {
-    save_connections(std::slice::from_ref(connection)).await
-}
-
-async fn rollback_saved_connection(
-    previous: Option<&SavedConnection>,
-    id: Uuid,
-) -> Result<(), bookie_storage::StorageError> {
-    match previous {
-        Some(connection) => save_one(connection).await,
-        None => bookie_storage::delete_connection(id).await,
-    }
 }
