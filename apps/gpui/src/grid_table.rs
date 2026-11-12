@@ -82,7 +82,16 @@ impl TableDelegate for GridDelegate {
             Some((row, column, view)) if *row == row_ix && *column == col_ix => div().flex_1().child(view.clone()),
             _ => {
                 let (text, right) = self.label_of(row_ix, col_ix);
-                div().w_full().flex().when(right, |cell| cell.justify_end()).child(text)
+                div().w_full().flex().child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .when(right, |cell| cell.text_right())
+                        .child(text),
+                )
             }
         }
     }
@@ -150,7 +159,7 @@ impl GridView {
         }
     }
 
-    pub(crate) fn sync_table(&self, cx: &mut Context<Self>) {
+    pub(crate) fn sync_table(&self, available_width: f32, cx: &mut Context<Self>) {
         let columns: Vec<(String, f32)> = self
             .source
             .columns()
@@ -163,13 +172,14 @@ impl GridView {
         } else {
             numeric
         };
-        let columns = if self.compare.is_some() {
+        let mut columns = if self.compare.is_some() {
             std::iter::once(("Change".to_string(), COMPARE_CHANGE_WIDTH))
                 .chain(columns)
                 .collect()
         } else {
             columns
         };
+        fill_last_column(&mut columns, available_width);
         let map = self.row_map();
         let editor = self.editing.as_ref().and_then(|editing| {
             let dataset = self.dataset_index_of(editing.row)?.checked_sub(map.base)?;
@@ -210,6 +220,17 @@ impl GridView {
 }
 
 const COMPARE_CHANGE_WIDTH: f32 = 70.0;
+
+fn fill_last_column(columns: &mut [(String, f32)], available_width: f32) {
+    let Some(last) = columns.len().checked_sub(1) else {
+        return;
+    };
+    if !available_width.is_finite() || available_width <= 0.0 {
+        return;
+    }
+    let preceding_width: f32 = columns[..last].iter().map(|(_, width)| width).sum();
+    columns[last].1 = columns[last].1.max((available_width - preceding_width).max(0.0));
+}
 
 fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
     cells
@@ -436,5 +457,20 @@ mod tests {
         .map(|(_, right)| right)
         .collect();
         assert_eq!(flags, vec![true, true, false]);
+    }
+
+    #[test]
+    fn the_last_column_fills_only_unused_viewport_space() {
+        let mut columns = vec![("id".into(), 200.0), ("label".into(), 100.0)];
+        fill_last_column(&mut columns, 520.0);
+        assert_eq!(columns, vec![("id".into(), 200.0), ("label".into(), 320.0)]);
+
+        fill_last_column(&mut columns, 250.0);
+        assert_eq!(columns, vec![("id".into(), 200.0), ("label".into(), 320.0)]);
+    }
+
+    #[test]
+    fn an_empty_result_has_no_column_to_expand() {
+        fill_last_column(&mut [], 520.0);
     }
 }

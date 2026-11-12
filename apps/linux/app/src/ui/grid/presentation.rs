@@ -8,6 +8,7 @@ pub(super) fn column_is_editable(column: &ColumnInfo) -> bool {
         && !column.is_generated
         && !column.is_auto_increment
         && !is_bytes_type(&column.data_type)
+        && !column.data_type.eq_ignore_ascii_case("udt")
         && !column.data_type.eq_ignore_ascii_case("mixed")
 }
 

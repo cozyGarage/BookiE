@@ -1,20 +1,3 @@
-//! Add-Index and Add-Foreign-Key form dialogs for the Structure tab.
-//!
-//! Split out of `structure_tab.rs` so that file can stay focused on
-//! the SimpleComponent itself. Both dialogs follow the same skeleton
-//! (`build_form_dialog`): an `adw::Dialog` carrying a custom HeaderBar
-//! with Cancel + suggested-action buttons and a vertically-scrolling
-//! content box. Per HIG, AlertDialog is for confirmation prompts; data
-//! entry forms belong on AdwDialog with explicit headerbar buttons.
-//!
-//! Form fields use AdwEntryRow / AdwSwitchRow / AdwComboRow inside an
-//! AdwPreferencesGroup — the same pattern GNOME Settings uses for
-//! every "Add account / Add network / Add printer" dialog. Raw
-//! GtkEntry + sibling labels was the quick-MVP layout but it doesn't
-//! pick up the rounded-corner / row-separator styling and breaks
-//! typing flow (the title float of AdwEntryRow doubles as the
-//! placeholder, halving vertical space).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -26,21 +9,8 @@ use bookie_core::{ForeignKeyInfo, IndexInfo};
 
 use super::structure_tab::{StructureTab, StructureTabInput, StructureTabOutput};
 
-/// `(column name, checkbox)` pairs, shared between the dialog body
-/// and the submit handler so the latter can collect which columns the
-/// user ticked. Pulled out as an alias so `build_column_checklist`'s
-/// return type stays under clippy's complexity threshold.
 type ColumnChecks = Rc<RefCell<Vec<(String, gtk::CheckButton)>>>;
 
-/// Build the standard form-dialog skeleton: AdwDialog with an
-/// AdwToolbarView, a HeaderBar carrying Cancel + suggested-action
-/// submit buttons, and a vertically-scrolling content box. Returned
-/// `(dialog, content, submit_btn)` lets the caller append form
-/// widgets to `content` and observe `submit_btn` for the Add action.
-///
-/// `submit_btn` is set as the dialog's default widget so Enter-key
-/// activation in any AdwEntryRow inside `content` submits the form
-/// (matches GNOME Settings's Add-account-style dialogs).
 fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box, gtk::Button) {
     let dialog = adw::Dialog::builder()
         .title(title)
@@ -77,8 +47,7 @@ fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box,
     toolbar_view.add_top_bar(&header);
     toolbar_view.set_content(Some(&scroller));
     dialog.set_child(Some(&toolbar_view));
-    // Enter inside any AdwEntryRow descendant fires the default widget.
-    // Without this the Add button only responds to mouse / Tab+Space.
+    // Keep Enter in an AdwEntryRow on the default Add action.
     dialog.set_default_widget(Some(&submit_btn));
 
     let dialog_for_cancel = dialog.downgrade();
@@ -92,22 +61,12 @@ fn build_form_dialog(title: &str, submit_label: &str) -> (adw::Dialog, gtk::Box,
     (dialog, content, submit_btn)
 }
 
-/// Build a section header label sized as a small caption — used
-/// above sub-groupings inside form dialogs. AdwPreferencesGroup
-/// already handles its own header, so this is for the "Columns"
-/// label that sits above the column checklist (which is itself a
-/// boxed-list, not a PreferencesGroup).
 fn section_label(title: &str) -> gtk::Label {
     let label = gtk::Label::builder().label(title).xalign(0.0).build();
     label.add_css_class("heading");
     label
 }
 
-/// Build a boxed-list `ListBox` of `AdwActionRow` + `CheckButton` —
-/// one per draft column — for picking columns inside a form dialog.
-/// Returns the list (so the caller can `body.append` it) plus the
-/// shared `Rc` of name/check pairs so the submit handler can extract
-/// which columns the user ticked.
 fn build_column_checklist(columns: &[DraftColumn]) -> (gtk::ListBox, ColumnChecks) {
     let list = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
     list.add_css_class("boxed-list");
@@ -125,9 +84,7 @@ fn build_column_checklist(columns: &[DraftColumn]) -> (gtk::ListBox, ColumnCheck
 }
 
 fn index_detail_group() -> (adw::PreferencesGroup, adw::EntryRow, adw::SwitchRow) {
-    // Name + Unique inside one AdwPreferencesGroup. AdwEntryRow's
-    // title slot doubles as the placeholder when empty (floats up
-    // when filled), so no separate "Name" label is needed.
+    // AdwEntryRow floats its title when text is entered, so do not add a second name label.
     let detail_group = adw::PreferencesGroup::builder().build();
     let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
     detail_group.add(&name_row);
@@ -165,8 +122,6 @@ pub(super) fn present_index_dialog(
         };
         let name = name_row.text().to_string();
         if name.trim().is_empty() {
-            // Toast instead of silent no-op so the user knows why
-            // their click didn't land.
             let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
                 "Index name is required."
             )));
@@ -210,8 +165,6 @@ pub(super) fn present_fk_dialog(
         &bookie_app_services::tr!("Add"),
     );
 
-    // Name in its own AdwPreferencesGroup at the top — matches the
-    // shape of the column-edit drawer + every other GNOME form.
     let name_group = adw::PreferencesGroup::builder().build();
     let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
     name_group.add(&name_row);
@@ -221,9 +174,7 @@ pub(super) fn present_fk_dialog(
     let (columns_list, column_checks) = build_column_checklist(columns);
     body.append(&columns_list);
 
-    // Reference target + ON DELETE / ON UPDATE in a second group.
-    // Reference columns stay free-text — wiring up an async fetch of
-    // the referenced table's columns is out of scope for an MVP.
+    // Reference columns stay free-text; resolving them requires an asynchronous catalog read.
     let ref_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("References"))
         .build();
@@ -291,9 +242,6 @@ pub(super) fn present_fk_dialog(
             )));
             return;
         }
-        // Source and reference column counts must match — `(a, b) → (x)`
-        // is structurally invalid SQL. Drivers reject it, but with an
-        // opaque error after Save instead of an inline guard.
         if ref_cols.len() != cols.len() {
             let _ = sender_for_resp.output(StructureTabOutput::ShowToast(bookie_app_services::tr!(
                 "Source and reference column counts must match."
@@ -304,11 +252,7 @@ pub(super) fn present_fk_dialog(
             Some((s, t)) => (Some(s.trim().to_string()), t.trim().to_string()),
             None => (None, ref_table),
         };
-        // Preserve the user's explicit "NO ACTION" choice as
-        // `Some("NO ACTION")`. Reserve `None` for the
-        // driver-returned-unknown case so the SQL emitter can choose
-        // sensibly per dialect (MySQL implicit RESTRICT vs Postgres
-        // implicit NO ACTION).
+        // Keep an explicit NO ACTION distinct from a driver-unknown action.
         let action_at = |idx: u32| -> Option<String> { fk_actions.get(idx as usize).map(|s| (*s).to_string()) };
         sender_for_resp.input(StructureTabInput::AddForeignKey(ForeignKeyInfo {
             name,
