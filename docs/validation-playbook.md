@@ -216,7 +216,7 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/test_ci_workflow.py` in the same change.
 
-Forgejo branch pushes use the pull-request regression profile. The Debian floor package build and scenarios run only on `main`, scheduled runs and manual dispatches, matching the GitHub pull-request exclusion. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
+`scripts/forgejo-gate.sh` ensures the requested commit exists on its gate ref, then dispatches `ci.yml` for that exact SHA. The workflow's push trigger is limited to `main`, so a standalone gate ref must use `workflow_dispatch`. The Debian floor package build and scenarios run on `main`, scheduled runs and manual dispatches. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
 
 ### Pull request hygiene checks
 
