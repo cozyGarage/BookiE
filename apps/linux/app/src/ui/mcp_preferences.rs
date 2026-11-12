@@ -26,6 +26,7 @@ pub fn build_page(
 
     let name_for_issue = issue.name_row.clone();
     let scope_for_issue = issue.scope_combo.clone();
+    let tools_for_issue = issue.tool_checks.clone();
     let tokens_for_issue = tokens_group.clone();
     let page_for_dialog = page.clone();
     issue.button.connect_clicked(move |_| {
@@ -37,25 +38,30 @@ pub fn build_page(
             1 => TokenPermissions::ReadWrite,
             _ => TokenPermissions::ReadOnly,
         };
+        let tool_allowlist = selected_tools(&tools_for_issue);
         glib::spawn_future_local(issue_token_flow(
             page_for_dialog.clone(),
             tokens_for_issue.clone(),
             mcp_bridge.clone(),
             name,
             permissions,
+            tool_allowlist,
         ));
     });
 
     page.add(&status_group);
     page.add(&issue.group);
+    page.add(&issue.tools_group);
     page.add(&tokens_group);
     page
 }
 
 struct IssueGroup {
     group: adw::PreferencesGroup,
+    tools_group: adw::PreferencesGroup,
     name_row: adw::EntryRow,
     scope_combo: adw::ComboRow,
+    tool_checks: Vec<(String, gtk::CheckButton)>,
     button: gtk::Button,
 }
 
@@ -107,6 +113,25 @@ fn issue_group() -> IssueGroup {
     scope_combo.set_model(Some(&scope_model));
     scope_combo.set_selected(0);
 
+    let tool_group = adw::PreferencesGroup::builder()
+        .title(tr!("Tool access"))
+        .description(tr!(
+            "Select tools to restrict this token. Leave all unchecked to allow tools permitted by its scope."
+        ))
+        .build();
+    let tool_checks = bookie_mcp::TOOL_NAMES
+        .iter()
+        .map(|tool| {
+            let row = adw::ActionRow::builder().use_markup(false).title(*tool).build();
+            let check = gtk::CheckButton::new();
+            check.set_valign(gtk::Align::Center);
+            row.add_suffix(&check);
+            row.set_activatable_widget(Some(&check));
+            tool_group.add(&row);
+            ((*tool).to_string(), check)
+        })
+        .collect();
+
     let button = gtk::Button::builder()
         .label(tr!("Issue token"))
         .valign(gtk::Align::Center)
@@ -120,8 +145,10 @@ fn issue_group() -> IssueGroup {
     group.add(&issue_row);
     IssueGroup {
         group,
+        tools_group: tool_group,
         name_row,
         scope_combo,
+        tool_checks,
         button,
     }
 }
@@ -139,6 +166,7 @@ async fn issue_token_flow(
     bridge: Option<Arc<McpBridge>>,
     name: String,
     permissions: TokenPermissions,
+    tool_allowlist: Option<Vec<String>>,
 ) {
     let allowlist = match bookie_storage::load_connections().await {
         Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
@@ -156,7 +184,7 @@ async fn issue_token_flow(
         );
         return;
     }
-    match mcp_service::issue_token(bridge.as_ref(), name, permissions, allowlist).await {
+    match mcp_service::issue_token(bridge.as_ref(), name, permissions, allowlist, tool_allowlist).await {
         Ok(issued) => {
             show_issued_token(&parent, &issued.plaintext, issued.keyring_saved);
             clear_and_refresh(&tokens_group, bridge.clone());
@@ -193,9 +221,10 @@ fn refresh_token_list(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpB
             .use_markup(false)
             .title(&token.name)
             .subtitle(format!(
-                "{} · {}",
+                "{} · {} · {}",
                 permissions_label(token.permissions),
-                token.created_at.format("%Y-%m-%d")
+                token.created_at.format("%Y-%m-%d"),
+                token_tools_label(token.tool_allowlist.as_deref())
             ))
             .build();
         let revoke = gtk::Button::builder()
@@ -218,6 +247,23 @@ fn refresh_token_list(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpB
         });
         row.add_suffix(&revoke);
         group.add(&row);
+    }
+}
+
+fn selected_tools(checks: &[(String, gtk::CheckButton)]) -> Option<Vec<String>> {
+    let selected = checks
+        .iter()
+        .filter(|(_, check)| check.is_active())
+        .map(|(name, _)| name.clone())
+        .collect::<Vec<_>>();
+    (!selected.is_empty()).then_some(selected)
+}
+
+fn token_tools_label(allowlist: Option<&[String]>) -> String {
+    match allowlist {
+        Some([]) => tr!("No tools allowed"),
+        Some(tools) => format!("{}: {}", tr!("Selected tools"), tools.join(", ")),
+        None => tr!("All tools allowed by scope"),
     }
 }
 
@@ -278,6 +324,20 @@ fn issued_token_message(plaintext: &str, keyring_saved: bool) -> String {
 #[cfg(test)]
 mod copy_tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn tool_restriction_is_optional_and_uses_only_selected_tools() {
+        adw::init().unwrap();
+        let issue = issue_group();
+
+        assert_eq!(issue.tool_checks.len(), bookie_mcp::TOOL_NAMES.len());
+        assert_eq!(selected_tools(&issue.tool_checks), None);
+
+        let (tool, check) = &issue.tool_checks[0];
+        check.set_active(true);
+        assert_eq!(selected_tools(&issue.tool_checks), Some(vec![tool.clone()]));
+    }
 
     #[test]
     #[ignore = "requires an isolated GTK display"]

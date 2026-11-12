@@ -67,6 +67,11 @@ pub enum SqlEditorInput {
     Stream(streaming::Input),
     FilterResults(Box<result_tools::FilterRequest>),
     FilterFinished(Box<result_tools::FilterDone>),
+    SetCellsPlanned {
+        result: Result<bookie_app_services::set_cells::SetCellsPlan, bookie_app_services::set_cells::SetCellsError>,
+        generation: u64,
+        run: u64,
+    },
     OpenCompare,
     CompareResults(Box<result_compare::CompareRequest>),
     CompareFinished(Box<result_compare::CompareDone>),

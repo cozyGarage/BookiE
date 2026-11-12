@@ -30,6 +30,20 @@ impl ColumnSelection {
         self.anchor = Some(anchor);
     }
 
+    pub fn extend_to_in_order(&mut self, column: usize, order: &[usize]) {
+        let anchor = self.anchor.unwrap_or(column);
+        let Some(end) = order.iter().position(|candidate| *candidate == column) else {
+            return;
+        };
+        let Some(start) = order.iter().position(|candidate| *candidate == anchor) else {
+            self.select_only(column);
+            return;
+        };
+        let (start, end) = (start.min(end), start.max(end));
+        self.columns = order[start..=end].iter().copied().collect();
+        self.anchor = Some(anchor);
+    }
+
     pub fn clear(&mut self) {
         self.columns.clear();
         self.anchor = None;
@@ -45,6 +59,10 @@ impl ColumnSelection {
 
     pub fn columns(&self) -> Vec<usize> {
         self.columns.iter().copied().collect()
+    }
+
+    pub fn columns_in_order(&self, order: &[usize]) -> Vec<usize> {
+        order.iter().copied().filter(|column| self.contains(*column)).collect()
     }
 
     pub fn retain_below(&mut self, width: usize) {
@@ -143,6 +161,26 @@ mod tests {
         assert_eq!(selection.columns(), vec![2, 3, 4]);
         selection.extend_to(5);
         assert_eq!(selection.columns(), vec![4, 5]);
+    }
+
+    #[test]
+    fn extending_uses_display_order() {
+        let mut selection = ColumnSelection::default();
+        selection.select_only(4);
+        selection.extend_to_in_order(2, &[4, 1, 2, 3]);
+        assert_eq!(selection.columns_in_order(&[4, 1, 2, 3]), [4, 1, 2]);
+        selection.extend_to_in_order(3, &[4, 1, 2, 3]);
+        assert_eq!(selection.columns_in_order(&[4, 1, 2, 3]), [4, 1, 2, 3]);
+    }
+
+    #[test]
+    fn extending_resets_a_hidden_anchor_and_ignores_a_hidden_target() {
+        let mut selection = ColumnSelection::default();
+        selection.select_only(4);
+        selection.extend_to_in_order(2, &[2, 3]);
+        assert_eq!(selection.columns(), [2]);
+        selection.extend_to_in_order(4, &[2, 3]);
+        assert_eq!(selection.columns(), [2]);
     }
 
     #[test]

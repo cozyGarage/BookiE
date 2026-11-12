@@ -838,6 +838,11 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::Stream(input) => self.on_stream_input(input, &sender),
             SqlEditorInput::FilterResults(request) => self.on_filter_results(*request, &sender),
             SqlEditorInput::FilterFinished(done) => self.on_filter_finished(*done, &sender),
+            SqlEditorInput::SetCellsPlanned {
+                result,
+                generation,
+                run,
+            } => self.finish_set_cells(result, generation, run, &sender),
             SqlEditorInput::OpenCompare => self.on_open_compare(&sender),
             SqlEditorInput::CompareResults(request) => self.on_compare_results(*request, &sender),
             SqlEditorInput::CompareFinished(done) => self.on_compare_finished(*done, &sender),
