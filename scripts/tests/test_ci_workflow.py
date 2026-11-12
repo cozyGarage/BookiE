@@ -321,6 +321,9 @@ class CiWorkflowTests(unittest.TestCase):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         github_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        github_release_job = re.search(
+            r"(?ms)^  postgres-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github
+        ).group(1)
         forgejo_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
         forgejo_server_jobs = "\n".join(
             re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
@@ -341,6 +344,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
         self.assertIn("Build Linux / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
         self.assertIn("lab-ci / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
+        self.assertNotIn("gtk-mysql-approval", github_release_job)
         for layer in ("gtk-clickhouse", "gtk-mongodb"):
             with self.subTest(layer=layer):
                 self.assertIn("Build Linux / gtk-server", layers[layer]["hosted_gate"])
@@ -1274,12 +1278,18 @@ class CiWorkflowTests(unittest.TestCase):
         gate = re.search(r"(?ms)^  regression-gate:\n(.*?)(?=\Z)", forgejo).group(1)
         self.assertRegex(gate, r"(?m)^      - b4-rollback$")
 
-    def test_mysql_approval_dialog_runs_in_hosted_installed_gtk_acceptance(self):
+    def test_mysql_approval_dialog_runs_once_in_the_gtk_server_layer(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        acceptance = workflow.split("  postgres-release:\n", 1)[1].split("  regression-gate:\n", 1)[0]
-        self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', acceptance)
-        self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", acceptance)
-        self.assertIn("python3 scripts/run-test-layer.py gtk-mysql-approval", acceptance)
+        release_job = re.search(
+            r"(?ms)^  postgres-release:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow
+        ).group(1)
+        gtk_server_job = re.search(
+            r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow
+        ).group(1)
+        self.assertIn('install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"', release_job)
+        self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", release_job)
+        self.assertIn("mysql-approval", gtk_server_job)
+        self.assertNotIn("gtk-mysql-approval", release_job)
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         self.assertIn('if [[ "$BOOKIE_TEST_LAYER" == driver-core ]]', integration)
         self.assertIn("python3 scripts/run-test-layer.py pg-dump", integration)

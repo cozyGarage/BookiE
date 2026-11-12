@@ -912,7 +912,6 @@ jobs:
               cargo build --locked --release -p bookie-app
               install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"
               python3 scripts/run-test-layer.py postgres-release
-              python3 scripts/run-test-layer.py gtk-mysql-approval
               if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
                 cargo build --locked --release -p bookie-agentd -p bookie-ssh --bin bookie-askpass
                 DEB_OUT="$GITHUB_WORKSPACE/floor-package" BOOKIE_BUILD_PROFILE=release DEB_SKIP_BUILD=1 \
