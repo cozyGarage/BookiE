@@ -410,10 +410,10 @@ jobs:
           find "$RUNNER_TEMP/bookie-direct-bundle/tests" "$RUNNER_TEMP/bookie-direct-bundle/bin" -type f -exec chmod u+x {} +
           printf 'BOOKIE_UNIT_BUNDLE=%s/bookie-unit-bundle\nBOOKIE_DIRECT_BUNDLE=%s/bookie-direct-bundle\nBOOKIE_REQUIRE_PREBUILT=1\nBOOKIE_SOURCE_COMMIT=%s\nBOOKIE_NEXTEST_PROFILE=ci\nGSETTINGS_SCHEMA_DIR=%s/bookie-unit-bundle/schemas\n' \
             "$RUNNER_TEMP" "$RUNNER_TEMP" "$BOOKIE_SOURCE_COMMIT" "$RUNNER_TEMP" >> "$GITHUB_ENV"
-      - name: Fetch pull request base for changed-path tests
-        if: github.event_name == 'pull_request'
+      - name: Fetch comparison base for changed-path tests
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
-          BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha }}
+          BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: git fetch --no-tags --depth=1 origin "$BOOKIE_CHANGE_BASE"
       - name: Focused tests for changed Data-lane value paths
         env:

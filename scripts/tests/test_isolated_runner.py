@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 NAME = json.loads((ROOT / "isolated-tests.json").read_text())["gtk"][0][2]
@@ -54,9 +55,20 @@ class IsolatedRunnerTests(unittest.TestCase):
                 "sys.exit(int(os.environ['FIXTURE_STATUS']))\n"
             )
             cargo.chmod(0o755)
+            environment = os.environ.copy()
+            for key in ("BOOKIE_REQUIRE_PREBUILT", "BOOKIE_TEST_BUNDLE", "BOOKIE_SOURCE_COMMIT", "BOOKIE_EXPECTED_GROUP"):
+                environment.pop(key, None)
+            environment.update(
+                {
+                    "PATH": directory,
+                    "FIXTURE_OUTPUT": output,
+                    "FIXTURE_STATUS": str(status),
+                    "FIXTURE_DIAGNOSTIC": diagnostic,
+                }
+            )
             return subprocess.run(
                 ["/usr/bin/python3", str(ROOT / "run-isolated-tests.py"), "gtk"],
-                env=os.environ | {"PATH": directory, "FIXTURE_OUTPUT": output, "FIXTURE_STATUS": str(status), "FIXTURE_DIAGNOSTIC": diagnostic},
+                env=environment,
                 capture_output=True, text=True,
             )
 
@@ -88,6 +100,14 @@ class IsolatedRunnerTests(unittest.TestCase):
         result = self.run_fixture("test __MATCH__ ... ok\n" + SUMMARY, diagnostic="test result: FAILED. diagnostic only")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("diagnostic only", result.stderr)
+
+    def test_unbundled_runner_fixtures_ignore_prebuilt_ci_environment(self):
+        with patch.dict(
+            os.environ,
+            {"BOOKIE_REQUIRE_PREBUILT": "1", "BOOKIE_TEST_BUNDLE": "/missing-test-bundle"},
+        ):
+            result = self.run_fixture("test __MATCH__ ... ok\n" + SUMMARY)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
