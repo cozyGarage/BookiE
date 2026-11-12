@@ -694,6 +694,15 @@ fn empty_grid_menu(row_mutations_allowed: bool) -> gio::Menu {
     menu
 }
 
+fn set_cells_item() -> gio::MenuItem {
+    let item = gio::MenuItem::new(
+        Some(&bookie_app_services::tr!("Set Cells to Value…")),
+        Some("cell.set-cells"),
+    );
+    item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    item
+}
+
 fn export_loaded_item() -> gio::MenuItem {
     let item = gio::MenuItem::new(
         Some(&bookie_app_services::tr!("Export All Loaded Rows…")),
@@ -851,12 +860,7 @@ fn build_menu(
             Some("cell.duplicate-row"),
         );
         actions.append(Some(&bookie_app_services::tr!("Set to NULL")), Some("cell.set-null"));
-        let set_cells = gio::MenuItem::new(
-            Some(&bookie_app_services::tr!("Set Cells to Value…")),
-            Some("cell.set-cells"),
-        );
-        set_cells.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
-        actions.append_item(&set_cells);
+        actions.append_item(&set_cells_item());
         actions.append(
             Some(&bookie_app_services::tr!("Set to Default")),
             Some("cell.set-default"),

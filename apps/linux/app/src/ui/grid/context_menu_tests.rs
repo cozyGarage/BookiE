@@ -26,6 +26,8 @@ fn reference_menu_does_not_navigate_from_a_rebound_cell() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cell = gtk::CheckButton::new();
@@ -102,6 +104,8 @@ fn filter_menu_does_not_use_a_rebound_cell() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cell = gtk::CheckButton::new();
@@ -190,6 +194,8 @@ fn inline_edit_does_not_open_a_rebound_cell() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cell = crate::ui::cell_editor::CellEditor::new();
@@ -283,6 +289,8 @@ fn full_value_edit_does_not_fetch_a_rebound_cell() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cell = gtk::CheckButton::new();
@@ -357,6 +365,8 @@ fn view_value_does_not_fetch_a_rebound_cell() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cell = gtk::CheckButton::new();
@@ -400,6 +410,8 @@ fn delete_action_preserves_the_stored_row_selected_when_menu_opened() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cell = gtk::Label::new(None);
@@ -455,6 +467,8 @@ fn delete_action_carries_the_selected_draft_identity() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cell = gtk::Label::new(None);
@@ -531,6 +545,8 @@ fn virtual_grid_disables_snapshot_export() {
             local_result_view: None,
             whole_result_filter: false,
             snapshot_export: false,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     view.activate_action("cell.export", None).unwrap();
@@ -650,6 +666,8 @@ fn whole_result_filter_installs_both_cell_actions() {
         local_result_view: Some(local.clone()),
         whole_result_filter,
         snapshot_export: false,
+        column_selection: Default::default(),
+        set_cells_enabled: false,
     };
     install_grid_context_menus(&view, sender.clone(), &[], false, "postgres".into(), options(false));
     assert!(view.activate_action("cell.whole-result-equals", None).is_err());
@@ -895,6 +913,8 @@ fn keyboard_menu_fixture() -> (gtk::Window, gtk::Label, GridMenus, LocalResultVi
             local_result_view: Some(local.clone()),
             whole_result_filter: false,
             snapshot_export: true,
+            column_selection: Default::default(),
+            set_cells_enabled: false,
         },
     );
     let cells = Rc::new(std::cell::RefCell::new(Vec::new()));

@@ -91,7 +91,7 @@ impl BrowseTab {
     fn in_list_column(&self) -> usize {
         self.current_column_view
             .as_ref()
-            .and_then(|view| crate::ui::grid::last_clicked_cell(view))
+            .and_then(crate::ui::grid::last_clicked_cell)
             .map_or(0, |(_, column, _)| column)
     }
 

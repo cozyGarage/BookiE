@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn statistics_can_be_limited_to_chosen_columns() {
-        let rows = vec![vec![Value::Int(1), Value::Int(10)], vec![Value::Int(2), Value::Int(20)]];
+        let rows = [vec![Value::Int(1), Value::Int(10)], vec![Value::Int(2), Value::Int(20)]];
         let stats = {
             let rows = rows
                 .iter()
