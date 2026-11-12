@@ -880,6 +880,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::dispatch_tests::large_sql_buffers_pause_syntax_highlighting_and_resume_after_shrinking"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::dispatch_tests::error_navigation_tests::a_new_run_disables_the_previous_error_navigation_action"
     ],
     [
