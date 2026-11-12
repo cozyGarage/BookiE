@@ -116,9 +116,26 @@ pub(in crate::ui::browse_tab) fn column_stats(
     columns: &[ColumnInfo],
     rows: &[crate::ui::row_object::RowObject],
 ) -> Vec<ColumnStats> {
+    column_stats_where(columns, rows, |_| true)
+}
+
+pub(in crate::ui::browse_tab) fn column_stats_in(
+    columns: &[ColumnInfo],
+    rows: &[crate::ui::row_object::RowObject],
+    only: &[usize],
+) -> Vec<ColumnStats> {
+    column_stats_where(columns, rows, |index| only.contains(&index))
+}
+
+fn column_stats_where(
+    columns: &[ColumnInfo],
+    rows: &[crate::ui::row_object::RowObject],
+    wanted: impl Fn(usize) -> bool,
+) -> Vec<ColumnStats> {
     columns
         .iter()
         .enumerate()
+        .filter(|(index, _)| wanted(*index))
         .filter_map(|(index, column)| {
             let mut total = None;
             for row in rows {
@@ -214,6 +231,22 @@ mod tests {
                 average: "2.5".into()
             }]
         );
+    }
+
+    #[test]
+    fn statistics_can_be_limited_to_chosen_columns() {
+        let rows = [vec![Value::Int(1), Value::Int(10)], vec![Value::Int(2), Value::Int(20)]];
+        let stats = {
+            let rows = rows
+                .iter()
+                .cloned()
+                .map(crate::ui::row_object::RowObject::new)
+                .collect::<Vec<_>>();
+            super::column_stats_in(&[column("a"), column("b")], &rows, &[1])
+        };
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].column, "b");
+        assert_eq!(stats[0].sum, "30");
     }
 
     #[test]

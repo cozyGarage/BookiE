@@ -120,6 +120,7 @@ impl App {
         self.show_database_switcher(&driver_id, id, &sender);
         self.show_sidebar_for_new_connection();
         self.disconnect_action.set_enabled(true);
+        self.sync_health_report_action();
         self.table_search.set_text("");
         self.ensure_workspace_root(sender.clone());
         self.show_in_content_holder(&self.workspace_outer_stack);
@@ -236,6 +237,7 @@ impl App {
         self.clear_multi_session_state();
         self.persist_open_sessions(sender.clone());
         self.current_driver_id = None;
+        self.sync_health_report_action();
         self.read_only = false;
         self.read_only_badge.set_visible(false);
         self.databases_button.set_visible(false);

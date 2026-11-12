@@ -209,6 +209,9 @@ pub(super) fn build_column(
                 is_editable: column_is_editable,
             },
         );
+        if let Some(child) = item.child() {
+            super::column_select::apply_to_cell(&child, &tab_ctx_for_bind.column_selection, idx);
+        }
     });
 
     let visibility = tab_ctx.row_visibility.clone();
@@ -269,11 +272,12 @@ pub(super) fn build_column(
         .resizable(true)
         .expand(true)
         .build();
-    column.set_header_menu(Some(&header_details(
-        info,
-        tab_ctx.foreign_key_columns.contains(&info.name),
-        sort_enabled,
-    )));
+    let header_menu = header_details(info, tab_ctx.foreign_key_columns.contains(&info.name), sort_enabled);
+    header_menu.append_section(
+        None,
+        &super::column_select::header_section(idx, tab_ctx.set_cells_enabled && editable),
+    );
+    column.set_header_menu(Some(&header_menu));
     if sort_enabled {
         let dummy = gtk4::CustomSorter::new(|_, _| gtk4::Ordering::Equal);
         column.set_sorter(Some(&dummy));

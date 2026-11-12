@@ -38,6 +38,8 @@ fn a_driver_that_declares_nothing_claims_no_structure_metadata() {
     assert!(!capabilities.supports_explicit_auto_increment_values);
     assert!(capabilities.supports_browse_filters);
     assert!(!capabilities.supports_table_default_collation);
+    assert!(!driver.supports_table_health_report());
+    assert!(!capabilities.supports_table_health_report);
     assert_eq!(driver.default_database(), "");
     assert_eq!(driver.default_username(), "");
 }

@@ -342,7 +342,7 @@ impl BrowseTab {
         self.row_store()?.row_key_at(position, &self.pk_indices())
     }
 
-    fn row_count_loaded(&self) -> u32 {
+    pub(super) fn row_count_loaded(&self) -> u32 {
         self.current_selection
             .as_ref()
             .map_or(0, |selection| selection.n_items())

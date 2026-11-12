@@ -43,6 +43,9 @@ Navigation uses **First**, **Previous**, **Next**, and **Last**. Unsorted tables
 - **Filter and sort**: Press `Ctrl+F` to open the structured filter bar. The WHERE field, **Saved filters** menu, **Clear all**, and **Apply** share one row, with the rule editor available under disclosure. Save named filter presets per table. Right-click any cell to **Filter by This Value**. Click a column header to sort; click the same header again to reverse that key. Click another header to add a secondary local sort key on the loaded rows (the previous key becomes a tie-breaker). The active keys appear in order above the grid or on the browse pager; **Clear sort** (header menu or pager) removes them. Query-result sort stays local and does not re-run SQL.
 - **Foreign key jumps**: Right-click a foreign key cell and choose **Go to Referenced Row** to open the target table filtered to that specific record.
 - **Referencing rows**: Right-click a saved row in a table with detected incoming foreign keys and choose **Show Referencing Rows** to open matching child records with pre-populated filters. The action is unavailable for new draft rows; referenced values must be present and non-NULL.
+- **Select a column**: Choose **Select Column** in a column header menu, or press `Ctrl+Space` on a cell. **Add Column to Selection** and **Extend Selection to Column** build a multi-column selection. Selected columns are shaded, their headers are bold and underlined, and the status bar shows the column count with statistics. A column selection covers the loaded rows only. `Esc` or a click on a cell clears it, and so does loading another page.
+- **Copy a selection**: `Ctrl+C` and **Copy as** act on the selected columns over the loaded rows. The selection count in the status bar opens **Copy TSV**, **Copy CSV**, **Copy JSON** and **Copy IN list**; nothing is sent to the database.
+- **Set Cells to Value**: On an editable table, **Set Cells to Value…** (cell menu) or **Set Column to Value…** (column header menu) sets the selected rows, or the selected columns over the loaded rows, to one typed value or NULL. Key, generated and identity columns, NULL into a NOT NULL column and text that does not fit the column type are refused before anything is staged. The change is a pending edit and follows the normal Save path.
 - **Copy as formats**: Right-click a row selection and choose **Copy as** to copy complete selected rows as **CSV**, **CSV (with headers)**, **Markdown**, **Text Table** (aligned ASCII borders with right-aligned numeric cells), **JSON Lines** (newline-delimited JSON objects), or **Values List** (multi-row SQL tuples with engine-specific escaping).
 - **Paste rows**: Paste tab-separated spreadsheet data (`Ctrl+V`) directly into cells. Each value is type-checked before staging.
 - **ENUM & SET pickers**: Double-click an ENUM or SET cell to open a dedicated item selection popover with an **Apply** button.
@@ -196,6 +199,7 @@ Press Ctrl+? for the full list. The most used:
 | Ctrl+F | Filter rows |
 | Ctrl+Alt+F | Find in loaded rows |
 | Ctrl+Shift+J | Jump to a column |
+| Ctrl+Space | Select the column of the active grid cell |
 | Ctrl+Shift+L | Reveal the open table in the sidebar |
 | Ctrl+D | Save query as favorite |
 | Ctrl+Shift+B | Open saved queries (favorites) |

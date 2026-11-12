@@ -14,6 +14,12 @@ fn history_menu_section() -> gio::Menu {
         Some(&bookie_app_services::tr!("Server Activity")),
         Some("win.show-activity"),
     );
+    let health_item = gio::MenuItem::new(
+        Some(&bookie_app_services::tr!("Table and Index Health")),
+        Some("win.show-health-report"),
+    );
+    health_item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    history_section.append_item(&health_item);
     history_section.append(Some(&bookie_app_services::tr!("Audit Log")), Some("win.show-audit"));
     history_section.append(Some(&bookie_app_services::tr!("Catalog")), Some("win.show-catalog"));
     history_section.append(
@@ -89,6 +95,7 @@ pub(super) fn install_window_actions(
     crate::ui::leak_probe::install(&group);
     window.insert_action_group("win", Some(&group));
     disconnect_action.set_enabled(false);
+    window.action_set_enabled("win.show-health-report", false);
     tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
     disconnect_action
 }
@@ -127,6 +134,7 @@ fn add_window_input_actions(
         input_action!("new-window", AppMsg::NewWindow),
         input_action!("show-history", AppMsg::ShowHistory),
         input_action!("show-activity", AppMsg::ShowActivity),
+        input_action!("show-health-report", AppMsg::ShowHealthReport),
         input_action!("show-audit", AppMsg::ShowAuditLog),
         input_action!("show-catalog", AppMsg::ShowCatalog),
         input_action!("explain-query", AppMsg::ExplainActiveQuery),

@@ -910,6 +910,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "a_pinned_spooled_page_reloads_without_retaining_its_payload",
                 "evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest",
                 "closing_one_of_two_editors_releases_only_its_pinned_and_active_stream_pages",
+                "mcp_catalog_tools_follow_restricted_postgres_role_visibility",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

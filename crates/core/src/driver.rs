@@ -85,6 +85,7 @@ pub struct DriverCapabilities {
     pub supports_table_default_collation: bool,
     pub supports_snapshot_export: bool,
     pub supports_updatable_views: bool,
+    pub supports_table_health_report: bool,
 }
 
 #[async_trait]
@@ -127,6 +128,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_table_default_collation: self.supports_table_default_collation(),
             supports_snapshot_export: self.supports_snapshot_export(),
             supports_updatable_views: self.supports_updatable_views(),
+            supports_table_health_report: self.supports_table_health_report(),
         }
     }
 
@@ -259,6 +261,10 @@ pub trait DatabaseDriver: Send + Sync {
     }
 
     fn supports_sequence_restart(&self) -> bool {
+        false
+    }
+
+    fn supports_table_health_report(&self) -> bool {
         false
     }
 

@@ -1,4 +1,5 @@
-use bookie_app_services::driver_error_presentation::{DriverFailurePresentation, SaveFailure, TlsAdvice};
+use bookie_app_services::driver_error_presentation::{DriverFailurePresentation, SaveFailure, TlsFailureKind};
+use bookie_app_services::tls_failure::redacted_tls_detail;
 use bookie_core::DriverError;
 use bookie_core::sql_dialect::BuildSqlError;
 
@@ -45,17 +46,7 @@ fn driver_presentation_message(presentation: &DriverFailurePresentation) -> Stri
         )
         .replace("{path}", path),
         DriverFailurePresentation::AuthFailed => bookie_app_services::tr!("Username or password is wrong."),
-        DriverFailurePresentation::Tls {
-            detail,
-            advice: TlsAdvice::ServerDoesNotSupportTls,
-        } => bookie_app_services::tr!(
-            "TLS handshake failed: {detail}. The server does not appear to use TLS. For a local container, set TLS to Disabled."
-        )
-        .replace("{detail}", detail),
-        DriverFailurePresentation::Tls { detail, .. } => bookie_app_services::tr!(
-            "TLS handshake failed: {detail}. Check the server certificate, the certificate authority file and the TLS mode. Do not turn TLS off to get past a certificate error."
-        )
-        .replace("{detail}", detail),
+        DriverFailurePresentation::Tls { detail, kind } => tls_message(*kind, detail),
         DriverFailurePresentation::Query {
             message,
             sqlstate: Some(sqlstate),
@@ -94,6 +85,38 @@ fn driver_presentation_message(presentation: &DriverFailurePresentation) -> Stri
         .replace("{detail}", detail),
         DriverFailurePresentation::Save(failure) => save_failure_message(failure),
     }
+}
+
+fn tls_message(kind: TlsFailureKind, detail: &str) -> String {
+    let never_off = bookie_app_services::tr!("Do not turn TLS off or lower verification to get past this.");
+    let step = match kind {
+        TlsFailureKind::UnknownIssuer => bookie_app_services::tr!(
+            "The server's certificate is not trusted. Choose the certificate authority file that signed it in the TLS section."
+        ),
+        TlsFailureKind::NameMismatch => bookie_app_services::tr!(
+            "The server's certificate is for a different host name than the one you typed. Check the host name, or ask for a certificate that covers it."
+        ),
+        TlsFailureKind::Expired => {
+            bookie_app_services::tr!("The server's certificate has expired. Ask the server's owner to renew it.")
+        }
+        TlsFailureKind::NotYetValid => bookie_app_services::tr!(
+            "The server's certificate is not valid yet. Check that this computer's clock is correct, then ask the server's owner if it still fails."
+        ),
+        TlsFailureKind::Revoked => bookie_app_services::tr!(
+            "The server's certificate was revoked. Ask the server's owner for a new certificate."
+        ),
+        TlsFailureKind::ServerRefusedTls => {
+            return bookie_app_services::tr!(
+                "TLS handshake failed: {detail}. The server does not appear to use TLS. For a local container, set TLS to Disabled."
+            )
+            .replace("{detail}", &redacted_tls_detail(detail));
+        }
+        TlsFailureKind::Other => bookie_app_services::tr!(
+            "TLS handshake failed: {detail}. Check the server certificate, the certificate authority file and the TLS mode."
+        )
+        .replace("{detail}", &redacted_tls_detail(detail)),
+    };
+    format!("{step} {never_off}")
 }
 
 fn save_failure_message(failure: &SaveFailure) -> String {

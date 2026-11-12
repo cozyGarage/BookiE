@@ -10,6 +10,7 @@ mod editor_files;
 mod environment_marker;
 mod favorites;
 mod grid_close;
+mod health_report;
 pub(crate) mod import;
 mod init_css;
 mod init_sidebar;
@@ -1060,6 +1061,8 @@ impl SimpleComponent for App {
                     &self.preferences,
                 );
             }
+            AppMsg::ShowHealthReport => self.show_health_report(&sender),
+            AppMsg::OpenSqlInEditor(sql) => self.append_editor_tab(Some(sql), sender),
             AppMsg::ShowCatalog => self.show_catalog(None),
             AppMsg::ShowCatalogKind(kind) => self.show_catalog(Some(kind)),
             AppMsg::LoadSidebarCatalog(kind) => self.on_load_sidebar_catalog(kind, &sender),

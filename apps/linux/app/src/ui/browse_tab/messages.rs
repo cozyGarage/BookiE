@@ -129,6 +129,14 @@ pub enum BrowseTabInput {
     Paste(paste::PasteAnchor),
     PasteText(paste::PasteTextInput),
     SelectAllRows,
+    ColumnSelectionChanged,
+    CopySelectionAs(bookie_app_services::column_selection::SelectionCopyFormat),
+    GridSetCells(crate::ui::grid::SetCellsRequest),
+    SetCellsConfirmed {
+        request: crate::ui::grid::SetCellsRequest,
+        value: bookie_app_services::set_cells::SetCellsValue,
+    },
+    SetCellsPlanned(super::set_cells::SetCellsPlanned),
     GoToFirstRow,
     GoToLastRow,
 }

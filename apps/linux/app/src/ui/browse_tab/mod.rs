@@ -199,6 +199,7 @@ pub struct BrowseTab {
     discard_button: gtk::Button,
     pending_label: gtk::Label,
     grid_sender: relm4::Sender<GridMsg>,
+    column_selection: crate::ui::grid::ColumnSelectionHandle,
     rejected_edit_revision: std::cell::Cell<u64>,
 }
 
@@ -207,6 +208,7 @@ mod choices;
 mod chrome;
 #[cfg(test)]
 mod chrome_tests;
+mod column_selection;
 #[cfg(test)]
 mod filter_support_tests;
 mod grid_messages;
@@ -224,6 +226,7 @@ mod save_completion_tests;
 #[cfg(test)]
 mod save_in_flight_tests;
 mod selection;
+mod set_cells;
 #[cfg(test)]
 mod tests;
 mod value_parse;
@@ -713,6 +716,7 @@ impl SimpleComponent for BrowseTab {
             discard_button: pending.discard_button,
             pending_label: pending.pending_label,
             grid_sender,
+            column_selection: Default::default(),
             rejected_edit_revision: Default::default(),
         };
         model.refresh_crud_buttons();
@@ -902,6 +906,13 @@ impl SimpleComponent for BrowseTab {
                 );
                 self.emit_fetch_page_and_count(&sender);
             }
+            BrowseTabInput::ColumnSelectionChanged => self.refresh_selection_chrome(),
+            BrowseTabInput::CopySelectionAs(format) => self.handle_copy_selection_as(format, sender),
+            BrowseTabInput::GridSetCells(request) => self.handle_grid_set_cells(request, sender),
+            BrowseTabInput::SetCellsConfirmed { request, value } => {
+                self.handle_set_cells_confirmed(request, value, sender)
+            }
+            BrowseTabInput::SetCellsPlanned(planned) => self.handle_set_cells_planned(planned, sender),
             BrowseTabInput::ClearSelection => {
                 let Some(sel) = self.current_selection.as_ref() else {
                     return;

@@ -646,6 +646,10 @@ impl BrowseTab {
     }
 
     pub(super) fn handle_copy_selected_rows_as_tsv(&mut self, sender: ComponentSender<Self>) {
+        if !self.column_selection.borrow().is_empty() {
+            self.handle_copy_selection_as(bookie_app_services::column_selection::SelectionCopyFormat::Tsv, sender);
+            return;
+        }
         let Some(selection) = self.current_selection.as_ref() else {
             return;
         };
@@ -751,6 +755,9 @@ impl BrowseTab {
                 | BrowseTabInput::GridCellEdited { .. }
                 | BrowseTabInput::GridReplaceBatch { .. }
                 | BrowseTabInput::GridSetCellNull { .. }
+                | BrowseTabInput::GridSetCells(_)
+                | BrowseTabInput::SetCellsConfirmed { .. }
+                | BrowseTabInput::SetCellsPlanned(_)
                 | BrowseTabInput::GridResetCell(_)
                 | BrowseTabInput::GridDeleteRowAt { .. }
                 | BrowseTabInput::Undo
@@ -980,6 +987,9 @@ fn is_row_mutation_input(input: &BrowseTabInput) -> bool {
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
+            | BrowseTabInput::GridSetCells(_)
+            | BrowseTabInput::SetCellsConfirmed { .. }
+            | BrowseTabInput::SetCellsPlanned(_)
             | BrowseTabInput::GridResetCell(_)
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave
@@ -1013,6 +1023,9 @@ fn requires_row_key(input: &BrowseTabInput) -> bool {
             | BrowseTabInput::GridCellEdited { .. }
             | BrowseTabInput::GridReplaceBatch { .. }
             | BrowseTabInput::GridSetCellNull { .. }
+            | BrowseTabInput::GridSetCells(_)
+            | BrowseTabInput::SetCellsConfirmed { .. }
+            | BrowseTabInput::SetCellsPlanned(_)
             | BrowseTabInput::GridDeleteRowAt { .. }
             | BrowseTabInput::CommitSave
             | BrowseTabInput::Paste(_)

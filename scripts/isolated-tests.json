@@ -199,6 +199,11 @@
       "bookie-app",
       "--lib",
       "ui::editor::pinned::tests::evicting_old_stream_pins_releases_their_pages_and_unpin_releases_the_rest"
+    ],
+    [
+      "bookie-app",
+      "postgres_mcp_catalog",
+      "mcp_catalog_tools_follow_restricted_postgres_role_visibility"
     ]
   ],
   "gtk": [
@@ -1725,6 +1730,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::column_select::tests::selected_column_cells_get_the_selection_style_and_lose_it_on_clear"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::column_select::tests::the_header_menu_offers_column_selection_and_only_offers_set_cells_when_enabled"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::local_sort_tests::sorting_a_fully_selected_result_restores_the_selection_in_one_signal"
     ],
     [
@@ -1761,6 +1776,16 @@
       "bookie-app",
       "--lib",
       "ui::grid::value_viewer::tests::the_viewer_dialog_shows_a_preview_and_copies_the_full_value"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::value_decoded::tests::the_decoded_section_is_read_only_and_absent_for_unrecognised_bytes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::health_report_dialog::tests::a_row_with_a_diagnostic_offers_copy_and_open_and_a_row_without_offers_neither"
     ],
     [
       "bookie-app",
