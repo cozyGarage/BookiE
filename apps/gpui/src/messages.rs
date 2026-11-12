@@ -37,7 +37,7 @@ impl MessageLog {
     }
 
     pub fn statement_ok(&mut self, sql: &str, rows: u64, truncated: bool, elapsed: Duration) {
-        let more = if truncated { " (more rows exist)" } else { "" };
+        let more = if truncated { " (result may be incomplete)" } else { "" };
         self.push(
             MessageKind::Success,
             format!("{} · {rows} rows{more} · {} ms", one_line(sql), elapsed.as_millis()),
@@ -87,7 +87,10 @@ mod tests {
         log.statement_failed("DELETE FROM t", "ReadOnly", Duration::from_millis(4));
         let entries = log.entries();
         assert_eq!(entries[0].text, "SELECT a, b FROM t · 3 rows · 12 ms");
-        assert_eq!(entries[1].text, "SELECT 1 · 100000 rows (more rows exist) · 0 ms");
+        assert_eq!(
+            entries[1].text,
+            "SELECT 1 · 100000 rows (result may be incomplete) · 0 ms"
+        );
         assert_eq!(
             (entries[2].kind, entries[2].text.as_str()),
             (MessageKind::Error, "DELETE FROM t · ReadOnly · 4 ms")
