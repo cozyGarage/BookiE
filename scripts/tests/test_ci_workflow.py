@@ -288,6 +288,20 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn(invocation, github)
                 self.assertIn(invocation, forgejo)
 
+    def test_unused_dependency_check_uses_the_same_layer_on_both_providers(self):
+        github = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        layer = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["unused-dependencies"]
+        invocation = "python3 scripts/run-test-layer.py unused-dependencies"
+        supply_chain = re.search(r"(?ms)^  supply-chain:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn(invocation, github)
+        self.assertIn(invocation, supply_chain)
+        self.assertIn("tool: cargo-shear@1.13.4", github)
+        self.assertIn("cargo install --locked cargo-shear --version 1.13.4", supply_chain)
+        self.assertIn("cargo-shear 1.13.4", layer["prerequisites"])
+        self.assertEqual(layer["steps"][0]["argv"], ["cargo", "shear"])
+
     def test_packaging_contracts_run_in_both_hosted_gates(self):
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()

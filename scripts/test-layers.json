@@ -602,6 +602,19 @@
         }
       ]
     },
+    "unused-dependencies": {
+      "purpose": "Find unused or misplaced workspace dependencies",
+      "prerequisites": "cargo-shear 1.13.4",
+      "hosted_gate": "Linux CI contracts / unused-dependencies; lab-ci / supply-chain",
+      "steps": [
+        {
+          "argv": ["cargo", "shear"],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "required_tools": ["cargo-shear"]
+        }
+      ]
+    },
     "workflow-lint": {
       "purpose": "GitHub and Forgejo workflow schema, expressions and embedded shell validation",
       "prerequisites": "actionlint v1.7.12 and shellcheck",
