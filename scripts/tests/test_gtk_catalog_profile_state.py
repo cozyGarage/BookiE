@@ -45,7 +45,7 @@ class GtkCatalogProfileStateTests(unittest.TestCase):
             state = json.loads(path.read_text())
             self.assertEqual(
                 state["connections"]["0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11"],
-                {"database": "bookie_test", "hidden_schemas": ["bench_00", "bench_01"]},
+                {"tabs": [], "database": "bookie_test", "hidden_schemas": ["bench_00", "bench_01"]},
             )
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
 

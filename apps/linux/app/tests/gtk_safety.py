@@ -698,6 +698,7 @@ def seed_catalog_hidden_schemas(bookie_config):
             {
                 "connections": {
                     POSTGRES_CONNECTION_ID: {
+                        "tabs": [],
                         "database": "bookie_test",
                         "hidden_schemas": hidden_schemas,
                     }
@@ -1808,9 +1809,13 @@ def postgres_sidebar_catalog_profile(_database, base):
     open_saved_connection(POSTGRES_CONNECTION_NAME)
     wait_for_frame_containing(f"{POSTGRES_CONNECTION_NAME} — BookiE", timeout=120)
     frame_ready = time.monotonic()
+    minimum_nodes = int(os.environ.get("BOOKIE_GTK_CATALOG_MINIMUM_NODES", os.environ["BOOKIE_GTK_CATALOG_TABLES"]))
     sidebar_nodes, tree_model_build_ms, created_list_items, ui_stall_count, ui_stall_max_ms = (
-        application_sidebar_model_metrics(int(os.environ["BOOKIE_GTK_CATALOG_TABLES"]))
+        application_sidebar_model_metrics(minimum_nodes)
     )
+    hidden_schemas = json.loads(os.environ.get("BOOKIE_GTK_CATALOG_HIDDEN_SCHEMAS_JSON", "[]"))
+    if hidden_schemas:
+        wait_for_node(name=hidden_schemas[0], role=pyatspi.ROLE_LIST_ITEM, present=False)
     catalog_ready = time.monotonic()
     search_toggle = wait_for_sidebar_control("Search tables", pyatspi.ROLE_TOGGLE_BUTTON)
     if not search_toggle.getState().contains(pyatspi.STATE_CHECKED):
