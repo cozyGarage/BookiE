@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.2.7] - 2026-11-11
+## [0.2.7] - 2026-11-12
 
 ### Added
 
@@ -63,6 +63,11 @@
 - CSV preview updates no longer block the import dialog on large files. (#2878)
 - Connection names render as plain text in history filters. (#2880)
 - Creating a new SQLite or DuckDB database file from the connection form now creates it without replacing an existing file. (#2952)
+- Restore the selected connection and its tab when reopening a window with multiple connections. (#2982)
+- PostgreSQL metadata and session queries ignore user-schema objects that shadow built-in catalog names. (#2985)
+- Bulk cell edits now refuse SQL Server CLR UDT columns whose values are exposed as opaque bytes. (#2987)
+- SQL Server grid edits preserve empty values and SQL NULL independently. (#2993)
+- Large value previews show a bounded prefix while Copy value keeps the full value. (#2998)
 
 ## [0.2.6] - 2026-11-10
 
