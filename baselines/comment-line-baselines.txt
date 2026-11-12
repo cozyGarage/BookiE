@@ -30,7 +30,7 @@ apps/linux/app/src/ui/browse_tab/chrome.rs 89
 apps/linux/app/src/ui/browse_tab/grid_render.rs 126
 apps/linux/app/src/ui/browse_tab/mod.rs 218
 apps/linux/app/src/ui/browse_tab/row_ops.rs 142
-apps/linux/app/src/ui/browse_tab/selection.rs 61
+apps/linux/app/src/ui/browse_tab/selection.rs 3
 apps/linux/app/src/ui/browse_tab/tests.rs 2
 apps/linux/app/src/ui/browse_tab/value_parse.rs 19
 apps/linux/app/src/ui/cell_editor.rs 15
@@ -59,7 +59,7 @@ apps/linux/app/src/ui/structure_tab/columns.rs 3
 apps/linux/app/src/ui/structure_tab/fks.rs 10
 apps/linux/app/src/ui/structure_tab/indexes.rs 14
 apps/linux/app/src/ui/structure_tab/mod.rs 262
-apps/linux/app/src/ui/structure_tab_dialogs.rs 59
+apps/linux/app/src/ui/structure_tab_dialogs.rs 4
 apps/linux/app/src/ui/welcome_view.rs 41
 crates/agentd/src/audit_isolation_tests.rs 1
 crates/agentd/src/lib.rs 4
