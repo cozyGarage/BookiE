@@ -8,6 +8,7 @@ pub struct StatementOutcome {
     pub elapsed_ms: u128,
     pub kind: StatementOutcomeKind,
     pub pinned: bool,
+    pub detail: super::outcome_detail::OutcomeDetail,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]

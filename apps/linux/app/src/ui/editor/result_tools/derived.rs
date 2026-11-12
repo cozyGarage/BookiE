@@ -95,5 +95,6 @@ pub(in crate::ui::editor) fn derived_outcome(
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(derived_result(source, filtered, generation))),
         pinned: true,
+        detail: Default::default(),
     }
 }

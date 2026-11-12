@@ -75,6 +75,7 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed)),
         pinned: false,
+        detail: Default::default(),
     };
     for index in 0..12 {
         let result = page(index);

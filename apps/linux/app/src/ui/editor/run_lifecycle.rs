@@ -192,7 +192,13 @@ impl SqlEditor {
             return;
         }
 
-        self.status.set_label(&totals.summary());
+        let (timing, messages) = super::outcome_detail::totals(&outcomes);
+        self.status
+            .set_label(&bookie_app_services::server_messages_view::status_with_messages(
+                &totals.summary(),
+                &messages,
+            ));
+        self.status.set_tooltip_text(Some(&timing.tooltip()));
         let shown = self.pinned.show(outcomes);
         self.refresh_pin_button();
         self.clear_result_surface();

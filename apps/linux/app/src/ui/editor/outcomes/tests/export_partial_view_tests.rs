@@ -40,6 +40,7 @@ fn an_incomplete_stream_does_not_offer_full_result_export() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
+        detail: Default::default(),
     };
     let (grid_sender, _receiver) = relm4::channel::<crate::ui::grid::GridMsg>();
     let widget = super::super::build_streamed_result_widget(
@@ -89,6 +90,7 @@ fn a_completed_stream_offers_its_saved_result_for_export() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
+        detail: Default::default(),
     };
     let (sender, receiver) = relm4::channel::<crate::ui::grid::GridMsg>();
     let widget = super::super::build_streamed_result_widget(

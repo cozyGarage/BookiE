@@ -483,6 +483,7 @@ fn a_cell_filter_picks_the_result_it_was_started_from_when_the_same_sql_is_pinne
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Streamed(Box::new(result)),
             pinned: false,
+            detail: Default::default(),
         }
     };
     let pinned = make(7);

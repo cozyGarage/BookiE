@@ -995,6 +995,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::editor::outcomes::messages_panel::tests::the_panel_is_added_only_when_the_statement_produced_messages"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::editor::outcomes::tests::error_view_tests::a_failure_action_targets_its_exact_audit_operation"
     ],
     [

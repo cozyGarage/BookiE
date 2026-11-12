@@ -41,6 +41,7 @@ pub(super) fn outcome(preview: &str, kind: StatementOutcomeKind) -> StatementOut
         elapsed_ms: 0,
         kind,
         pinned: false,
+        detail: Default::default(),
     }
 }
 

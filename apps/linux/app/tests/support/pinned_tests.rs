@@ -11,6 +11,7 @@ fn rows(sql: &str) -> StatementOutcome {
         elapsed_ms: 1,
         kind: StatementOutcomeKind::Rows(Vec::new()),
         pinned: false,
+        detail: Default::default(),
     }
 }
 

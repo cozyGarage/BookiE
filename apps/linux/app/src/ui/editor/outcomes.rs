@@ -8,7 +8,7 @@ use crate::ui::grid::local_filter::{LocalResultSettingsStore, ResultViewKey};
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 use bookie_app_services::stream_result_spool::{StreamResultSpool, StreamResultSpoolManager};
 use bookie_core::sql_syntax::script::{BatchErrorPolicy, LexicalSettings};
-use bookie_core::{DriverError, OperationControl, QueryResult};
+use bookie_core::{DriverError, OperationControl, QueryResult, ServerMessages};
 use bookie_policy::AuditReceipt;
 use std::future::Future;
 use stream_result_view::build_streamed_result_widget;
@@ -162,6 +162,8 @@ where
     crate::services::approval_wait::track(run_tracked_statements(run, stream_spool_manager, stream_update)).await
 }
 
+#[path = "outcomes/messages_panel.rs"]
+mod messages_panel;
 #[path = "outcomes/run_loop.rs"]
 mod run_loop;
 use run_loop::run_tracked_statements;
@@ -196,7 +198,7 @@ async fn run_statement<F, Fut>(
     attempt: StreamAttempt<'_>,
     stream_update: &mut F,
     succeeded: &impl Fn(&str),
-) -> Result<StatementOutcomeKind, Halt>
+) -> Result<(StatementOutcomeKind, ServerMessages), Halt>
 where
     F: FnMut(StreamUpdate) -> Fut,
     Fut: Future<Output = bool>,
@@ -249,6 +251,7 @@ fn not_run_outcome(identity: StatementIdentity, preview: String, sql: String) ->
         elapsed_ms: 0,
         kind: StatementOutcomeKind::NotRun,
         pinned: false,
+        detail: Default::default(),
     }
 }
 
@@ -259,6 +262,7 @@ fn statement_outcome(
     started: std::time::Instant,
     waited_before: std::time::Duration,
     kind: StatementOutcomeKind,
+    messages: ServerMessages,
 ) -> StatementOutcome {
     StatementOutcome {
         identity,
@@ -267,7 +271,17 @@ fn statement_outcome(
         elapsed_ms: elapsed_without_approval_wait(started, waited_before),
         kind,
         pinned: false,
+        detail: super::outcome_detail::OutcomeDetail {
+            messages,
+            approval_wait_ms: approval_wait_since(waited_before),
+        },
     }
+}
+
+fn approval_wait_since(waited_before: std::time::Duration) -> u128 {
+    crate::services::approval_wait::waited()
+        .saturating_sub(waited_before)
+        .as_millis()
 }
 
 fn elapsed_without_approval_wait(started: std::time::Instant, waited_before: std::time::Duration) -> u128 {
@@ -293,6 +307,7 @@ fn bind_statement_for_run(
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Error(crate::ui::parameters_dialog::error_message(error).into()),
             pinned: false,
+            detail: Default::default(),
         })
     })
 }
@@ -304,19 +319,21 @@ async fn query_statement(
     sql: &str,
     control: &OperationControl,
     succeeded: &impl Fn(&str),
-) -> Result<StatementOutcomeKind, ScriptRunResult> {
+) -> Result<(StatementOutcomeKind, ServerMessages), ScriptRunResult> {
     let audited = target.query_with_audit(bound_sql, bound_params, control).await;
     match audited.result {
         Ok(result) => {
             succeeded(sql);
-            Ok(StatementOutcomeKind::Rows(
-                result.result_sets.into_iter().map(std::sync::Arc::new).collect(),
-            ))
+            let rows = StatementOutcomeKind::Rows(result.result_sets.into_iter().map(std::sync::Arc::new).collect());
+            Ok((rows, result.messages))
         }
         Err(DriverError::Cancelled) => Err(ScriptRunResult::Cancelled),
         Err(DriverError::TimedOut) => Err(ScriptRunResult::TimedOut),
-        Err(error) => Ok(StatementOutcomeKind::Error(
-            failure_message(&error, sql, bound_sql).with_audit_receipts(audited.audit_receipts),
+        Err(error) => Ok((
+            StatementOutcomeKind::Error(
+                failure_message(&error, sql, bound_sql).with_audit_receipts(audited.audit_receipts),
+            ),
+            ServerMessages::default(),
         )),
     }
 }
@@ -357,6 +374,7 @@ where
                 bookie_app_services::tr!("Temporary result storage is unavailable.").into(),
             ),
             pinned: false,
+            detail: Default::default(),
         })
     })?;
     let opened = attempt
@@ -394,6 +412,7 @@ where
                 failure_message(&error, attempt.sql, attempt.bound_sql).with_audit_receipts(audit_receipts),
             ),
             pinned: false,
+            detail: Default::default(),
         })),
     }
 }
@@ -614,6 +633,18 @@ pub(crate) fn summary_label(n_total: usize, n_ok: usize, total_ms: u128, has_err
 }
 
 fn build_outcome_widget(
+    o: &StatementOutcome,
+    grid_sender: &relm4::Sender<GridMsg>,
+    connection_id: Option<uuid::Uuid>,
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    settings_store: LocalResultSettingsStore,
+    sender: Option<&relm4::ComponentSender<super::SqlEditor>>,
+) -> gtk::Widget {
+    let content = build_outcome_content(o, grid_sender, connection_id, database, settings_store, sender);
+    messages_panel::attach(content, &o.detail.messages)
+}
+
+fn build_outcome_content(
     o: &StatementOutcome,
     grid_sender: &relm4::Sender<GridMsg>,
     connection_id: Option<uuid::Uuid>,
@@ -1142,6 +1173,9 @@ mod lexing_tests;
 #[cfg(test)]
 #[path = "outcomes/lifetime_tests.rs"]
 mod lifetime_tests;
+#[cfg(test)]
+#[path = "outcomes/messages_tests.rs"]
+mod messages_tests;
 #[cfg(test)]
 #[path = "outcomes/result_tab_icon_tests.rs"]
 mod result_tab_icon_tests;
