@@ -3,10 +3,12 @@ use std::rc::Rc;
 
 use relm4::gtk::prelude::*;
 use relm4::{ComponentSender, gtk};
+use sourceview5::prelude::*;
 
 use super::{DropGeneration, SqlEditor, SqlEditorOutput, folding::FoldController};
 
 pub(crate) const DEFAULT_INITIAL_QUERY: &str = "SELECT 1;";
+pub(super) const MAX_SYNTAX_HIGHLIGHT_BYTES: usize = 100_000;
 
 pub(super) fn install(
     view: &sourceview5::View,
@@ -21,7 +23,10 @@ pub(super) fn install(
     let buffer = view.buffer();
     let (start, end) = buffer.bounds();
     let bytes = Rc::new(Cell::new(buffer.text(&start, &end, true).len()));
+    update_syntax_highlighting(&buffer, view, bytes.get());
     let deleted_text = install_edit_guards(&buffer, status, bytes.clone());
+    let highlight_bytes = bytes.clone();
+    let highlight_view = view.downgrade();
     let publish_bytes = bytes;
     let publish = Rc::new(move |buffer: &gtk::TextBuffer| {
         if let Some(buffer) = buffer.downcast_ref::<sourceview5::Buffer>() {
@@ -48,12 +53,29 @@ pub(super) fn install(
     });
     buffer.connect_changed(move |buffer| {
         generation.changed();
+        if let Some(view) = highlight_view.upgrade() {
+            update_syntax_highlighting(buffer, &view, highlight_bytes.get());
+        }
         if depth.get() > 0 {
             pending.set(true);
             return;
         }
         publish(buffer);
     });
+}
+
+fn update_syntax_highlighting(buffer: &gtk::TextBuffer, view: &sourceview5::View, bytes: usize) {
+    let Some(buffer) = buffer.downcast_ref::<sourceview5::Buffer>() else {
+        return;
+    };
+    let enabled = bytes <= MAX_SYNTAX_HIGHLIGHT_BYTES;
+    if buffer.is_highlight_syntax() != enabled {
+        buffer.set_highlight_syntax(enabled);
+        let tooltip = (!enabled).then(|| {
+            bookie_app_services::tr!("SQL syntax highlighting is paused for large scripts to keep editing responsive.")
+        });
+        view.set_tooltip_text(tooltip.as_deref());
+    }
 }
 
 fn install_edit_guards(
