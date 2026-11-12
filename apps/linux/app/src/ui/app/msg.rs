@@ -142,6 +142,7 @@ pub enum AppMsg {
     Disconnect,
     ForceDisconnect,
     PrepareWindowClose,
+    PromptWindowClose,
     FlushWindowEdits,
     GridEditsPrepared {
         intent: super::grid_close::GridCloseIntent,
@@ -215,6 +216,10 @@ pub enum AppMsg {
         statement: bookie_core::sql_literal::RowStatement,
     },
     FetchBrowsePage(Uuid),
+    AttachWorkspaceTab {
+        tab_id: Uuid,
+        connection_id: Option<Uuid>,
+    },
     FetchBrowseCellValue(
         Uuid,
         crate::ui::browse_tab::BrowseCellValueRequest,

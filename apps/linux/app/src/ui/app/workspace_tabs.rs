@@ -220,6 +220,10 @@ impl App {
                 let mut tabs = workspace_tabs_for_create.borrow_mut();
                 tabs.insert(tab_id, WorkspaceTab::Editor(slot));
             }
+            sender_for_create.input(AppMsg::AttachWorkspaceTab {
+                tab_id,
+                connection_id: super::multi_session::overview_new_tab_connection(&front_connection_id_for_create),
+            });
             sender_for_create.input(AppMsg::WorkspaceTabsChanged);
             page
         });
@@ -341,6 +345,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Structure(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -470,6 +475,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert_with_preview(tab_id, WorkspaceTab::Table(slot), preview);
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -525,6 +531,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Structure(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -585,6 +592,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Editor(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.show_in_content_holder(&self.workspace_outer_stack);
@@ -633,6 +641,7 @@ impl App {
         let Some(mut removed) = removed else {
             return;
         };
+        self.multi.sessions.detach_tab(id);
         // Snapshot the closed tab into the reopen stack BEFORE running
         // the per-kind teardown below — the BrowseModel still has its
         // pagination + sort state intact, and the EditorTabSlot still

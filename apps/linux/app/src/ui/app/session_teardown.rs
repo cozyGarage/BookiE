@@ -75,7 +75,7 @@ impl App {
         }
         let mut replies = Vec::new();
         for (id, tab) in self.workspace_tabs.borrow().iter() {
-            if matches!(action, SessionTeardownAction::CloseTab(target) if target != *id) {
+            if !self.teardown_includes(action, *id) {
                 continue;
             }
             let WorkspaceTab::Editor(slot) = tab else {

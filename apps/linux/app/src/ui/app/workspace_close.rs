@@ -151,9 +151,10 @@ impl App {
         body: &str,
         accept_label: &str,
     ) -> bool {
-        let has_open_transaction = self.workspace_tabs.borrow().values().any(|tab| match tab {
+        let has_open_transaction = self.workspace_tabs.borrow().iter().any(|(id, tab)| match tab {
             WorkspaceTab::Editor(slot) => {
-                relm4::ComponentController::model(&slot.controller).session_transaction_open()
+                self.teardown_includes(action, *id)
+                    && relm4::ComponentController::model(&slot.controller).session_transaction_open()
             }
             _ => false,
         });

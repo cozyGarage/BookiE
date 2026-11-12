@@ -263,3 +263,93 @@ fn startup_restores_nothing_after_the_last_connection_was_cleared() {
     let stored = stored_windows(&[&[key]]);
     assert!(startup_restore_keys(Some(&stored), None, &[key]).is_empty());
 }
+
+fn two_sessions_with_tabs() -> (WindowSessions, [Uuid; 2], [Uuid; 2]) {
+    let connections = [Uuid::new_v4(), Uuid::new_v4()];
+    let tabs = [Uuid::new_v4(), Uuid::new_v4()];
+    let mut sessions = WindowSessions::default();
+    sessions.open_working(connections[0]);
+    sessions.open_working(connections[1]);
+    sessions.attach_tab(tabs[0], connections[0]).unwrap();
+    sessions.attach_tab(tabs[1], connections[1]).unwrap();
+    (sessions, connections, tabs)
+}
+
+#[test]
+fn a_tab_resolves_to_its_own_connection_even_when_another_session_is_in_front() {
+    let (mut sessions, connections, tabs) = two_sessions_with_tabs();
+    sessions.focus_working(connections[1]);
+    assert_eq!(sessions.resolve_tab_connection(tabs[0]), Ok(connections[0]));
+    assert_eq!(sessions.resolve_tab_connection(tabs[1]), Ok(connections[1]));
+}
+
+#[test]
+fn a_tab_without_a_recorded_connection_is_refused_and_never_falls_back_to_the_front_session() {
+    let (sessions, _, _) = two_sessions_with_tabs();
+    let stray = Uuid::new_v4();
+    assert_eq!(
+        sessions.resolve_tab_connection(stray),
+        Err(TabConnectionError::NoRecordedConnection { tab_id: stray })
+    );
+}
+
+#[test]
+fn a_tab_whose_session_was_closed_is_refused() {
+    let (mut sessions, connections, tabs) = two_sessions_with_tabs();
+    sessions.disconnect(connections[0]);
+    assert_eq!(
+        sessions.resolve_tab_connection(tabs[0]),
+        Err(TabConnectionError::NoRecordedConnection { tab_id: tabs[0] })
+    );
+}
+
+#[test]
+fn dirty_tabs_across_sessions_make_one_prompt_naming_each_connection_in_window_order() {
+    let (sessions, connections, tabs) = two_sessions_with_tabs();
+    let prompt = plan_dirty_tabs(&sessions, &[tabs[1], tabs[0]]).unwrap();
+    assert!(prompt.needs_prompt());
+    assert_eq!(
+        prompt.connections_in_order(sessions.working_order()),
+        connections.to_vec()
+    );
+    assert_eq!(prompt.tabs_for_connection(connections[1]), vec![tabs[1]]);
+}
+
+#[test]
+fn a_dirty_tab_without_a_connection_blocks_the_whole_prompt_plan() {
+    let (sessions, _, tabs) = two_sessions_with_tabs();
+    let stray = Uuid::new_v4();
+    assert_eq!(
+        plan_dirty_tabs(&sessions, &[tabs[0], stray]).map(|_| ()),
+        Err(TabConnectionError::NoRecordedConnection { tab_id: stray })
+    );
+}
+
+#[test]
+fn disconnecting_one_session_prompts_only_for_its_own_dirty_tabs() {
+    let (sessions, connections, tabs) = two_sessions_with_tabs();
+    let prompt = plan_dirty_tabs(&sessions, &[tabs[0], tabs[1]]).unwrap();
+    assert_eq!(prompt.tabs_for_connection(connections[0]), vec![tabs[0]]);
+    assert!(prompt.tabs_for_connection(Uuid::new_v4()).is_empty());
+}
+
+#[test]
+fn disconnecting_one_of_two_sessions_scopes_teardown_to_that_sessions_tabs() {
+    let (sessions, connections, tabs) = two_sessions_with_tabs();
+    assert_eq!(disconnect_scope(&sessions, connections[0], &tabs), vec![tabs[0]]);
+    assert_eq!(disconnect_scope(&sessions, connections[1], &tabs), vec![tabs[1]]);
+}
+
+#[test]
+fn disconnecting_the_only_session_covers_every_tab_in_the_window() {
+    let connection = Uuid::new_v4();
+    let tab = Uuid::new_v4();
+    let unclaimed = Uuid::new_v4();
+    let mut sessions = WindowSessions::default();
+    sessions.open_working(connection);
+    sessions.attach_tab(tab, connection).unwrap();
+    assert_eq!(
+        disconnect_scope(&sessions, connection, &[tab, unclaimed]),
+        vec![tab, unclaimed]
+    );
+}

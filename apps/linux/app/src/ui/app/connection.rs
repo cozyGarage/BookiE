@@ -141,12 +141,10 @@ impl App {
         if let Some(connection_id) = self.connection_id {
             self.set_last_connection_id(Some(connection_id), sender.clone());
             self.restore_workspace_tabs(connection_id, sender.clone());
-            self.claim_orphan_tabs(connection_id);
             if self.multi.sessions.names_tabs_with_connection()
                 && self.multi.sessions.tabs_for_connection(connection_id).is_empty()
             {
                 self.append_editor_tab(None, sender.clone());
-                self.claim_orphan_tabs(connection_id);
             }
             self.refresh_multi_session_tab_titles();
             self.persist_open_sessions(sender.clone());
@@ -169,13 +167,11 @@ impl App {
         // the connection mid-edit silently destroys the user's work.
         // Confirm via an AlertDialog mirroring the window-close-with-
         // pending and F5-with-pending paths.
-        let has_pending = self.window_has_pending();
+        let has_pending = self.disconnect_has_pending();
         if has_pending {
             let dialog = adw::AlertDialog::new(
                 Some(&bookie_app_services::tr!("Discard pending changes?")),
-                Some(&bookie_app_services::tr!(
-                    "Disconnecting will close every tab and drop every unsaved row edit and DDL change."
-                )),
+                Some(&self.disconnect_discard_body()),
             );
             dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
             dialog.add_response("discard", &bookie_app_services::tr!("Discard and disconnect"));
@@ -690,11 +686,7 @@ impl App {
             return;
         }
         crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
-        if additive {
-            if let Some(previous) = self.connection_id {
-                self.claim_orphan_tabs(previous);
-            }
-        } else if self.connected {
+        if !additive && self.connected {
             self.teardown_workspace_tabs();
             self.clear_closed_tabs_stack();
             self.connected_database = None;

@@ -62,23 +62,6 @@ impl App {
         );
     }
 
-    pub(super) fn claim_orphan_tabs(&mut self, connection_id: Uuid) {
-        let tab_ids: Vec<Uuid> = self.workspace_tabs.borrow().keys().copied().collect();
-        for tab_id in tab_ids {
-            if self.multi.sessions.connection_for_tab(tab_id).is_some() {
-                continue;
-            }
-            let _ = self.multi.sessions.attach_tab(tab_id, connection_id);
-        }
-    }
-
-    pub(super) fn sync_orphan_tabs_to_front(&mut self) {
-        let Some(front) = self.multi.sessions.front() else {
-            return;
-        };
-        self.claim_orphan_tabs(front);
-    }
-
     pub(super) fn focus_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
         if !self.multi.sessions.is_working(connection_id) {
             return;
@@ -94,6 +77,7 @@ impl App {
         if !self.multi.sessions.focus_working(connection_id) {
             return;
         }
+        self.do_persist_workspace_state_now();
         self.connection_id = Some(connection_id);
         self.overview_front_connection_id.set(Some(connection_id));
         self.workspace_save_token = Some(self.workspace.connection_save_token(connection_id));
@@ -104,6 +88,7 @@ impl App {
         self.read_only_badge.set_visible(self.read_only);
         let catalog = self.multi.catalogs.get(&connection_id).cloned();
         self.connected_database = catalog.as_ref().map(|catalog| catalog.database.clone());
+        self.restore_sidebar_state();
         if let Some(catalog) = catalog {
             self.sidebar_views = catalog.views;
             self.reset_sidebar_catalog();
@@ -120,7 +105,6 @@ impl App {
     }
 
     pub(super) fn follow_selected_tab_session(&mut self, sender: ComponentSender<Self>) {
-        self.sync_orphan_tabs_to_front();
         let Some(tab_id) = self.selected_workspace_tab_id() else {
             return;
         };
@@ -199,6 +183,7 @@ impl App {
     }
 
     pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
+        self.do_persist_workspace_state_now();
         let closed_tabs = self.multi.sessions.disconnect(connection_id);
         self.release_connection_resources(connection_id);
         self.persist_open_sessions(sender.clone());
