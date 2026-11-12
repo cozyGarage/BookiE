@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#![recursion_limit = "256"]
 //! A frontend without GTK opens a saved connection and reads through the
 //! policy guard, the path ADR 0043 gives the GPUI experiment.
 
