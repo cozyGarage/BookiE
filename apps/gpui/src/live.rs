@@ -446,7 +446,7 @@ impl ResultSource for LiveTable {
             if self.snapshot_consistent {
                 " · snapshot for this load"
             } else {
-                " · concurrent changes may shift rows"
+                " · concurrent changes may skip or repeat rows"
             }
         });
         format!("{} · {} · read-only{consistency}{cap}", self.session.driver_id, table)
@@ -820,7 +820,7 @@ mod tests {
         assert!(table.truncated);
         assert_eq!(
             table.origin(),
-            "sqlite · orders · read-only · concurrent changes may shift rows · 4 rows loaded; result may be incomplete"
+            "sqlite · orders · read-only · concurrent changes may skip or repeat rows · 4 rows loaded; result may be incomplete"
         );
         let whole = LiveTable::load(
             &fixture(),
@@ -833,9 +833,9 @@ mod tests {
         .expect("load");
         assert_eq!(
             whole.origin(),
-            "sqlite · orders · read-only · concurrent changes may shift rows"
+            "sqlite · orders · read-only · concurrent changes may skip or repeat rows"
         );
-        assert!(whole.origin().contains("concurrent changes may shift rows"));
+        assert!(whole.origin().contains("concurrent changes may skip or repeat rows"));
     }
 
     #[test]
