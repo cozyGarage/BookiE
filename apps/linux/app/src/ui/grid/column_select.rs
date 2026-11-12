@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bookie_app_services::column_selection::{ColumnSelection, pick_columns};
+use bookie_app_services::column_selection::{ColumnSelection, SelectionCopyFormat, copy_selection, pick_columns};
 use bookie_core::{ColumnInfo, Value};
 use gtk4::{self as gtk, gio, prelude::*};
 
@@ -11,6 +11,12 @@ use super::{GridMsg, SetCellsRequest, SetCellsRows};
 
 pub type ColumnSelectionHandle = Rc<RefCell<ColumnSelection>>;
 
+#[derive(Clone, Copy)]
+pub(super) struct CopySource<'a> {
+    pub(super) columns: &'a [ColumnInfo],
+    pub(super) driver_id: &'a str,
+}
+
 const CELL_CLASS: &str = "tp-column-selected";
 const HEADER_CLASS: &str = "tp-column-header-selected";
 
@@ -18,6 +24,22 @@ pub(super) enum Projection {
     NoSelection,
     Incomplete,
     Rows(Vec<ColumnInfo>, Vec<Vec<Value>>),
+}
+
+pub(crate) fn selection_chrome() -> gtk::Box {
+    let row = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(6)
+        .visible(false)
+        .margin_start(8)
+        .margin_end(8)
+        .margin_top(4)
+        .margin_bottom(4)
+        .build();
+    let status = gtk::Label::builder().hexpand(true).halign(gtk::Align::Start).build();
+    status.set_accessible_role(gtk::AccessibleRole::Status);
+    row.append(&status);
+    row
 }
 
 pub(crate) fn project_rows(
@@ -46,7 +68,7 @@ pub(super) fn projected_rows(
     handle: &ColumnSelectionHandle,
     columns: &[ColumnInfo],
 ) -> Projection {
-    let selected = handle.borrow().columns();
+    let selected = selection_columns(view, &handle.borrow());
     if selected.is_empty() {
         return Projection::NoSelection;
     }
@@ -109,37 +131,8 @@ pub(super) fn apply_to_cell(child: &gtk::Widget, handle: &ColumnSelectionHandle,
     set_class(child, CELL_CLASS, handle.borrow().contains(column));
 }
 
-fn first_label(root: &gtk::Widget) -> Option<gtk::Label> {
-    let mut stack = vec![root.clone()];
-    while let Some(widget) = stack.pop() {
-        if let Ok(label) = widget.clone().downcast::<gtk::Label>() {
-            return Some(label);
-        }
-        let mut child = widget.first_child();
-        while let Some(current) = child {
-            child = current.next_sibling();
-            stack.push(current);
-        }
-    }
-    None
-}
-
-fn selected_titles(view: &gtk::ColumnView, selection: &ColumnSelection) -> Vec<String> {
-    let model = view.columns();
-    (0..model.n_items())
-        .filter_map(|position| model.item(position)?.downcast::<gtk::ColumnViewColumn>().ok())
-        .filter(|column| {
-            column
-                .id()
-                .and_then(|id| id.parse::<usize>().ok())
-                .is_some_and(|index| selection.contains(index))
-        })
-        .filter_map(|column| column.title().map(|title| title.to_string()))
-        .collect()
-}
-
 fn refresh_headers(view: &gtk::ColumnView, selection: &ColumnSelection) {
-    let titles = selected_titles(view, selection);
+    let selected = selected_header_slots(&view_column_slots(view), selection);
     let mut child = view.first_child();
     while let Some(widget) = child {
         child = widget.next_sibling();
@@ -147,10 +140,161 @@ fn refresh_headers(view: &gtk::ColumnView, selection: &ColumnSelection) {
             continue;
         }
         let mut title = widget.first_child();
+        let mut position = 0;
         while let Some(cell) = title {
             title = cell.next_sibling();
-            let selected = first_label(&cell).is_some_and(|label| titles.iter().any(|text| *text == label.text()));
+            let selected = selected.get(position).copied().unwrap_or(false);
+            position += 1;
             set_class(&cell, HEADER_CLASS, selected);
+        }
+    }
+}
+
+fn selected_header_slots(columns: &[Option<usize>], selection: &ColumnSelection) -> Vec<bool> {
+    columns
+        .iter()
+        .map(|column| column.is_some_and(|index| selection.contains(index)))
+        .collect()
+}
+
+fn view_column_slots(view: &gtk::ColumnView) -> Vec<Option<usize>> {
+    let model = view.columns();
+    (0..model.n_items())
+        .filter_map(|position| model.item(position)?.downcast::<gtk::ColumnViewColumn>().ok())
+        .filter(|column| column.is_visible())
+        .map(|column| column.id().and_then(|id| id.parse().ok()))
+        .collect()
+}
+
+fn view_columns(view: &gtk::ColumnView) -> Vec<usize> {
+    view_column_slots(view).into_iter().flatten().collect()
+}
+
+fn selection_columns(view: &gtk::ColumnView, selection: &ColumnSelection) -> Vec<usize> {
+    selection.columns_in_order(&view_columns(view))
+}
+
+fn update_chrome(view: &gtk::ColumnView, handle: &ColumnSelectionHandle, chrome: Option<&gtk::Box>) {
+    let Some(chrome) = chrome else { return };
+    let Some(label) = chrome
+        .first_child()
+        .and_then(|child| child.downcast::<gtk::Label>().ok())
+    else {
+        return;
+    };
+    let selected = selection_columns(view, &handle.borrow());
+    let children: Vec<_> = std::iter::successors(chrome.first_child(), |widget| widget.next_sibling()).collect();
+    for button in children
+        .iter()
+        .skip(1)
+        .filter_map(|child| child.clone().downcast::<gtk::Button>().ok())
+    {
+        button.set_sensitive(!selected.is_empty());
+    }
+    if selected.is_empty() {
+        chrome.set_visible(false);
+        return;
+    }
+    let selected: std::collections::HashSet<_> = selected.into_iter().collect();
+    let model = view.columns();
+    let names: Vec<_> = (0..model.n_items())
+        .filter_map(|position| model.item(position)?.downcast::<gtk::ColumnViewColumn>().ok())
+        .filter(|column| column.is_visible())
+        .filter(|column| {
+            column
+                .id()
+                .and_then(|id| id.parse::<usize>().ok())
+                .is_some_and(|id| selected.contains(&id))
+        })
+        .filter_map(|column| column.title().map(|title| title.to_string()))
+        .collect();
+    let rows = view.model().map_or(0, |model| model.n_items());
+    label.set_label(
+        &bookie_app_services::tr!("Selected columns: {columns}; loaded rows only: {rows}")
+            .replace("{columns}", &names.join(", "))
+            .replace("{rows}", &rows.to_string()),
+    );
+    chrome.set_visible(true);
+}
+
+fn install_chrome(
+    view: &gtk::ColumnView,
+    handle: &ColumnSelectionHandle,
+    chrome: &gtk::Box,
+    source: CopySource<'_>,
+    sender: &Option<relm4::Sender<GridMsg>>,
+) {
+    let Some(sender) = sender else { return };
+    let mut formats = vec![
+        (bookie_app_services::tr!("Copy TSV"), SelectionCopyFormat::Tsv),
+        (bookie_app_services::tr!("Copy CSV"), SelectionCopyFormat::Csv),
+        (bookie_app_services::tr!("Copy JSON"), SelectionCopyFormat::Json),
+    ];
+    if bookie_core::export::supports_sql_literals(source.driver_id) {
+        formats.push((bookie_app_services::tr!("Copy IN list"), SelectionCopyFormat::InList));
+    }
+    let columns: Rc<[ColumnInfo]> = Rc::from(source.columns);
+    let driver_id = source.driver_id.to_owned();
+    for (label, format) in formats {
+        let button = gtk::Button::with_label(&label);
+        button.set_sensitive(false);
+        let view = view.downgrade();
+        let handle = handle.clone();
+        let columns = columns.clone();
+        let driver_id = driver_id.clone();
+        let sender = sender.clone();
+        button.connect_clicked(move |_| {
+            let Some(view) = view.upgrade() else { return };
+            copy_selected(
+                &view,
+                &handle,
+                CopySource {
+                    columns: &columns,
+                    driver_id: &driver_id,
+                },
+                format,
+                &Some(sender.clone()),
+            );
+        });
+        chrome.append(&button);
+    }
+}
+
+fn copy_selected(
+    view: &gtk::ColumnView,
+    handle: &ColumnSelectionHandle,
+    source: CopySource<'_>,
+    format: SelectionCopyFormat,
+    sender: &Option<relm4::Sender<GridMsg>>,
+) {
+    let Some(sender) = sender else { return };
+    match projected_rows(view, handle, source.columns) {
+        Projection::Rows(columns, rows) => match copy_selection(format, source.driver_id, &columns, &rows) {
+            Ok(copy) => {
+                sender.send(GridMsg::CopyToClipboard(copy.text)).ok();
+                if copy.note.is_some() {
+                    sender
+                        .send(GridMsg::ShowToast(bookie_app_services::tr!(
+                            "Some values were left out of the list."
+                        )))
+                        .ok();
+                }
+            }
+            Err(_) => {
+                sender
+                    .send(GridMsg::ShowToast(bookie_app_services::tr!(
+                        "These values cannot be copied in this format."
+                    )))
+                    .ok();
+            }
+        },
+        Projection::Incomplete => {
+            sender.send(GridMsg::IncompleteRowData).ok();
+        }
+        Projection::NoSelection => {
+            sender
+                .send(GridMsg::ShowToast(bookie_app_services::tr!("Select a column first")))
+                .ok();
         }
     }
 }
@@ -178,19 +322,30 @@ pub(crate) fn refresh(view: &gtk::ColumnView, handle: &ColumnSelectionHandle) {
     refresh_headers(view, &selection);
 }
 
-fn changed(view: &gtk::ColumnView, handle: &ColumnSelectionHandle, sender: &Option<relm4::Sender<GridMsg>>) {
+fn changed(
+    view: &gtk::ColumnView,
+    handle: &ColumnSelectionHandle,
+    sender: &Option<relm4::Sender<GridMsg>>,
+    chrome: Option<&gtk::Box>,
+) {
     refresh(view, handle);
+    update_chrome(view, handle, chrome);
     if let Some(sender) = sender {
         sender.send(GridMsg::ColumnSelectionChanged).ok();
     }
 }
 
-pub(crate) fn clear(view: &gtk::ColumnView, handle: &ColumnSelectionHandle, sender: &Option<relm4::Sender<GridMsg>>) {
+pub(crate) fn clear(
+    view: &gtk::ColumnView,
+    handle: &ColumnSelectionHandle,
+    sender: &Option<relm4::Sender<GridMsg>>,
+    chrome: Option<&gtk::Box>,
+) {
     if handle.borrow().is_empty() {
         return;
     }
     handle.borrow_mut().clear();
-    changed(view, handle, sender);
+    changed(view, handle, sender, chrome);
 }
 
 type Edit = fn(&mut ColumnSelection, usize);
@@ -201,8 +356,37 @@ fn selection_action(
     handle: &ColumnSelectionHandle,
     sender: &Option<relm4::Sender<GridMsg>>,
     edit: Edit,
+    chrome: Option<&gtk::Box>,
 ) -> gio::SimpleAction {
+    let extend = name == "extend-column";
     let action = gio::SimpleAction::new(name, Some(glib::VariantTy::UINT32));
+    let view = view.downgrade();
+    let handle = handle.clone();
+    let sender = sender.clone();
+    let chrome = chrome.cloned();
+    action.connect_activate(move |_, parameter| {
+        let Some(column) = parameter.and_then(|value| value.get::<u32>()) else {
+            return;
+        };
+        let Some(view) = view.upgrade() else { return };
+        if extend {
+            handle
+                .borrow_mut()
+                .extend_to_in_order(column as usize, &view_columns(&view));
+        } else {
+            edit(&mut handle.borrow_mut(), column as usize);
+        }
+        changed(&view, &handle, &sender, chrome.as_ref());
+    });
+    action
+}
+
+fn set_column_action(
+    view: &gtk::ColumnView,
+    handle: &ColumnSelectionHandle,
+    sender: &relm4::Sender<GridMsg>,
+) -> gio::SimpleAction {
+    let action = gio::SimpleAction::new("set-column-value", Some(glib::VariantTy::UINT32));
     let view = view.downgrade();
     let handle = handle.clone();
     let sender = sender.clone();
@@ -211,21 +395,7 @@ fn selection_action(
             return;
         };
         let Some(view) = view.upgrade() else { return };
-        edit(&mut handle.borrow_mut(), column as usize);
-        changed(&view, &handle, &sender);
-    });
-    action
-}
-
-fn set_column_action(handle: &ColumnSelectionHandle, sender: &relm4::Sender<GridMsg>) -> gio::SimpleAction {
-    let action = gio::SimpleAction::new("set-column-value", Some(glib::VariantTy::UINT32));
-    let handle = handle.clone();
-    let sender = sender.clone();
-    action.connect_activate(move |_, parameter| {
-        let Some(column) = parameter.and_then(|value| value.get::<u32>()) else {
-            return;
-        };
-        let columns = target_columns(&handle.borrow(), column as usize);
+        let columns = target_columns(&handle.borrow(), column as usize, &view_columns(&view));
         sender
             .send(GridMsg::SetCells(SetCellsRequest {
                 columns,
@@ -236,9 +406,9 @@ fn set_column_action(handle: &ColumnSelectionHandle, sender: &relm4::Sender<Grid
     action
 }
 
-pub(super) fn target_columns(selection: &ColumnSelection, clicked: usize) -> Vec<usize> {
+pub(super) fn target_columns(selection: &ColumnSelection, clicked: usize, order: &[usize]) -> Vec<usize> {
     if selection.contains(clicked) {
-        selection.columns()
+        selection.columns_in_order(order)
     } else {
         vec![clicked]
     }
@@ -250,6 +420,8 @@ pub(super) fn install(
     handle: &ColumnSelectionHandle,
     sender: Option<relm4::Sender<GridMsg>>,
     set_cells: bool,
+    source: CopySource<'_>,
+    chrome: Option<&gtk::Box>,
 ) {
     actions.add_action(&selection_action(
         "select-column",
@@ -257,6 +429,7 @@ pub(super) fn install(
         handle,
         &sender,
         ColumnSelection::select_only,
+        chrome,
     ));
     actions.add_action(&selection_action(
         "toggle-column",
@@ -264,6 +437,7 @@ pub(super) fn install(
         handle,
         &sender,
         ColumnSelection::toggle,
+        chrome,
     ));
     actions.add_action(&selection_action(
         "extend-column",
@@ -271,35 +445,75 @@ pub(super) fn install(
         handle,
         &sender,
         ColumnSelection::extend_to,
+        chrome,
     ));
     if let Some(sender) = sender.as_ref().filter(|_| set_cells) {
-        actions.add_action(&set_column_action(handle, sender));
+        actions.add_action(&set_column_action(view, handle, sender));
     }
-    install_keys(view, handle, &sender);
-    install_click_clear(view, handle, &sender);
+    if let Some(chrome) = chrome {
+        install_chrome(view, handle, chrome, source, &sender);
+        update_chrome(view, handle, Some(chrome));
+        let weak = view.downgrade();
+        let handle = handle.clone();
+        let chrome = chrome.clone();
+        view.columns().connect_items_changed(move |_, _, _, _| {
+            if let Some(view) = weak.upgrade() {
+                refresh(&view, &handle);
+                update_chrome(&view, &handle, Some(&chrome));
+            }
+        });
+    }
+    install_keys(view, handle, &sender, chrome, source);
+    install_click_clear(view, handle, &sender, chrome);
 }
 
-fn install_keys(view: &gtk::ColumnView, handle: &ColumnSelectionHandle, sender: &Option<relm4::Sender<GridMsg>>) {
+fn install_keys(
+    view: &gtk::ColumnView,
+    handle: &ColumnSelectionHandle,
+    sender: &Option<relm4::Sender<GridMsg>>,
+    chrome: Option<&gtk::Box>,
+    source: CopySource<'_>,
+) {
     let controller = gtk::EventControllerKey::new();
     controller.set_propagation_phase(gtk::PropagationPhase::Capture);
     let weak = view.downgrade();
     let handle = handle.clone();
     let sender = sender.clone();
+    let chrome = chrome.cloned();
+    let columns: Rc<[ColumnInfo]> = Rc::from(source.columns);
+    let driver_id = source.driver_id.to_owned();
     controller.connect_key_pressed(move |_, key, _, state| {
         let Some(view) = weak.upgrade() else {
             return glib::Propagation::Proceed;
         };
+        let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
+        if key == gtk::gdk::Key::c
+            && ctrl
+            && !state.intersects(gtk::gdk::ModifierType::SHIFT_MASK | gtk::gdk::ModifierType::ALT_MASK)
+            && !handle.borrow().is_empty()
+        {
+            copy_selected(
+                &view,
+                &handle,
+                CopySource {
+                    columns: &columns,
+                    driver_id: &driver_id,
+                },
+                SelectionCopyFormat::Tsv,
+                &sender,
+            );
+            return glib::Propagation::Stop;
+        }
         let Some((_, column, _)) = super::display::focused_cell_identity(&view) else {
             return glib::Propagation::Proceed;
         };
-        let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
         if key == gtk::gdk::Key::space && ctrl && !state.contains(gtk::gdk::ModifierType::SHIFT_MASK) {
             handle.borrow_mut().select_only(column);
-            changed(&view, &handle, &sender);
+            changed(&view, &handle, &sender, chrome.as_ref());
             return glib::Propagation::Stop;
         }
         if key == gtk::gdk::Key::Escape && !handle.borrow().is_empty() {
-            clear(&view, &handle, &sender);
+            clear(&view, &handle, &sender, chrome.as_ref());
             return glib::Propagation::Stop;
         }
         glib::Propagation::Proceed
@@ -311,6 +525,7 @@ fn install_click_clear(
     view: &gtk::ColumnView,
     handle: &ColumnSelectionHandle,
     sender: &Option<relm4::Sender<GridMsg>>,
+    chrome: Option<&gtk::Box>,
 ) {
     let gesture = gtk::GestureClick::builder()
         .button(gtk::gdk::BUTTON_PRIMARY)
@@ -319,6 +534,7 @@ fn install_click_clear(
     let weak = view.downgrade();
     let handle = handle.clone();
     let sender = sender.clone();
+    let chrome = chrome.cloned();
     gesture.connect_pressed(move |gesture, _, x, y| {
         let Some(view) = weak.upgrade() else { return };
         let extended = gesture
@@ -333,7 +549,7 @@ fn install_click_clear(
                 return;
             }
             if COLUMN_SLOT.get(&current).is_some() {
-                clear(&view, &handle, &sender);
+                clear(&view, &handle, &sender, chrome.as_ref());
                 return;
             }
             widget = current.parent();
@@ -362,7 +578,7 @@ pub(super) fn set_cells_entry(
                     slot.row_position.unwrap_or(0),
                 ))
             };
-            let columns = target_columns(&selection, slot.col_index);
+            let columns = target_columns(&selection, slot.col_index, &view_columns(&view));
             sender.send(GridMsg::SetCells(SetCellsRequest { columns, rows })).ok();
         })
         .build()
@@ -398,8 +614,18 @@ mod tests {
         let mut selection = ColumnSelection::default();
         selection.select_only(1);
         selection.toggle(3);
-        assert_eq!(target_columns(&selection, 3), vec![1, 3]);
-        assert_eq!(target_columns(&selection, 2), vec![2]);
+        assert_eq!(target_columns(&selection, 3, &[3, 1, 2]), vec![3, 1]);
+        assert_eq!(target_columns(&selection, 2, &[3, 1, 2]), vec![2]);
+    }
+
+    #[test]
+    fn duplicate_header_titles_keep_distinct_column_identity() {
+        let mut selection = ColumnSelection::default();
+        selection.select_only(2);
+        assert_eq!(
+            selected_header_slots(&[None, Some(2), Some(0), Some(1)], &selection),
+            [false, true, false, false]
+        );
     }
 
     #[test]

@@ -17,6 +17,13 @@ pub(crate) fn cell_allows_inline_edit(column: &ColumnInfo, value: &Value) -> boo
     cell_allows_inline_edit_with_column_eligibility(column, value, column_is_editable(column))
 }
 
+pub(crate) fn cell_allows_set_cells(column: &ColumnInfo, value: &Value) -> bool {
+    column_is_editable(column)
+        && (!is_bool_type(&column.data_type)
+            || matches!(value, Value::Bool(_) | Value::Null)
+            || (column.data_type.eq_ignore_ascii_case("bit(1)") && matches!(value, Value::Int(0 | 1))))
+}
+
 pub(super) fn cell_allows_inline_edit_with_column_eligibility(
     column: &ColumnInfo,
     value: &Value,

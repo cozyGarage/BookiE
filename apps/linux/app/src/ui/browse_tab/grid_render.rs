@@ -306,6 +306,7 @@ impl BrowseTab {
             row_number_base: self.current_offset,
             column_selection: self.column_selection.clone(),
             set_cells_enabled: self.allows_keyed_row_mutations(),
+            column_selection_chrome: None,
         };
         let (column_view, selection) = build_column_view(
             &result,
