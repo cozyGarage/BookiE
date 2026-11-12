@@ -14,7 +14,7 @@ BOOKIE_RC_VERSION="$(python3 scripts/check-release-version.py --print)" \
 BOOKIE_RC_DATE="$(date -u +%F)" bash scripts/build-arch-rc.sh
 ```
 
-The example builds the workspace release version from the committed tree. The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives that exact local commit, computes the checksum, builds with `makepkg`, and runs `namcap` and package-content validation. Set `BOOKIE_RC_TAG=linux-v…` instead of `BOOKIE_RC_COMMIT` to verify an already published tag against the remote. The Arch package replaces/conflicts with `bookie`; it retains production paths, application ID, gettext domain, keyring records, and legacy commands. Publication remains a separate decision.
+The example builds the workspace release version from the committed tree. The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives that exact local commit, computes the checksum, builds with `makepkg`, and runs `namcap` and package-content validation. Set `BOOKIE_RC_TAG=linux-v…` instead of `BOOKIE_RC_COMMIT` to verify an already published tag against the remote. The Arch package is named `bookie` and replaces/conflicts with the legacy `tablepro` package. It installs `bookie`, `bookie-agentd`, and `bookie-askpass`; it does not install legacy command aliases. Publication remains a separate decision.
 
 The standalone build, upgrade and removal wrapper runs in an isolated Arch container:
 
