@@ -82,7 +82,7 @@ fn grants_sql() -> String {
     format!(
         "SELECT n.nspname, c.relname,
              CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(a.grantee) END
-                 || ': ' || string_agg(a.privilege_type, ', ' ORDER BY a.privilege_type)
+                 || ': ' || pg_catalog.string_agg(a.privilege_type, ', ' ORDER BY a.privilege_type)
          FROM pg_catalog.pg_class c
          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
          CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))) a
@@ -101,7 +101,7 @@ const EXTENSIONS_SQL: &str = "SELECT n.nspname, e.extname, e.extversion
      ORDER BY 2 LIMIT $2";
 
 const ROLES_SQL: &str = "SELECT NULL::text, r.rolname,
-         NULLIF(concat_ws(', ',
+         NULLIF(pg_catalog.concat_ws(', ',
              CASE WHEN r.rolsuper THEN 'superuser' END,
              CASE WHEN r.rolcanlogin THEN 'login' END,
              CASE WHEN r.rolcreatedb THEN 'create database' END,

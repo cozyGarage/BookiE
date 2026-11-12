@@ -193,10 +193,10 @@ impl Connection for PgConnection {
     async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
         let rows = sqlx::query(
             "SELECT collname::text,
-                    CASE WHEN collencoding = -1 THEN '' ELSE pg_encoding_to_char(collencoding) END,
+                    CASE WHEN collencoding = -1 THEN '' ELSE pg_catalog.pg_encoding_to_char(collencoding) END,
                     collname = 'default'
-             FROM pg_collation
-             WHERE collencoding IN (-1, pg_char_to_encoding(pg_encoding_to_char((SELECT encoding FROM pg_database WHERE datname = current_database()))))
+             FROM pg_catalog.pg_collation
+             WHERE collencoding IN (-1, pg_catalog.pg_char_to_encoding(pg_catalog.pg_encoding_to_char((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))))
              ORDER BY collname
              LIMIT $1",
         )
@@ -216,8 +216,8 @@ impl Connection for PgConnection {
 
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
-            "SELECT datname FROM pg_database
-             WHERE datallowconn AND NOT datistemplate AND has_database_privilege(datname, 'CONNECT')
+            "SELECT datname FROM pg_catalog.pg_database
+             WHERE datallowconn AND NOT datistemplate AND pg_catalog.has_database_privilege(datname, 'CONNECT')
              ORDER BY datname",
         )
         .fetch_all(&self.pool)
@@ -582,7 +582,7 @@ impl Connection for PgConnection {
                     SELECT CASE WHEN k.attnum = 0
                         THEN pg_catalog.pg_get_indexdef(ix.indexrelid, k.ordinality::int, true)
                         ELSE a.attname::text END
-                    FROM unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ordinality)
+                    FROM pg_catalog.unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ordinality)
                     LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
                     WHERE k.ordinality <= ix.indnkeyatts
                     ORDER BY k.ordinality
@@ -658,10 +658,10 @@ impl Connection for PgConnection {
         let rows = sqlx::query(
             "SELECT
                 c.conname AS fk_name,
-                array_agg(a.attname ORDER BY kf.ordinality) AS columns,
+                pg_catalog.array_agg(a.attname ORDER BY kf.ordinality) AS columns,
                 fn_class.relname AS ref_table,
                 fn_ns.nspname AS ref_schema,
-                array_agg(fa.attname ORDER BY kf.ordinality) AS ref_columns,
+                pg_catalog.array_agg(fa.attname ORDER BY kf.ordinality) AS ref_columns,
                 c.confdeltype::text AS on_delete_code,
                 c.confupdtype::text AS on_update_code
             FROM pg_catalog.pg_constraint c
@@ -669,9 +669,9 @@ impl Connection for PgConnection {
             JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
             JOIN pg_catalog.pg_class fn_class ON fn_class.oid = c.confrelid
             JOIN pg_catalog.pg_namespace fn_ns ON fn_ns.oid = fn_class.relnamespace
-            JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
+            JOIN LATERAL pg_catalog.unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
             JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = kf.attnum
-            JOIN LATERAL unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
+            JOIN LATERAL pg_catalog.unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
                 ON kfr.ordinality = kf.ordinality
             JOIN pg_catalog.pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = kfr.attnum
             WHERE c.contype = 'f'
@@ -713,16 +713,16 @@ impl Connection for PgConnection {
                 c.conname AS fk_name,
                 t_ns.nspname AS source_schema,
                 t.relname AS source_table,
-                array_agg(a.attname ORDER BY kf.ordinality) AS source_columns,
-                array_agg(fa.attname ORDER BY kf.ordinality) AS target_columns
+                pg_catalog.array_agg(a.attname ORDER BY kf.ordinality) AS source_columns,
+                pg_catalog.array_agg(fa.attname ORDER BY kf.ordinality) AS target_columns
             FROM pg_catalog.pg_constraint c
             JOIN pg_catalog.pg_class t ON t.oid = c.conrelid
             JOIN pg_catalog.pg_namespace t_ns ON t_ns.oid = t.relnamespace
             JOIN pg_catalog.pg_class fn_class ON fn_class.oid = c.confrelid
             JOIN pg_catalog.pg_namespace fn_ns ON fn_ns.oid = fn_class.relnamespace
-            JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
+            JOIN LATERAL pg_catalog.unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
             JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = kf.attnum
-            JOIN LATERAL unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
+            JOIN LATERAL pg_catalog.unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
                 ON kfr.ordinality = kf.ordinality
             JOIN pg_catalog.pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = kfr.attnum
             WHERE c.contype = 'f'

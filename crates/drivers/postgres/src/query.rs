@@ -306,7 +306,7 @@ async fn refresh_domain_column_names(
     let rows = sqlx::query(
         "SELECT origin.ordinality - 1, pg_catalog.format_type(attribute.atttypid, NULL), \
                 namespace.nspname, declared_type.typname \
-         FROM unnest($1::bigint[], $2::smallint[]) WITH ORDINALITY \
+         FROM ROWS FROM (pg_catalog.unnest($1::bigint[]), pg_catalog.unnest($2::smallint[])) WITH ORDINALITY \
               AS origin(relation_id, attribute_number, ordinality) \
          JOIN pg_catalog.pg_attribute AS attribute \
            ON attribute.attrelid::bigint = origin.relation_id \
@@ -373,7 +373,7 @@ async fn refresh_enum_type_names(
          JOIN pg_catalog.pg_namespace AS ns ON ns.oid = type.typnamespace \
          LEFT JOIN pg_catalog.pg_type AS elem ON elem.oid = type.typelem AND type.typtype = 'b' AND elem.typtype = 'e' \
          LEFT JOIN pg_catalog.pg_namespace AS elem_ns ON elem_ns.oid = elem.typnamespace \
-         WHERE type.oid IN (SELECT unnest($1::bigint[])::oid)",
+         WHERE type.oid IN (SELECT pg_catalog.unnest($1::bigint[])::oid)",
     )
     .bind(&type_oids)
     .fetch_all(&mut **connection)

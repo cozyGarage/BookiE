@@ -38,7 +38,7 @@ const COLUMNS_SQL: &str = "SELECT a.attnum::int4, a.attname::text, \
     WHERE a.attrelid = $1::int8::oid AND a.attnum > 0 AND NOT a.attisdropped ORDER BY a.attnum";
 
 const PRIMARY_KEY_SQL: &str = "SELECT k.attnum::int4 FROM pg_catalog.pg_constraint c, \
-    LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, position) \
+    LATERAL pg_catalog.unnest(c.conkey) WITH ORDINALITY AS k(attnum, position) \
     WHERE c.conrelid = $1::int8::oid AND c.contype = 'p' ORDER BY k.position";
 
 struct Relation {
