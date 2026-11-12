@@ -134,7 +134,7 @@
     "drivers": {
       "purpose": "Database drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
-      "hosted_gate": "Build Linux / integration (driver-core, driver-analytics, driver-extended, socket-ssh); lab-ci / driver (core, analytics, extended), consumers and socket-ssh",
+      "hosted_gate": "Build Linux / integration (driver-core, driver-analytics, driver-extended, socket-ssh); lab-ci / driver (driver-core, driver-analytics, driver-extended, socket-ssh), consumers",
       "steps": [
         {
           "argv": [
@@ -275,7 +275,7 @@
     "ssh": {
       "purpose": "Agent authentication and OpenSSH sessions",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / socket-ssh",
+      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / driver (socket-ssh)",
       "steps": [
         {
           "argv": [
@@ -290,7 +290,7 @@
     "socket-ssh": {
       "purpose": "PostgreSQL Unix-socket and OpenSSH integration tests",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / socket-ssh",
+      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / driver (socket-ssh)",
       "steps": [
         {
           "argv": ["bash", "scripts/test-postgres-socket.sh"],

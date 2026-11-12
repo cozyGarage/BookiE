@@ -702,18 +702,19 @@ jobs:
   driver:
     runs-on: any-host
     needs: [pin-revision, guards, clippy, test-build]
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/driver-${{ matrix.driver }}
-      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}
+      CARGO_TARGET_DIR: /var/cache/ci/target/${{ matrix.group }}
+      TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
+      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
     strategy:
       fail-fast: false
       matrix:
-        driver: [core, analytics, extended]
+        group: [driver-core, driver-analytics, driver-extended, socket-ssh]
     steps:
       - name: Prepare runner workspace
         run: |
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
           rm -rf src
       - name: Check runner space before checkout
         shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
@@ -731,19 +732,34 @@ jobs:
           BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
           BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
           BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "driver-${{ matrix.driver }}"
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" "${{ matrix.group }}"
       - name: Docker Hub login
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull PostgreSQL socket fixture image
+        if: matrix.group == 'socket-ssh'
+        run: bash src/scripts/prepull-test-images.sh socket-ssh
       - name: Driver integration
-        run: cd src && python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"
+        env:
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
+        run: |
+          cd src
+          if [[ "$BOOKIE_TEST_LAYER" == socket-ssh ]]; then
+            cleanup_testcontainers() {
+              python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
+            }
+            trap cleanup_testcontainers EXIT
+            trap 'cleanup_testcontainers; exit 143' TERM
+            trap 'cleanup_testcontainers; exit 130' INT
+          fi
+          python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"
       - name: Pre-pull pg_dump image
-        if: matrix.driver == 'core'
+        if: matrix.group == 'driver-core'
         run: bash src/scripts/prepull-test-images.sh pg-dump
       - name: PostgreSQL dump and restore
-        if: matrix.driver == 'core'
+        if: matrix.group == 'driver-core'
         run: cd src && python3 scripts/run-test-layer.py pg-dump
 
       - name: Finalize runner job
@@ -1059,61 +1075,6 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  socket-ssh:
-    runs-on: any-host
-    needs: [pin-revision, guards, clippy, test-build]
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/socket-ssh
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-socket-ssh
-    steps:
-      - name: Prepare runner workspace
-        run: |
-          rm -rf src
-      - name: Check runner space before checkout
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        run: true
-      - name: Check out source revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          persist-credentials: false
-          fetch-depth: 1
-          path: src
-      - name: Obtain the source-pinned test bundle
-        env:
-          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
-          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
-          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
-        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" socket-ssh
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: Pre-pull PostgreSQL socket fixture image
-        run: bash src/scripts/prepull-test-images.sh socket-ssh
-      - name: PostgreSQL socket and SSH fixtures
-        run: |
-          cd src
-          cleanup_testcontainers() {
-            python3 scripts/cleanup-testcontainers.py "$BOOKIE_TEST_RUN_ID"
-          }
-          trap cleanup_testcontainers EXIT
-          trap 'cleanup_testcontainers; exit 143' TERM
-          trap 'cleanup_testcontainers; exit 130' INT
-          python3 scripts/run-test-layer.py socket-ssh
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
   gtk-server:
     runs-on: any-host
     needs: [pin-revision, guards, clippy, gtk-build]
@@ -1339,7 +1300,6 @@ jobs:
       - consumers
       - gtk
       - pg-release
-      - socket-ssh
       - gtk-server
       - driver-tls
       - keyring

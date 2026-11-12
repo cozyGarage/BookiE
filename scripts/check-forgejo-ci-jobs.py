@@ -20,7 +20,6 @@ REQUIRED = {
     "consumers",
     "gtk",
     "pg-release",
-    "socket-ssh",
     "gtk-server",
     "driver-tls",
     "keyring",

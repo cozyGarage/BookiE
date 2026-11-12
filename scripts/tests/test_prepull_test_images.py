@@ -170,10 +170,11 @@ class PrepullTestImagesTests(unittest.TestCase):
         for job, group, command in (
             ("pg-release", "pg-release", "python3 scripts/run-test-layer.py postgres-release"),
             ("driver", "pg-dump", "python3 scripts/run-test-layer.py pg-dump"),
-            ("socket-ssh", "socket-ssh", "python3 scripts/run-test-layer.py socket-ssh"),
+            ("driver", "socket-ssh", 'python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"'),
             ("driver-tls", "driver-tls", "python3 scripts/run-test-layer.py tls"),
         ):
-            body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", ci).group(1)
+            end_job = "b4-rollback" if job == "driver" else "[a-z][a-z0-9-]*"
+            body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  {end_job}:\n|\Z)", ci).group(1)
             prepull = body.index(f"bash src/scripts/prepull-test-images.sh {group}")
             self.assertLess(prepull, body.index(command))
 
@@ -195,9 +196,14 @@ class PrepullTestImagesTests(unittest.TestCase):
 
     def test_the_driver_jobs_pre_pull_before_their_tests(self):
         ci = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        driver = ci.split("  driver:\n", 1)[1].split("  e2e:\n", 1)[0]
+        driver = ci.split("  driver:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         group = (ROOT / "scripts/run-driver-group.sh").read_text()
-        self.assertIn('python3 scripts/run-test-layer.py "driver-${{ matrix.driver }}"', driver)
+        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", driver)
+        self.assertIn('mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"', driver)
+        self.assertIn("if: matrix.group == 'socket-ssh'", driver)
+        self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', driver)
+        self.assertLess(driver.index("bash src/scripts/prepull-test-images.sh socket-ssh"),
+                        driver.index('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"'))
         self.assertIn('bash scripts/prepull-test-images.sh "$driver"', group)
         self.assertLess(group.index('bash scripts/prepull-test-images.sh "$driver"'), group.index("bash scripts/run-rust-tests.sh"))
         self.assertIn("bash src/scripts/prepull-test-images.sh driver-tls", ci)

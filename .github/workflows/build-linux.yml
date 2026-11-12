@@ -648,7 +648,7 @@ jobs:
     name: Driver integration tests (docker) (${{ matrix.group }})
     timeout-minutes: 90
     runs-on: ubuntu-24.04
-    needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]
+    needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]
     strategy:
       fail-fast: false
       matrix:
