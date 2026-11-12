@@ -220,6 +220,10 @@ impl App {
                 let mut tabs = workspace_tabs_for_create.borrow_mut();
                 tabs.insert(tab_id, WorkspaceTab::Editor(slot));
             }
+            sender_for_create.input(AppMsg::AttachWorkspaceTab {
+                tab_id,
+                connection_id: super::multi_session::overview_new_tab_connection(&front_connection_id_for_create),
+            });
             sender_for_create.input(AppMsg::WorkspaceTabsChanged);
             page
         });
@@ -341,6 +345,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Structure(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -470,6 +475,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert_with_preview(tab_id, WorkspaceTab::Table(slot), preview);
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -525,6 +531,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Structure(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.refresh_window_title();
@@ -585,6 +592,7 @@ impl App {
         self.workspace_tabs
             .borrow_mut()
             .insert(tab_id, WorkspaceTab::Editor(slot));
+        self.attach_tab_to_front(tab_id);
         tab_view.set_selected_page(&page);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         self.show_in_content_holder(&self.workspace_outer_stack);
@@ -633,14 +641,15 @@ impl App {
         let Some(mut removed) = removed else {
             return;
         };
+        let owner = self.multi.sessions.detach_tab(id);
         // Snapshot the closed tab into the reopen stack BEFORE running
         // the per-kind teardown below — the BrowseModel still has its
         // pagination + sort state intact, and the EditorTabSlot still
         // owns the latest query buffer. New-mode Structure drafts are
         // skipped because the table they describe doesn't exist yet,
         // so reopening a draft would be useless.
-        if let Some(descriptor) = describe_closed_tab(&mut removed, preview) {
-            push_closed_tab(&self.closed_tabs_stack, descriptor);
+        if let (Some(owner), Some(descriptor)) = (owner, describe_closed_tab(&mut removed, preview)) {
+            push_closed_tab(&self.closed_tabs_stack, owner, descriptor);
         }
         // Drop any close-after-save / window-close-after-save intent
         // pinned to this tab. `close_tabs_for_table` (Drop Table)
@@ -969,22 +978,24 @@ fn browse_tab_tooltip(schema: Option<&str>, table: &str, label: &str) -> Option<
 }
 
 fn push_closed_tab(
-    stack: &std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<ClosedTabDescriptor>>>,
+    stack: &std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<(Uuid, ClosedTabDescriptor)>>>,
+    owner: Uuid,
     descriptor: ClosedTabDescriptor,
 ) {
     let mut q = stack.borrow_mut();
     if q.len() == CLOSED_TABS_CAPACITY {
         q.pop_front();
     }
-    q.push_back(descriptor);
+    q.push_back((owner, descriptor));
 }
 
 impl App {
     pub(super) fn on_reopen_closed_tab(&mut self, sender: ComponentSender<Self>) {
-        if !self.connected {
+        let Some(front) = self.connection_id.filter(|_| self.connected) else {
             return;
-        }
-        let descriptor = self.closed_tabs_stack.borrow_mut().pop_back();
+        };
+        let descriptor =
+            bookie_app_services::window_sessions::take_latest_for(&mut self.closed_tabs_stack.borrow_mut(), front);
         let Some(descriptor) = descriptor else {
             // Stack empty — nothing to reopen. Toast keeps the
             // shortcut from feeling broken when the user hits it

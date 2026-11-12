@@ -30,7 +30,7 @@ impl App {
         sources: Vec<StatementSource>,
         sender: ComponentSender<App>,
     ) {
-        let Some(conn) = self.window_connection() else {
+        let (Some(conn), Some(tab_driver_id)) = (self.tab_connection(tab_id), self.tab_driver_id(tab_id)) else {
             self.finish_browse_save_failure(tab_id, save_id, bookie_app_services::tr!("No active connection"));
             return;
         };
@@ -40,11 +40,10 @@ impl App {
         // below would read as "every row vanished". Skip the guard for
         // them rather than warn on every successful save.
         let reports_rows_affected = self
-            .current_driver_id
-            .as_ref()
-            .and_then(|id| self.registry.get(id))
+            .registry
+            .get(&tab_driver_id)
             .is_none_or(|driver| driver.capabilities().reports_rows_affected);
-        let checked_writes = checked_write_indexes(self.current_driver_id.as_deref(), &sources);
+        let checked_writes = checked_write_indexes(Some(&tab_driver_id), &sources);
         self.set_row_op_in_flight(true);
         // Increment the in-flight counter so window-close blocks until
         // the transaction resolves. Decrement happens in the
@@ -52,9 +51,8 @@ impl App {
         // outcome.
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let mut recorded = self.ran_statements(Source::Browse, &sql_without_parameters(&statements));
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let mut recorded = self.ran_statements(tab_id, Source::Browse, &sql_without_parameters(&statements));
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {

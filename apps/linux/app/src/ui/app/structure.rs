@@ -98,9 +98,13 @@ impl App {
             self.show_toast(&bookie_app_services::tr!("Connect to a database first."));
             return;
         }
-        let existing_structure = self.workspace_tabs.borrow().iter().find_map(|(_, tab)| match tab {
+        let front = self.connection_id;
+        let existing_structure = self.workspace_tabs.borrow().iter().find_map(|(id, tab)| match tab {
             WorkspaceTab::Structure(slot)
-                if slot.mode == StructureMode::Edit && slot.schema == schema && slot.table == table =>
+                if slot.mode == StructureMode::Edit
+                    && slot.schema == schema
+                    && slot.table == table
+                    && self.tab_belongs_to(*id, front) =>
             {
                 Some(slot.page.clone())
             }
@@ -115,11 +119,16 @@ impl App {
         self.append_existing_structure_tab(schema, table, sender);
     }
 
-    fn has_open_tabs_for_table(&self, schema: Option<&str>, table: &str) -> bool {
-        self.workspace_tabs.borrow().values().any(|tab| match tab {
-            WorkspaceTab::Structure(s) => s.schema.as_deref() == schema && s.table == table,
-            WorkspaceTab::Table(s) => s.schema.as_deref() == schema && s.table == table,
-            _ => false,
+    fn has_open_tabs_for_table(&self, connection_id: Uuid, schema: Option<&str>, table: &str) -> bool {
+        self.workspace_tabs.borrow().iter().any(|(id, tab)| {
+            if !self.tab_belongs_to(*id, Some(connection_id)) {
+                return false;
+            }
+            match tab {
+                WorkspaceTab::Structure(s) => s.schema.as_deref() == schema && s.table == table,
+                WorkspaceTab::Table(s) => s.schema.as_deref() == schema && s.table == table,
+                _ => false,
+            }
         })
     }
 
@@ -219,7 +228,7 @@ impl App {
         let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             return;
         };
-        if self.has_open_tabs_for_table(schema.as_deref(), &table) {
+        if self.has_open_tabs_for_table(origin.id, schema.as_deref(), &table) {
             self.show_error_alert(
                 &bookie_app_services::tr!("Cannot rename table"),
                 &bookie_app_services::tr!("Close the open tabs for {table} first, so no pending changes are lost.")
@@ -417,7 +426,10 @@ impl App {
             );
             return;
         }
-        let driver_id = self.driver_id().to_string();
+        let Some(driver_id) = self.tab_driver_id(tab_id) else {
+            self.report_refused_tab_save(tab_id, &sender);
+            return;
+        };
         let result = self
             .structure_trackers
             .with_tab_ref(tab_id, |t| t.materialize(&driver_id));
@@ -429,7 +441,7 @@ impl App {
                 // Nothing to save — short-circuit so close-after-save
                 // can proceed.
                 sender.input(AppMsg::StructureSaveCompleted {
-                    origin: CatalogOrigin::capture(self.connection_id, &self.database),
+                    origin: self.tab_origin(tab_id),
                     tab_id,
                     new_table_name: None,
                 });
@@ -455,7 +467,7 @@ impl App {
         if !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
-        self.close_tabs_for_table(schema.as_deref(), &table);
+        self.close_tabs_for_table(origin.id, schema.as_deref(), &table);
         sender.input(AppMsg::SchemaChanged {
             origin: origin.clone(),
             schema,
@@ -466,12 +478,15 @@ impl App {
     /// Walk the tab map and force-close any Browse / Structure tabs
     /// pointing at `(schema, table)`. Skips the per-tab pending-changes
     /// dialog because the underlying table is gone.
-    pub(super) fn close_tabs_for_table(&mut self, schema: Option<&str>, table: &str) {
+    pub(super) fn close_tabs_for_table(&mut self, connection_id: Uuid, schema: Option<&str>, table: &str) {
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
         };
         let mut targets: Vec<Uuid> = Vec::new();
         for (id, tab) in self.workspace_tabs.borrow().iter() {
+            if !self.tab_belongs_to(*id, Some(connection_id)) {
+                continue;
+            }
             match tab {
                 WorkspaceTab::Structure(s) if s.schema.as_deref() == schema && s.table == table => targets.push(*id),
                 WorkspaceTab::Table(s) if s.schema.as_deref() == schema && s.table == table => targets.push(*id),
@@ -503,12 +518,9 @@ impl App {
             tracing::debug!(?tab_id, "structure save already in flight; ignoring duplicate");
             return;
         }
-        let Some(driver_id) = self.current_driver_id.clone() else {
+        let Some(driver_id) = self.tab_driver_id(tab_id) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-            sender.input(AppMsg::StructureSaveFailed(
-                tab_id,
-                bookie_app_services::tr!("No active connection."),
-            ));
+            self.report_refused_tab_save(tab_id, &sender);
             return;
         };
         let ddl_is_transactional = self
@@ -553,7 +565,7 @@ impl App {
             None
         };
 
-        let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
+        let Some(origin) = self.tab_origin(tab_id) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
             sender.input(AppMsg::StructureSaveFailed(
                 tab_id,
@@ -563,10 +575,9 @@ impl App {
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let mut recorded = self.ran_statements(Source::Structure, &statements);
+        let mut recorded = self.ran_statements(tab_id, Source::Structure, &statements);
         let connection = origin.connection(&self.database);
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
@@ -630,7 +641,7 @@ impl App {
         }
         self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
 
-        let Some(origin) = origin.filter(|origin| origin.owns_window(self.connection_id, &self.database)) else {
+        let Some(origin) = origin.filter(|origin| self.tab_owns_origin(tab_id, origin)) else {
             return;
         };
 
@@ -733,6 +744,7 @@ impl App {
         // tab will spuriously close the window.
         self.close_after_save.borrow_mut().cancel(&tab_id);
         self.close_window_after_save.set(false);
+        self.announce_save_failure(tab_id, &message);
         if let Some(controller) = self
             .workspace_tabs
             .borrow()
@@ -936,11 +948,17 @@ impl App {
         };
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
         let sender_for_cmd = sender.clone();
-        let capabilities = crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id());
-        let connection_id = self.connection_id;
+        let Some(tab_driver_id) = self.tab_driver_id(tab_id) else {
+            sender.input(AppMsg::StructureLoadFailed {
+                tab_id,
+                message: bookie_app_services::tr!("No active connection."),
+            });
+            return;
+        };
+        let capabilities = crate::ui::structure_tab::driver_capabilities_for(&self.registry, &tab_driver_id);
+        let connection_id = self.resolve_tab_connection(tab_id).ok();
         let database = self.database.clone();
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
@@ -1017,13 +1035,13 @@ impl App {
     pub(super) fn on_fetch_collations(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Structure);
         let sender_for_cmd = sender.clone();
-        let connection_id = self.connection_id;
+        let connection_id = self.resolve_tab_connection(tab_id).ok();
         let database = self.database.clone();
-        let table_default_supported =
-            crate::ui::structure_tab::driver_capabilities_for(&self.registry, self.driver_id())
-                .supports_table_default_collation;
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let table_default_supported = self.tab_driver_id(tab_id).is_some_and(|driver_id| {
+            crate::ui::structure_tab::driver_capabilities_for(&self.registry, &driver_id)
+                .supports_table_default_collation
+        });
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {

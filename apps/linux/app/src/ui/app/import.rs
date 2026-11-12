@@ -514,7 +514,8 @@ impl App {
             .iter()
             .filter_map(|(id, tab)| match tab {
                 WorkspaceTab::Table(slot)
-                    if import_targets_table(slot.schema.as_deref(), &slot.table, schema, table) =>
+                    if import_targets_table(slot.schema.as_deref(), &slot.table, schema, table)
+                        && self.tab_belongs_to(*id, self.connection_id) =>
                 {
                     Some(*id)
                 }

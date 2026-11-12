@@ -21,15 +21,20 @@ impl App {
             mode: open_mode,
             preview_enabled: self.preferences.load().open_tables_in_preview_tab,
         };
-        let plan = self.workspace_tabs.borrow().plan_table_open(request, |id| {
-            self.change_trackers
-                .with_tab_ref(id, |tracker| tracker.has_pending())
-                .unwrap_or(false)
-                || self
-                    .structure_trackers
+        let front = self.connection_id;
+        let plan = self.workspace_tabs.borrow().plan_table_open_scoped(
+            request,
+            |id| {
+                self.change_trackers
                     .with_tab_ref(id, |tracker| tracker.has_pending())
                     .unwrap_or(false)
-        });
+                    || self
+                        .structure_trackers
+                        .with_tab_ref(id, |tracker| tracker.has_pending())
+                        .unwrap_or(false)
+            },
+            |id| self.tab_belongs_to(id, front),
+        );
         let TableOpenPlan::Append {
             preview: is_preview,
             replace,

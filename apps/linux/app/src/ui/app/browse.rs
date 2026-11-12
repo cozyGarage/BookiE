@@ -50,7 +50,7 @@ impl App {
                 return;
             }
         };
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             self.fail_browse_cell_value(
                 &sender,
                 tab_id,
@@ -61,8 +61,7 @@ impl App {
             );
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::CellValue);
         let reply = sender.clone();
         sender.command(move |_, shutdown| {
@@ -152,7 +151,7 @@ impl App {
         };
 
         let offset = request.offset;
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             sender.input(AppMsg::LoadFailed(
                 Some(tab_id),
                 BrowseLoadFailure {
@@ -169,7 +168,8 @@ impl App {
         let hidden_columns = if pending {
             std::collections::HashSet::new()
         } else {
-            self.connection_id
+            self.resolve_tab_connection(tab_id)
+                .ok()
                 .zip(self.persistence.column_widths.as_ref())
                 .map(|(connection_id, store)| store.hidden_columns(connection_id, &table))
                 .unwrap_or_default()
@@ -207,8 +207,7 @@ impl App {
             }
         };
 
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Page);
         let sender_clone = sender.clone();
         let reverse_rows = matches!(&query, PageQuery::Sql(bound) if bound.reverse_rows);
@@ -262,14 +261,13 @@ impl App {
             (model.schema().map(str::to_owned), model.table().to_string())
         };
 
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let check_view = self
-            .registry
-            .get(self.driver_id())
+            .tab_driver_id(tab_id)
+            .and_then(|driver_id| self.registry.get(&driver_id))
             .is_some_and(|driver| driver.capabilities().supports_updatable_views)
             && !self.relation_is_ordinary_table(schema.as_deref(), &table);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Columns);
@@ -323,11 +321,10 @@ impl App {
             (model.schema().map(str::to_owned), model.table().to_string())
         };
 
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::ForeignKeys);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -373,7 +370,7 @@ impl App {
             )
         };
 
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
 
@@ -395,8 +392,7 @@ impl App {
             }
         };
 
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Count);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -443,11 +439,10 @@ impl App {
         targets: Vec<(String, bookie_core::QualifiedTypeName)>,
         sender: ComponentSender<Self>,
     ) {
-        let Some(conn) = self.window_connection() else {
+        let Some(conn) = self.tab_connection(tab_id) else {
             return;
         };
-        let timeout_secs =
-            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let timeout_secs = self.tab_timeout_secs(tab_id);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::EnumLabels);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -572,18 +567,24 @@ impl App {
                 };
                 crate::ui::export_dialog::present(&self.window, &self.toast_overlay, request, &self.preferences);
             }
-            FrontExport::Editor { result, name } => crate::ui::export_dialog::present(
-                &self.window,
-                &self.toast_overlay,
-                crate::ui::export_dialog::ExportRequest {
-                    scope: crate::ui::export_dialog::ExportScope::QueryResult,
-                    paged: None,
-                    result,
-                    suggested_name: name,
-                    driver_id: self.driver_id().to_string(),
-                },
-                &self.preferences,
-            ),
+            FrontExport::Editor { result, name } => {
+                let Some(driver_id) = self.tab_driver_id(id) else {
+                    self.show_toast(&bookie_app_services::tr!("Nothing to export"));
+                    return;
+                };
+                crate::ui::export_dialog::present(
+                    &self.window,
+                    &self.toast_overlay,
+                    crate::ui::export_dialog::ExportRequest {
+                        scope: crate::ui::export_dialog::ExportScope::QueryResult,
+                        paged: None,
+                        result,
+                        suggested_name: name,
+                        driver_id,
+                    },
+                    &self.preferences,
+                )
+            }
             FrontExport::Empty => self.show_toast(&bookie_app_services::tr!("Nothing to export")),
         }
     }
@@ -594,6 +595,10 @@ impl App {
             return None;
         };
         let Some(active_id) = self.selected_browse_tab_id() else {
+            self.show_toast(&bookie_app_services::tr!("Nothing to export"));
+            return None;
+        };
+        let Some(driver_id) = self.tab_driver_id(active_id) else {
             self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return None;
         };
@@ -631,7 +636,7 @@ impl App {
             paged: self.snapshot_export(active_id),
             result: std::sync::Arc::new(result),
             suggested_name: table_label,
-            driver_id: self.driver_id().to_string(),
+            driver_id,
         })
     }
 
@@ -687,26 +692,24 @@ impl App {
             filter: model.current_filter().clone(),
             sort: model.current_sort(),
             row_id_order: self.relation_is_ordinary_table(model.schema(), model.table()),
-            timeout_secs: crate::services::operation_control::timeout_for(
-                &self.preferences,
-                &self.database,
-                self.connection_id,
-            ),
+            timeout_secs: self.tab_timeout_secs(tab_id),
         };
         let total = model.total_rows().and_then(|total| usize::try_from(total).ok());
         Some((plan, total))
     }
 
     fn snapshot_export(&self, tab_id: Uuid) -> Option<crate::ui::export_dialog::PagedExport> {
+        let driver_id = self.tab_driver_id(tab_id)?;
         let supported = self
             .registry
-            .get(self.driver_id())
+            .get(&driver_id)
             .is_some_and(|driver| driver.capabilities().supports_snapshot_export);
         if !supported {
             return None;
         }
         let guard = self
-            .connection_id
+            .resolve_tab_connection(tab_id)
+            .ok()
             .and_then(|id| self.database.guard(id, bookie_policy::Principal::human_gui()))?;
         let (plan, total_rows) = self.export_page_plan(tab_id)?;
         Some(crate::ui::export_dialog::PagedExport {
@@ -720,7 +723,7 @@ impl App {
         let selected = self.selected_browse_tab_id();
         let planned = selected
             .and_then(|id| self.export_page_plan(id))
-            .zip(self.window_connection());
+            .zip(selected.and_then(|id| self.tab_connection(id)));
         let (Some(selected), Some(((plan, total_rows), conn))) = (selected, planned) else {
             self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return;
@@ -730,6 +733,7 @@ impl App {
             None => plan.table.clone(),
         };
         let snapshot = self.snapshot_export(selected);
+        let driver_id = plan.driver_id.clone();
         let columns_only = QueryResult {
             columns: plan.columns.clone(),
             rows: Vec::new().into(),
@@ -755,7 +759,7 @@ impl App {
                 })),
                 result: std::sync::Arc::new(columns_only),
                 suggested_name: label,
-                driver_id: self.driver_id().to_string(),
+                driver_id,
             },
             matches!(format, ExportFormat::Json),
             &self.preferences,

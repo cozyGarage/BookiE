@@ -54,6 +54,7 @@ impl App {
 
     pub(super) fn finish_browse_save_failure(&mut self, tab_id: Uuid, save_id: Uuid, message: String) {
         self.set_row_op_in_flight(false);
+        self.announce_save_failure(tab_id, &message);
         cancel_browse_save_intents(
             &mut self.close_after_save.borrow_mut(),
             &self.close_window_after_save,
