@@ -384,7 +384,7 @@
     "keyring": {
       "purpose": "Secret Service persistence and transport contracts",
       "prerequisites": "Rust 1.98; gnome-keyring; libsecret tools; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-safety; lab-ci / keyring",
+      "hosted_gate": "Build Linux / keyring; lab-ci / keyring",
       "steps": [
         {
           "argv": [

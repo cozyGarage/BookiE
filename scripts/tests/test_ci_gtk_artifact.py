@@ -47,7 +47,7 @@ class GtkArtifactWorkflowTests(unittest.TestCase):
         self.assertNotIn("--no-default-features", build_job)
         self.assertNotRegex(build_job, r"cargo build[^\n]*--features")
         self.assertEqual(len(re.findall(r"ci-gtk-artifact\.py create (?!--package)", workflow)), 1)
-        for name in ("e2e", "gtk", "gtk-server"):
+        for name in ("gtk", "gtk-server"):
             job = jobs[name]
             self.assertRegex(job, r"needs: \[[^\]]*gtk-build[^\]]*\]")
             self.assertNotIn("test-build", job)

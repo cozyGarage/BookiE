@@ -489,7 +489,7 @@ class CiWorkflowTests(unittest.TestCase):
         providers = bundle_groups["providers"]
         self.assertEqual(set(providers["github"]), {
             "direct", "consumers", "driver-core", "driver-analytics", "driver-extended",
-            "socket-ssh", "driver-tls",
+            "socket-ssh", "driver-tls", "keyring",
         })
         self.assertEqual(set(providers["forgejo"]), {
             "direct", "consumers", "driver-core", "driver-analytics", "driver-extended",
@@ -1398,15 +1398,20 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("ci-gtk-artifact.py verify target/gtk-safety", gtk_safety)
         self.assertIn("GSETTINGS_SCHEMA_DIR=", gtk_safety)
 
-    def test_gtk_safety_installs_pinned_rust_before_keyring_tests(self):
+    def test_github_keyring_uses_a_source_pinned_prebuilt_bundle(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        gtk_safety = workflow.split("  gtk-safety:\n", 1)[1].split("  current-stable-clippy:\n", 1)[0]
-        toolchain_action = "uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772"
-        keyring_step = "name: Secret Service round-trip"
+        keyring = re.search(r"(?ms)^  keyring:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        gtk_safety = re.search(r"(?ms)^  gtk-safety:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        gate = workflow.split("  regression-gate:\n", 1)[1]
 
-        self.assertIn(toolchain_action, gtk_safety)
-        self.assertIn("toolchain: 1.98", gtk_safety)
-        self.assertLess(gtk_safety.index(toolchain_action), gtk_safety.index(keyring_step))
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", keyring)
+        self.assertIn("--expected-group keyring", keyring)
+        self.assertIn("BOOKIE_REQUIRE_PREBUILT: \"1\"", keyring)
+        self.assertIn("python3 scripts/run-test-layer.py keyring", keyring)
+        self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-keyring", keyring)
+        self.assertNotIn("run-test-layer.py keyring", gtk_safety)
+        self.assertIn("- keyring", gate)
+        self.assertIn("keyring", checker.REQUIRED)
 
     def test_postgres_release_runs_on_the_supported_gtk_floor_with_host_docker(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

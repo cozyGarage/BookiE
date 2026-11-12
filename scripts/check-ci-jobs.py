@@ -11,6 +11,7 @@ REQUIRED = {
     "preflight",
     "fast",
     "gtk-safety",
+    "keyring",
     "gtk-server",
     "distro-floor-scenarios",
     "integration",
