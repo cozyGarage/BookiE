@@ -2,6 +2,16 @@
 
 Part of the [manual verification checklist](manual-verification-0.2-features.md), which holds the setup and private recording rules for every item here.
 
+## Editing PostgreSQL views
+
+Create `items(id int primary key, name text)`, `v_items` as `SELECT id, name FROM items`, `v_names` as `SELECT name FROM items`, and `v_counts` as `SELECT name, count(*) FROM items GROUP BY name`.
+
+- [ ] Open `v_items`. Edit a name and save. The change appears in `items`, and the audit journal shows the write against `v_items`. Delete a row and save; it disappears from `items`.
+- [ ] Open `v_names`. The banner says the view does not expose the table's primary key; nothing is editable.
+- [ ] Open `v_counts`. The banner says the view is not automatically updatable, which differs from the previous banner.
+- [ ] Add an INSTEAD OF trigger to `v_items` and reopen it. It becomes read-only with the not-updatable banner.
+- [ ] On a read-only connection `v_items` stays read-only. On a MySQL or SQL Server connection views stay read-only.
+
 ## Export dialog
 
 Open a result, then Export Results.

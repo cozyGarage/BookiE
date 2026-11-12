@@ -53,6 +53,7 @@ pub enum AppMsg {
     },
     ChooseReferencedRow(Vec<crate::ui::browse_tab::reference::ReferencedRowTarget>),
     ColumnsLoaded(Uuid, Vec<ColumnInfo>, tokio_util::sync::CancellationToken),
+    BrowseViewRestriction(Uuid, Option<bookie_app_services::view_edit::ViewEditRestriction>),
     FetchBrowseForeignKeys(Uuid),
     FetchBrowseEnumLabels(Uuid, Vec<(String, bookie_core::QualifiedTypeName)>),
     EnumLabelsLoaded(Uuid, Vec<(String, Vec<String>)>),

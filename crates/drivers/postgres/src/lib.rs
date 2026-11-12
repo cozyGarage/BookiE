@@ -29,6 +29,7 @@ mod temporal;
 #[cfg(test)]
 mod test_rng;
 mod transaction;
+mod view_editability;
 
 use params::{bind_pg_params, describe_query_parameters, needs_text_type_inference};
 use query::{
@@ -418,6 +419,14 @@ impl Connection for PgConnection {
                 })
             })
             .collect::<Result<Vec<_>, DriverError>>()?)
+    }
+
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        view_editability::fetch(&self.pool, schema, table).await
     }
 
     async fn fetch_rows(

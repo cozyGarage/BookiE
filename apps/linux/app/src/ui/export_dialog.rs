@@ -46,6 +46,7 @@ impl PageFetcher {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PagedExportMode {
     FullTable,
+    SnapshotTable,
     StoredQuery,
 }
 
@@ -178,6 +179,10 @@ fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String 
             ..
         }) => bookie_app_services::tr!("All rows from this completed query result"),
         Some(PagedExport {
+            mode: PagedExportMode::SnapshotTable,
+            ..
+        }) => scope::snapshot_description(),
+        Some(PagedExport {
             total_rows: Some(total),
             ..
         }) => bookie_app_services::tr!("All {n} rows, read page by page; changes made meanwhile may be missed")
@@ -297,6 +302,7 @@ fn present_export(
         suggested_name,
         driver_id,
     } = request;
+    let (paged, snapshot) = split_snapshot(scope, paged);
     let null_marker = if paged.is_some() {
         "\\N".to_string()
     } else {
@@ -304,7 +310,7 @@ fn present_export(
     };
     let page = adw::PreferencesPage::new();
 
-    let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref());
+    let (scope_group, scope_choice) = scope::build(scope, &result, paged.as_ref(), snapshot.is_some());
     page.add(&scope_group);
     let format_group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Format"))
@@ -395,11 +401,12 @@ fn present_export(
         .label(bookie_app_services::tr!("Export\u{2026}"))
         .build();
     export_button.add_css_class("suggested-action");
+    let snapshot_available = snapshot.is_some();
     if let Some(choice) = scope_choice.as_ref() {
         let export_button = export_button.downgrade();
         choice.connect_selected_notify(move |choice| {
             if let Some(export_button) = export_button.upgrade() {
-                export_button.set_sensitive(choice.selected() == 0);
+                export_button.set_sensitive(choice.selected() == 0 || snapshot_available);
             }
         });
     }
@@ -436,7 +443,8 @@ fn present_export(
         let Some(dialog_for_export) = dialog_for_export.upgrade() else {
             return;
         };
-        if scope_choice.as_ref().is_some_and(|choice| choice.selected() != 0) {
+        let all_rows = scope_choice.as_ref().is_some_and(|choice| choice.selected() != 0);
+        if all_rows && snapshot.is_none() {
             return;
         }
         let format = selected_format(&formats, format_row.selected());
@@ -450,11 +458,15 @@ fn present_export(
                 suggested_name: suggested_name.clone(),
                 driver_id: driver_id.clone(),
                 result: result.clone(),
-                paged: paged.clone(),
+                paged: if all_rows { snapshot.clone() } else { paged.clone() },
                 include_header,
                 sanitize_formulas: safe_csv.is_active(),
                 spare_plain_numbers: spare_numbers.is_active(),
-                null_marker: null_marker_for_export.clone(),
+                null_marker: if all_rows {
+                    "\\N".to_string()
+                } else {
+                    null_marker_for_export.clone()
+                },
                 sql_target: sql_target.text().to_string(),
             },
         );
@@ -544,6 +556,21 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             },
         );
     });
+}
+
+fn split_snapshot(scope: ExportScope, paged: Option<PagedExport>) -> (Option<PagedExport>, Option<PagedExport>) {
+    match (scope, paged) {
+        (
+            ExportScope::TablePage { .. },
+            Some(
+                snapshot @ PagedExport {
+                    mode: PagedExportMode::SnapshotTable,
+                    ..
+                },
+            ),
+        ) => (None, Some(snapshot)),
+        (_, paged) => (paged, None),
+    }
 }
 
 fn job_source(paged: &Option<PagedExport>, result: &std::sync::Arc<QueryResult>) -> file::JobSource {

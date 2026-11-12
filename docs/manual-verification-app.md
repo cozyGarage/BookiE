@@ -72,7 +72,7 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 
 - [ ] With an open owned-session transaction, check the separate active badge and commit/rollback-and-close buttons at narrow width and enlarged text. While a query runs they cannot dispatch; Commit on an aborted PostgreSQL transaction reports rollback. Session closure and connection replacement do not accept an old queued action.
 - [ ] Run All and Run Current through the menu match their shortcuts in both split panes. File output names the statement/result set; exporting loaded rows never reruns SQL. A stream rerun is clearly labeled.
-- [ ] Table toolbar and grid-menu export both show Scope before Format. All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export.
+- [ ] Table toolbar and grid-menu export both show Scope before Format. On PostgreSQL, All matching rows exports every row (with the active filter and sort) as they were when the export started, even while another session changes the table, and Cancel leaves no file. On other engines All matching rows explains its snapshot refusal and cannot proceed; returning to Current page restores the action. A joined query exports its result columns and cannot be mistaken for a full source-table export.
 - [ ] Header names and types retain their case; Column details exposes complete null/key metadata and a bounded column comment without making every header taller. Test keyboard menus and light/dark/high-contrast themes.
 
 ## Schema ER diagram

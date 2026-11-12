@@ -7,6 +7,7 @@ use super::PagedExport;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExportScope {
     TablePage { filtered: bool },
+    TableSnapshot { filtered: bool },
     QueryResult,
     QueryStored,
 }
@@ -15,6 +16,7 @@ pub(super) fn build(
     scope: ExportScope,
     result: &QueryResult,
     paged: Option<&PagedExport>,
+    snapshot: bool,
 ) -> (adw::PreferencesGroup, Option<adw::ComboRow>) {
     let group = adw::PreferencesGroup::builder()
         .title(bookie_app_services::tr!("Scope"))
@@ -22,7 +24,11 @@ pub(super) fn build(
     if let ExportScope::TablePage { filtered } = scope {
         let labels = [
             bookie_app_services::tr!("Current table page"),
-            bookie_app_services::tr!("All matching table rows (unavailable)"),
+            if snapshot {
+                bookie_app_services::tr!("All matching table rows")
+            } else {
+                bookie_app_services::tr!("All matching table rows (unavailable)")
+            },
         ];
         let choices = gtk::StringList::new(&labels.iter().map(String::as_str).collect::<Vec<_>>());
         let choice = adw::ComboRow::builder()
@@ -40,6 +46,8 @@ pub(super) fn build(
         choice.connect_selected_notify(move |choice| {
             choice.set_subtitle(&if choice.selected() == 0 {
                 page_description.clone()
+            } else if snapshot {
+                snapshot_description()
             } else {
                 super::file::snapshot_refusal_message().to_string()
             });
@@ -49,6 +57,7 @@ pub(super) fn build(
     }
     let title = match scope {
         ExportScope::QueryStored => bookie_app_services::tr!("All rows from this query result"),
+        ExportScope::TableSnapshot { .. } => bookie_app_services::tr!("All matching table rows"),
         _ => bookie_app_services::tr!("Loaded query result"),
     };
     let subtitle = super::format_subtitle(result, paged);
@@ -60,6 +69,10 @@ pub(super) fn build(
             .build(),
     );
     (group, None)
+}
+
+pub(super) fn snapshot_description() -> String {
+    bookie_app_services::tr!("Every matching row, read in one consistent snapshot taken when the export starts")
 }
 
 #[cfg(test)]
@@ -75,7 +88,7 @@ mod tests {
             rows: vec![Vec::new()].into(),
             truncated: true,
         };
-        let (group, choice) = build(ExportScope::TablePage { filtered: true }, &result, None);
+        let (group, choice) = build(ExportScope::TablePage { filtered: true }, &result, None, false);
         let choice = choice.unwrap();
         assert_eq!(group.title(), "Scope");
         assert_eq!(choice.selected(), 0);
@@ -88,7 +101,7 @@ mod tests {
         );
         choice.set_selected(0);
         assert_eq!(choice.subtitle(), page_description);
-        let (_, query_choice) = build(ExportScope::QueryResult, &result, None);
+        let (_, query_choice) = build(ExportScope::QueryResult, &result, None, false);
         assert!(query_choice.is_none());
     }
 }

@@ -13,6 +13,7 @@ pub enum BrowseTabInput {
         projected_columns: Option<Vec<usize>>,
     },
     ColumnsLoaded(Vec<ColumnInfo>),
+    ViewRestriction(Option<bookie_app_services::view_edit::ViewEditRestriction>),
     ForeignKeysLoaded(Vec<ForeignKeyInfo>),
     InboundForeignKeysLoaded(Vec<InboundForeignKeyInfo>),
     EnumLabelsLoaded(Vec<(String, Vec<String>)>),

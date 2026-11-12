@@ -493,6 +493,21 @@ pub trait Connection: Send + Sync {
     ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
         run_controlled(self.fetch_inbound_foreign_keys(schema, table), control).await
     }
+    async fn fetch_view_editability(
+        &self,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> Result<crate::ViewEditability, DriverError> {
+        Ok(crate::ViewEditability::NotApplicable)
+    }
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<crate::ViewEditability, DriverError> {
+        run_controlled(self.fetch_view_editability(schema, table), control).await
+    }
     async fn fetch_enum_labels(&self, _schema: &str, _name: &str) -> Result<Vec<String>, DriverError> {
         Ok(Vec::new())
     }

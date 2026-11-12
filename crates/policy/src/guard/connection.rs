@@ -622,6 +622,45 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        let operation = self.table_metadata_operation("FETCH VIEW EDITABILITY", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH VIEW EDITABILITY",
+                self.inner.fetch_view_editability(schema, table),
+            )
+            .await;
+        self.audit_read_result(&operation, start, &result, None).await?;
+        result
+    }
+
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.table_metadata_operation("FETCH VIEW EDITABILITY", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH VIEW EDITABILITY",
+                self.inner.fetch_view_editability_controlled(schema, table, control),
+            )
+            .await;
+        self.audit_controlled_read_result(&operation, start, &result, None)
+            .await?;
+        result
+    }
+
     async fn fetch_enum_labels(&self, schema: &str, name: &str) -> Result<Vec<String>, DriverError> {
         let operation = self.metadata_operation("FETCH ENUM LABELS", vec![format!("{schema}.{name}")]);
         self.prepare_governed_read(&operation).await?;

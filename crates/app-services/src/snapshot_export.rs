@@ -49,7 +49,10 @@ impl SnapshotPages {
         if self.finished {
             return Ok(None);
         }
-        let control = OperationControl::new(self.cancel.clone(), operation_control::deadline_for(self.plan.timeout_secs));
+        let control = OperationControl::new(
+            self.cancel.clone(),
+            operation_control::deadline_for(self.plan.timeout_secs),
+        );
         let held = self.held.clone();
         let complete = self.complete.clone();
         let future: PageFuture = if self.started {

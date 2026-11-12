@@ -36,6 +36,7 @@ mod sqlite_any_csv;
 pub mod text_file;
 mod tls;
 mod transaction;
+mod view_editability;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
@@ -79,3 +80,4 @@ pub use registry::DriverRegistry;
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;
+pub use view_editability::ViewEditability;

@@ -335,6 +335,9 @@ impl BrowseTab {
             && !self.current_columns.is_empty()
             && !self.current_columns.iter().any(|c| c.primary_key);
         self.read_only_banner.set_revealed(read_only);
+        if let Some(text) = self.view_restriction.and_then(|restriction| restriction.banner_text()) {
+            self.no_pk_banner.set_title(&text);
+        }
         self.no_pk_banner.set_revealed(!read_only && no_pk);
     }
 
@@ -354,8 +357,11 @@ impl BrowseTab {
         // formed without a PK and our materialise path would silently
         // no-op on UPDATE/DELETE. Disable instead of hide so the
         // affordance stays discoverable; tooltip explains the gate.
-        self.insert_button.set_sensitive(has_columns && has_pk);
-        if has_columns && !has_pk {
+        self.insert_button
+            .set_sensitive(has_columns && has_pk && self.view_restriction.is_none());
+        if let Some(restriction) = self.view_restriction {
+            self.insert_button.set_tooltip_text(Some(&restriction.insert_reason()));
+        } else if has_columns && !has_pk {
             self.insert_button.set_tooltip_text(Some(&bookie_app_services::tr!(
                 "This table has no primary key. Inline editing is disabled."
             )));

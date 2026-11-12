@@ -106,7 +106,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab's shown rows. Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). Full-table unindexed snapshot exports remain unavailable until a consistent snapshot path is supported.
+- **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab's shown rows. Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). On PostgreSQL, **All matching table rows** exports the whole table, or the active filter and sort, from one consistent snapshot taken when the export starts. Other engines refuse a full-table export; export the current page or a query result instead.
 - **Import**: Right-click any table and choose **Import CSV…**, or import from a schema header to create a new table. Excel `.xlsx` files read the first populated sheet. Delimiters, headers, encodings (UTF-8, Windows-1252, UTF-16), and column mappings are detected automatically and can be remembered per table.
 
 ## Safety

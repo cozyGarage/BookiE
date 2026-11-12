@@ -301,6 +301,25 @@ impl Connection for SessionConnection {
         self.inner.fetch_foreign_keys_controlled(schema, table, control).await
     }
 
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        self.inner.fetch_view_editability(schema, table).await
+    }
+
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        self.inner
+            .fetch_view_editability_controlled(schema, table, control)
+            .await
+    }
+
     async fn fetch_inbound_foreign_keys(
         &self,
         schema: Option<&str>,
