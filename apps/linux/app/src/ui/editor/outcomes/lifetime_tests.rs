@@ -4,23 +4,30 @@ use bookie_core::{ColumnInfo, QueryResult, Value};
 use std::sync::Arc;
 
 fn page(index: u64) -> Arc<QueryResult> {
+    let mut rows: Vec<_> = (0..5_000)
+        .map(|row| vec![Value::Int(index as i64 * 5_000 + row), Value::Text(String::new())])
+        .collect();
+    if let Some(payload) = rows.first_mut().and_then(|row| row.get_mut(1)) {
+        *payload = Value::Text("x".repeat(1024 * 1024));
+    }
     Arc::new(QueryResult {
-        columns: vec![ColumnInfo {
-            name: "id".into(),
-            data_type: "BIGINT".into(),
-            nullable: false,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-            enum_type: None,
-            domain_type: None,
-        }],
-        rows: (0..5_000)
-            .map(|row| vec![Value::Int(index as i64 * 5_000 + row)])
+        columns: ["id", "payload"]
+            .into_iter()
+            .map(|name| ColumnInfo {
+                name: name.into(),
+                data_type: if name == "id" { "BIGINT" } else { "TEXT" }.into(),
+                nullable: false,
+                primary_key: false,
+                is_auto_increment: false,
+                default_value: None,
+                is_generated: false,
+                comment: None,
+                collation: None,
+                enum_type: None,
+                domain_type: None,
+            })
             .collect(),
+        rows: rows.into(),
         truncated: false,
     })
 }
@@ -58,7 +65,7 @@ fn append_live_page(
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
-fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
+fn streamed_widgets_keep_wide_pages_charged_until_close() {
     gtk::init().unwrap();
     let budget = bookie_results::stream_page_budget::StreamPageBudget::default();
     let mut cache = StreamPageCache::with_budget(budget.clone());
@@ -68,10 +75,11 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
     let settings = LocalResultSettingsStore::default();
     let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
     let mut cursor = super::super::stream_view::EvictionCursor::default();
+    let mut retained_bytes = 0;
     let make_outcome = |streamed| StatementOutcome {
         identity: StatementIdentity::default(),
-        sql_preview: "SELECT id FROM items".into(),
-        sql: "SELECT id FROM items".into(),
+        sql_preview: "SELECT id, payload FROM items".into(),
+        sql: "SELECT id, payload FROM items".into(),
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed)),
         pinned: false,
@@ -79,6 +87,7 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
     };
     for index in 0..12 {
         let result = page(index);
+        retained_bytes += result.estimated_row_bytes();
         pages.push(Arc::downgrade(&result));
         cache.append(index, result).unwrap();
         let outcome = make_outcome(cache.snapshot(StreamTerminal::Loading, None));
@@ -101,7 +110,7 @@ fn streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close() {
     holder.append(&build_outcome_widget(&outcome, &sender, None, database, settings, None));
     drop(outcome);
     drop(cache);
-    assert!(budget.used_bytes() > 0);
+    assert_eq!(budget.used_bytes(), retained_bytes);
     assert_eq!(
         pages.iter().filter(|page| page.upgrade().is_some()).count(),
         pages.len()

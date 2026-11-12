@@ -1020,7 +1020,7 @@
     [
       "bookie-app",
       "--lib",
-      "ui::editor::outcomes::lifetime_tests::streamed_widgets_keep_small_pages_and_release_cancelled_results_on_close"
+      "ui::editor::outcomes::lifetime_tests::streamed_widgets_keep_wide_pages_charged_until_close"
     ],
     [
       "bookie-app",
