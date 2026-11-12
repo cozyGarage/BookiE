@@ -5,7 +5,7 @@ apps/linux/app/src/logging.rs 3
 apps/linux/app/src/services/gtk_approval.rs 13
 apps/linux/app/src/services/mcp_service.rs 3
 apps/linux/app/src/services/preferences.rs 3
-apps/linux/app/src/services/single_instance.rs 24
+apps/linux/app/src/services/single_instance.rs 4
 apps/linux/app/src/services/window_registry.rs 3
 apps/linux/app/src/ui/activity_dialog.rs 6
 apps/linux/app/src/ui/app/app_helpers.rs 6

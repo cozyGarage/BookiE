@@ -77,7 +77,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
         assert_eq!(view.catalog.grid_table, table_info("orders"));
         assert_eq!(view.catalog.tables, [table_info("customers"), table_info("orders")]);
         assert_eq!(view.source.total(), 6);
-        assert!(view.source.origin().contains("concurrent changes may shift rows"));
+        assert!(view.source.origin().contains("concurrent changes may skip or repeat rows"));
     });
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -94,7 +94,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
             view.tabs.current(),
             &bookie_gpui::shell::Tab::Table(table_info("customers"))
         );
-        assert!(view.source.origin().contains("concurrent changes may shift rows"));
+        assert!(view.source.origin().contains("concurrent changes may skip or repeat rows"));
         assert!(view.status.is_empty(), "{}", view.status);
     });
 }
