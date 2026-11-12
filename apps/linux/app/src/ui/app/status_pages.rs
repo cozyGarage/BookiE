@@ -152,7 +152,7 @@ impl App {
         drop(tabs);
         crate::ui::explain_dialog::present(
             &self.window,
-            self.connection_id,
+            self.resolve_tab_connection(id).ok(),
             &sql,
             &self.database,
             &self.preferences,

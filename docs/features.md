@@ -26,6 +26,8 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - The welcome screen offers up to three recently opened connections, with their driver and environment shown on each card.
 - Saved connections keep passwords in the desktop keyring (Secret Service), not in BookiE's own files.
 - SSH tunnels use the built-in client or the system OpenSSH. BookiE asks before trusting an unknown host key.
+- The built-in SSH client can go through a chain of up to eight hosts. Add, reorder and remove jump hosts in the connection form; their passwords and key passphrases are kept in the desktop keyring, one entry per host.
+- One window can hold several open connections. Opening another saved connection adds its tabs to the same tab bar, and each tab says which connection it belongs to while more than one is open. The selected tab decides which connection the header, the sidebar and Safe Mode show. Saving, loading and exporting from a tab always use that tab's own connection. Closing the window asks once about unsaved changes in every connection and names them; Save writes each tab to its own connection and Cancel keeps every connection open. Disconnect closes one connection and its tabs. A connection that fails to open reports the error without disturbing the others. Each window reopens its connections at the next start.
 - TLS has several strictness levels, up to checking both the certificate authority and the host name.
 - Each connection has an environment: Local, Dev, Staging or Prod. A Prod connection shows a red badge, a tinted header and `[Production]` in the window title.
 - A read-only connection refuses every change.

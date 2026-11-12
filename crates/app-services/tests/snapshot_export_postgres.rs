@@ -4,9 +4,12 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use bookie_app_services::export_pages::{PagePlan, PageRunner};
+use bookie_app_services::read_session::PostgresTableCursor;
 use bookie_app_services::snapshot_export::SnapshotPages;
 use bookie_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, write_paged_file};
-use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, FilterSet, Value};
+use bookie_core::{
+    ConnectOptions, Connection, DatabaseDriver, Environment, FilterSet, OperationControl, TableInfo, Value,
+};
 use bookie_policy::{
     AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AutoApproveSink,
     GuardContext, PolicyConfig, PolicyGuard, Principal,
@@ -162,6 +165,46 @@ async fn rows_changed_between_pages_do_not_reach_the_export() {
     assert_eq!(live.rows[0][0], Value::Int(11_000));
     assert!(audit.outcomes(AuditTerminalStatus::Succeeded) >= 1);
     assert_eq!(audit.outcomes(AuditTerminalStatus::Failed), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Docker; run cargo test -p bookie-app-services --test snapshot_export_postgres -- --include-ignored"]
+async fn live_table_cursor_keeps_a_snapshot_when_the_table_changes_between_pages() {
+    let fixture = fixture().await;
+    let guard = guard(&fixture, Arc::new(CapturingAudit::default()), "postgres").await;
+    let table = TableInfo {
+        schema: Some("public".into()),
+        name: "snap".into(),
+    };
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(60));
+    let mut cursor = PostgresTableCursor::open(&guard, &table, &control).await.unwrap();
+    let first = cursor.next_page(&control).await.unwrap();
+    assert_eq!(first.result.rows.len(), 5_000);
+    assert!(first.has_next_page);
+    let mut seen: Vec<_> = first.result.rows.iter().map(|row| row.to_vec()).collect();
+    for statement in [
+        "INSERT INTO snap VALUES (50000, 'late insert')",
+        "UPDATE snap SET label = 'changed' WHERE id > 7000",
+        "DELETE FROM snap WHERE id > 11000",
+    ] {
+        fixture.admin.execute(statement).await.expect(statement);
+    }
+    loop {
+        let page = cursor.next_page(&control).await.unwrap();
+        seen.extend(page.result.rows.iter().map(|row| row.to_vec()));
+        if !page.has_next_page {
+            break;
+        }
+    }
+    cursor.close().await.unwrap();
+    seen.sort_by_key(|row| match row.first() {
+        Some(Value::Int(id)) => *id,
+        other => panic!("unexpected row id {other:?}"),
+    });
+    let expected: Vec<_> = (1..=ROWS)
+        .map(|id| vec![Value::Int(id), Value::Text(format!("row {id}"))])
+        .collect();
+    assert_eq!(seen, expected);
 }
 
 #[tokio::test(flavor = "multi_thread")]

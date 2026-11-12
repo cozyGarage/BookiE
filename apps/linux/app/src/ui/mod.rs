@@ -38,6 +38,7 @@ pub(crate) mod shortcut;
 mod sidebar_columns;
 mod sidebar_row;
 mod sidebar_tree_model;
+mod ssh_jumps;
 mod ssh_prompt;
 mod ssh_section;
 mod structure_tab;

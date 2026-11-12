@@ -142,6 +142,7 @@ pub enum AppMsg {
     Disconnect,
     ForceDisconnect,
     PrepareWindowClose,
+    PromptWindowClose,
     FlushWindowEdits,
     GridEditsPrepared {
         intent: super::grid_close::GridCloseIntent,
@@ -194,6 +195,7 @@ pub enum AppMsg {
     /// destroyed GTK widget's pointer, cast to `usize`, so the entry in
     /// `extra_windows` can be found and dropped.
     ExtraWindowClosed(usize),
+    ExtraWindowDismissed(usize),
     RowCountLoaded(Uuid, crate::ui::browse_tab::BrowseRowCountRequest, u64),
     RowCountFailed(Uuid, crate::ui::browse_tab::BrowseRowCountRequest),
     JumpToColumn,
@@ -215,6 +217,10 @@ pub enum AppMsg {
         statement: bookie_core::sql_literal::RowStatement,
     },
     FetchBrowsePage(Uuid),
+    AttachWorkspaceTab {
+        tab_id: Uuid,
+        connection_id: Option<Uuid>,
+    },
     FetchBrowseCellValue(
         Uuid,
         crate::ui::browse_tab::BrowseCellValueRequest,

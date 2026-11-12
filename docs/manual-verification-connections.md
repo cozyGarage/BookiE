@@ -34,6 +34,12 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] On PostgreSQL, right-click a schema and hide it. Confirm its tables and views disappear, search cannot reveal them, the filter menu can restore one or all schemas, and each connection retains its own hidden-schema list after reconnecting.
 - [ ] Open two saved connections in one window, select a tab of the first one, and quit. Start BookiE: both connections reopen in the same window with their tabs, and the connection that was in front is in front again. Stop one of the two database servers, quit and start again: the reachable connection reopens and the other reports Connection failed in the same window.
 - [ ] With two connections open, disconnect both and quit. Start BookiE: the welcome page appears and nothing reconnects.
+- [ ] With connection A in one window and connection B in a second window, quit. Start BookiE: both windows reopen with their own connection. Delete connection B from the saved list, quit and start again: only A reopens and no empty second window appears. Open A and B in two windows again, close the second window with its close button, then quit: only A's window reopens. Open both windows again and quit with Ctrl+Q while both are open: both windows reopen.
+- [ ] Open connections A and B in one window, open a table tab of each, and edit a cell in the A tab. Select the B tab, then close the A tab with its close button and choose Save: the change reaches A's database only and B's database is unchanged. Run the same check with a structure change.
+- [ ] With A and B open and an unsaved edit in a tab of each, close the window. One dialog names both connections. Cancel keeps both open with the edits. Close again and choose Save: each tab saves to its own database and the window closes. Make the save of one fail (stop its server): the window stays open and a toast names that connection.
+- [ ] With A and B open and an unsaved edit in a tab of each, choose Disconnect while A is in front: the prompt mentions A only, B and its edits stay open, and only A's tabs close. An open transaction in a B editor is not rolled back.
+- [ ] With A open, try to open an unreachable saved connection C: an error dialog appears in the same window, A and its tabs are untouched and no window opens.
+- [ ] With A and B open, run an MCP client against B only. Quit and start BookiE: the record restores A and B as the window held them, and no connection appears that was only opened for the client.
 
 ## Long-query notice
 
@@ -61,6 +67,15 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] A new host shows its fingerprint before trust; decline/cancel writes no key and opens no database connection. Explicit acceptance persists only that key.
 - [ ] A changed key is refused. Reconnect never silently learns an unknown key.
 - [ ] Bastion loss retires affected editor sessions and starts reconnect promptly; a result from the old session cannot replace current state.
+
+## SSH jump hosts
+
+- [ ] In the SSH section choose **Add jump host** twice and fill the three hosts (first host in the section, then two jump hosts) with one password host and one key host. Connect through the chain and run a query.
+- [ ] Reopen the connection for editing. All hosts appear, no secret is shown, a password field says it is saved and an untouched save keeps the connection working.
+- [ ] Move a jump host up and down, remove one and save: the chain connects in the new order and the removed host's keyring entry is gone (`secret-tool search` shows no entry for its host).
+- [ ] Type a new password for a jump host and save: the connection works with the new password and only one entry remains for that host.
+- [ ] Turn on "Use system OpenSSH": the jump host list is disabled and says why. With jump hosts present, saving is refused with a message.
+- [ ] Duplicate a connection with jump hosts: the copy opens for editing, shows the hosts and asks for their passwords.
 
 ## SSH agent (built-in client)
 

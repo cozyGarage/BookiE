@@ -5,7 +5,7 @@ use relm4::ComponentSender;
 use relm4::adw::prelude::*;
 use uuid::Uuid;
 
-use super::App;
+use super::{App, AppMsg};
 
 pub(super) fn next_restore_target(queue: &mut VecDeque<Uuid>, can_open: impl Fn(Uuid) -> bool) -> Option<Uuid> {
     while let Some(id) = queue.pop_front() {
@@ -16,15 +16,40 @@ pub(super) fn next_restore_target(queue: &mut VecDeque<Uuid>, can_open: impl Fn(
     None
 }
 
+pub(super) fn forget_group_on_close(window: &relm4::gtk::Window, key: usize, sender: ComponentSender<App>) {
+    window.connect_close_request(move |_| {
+        sender.input(AppMsg::ExtraWindowDismissed(key));
+        relm4::gtk::glib::Propagation::Proceed
+    });
+}
+
 impl App {
     pub(super) fn begin_session_restore(&mut self, connections: &[SavedConnection], sender: ComponentSender<Self>) {
         if !crate::services::window_state::take_session_restore_turn() {
+            self.begin_group_restore(sender);
             return;
         }
         let last = self.window_state.borrow().last_connection_id;
         let available: Vec<Uuid> = connections.iter().map(|saved| saved.id).collect();
         let stored = crate::services::open_sessions::stored();
-        let keys = bookie_app_services::window_sessions::startup_restore_keys(stored.as_deref(), last, &available);
+        let plan = bookie_app_services::window_sessions::startup_restore_plan(stored.as_deref(), last, &available);
+        let windows_to_open = plan.others.len();
+        let window = self.window.as_ptr() as usize;
+        crate::services::open_sessions::record_window(window, plan.first.clone());
+        if let Some(pending) = crate::services::open_sessions::queue_groups(plan.others) {
+            self.save_open_sessions(pending, sender.clone());
+        }
+        for _ in 0..windows_to_open {
+            sender.input(AppMsg::NewWindow);
+        }
+        self.multi.restore_queue = plan.first.into();
+        self.continue_session_restore(sender);
+    }
+
+    fn begin_group_restore(&mut self, sender: ComponentSender<Self>) {
+        let Some(keys) = crate::services::open_sessions::take_group() else {
+            return;
+        };
         self.multi.restore_queue = keys.into();
         self.continue_session_restore(sender);
     }
@@ -48,6 +73,15 @@ impl App {
     pub(super) fn persist_open_sessions(&self, sender: ComponentSender<Self>) {
         let window = self.window.as_ptr() as usize;
         let pending = crate::services::open_sessions::record_window(window, self.multi.sessions.restore_keys());
+        self.save_open_sessions(pending, sender);
+    }
+
+    pub(super) fn forget_open_sessions_window(&self, window: usize, sender: ComponentSender<Self>) {
+        let pending = crate::services::open_sessions::record_window(window, Vec::new());
+        self.save_open_sessions(pending, sender);
+    }
+
+    fn save_open_sessions(&self, pending: crate::services::open_sessions::PendingSave, sender: ComponentSender<Self>) {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {

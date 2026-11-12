@@ -281,6 +281,32 @@ mod tests {
         assert!(!token.allows_tool("execute_query"));
     }
 
+    #[tokio::test]
+    async fn an_mcp_request_never_opens_a_connection_the_window_does_not_hold() {
+        use super::AppConnectionProvider;
+        let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());
+        let provider = AppConnectionProvider {
+            database: database.clone(),
+        };
+        let unopened = Uuid::new_v4();
+        let human = provider
+            .connection(unopened, bookie_policy::Principal::human_gui())
+            .await;
+        let agent = provider
+            .connection(
+                unopened,
+                bookie_policy::Principal::Agent {
+                    token: Uuid::new_v4().to_string(),
+                    client: Some("test".into()),
+                    model: None,
+                },
+            )
+            .await;
+        assert!(human.is_err());
+        assert!(agent.is_err());
+        assert!(!database.is_active(unopened));
+    }
+
     #[test]
     fn test_mcp_port_override_accepts_only_nonzero_u16_values() {
         assert_eq!(server_config(Some("23456")).bind_port, 23456);
