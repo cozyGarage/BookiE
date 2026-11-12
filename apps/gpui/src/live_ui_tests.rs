@@ -8,6 +8,11 @@ use crate::ui_tests::open;
 use bookie_core::TableInfo;
 use bookie_gpui::shell::table_info;
 
+fn orders_fixture() -> std::path::PathBuf {
+    std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/orders.sqlite")
+}
+
 #[gpui::test]
 fn f3_toggles_a_detail_panel_that_follows_the_active_cell(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
@@ -50,8 +55,7 @@ fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
 #[gpui::test]
 fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let origin = Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -96,8 +100,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
 #[gpui::test]
 fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let manifest_dir = std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR");
-    let origin = Origin::File(std::path::PathBuf::from(manifest_dir).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -165,7 +168,7 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
 #[gpui::test]
 fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut TestAppContext) {
     let origin = bookie_gpui::live::Origin::File(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"),
+        orders_fixture(),
     );
     let table = std::sync::Arc::new(
         bookie_gpui::live::LiveTable::load(
@@ -219,7 +222,7 @@ fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut Te
 #[gpui::test]
 fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -273,7 +276,7 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
     use bookie_gpui::live::{LiveTable, Origin};
     use bookie_gpui::messages::MessageKind;
     use bookie_gpui::shell::ResultView;
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -341,7 +344,7 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
         assert!(view.live.is_none());
         assert_eq!(view.catalog.grid_table, table_info("synthetic_rows"));
     });
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
@@ -750,7 +753,7 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
 #[gpui::test]
 fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -800,7 +803,7 @@ fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppC
 #[gpui::test]
 fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_sessions_query(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -839,7 +842,7 @@ fn the_sessions_command_is_hidden_off_postgres_and_fills_the_editor_with_the_ses
 
 fn open_live(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -939,7 +942,7 @@ fn the_redis_listen_command_is_not_offered_on_other_engines(cx: &mut TestAppCont
 #[gpui::test]
 fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -973,7 +976,7 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
 #[gpui::test]
 fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -1010,7 +1013,7 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
 #[gpui::test]
 fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_buffer(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite"));
+    let origin = Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
