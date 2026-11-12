@@ -56,6 +56,7 @@ mod imp {
         }
 
         fn dispose(&self) {
+            // GTK custom widgets must unparent children during disposal.
             if let Some(entry) = self.entry.borrow().as_ref() {
                 entry.unparent();
             }
@@ -156,8 +157,6 @@ impl CellEditor {
             self.emit_by_name::<()>("editing-changed", &[]);
         }
         entry.grab_focus();
-        // Select all so the first keystroke replaces — matches the
-        // GTK Files rename flow and is what spreadsheet users expect.
         entry.select_region(0, -1);
     }
 
@@ -246,6 +245,7 @@ impl CellEditor {
         });
 
         let key_ctrl = gtk4::EventControllerKey::new();
+        // Capture Escape before GtkText handles its own edit commands.
         key_ctrl.set_propagation_phase(gtk4::PropagationPhase::Capture);
         let weak_for_key = self.downgrade();
         key_ctrl.connect_key_pressed(move |_, keyval, _, _| {
@@ -372,7 +372,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
-    fn focus_leave_commits_pending_preedit_text() {
+    fn an_active_preedit_is_included_when_edit_commits() {
         gtk4::init().unwrap();
         let cell = CellEditor::new();
         cell.set_inline_editable(true);
