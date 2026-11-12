@@ -355,6 +355,17 @@ fn disconnecting_the_only_session_covers_every_tab_in_the_window() {
 }
 
 #[test]
+fn reopening_a_closed_tab_only_offers_tabs_of_the_front_connection() {
+    let [first, second] = [Uuid::new_v4(), Uuid::new_v4()];
+    let mut stack = std::collections::VecDeque::from([(first, "a1"), (second, "b1"), (first, "a2"), (second, "b2")]);
+    assert_eq!(take_latest_for(&mut stack, first), Some("a2"));
+    assert_eq!(take_latest_for(&mut stack, first), Some("a1"));
+    assert_eq!(take_latest_for(&mut stack, first), None);
+    assert_eq!(stack.len(), 2);
+    assert_eq!(take_latest_for(&mut stack, second), Some("b2"));
+}
+
+#[test]
 fn startup_plan_restores_every_other_window_after_the_front_window() {
     let [other, first, front, third] = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
     let stored = stored_windows(&[&[other], &[first, front], &[third]]);

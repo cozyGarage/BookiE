@@ -575,7 +575,7 @@ impl App {
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let mut recorded = self.ran_statements(Source::Structure, &statements);
+        let mut recorded = self.ran_statements(tab_id, Source::Structure, &statements);
         let connection = origin.connection(&self.database);
         let timeout_secs = self.tab_timeout_secs(tab_id);
         sender.command(move |_, shutdown| {

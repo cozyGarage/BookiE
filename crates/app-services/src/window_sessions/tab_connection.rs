@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -19,6 +21,11 @@ impl WindowSessions {
         }
         Err(TabConnectionError::NoRecordedConnection { tab_id })
     }
+}
+
+pub fn take_latest_for<T>(stack: &mut VecDeque<(Uuid, T)>, connection_id: Uuid) -> Option<T> {
+    let index = stack.iter().rposition(|(owner, _)| *owner == connection_id)?;
+    stack.remove(index).map(|(_, item)| item)
 }
 
 pub fn disconnect_scope(sessions: &WindowSessions, connection_id: Uuid, window_tabs: &[Uuid]) -> Vec<Uuid> {

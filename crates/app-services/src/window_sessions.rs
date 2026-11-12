@@ -13,7 +13,7 @@ pub use open_sessions::{
     restore_window_keys, startup_restore_keys, startup_restore_plan,
 };
 pub use save_prompt::WindowSavePrompt;
-pub use tab_connection::{TabConnectionError, disconnect_scope, plan_dirty_tabs};
+pub use tab_connection::{TabConnectionError, disconnect_scope, plan_dirty_tabs, take_latest_for};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttachTabError {

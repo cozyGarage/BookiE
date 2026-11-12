@@ -184,6 +184,9 @@ impl App {
 
     pub(super) fn drop_working_session(&mut self, connection_id: Uuid, sender: ComponentSender<Self>) {
         self.do_persist_workspace_state_now();
+        self.closed_tabs_stack
+            .borrow_mut()
+            .retain(|(owner, _)| *owner != connection_id);
         let closed_tabs = self.multi.sessions.disconnect(connection_id);
         self.release_connection_resources(connection_id);
         self.persist_open_sessions(sender.clone());

@@ -249,7 +249,7 @@ pub struct App {
     /// schema. Editor descriptors round-trip the buffer text;
     /// dirty tabs lose their pending row/DDL edits because the
     /// trackers have already been cleared by the close path.
-    closed_tabs_stack: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<ClosedTabDescriptor>>>,
+    closed_tabs_stack: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<(Uuid, ClosedTabDescriptor)>>>,
     /// Extra ApplicationWindows spawned via New Window. Kept alive so
     /// closing the primary window does not drop them mid-use. Removing an
     /// entry (see `AppMsg::ExtraWindowClosed`) drops its `Controller`,
