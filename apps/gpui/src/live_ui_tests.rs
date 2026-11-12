@@ -166,10 +166,44 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
 }
 
 #[gpui::test]
-fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut TestAppContext) {
-    let origin = bookie_gpui::live::Origin::File(
-        orders_fixture(),
+fn live_sqlite_selection_copies_exact_typed_values(cx: &mut TestAppContext) {
+    use bookie_core::Value;
+    use bookie_gpui::live::{LiveSession, Origin};
+
+    let session = LiveSession::open(&Origin::File(orders_fixture())).expect("open SQLite fixture");
+    let result = std::sync::Arc::new(
+        session
+            .run_query(
+                "SELECT 9223372036854775807 AS n, X'00FF' AS raw, NULL AS missing, 'α' AS text",
+                100,
+            )
+            .expect("read typed values"),
     );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(result, Instant::now(), window, cx));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.click_row(0, false);
+            let selected = view.selected_rows(view.selection.expect("selected row"));
+            assert_eq!(
+                selected,
+                vec![vec![
+                    Value::Int(i64::MAX),
+                    Value::Bytes(vec![0, 255]),
+                    Value::Null,
+                    Value::Text("α".into()),
+                ]]
+            );
+            view.copy_selection(false, cx);
+        })
+    });
+    let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert_eq!(copied.as_deref(), Some("9223372036854775807\t\\x00ff\t\\N\tα"));
+}
+
+#[gpui::test]
+fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut TestAppContext) {
+    let origin = bookie_gpui::live::Origin::File(orders_fixture());
     let table = std::sync::Arc::new(
         bookie_gpui::live::LiveTable::load(
             &origin,

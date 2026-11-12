@@ -9,6 +9,16 @@
 - The New Table tab now lets you pick each column's collation from the server's list, on engines that provide one. (#2862)
 - The New Table tab on MySQL and MariaDB can now set the table's default collation from the server's list. (#2865)
 - A workspace tab can be renamed from its menu or with F2, given a colour and tags, and these are saved with the workspace. Tags are found in Open Quickly and the tab overview. (#2887, #2889, #2890, #2892)
+- Query results can select columns, copy loaded values and stage bulk cell edits. (#2953, #2966)
+- View Value shows a read-only decoded preview of MessagePack and schema-less Protobuf bytes below the hex dump. (#2953)
+- PostgreSQL connections can open a read-only table and index health report and copy maintenance statements without running them. (#2953)
+- PostgreSQL can export a whole table, or its active filter and sort, from one consistent snapshot. (#2956)
+- PostgreSQL rows in updatable views can be edited when the view exposes its table's primary key. (#2956)
+- The SQL editor shows PostgreSQL notices and warnings, SQL Server PRINT output, and MySQL or MariaDB warnings next to results. (#2956)
+- MCP agents can read bounded schema context and routine definitions, and tokens can be limited to selected tools. (#2956, #2967)
+- Search Database Values searches a connection's tables and opens matching tables filtered to the matching columns. (#2970)
+- CSV, TSV and XLSX imports can update matching rows on supported engines and process up to 20 files in one run. (#2970)
+- The connection form can add, reorder and remove SSH jump hosts, with each hop's secrets stored in the keyring. (#2969)
 
 ### Changed
 
@@ -20,6 +30,9 @@
 - The AppImage requires glibc 2.43 or newer. (#2875)
 - Grid column headers align with their cell values. (#2874)
 - A terminal approval in bookie-agentd now asks you to type `approve` and a code shown in the prompt instead of `y`, so a late answer to an older prompt cannot approve a new one. (#2938)
+- Large database catalogs create sidebar rows on demand, reducing initial sidebar work. (#2944)
+- Windows restore all saved connections at startup, and each tab's work and edits use its own connection. (#2951, #2969)
+- Connection errors identify common server certificate failures and point to the field to correct. (#2953)
 
 ### Fixed
 
@@ -49,6 +62,7 @@
 - Inactive streamed result views release loaded pages and restore them from the saved result when shown again. (#2867)
 - CSV preview updates no longer block the import dialog on large files. (#2878)
 - Connection names render as plain text in history filters. (#2880)
+- Creating a new SQLite or DuckDB database file from the connection form now creates it without replacing an existing file. (#2952)
 
 ## [0.2.6] - 2026-11-10
 
