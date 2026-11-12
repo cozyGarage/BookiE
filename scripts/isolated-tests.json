@@ -2090,6 +2090,11 @@
       "a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly"
     ],
     [
+      "bookie-app-services",
+      "--lib",
+      "ssh_chain_secrets::tests::jump_host_secrets_round_trip_through_the_secret_service_and_clear_on_obsolescence"
+    ],
+    [
       "bookie-storage",
       "--lib",
       "connection_bundle::tests::a_connection_with_no_stored_credentials_contributes_nothing_to_a_bundle"
