@@ -1121,6 +1121,7 @@ impl SimpleComponent for App {
             }
             AppMsg::ExtraWindowClosed(key) => {
                 self.extra_windows.retain(|(k, _)| *k != key);
+                self.forget_open_sessions_window(key, sender);
             }
             AppMsg::JumpToColumn => {
                 let opened = self

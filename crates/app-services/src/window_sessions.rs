@@ -9,8 +9,8 @@ mod save_prompt;
 mod tab_connection;
 
 pub use open_sessions::{
-    OPEN_SESSIONS_VERSION, OpenSessionsLoad, OpenSessionsRecord, parse_open_sessions, restore_window_keys,
-    startup_restore_keys,
+    OPEN_SESSIONS_VERSION, OpenSessionsLoad, OpenSessionsRecord, StartupRestorePlan, parse_open_sessions,
+    restore_window_keys, startup_restore_keys, startup_restore_plan,
 };
 pub use save_prompt::WindowSavePrompt;
 pub use tab_connection::{TabConnectionError, disconnect_scope, plan_dirty_tabs};

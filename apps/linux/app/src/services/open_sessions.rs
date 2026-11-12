@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -9,6 +10,7 @@ use super::config_io::{atomic_write_json, xdg_config_path};
 const FILE_NAME: &str = "open-sessions.json";
 
 static WINDOWS: Mutex<WindowKeys> = Mutex::new(WindowKeys::new());
+static PENDING_GROUPS: Mutex<VecDeque<(usize, Vec<Uuid>)>> = Mutex::new(VecDeque::new());
 static FILE_LOCK: Mutex<u64> = Mutex::new(0);
 
 struct WindowKeys {
@@ -29,6 +31,10 @@ impl WindowKeys {
         }
     }
 
+    fn release(&mut self, window: usize) {
+        self.windows.retain(|(token, _)| *token != window);
+    }
+
     fn record(&mut self, window: usize, keys: Vec<Uuid>) -> PendingSave {
         match self.windows.iter_mut().find(|(token, _)| *token == window) {
             Some((_, current)) => *current = keys,
@@ -47,6 +53,30 @@ pub fn record_window(window: usize, keys: Vec<Uuid>) -> PendingSave {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .record(window, keys)
+}
+
+pub fn queue_groups(groups: Vec<Vec<Uuid>>) -> Option<PendingSave> {
+    let mut pending = PENDING_GROUPS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut windows = WINDOWS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut saved = None;
+    for keys in groups {
+        let placeholder = usize::MAX - pending.len();
+        saved = Some(windows.record(placeholder, keys.clone()));
+        pending.push_back((placeholder, keys));
+    }
+    saved
+}
+
+pub fn take_group() -> Option<Vec<Uuid>> {
+    let (placeholder, keys) = PENDING_GROUPS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .pop_front()?;
+    WINDOWS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .release(placeholder);
+    Some(keys)
 }
 
 pub fn stored() -> Option<Vec<u8>> {
@@ -91,6 +121,18 @@ mod tests {
         assert_eq!(pending.record.windows, vec![vec![a, c], vec![b]]);
         let pending = windows.record(2, Vec::new());
         assert_eq!(pending.record.windows, vec![vec![a, c]]);
+    }
+
+    #[test]
+    fn queued_groups_are_claimed_in_order_and_leave_the_record_once_claimed() {
+        let [a, b] = [Uuid::new_v4(), Uuid::new_v4()];
+        let queued = queue_groups(vec![vec![a], vec![b]]).unwrap();
+        assert_eq!(queued.record.windows, vec![vec![a], vec![b]]);
+        assert_eq!(take_group(), Some(vec![a]));
+        let snapshot = record_window(1, Vec::new());
+        assert_eq!(snapshot.record.windows, vec![vec![b]]);
+        assert_eq!(take_group(), Some(vec![b]));
+        assert_eq!(take_group(), None);
     }
 
     #[test]

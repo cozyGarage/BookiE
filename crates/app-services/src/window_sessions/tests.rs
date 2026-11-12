@@ -353,3 +353,61 @@ fn disconnecting_the_only_session_covers_every_tab_in_the_window() {
         vec![tab, unclaimed]
     );
 }
+
+#[test]
+fn startup_plan_restores_every_other_window_after_the_front_window() {
+    let [other, first, front, third] = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+    let stored = stored_windows(&[&[other], &[first, front], &[third]]);
+    let plan = startup_restore_plan(Some(&stored), Some(front), &[other, first, front, third]);
+    assert_eq!(plan.first, vec![first, front]);
+    assert_eq!(plan.others, vec![vec![other], vec![third]]);
+}
+
+#[test]
+fn startup_plan_drops_deleted_connections_and_windows_left_empty() {
+    let [gone, kept, front] = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+    let stored = stored_windows(&[&[gone], &[front], &[gone, kept]]);
+    let plan = startup_restore_plan(Some(&stored), Some(front), &[kept, front]);
+    assert_eq!(plan.first, vec![front]);
+    assert_eq!(plan.others, vec![vec![kept]]);
+}
+
+#[test]
+fn startup_plan_opens_a_connection_in_one_window_only() {
+    let [shared, front] = [Uuid::new_v4(), Uuid::new_v4()];
+    let stored = format!(r#"{{"version":1,"windows":[["{shared}","{front}"],["{shared}"]]}}"#);
+    let plan = startup_restore_plan(Some(stored.as_bytes()), Some(front), &[shared, front]);
+    assert_eq!(plan.first, vec![shared, front]);
+    assert!(plan.others.is_empty());
+}
+
+#[test]
+fn startup_plan_ignores_other_windows_when_the_record_is_unusable() {
+    let [stale, front] = [Uuid::new_v4(), Uuid::new_v4()];
+    let unsupported = br#"{"version":99,"windows":[]}"#;
+    let plan = startup_restore_plan(Some(unsupported), Some(front), &[stale, front]);
+    assert_eq!(plan.first, vec![front]);
+    assert!(plan.others.is_empty());
+    let plan = startup_restore_plan(Some(b"{ not json"), Some(front), &[front]);
+    assert_eq!(plan.first, vec![front]);
+    assert!(plan.others.is_empty());
+}
+
+#[test]
+fn startup_plan_keeps_a_record_written_before_the_front_was_recorded() {
+    let [stale, front] = [Uuid::new_v4(), Uuid::new_v4()];
+    let stored = stored_windows(&[&[stale]]);
+    let plan = startup_restore_plan(Some(&stored), Some(front), &[stale, front]);
+    assert_eq!(plan.first, vec![front]);
+    assert_eq!(plan.others, vec![vec![stale]]);
+}
+
+#[test]
+fn startup_plan_is_empty_after_the_last_connection_was_cleared() {
+    let key = Uuid::new_v4();
+    let stored = stored_windows(&[&[key]]);
+    assert_eq!(
+        startup_restore_plan(Some(&stored), None, &[key]),
+        StartupRestorePlan::default()
+    );
+}
