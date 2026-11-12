@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-from collections import deque
 import datetime
 import fcntl
 import hashlib
@@ -101,6 +100,21 @@ def execution_evidence(kind, output):
     return bool(summaries) and sum(count for _, count in summaries) > 0 and all(ok for ok, _ in summaries)
 
 
+def failure_excerpt(output):
+    lines = output.splitlines()
+    markers = ("FAILED:", "Traceback (most recent call last):", "AssertionError:")
+    marker = next((index for index, line in enumerate(lines) if line.startswith(markers)), None)
+    if marker is None:
+        return "\n".join(lines[-40:])
+    start = max(0, marker - 2)
+    end = min(len(lines), marker + 28)
+    excerpt = lines[start:end]
+    tail = lines[-12:]
+    if end < len(lines) and tail[0] not in excerpt:
+        excerpt.extend(("... final log lines ...", *tail))
+    return "\n".join(excerpt)
+
+
 def stop_process(process, force=False):
     if force or process.poll() is None:
         try:
@@ -180,9 +194,8 @@ def run_layers(names, layers, directory):
             write_report(report_path, report)
             print(f"  {result['status']}: {result.get('reason', result.get('log', 'not executed'))}", flush=True)
             if result["status"] != "passed" and (log_name := result.get("log")):
-                if (directory / log_name).exists():
-                    with (directory / log_name).open(errors="replace") as output:
-                        print("".join(deque(output, maxlen=40)), flush=True)
+                if (log_path := directory / log_name).exists():
+                    print(failure_excerpt(log_path.read_text(errors="replace")), flush=True)
         report["layers"][name]["status"] = "passed" if all(row["status"] == "passed" for row in results) else "failed"
     report["status"] = "passed" if all(row["status"] == "passed" for row in report["layers"].values()) else "failed"
     report["finished_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
