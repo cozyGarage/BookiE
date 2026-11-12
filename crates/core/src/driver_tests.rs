@@ -40,6 +40,7 @@ fn a_driver_that_declares_nothing_claims_no_structure_metadata() {
     assert!(!capabilities.supports_table_default_collation);
     assert!(!driver.supports_table_health_report());
     assert!(!capabilities.supports_table_health_report);
+    assert_eq!(capabilities.import_upsert, ImportUpsertStyle::Unsupported);
     assert_eq!(driver.default_database(), "");
     assert_eq!(driver.default_username(), "");
 }

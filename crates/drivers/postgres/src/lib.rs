@@ -54,6 +54,10 @@ impl DatabaseDriver for PgDriver {
         "postgres"
     }
 
+    fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
+        bookie_core::ImportUpsertStyle::OnConflict
+    }
+
     fn supports_snapshot_export(&self) -> bool {
         true
     }

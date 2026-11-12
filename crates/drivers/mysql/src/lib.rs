@@ -65,6 +65,10 @@ impl DatabaseDriver for MysqlDriver {
         "mysql"
     }
 
+    fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
+        bookie_core::ImportUpsertStyle::OnDuplicateKey
+    }
+
     fn display_name(&self) -> &'static str {
         "MySQL"
     }

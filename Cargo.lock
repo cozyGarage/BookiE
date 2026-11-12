@@ -1422,6 +1422,7 @@ dependencies = [
  "glob",
  "hex",
  "proptest",
+ "rust_decimal",
  "secrecy",
  "serde",
  "serde_json",

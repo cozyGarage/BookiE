@@ -60,6 +60,14 @@ pub enum DataModel {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImportUpsertStyle {
+    #[default]
+    Unsupported,
+    OnConflict,
+    OnDuplicateKey,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DriverCapabilities {
     pub maturity: DriverMaturity,
     pub data_model: DataModel,
@@ -86,6 +94,7 @@ pub struct DriverCapabilities {
     pub supports_snapshot_export: bool,
     pub supports_updatable_views: bool,
     pub supports_table_health_report: bool,
+    pub import_upsert: ImportUpsertStyle,
 }
 
 #[async_trait]
@@ -129,6 +138,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_snapshot_export: self.supports_snapshot_export(),
             supports_updatable_views: self.supports_updatable_views(),
             supports_table_health_report: self.supports_table_health_report(),
+            import_upsert: self.import_upsert(),
         }
     }
 
@@ -227,6 +237,10 @@ pub trait DatabaseDriver: Send + Sync {
 
     fn supports_updatable_views(&self) -> bool {
         false
+    }
+
+    fn import_upsert(&self) -> ImportUpsertStyle {
+        ImportUpsertStyle::Unsupported
     }
 
     fn catalog_object_kinds(&self) -> &'static [crate::CatalogObjectKind] {

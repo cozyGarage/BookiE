@@ -344,6 +344,10 @@ fn the_driver_reports_its_capabilities() {
     assert!(driver.supports_view_metadata());
     assert!(driver.supports_table_health_report());
     assert!(driver.capabilities().supports_table_health_report);
+    assert_eq!(
+        driver.capabilities().import_upsert,
+        bookie_core::ImportUpsertStyle::OnConflict
+    );
     assert!(driver.supports_local_socket());
     assert_eq!(driver.forwarded_socket_name(15432).as_deref(), Some(".s.PGSQL.15432"));
     assert!(!driver.catalog_object_kinds().is_empty());

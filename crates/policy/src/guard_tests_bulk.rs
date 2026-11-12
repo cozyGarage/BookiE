@@ -903,3 +903,163 @@ async fn beginning_a_bulk_insert_parses_the_statement_once() {
     assert_eq!(crate::parsed_sql::counter::count(), 1);
     end_quietly(&guard, &mut scope).await;
 }
+
+const UPSERT_POSTGRES: &str =
+    "INSERT INTO people (id, name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name";
+
+const UPSERT_MYSQL: &str = "INSERT INTO people (id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)";
+
+struct CapturingApprovalSink {
+    requests: Arc<Mutex<Vec<ApprovalRequest>>>,
+}
+
+#[async_trait]
+impl ApprovalSink for CapturingApprovalSink {
+    async fn request(&self, request: ApprovalRequest) -> ApprovalOutcome {
+        self.requests.lock().expect("request lock").push(request);
+        ApprovalOutcome::AllowOnce
+    }
+}
+
+fn guard_for(
+    driver_id: &str,
+    approval: Arc<dyn ApprovalSink>,
+    audit: Arc<SequenceAuditSink>,
+) -> (PolicyGuard, Arc<Mutex<Vec<usize>>>) {
+    let (connection, batches) = BulkConn::open(usize::MAX);
+    let mut ctx = context(
+        Principal::human_gui(),
+        Environment::Prod,
+        PolicyConfig::default(),
+        approval,
+        audit,
+        Arc::new(AuditState::new()),
+    );
+    ctx.driver_id = driver_id.into();
+    (PolicyGuard::new(connection, ctx), batches)
+}
+
+fn upsert_request(statement: &str) -> BulkInsertRequest {
+    let mut request = request(4);
+    request.statement = statement.into();
+    request
+}
+
+#[tokio::test]
+async fn an_upsert_is_accepted_as_one_insert_shape_in_every_supported_dialect() {
+    let sqlite = UPSERT_POSTGRES.replace("$1", "?1").replace("$2", "?2");
+    for (driver, statement) in [
+        ("postgres", UPSERT_POSTGRES.to_owned()),
+        ("sqlite", sqlite),
+        ("duckdb", UPSERT_POSTGRES.replace("$1", "?").replace("$2", "?")),
+        ("mysql", UPSERT_MYSQL.to_owned()),
+    ] {
+        let audit = Arc::new(SequenceAuditSink::new(vec![]));
+        let (guard, batches) = guard_for(driver, Arc::new(AutoApproveSink), audit);
+        let mut scope = guard
+            .begin_bulk_insert(upsert_request(&statement))
+            .await
+            .unwrap_or_else(|error| panic!("{driver}: {error}"));
+        let rows = rows(2);
+        guard
+            .execute_bulk_batch(&mut scope, batch(&statement, "people", &rows), &control())
+            .await
+            .expect("batch");
+        guard
+            .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+            .await
+            .expect("finish");
+        assert_eq!(*batches.lock().expect("batch lock"), vec![2], "{driver}");
+    }
+}
+
+#[tokio::test]
+async fn an_upsert_approval_and_audit_say_existing_rows_may_be_updated() {
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let approval = Arc::new(CapturingApprovalSink {
+        requests: requests.clone(),
+    });
+    let (guard, _batches) = guard_for("postgres", approval, audit.clone());
+    let mut scope = guard
+        .begin_bulk_insert(upsert_request(UPSERT_POSTGRES))
+        .await
+        .expect("scope");
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .expect("finish");
+
+    let requests = requests.lock().expect("request lock");
+    assert_eq!(requests.len(), 1);
+    assert!(
+        requests[0]
+            .preview
+            .as_deref()
+            .is_some_and(|text| text.contains("existing rows may change"))
+    );
+    assert!(requests[0].reason.contains("existing rows may be updated"));
+    let events = events(&audit);
+    assert!(events.iter().all(|event| event.targets[0].contains("upsert")));
+    assert_eq!(events[1].terminal_status, AuditTerminalStatus::Succeeded);
+}
+
+#[tokio::test]
+async fn a_plain_import_keeps_its_plain_approval_text_and_audit_target() {
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let approval = Arc::new(CapturingApprovalSink {
+        requests: requests.clone(),
+    });
+    let (guard, _batches) = guard_for("postgres", approval, audit.clone());
+    let mut scope = guard.begin_bulk_insert(request(4)).await.expect("scope");
+    end_quietly(&guard, &mut scope).await;
+
+    let requests = requests.lock().expect("request lock");
+    assert!(
+        requests[0]
+            .preview
+            .as_deref()
+            .is_some_and(|text| !text.contains("existing rows"))
+    );
+    assert!(
+        events(&audit)
+            .iter()
+            .all(|event| event.targets == vec!["people".to_owned()])
+    );
+}
+
+#[tokio::test]
+async fn an_upsert_that_is_not_approved_is_denied_with_a_terminal_audit_record() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let (guard, batches) = guard_for("postgres", Arc::new(DenyApprovalSink), audit.clone());
+
+    let error = guard
+        .begin_bulk_insert(upsert_request(UPSERT_POSTGRES))
+        .await
+        .err()
+        .expect("denied");
+
+    assert!(matches!(error, DriverError::PolicyDenied(_)));
+    let events = events(&audit);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].terminal_status, AuditTerminalStatus::Denied);
+    assert_eq!(events[0].approval_outcome, AuditApprovalOutcome::Denied);
+    assert!(batches.lock().expect("batch lock").is_empty());
+}
+
+#[tokio::test]
+async fn statements_other_than_one_insert_are_still_refused_for_an_import() {
+    for statement in [
+        "MERGE INTO people AS t USING staging AS s ON t.id = s.id WHEN MATCHED THEN UPDATE SET name = s.name",
+        "UPDATE people SET name = $2 WHERE id = $1",
+        "INSERT INTO people (id, name) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name; DELETE FROM people",
+        "INSERT INTO people (id, name) SELECT id, name FROM staging; DROP TABLE people",
+    ] {
+        let audit = Arc::new(SequenceAuditSink::new(vec![]));
+        let (guard, batches) = guard_for("postgres", Arc::new(AutoApproveSink), audit);
+        let result = guard.begin_bulk_insert(upsert_request(statement)).await;
+        assert!(matches!(result, Err(DriverError::PolicyDenied(_))), "{statement}");
+        assert!(batches.lock().expect("batch lock").is_empty());
+    }
+}

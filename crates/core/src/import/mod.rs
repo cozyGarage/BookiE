@@ -11,6 +11,7 @@ mod infer;
 mod integer_type;
 mod plan;
 mod text_kind;
+mod upsert;
 mod xlsx_import;
 
 pub use cell::{CellError, ColumnKind, CsvRowError, column_kind, parse_cell, row_to_values};
@@ -24,4 +25,5 @@ pub use infer::{INFER_SAMPLE_ROWS, infer_columns, supports_table_creation, type_
 pub use plan::{
     DEFAULT_IMPORT_BATCH_ROWS, ImportTarget, InsertPlan, MAX_REPORTED_ROW_ERRORS, PlanError, build_insert_plan,
 };
+pub use upsert::{ConflictKey, MAX_CONFLICT_KEYS, WriteMode, apply_upsert, conflict_key_candidates};
 pub use xlsx_import::{is_xlsx, xlsx_to_csv};

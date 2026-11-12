@@ -50,7 +50,8 @@ pub use connection::{
 };
 pub use driver::{
     ConnectionFormDefaults, DataModel, DatabaseDriver, DriverCapabilities, DriverMaturity,
-    DriverValueInputCapabilities, EnumInputStyle, connection_form_defaults, initial_connection_form_defaults,
+    DriverValueInputCapabilities, EnumInputStyle, ImportUpsertStyle, connection_form_defaults,
+    initial_connection_form_defaults,
 };
 pub use error::DriverError;
 pub use filter::{

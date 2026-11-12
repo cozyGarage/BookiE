@@ -44,6 +44,10 @@ impl DatabaseDriver for SqliteDriver {
         "sqlite"
     }
 
+    fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
+        bookie_core::ImportUpsertStyle::OnConflict
+    }
+
     fn display_name(&self) -> &'static str {
         "SQLite"
     }

@@ -44,6 +44,10 @@ impl DatabaseDriver for DuckdbDriver {
         "duckdb"
     }
 
+    fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
+        bookie_core::ImportUpsertStyle::OnConflict
+    }
+
     fn display_name(&self) -> &'static str {
         "DuckDB"
     }
