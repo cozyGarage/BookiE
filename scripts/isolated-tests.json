@@ -1895,6 +1895,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::mcp_preferences::copy_tests::tool_restriction_is_optional_and_uses_only_selected_tools"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::plain_text::tests::a_banner_without_markup_shows_a_hostile_title_literally"
     ],
     [

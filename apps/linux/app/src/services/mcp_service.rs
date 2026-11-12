@@ -121,12 +121,14 @@ pub async fn issue_token(
     name: String,
     permissions: TokenPermissions,
     connection_allowlist: Vec<Uuid>,
+    tool_allowlist: Option<Vec<String>>,
 ) -> Result<IssuedToken, String> {
     issue_token_with_store(
         bridge,
         name,
         permissions,
         connection_allowlist,
+        tool_allowlist,
         |id, plaintext, label| async move { store_mcp_token(id, &plaintext, &label).await },
     )
     .await
@@ -142,6 +144,7 @@ async fn issue_token_with_store<F, Fut>(
     name: String,
     permissions: TokenPermissions,
     connection_allowlist: Vec<Uuid>,
+    tool_allowlist: Option<Vec<String>>,
     store: F,
 ) -> Result<IssuedToken, String>
 where
@@ -149,9 +152,10 @@ where
     Fut: Future<Output = Result<(), StorageError>>,
 {
     let bridge = bridge.ok_or_else(|| "MCP server is not running".to_string())?;
-    let (meta, plaintext) = bridge
-        .tokens()
-        .issue(name.clone(), permissions, connection_allowlist, None)?;
+    let (meta, plaintext) =
+        bridge
+            .tokens()
+            .issue_with_tools(name.clone(), permissions, connection_allowlist, tool_allowlist, None)?;
     let keyring_saved = match store(meta.id, plaintext.clone(), format!("BookiE MCP: {name}")).await {
         Ok(()) => true,
         Err(error) => {
@@ -222,13 +226,16 @@ mod tests {
             "test client".into(),
             TokenPermissions::ReadOnly,
             vec![Uuid::new_v4()],
+            None,
             |_, _, _| async { Ok::<(), StorageError>(()) },
         )
         .await
         .unwrap();
 
         assert!(issued.keyring_saved);
-        assert_eq!(bridge.tokens().list().len(), 1);
+        let tokens = bridge.tokens().list();
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].tool_allowlist, None);
     }
 
     #[tokio::test]
@@ -239,6 +246,7 @@ mod tests {
             "test client".into(),
             TokenPermissions::ReadOnly,
             vec![Uuid::new_v4()],
+            None,
             |_, _, _| async { Err(StorageError::Keyring(KeyringFailure::Unavailable)) },
         )
         .await
@@ -246,6 +254,31 @@ mod tests {
 
         assert!(!issued.keyring_saved);
         assert!(bridge.tokens().authenticate(&issued.plaintext).is_ok());
+        assert_eq!(bridge.tokens().list()[0].tool_allowlist, None);
+    }
+
+    #[tokio::test]
+    async fn issue_token_applies_selected_tool_allowlist() {
+        let (_directory, bridge) = bridge();
+        let issued = issue_token_with_store(
+            Some(&bridge),
+            "test client".into(),
+            TokenPermissions::ReadOnly,
+            vec![Uuid::new_v4()],
+            Some(vec!["list_tables".into()]),
+            |_, _, _| async { Ok::<(), StorageError>(()) },
+        )
+        .await
+        .unwrap();
+
+        assert!(bridge.tokens().authenticate(&issued.plaintext).is_ok());
+        let token = bridge.tokens().list().remove(0);
+        assert_eq!(
+            token.tool_allowlist.as_deref(),
+            Some(["list_tables".to_string()].as_slice())
+        );
+        assert!(token.allows_tool("list_tables"));
+        assert!(!token.allows_tool("execute_query"));
     }
 
     #[tokio::test]

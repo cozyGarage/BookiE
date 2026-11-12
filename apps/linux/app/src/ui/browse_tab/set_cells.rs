@@ -103,7 +103,7 @@ fn spawn_plan(job: PlanJob, targets: Vec<SetCellTarget>) {
                 value: &value,
                 targets: &targets,
                 hooks: &hooks,
-                cell_allows_edit: crate::ui::grid::cell_allows_inline_edit,
+                cell_allows_edit: crate::ui::grid::cell_allows_set_cells,
             })
         })
         .await;

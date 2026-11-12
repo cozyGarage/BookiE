@@ -101,6 +101,8 @@ fn start_view(
             return;
         }
         let callback = model.visibility_callback(&runtime, &spool, &columns);
+        let column_selection = Default::default();
+        let column_selection_chrome = crate::ui::grid::selection_chrome();
         let (view, selection) = build_column_view(
             &empty,
             &columns,
@@ -117,6 +119,8 @@ fn start_view(
                     result_model: Some(model.clone().upcast()),
                     row_visibility: Some(callback),
                     preview_result_values: true,
+                    column_selection,
+                    column_selection_chrome: Some(column_selection_chrome.clone()),
                     ..Default::default()
                 },
                 column_widths: None,
@@ -137,6 +141,7 @@ fn start_view(
         });
         container.append(&status);
         container.append(&retry);
+        container.append(&column_selection_chrome);
         container.append(&crate::ui::grid::wrap_grid_scrolled(&view));
     });
 }
