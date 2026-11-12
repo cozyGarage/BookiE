@@ -23,6 +23,7 @@ mod protobuf_wire;
 mod query;
 mod query_rows;
 mod registry;
+mod routine;
 mod server_message;
 mod session;
 pub mod sql_credentials;
@@ -78,6 +79,7 @@ pub use query::{
 };
 pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;
+pub use routine::{ROUTINE_DEFINITION_LIMIT_BYTES, RoutineDefinition, RoutineLookup, RoutineRef, cap_definition};
 pub use server_message::{
     MAX_SERVER_MESSAGE_TEXT_BYTES, MAX_SERVER_MESSAGES, MAX_SERVER_MESSAGES_TOTAL_BYTES, MessageSeverity,
     ServerMessage, ServerMessages,

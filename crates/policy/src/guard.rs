@@ -1114,6 +1114,7 @@ mod bulk;
 mod connection;
 mod excluded_catalog;
 mod governed_listing;
+mod governed_routine;
 mod panic_boundary;
 mod scoped_tables;
 mod session;

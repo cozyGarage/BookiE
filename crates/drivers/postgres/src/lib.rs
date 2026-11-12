@@ -284,6 +284,13 @@ impl Connection for PgConnection {
         catalog::list_objects_excluding(&self.pool, kind, schema, excluded_schemas).await
     }
 
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        catalog::routine_definition(&self.pool, routine).await
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         // Source schema metadata from pg_catalog rather than
         // information_schema:

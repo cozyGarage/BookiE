@@ -96,6 +96,20 @@ impl Connection for CatalogConn {
         self.record_exclusion("objects", schemas);
         self.answer(Vec::new())
     }
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.answer(bookie_core::RoutineLookup::Found(bookie_core::RoutineDefinition {
+            schema: routine.schema.clone(),
+            name: routine.name.clone(),
+            kind: "function".into(),
+            identity_arguments: String::new(),
+            definition: ROUTINE_BODY.into(),
+            total_bytes: None,
+            truncated: false,
+        }))
+    }
     async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         self.answer(Vec::new())
     }
@@ -164,6 +178,16 @@ impl Connection for CatalogConn {
     }
 }
 
+const ROUTINE_BODY: &str = "CREATE FUNCTION f() AS 'SELECT secret_marker'";
+
+fn routine_ref() -> bookie_core::RoutineRef {
+    bookie_core::RoutineRef {
+        schema: "public".into(),
+        name: "f".into(),
+        identity_arguments: Some("a integer".into()),
+    }
+}
+
 impl CatalogConn {
     fn record_exclusion(&self, kind: &str, schemas: &[String]) {
         self.exclusion_scopes
@@ -222,6 +246,7 @@ fn catalog_guard_with_scopes(exclusion_scopes: ExclusionScopes) -> PolicyGuard {
 async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>) -> Vec<Result<(), DriverError>> {
     let schema = Some("public");
     let kind = CatalogObjectKind::ALL[0];
+    let routine = routine_ref();
     macro_rules! read {
         ($plain:expr, $controlled:expr) => {
             match control {
@@ -243,6 +268,8 @@ async fn run_every_read(guard: &PolicyGuard, control: Option<&OperationControl>)
             .list_objects_controlled(kind, schema, c)),
         read!(guard.list_objects_excluding(kind, schema, &[]), |c| guard
             .list_objects_excluding_controlled(kind, schema, &[], c)),
+        read!(guard.routine_definition(&routine), |c| guard
+            .routine_definition_controlled(&routine, c)),
         read!(guard.fetch_columns(schema, "t"), |c| guard
             .fetch_columns_controlled(schema, "t", c)),
         read!(guard.fetch_rows(schema, "t", 0, 10), |c| guard
@@ -699,4 +726,38 @@ async fn no_read_under_a_cancelled_control_writes_two_outcomes() {
     for (operation, statuses) in outcomes {
         assert_eq!(statuses.len(), 1, "{operation}: {statuses:?}");
     }
+}
+
+#[tokio::test]
+async fn a_routine_definition_read_is_audited_with_its_identity_and_never_its_text() {
+    for controlled in [false, true] {
+        let (guard, _calls, audit) = catalog_guard(false);
+        let lookup = if controlled {
+            guard.routine_definition_controlled(&routine_ref(), &control()).await
+        } else {
+            guard.routine_definition(&routine_ref()).await
+        };
+        assert!(matches!(lookup, Ok(bookie_core::RoutineLookup::Found(_))));
+        let events = audit.events.lock().expect("events");
+        assert_eq!(events.len(), 2, "an intent and a terminal outcome");
+        assert_eq!(events[1].terminal_status, AuditTerminalStatus::Succeeded);
+        assert_eq!(events[1].rows_affected, Some(1));
+        assert_eq!(events[0].targets, ["routine:public.f(a integer)"]);
+        assert!(
+            !format!("{events:?}").contains("secret_marker"),
+            "the audit journal holds no definition text"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_failed_routine_definition_read_records_a_failed_terminal_outcome() {
+    let (guard, _calls, audit) = catalog_guard(true);
+    let outcome = guard.routine_definition(&routine_ref()).await;
+    assert!(matches!(outcome, Err(DriverError::Disconnected)));
+    let events = audit.events.lock().expect("events");
+    assert_eq!(
+        events.last().map(|event| event.terminal_status),
+        Some(AuditTerminalStatus::Failed)
+    );
 }

@@ -445,6 +445,24 @@ impl Connection for MssqlConnection {
             .await
     }
 
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        let mut client = self.client().await?;
+        catalog::routine_definition(&mut client, routine).await
+    }
+
+    async fn routine_definition_controlled(
+        &self,
+        routine: &bookie_core::RoutineRef,
+        control: &OperationControl,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        let mut client = bookie_core::run_controlled_setup(self.client(), control).await??;
+        self.run_abandonable(catalog::routine_definition(&mut client, routine), control)
+            .await
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         // sys catalog is authoritative: is_identity/is_computed are exact
         // flags, sys.default_constraints.definition carries the DEFAULT
