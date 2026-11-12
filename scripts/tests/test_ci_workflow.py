@@ -488,7 +488,8 @@ class CiWorkflowTests(unittest.TestCase):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())
         providers = bundle_groups["providers"]
         self.assertEqual(set(providers["github"]), {
-            "direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "socket-ssh",
+            "direct", "consumers", "driver-core", "driver-analytics", "driver-extended",
+            "socket-ssh", "driver-tls",
         })
         self.assertEqual(set(providers["forgejo"]), {
             "direct", "consumers", "driver-core", "driver-analytics", "driver-extended",
@@ -508,6 +509,24 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn("mapfile -t publish_groups", forgejo_builder)
         self.assertIn('config.get("providers", {}).get("forgejo", fallback)', forgejo_builder)
+
+    def test_driver_tls_uses_the_source_pinned_prebuilt_bundle_on_both_providers(self):
+        github = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        github_job = re.search(r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
+        forgejo_job = re.search(r"(?ms)^  driver-tls:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+
+        self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-tls", github_job)
+        self.assertIn('prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" driver-tls', forgejo_job)
+        for provider, job in (("github", github_job), ("forgejo", forgejo_job)):
+            with self.subTest(provider=provider):
+                self.assertIn('python3 scripts/run-test-layer.py tls', job)
+                self.assertIn('BOOKIE_TEST_RUN_ID:', job)
+        self.assertIn('BOOKIE_REQUIRE_PREBUILT: "1"', github_job)
+        self.assertIn("needs: [pin-revision, ensure-ci-gtk-image, reusable-test-builds]", github_job)
+        self.assertIn("timeout-minutes: 45", github_job)
+        self.assertNotIn("dtolnay/rust-toolchain", github_job)
+        self.assertNotIn("cargo test", github_job)
 
     def test_github_gtk_test_job_uses_a_shallow_checkout(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

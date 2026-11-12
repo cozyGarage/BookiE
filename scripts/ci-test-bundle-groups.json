@@ -45,7 +45,7 @@
     }
   },
   "providers": {
-    "github": ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "socket-ssh"],
+    "github": ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "socket-ssh", "driver-tls"],
     "forgejo": ["direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "pg-release", "socket-ssh", "driver-tls", "keyring"]
   }
 }
