@@ -521,14 +521,14 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertLess(checkout, safe_directory)
         self.assertLess(safe_directory, git_call)
 
-    def test_fast_checks_fetch_exact_pull_request_base_before_change_contracts(self):
+    def test_fast_checks_fetch_the_comparison_base_before_change_contracts(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         job = re.search(r"(?ms)^  fast:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
-        step = "      - name: Fetch pull request base for changed-path tests"
+        step = "      - name: Fetch comparison base for changed-path tests"
         self.assertIn(step, job)
         fetch_step = job.split(step, 1)[1].split("      - ", 1)[0]
-        self.assertIn("if: github.event_name == 'pull_request'", fetch_step)
-        self.assertIn("BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha }}", fetch_step)
+        self.assertIn("if: github.event_name == 'pull_request' || github.event_name == 'push'", fetch_step)
+        self.assertIn("BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}", fetch_step)
         self.assertIn('git fetch --no-tags --depth=1 origin "$BOOKIE_CHANGE_BASE"', fetch_step)
         self.assertLess(job.index(step), job.index("python3 scripts/run-test-layer.py change-contracts"))
         self.assertIn("fetch-depth: 1", job)
