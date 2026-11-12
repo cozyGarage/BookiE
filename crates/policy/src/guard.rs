@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use bookie_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo,
-    OperationControl, QueryResult, QueryResultBatch, TableInfo, Transaction, Value, check_pre_dispatch,
+    OperationControl, QueryResult, QueryResultBatch, ServerMessages, TableInfo, Transaction, Value, check_pre_dispatch,
 };
 use chrono::Utc;
 use sha2::{Digest, Sha256};
@@ -767,6 +767,13 @@ impl PolicyGuard {
         self.mask_patterns.is_some()
     }
 
+    fn releasable_messages(&self, messages: ServerMessages) -> ServerMessages {
+        if self.should_mask() {
+            return ServerMessages::default();
+        }
+        messages
+    }
+
     fn mask_result(&self, result: QueryResult) -> QueryResult {
         self.mask_result_for_analysis(None, result)
     }
@@ -803,7 +810,11 @@ impl PolicyGuard {
             .into_iter()
             .map(|result_set| self.mask_result_for_analysis(Some(analysis), result_set))
             .collect();
-        QueryResultBatch { result_sets, truncated }
+        QueryResultBatch {
+            result_sets,
+            truncated,
+            messages: ServerMessages::default(),
+        }
     }
 
     async fn audit_read_result<T>(

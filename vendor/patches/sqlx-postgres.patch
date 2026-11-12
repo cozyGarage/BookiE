@@ -95,10 +95,10 @@ index e0f4c3d..fd892bc 100755
              // Query will trigger a ReadyForQuery
              self.queue_simple_query(sql)?;
 diff --git a/src/connection/mod.rs b/src/connection/mod.rs
-index d594585..95677af 100755
+index d594585..96fe820 100755
 --- a/src/connection/mod.rs
 +++ b/src/connection/mod.rs
-@@ -16,7 +16,7 @@ use crate::message::{
+@@ -16,12 +16,12 @@ use crate::message::{
  use crate::statement::PgStatementMetadata;
  use crate::transaction::Transaction;
  use crate::types::Oid;
@@ -107,6 +107,12 @@ index d594585..95677af 100755
  
  pub(crate) use sqlx_core::connection::*;
  use sqlx_core::sql_str::SqlSafeStr;
+ 
+-pub use self::stream::PgStream;
++pub use self::stream::{PgServerNotice, PgStream};
+ 
+ #[cfg(feature = "offline")]
+ mod describe;
 @@ -44,6 +44,7 @@ pub struct PgConnectionInner {
      // wrapped in a potentially TLS stream,
      // wrapped in a buffered stream
@@ -144,7 +150,7 @@ index d594585..95677af 100755
  pub(crate) struct TableData {
      table_name: Arc<str>,
      /// Attribute number -> name.
-@@ -85,11 +105,28 @@ pub(crate) struct TableData {
+@@ -85,11 +105,34 @@ pub(crate) struct TableData {
  }
  
  impl PgConnection {
@@ -161,6 +167,12 @@ index d594585..95677af 100755
 +    }
 +
      /// the version number of the server in `libpq` format
++    pub fn take_server_notices(&mut self) -> (Vec<PgServerNotice>, u64) {
++        let notices = std::mem::take(&mut self.inner.stream.server_notices);
++        let dropped = std::mem::take(&mut self.inner.stream.dropped_server_notices);
++        (notices, dropped)
++    }
++
      pub fn server_version_num(&self) -> Option<u32> {
          self.inner.stream.server_version_num
      }
@@ -277,10 +289,62 @@ index 157e121..9c1cb1e 100755
  
      mac.update(salt);
 diff --git a/src/connection/stream.rs b/src/connection/stream.rs
-index e8a1aed..77882a9 100755
+index e8a1aed..3efa129 100755
 --- a/src/connection/stream.rs
 +++ b/src/connection/stream.rs
-@@ -62,6 +62,17 @@ impl PgStream {
+@@ -38,6 +38,42 @@ pub struct PgStream {
+     pub(crate) parameter_statuses: BTreeMap<String, String>,
+ 
+     pub(crate) server_version_num: Option<u32>,
++
++    pub(crate) server_notices: Vec<PgServerNotice>,
++
++    pub(crate) dropped_server_notices: u64,
++}
++
++pub const MAX_BUFFERED_SERVER_NOTICES: usize = 256;
++pub const MAX_SERVER_NOTICE_BYTES: usize = 8192;
++
++#[derive(Debug, Clone)]
++pub struct PgServerNotice {
++    pub severity: PgSeverity,
++    pub code: String,
++    pub message: String,
++}
++
++impl PgStream {
++    pub(crate) fn buffer_server_notice(&mut self, notice: &Notice) {
++        if self.server_notices.len() >= MAX_BUFFERED_SERVER_NOTICES {
++            self.dropped_server_notices = self.dropped_server_notices.saturating_add(1);
++            return;
++        }
++        let mut message = notice.message().to_owned();
++        if message.len() > MAX_SERVER_NOTICE_BYTES {
++            let mut end = MAX_SERVER_NOTICE_BYTES;
++            while !message.is_char_boundary(end) {
++                end -= 1;
++            }
++            message.truncate(end);
++        }
++        self.server_notices.push(PgServerNotice {
++            severity: notice.severity(),
++            code: notice.code().to_owned(),
++            message,
++        });
++    }
+ }
+ 
+ impl PgStream {
+@@ -54,6 +90,8 @@ impl PgStream {
+             notifications: None,
+             parameter_statuses: BTreeMap::default(),
+             server_version_num: None,
++            server_notices: Vec::new(),
++            dropped_server_notices: 0,
+         })
+     }
+ 
+@@ -62,6 +100,17 @@ impl PgStream {
          self.write(EncodeMessage(message))
      }
  
@@ -298,6 +362,14 @@ index e8a1aed..77882a9 100755
      pub(crate) async fn send<T>(&mut self, message: T) -> Result<(), Error>
      where
          T: FrontendMessage,
+@@ -163,6 +212,7 @@ impl PgStream {
+                     // if you are reading this comment and think so, open an issue
+ 
+                     let notice: Notice = message.decode()?;
++                    self.buffer_server_notice(&notice);
+ 
+                     let (log_level, tracing_level) = match notice.severity() {
+                         PgSeverity::Fatal | PgSeverity::Panic | PgSeverity::Error => {
 diff --git a/src/connection/tls.rs b/src/connection/tls.rs
 index a49c9ca..e9b9595 100755
 --- a/src/connection/tls.rs
@@ -326,7 +398,7 @@ index a49c9ca..e9b9595 100755
 +    let _ = socket2::SockRef::from(stream).set_tcp_keepalive(&keepalive);
 +}
 diff --git a/src/lib.rs b/src/lib.rs
-index f68c928..c59eb43 100755
+index f68c928..c743320 100755
 --- a/src/lib.rs
 +++ b/src/lib.rs
 @@ -50,7 +50,7 @@ pub use advisory_lock::{PgAdvisoryLock, PgAdvisoryLockGuard, PgAdvisoryLockKey};
@@ -334,7 +406,7 @@ index f68c928..c59eb43 100755
  pub use bind_iter::PgBindIterExt;
  pub use column::PgColumn;
 -pub use connection::PgConnection;
-+pub use connection::{PgCancelToken, PgConnection};
++pub use connection::{PgCancelToken, PgConnection, PgServerNotice};
  pub use copy::{PgCopyIn, PgPoolCopyExt};
  pub use database::Postgres;
  pub use error::{PgDatabaseError, PgErrorPosition};

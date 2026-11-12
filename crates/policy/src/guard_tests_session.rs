@@ -86,6 +86,7 @@ impl bookie_core::Session for ScriptedSession {
         Ok(bookie_core::QueryResultBatch {
             result_sets: vec![secret_set("first-secret"), secret_set("second-secret")],
             truncated: false,
+            messages: Default::default(),
         })
     }
 

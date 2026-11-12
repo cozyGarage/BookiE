@@ -10,14 +10,16 @@ use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
     CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, CommitResolution, CommitToken, ConnectOptions,
     Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo,
-    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult,
+    QueryResultBatch, ServerMessages, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
+    run_server_cancellable,
 };
 
 mod array;
 mod catalog;
 mod commit_resolution;
 mod decode;
+mod notices;
 mod numeric;
 mod params;
 mod pool;
@@ -452,6 +454,19 @@ impl Connection for PgConnection {
         let (connection, result) = controlled_query(connection, sql, &[], true, control).await;
         drop(connection);
         result
+    }
+
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let connection = acquire_controlled(&self.pool, control).await?;
+        let (connection, result) = controlled_query_with_messages(connection, sql, params, true, control).await;
+        drop(connection);
+        let (rows, messages) = result?;
+        Ok(QueryResultBatch::single(rows).with_messages(messages))
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
@@ -944,23 +959,39 @@ async fn acquire_controlled(
 }
 
 async fn controlled_query(
-    mut connection: PoolConnection<Postgres>,
+    connection: PoolConnection<Postgres>,
     sql: &str,
     params: &[Value],
     retry_stale_type_cache: bool,
     control: &OperationControl,
 ) -> (Option<PoolConnection<Postgres>>, Result<QueryResult, DriverError>) {
+    let (connection, result) =
+        controlled_query_with_messages(connection, sql, params, retry_stale_type_cache, control).await;
+    (connection, result.map(|(rows, _)| rows))
+}
+
+pub(crate) type MessagedResult = Result<(QueryResult, ServerMessages), DriverError>;
+
+async fn controlled_query_with_messages(
+    mut connection: PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+    retry_stale_type_cache: bool,
+    control: &OperationControl,
+) -> (Option<PoolConnection<Postgres>>, MessagedResult) {
     let cancel_token = connection.cancel_token();
     let stop = Some(QueryStop {
         cancel_token: cancel_token.clone(),
     });
+    notices::discard(&mut connection);
     let result = run_server_cancellable(
         async {
-            if retry_stale_type_cache {
+            let rows = if retry_stale_type_cache {
                 query_connection(&mut connection, sql, params, stop).await
             } else {
                 query_connection_once(&mut connection, sql, params, stop).await
-            }
+            }?;
+            Ok((rows, notices::drain(&mut connection)))
         },
         request_cancellation(cancel_token),
         confirms_cancellation,

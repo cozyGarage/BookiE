@@ -38,6 +38,42 @@ pub struct PgStream {
     pub(crate) parameter_statuses: BTreeMap<String, String>,
 
     pub(crate) server_version_num: Option<u32>,
+
+    pub(crate) server_notices: Vec<PgServerNotice>,
+
+    pub(crate) dropped_server_notices: u64,
+}
+
+pub const MAX_BUFFERED_SERVER_NOTICES: usize = 256;
+pub const MAX_SERVER_NOTICE_BYTES: usize = 8192;
+
+#[derive(Debug, Clone)]
+pub struct PgServerNotice {
+    pub severity: PgSeverity,
+    pub code: String,
+    pub message: String,
+}
+
+impl PgStream {
+    pub(crate) fn buffer_server_notice(&mut self, notice: &Notice) {
+        if self.server_notices.len() >= MAX_BUFFERED_SERVER_NOTICES {
+            self.dropped_server_notices = self.dropped_server_notices.saturating_add(1);
+            return;
+        }
+        let mut message = notice.message().to_owned();
+        if message.len() > MAX_SERVER_NOTICE_BYTES {
+            let mut end = MAX_SERVER_NOTICE_BYTES;
+            while !message.is_char_boundary(end) {
+                end -= 1;
+            }
+            message.truncate(end);
+        }
+        self.server_notices.push(PgServerNotice {
+            severity: notice.severity(),
+            code: notice.code().to_owned(),
+            message,
+        });
+    }
 }
 
 impl PgStream {
@@ -54,6 +90,8 @@ impl PgStream {
             notifications: None,
             parameter_statuses: BTreeMap::default(),
             server_version_num: None,
+            server_notices: Vec::new(),
+            dropped_server_notices: 0,
         })
     }
 
@@ -174,6 +212,7 @@ impl PgStream {
                     // if you are reading this comment and think so, open an issue
 
                     let notice: Notice = message.decode()?;
+                    self.buffer_server_notice(&notice);
 
                     let (log_level, tracing_level) = match notice.severity() {
                         PgSeverity::Fatal | PgSeverity::Panic | PgSeverity::Error => {

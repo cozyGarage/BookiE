@@ -23,6 +23,7 @@ mod protobuf_wire;
 mod query;
 mod query_rows;
 mod registry;
+mod server_message;
 mod session;
 pub mod sql_credentials;
 pub mod sql_ddl;
@@ -77,6 +78,10 @@ pub use query::{
 };
 pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;
+pub use server_message::{
+    MAX_SERVER_MESSAGE_TEXT_BYTES, MAX_SERVER_MESSAGES, MAX_SERVER_MESSAGES_TOTAL_BYTES, MessageSeverity,
+    ServerMessage, ServerMessages,
+};
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;

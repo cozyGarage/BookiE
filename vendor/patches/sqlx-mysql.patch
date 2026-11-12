@@ -55,7 +55,7 @@ index ad10e14..2bc5422 100755
      stream.write_packet(&[public_key_request_id][..])?;
      stream.flush().await?;
 diff --git a/src/connection/establish.rs b/src/connection/establish.rs
-index f61654d..84dd43e 100755
+index f61654d..6dfaac8 100755
 --- a/src/connection/establish.rs
 +++ b/src/connection/establish.rs
 @@ -8,6 +8,7 @@ use crate::net::{Socket, WithSocket};
@@ -66,7 +66,15 @@ index f61654d..84dd43e 100755
  use crate::protocol::Capabilities;
  use crate::{MySqlConnectOptions, MySqlConnection, MySqlSslMode};
  
-@@ -63,6 +64,9 @@ impl<'a> DoHandshake<'a> {
+@@ -27,6 +28,7 @@ impl MySqlConnection {
+                 stream,
+                 transaction_depth: 0,
+                 status_flags: Default::default(),
++                warning_count: 0,
+                 cache_statement: StatementCache::new(options.statement_cache_capacity),
+                 log_settings: options.log_settings.clone(),
+             }),
+@@ -63,6 +65,9 @@ impl<'a> DoHandshake<'a> {
          let handshake: Handshake = stream.recv_packet().await?.decode()?;
  
          let mut plugin = handshake.auth_plugin;
@@ -76,7 +84,7 @@ index f61654d..84dd43e 100755
          let nonce = handshake.auth_plugin_data;
  
          // FIXME: server version parse is a bit ugly
-@@ -171,6 +175,7 @@ impl WithSocket for DoHandshake<'_> {
+@@ -171,6 +176,7 @@ impl WithSocket for DoHandshake<'_> {
      type Output = Result<MySqlStream, Error>;
  
      async fn with_socket<S: Socket>(self, socket: S) -> Self::Output {
@@ -85,10 +93,46 @@ index f61654d..84dd43e 100755
      }
  }
 diff --git a/src/connection/executor.rs b/src/connection/executor.rs
-index ee59d03..0f4f959 100755
+index ee59d03..38b6291 100755
 --- a/src/connection/executor.rs
 +++ b/src/connection/executor.rs
-@@ -435,6 +435,15 @@ async fn recv_result_metadata(
+@@ -190,6 +190,10 @@ impl MySqlConnection {
+                     let ok = packet.ok()?;
+ 
+                     self.inner.status_flags = ok.status;
++                    self.inner.warning_count = self
++                        .inner
++                        .warning_count
++                        .saturating_add(u32::from(ok.warnings));
+ 
+                     let rows_affected = ok.affected_rows;
+                     logger.increase_rows_affected(rows_affected);
+@@ -225,17 +229,21 @@ impl MySqlConnection {
+                     let packet = self.inner.stream.recv_packet().await?;
+ 
+                     if packet[0] == 0xfe {
+-                        let (rows_affected, last_insert_id, status) = if packet.len() < 9 {
++                        let (rows_affected, last_insert_id, status, warnings) = if packet.len() < 9 {
+                             // EOF packet
+                             let eof = packet.eof(self.inner.stream.capabilities)?;
+-                            (0, 0, eof.status)
++                            (0, 0, eof.status, eof.warnings)
+                         } else {
+                             // OK packet
+                             let ok = packet.ok()?;
+-                            (ok.affected_rows, ok.last_insert_id, ok.status)
++                            (ok.affected_rows, ok.last_insert_id, ok.status, ok.warnings)
+                         };
+ 
+                         self.inner.status_flags = status;
++                        self.inner.warning_count = self
++                            .inner
++                            .warning_count
++                            .saturating_add(u32::from(warnings));
+                         r#yield!(Either::Left(MySqlQueryResult {
+                             rows_affected,
+                             last_insert_id,
+@@ -435,6 +443,15 @@ async fn recv_result_metadata(
      // the result-set metadata is primarily a listing of each output
      // column in the result-set
  
@@ -104,6 +148,30 @@ index ee59d03..0f4f959 100755
      let mut column_names = HashMap::with_capacity(num_columns);
  
      columns.clear();
+diff --git a/src/connection/mod.rs b/src/connection/mod.rs
+index 569ad32..7a6380f 100755
+--- a/src/connection/mod.rs
++++ b/src/connection/mod.rs
+@@ -45,6 +45,8 @@ pub(crate) struct MySqlConnectionInner {
+     pub(crate) transaction_depth: usize,
+     status_flags: Status,
+ 
++    pub(crate) warning_count: u32,
++
+     // cache by query string to the statement id and metadata
+     cache_statement: StatementCache<(u32, MySqlStatementMetadata)>,
+ 
+@@ -52,6 +54,10 @@ pub(crate) struct MySqlConnectionInner {
+ }
+ 
+ impl MySqlConnection {
++    pub fn take_warning_count(&mut self) -> u32 {
++        std::mem::take(&mut self.inner.warning_count)
++    }
++
+     pub(crate) fn in_transaction(&self) -> bool {
+         self.inner
+             .status_flags
 diff --git a/src/connection/stream.rs b/src/connection/stream.rs
 index e6aa8b4..d128016 100755
 --- a/src/connection/stream.rs

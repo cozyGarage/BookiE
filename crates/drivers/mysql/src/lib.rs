@@ -18,6 +18,7 @@ mod packed;
 mod pool_saturation;
 mod session;
 mod text_protocol;
+mod warnings;
 pub(crate) use text_protocol::{is_call_statement, text_protocol};
 use text_protocol::{mysql_row_payload_bytes, statement_columns};
 mod temporal;
