@@ -168,6 +168,25 @@ fn a_stored_secret_loads_back_for_a_connect() {
 }
 
 #[test]
+fn deleting_a_connection_removes_the_secrets_of_every_hop_in_its_chain() {
+    let plan = plan_chain(head(), &[password_hop("a", "one"), password_hop("b", "two")], None).unwrap();
+    let store = FakeStore::default();
+    let connection = Uuid::new_v4();
+    block_on(commit_with(&store, connection, &plan, "db")).unwrap();
+    let refs = chain_secret_refs(&plan.head);
+    assert_eq!(refs.len(), 2);
+    assert!(refs.iter().all(|secret| store.holds(*secret)));
+    block_on(delete_all(&store, connection, &refs)).unwrap();
+    assert!(refs.iter().all(|secret| !store.holds(*secret)));
+}
+
+#[test]
+fn a_chain_without_hop_secrets_has_nothing_to_delete() {
+    let plan = plan_chain(head(), &[], None).unwrap();
+    assert!(chain_secret_refs(&plan.head).is_empty());
+}
+
+#[test]
 #[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
 fn jump_host_secrets_round_trip_through_the_secret_service_and_clear_on_obsolescence() {
     let connection = Uuid::new_v4();

@@ -864,6 +864,11 @@ fn execute_delete_connection(
         shutdown
             .register(async move {
                 let _save_turn = crate::services::connection_save_turn::take().await;
+                let chain = bookie_storage::load_connections()
+                    .await
+                    .ok()
+                    .and_then(|all| all.into_iter().find(|saved| saved.id == id))
+                    .and_then(|saved| saved.ssh);
                 let result = bookie_storage::delete_connection(id).await;
                 if let Err(error) = result {
                     tracing::warn!(error = %error, "deleting the connection file entry failed");
@@ -881,6 +886,13 @@ fn execute_delete_connection(
                 let ssh_password = bookie_storage::delete_ssh_password(id).await;
                 let ssh_passphrase = bookie_storage::delete_ssh_passphrase(id).await;
                 let mut credential_failure = false;
+                if let Some(Err(error)) = match &chain {
+                    Some(chain) => Some(bookie_app_services::ssh_chain_secrets::delete_chain_secrets(id, chain).await),
+                    None => None,
+                } {
+                    credential_failure = true;
+                    tracing::warn!(error = %error, "deleting jump host credentials failed");
+                }
                 for error in [password.err(), ssh_password.err(), ssh_passphrase.err()]
                     .into_iter()
                     .flatten()

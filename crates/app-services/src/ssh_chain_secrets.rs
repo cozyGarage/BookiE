@@ -1,4 +1,4 @@
-use bookie_storage::StorageError;
+use bookie_storage::{SavedSshAuth, SavedSshConfig, StorageError};
 use secrecy::{ExposeSecret, SecretString};
 use thiserror::Error;
 use uuid::Uuid;
@@ -90,6 +90,29 @@ pub async fn rollback_hop_secrets(connection_id: Uuid, committed: &CommittedHopS
 
 pub async fn delete_obsolete_hop_secrets(connection_id: Uuid, plan: &ChainPlan) -> Result<(), HopSecretError> {
     delete_all(&SecretServiceStore, connection_id, &plan.obsolete).await
+}
+
+pub fn chain_secret_refs(chain: &SavedSshConfig) -> Vec<HopSecretRef> {
+    chain
+        .flatten_hops()
+        .into_iter()
+        .filter(|hop| hop.credential_revision > 0)
+        .flat_map(|hop| {
+            let kinds: &[HopSecretKind] = match hop.auth {
+                SavedSshAuth::Password => &[HopSecretKind::Password],
+                SavedSshAuth::PrivateKey { .. } => &[HopSecretKind::Passphrase],
+            };
+            kinds.iter().map(|kind| HopSecretRef {
+                hop_id: hop.hop_id,
+                revision: hop.credential_revision,
+                kind: *kind,
+            })
+        })
+        .collect()
+}
+
+pub async fn delete_chain_secrets(connection_id: Uuid, chain: &SavedSshConfig) -> Result<(), HopSecretError> {
+    delete_all(&SecretServiceStore, connection_id, &chain_secret_refs(chain)).await
 }
 
 pub async fn load_hop_secret(
