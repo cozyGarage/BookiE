@@ -204,7 +204,12 @@ async fn assert_restricted_catalog(bridge: &McpBridge, token: &bookie_mcp::McpTo
         .collect();
     assert_eq!(
         visible_routines,
-        vec![json!({"schema":"bookie_visible","name":"open_fn"})]
+        vec![json!({
+            "kind": "routine",
+            "schema": "bookie_visible",
+            "name": "open_fn",
+            "detail": "function()"
+        })]
     );
 
     let hidden_columns = dispatch(

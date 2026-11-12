@@ -134,7 +134,7 @@
     "drivers": {
       "purpose": "Database drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
-      "hosted_gate": "Build Linux / integration; lab-ci / driver (core, analytics, extended), consumers and socket-ssh",
+      "hosted_gate": "Build Linux / integration (driver-core, driver-analytics, driver-extended, socket-ssh); lab-ci / driver (core, analytics, extended), consumers and socket-ssh",
       "steps": [
         {
           "argv": [
@@ -150,7 +150,7 @@
     "driver-core": {
       "purpose": "PostgreSQL, MySQL and SQL Server integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "lab-ci / driver (core)",
+      "hosted_gate": "Build Linux / integration (driver-core); lab-ci / driver (core)",
       "steps": [
         {
           "argv": [
@@ -166,7 +166,7 @@
     "driver-analytics": {
       "purpose": "ClickHouse, MongoDB and Redis integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "lab-ci / driver (analytics)",
+      "hosted_gate": "Build Linux / integration (driver-analytics); lab-ci / driver (analytics)",
       "steps": [
         {
           "argv": [
@@ -182,7 +182,7 @@
     "driver-extended": {
       "purpose": "Cassandra, DuckDB and Oracle integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "lab-ci / driver (extended)",
+      "hosted_gate": "Build Linux / integration (driver-extended); lab-ci / driver (extended)",
       "steps": [
         {
           "argv": [
@@ -275,7 +275,7 @@
     "ssh": {
       "purpose": "Agent authentication and OpenSSH sessions",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration; lab-ci / socket-ssh",
+      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / socket-ssh",
       "steps": [
         {
           "argv": [
@@ -283,6 +283,23 @@
             "scripts/test-ssh.sh"
           ],
           "timeout_seconds": 2700,
+          "evidence": "rust-tests"
+        }
+      ]
+    },
+    "socket-ssh": {
+      "purpose": "PostgreSQL Unix-socket and OpenSSH integration tests",
+      "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
+      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / socket-ssh",
+      "steps": [
+        {
+          "argv": ["bash", "scripts/test-postgres-socket.sh"],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests"
+        },
+        {
+          "argv": ["bash", "scripts/test-ssh.sh"],
+          "timeout_seconds": 1800,
           "evidence": "rust-tests"
         }
       ]
@@ -305,7 +322,7 @@
     "pg-dump": {
       "purpose": "PostgreSQL dump and restore integration through the packaged client tools",
       "prerequisites": "Rust 1.98; Docker with postgres:18-alpine; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration; lab-ci / driver (core)",
+      "hosted_gate": "Build Linux / integration (driver-core); lab-ci / driver (core)",
       "steps": [
         {
           "argv": [
@@ -442,7 +459,7 @@
     "gtk-mysql-approval": {
       "purpose": "Human approval dialog policy and dispatch against a native MySQL fixture",
       "prerequisites": "GTK 4.24; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / postgres-release; lab-ci / gtk-server",
+      "hosted_gate": "Build Linux / gtk-server; lab-ci / gtk-server",
       "steps": [
         {
           "argv": [
