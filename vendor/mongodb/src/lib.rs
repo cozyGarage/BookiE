@@ -11,11 +11,13 @@
     clippy::cognitive_complexity,
     clippy::float_cmp,
     clippy::match_like_matches_macro,
-    clippy::derive_partial_eq_without_eq
+    clippy::derive_partial_eq_without_eq,
+    // The 2024 edition makes let chains available, so this now fires on every nested `if let`.
+    clippy::collapsible_if
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/3.9.1")]
+#![doc(html_root_url = "https://docs.rs/mongodb/3.10.0")]
 
 #[macro_use]
 pub mod options;

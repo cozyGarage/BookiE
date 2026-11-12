@@ -21,6 +21,7 @@ use crate::{
         Topology,
         TopologyDescription,
         TopologyVersion,
+        MIN_HEARTBEAT_FREQUENCY,
     },
     selection_criteria::TagSet,
     test::{
@@ -380,19 +381,26 @@ async fn run_test(test_file: TestFile) {
                 );
             }
             Outcome::Events(EventsOutcome { events: expected }) => {
-                let actual = event_stream
-                    .collect(Duration::from_millis(500), |e| matches!(e, Event::Sdam(_)))
-                    .await
-                    .into_iter()
-                    .map(|e| e.unwrap_sdam_event());
+                let filter_map = |event: Event| match event {
+                    Event::Sdam(event) => Some(event),
+                    _ => None,
+                };
 
-                assert_eq!(
-                    actual.len(),
-                    expected.len(),
-                    "{test_description}: {phase_description}: event list length mismatch:\n \
-                     actual: {actual:#?}, expected: {expected:#?}"
-                );
-                for (actual, expected) in actual.zip(expected) {
+                let mut actual = Vec::new();
+                while actual.len() < expected.len() {
+                    let next = event_stream
+                        .next_map(Duration::from_millis(500), filter_map)
+                        .await
+                        .expect("timed out waiting for expected event");
+                    actual.push(next);
+                }
+                if let Some(next) = event_stream
+                    .next_map(Duration::from_millis(50), filter_map)
+                    .await
+                {
+                    panic!("{test_description}: extra event: {next:?}");
+                }
+                for (actual, expected) in actual.into_iter().zip(expected) {
                     assert_eq!(
                         actual, expected,
                         "{test_description}: {phase_description}: SDAM events do not match:\n \
@@ -561,11 +569,9 @@ async fn load_balanced() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn topology_closed_event_last() {
     let client = Client::for_test()
         .use_single_mongos()
-        .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .await;
     let events = client.events.clone();
@@ -573,8 +579,8 @@ async fn topology_closed_event_last() {
     let mut subscriber = events.stream_all();
 
     client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("topology_closed_event_last")
+        .collection("topology_closed_event_last")
         .insert_one(doc! { "x": 1 })
         .await
         .unwrap();
@@ -600,7 +606,6 @@ async fn topology_closed_event_last() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "SERVER-128517"]
 async fn heartbeat_events() {
     if topology_is_load_balanced().await {
         log_uncaptured("skipping heartbeat_events tests due to load-balanced topology");
@@ -609,27 +614,26 @@ async fn heartbeat_events() {
 
     let mut options = get_client_options().await.clone();
     options.hosts.drain(1..);
-    options.heartbeat_freq = Some(Duration::from_millis(50));
+    options.heartbeat_freq = Some(MIN_HEARTBEAT_FREQUENCY);
     options.app_name = "heartbeat_events".to_string().into();
 
     let client = Client::for_test()
         .options(options.clone())
         .use_single_mongos()
-        .min_heartbeat_freq(Duration::from_millis(50))
         .monitor_events()
         .await;
 
     let mut subscriber = client.events.stream_all();
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatStarted(_)))
         })
         .await
         .expect("should see server heartbeat started event");
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatSucceeded(_)))
         })
         .await
@@ -652,7 +656,7 @@ async fn heartbeat_events() {
     let _guard = fp_client.enable_fail_point(fail_point).await.unwrap();
 
     subscriber
-        .next_match(Duration::from_millis(500), |event| {
+        .next_match(MIN_HEARTBEAT_FREQUENCY * 4, |event| {
             matches!(event, Event::Sdam(SdamEvent::ServerHeartbeatFailed(_)))
         })
         .await
@@ -660,7 +664,6 @@ async fn heartbeat_events() {
 }
 
 #[tokio::test]
-#[function_name::named]
 async fn direct_connection() {
     if !topology_is_replica_set().await {
         log_uncaptured("Skipping direct_connection test due to non-replica set topology");
@@ -685,8 +688,8 @@ async fn direct_connection() {
     let direct_false_client =
         Client::with_options(direct_false_options).expect("client construction should succeed");
     direct_false_client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("direct_connection")
+        .collection("direct_connection")
         .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection=false on secondary");
@@ -696,8 +699,8 @@ async fn direct_connection() {
     let direct_true_client =
         Client::with_options(direct_true_options).expect("client construction should succeed");
     let error = direct_true_client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("direct_connection")
+        .collection("direct_connection")
         .insert_one(doc! {})
         .await
         .expect_err("write should fail with directConnection=true on secondary");
@@ -706,8 +709,8 @@ async fn direct_connection() {
     let client =
         Client::with_options(secondary_options).expect("client construction should succeed");
     client
-        .database(function_name!())
-        .collection(function_name!())
+        .database("direct_connection")
+        .collection("direct_connection")
         .insert_one(doc! {})
         .await
         .expect("write should succeed with directConnection unspecified");

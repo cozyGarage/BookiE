@@ -1,6 +1,9 @@
 use tokio::sync::broadcast;
 
 #[cfg(test)]
+mod test;
+
+#[cfg(test)]
 use super::options::BackgroundThreadInterval;
 use super::{
     conn::{pooled::PooledConnection, PendingConnection},
@@ -25,6 +28,7 @@ use crate::{
     client::auth::Credential,
     error::{load_balanced_mode_mismatch, Error, ErrorKind, Result},
     event::cmap::{
+        CmapEvent,
         CmapEventEmitter,
         ConnectionClosedEvent,
         ConnectionClosedReason,
@@ -39,6 +43,7 @@ use crate::{
 
 use std::{
     collections::{HashMap, VecDeque},
+    ops::ControlFlow,
     time::{Duration, Instant},
 };
 
@@ -356,9 +361,16 @@ impl ConnectionPoolWorker {
                 }
             }
 
-            if self.can_service_connection_request() {
-                if let Some(request) = self.wait_queue.pop_front() {
-                    self.check_out(request);
+            // Skip cancelled requests without another wake-up.
+            while self.can_service_connection_request() {
+                let Some(request) = self.wait_queue.pop_front() else {
+                    break;
+                };
+                if request.is_abandoned() {
+                    continue;
+                }
+                if self.check_out(request).is_break() {
+                    break;
                 }
             }
         }
@@ -368,10 +380,9 @@ impl ConnectionPoolWorker {
         }
 
         self.event_emitter.emit_event(|| {
-            PoolClosedEvent {
+            CmapEvent::PoolClosed(PoolClosedEvent {
                 address: self.address.clone(),
-            }
-            .into()
+            })
         });
     }
 
@@ -391,11 +402,14 @@ impl ConnectionPoolWorker {
         self.below_max_connections() && self.pending_connection_count < self.max_connecting
     }
 
-    fn check_out(&mut self, request: ConnectionRequest) {
+    /// Returns `Continue` to try the next waiter without another wake-up.
+    fn check_out(&mut self, request: ConnectionRequest) -> ControlFlow<()> {
         if request.is_warm_pool() {
             if self.total_connection_count >= self.min_pool_size.unwrap_or(0) {
-                let _ = request.fulfill(ConnectionRequestResult::PoolWarmed);
-                return;
+                return match request.fulfill(ConnectionRequestResult::PoolWarmed) {
+                    Ok(()) => ControlFlow::Break(()),
+                    Err(_) => ControlFlow::Continue(()),
+                };
             }
         } else {
             // first attempt to check out an available connection
@@ -413,17 +427,7 @@ impl ConnectionPoolWorker {
                 }
 
                 conn.mark_checked_out(self.manager.clone(), self.get_cancellation_receiver());
-                if let Err(request) =
-                    request.fulfill(ConnectionRequestResult::Pooled(Box::new(conn)))
-                {
-                    // checking out thread stopped listening, indicating it hit the WaitQueue
-                    // timeout, so we put connection back into pool.
-                    let mut connection = request.unwrap_pooled_connection();
-                    connection.mark_checked_in();
-                    self.available_connections.push_back(connection);
-                }
-
-                return;
+                return Self::fulfill_checkout(request, conn, &mut self.available_connections);
             }
         }
 
@@ -467,6 +471,23 @@ impl ConnectionPoolWorker {
             // next time a request can be processed.
             self.wait_queue.push_front(request);
         }
+        ControlFlow::Break(())
+    }
+
+    fn fulfill_checkout(
+        request: ConnectionRequest,
+        connection: PooledConnection,
+        available_connections: &mut VecDeque<PooledConnection>,
+    ) -> ControlFlow<()> {
+        if let Err(result) = request.fulfill(ConnectionRequestResult::Pooled(Box::new(connection)))
+        {
+            // The requester cancelled. Return the connection and try the next waiter.
+            let mut connection = result.unwrap_pooled_connection();
+            connection.mark_checked_in();
+            available_connections.push_back(connection);
+            return ControlFlow::Continue(());
+        }
+        ControlFlow::Break(())
     }
 
     fn create_pending_connection(&mut self) -> PendingConnection {
@@ -483,7 +504,7 @@ impl ConnectionPoolWorker {
         };
         self.next_connection_id += 1;
         self.event_emitter
-            .emit_event(|| pending_connection.created_event().into());
+            .emit_event(|| CmapEvent::ConnectionCreated(pending_connection.created_event()));
 
         pending_connection
     }
@@ -513,7 +534,7 @@ impl ConnectionPoolWorker {
 
     fn check_in(&mut self, mut conn: PooledConnection) {
         self.event_emitter
-            .emit_event(|| conn.checked_in_event().into());
+            .emit_event(|| CmapEvent::ConnectionCheckedIn(conn.checked_in_event()));
 
         conn.mark_checked_in();
 
@@ -537,14 +558,14 @@ impl ConnectionPoolWorker {
         }
 
         let was_ready = match (&mut self.generation, service_id) {
-            (PoolGeneration::Normal(gen), None) => {
-                *gen += 1;
+            (PoolGeneration::Normal(generation), None) => {
+                *generation += 1;
                 let prev = std::mem::replace(&mut self.state, PoolState::Paused(cause.clone()));
                 matches!(prev, PoolState::Ready)
             }
             (PoolGeneration::LoadBalanced(gen_map), Some(sid)) => {
-                let gen = gen_map.entry(sid).or_insert(0);
-                *gen += 1;
+                let generation = gen_map.entry(sid).or_insert(0);
+                *generation += 1;
                 true
             }
             (..) => load_balanced_mode_mismatch!(),
@@ -553,12 +574,11 @@ impl ConnectionPoolWorker {
 
         if was_ready {
             self.event_emitter.emit_event(|| {
-                PoolClearedEvent {
+                CmapEvent::PoolCleared(PoolClearedEvent {
                     address: self.address.clone(),
                     service_id,
                     interrupt_in_use_connections,
-                }
-                .into()
+                })
             });
 
             if !matches!(self.generation, PoolGeneration::LoadBalanced(_)) {
@@ -579,10 +599,9 @@ impl ConnectionPoolWorker {
 
         self.state = PoolState::Ready;
         self.event_emitter.emit_event(|| {
-            PoolReadyEvent {
+            CmapEvent::PoolReady(PoolReadyEvent {
                 address: self.address.clone(),
-            }
-            .into()
+            })
         });
     }
 
@@ -707,20 +726,19 @@ async fn establish_connection(
                 )
                 .await;
             event_emitter.emit_event(|| {
-                ConnectionClosedEvent {
+                CmapEvent::ConnectionClosed(ConnectionClosedEvent {
                     address,
                     reason: ConnectionClosedReason::Error,
                     connection_id,
                     #[cfg(feature = "tracing-unstable")]
                     error: Some(e.cause.clone()),
                     service_id: None,
-                }
-                .into()
+                })
             });
             manager.handle_connection_failed();
         }
         Ok(ref mut connection) => {
-            event_emitter.emit_event(|| connection.ready_event().into());
+            event_emitter.emit_event(|| CmapEvent::ConnectionReady(connection.ready_event()));
         }
     }
 

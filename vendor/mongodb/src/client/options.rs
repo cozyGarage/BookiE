@@ -7,13 +7,14 @@ mod resolver_config;
 
 use std::{
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     convert::TryFrom,
     fmt::{self, Display, Formatter, Write},
     hash::{Hash, Hasher},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr},
     path::PathBuf,
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
 
@@ -43,7 +44,7 @@ use crate::{
     sdam::{verify_max_staleness, DEFAULT_HEARTBEAT_FREQUENCY, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     serde_util,
-    srv::{OriginalSrvInfo, SrvResolver},
+    srv::{OriginalSrvInfo, SrvResolver, SrvResolverOptions},
 };
 
 pub use bulk_write::*;
@@ -331,7 +332,32 @@ impl ServerAddress {
         })
     }
 
-    #[cfg(feature = "dns-resolver")]
+    pub(crate) fn unparse(&self) -> String {
+        match self {
+            Self::Tcp { host, port } => {
+                let port = port.unwrap_or(DEFAULT_PORT);
+                if host.contains(':') {
+                    format!("[{host}]:{port}")
+                } else {
+                    format!("{host}:{port}")
+                }
+            }
+            #[cfg(unix)]
+            Self::Unix { path } => {
+                // `parse` identifies socket paths by a literal ".sock" suffix, so the unreserved
+                // characters (including '.') must be left as-is.
+                const UNRESERVED: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+                    .remove(b'-')
+                    .remove(b'.')
+                    .remove(b'_')
+                    .remove(b'~');
+                percent_encoding::utf8_percent_encode(&path.display().to_string(), UNRESERVED)
+                    .to_string()
+            }
+        }
+    }
+
+    #[cfg(any(feature = "tracing-unstable", feature = "gssapi-auth", test))]
     pub(crate) fn host(&self) -> std::borrow::Cow<'_, str> {
         match self {
             Self::Tcp { host, .. } => std::borrow::Cow::Borrowed(host.as_str()),
@@ -475,6 +501,9 @@ impl Socks5Proxy {
     }
 }
 
+/// A custom callback to perform SRV domain name validation.
+pub type SrvHostValidator = Arc<dyn Fn(&str) -> bool + Send + Sync>;
+
 /// Contains the options that can be used to create a new [`Client`](../struct.Client.html).
 #[derive(Clone, Deserialize, TypedBuilder)]
 #[builder(field_defaults(default, setter(into)))]
@@ -541,7 +570,8 @@ pub struct ClientOptions {
     pub direct_connection: Option<bool>,
 
     /// Extra information to append to the driver version in the metadata of the handshake with the
-    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.
+    /// server. This should be used by libraries wrapping the driver, e.g. ODMs.  The '|' character
+    /// is not allowed in any field.
     pub driver_info: Option<DriverInfo>,
 
     /// The amount of time each monitoring thread should wait between performing server checks.
@@ -651,6 +681,12 @@ pub struct ClientOptions {
 
     /// Overrides the default "mongodb" service name for SRV lookup in both discovery and polling
     pub srv_service_name: Option<String>,
+
+    /// Replaces the default SRV domain name validation with a custom callback.  WARNING: Modifying
+    /// the default SRV domain name validation can create vulnerabilities.
+    #[serde(skip)]
+    #[derive_where(skip)]
+    pub srv_host_validator: Option<SrvHostValidator>,
 
     /// The TLS configuration for the Client to use in its connections with the server.
     ///
@@ -915,6 +951,9 @@ where
 /// Contains the options that can be set via a MongoDB connection string.
 ///
 /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
+///
+/// If values are set that would not be valid to parse from a MongoDB connection string, the output
+/// from the `Display` implementation may fail to parse or parse incorrectly.
 #[skip_serializing_none]
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1151,13 +1190,12 @@ impl HostInfo {
     async fn resolve(
         self,
         resolver_config: Option<ResolverConfig>,
-        srv_service_name: Option<String>,
+        srv_options: SrvResolverOptions,
     ) -> Result<ResolvedHostInfo> {
         Ok(match self {
             Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
             Self::DnsRecord(hostname) => {
-                let mut resolver =
-                    SrvResolver::new(resolver_config.clone(), srv_service_name).await?;
+                let mut resolver = SrvResolver::new(resolver_config.clone(), srv_options).await?;
                 let config = resolver.resolve_client_options(&hostname).await?;
                 ResolvedHostInfo::DnsRecord { hostname, config }
             }
@@ -1422,11 +1460,11 @@ impl ClientOptions {
         }
 
         if let Some(heartbeat_frequency) = self.heartbeat_freq {
-            if heartbeat_frequency < self.min_heartbeat_frequency() {
+            if heartbeat_frequency < MIN_HEARTBEAT_FREQUENCY {
                 return Err(ErrorKind::InvalidArgument {
                     message: format!(
                         "'heartbeat_freq' must be at least {}ms, but {}ms was given",
-                        self.min_heartbeat_frequency().as_millis(),
+                        MIN_HEARTBEAT_FREQUENCY.as_millis(),
                         heartbeat_frequency.as_millis()
                     ),
                 }
@@ -1481,27 +1519,18 @@ impl ClientOptions {
             }
         }
 
+        if self.srv_host_validator.is_some() && self.original_srv_info.is_none() {
+            return Err(Error::invalid_argument(
+                "cannot specify an srv host validator with a non-srv URI",
+            ));
+        }
+
         Ok(())
     }
 
     #[cfg(test)]
     pub(crate) fn test_options_mut(&mut self) -> &mut TestOptions {
         self.test_options.get_or_insert_with(Default::default)
-    }
-
-    pub(crate) fn min_heartbeat_frequency(&self) -> Duration {
-        #[cfg(test)]
-        {
-            self.test_options
-                .as_ref()
-                .and_then(|to| to.min_heartbeat_freq)
-                .unwrap_or(MIN_HEARTBEAT_FREQUENCY)
-        }
-
-        #[cfg(not(test))]
-        {
-            MIN_HEARTBEAT_FREQUENCY
-        }
     }
 
     pub(crate) fn resolver_config(&self) -> Option<&ResolverConfig> {
@@ -1564,6 +1593,36 @@ fn percent_decode(s: &str, err_message: &str) -> Result<String> {
 
 fn percent_encode(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
+}
+
+struct UriOptions(String);
+
+impl UriOptions {
+    fn new() -> Self {
+        Self(String::new())
+    }
+
+    // Option keys are static to enforce that they're constants and not user input.
+    fn push_str(&mut self, key: &'static str, s: &str) {
+        let encoded = percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC);
+        // unwrap safety: write! to a string target is infallible
+        write!(&mut self.0, "&{key}={encoded}").unwrap();
+    }
+
+    fn push_bool(&mut self, key: &'static str, b: bool) {
+        self.push_str(key, if b { "true" } else { "false" });
+    }
+
+    fn push<T: Display>(&mut self, key: &'static str, v: &T) {
+        self.push_str(key, &v.to_string());
+    }
+
+    fn append_to(mut self, out: &mut String) {
+        if !self.0.is_empty() {
+            self.0.replace_range(0..1, "?"); // mark start of options
+            out.push_str(&self.0);
+        }
+    }
 }
 
 fn validate_and_parse_userinfo(s: &str, userinfo_type: &str) -> Result<String> {
@@ -1878,7 +1937,7 @@ impl ConnectionString {
     }
 
     /// Un-parses a [`ConnectionString`] struct back into a MongoDB connection string.
-    fn to_uri_str(&self) -> String {
+    fn unparse(&self) -> String {
         let ConnectionString {
             host_info,
             app_name,
@@ -1925,7 +1984,7 @@ impl ConnectionString {
         } = self;
 
         let mut res: String = String::new();
-        let mut opts = String::new();
+        let mut opts = UriOptions::new();
 
         if self.is_srv() {
             res.push_str("mongodb+srv://");
@@ -1951,7 +2010,7 @@ impl ConnectionString {
             res.push_str(
                 &hosts
                     .iter()
-                    .map(|h| h.to_string())
+                    .map(|h| h.unparse())
                     .collect::<Vec<_>>()
                     .join(","),
             );
@@ -1960,75 +2019,68 @@ impl ConnectionString {
         res.push('/');
 
         if let Some(authdb) = default_database {
-            res.push_str(authdb);
+            res.push_str(&percent_encode(authdb));
         }
 
         if let Some(replica_set) = replica_set {
-            opts.push_str(&format!("&replicaSet={replica_set}"));
+            opts.push_str("replicaSet", replica_set);
         }
 
         if let Some(direct_connection) = direct_connection {
-            opts.push_str(&format!("&directConnection={direct_connection}"));
+            opts.push_bool("directConnection", *direct_connection);
         }
 
         if let Some(tls) = tls {
             match tls {
                 Tls::Enabled(options) => {
-                    opts.push_str("&tls=true");
+                    opts.push_bool("tls", true);
 
                     if let Some(cert_key_file_path) = &options.cert_key_file_path {
-                        opts.push_str(&format!(
-                            "&tlsCertificateKeyFile={}",
-                            cert_key_file_path.to_str().unwrap()
-                        ));
+                        opts.push_str(
+                            "tlsCertificateKeyFile",
+                            cert_key_file_path.to_str().unwrap(),
+                        );
                     }
 
                     #[cfg(feature = "cert-key-password")]
                     if let Some(tls_certificate_key_file_password) =
                         &options.tls_certificate_key_file_password
                     {
-                        opts.push_str(&format!(
-                            "&tlsCertificateKeyFilePassword={}",
-                            std::str::from_utf8(tls_certificate_key_file_password).unwrap()
-                        ));
+                        opts.push_str(
+                            "tlsCertificateKeyFilePassword",
+                            std::str::from_utf8(tls_certificate_key_file_password).unwrap(),
+                        );
                     }
 
                     if let Some(ca_file_path) = &options.ca_file_path {
-                        opts.push_str(&format!("&tlsCAFile={}", ca_file_path.to_str().unwrap()));
+                        opts.push_str("tlsCAFile", ca_file_path.to_str().unwrap());
                     }
 
                     if let Some(allow_invalid_certificates) = options.allow_invalid_certificates {
-                        opts.push_str(&format!(
-                            "&tlsAllowInvalidCertificates={allow_invalid_certificates}"
-                        ));
+                        opts.push_bool("tlsAllowInvalidCertificates", allow_invalid_certificates);
                     }
 
                     #[cfg(feature = "openssl-tls")]
                     if let Some(allow_invalid_hostnames) = options.allow_invalid_hostnames {
-                        opts.push_str(&format!(
-                            "&tlsAllowInvalidHostnames={allow_invalid_hostnames}"
-                        ));
+                        opts.push_bool("tlsAllowInvalidHostnames", allow_invalid_hostnames);
                     }
 
                     if let Some(tls_insecure) = tls_insecure {
-                        opts.push_str(&format!("&tlsInsecure={tls_insecure}"));
+                        opts.push_bool("tlsInsecure", *tls_insecure);
                     }
                 }
                 Tls::Disabled => {
-                    opts.push_str("&tls=false");
+                    opts.push_bool("tls", false);
                 }
             }
         }
 
         if let Some(connect_timeout) = connect_timeout {
-            opts.push_str(&format!(
-                "&connectTimeoutMS={}",
-                connect_timeout.as_millis()
-            ));
+            opts.push("connectTimeoutMS", &connect_timeout.as_millis());
         }
 
         if let Some(socket_timeout) = socket_timeout {
-            opts.push_str(&format!("&socketTimeoutMS={}", socket_timeout.as_millis()));
+            opts.push("socketTimeoutMS", &socket_timeout.as_millis());
         }
 
         #[cfg(any(
@@ -2037,102 +2089,89 @@ impl ConnectionString {
             feature = "snappy-compression"
         ))]
         if let Some(compressors) = compressors {
-            opts.push_str(&format!(
-                "&compressors={}",
-                compressors
+            opts.push_str(
+                "compressors",
+                &compressors
                     .iter()
                     .map(|c| c.name())
                     .collect::<Vec<_>>()
-                    .join(",")
-            ));
+                    .join(","),
+            );
         }
 
         #[cfg(feature = "zlib-compression")]
         if let Some(compressors) = compressors {
             for compressor in compressors {
                 if let Compressor::Zlib { level: Some(level) } = compressor {
-                    opts.push_str(&format!("&zlibCompressionLevel={level}"));
+                    opts.push("zlibCompressionLevel", level);
                 }
             }
         }
 
         if let Some(max_pool_size) = max_pool_size {
-            opts.push_str(&format!("&maxPoolSize={max_pool_size}"));
+            opts.push("maxPoolSize", max_pool_size);
         }
 
         if let Some(min_pool_size) = min_pool_size {
-            opts.push_str(&format!("&minPoolSize={min_pool_size}"));
+            opts.push("minPoolSize", min_pool_size);
         }
 
         if let Some(max_connecting) = max_connecting {
-            opts.push_str(&format!("&maxConnecting={max_connecting}"));
+            opts.push("maxConnecting", max_connecting);
         }
 
         if let Some(max_idle_time) = max_idle_time {
-            opts.push_str(&format!("&maxIdleTimeMS={}", max_idle_time.as_millis()));
+            opts.push("maxIdleTimeMS", &max_idle_time.as_millis());
         }
 
         if let Some(wait_queue_timeout) = wait_queue_timeout {
-            opts.push_str(&format!(
-                "&waitQueueTimeoutMS={}",
-                wait_queue_timeout.as_millis()
-            ));
+            opts.push("waitQueueTimeoutMS", &wait_queue_timeout.as_millis());
         }
 
         if let Some(write_concern) = write_concern {
             if let Some(w) = &write_concern.w {
                 match w {
                     Acknowledgment::Nodes(i) => {
-                        opts.push_str(&format!("&w={i}"));
+                        opts.push("w", i);
                     }
                     Acknowledgment::Majority => {
-                        opts.push_str("&w=majority");
+                        opts.push_str("w", "majority");
                     }
                     Acknowledgment::Custom(tag) => {
-                        opts.push_str(&format!("&w={tag}"));
+                        opts.push_str("w", tag);
                     }
                 }
             }
 
             if let Some(w_timeout) = write_concern.w_timeout {
-                opts.push_str(&format!("&wtimeoutMS={}", w_timeout.as_millis()));
+                opts.push("wtimeoutMS", &w_timeout.as_millis());
             }
 
             if let Some(journal) = write_concern.journal {
-                opts.push_str(&format!("&journal={journal}"));
+                opts.push_bool("journal", journal);
             }
         }
 
         if let Some(read_concern) = read_concern {
-            opts.push_str(&format!(
-                "&readConcernLevel={}",
-                read_concern.level.as_str()
-            ));
+            opts.push_str("readConcernLevel", read_concern.level.as_str());
         }
 
         if let Some(read_preference) = read_preference {
-            opts.push_str(&format!("&readPreference={}", read_preference.mode()));
+            opts.push_str("readPreference", read_preference.mode());
 
             if let Some(max_staleness) = read_preference.max_staleness() {
-                opts.push_str(&format!("&maxStalenessSeconds={}", max_staleness.as_secs()));
+                opts.push("maxStalenessSeconds", &max_staleness.as_secs());
             }
 
             if let Some(tag_sets) = read_preference.tag_sets() {
-                let ser_tag_set = |tag_set: &HashMap<String, String>| -> String {
+                for tag_set in tag_sets {
                     let tags = tag_set
                         .iter()
                         .map(|(k, v)| format!("{k}:{v}"))
                         .collect::<Vec<_>>()
                         .join(",");
-                    format!("&readPreferenceTags={tags}")
-                };
-                opts.push_str(
-                    &tag_sets
-                        .iter()
-                        .map(ser_tag_set)
-                        .collect::<Vec<_>>()
-                        .join(""),
-                )
+                    opts.push_str("readPreferenceTags", &tags);
+                }
             }
         }
 
@@ -2140,17 +2179,14 @@ impl ConnectionString {
             .as_ref()
             .and_then(|c: &Credential| c.source.as_ref())
         {
-            opts.push_str(&format!("&authSource={auth_source}"));
+            opts.push_str("authSource", auth_source);
         }
 
         if let Some(auth_mechanism) = credential
             .as_ref()
             .and_then(|c: &Credential| c.mechanism.as_ref())
         {
-            opts.push_str(&format!(
-                "&authMechanism={}",
-                auth_mechanism.as_str().to_uppercase()
-            ));
+            opts.push_str("authMechanism", &auth_mechanism.as_str().to_uppercase());
         }
 
         if let Some(auth_mechanism_properties) = credential
@@ -2158,48 +2194,46 @@ impl ConnectionString {
             .and_then(|c: &Credential| c.mechanism_properties.as_ref())
         {
             if !auth_mechanism_properties.is_empty() {
-                opts.push_str(&format!(
-                    "&authMechanismProperties={}",
-                    auth_mechanism_properties
+                opts.push_str(
+                    "authMechanismProperties",
+                    &auth_mechanism_properties
                         .iter()
-                        .map(|(k, v)| format!("{k}:{v}"))
+                        .map(|(k, v)| match v {
+                            // avoid quoting on emitted strings
+                            Bson::String(s) => format!("{k}:{s}"),
+                            _ => format!("{k}:{v}"),
+                        })
                         .collect::<Vec<_>>()
-                        .join(",")
-                ))
+                        .join(","),
+                )
             }
         }
 
         if let Some(local_threshold) = local_threshold {
-            opts.push_str(&format!(
-                "&localThresholdMS={}",
-                local_threshold.as_millis()
-            ));
+            opts.push("localThresholdMS", &local_threshold.as_millis());
         }
 
         if let Some(server_selection_timeout) = server_selection_timeout {
-            opts.push_str(&format!(
-                "&serverSelectionTimeoutMS={}",
-                server_selection_timeout.as_millis()
-            ));
+            opts.push(
+                "serverSelectionTimeoutMS",
+                &server_selection_timeout.as_millis(),
+            );
         }
 
         if let Some(heartbeat_frequency) = heartbeat_frequency {
-            opts.push_str(&format!(
-                "&heartbeatFrequencyMS={}",
-                heartbeat_frequency.as_millis()
-            ));
+            opts.push("heartbeatFrequencyMS", &heartbeat_frequency.as_millis());
         }
 
         if let Some(app_name) = app_name {
-            opts.push_str(&format!("&appName={app_name}"));
+            opts.push_str("appName", app_name);
         }
 
         if let Some(retry_reads) = retry_reads {
-            opts.push_str(&format!("&retryReads={retry_reads}"));
+            opts.push_bool("retryReads", *retry_reads);
         }
 
         if let Some(retry_writes) = retry_writes {
-            opts.push_str(&format!("&retryWrites={retry_writes}"));
+            opts.push_bool("retryWrites", *retry_writes);
         }
 
         if let Some(uuid_rep) = uuid_representation {
@@ -2210,48 +2244,42 @@ impl ConnectionString {
                 UuidRepresentation::PythonLegacy => "pythonLegacy",
                 _ => "",
             };
-            opts.push_str(&format!("&uuidRepresentation={s}"));
+            opts.push_str("uuidRepresentation", s);
         }
 
         if let Some(load_balanced) = load_balanced {
-            opts.push_str(&format!("&loadBalanced={load_balanced}"));
+            opts.push_bool("loadBalanced", *load_balanced);
         }
 
         if let Some(srv_max_hosts) = srv_max_hosts {
-            opts.push_str(&format!("&srvMaxHosts={srv_max_hosts}"));
+            opts.push("srvMaxHosts", srv_max_hosts);
         }
 
         #[cfg(feature = "socks5-proxy")]
         if let Some(proxy) = socks5_proxy {
-            opts.push_str(&format!("&proxyHost={}", proxy.host));
+            opts.push_str("proxyHost", &proxy.host);
             if let Some(port) = proxy.port {
-                opts.push_str(&format!("&proxyPort={port}"));
+                opts.push("proxyPort", &port);
             }
             if let Some((username, password)) = proxy.authentication.as_ref() {
-                opts.push_str(&format!(
-                    "&proxyUsername={username}&proxyPassword={password}"
-                ));
+                opts.push_str("proxyUsername", username);
+                opts.push_str("proxyPassword", password);
             }
         }
 
         if let Some(adaptive_retries) = adaptive_retries {
-            opts.push_str(&format!("&adaptiveRetries={adaptive_retries}"));
+            opts.push_bool("adaptiveRetries", *adaptive_retries);
         }
 
         if let Some(max_adaptive_retries) = max_adaptive_retries {
-            opts.push_str(&format!("&maxAdaptiveRetries={max_adaptive_retries}"));
+            opts.push("maxAdaptiveRetries", max_adaptive_retries);
         }
 
         if let Some(enable_overload_retargeting) = enable_overload_retargeting {
-            opts.push_str(&format!(
-                "&enableOverloadRetargeting={enable_overload_retargeting}"
-            ));
+            opts.push_bool("enableOverloadRetargeting", *enable_overload_retargeting);
         }
 
-        if !opts.is_empty() {
-            opts.replace_range(0..1, "?"); // mark start of options
-            res.push_str(&opts);
-        }
+        opts.append_to(&mut res);
 
         res
     }
@@ -2584,21 +2612,15 @@ impl ConnectionString {
                 } else {
                     value
                         .split(',')
-                        .map(|tag| {
-                            let mut values = tag.split(':');
-
-                            match (values.next(), values.next()) {
-                                (Some(key), Some(value)) => {
-                                    Ok((key.to_string(), value.to_string()))
-                                }
-                                _ => Err(ErrorKind::InvalidArgument {
-                                    message: format!(
-                                        "'{value}' is not a valid read preference tag (which must \
-                                         be of the form 'key:value'",
-                                    ),
-                                }
-                                .into()),
+                        .map(|tag| match tag.split_once(':') {
+                            Some((key, value)) => Ok((key.to_string(), value.to_string())),
+                            None => Err(ErrorKind::InvalidArgument {
+                                message: format!(
+                                    "'{tag}' is not a valid read preference tag (which must be of \
+                                     the form 'key:value'",
+                                ),
                             }
+                            .into()),
                         })
                         .collect()
                 };
@@ -2674,7 +2696,7 @@ impl ConnectionString {
                     .tls
                     .get_or_insert_with(|| Tls::Enabled(Default::default()))
                 {
-                    Tls::Enabled(ref mut options) => {
+                    Tls::Enabled(options) => {
                         options.allow_invalid_certificates = Some(val);
                         #[cfg(feature = "openssl-tls")]
                         {
@@ -2695,7 +2717,7 @@ impl ConnectionString {
                     .tls
                     .get_or_insert_with(|| Tls::Enabled(Default::default()))
                 {
-                    Tls::Enabled(ref mut options) => {
+                    Tls::Enabled(options) => {
                         options.allow_invalid_certificates = Some(val);
                     }
                     Tls::Disabled => {
@@ -2893,7 +2915,7 @@ impl<'de> Deserialize<'de> for ConnectionString {
 
 impl Display for ConnectionString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_uri_str())
+        write!(f, "{}", self.unparse())
     }
 }
 
@@ -2920,7 +2942,7 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    use super::{ClientOptions, ServerAddress};
+    use super::{ClientOptions, ConnectionString, ServerAddress};
     use crate::{
         concern::{Acknowledgment, ReadConcernLevel, WriteConcern},
         selection_criteria::{ReadPreference, ReadPreferenceOptions},
@@ -3287,6 +3309,163 @@ mod tests {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn to_uri_str_simple() {
+        let conn_str = ConnectionString::parse("mongodb://localhost:27017/?appName=foo").unwrap();
+        assert_eq!(
+            conn_str.to_string(),
+            "mongodb://localhost:27017/?appName=foo"
+        );
+    }
+
+    #[test]
+    fn to_uri_str_escapes_option_values() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://localhost/?appName=a%26b%3Dc%20d%23e%25f&replicaSet=r%26s",
+        )
+        .unwrap();
+        assert_eq!(conn_str.app_name.as_deref(), Some("a&b=c d#e%f"));
+
+        let s = conn_str.to_string();
+        // Reserved characters must not leak into the option string unescaped.
+        assert_eq!(s.matches('&').count(), 1, "{s}");
+        assert_eq!(s.matches('=').count(), 2, "{s}");
+        assert!(!s.contains('#'), "{s}");
+
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.app_name, conn_str.app_name);
+        assert_eq!(reparsed.replica_set.as_deref(), Some("r&s"));
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_escapes_default_database() {
+        let conn_str = ConnectionString::parse("mongodb://localhost/my%3Fdb%23x%40y").unwrap();
+        assert_eq!(conn_str.default_database.as_deref(), Some("my?db#x@y"));
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.default_database, conn_str.default_database);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn to_uri_str_escapes_unix_socket() {
+        let conn_str =
+            ConnectionString::parse("mongodb://localhost:27017,%2Ftmp%2Fmongodb-27017.sock/")
+                .unwrap();
+        let super::HostInfo::HostIdentifiers(hosts) = &conn_str.host_info else {
+            panic!("expected host identifiers");
+        };
+        assert_eq!(
+            hosts[1],
+            ServerAddress::Unix {
+                path: std::path::PathBuf::from("/tmp/mongodb-27017.sock")
+            }
+        );
+
+        let s = conn_str.to_string();
+        assert!(s.contains("%2Ftmp%2Fmongodb-27017.sock"), "{s}");
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_brackets_ipv6_hosts() {
+        let conn_str =
+            ConnectionString::parse("mongodb://[::1]:27018,[fe80::1],host:27019/").unwrap();
+
+        let s = conn_str.to_string();
+        assert!(
+            s.starts_with("mongodb://[::1]:27018,[fe80::1]:27017,host:27019/"),
+            "{s}"
+        );
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_escapes_credentials() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://us%40er:p%3Ass%2Fw%25rd@localhost/?authSource=a%26b",
+        )
+        .unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        let credential = reparsed.credential.as_ref().unwrap();
+        assert_eq!(credential.username.as_deref(), Some("us@er"));
+        assert_eq!(credential.password.as_deref(), Some("p:ss/w%rd"));
+        assert_eq!(credential.source.as_deref(), Some("a&b"));
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn to_uri_str_auth_mechanism_properties_unquoted() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://u@localhost/?authMechanism=MONGODB-OIDC&\
+             authMechanismProperties=ENVIRONMENT:azure,TOKEN_RESOURCE:a%3Ab",
+        )
+        .unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        let properties = reparsed
+            .credential
+            .as_ref()
+            .and_then(|c| c.mechanism_properties.as_ref())
+            .unwrap();
+        assert_eq!(properties.get_str("ENVIRONMENT").unwrap(), "azure");
+        assert_eq!(properties.get_str("TOKEN_RESOURCE").unwrap(), "a:b");
+        assert_eq!(reparsed.to_string(), s);
+    }
+
+    #[test]
+    fn read_preference_tag_value_with_colon() {
+        let conn_str = ConnectionString::parse(
+            "mongodb://localhost/?readPreference=secondary&readPreferenceTags=a:b:c,dc:ny",
+        )
+        .unwrap();
+        let tag_sets = conn_str
+            .read_preference
+            .as_ref()
+            .and_then(|rp| rp.tag_sets())
+            .unwrap();
+        assert_eq!(tag_sets.len(), 1);
+        assert_eq!(tag_sets[0].get("a").map(String::as_str), Some("b:c"));
+        assert_eq!(tag_sets[0].get("dc").map(String::as_str), Some("ny"));
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.read_preference, conn_str.read_preference);
+    }
+
+    #[test]
+    fn to_uri_str_round_trip_many_options() {
+        let uri = "mongodb://u:p@host1:27017,host2:27018/db?replicaSet=rs&directConnection=false&\
+                   connectTimeoutMS=1000&maxPoolSize=10&minPoolSize=2&maxIdleTimeMS=5000&\
+                   w=majority&wtimeoutMS=100&journal=true&readConcernLevel=majority&\
+                   readPreference=secondary&maxStalenessSeconds=120&retryReads=true&\
+                   retryWrites=false&appName=my%20app&localThresholdMS=15&\
+                   serverSelectionTimeoutMS=3000&heartbeatFrequencyMS=10000&tls=true&\
+                   uuidRepresentation=javaLegacy";
+        let conn_str = ConnectionString::parse(uri).unwrap();
+
+        let s = conn_str.to_string();
+        let reparsed = ConnectionString::parse(&s).unwrap();
+        assert_eq!(reparsed.to_string(), s);
+        assert_eq!(reparsed.host_info, conn_str.host_info);
+        assert_eq!(reparsed.replica_set, conn_str.replica_set);
+        assert_eq!(reparsed.app_name.as_deref(), Some("my app"));
+        assert_eq!(reparsed.write_concern, conn_str.write_concern);
+        assert_eq!(reparsed.read_preference, conn_str.read_preference);
+        assert_eq!(reparsed.max_pool_size, Some(10));
+        assert_eq!(reparsed.tls, conn_str.tls);
     }
 }
 
