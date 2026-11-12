@@ -450,7 +450,7 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     view.update(cx, |view, cx| {
         view.edits.insert((1, 1), Cell::Text(full.clone()));
         requests.store(0, Ordering::Relaxed);
-        view.sync_table(cx);
+        view.sync_table(0.0, cx);
         view.table.update(cx, |table, _| {
             let delegate = table.delegate_mut();
             let edited = delegate.label_of(1, 1).0;
@@ -461,6 +461,19 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.start_edit(1, 1, window, cx)));
     view.read_with(cx, |view, cx| assert_eq!(view.editor.read(cx).content(), full));
+}
+
+#[gpui::test]
+fn grid_table_expands_the_last_column_to_fill_wide_viewports(cx: &mut TestAppContext) {
+    let source = std::sync::Arc::new(bookie_gpui::source::Synthetic::new(1));
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    view.update(cx, |view, cx| view.sync_table(1_200.0, cx));
+    cx.run_until_parked();
+
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.table.read(cx).col_width(3), Some(gpui::px(560.0)));
+    });
 }
 
 #[gpui::test]

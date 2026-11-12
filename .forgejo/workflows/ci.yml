@@ -448,6 +448,12 @@ jobs:
           mkdir -p "$CARGO_TARGET_DIR"
           export TMPDIR="$CARGO_TARGET_DIR"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" --workspace-remap "$PWD" --profile ci --no-tests=fail -E 'kind(lib) | kind(bin)'
+      - name: Obtain the source-pinned direct test bundle
+        env:
+          BOOKIE_REGISTRY_TOKEN: ${{ secrets.BOOKIE_REGISTRY_TOKEN }}
+          BOOKIE_GITHUB_ARTIFACT_TOKEN: ${{ secrets.BOOKIE_GITHUB_ARTIFACT_TOKEN }}
+          BOOKIE_REGISTRY_URL: ${{ github.server_url }}/api/packages/trung/generic/bookie-test-bundles
+        run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
       - name: Focused Data-lane change contracts
         env:
           BOOKIE_CI_REF: ${{ github.ref }}
@@ -1097,8 +1103,7 @@ jobs:
           trap cleanup_testcontainers EXIT
           trap 'cleanup_testcontainers; exit 143' TERM
           trap 'cleanup_testcontainers; exit 130' INT
-          ./scripts/test-postgres-socket.sh
-          bash ./scripts/test-ssh.sh
+          python3 scripts/run-test-layer.py socket-ssh
 
       - name: Finalize runner job
         if: always()
@@ -1117,6 +1122,7 @@ jobs:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
     strategy:
       fail-fast: false
       matrix:
@@ -1160,6 +1166,8 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: bash src/scripts/docker-hub-login.sh
+      - name: Pre-pull GTK fixture image with retries
+        run: bash src/scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
       - name: Select isolated MCP HTTP port
         run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
       - name: Installed GTK scenarios against a real server

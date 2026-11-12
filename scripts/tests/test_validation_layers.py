@@ -267,8 +267,11 @@ class LayerRunnerTests(unittest.TestCase):
             self.assertIn(text, security)
         self.assertNotIn("continue-on-error:", security)
         build = (workflows / "build-linux.yml").read_text()
-        for layer in ["quick", "gtk-app", "drivers", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring"]:
+        for layer in ["quick", "gtk-app", "b4-rollback", "tls", "postgres-release", "ui", "widgets", "keyring"]:
             self.assertIn(f"run-test-layer.py {layer}", build)
+        integration = build.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", integration)
+        self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', integration)
         self.assertNotIn("if-no-files-found: ignore", build)
         contracts = (workflows / "linux-ci-contracts.yml").read_text()
         self.assertIn("run-test-layer.py harness", contracts)

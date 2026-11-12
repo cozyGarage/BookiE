@@ -225,11 +225,32 @@ jobs:
           path: reusable-builds/consumers/
           if-no-files-found: error
           retention-days: 14
-      - name: Upload source-pinned driver test bundle
+      - name: Upload source-pinned core driver test bundle
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-drivers
-          path: reusable-builds/drivers/
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-core
+          path: reusable-builds/driver-core/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned analytics driver test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-analytics
+          path: reusable-builds/driver-analytics/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned extended driver test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-driver-extended
+          path: reusable-builds/driver-extended/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload source-pinned socket and SSH test bundle
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-socket-ssh
+          path: reusable-builds/socket-ssh/
           if-no-files-found: error
           retention-days: 14
       - name: Upload source-pinned unit archive
@@ -375,10 +396,10 @@ jobs:
           find "$RUNNER_TEMP/bookie-direct-bundle/tests" "$RUNNER_TEMP/bookie-direct-bundle/bin" -type f -exec chmod u+x {} +
           printf 'BOOKIE_UNIT_BUNDLE=%s/bookie-unit-bundle\nBOOKIE_DIRECT_BUNDLE=%s/bookie-direct-bundle\nBOOKIE_REQUIRE_PREBUILT=1\nBOOKIE_SOURCE_COMMIT=%s\nBOOKIE_NEXTEST_PROFILE=ci\nGSETTINGS_SCHEMA_DIR=%s/bookie-unit-bundle/schemas\n' \
             "$RUNNER_TEMP" "$RUNNER_TEMP" "$BOOKIE_SOURCE_COMMIT" "$RUNNER_TEMP" >> "$GITHUB_ENV"
-      - name: Fetch pull request base for changed-path tests
-        if: github.event_name == 'pull_request'
+      - name: Fetch comparison base for changed-path tests
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
-          BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha }}
+          BOOKIE_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: git fetch --no-tags --depth=1 origin "$BOOKIE_CHANGE_BASE"
       - name: Focused tests for changed Data-lane value paths
         env:
@@ -513,10 +534,11 @@ jobs:
     env:
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
       BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-gtk-server-${{ matrix.server }}
+      BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}
     strategy:
       fail-fast: false
       matrix:
-        server: [clickhouse, mongodb, postgres, mysql]
+        server: [clickhouse, mongodb, postgres, mysql, mysql-approval]
     steps:
       - name: Install Git before checkout
         working-directory: /tmp
@@ -547,6 +569,8 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Pre-pull GTK fixture image with retries
+        run: bash scripts/prepull-test-images.sh "$BOOKIE_GTK_SERVER_IMAGE_GROUP"
       - name: Installed GTK scenarios against ${{ matrix.server }}
         run: python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
       - name: Clean fixture containers
@@ -624,10 +648,14 @@ jobs:
         run: cargo +stable clippy --workspace --all-targets -- -D warnings
 
   integration:
-    name: Driver integration tests (docker)
+    name: Driver integration tests (docker) (${{ matrix.group }})
     timeout-minutes: 90
     runs-on: ubuntu-24.04
     needs: [pin-revision, b4-rollback, ensure-ci-gtk-image, reusable-test-builds]
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [driver-core, driver-analytics, driver-extended, socket-ssh]
     defaults:
       run:
         working-directory: .
@@ -652,19 +680,22 @@ jobs:
           echo "tree under test: $(git rev-parse HEAD)"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-drivers
-          path: ${{ runner.temp }}/bookie-drivers-bundle
+          name: bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}
+          path: ${{ runner.temp }}/bookie-test-bundle
       - name: Verify the test bundle
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
-          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-drivers-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group drivers
-          find "$RUNNER_TEMP/bookie-drivers-bundle/tests" "$RUNNER_TEMP/bookie-drivers-bundle/bin" -type f -exec chmod u+x {} +
-      - name: Driver, socket and SSH integration
+          python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-test-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group "${{ matrix.group }}"
+          find "$RUNNER_TEMP/bookie-test-bundle/tests" "$RUNNER_TEMP/bookie-test-bundle/bin" -type f -exec chmod u+x {} +
+      - name: Run integration layer in the shared image
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_BUILD_IMAGE: ghcr.io/cozygarage/bookie/ci-debian-testing-gtk:${{ needs.ensure-ci-gtk-image.outputs.tag }}
+          BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-test-bundle
+          BOOKIE_TEST_LAYER: ${{ matrix.group }}
+          BOOKIE_TEST_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}
         run: |
           task_tmp="$(mktemp -d /tmp/bookie-ci.XXXXXX)"
           trap 'rm -rf -- "$task_tmp"' EXIT
@@ -683,15 +714,17 @@ jobs:
             --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory \
             --env GIT_CONFIG_VALUE_0="$GITHUB_WORKSPACE" \
             --env DOCKER_CONFIG=/docker --env GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
-            --env BOOKIE_TEST_BUNDLE="$RUNNER_TEMP/bookie-drivers-bundle" \
+            --env BOOKIE_TEST_BUNDLE="$BOOKIE_TEST_BUNDLE" \
+            --env BOOKIE_TEST_LAYER="$BOOKIE_TEST_LAYER" \
+            --env BOOKIE_TEST_RUN_ID="$BOOKIE_TEST_RUN_ID" \
             --env BOOKIE_REQUIRE_PREBUILT=1 --env BOOKIE_SOURCE_COMMIT="$BOOKIE_SOURCE_COMMIT" \
-            "$BOOKIE_BUILD_IMAGE" bash -euo pipefail -c 'python3 scripts/run-test-layer.py drivers && python3 scripts/run-test-layer.py pg-dump'
+            "$BOOKIE_BUILD_IMAGE" bash -euo pipefail -c 'python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"; if [[ "$BOOKIE_TEST_LAYER" == driver-core ]]; then python3 scripts/run-test-layer.py pg-dump; fi'
 
       - name: Upload validation evidence
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
-          name: regression-integration-${{ github.run_id }}-${{ github.run_attempt }}
+          name: regression-integration-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: target/quality/*-layers
           if-no-files-found: error
 
@@ -882,7 +915,6 @@ jobs:
               cargo build --locked --release -p bookie-app
               install -Dm755 target/release/bookie-app "$BOOKIE_GTK_BINARY"
               python3 scripts/run-test-layer.py postgres-release
-              python3 scripts/run-test-layer.py gtk-mysql-approval
               if [[ "$GITHUB_EVENT_NAME" != pull_request ]]; then
                 cargo build --locked --release -p bookie-agentd -p bookie-ssh --bin bookie-askpass
                 DEB_OUT="$GITHUB_WORKSPACE/floor-package" BOOKIE_BUILD_PROFILE=release DEB_SKIP_BUILD=1 \

@@ -1106,6 +1106,30 @@ mod error_navigation_tests;
 
 #[test]
 #[ignore = "requires an isolated GTK display"]
+fn large_sql_buffers_pause_syntax_highlighting_and_resume_after_shrinking() {
+    let fixture = EditorFixture::new();
+    let buffer = fixture
+        .controller
+        .model()
+        .source_view
+        .buffer()
+        .downcast::<sourceview5::Buffer>()
+        .unwrap();
+    let view = fixture.controller.model().source_view.clone();
+    let large = "SELECT 1;\n".repeat(super::query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES / 10 + 1);
+    assert!(large.len() > super::query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES);
+
+    buffer.set_text(&large);
+
+    assert!(!buffer.is_highlight_syntax());
+    assert!(view.tooltip_text().is_some());
+    buffer.set_text("SELECT 1;");
+    assert!(buffer.is_highlight_syntax());
+    assert!(view.tooltip_text().is_none());
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
 fn dropping_an_editor_releases_its_source_view_and_buffer() {
     adw::init().unwrap();
     let native = sourceview5::View::new();

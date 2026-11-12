@@ -11,7 +11,7 @@ use bookie_core::Value;
 
 use super::display::{readonly_null_sentinel, value_to_copy_text, value_to_full_edit_text};
 
-const MAX_VIEW_BYTES: usize = 1 << 20;
+const MAX_VIEW_BYTES: usize = 64 * 1024;
 const MAX_WORD_WRAP_BYTES: usize = 4 * 1024;
 const HEX_ROW_BYTES: usize = 16;
 const HEX_MAX_BYTES: usize = 16 * 1024;
@@ -22,7 +22,7 @@ pub(super) fn body(value: &Value) -> String {
         Value::Null => readonly_null_sentinel(),
         Value::Bytes(bytes) => match std::str::from_utf8(bytes) {
             Ok(text) if !text.contains('\0') => return capped(text),
-            _ => hex_dump(bytes),
+            _ => return hex_dump(bytes),
         },
         Value::Json(json) => return json_preview(json),
         other => value_to_full_edit_text(other),
@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn a_long_hex_dump_says_how_much_it_shows() {
         let dump = body(&Value::Bytes(vec![0u8; MAX_VIEW_BYTES]));
-        assert!(dump.contains("Showing the first 16384 of 1048576 bytes."));
+        assert!(dump.contains(&format!("Showing the first {HEX_MAX_BYTES} of {MAX_VIEW_BYTES} bytes.")));
     }
 
     #[test]
@@ -371,6 +371,20 @@ mod tests {
         let shown = body(&Value::Text(text));
         assert!(shown.contains("Showing the first"));
         assert!(shown.len() < MAX_VIEW_BYTES + 200);
+    }
+
+    #[test]
+    fn a_large_text_viewer_keeps_the_gtk_preview_within_64_kib() {
+        let shown = body(&Value::Text("x".repeat(1_200_000)));
+        let (preview, note) = shown.split_once("\n\n").expect("truncation note");
+        assert!(preview.len() <= 64 * 1024);
+        assert_eq!(
+            note,
+            format!(
+                "Showing the first {} of 1200000 bytes. Copy value copies the whole value.",
+                preview.len()
+            )
+        );
     }
 
     #[test]
