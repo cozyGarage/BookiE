@@ -2694,6 +2694,51 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
 switched_connection_keeps_workspace_tabs_after_debounce.environment = "local"
 
 
+def restart_restores_two_connections_in_the_same_window(database, base, restart):
+    invoke_accessible_action("win.open-editor")
+    set_editor_text("SELECT 174201 AS first_session_marker")
+    open_saved_connection(CONNECTION_B_NAME)
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    invoke_accessible_action("win.open-editor")
+    set_editor_text("SELECT 174202 AS second_session_marker")
+    open_saved_connection(CONNECTION_NAME)
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    open_saved_connection(CONNECTION_B_NAME)
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    state_path = base / "config" / storage_dir_name() / "window.json"
+    records = json.loads((base / "config" / storage_dir_name() / "connections.json").read_text())["connections"]
+    expected = next(record["id"] for record in records if record["name"] == CONNECTION_B_NAME)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        if state_path.exists() and json.loads(state_path.read_text()).get("last_connection_id") == expected:
+            break
+        time.sleep(POLL_SECONDS)
+    else:
+        raise AssertionError(f"front session was not persisted: {state_path.read_text()}")
+
+    restart()
+
+    window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
+    first_tab = wait_for_node_containing("SELECT 174201 AS first_session", role=pyatspi.ROLE_PAGE_TAB)
+    second_tab = wait_for_node_containing("SELECT 174202 AS second_sessio", role=pyatspi.ROLE_PAGE_TAB)
+    frames = [node for node in descendants(application_node()) if node_role(node) == pyatspi.ROLE_FRAME]
+    assert len(frames) == 1, f"restored sessions opened {len(frames)} windows"
+    bounds = second_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    run_sql_within(window, "INSERT INTO safety_items(id) VALUES (174204)")
+    wait_for_database_count(base / "safety-b.sqlite", 1)
+    bounds = first_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    run_sql_within(window, "INSERT INTO safety_items(id) VALUES (174203)")
+    wait_for_database_count(database, 1)
+    assert database_ids(database) == [174203]
+    assert database_ids(base / "safety-b.sqlite") == [174204]
+
+
+restart_restores_two_connections_in_the_same_window.environment = "local"
+restart_restores_two_connections_in_the_same_window.needs_restart = True
+
+
 def switching_one_window_leaves_the_other_windows_edits(database, base):
     database_b = base / "safety-b.sqlite"
 
@@ -3152,6 +3197,7 @@ def main():
         current_page_csv_export_is_pk_ordered,
         current_page_json_export_preserves_values,
         restart_restores_active_editor_and_connection,
+        restart_restores_two_connections_in_the_same_window,
         first_keyboard_input_after_restore_targets_selected_editor,
         pending_edits_survive_opening_another_connection,
         preview_sql_shows_the_pending_statement_without_saving,

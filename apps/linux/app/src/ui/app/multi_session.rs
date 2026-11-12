@@ -79,6 +79,7 @@ impl App {
         }
         self.do_persist_workspace_state_now();
         self.connection_id = Some(connection_id);
+        self.set_last_connection_id(Some(connection_id), sender.clone());
         self.overview_front_connection_id.set(Some(connection_id));
         self.workspace_save_token = Some(self.workspace.connection_save_token(connection_id));
         let metadata = self.database.metadata(connection_id);

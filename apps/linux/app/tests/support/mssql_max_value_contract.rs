@@ -1,4 +1,4 @@
-use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig, Value};
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, OperationControl, TlsConfig, Value};
 use sha2::Digest;
 use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::mssql_server::MssqlServer;
@@ -246,5 +246,87 @@ async fn value_contract_mssql_max_values_survive_connection_session_and_consumer
         bookie_core::export::write_result_file(&xlsx_path, &over_limit, &export, || false, |_| {}).is_err(),
         "XLSX must report its cell-length limit instead of silently truncating max values"
     );
+    round_trip_grid_empty_and_null_values(connection.as_ref(), &columns, &control).await;
     session.close().await.unwrap();
+}
+
+async fn round_trip_grid_empty_and_null_values(
+    connection: &dyn Connection,
+    columns: &[bookie_core::ColumnInfo],
+    control: &OperationControl,
+) {
+    let empty = [
+        Value::Text(String::new()),
+        Value::Text(String::new()),
+        Value::Bytes(Vec::new()),
+    ];
+    let changed = [
+        Value::Text("grid edit".into()),
+        Value::Text("grid edit".into()),
+        Value::Bytes(vec![0, 255]),
+    ];
+    save_grid_values(connection, columns, 5, &empty, &changed, control).await;
+    assert_grid_values(connection, control, 5, &changed).await;
+    assert_grid_values(connection, control, 6, &[Value::Null, Value::Null, Value::Null]).await;
+
+    save_grid_values(connection, columns, 5, &changed, &empty, control).await;
+    assert_grid_values(connection, control, 5, &empty).await;
+    save_grid_values(
+        connection,
+        columns,
+        6,
+        &[Value::Null, Value::Null, Value::Null],
+        &empty,
+        control,
+    )
+    .await;
+    assert_grid_values(connection, control, 6, &empty).await;
+    save_grid_values(
+        connection,
+        columns,
+        6,
+        &empty,
+        &[Value::Null, Value::Null, Value::Null],
+        control,
+    )
+    .await;
+    assert_grid_values(connection, control, 6, &[Value::Null, Value::Null, Value::Null]).await;
+}
+
+async fn save_grid_values(
+    connection: &dyn Connection,
+    columns: &[bookie_core::ColumnInfo],
+    row_id: i64,
+    old: &[Value; 3],
+    new: &[Value; 3],
+    control: &OperationControl,
+) {
+    let key = bookie_app_services::change_tracker::RowKey::from_pk_values(&[Value::Int(row_id)]).unwrap();
+    let mut changes = bookie_app_services::change_tracker::TabChangeTracker::new();
+    for (column, (old_value, new_value)) in old.iter().zip(new).enumerate() {
+        changes.track_cell_edit(key.clone(), column + 1, old_value.clone(), new_value.clone());
+    }
+    let (statements, _) = changes.materialize("mssql", None, "mssql_max_values", columns).unwrap();
+    let expected = (0..statements.len()).collect::<Vec<_>>();
+    let affected = connection
+        .execute_in_transaction_checked_controlled(&statements, &expected, control)
+        .await
+        .unwrap_or_else(|error| panic!("row {row_id} failed to save {}: {error:?}", statements[0].0));
+    assert_eq!(affected, vec![1; expected.len()]);
+}
+
+async fn assert_grid_values(
+    connection: &dyn Connection,
+    control: &OperationControl,
+    row_id: i64,
+    expected: &[Value; 3],
+) {
+    let result = connection
+        .query_controlled(
+            &format!("SELECT ntext, vtext, payload FROM mssql_max_values WHERE id = {row_id}"),
+            control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.rows, vec![expected.to_vec()]);
 }

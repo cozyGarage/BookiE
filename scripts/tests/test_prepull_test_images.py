@@ -170,7 +170,7 @@ class PrepullTestImagesTests(unittest.TestCase):
         for job, group, command in (
             ("pg-release", "pg-release", "python3 scripts/run-test-layer.py postgres-release"),
             ("driver", "pg-dump", "python3 scripts/run-test-layer.py pg-dump"),
-            ("socket-ssh", "socket-ssh", "./scripts/test-postgres-socket.sh"),
+            ("socket-ssh", "socket-ssh", "python3 scripts/run-test-layer.py socket-ssh"),
             ("driver-tls", "driver-tls", "python3 scripts/run-test-layer.py tls"),
         ):
             body = re.search(rf"(?ms)^  {job}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", ci).group(1)

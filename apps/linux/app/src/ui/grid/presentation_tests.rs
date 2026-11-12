@@ -240,3 +240,25 @@ fn set_cells_accepts_large_text_values_but_keeps_boolean_representation_safe() {
     assert!(cell_allows_set_cells(&boolean, &Value::Null));
     assert!(!cell_allows_set_cells(&boolean, &Value::Text("true".into())));
 }
+
+#[test]
+fn sql_server_udt_columns_reject_inline_and_bulk_edits() {
+    let udt = ColumnInfo {
+        name: "shape".into(),
+        data_type: "udt".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        is_generated: false,
+        default_value: None,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let raw_value = Value::Bytes(vec![0xE6, 0x10, 0x00, 0x00, 0x01]);
+
+    assert!(!cell_allows_inline_edit(&udt, &raw_value));
+    assert!(!cell_allows_set_cells(&udt, &Value::Text("replacement".into())));
+    assert!(!cell_allows_set_cells(&udt, &raw_value));
+}
