@@ -2694,7 +2694,7 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
 switched_connection_keeps_workspace_tabs_after_debounce.environment = "local"
 
 
-def restart_restores_two_connections_in_the_same_window(_database, base, restart):
+def restart_restores_two_connections_in_the_same_window(database, base, restart):
     invoke_accessible_action("win.open-editor")
     set_editor_text("SELECT 174201 AS first_session_marker")
     open_saved_connection(CONNECTION_B_NAME)
@@ -2719,10 +2719,20 @@ def restart_restores_two_connections_in_the_same_window(_database, base, restart
     restart()
 
     window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
-    wait_for_node_containing("SELECT 174201 AS first_session", role=pyatspi.ROLE_PAGE_TAB)
-    wait_for_node_containing("SELECT 174202 AS second_sessio", role=pyatspi.ROLE_PAGE_TAB)
+    first_tab = wait_for_node_containing("SELECT 174201 AS first_session", role=pyatspi.ROLE_PAGE_TAB)
+    second_tab = wait_for_node_containing("SELECT 174202 AS second_sessio", role=pyatspi.ROLE_PAGE_TAB)
     frames = [node for node in descendants(application_node()) if node_role(node) == pyatspi.ROLE_FRAME]
     assert len(frames) == 1, f"restored sessions opened {len(frames)} windows"
+    bounds = second_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    run_sql_within(window, "INSERT INTO safety_items(id) VALUES (174204)")
+    wait_for_database_count(base / "safety-b.sqlite", 1)
+    bounds = first_tab.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width // 2, bounds.y + bounds.height // 2, button=1)
+    run_sql_within(window, "INSERT INTO safety_items(id) VALUES (174203)")
+    wait_for_database_count(database, 1)
+    assert database_ids(database) == [174203]
+    assert database_ids(base / "safety-b.sqlite") == [174204]
 
 
 restart_restores_two_connections_in_the_same_window.environment = "local"
