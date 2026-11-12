@@ -6,8 +6,9 @@ BookiE maintains patched dependency snapshots under `vendor/`, applied through w
 
 | Dependency | Behavior required by BookiE |
 |---|---|
-| PostgreSQL driver | Bound SCRAM work; preserve quoted text `NULL` in arrays; recognize multirange metadata for explicit refusal; resolve nested type metadata within a bound; support selected server-formatted text results; support protocol cancellation; expose session parameters used by SQL lexing. |
-| MySQL driver | Preserve `ENUM` and `SET` text under binary collation; report `SET` column names; reject malformed or oversized packets with protocol errors; refuse the in-band RSA password exchange without TLS or a local socket (an SSH-forwarded socket counts as local, so that connection is protected only as far as the SSH server). |
+| PostgreSQL driver | Bound SCRAM work; preserve quoted text `NULL` in arrays; recognize multirange metadata for explicit refusal; resolve nested type metadata within a bound; support selected server-formatted text results; support protocol cancellation; expose session parameters used by SQL lexing; keep a bounded buffer of server notices for display. |
+| MySQL driver | Preserve `ENUM` and `SET` text under binary collation; report `SET` column names; reject malformed or oversized packets with protocol errors; refuse the in-band RSA password exchange without TLS or a local socket (an SSH-forwarded socket counts as local, so that connection is protected only as far as the SSH server); expose the warning count of the last statement. |
+| SQL Server driver | Keep a bounded buffer of the informational messages the server sends while a statement runs (`PRINT`, `RAISERROR` at severity 10 or below) and expose it to the caller. |
 | SQLite driver | Permit the fixed `libsqlite3-sys` 0.39.x release selected by the lockfile. BookiE enables SQLx's `sqlite-unbundled` feature and links to the operating system SQLite library. |
 | MongoDB driver | Bound SCRAM work and verify the server nonce; preserve TLS hostname verification when connecting through a tunnel. |
 | Redis driver | Preserve TLS hostname verification when connecting through a tunnel. |

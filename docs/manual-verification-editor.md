@@ -25,6 +25,17 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Saving a structure change or edited rows appears in history, and the history dialog can filter those out.
 - [ ] `BOOKIE_LOG_FORMAT=json ./target/debug/bookie` writes lines that parse as JSON; unset keeps the human format.
 
+## Server messages and timing
+
+- [ ] On PostgreSQL, run `DO $$ BEGIN RAISE NOTICE 'hello'; RAISE WARNING 'careful'; END $$`. A Messages section under the result lists both, with severity, code and text, and the status line ends with the message count. Copy messages puts one line per message on the clipboard.
+- [ ] On PostgreSQL, run `SELECT 1` straight after it. The Messages section is gone and the status line has no count.
+- [ ] On PostgreSQL, run a loop that raises 300 notices. The section shows 100 and says how many more were not shown; the window stays responsive.
+- [ ] On SQL Server, run `PRINT 'hello'; RAISERROR('low', 10, 1); SELECT 1`. Both messages appear next to the result set.
+- [ ] On MySQL or MariaDB, run `SELECT CAST('abc' AS SIGNED)`. A warning with code 1292 appears next to the result.
+- [ ] With the connection in an editor session, repeat the PostgreSQL steps. Messages come from the session's own statements only.
+- [ ] Hover the status line after a run. The tooltip shows the run time, and the approval wait when a write waited for approval, and says the server does not report its own time.
+- [ ] Use an MCP client against the same connection and run the PostgreSQL notice statement. The tool result carries no messages.
+
 ## SQL result editing
 
 - [ ] Create a disposable table with primary key `id` and distinct text columns `a` and `b`. Run `SELECT id AS row_id, b AS a FROM t`, edit the displayed `a`, preview and save. The preview targets source column `b` using key `id`; an independent database query confirms that `a` and the key stayed unchanged. Repeat after sorting the result.
