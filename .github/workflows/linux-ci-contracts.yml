@@ -80,7 +80,7 @@ jobs:
       - name: No unused or misplaced dependencies
         # A dependency kept only for a feature, or only for a test file included by path from another crate,
         # is listed under [package.metadata.cargo-shear] ignored, with the reason beside it.
-        run: cargo shear
+        run: python3 scripts/run-test-layer.py unused-dependencies
   harness:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
