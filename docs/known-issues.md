@@ -41,7 +41,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | UI-1b | [#548](https://github.com/cozyGarage/BookiE/issues/548) | Policy |
 | UI-14b | [#592](https://github.com/cozyGarage/BookiE/issues/592) | Data |
 | UI-19 | [#549](https://github.com/cozyGarage/BookiE/issues/549) | Data |
-| UI-20 | [#550](https://github.com/cozyGarage/BookiE/issues/550) | Data |
+| UI-20 | [#2961](https://github.com/cozyGarage/BookiE/issues/2961) | Data |
 | UI-21 | [#560](https://github.com/cozyGarage/BookiE/issues/560) | UX |
 | UI-35 | [#579](https://github.com/cozyGarage/BookiE/issues/579) | UX |
 | UI-22 | [#552](https://github.com/cozyGarage/BookiE/issues/552) | UX |
@@ -68,7 +68,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | DOC-3 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
 | DOC-5 | [#561](https://github.com/cozyGarage/BookiE/issues/561) | Maintainer |
 | PERF-3 | [#555](https://github.com/cozyGarage/BookiE/issues/555) | Data |
-| PERF-4 | [#550](https://github.com/cozyGarage/BookiE/issues/550) | Data |
+| PERF-4 | [#2961](https://github.com/cozyGarage/BookiE/issues/2961) | Data |
 | PERF-9 | [#596](https://github.com/cozyGarage/BookiE/issues/596) | Data |
 | AUD-2 | [#598](https://github.com/cozyGarage/BookiE/issues/598) | Policy |
 | AUD-5 | [#563](https://github.com/cozyGarage/BookiE/issues/563) | UX |
@@ -82,7 +82,7 @@ This page is an index of ledger IDs to issues. Do not track evidence, owners or 
 | DBF-4 | [#1358](https://github.com/cozyGarage/BookiE/issues/1358) | Policy |
 | DRV-1 | [#1688](https://github.com/cozyGarage/BookiE/issues/1688) | UX |
 | B4-24 | [#1365](https://github.com/cozyGarage/BookiE/issues/1365) | Policy |
-| PERF-11 | [#580](https://github.com/cozyGarage/BookiE/issues/580) | UX |
+| PERF-11 | [#2960](https://github.com/cozyGarage/BookiE/issues/2960) | Data |
 | PERF-12 | [#1989](https://github.com/cozyGarage/BookiE/issues/1989) | Data |
 | PERF-13 | [#2159](https://github.com/cozyGarage/BookiE/issues/2159) | Data |
 | PERF-15 | [#2282](https://github.com/cozyGarage/BookiE/issues/2282) | Data |
