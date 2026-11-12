@@ -21,6 +21,7 @@ export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-8}
 export CARGO_PROFILE_TEST_STRIP="${CARGO_PROFILE_TEST_STRIP:-symbols}"
 nextest="$(bash scripts/ensure-nextest.sh)"
 build_provider_bundles() {
+  cargo metadata --manifest-path apps/gpui/Cargo.toml --locked --format-version 1 >/dev/null
   local config="$ROOT/scripts/ci-test-bundle-groups.json"
   sandbox_packages=(
     bookie-core bookie-policy bookie-storage bookie-transport bookie-app-services bookie-results
