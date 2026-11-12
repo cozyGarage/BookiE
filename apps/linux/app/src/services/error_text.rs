@@ -40,6 +40,10 @@ pub fn driver_message(error: &DriverError) -> String {
 fn driver_presentation_message(presentation: &DriverFailurePresentation) -> String {
     match presentation {
         DriverFailurePresentation::ConnectionRefused => bookie_app_services::tr!("Could not reach the database. Is it running?"),
+        DriverFailurePresentation::DatabaseFileNotFound(path) => bookie_app_services::tr!(
+            "The database file {path} does not exist. Check the path, or use Create a new database file in the connection form."
+        )
+        .replace("{path}", path),
         DriverFailurePresentation::AuthFailed => bookie_app_services::tr!("Username or password is wrong."),
         DriverFailurePresentation::Tls {
             detail,
@@ -139,6 +143,30 @@ pub fn open_failure_message(failure: &bookie_app_services::open_failure::OpenFai
             bookie_app_services::tr!("Policy unavailable. Fix policy.toml and reopen Preferences or restart BookiE.")
         }
         OpenFailure::Other(detail) => detail.clone(),
+    }
+}
+
+pub fn create_database_file_message(
+    error: &bookie_app_services::database_file::CreateDatabaseFileError,
+    path: &std::path::Path,
+) -> String {
+    use bookie_app_services::database_file::CreateDatabaseFileError;
+    let path = path.display().to_string();
+    match error {
+        CreateDatabaseFileError::AlreadyExists => bookie_app_services::tr!(
+            "{path} already exists and was not replaced. Use Choose an existing database file to open it, or pick a new name."
+        )
+        .replace("{path}", &path),
+        CreateDatabaseFileError::Initialize(source) => {
+            bookie_app_services::tr!("Could not create {path}: {detail}. Check the folder and its permissions.")
+                .replace("{path}", &path)
+                .replace("{detail}", &driver_message(source))
+        }
+        CreateDatabaseFileError::Io(source) => {
+            bookie_app_services::tr!("Could not create {path}: {detail}. Check the folder and its permissions.")
+                .replace("{path}", &path)
+                .replace("{detail}", &source.to_string())
+        }
     }
 }
 

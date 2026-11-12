@@ -1054,6 +1054,7 @@ fn interactive_transaction_error_outcome(error: &DriverError) -> (AuditTerminalS
 pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
     match error {
         DriverError::ConnectionRefused
+        | DriverError::DatabaseFileNotFound(_)
         | DriverError::Disconnected
         | DriverError::AuthFailed
         | DriverError::IntegratedAuth(_)
@@ -1077,7 +1078,9 @@ pub fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
 
 fn error_category(error: &DriverError) -> AuditErrorCategory {
     match error {
-        DriverError::ConnectionRefused | DriverError::Disconnected => AuditErrorCategory::Connection,
+        DriverError::ConnectionRefused | DriverError::DatabaseFileNotFound(_) | DriverError::Disconnected => {
+            AuditErrorCategory::Connection
+        }
         DriverError::AuthFailed | DriverError::IntegratedAuth(_) => AuditErrorCategory::Authentication,
         DriverError::Tls(_) => AuditErrorCategory::Tls,
         DriverError::Query { .. } => AuditErrorCategory::Query,
