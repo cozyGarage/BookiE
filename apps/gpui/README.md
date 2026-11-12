@@ -101,7 +101,7 @@ The application prints `PROTOTYPE_FIRST_FRAME`, `PROTOTYPE_SCROLL_DONE steps=…
 
 ## Limits
 
-- The default source is synthetic. A saved connection can also be opened from the Home page. An empty catalog opens a query tab on the live connection. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only, capped at 100,000 rows and subject to the shared decoded-byte and cell budgets. The status marks results that may be incomplete. Pages are separate reads, not a consistent snapshot; concurrent changes can affect the rows shown.
+- The default source is synthetic. A saved connection can also be opened from the Home page. An empty catalog opens a query tab on the live connection. Set `BOOKIE_PROTOTYPE_TABLE` and either `BOOKIE_PROTOTYPE_FILE` for SQLite or DuckDB or `BOOKIE_PROTOTYPE_CONNECTION` for a saved connection to load a live table through `ReadSession`. Live data is read-only, capped at 100,000 rows and subject to the shared decoded-byte and cell budgets. The status marks results that may be incomplete. PostgreSQL table loads use a read-only repeatable-read cursor for the duration of each load. Other drivers use separate page reads, and the status warns that concurrent changes may shift rows.
 - Cells are `bookie_core::Value` throughout (`Cell` is a type alias), so driver values and synthetic values use the same type. Tests cover typed round trips and bounded JSON previews.
 - No accessibility tree. Screen readers and the accessible-name scenarios the GTK application is tested with cannot see this window.
 - Cell editing uses a single-line field; values containing newlines cannot be edited there.
