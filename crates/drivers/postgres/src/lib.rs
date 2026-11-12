@@ -51,6 +51,14 @@ impl DatabaseDriver for PgDriver {
         "postgres"
     }
 
+    fn supports_snapshot_export(&self) -> bool {
+        true
+    }
+
+    fn supports_updatable_views(&self) -> bool {
+        true
+    }
+
     fn display_name(&self) -> &'static str {
         "PostgreSQL"
     }

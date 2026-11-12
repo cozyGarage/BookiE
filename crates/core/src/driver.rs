@@ -83,6 +83,8 @@ pub struct DriverCapabilities {
     pub supports_explicit_auto_increment_values: bool,
     pub supports_browse_filters: bool,
     pub supports_table_default_collation: bool,
+    pub supports_snapshot_export: bool,
+    pub supports_updatable_views: bool,
 }
 
 #[async_trait]
@@ -123,6 +125,8 @@ pub trait DatabaseDriver: Send + Sync {
             supports_explicit_auto_increment_values: self.supports_explicit_auto_increment_values(),
             supports_browse_filters: self.supports_browse_filters(),
             supports_table_default_collation: self.supports_table_default_collation(),
+            supports_snapshot_export: self.supports_snapshot_export(),
+            supports_updatable_views: self.supports_updatable_views(),
         }
     }
 
@@ -208,6 +212,14 @@ pub trait DatabaseDriver: Send + Sync {
     }
 
     fn supports_table_default_collation(&self) -> bool {
+        false
+    }
+
+    fn supports_snapshot_export(&self) -> bool {
+        false
+    }
+
+    fn supports_updatable_views(&self) -> bool {
         false
     }
 

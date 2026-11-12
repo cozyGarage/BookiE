@@ -66,6 +66,15 @@ impl BrowseTarget<'_> {
         Ok(query)
     }
 
+    pub fn full_select(&self, sort: Option<(usize, bool)>, row_id_order: bool) -> Result<BoundQuery, String> {
+        let mut query = self.filtered_query("*")?;
+        if let Some(order) = resolved_order_by(self.driver_id, self.columns, sort, row_id_order) {
+            query.sql.push_str(" ORDER BY ");
+            query.sql.push_str(&order);
+        }
+        Ok(query)
+    }
+
     pub fn count(&self) -> Result<BoundQuery, String> {
         self.filtered_query("COUNT(*)")
     }
