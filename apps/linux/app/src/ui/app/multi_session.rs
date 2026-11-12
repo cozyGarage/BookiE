@@ -260,6 +260,10 @@ pub(super) fn overview_new_tab_connection(front: &std::cell::Cell<Option<Uuid>>)
 }
 
 #[cfg(test)]
+#[path = "multi_session_gtk_tests.rs"]
+mod gtk_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

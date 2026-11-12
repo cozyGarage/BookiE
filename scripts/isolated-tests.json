@@ -260,6 +260,21 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::multi_session::gtk_tests::a_failed_connect_keeps_both_sessions_in_the_same_window"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::a_save_from_a_background_tab_reaches_its_own_connection_and_not_the_front_one"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::a_save_from_a_tab_without_a_recorded_connection_writes_nowhere"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
     ],
     [
