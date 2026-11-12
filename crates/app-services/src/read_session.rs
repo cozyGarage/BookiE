@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
-use bookie_core::{Connection, DriverRegistry, OperationControl, QueryResult, TableInfo};
-use bookie_policy::Principal;
+use bookie_core::{
+    Connection, DriverRegistry, OperationControl, QueryCursorId, QueryCursorPage, QueryResult, Session, TableInfo,
+};
+use bookie_policy::{AuditedSession, PolicyGuard, Principal};
 use bookie_storage::SavedConnection;
 use bookie_transport::SshEnvironment;
 use tokio_util::sync::CancellationToken;
@@ -41,11 +43,93 @@ pub struct ReadSession {
     database: Arc<DatabaseService>,
     id: Uuid,
     generation: Uuid,
+    supports_snapshot_cursor: bool,
     pub driver_id: String,
     pub tables: Vec<TableInfo>,
 }
 
+pub struct PostgresTableCursor {
+    session: AuditedSession,
+    cursor: QueryCursorId,
+}
+
+impl PostgresTableCursor {
+    pub async fn open(
+        guard: &PolicyGuard,
+        table: &TableInfo,
+        control: &OperationControl,
+    ) -> Result<Self, DriverFailurePresentation> {
+        let mut session = guard
+            .open_session_with_audit()
+            .await
+            .map_err(|error| classify(&error))?;
+        if let Err(error) = session
+            .query_params_controlled(crate::snapshot_export::SNAPSHOT_BEGIN, &[], control)
+            .await
+        {
+            let _ = Box::new(session).close().await;
+            return Err(classify(&error));
+        }
+        match open_table_cursor(&mut session, table, control).await {
+            Ok(cursor) => Ok(Self { session, cursor }),
+            Err(error) => {
+                let _ = Box::new(session).close().await;
+                Err(error)
+            }
+        }
+    }
+
+    pub async fn next_page(
+        &mut self,
+        control: &OperationControl,
+    ) -> Result<QueryCursorPage, DriverFailurePresentation> {
+        self.session
+            .fetch_query_cursor_page_controlled_with_audit(self.cursor, control)
+            .await
+            .result
+            .map_err(|error| classify(&error))
+    }
+
+    pub async fn close(self) -> Result<(), DriverFailurePresentation> {
+        let cursor_control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+        let mut session = self.session;
+        let cursor_result = session
+            .close_query_cursor_controlled_with_audit(self.cursor, &cursor_control)
+            .await
+            .result;
+        let session_result = Box::new(session).close().await;
+        if let Err(error) = cursor_result
+            && !matches!(error, bookie_core::DriverError::Unsupported(_))
+        {
+            return Err(classify(&error));
+        }
+        session_result.map_err(|error| classify(&error))
+    }
+}
+
+async fn open_table_cursor(
+    session: &mut AuditedSession,
+    table: &TableInfo,
+    control: &OperationControl,
+) -> Result<QueryCursorId, DriverFailurePresentation> {
+    let quote = |name: &str| bookie_core::sql_dialect::quote_ident("postgres", name);
+    let relation = table.schema.as_deref().map_or_else(
+        || quote(&table.name),
+        |schema| format!("{}.{}", quote(schema), quote(&table.name)),
+    );
+    let sql = format!("SELECT * FROM {relation}");
+    session
+        .open_query_cursor_controlled_with_audit(&sql, &[], control)
+        .await
+        .result
+        .map_err(|error| classify(&error))
+}
+
 impl ReadSession {
+    pub fn supports_snapshot_cursor(&self) -> bool {
+        self.supports_snapshot_cursor
+    }
+
     pub async fn open_saved(id: Uuid, registry: Arc<DriverRegistry>) -> Result<Self, OpenFailure> {
         Self::open_saved_controlled(id, registry, CancellationToken::new()).await
     }
@@ -99,6 +183,9 @@ impl ReadSession {
     ) -> Result<Self, OpenFailure> {
         check_open_cancellation(&cancellation)?;
         saved.read_only = true;
+        let supports_snapshot_cursor = registry
+            .get(&saved.driver_id)
+            .is_some_and(|driver| driver.capabilities().supports_snapshot_export);
         let prepared = open_saved(
             registry,
             saved,
@@ -120,6 +207,7 @@ impl ReadSession {
             database,
             id,
             generation,
+            supports_snapshot_cursor,
             driver_id: activated.driver_id,
             tables,
         })
@@ -146,6 +234,21 @@ impl ReadSession {
             .fetch_rows_controlled(table.schema.as_deref(), &table.name, offset, limit, control)
             .await
             .map_err(|error| classify(&error))
+    }
+
+    pub async fn open_table_cursor(
+        &self,
+        table: &TableInfo,
+        control: &OperationControl,
+    ) -> Result<Option<PostgresTableCursor>, DriverFailurePresentation> {
+        if !self.supports_snapshot_cursor {
+            return Ok(None);
+        }
+        let guard = self
+            .database
+            .guard_for_generation(self.id, self.generation, Principal::human_gui())
+            .ok_or(DriverFailurePresentation::Disconnected)?;
+        PostgresTableCursor::open(&guard, table, control).await.map(Some)
     }
 }
 

@@ -85,6 +85,7 @@ async fn a_session_lists_tables_and_reads_typed_pages() {
         .expect("items table")
         .clone();
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    assert!(session.open_table_cursor(&items, &control).await.unwrap().is_none());
     let first = session.read_page(&items, 0, 2, &control).await.expect("first page");
     let last = session.read_page(&items, 2, 2, &control).await.expect("last page");
     assert_eq!(first.rows.len(), 2);
