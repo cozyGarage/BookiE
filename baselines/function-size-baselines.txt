@@ -31,7 +31,7 @@ apps/linux/app/src/ui/export_dialog.rs 1
 apps/linux/app/src/ui/export_dialog/file.rs 1
 apps/linux/app/src/ui/grid/column.rs 1
 apps/linux/app/src/ui/grid/column_jump.rs 1
-apps/linux/app/src/ui/grid/context_menu.rs 1
+apps/linux/app/src/ui/grid/context_menu.rs 0
 apps/linux/app/src/ui/grid/editing.rs 1
 apps/linux/app/src/ui/grid/mod.rs 1
 apps/linux/app/src/ui/parameters_dialog.rs 1
