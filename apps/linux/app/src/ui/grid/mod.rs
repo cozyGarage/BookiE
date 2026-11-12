@@ -3,6 +3,9 @@ mod choice_editor;
 mod close_edits;
 pub(crate) use close_edits::finish_active_edits;
 mod column;
+mod column_select;
+pub use column_select::ColumnSelectionHandle;
+pub(crate) use column_select::{project_rows, refresh as refresh_column_selection};
 mod column_jump;
 mod column_order;
 mod column_visibility;
@@ -64,6 +67,18 @@ pub(crate) fn enter_cell_edit_mode(label: &crate::ui::cell_editor::CellEditor) {
 }
 
 #[derive(Debug, Clone)]
+pub enum SetCellsRows {
+    AllLoaded,
+    Positions(Vec<u32>),
+}
+
+#[derive(Debug, Clone)]
+pub struct SetCellsRequest {
+    pub columns: Vec<usize>,
+    pub rows: SetCellsRows,
+}
+
+#[derive(Debug, Clone)]
 pub struct ResetCellRequest {
     pub row_position: u32,
     pub col_index: usize,
@@ -105,6 +120,8 @@ pub enum GridMsg {
             >,
         >,
     },
+    ColumnSelectionChanged,
+    SetCells(SetCellsRequest),
     CopyToClipboard(String),
     FetchCellValue {
         col_index: usize,
@@ -185,6 +202,8 @@ pub struct TabGridContext {
     pub choices: ChoiceMap,
     pub ambiguous_keys: AmbiguousKeys,
     pub row_number_base: u64,
+    pub column_selection: ColumnSelectionHandle,
+    pub set_cells_enabled: bool,
 }
 
 pub type AmbiguousKeys =
@@ -312,6 +331,8 @@ pub fn build_column_view(
                 local_result_view: tab_ctx.local_result_view.clone(),
                 whole_result_filter: tab_ctx.whole_result_filter,
                 snapshot_export: tab_ctx.result_model.is_none(),
+                column_selection: tab_ctx.column_selection.clone(),
+                set_cells_enabled: tab_ctx.set_cells_enabled,
             },
         );
     }
@@ -401,6 +422,13 @@ pub fn build_column_view(
         menu_sender.clone(),
     );
     font_zoom::install(&column_view, &grid_actions);
+    column_select::install(
+        &column_view,
+        &grid_actions,
+        &tab_ctx.column_selection,
+        menu_sender.clone(),
+        tab_ctx.set_cells_enabled,
+    );
     column_view.insert_action_group("grid", Some(&grid_actions));
     row_number_column::fit(&column_view, tab_ctx.row_number_base);
     {

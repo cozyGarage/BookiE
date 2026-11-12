@@ -237,6 +237,7 @@ impl BrowseTab {
             return;
         }
         self.refresh_ambiguous_keys(&result);
+        let dropped_column_selection = self.drop_column_selection();
 
         // Fast path: column structure hasn't changed since the last
         // render (typical for sort flips / page changes / save reloads
@@ -252,6 +253,9 @@ impl BrowseTab {
             }
             self.refresh_grid_chrome();
             self.restore_focused_row();
+            if dropped_column_selection {
+                self.refresh_selection_chrome();
+            }
             let _ = sender.output(BrowseTabOutput::StateChanged);
             return;
         }
@@ -300,6 +304,8 @@ impl BrowseTab {
             choices: self.choice_labels.clone(),
             ambiguous_keys: self.ambiguous_keys.clone(),
             row_number_base: self.current_offset,
+            column_selection: self.column_selection.clone(),
+            set_cells_enabled: self.allows_keyed_row_mutations(),
         };
         let (column_view, selection) = build_column_view(
             &result,
@@ -535,7 +541,7 @@ fn inspected_row(
     Some(crate::ui::row_inspector::inspector_fields_for_row(columns, &row))
 }
 
-fn selection_tooltip(selection: &gtk::MultiSelection, columns: &[ColumnInfo]) -> Option<String> {
+pub(super) fn selection_tooltip(selection: &gtk::MultiSelection, columns: &[ColumnInfo]) -> Option<String> {
     let model = selection.model()?;
     let bits = selection.selection();
     let rows: Vec<crate::ui::row_object::RowObject> = (0..bits.size())

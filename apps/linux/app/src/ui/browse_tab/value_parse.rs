@@ -5,7 +5,7 @@ pub(super) use bookie_app_services::value_input::*;
 
 use bookie_core::{ColumnInfo, EnumInputStyle, Value};
 
-fn input_error_message(error: ValueInputError) -> String {
+pub(super) fn input_error_message(error: ValueInputError) -> String {
     use ValueInputError as Error;
     match error {
         Error::FieldRequired => bookie_app_services::tr!("Field is required"),

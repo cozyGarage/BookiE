@@ -60,6 +60,8 @@ pub(super) fn to_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::ShowToast(message) => BrowseTabInput::ShowToast(message),
         GridMsg::GoToReference { column, row } => BrowseTabInput::GoToReference { column, row },
         GridMsg::ShowReferencingRows { row } => BrowseTabInput::ShowReferencingRows { row },
+        GridMsg::ColumnSelectionChanged => BrowseTabInput::ColumnSelectionChanged,
+        GridMsg::SetCells(request) => BrowseTabInput::GridSetCells(request),
         GridMsg::HighlightRulesChanged => BrowseTabInput::HighlightRulesChanged,
     }
 }

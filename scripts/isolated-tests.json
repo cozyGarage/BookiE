@@ -1720,6 +1720,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::column_select::tests::selected_column_cells_get_the_selection_style_and_lose_it_on_clear"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::grid::column_select::tests::the_header_menu_offers_column_selection_and_only_offers_set_cells_when_enabled"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::grid::local_sort_tests::sorting_a_fully_selected_result_restores_the_selection_in_one_signal"
     ],
     [
