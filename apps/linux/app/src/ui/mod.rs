@@ -16,6 +16,7 @@ mod export_dialog;
 mod filter_presets;
 mod filter_strip;
 mod grid;
+mod health_report_dialog;
 mod history_dialog;
 pub(crate) mod icons;
 mod import_dialog;

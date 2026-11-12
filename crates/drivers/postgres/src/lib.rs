@@ -79,6 +79,10 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
+    fn supports_table_health_report(&self) -> bool {
+        true
+    }
+
     fn supports_foreign_key_metadata(&self) -> bool {
         true
     }

@@ -158,3 +158,28 @@ Use a keyed table with a nullable text column and values above 8 KiB. Include CR
 - [ ] In a table browse tab, right-click a foreign key cell and choose **Go to Referenced Row**: opens a tab for the referenced parent table filtered to `parent_pk = <fk_value>`.
 - [ ] On a table referenced by inbound foreign keys (e.g. `customers` referenced by `orders.customer_id`), right-click any persisted row and choose **Show Referencing Rows**: a sub-menu lists referencing child tables. Selecting a target opens that table in a new tab filtered to matching child rows (`customer_id = <id>`).
 - [ ] On an unpersisted newly inserted row or a table with no inbound foreign keys, **Show Referencing Rows** is absent or greyed out.
+
+## Column selection, selection copy and Set Cells to Value
+
+Use a keyed, editable table with at least four columns and some rows. Run BookiE with isolated `XDG_*` and `HOME`.
+
+1. Open the header menu of a column and choose **Select Column**. The column cells are shaded with side bars, the header is bold with an underline, and the status bar reads `1 column selected` with loaded-row statistics.
+2. Choose **Add Column to Selection** on another header, then **Extend Selection to Column** on a third. The count and shading follow.
+3. Press Esc. The shading and the count disappear. Select a column again and click a cell. The selection clears. Select again and go to the next page. The selection clears.
+4. Click a cell and press Ctrl+Space. That cell's column is selected. While a cell is open for editing, Ctrl+Space and Esc must still act on the editor.
+5. With a column selected, press Ctrl+C and paste into a text editor. Only the selected columns and the loaded rows appear. Repeat with **Copy as** in the cell menu for CSV, JSON and IN Clause.
+6. Open the status bar selection button. **Copy TSV**, **Copy CSV**, **Copy JSON** and **Copy IN list** copy the selection. With row selection and no column selection the same buttons copy the selected rows.
+7. Select a text column and choose **Set Column to Value…**, type a value, and confirm. Every loaded row shows a pending edit and the pending bar counts the cells. **Preview SQL** lists one UPDATE per row. Save runs the normal approval and audit path.
+8. Try the same on a primary key column, a NOT NULL column with **Set to NULL** ticked, and an integer column with `abc`. Each shows a message and stages nothing.
+9. Select two rows, right-click a cell and choose **Set Cells to Value…**. Only the selected rows change. In a query result grid the item is not offered.
+10. On a page of 10,000 rows, set a column to a value. The window stays responsive.
+
+## Decoded preview in View Value
+
+Use a table with a `bytea` or `blob` column. Run BookiE with isolated `XDG_*` and `HOME`.
+
+1. Store the MessagePack bytes `82 a1 61 01 a1 62 c3` in a row and open **View Value** on the cell. The hex dump shows, and a **Decoded as MessagePack** section below it shows `"a": 1` and `"b": true`. The section cannot be edited.
+2. Click **Copy Value** and paste. The clipboard holds the original bytes, not the decoded text.
+3. Store the bytes `08 96 01 12 07` followed by `testing`. The section reads **Decoded as Protobuf without a schema** and lists field `1` as 150 and field `2` as `testing`.
+4. Store `de ad be ef`, plain text and an image. No **Decoded** section appears.
+5. Store a MessagePack array over 64 KiB. No **Decoded** section appears and the hex dump still shows.

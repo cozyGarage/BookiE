@@ -198,6 +198,9 @@ pub(crate) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: Value
         content.append(&picture);
     }
     content.append(&scroller);
+    if let Some(decoded) = super::value_decoded::section(&value) {
+        content.append(&decoded);
+    }
 
     let copy = gtk::Button::with_label(&bookie_app_services::tr!("Copy value"));
     copy.add_css_class("suggested-action");

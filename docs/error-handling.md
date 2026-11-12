@@ -55,6 +55,7 @@ Map at the edge that understands the native failure. Follow the production mappi
 
 - Connect refusal, established loss, authentication failure and certificate failure are different `DriverError` variants. They must stay distinct.
 - Certificate verification often surfaces as I/O in sqlx. The PostgreSQL driver walks the error chain and reports hostname or authority mismatch as `DriverError::Tls`. Reporting those as `Internal` tells the user the wrong story.
+- A TLS failure reaches the app as `DriverError::Tls` text, because the engines report it as library text that drivers flatten at their boundary. `bookie_app_services::tls_failure` classifies that text into `TlsFailureKind` (unknown issuer, name mismatch, expired, not yet valid, revoked, server refused TLS, other) by matching stable phrases from rustls (`CertificateError` text) and OpenSSL (`X509_verify_cert_error_string` text, used by native-tls and tiberius). Add a phrase there with a test that pins the library's exact wording. The message for a verification failure names the next step for its kind, drops the library text and never advises turning TLS off or lowering verification. The connect dialog keeps the kind and offers a toast button that focuses the certificate authority row or the host row.
 - Drivers never pass `sqlx::Error`, `tiberius` errors or similar to callers. Callers see only `DriverError`.
 - When wrapping, prefer `map_err` into a variant with `source` over `map_err(|e| … e.to_string())` unless the foreign type cannot be kept and the string is already redacted.
 

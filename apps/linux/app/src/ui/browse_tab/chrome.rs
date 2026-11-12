@@ -81,6 +81,7 @@ impl BrowseTab {
             .build();
         selection_details.append(&selection_details_label);
         selection_details.append(&copy_selection_button);
+        selection_details.append(&column_selection::selection_buttons(sender.clone()));
         let selection_popover = gtk::Popover::new();
         selection_popover.set_child(Some(&selection_details));
         let selection_label = gtk::MenuButton::new();

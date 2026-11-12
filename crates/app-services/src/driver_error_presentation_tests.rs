@@ -12,7 +12,7 @@ fn every_driver_error_variant_has_a_typed_classification() {
             DriverError::Tls("certificate verify failed".into()),
             DriverFailurePresentation::Tls {
                 detail: "certificate verify failed".into(),
-                advice: TlsAdvice::VerifyCertificate,
+                kind: TlsFailureKind::Other,
             },
         ),
         (
@@ -112,13 +112,13 @@ fn refused_auth_timeout_and_cancel_remain_distinct() {
 }
 
 #[test]
-fn tls_advice_distinguishes_missing_server_tls_from_verification_failure() {
+fn tls_kind_distinguishes_missing_server_tls_from_verification_failure() {
     let certificate = classify(&DriverError::Tls("certificate hostname mismatch".into()));
     assert_eq!(
         certificate,
         DriverFailurePresentation::Tls {
             detail: "certificate hostname mismatch".into(),
-            advice: TlsAdvice::VerifyCertificate,
+            kind: TlsFailureKind::NameMismatch,
         }
     );
 
@@ -127,7 +127,7 @@ fn tls_advice_distinguishes_missing_server_tls_from_verification_failure() {
         unsupported,
         DriverFailurePresentation::Tls {
             detail: "server does not support TLS".into(),
-            advice: TlsAdvice::ServerDoesNotSupportTls,
+            kind: TlsFailureKind::ServerRefusedTls,
         }
     );
 }

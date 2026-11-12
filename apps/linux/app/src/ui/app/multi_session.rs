@@ -99,6 +99,7 @@ impl App {
         self.workspace_save_token = Some(self.workspace.connection_save_token(connection_id));
         let metadata = self.database.metadata(connection_id);
         self.current_driver_id = metadata.as_ref().map(|metadata| metadata.driver_id.clone());
+        self.sync_health_report_action();
         self.read_only = metadata.as_ref().map(|metadata| metadata.read_only).unwrap_or(false);
         self.read_only_badge.set_visible(self.read_only);
         let catalog = self.multi.catalogs.get(&connection_id).cloned();
@@ -216,6 +217,7 @@ impl App {
                 self.workspace_save_token = None;
                 self.connected_database = None;
                 self.current_driver_id = None;
+                self.sync_health_report_action();
                 self.read_only = false;
                 self.read_only_badge.set_visible(false);
                 self.databases_button.set_visible(false);

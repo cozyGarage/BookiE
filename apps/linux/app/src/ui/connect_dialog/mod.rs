@@ -89,6 +89,7 @@ fn selected_path(row: &adw::EntryRow) -> Option<std::path::PathBuf> {
 mod auth_source;
 mod bootstrap;
 mod browse;
+mod connect_failure;
 mod controls;
 mod entry_activation;
 mod form;
@@ -100,6 +101,7 @@ mod socket_endpoint;
 mod error_tests;
 
 use bootstrap::{CandidateBootstrap, ConnectRequest, OpenedCandidate, open_candidate};
+use connect_failure::{ConnectFailure, remedy_label};
 pub(super) use controls::AUTH_MODE_ROWS;
 use controls::{AccessibleChoice, auth_mode_for_row, choice_row, timeout_rows, timeout_value};
 use form::{default_driver_row, test_result_text};
@@ -148,7 +150,7 @@ pub enum ConnectDialogOutput {
 
 #[derive(Debug)]
 pub enum ConnectDialogCmd {
-    Result(Result<Box<connection_service::PreparedConnection>, String>),
+    Result(Result<Box<connection_service::PreparedConnection>, ConnectFailure>),
     Cancelled,
     TestResult(Result<usize, String>),
 }
@@ -756,9 +758,9 @@ impl Component for ConnectDialog {
                 let _ = sender.output(ConnectDialogOutput::Prepared(prepared));
                 root.close();
             }
-            ConnectDialogCmd::Result(Err(e)) => {
-                tracing::warn!(error = %e, "connect failed");
-                self.show_toast(&e);
+            ConnectDialogCmd::Result(Err(failure)) => {
+                tracing::warn!(error = %failure.message, "connect failed");
+                self.show_failure(&failure);
             }
             ConnectDialogCmd::TestResult(result) => {
                 self.test_banner.set_title(&test_result_text(&result));
@@ -958,6 +960,25 @@ impl ConnectDialog {
         self.driver_row.set_subtitle(&subtitle);
     }
 
+    fn show_failure(&self, failure: &ConnectFailure) {
+        let toast = crate::ui::plain_text::toast(&failure.message);
+        if let Some(remedy) = failure.tls_remedy {
+            let row = self.remedy_row(remedy);
+            toast.set_button_label(Some(&remedy_label(remedy)));
+            toast.connect_button_clicked(move |_| {
+                row.grab_focus();
+            });
+        }
+        self.toast_overlay.add_toast(toast);
+    }
+
+    fn remedy_row(&self, remedy: bookie_app_services::tls_failure::TlsRemedy) -> adw::EntryRow {
+        match remedy {
+            bookie_app_services::tls_failure::TlsRemedy::ChooseCertificateAuthority => self.tls_root_cert.clone(),
+            bookie_app_services::tls_failure::TlsRemedy::CheckServerName => self.host.clone(),
+        }
+    }
+
     fn show_toast(&self, message: &str) {
         self.toast_overlay.add_toast(crate::ui::plain_text::toast(message));
     }
@@ -998,7 +1019,9 @@ fn toggle_error(row: &adw::EntryRow, invalid: bool) {
     }
 }
 
-async fn run_connect(request: ConnectRequest) -> Result<Option<connection_service::PreparedConnection>, String> {
+async fn run_connect(
+    request: ConnectRequest,
+) -> Result<Option<connection_service::PreparedConnection>, ConnectFailure> {
     let ConnectRequest {
         driver,
         driver_id,
@@ -1123,7 +1146,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
                     .map_err(|rollback_error| {
                         format!("delete obsolete stored password: {error}; restore saved connection: {rollback_error}")
                     })?;
-                return Err(format!("delete obsolete stored password: {error}"));
+                return Err(format!("delete obsolete stored password: {error}").into());
             }
         }
         AuthMode::Password => {
@@ -1133,7 +1156,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
                     .map_err(|rollback_error| {
                         format!("store password: {error}; restore saved connection: {rollback_error}")
                     })?;
-                return Err(format!("store password: {error}"));
+                return Err(format!("store password: {error}").into());
             }
         }
         AuthMode::Kerberos
@@ -1147,7 +1170,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
                     .map_err(|rollback_error| {
                         format!("delete stored password: {error}; restore saved connection: {rollback_error}")
                     })?;
-                return Err(format!("delete stored password: {error}"));
+                return Err(format!("delete stored password: {error}").into());
             }
         }
         AuthMode::Kerberos => {}

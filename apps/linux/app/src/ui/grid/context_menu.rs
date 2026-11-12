@@ -45,6 +45,8 @@ pub(super) struct GridMenuOptions {
     pub(super) local_result_view: Option<LocalResultView>,
     pub(super) whole_result_filter: bool,
     pub(super) snapshot_export: bool,
+    pub(super) column_selection: super::column_select::ColumnSelectionHandle,
+    pub(super) set_cells_enabled: bool,
 }
 
 fn reset_cell_entry(
@@ -221,6 +223,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         |columns, rows| export::render_tsv(columns, rows, false),
     );
     let copy_rows_headers_entry = copy_rows_action(
@@ -229,6 +232,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         |columns, rows| export::render_tsv(columns, rows, true),
     );
     let copy_json_entry = copy_rows_action(
@@ -237,6 +241,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         export::render_json,
     );
     let copy_csv_entry = copy_rows_action(
@@ -245,6 +250,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         |columns, rows| export::render_csv(columns, rows, false),
     );
     let copy_csv_headers_entry = copy_rows_action(
@@ -253,6 +259,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         |columns, rows| export::render_csv(columns, rows, true),
     );
     let copy_markdown_entry = copy_rows_action(
@@ -261,6 +268,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         export::render_markdown,
     );
     let copy_text_table_entry = copy_rows_action(
@@ -269,6 +277,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         export::render_text_table,
     );
     let copy_json_lines_entry = copy_rows_action(
@@ -277,6 +286,7 @@ pub(super) fn install_grid_context_menus(
         sender.clone(),
         column_view,
         columns.clone(),
+        options.column_selection.clone(),
         export::render_json_lines,
     );
     let copy_values_list_entry = {
@@ -287,11 +297,13 @@ pub(super) fn install_grid_context_menus(
             sender.clone(),
             column_view,
             columns.clone(),
+            options.column_selection.clone(),
             move |columns, rows| export::render_value_list(&driver_id, columns, rows),
         )
     };
     let supports_sql = bookie_core::export::supports_sql_literals(&driver_id);
     let copy_in_clause_action = {
+        let options_selection = options.column_selection.clone();
         let context = context.clone();
         let sender = sender.clone();
         let view = column_view.downgrade();
@@ -300,7 +312,16 @@ pub(super) fn install_grid_context_menus(
                 let context = context.snapshot();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
-                let Some(rows) = values_for_column_menu(&view, position(slot), slot.col_index) else {
+                let column_rows = if options_selection.borrow().contains(slot.col_index) {
+                    super::column_select::project_rows(
+                        &[slot.col_index],
+                        0..view.model().map_or(0, |m| m.n_items()),
+                        |p| row_object_at(&view, p),
+                    )
+                } else {
+                    values_for_column_menu(&view, position(slot), slot.col_index)
+                };
+                let Some(rows) = column_rows else {
                     sender.send(GridMsg::IncompleteRowData).ok();
                     return;
                 };
@@ -590,6 +611,18 @@ pub(super) fn install_grid_context_menus(
             view.statement_identity(),
         ));
     }
+    group.add_action_entries([super::column_select::set_cells_entry(
+        context.clone(),
+        sender.clone(),
+        column_view,
+        options.column_selection.clone(),
+    )]);
+    if let Some(action) = group
+        .lookup_action("set-cells")
+        .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+    {
+        action.set_enabled(options.set_cells_enabled);
+    }
     group.add_action(&reference_action);
     group.add_action(&show_referencing_action);
     if !options.snapshot_export
@@ -659,6 +692,15 @@ fn empty_grid_menu(row_mutations_allowed: bool) -> gio::Menu {
         Some("grid.jump-column"),
     );
     menu
+}
+
+fn set_cells_item() -> gio::MenuItem {
+    let item = gio::MenuItem::new(
+        Some(&bookie_app_services::tr!("Set Cells to Value…")),
+        Some("cell.set-cells"),
+    );
+    item.set_attribute_value("hidden-when", Some(&"action-disabled".to_variant()));
+    item
 }
 
 fn export_loaded_item() -> gio::MenuItem {
@@ -818,6 +860,7 @@ fn build_menu(
             Some("cell.duplicate-row"),
         );
         actions.append(Some(&bookie_app_services::tr!("Set to NULL")), Some("cell.set-null"));
+        actions.append_item(&set_cells_item());
         actions.append(
             Some(&bookie_app_services::tr!("Set to Default")),
             Some("cell.set-default"),
@@ -960,6 +1003,7 @@ fn copy_rows_action<F>(
     sender: relm4::Sender<GridMsg>,
     column_view: &gtk::ColumnView,
     columns: Rc<Vec<ColumnInfo>>,
+    selection: super::column_select::ColumnSelectionHandle,
     render: F,
 ) -> gio::ActionEntry<gio::SimpleActionGroup>
 where
@@ -971,6 +1015,17 @@ where
             let context = context.snapshot();
             let Some(slot) = context.as_ref() else { return };
             let Some(view) = view.upgrade() else { return };
+            match super::column_select::projected_rows(&view, &selection, &columns) {
+                super::column_select::Projection::Rows(picked, rows) => {
+                    sender.send(GridMsg::CopyToClipboard(render(&picked, &rows))).ok();
+                    return;
+                }
+                super::column_select::Projection::Incomplete => {
+                    sender.send(GridMsg::IncompleteRowData).ok();
+                    return;
+                }
+                super::column_select::Projection::NoSelection => {}
+            }
             let Some(rows) = rows_for_menu(&view, position(slot)) else {
                 sender.send(GridMsg::IncompleteRowData).ok();
                 return;
@@ -1241,7 +1296,7 @@ fn values_for_column_menu(view: &gtk::ColumnView, clicked: u32, column: usize) -
         })
         .collect()
 }
-fn selected_row_positions(view: &gtk::ColumnView, clicked: u32) -> Vec<u32> {
+pub(super) fn selected_row_positions(view: &gtk::ColumnView, clicked: u32) -> Vec<u32> {
     view.model()
         .and_then(|model| model.downcast::<gtk::MultiSelection>().ok())
         .map(|selection| selected_positions(&selection))

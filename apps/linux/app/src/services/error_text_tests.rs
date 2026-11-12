@@ -1,15 +1,69 @@
+const NEVER_TURN_OFF: &str = "Do not turn TLS off or lower verification to get past this.";
+
+fn verification_messages() -> Vec<(&'static str, String)> {
+    [
+        "invalid peer certificate: UnknownIssuer",
+        "certificate verify failed: self-signed certificate",
+        "invalid peer certificate: certificate not valid for name \"db.example\"; certificate is only valid for x.example",
+        "certificate verify failed: hostname mismatch",
+        "invalid peer certificate: certificate expired: verification time 2 (UNIX)",
+        "certificate verify failed: certificate has expired",
+        "invalid peer certificate: NotValidYet",
+        "invalid peer certificate: Revoked",
+        "certificate verify failed: certificate signature failure",
+    ]
+    .into_iter()
+    .map(|detail| (detail, driver_message(&DriverError::Tls(detail.into()))))
+    .collect()
+}
+
 #[test]
 fn a_certificate_failure_never_advises_turning_tls_off() {
-    for detail in [
-        "certificate verify failed",
-        "unknown issuer",
-        "certificate hostname mismatch",
-    ] {
-        let message = driver_message(&DriverError::Tls(detail.into()));
-        assert!(message.contains(detail));
-        assert!(!message.contains("set TLS to Disabled"), "{detail}: {message}");
-        assert!(message.contains("certificate authority file"));
+    for (detail, message) in verification_messages() {
+        let advice = message.replace(NEVER_TURN_OFF, "").to_ascii_lowercase();
+        assert!(message.contains(NEVER_TURN_OFF), "{detail}: {message}");
+        for forbidden in [
+            "disable",
+            "turn off",
+            "turn tls off",
+            "lower",
+            "skip",
+            "ignore",
+            "insecure",
+        ] {
+            assert!(!advice.contains(forbidden), "{detail}: {message}");
+        }
     }
+}
+
+#[test]
+fn each_certificate_failure_names_its_own_next_step() {
+    let expect = [
+        (
+            "invalid peer certificate: UnknownIssuer",
+            "Choose the certificate authority file",
+        ),
+        ("certificate verify failed: hostname mismatch", "different host name"),
+        ("certificate verify failed: certificate has expired", "has expired"),
+        ("invalid peer certificate: NotValidYet", "clock"),
+        ("invalid peer certificate: Revoked", "was revoked"),
+    ];
+    for (detail, phrase) in expect {
+        let message = driver_message(&DriverError::Tls(detail.into()));
+        assert!(message.contains(phrase), "{detail}: {message}");
+    }
+}
+
+#[test]
+fn certificate_messages_do_not_repeat_library_text_or_paths() {
+    let message = driver_message(&DriverError::Tls(
+        "invalid peer certificate: UnknownIssuer in /home/me/.secret/ca.pem".into(),
+    ));
+    assert!(!message.contains("/home/me"));
+    assert!(!message.contains("UnknownIssuer"));
+    let other = driver_message(&DriverError::Tls("cannot read /home/me/.secret/ca.pem: denied".into()));
+    assert!(!other.contains("/home/me"));
+    assert!(other.contains("denied"));
 }
 
 #[test]
