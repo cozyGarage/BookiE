@@ -56,8 +56,9 @@ impl App {
         dialog.set_default_response(Some("save"));
         dialog.set_close_response("cancel");
 
-        let driver_id = self.current_driver_id.clone();
-        let connection_id = self.connection_id;
+        let tab = self.selected_editor_tab_id();
+        let driver_id = tab.and_then(|id| self.tab_driver_id(id));
+        let connection_id = tab.and_then(|id| self.resolve_tab_connection(id).ok());
         let sender_for_response = sender.clone();
         dialog.connect_response(None, move |_, response| {
             if response != "save" {

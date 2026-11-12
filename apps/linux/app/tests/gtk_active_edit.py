@@ -70,6 +70,13 @@ def scenarios(ui):
         ui.wait_for_node(name="1 unsaved change")
         save_and_assert_notes(database)
 
+    def active_cell_edit_escape_cancels_uncommitted_text(database, _base):
+        begin_edit(database)
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="alpha", role=ui.pyatspi.ROLE_LABEL)
+        assert ui.find_node(name="1 unsaved change") is None, "Escape staged the cell edit"
+        assert notes(database) == [(1, "alpha"), (2, "beta")], "Escape committed the cell edit"
+
     def active_cell_edit_f2_after_click_saves_only_the_selected_cell(database, _base):
         with sqlite3.connect(database) as connection:
             connection.executemany(
@@ -365,6 +372,7 @@ def scenarios(ui):
 
     result = [
         active_cell_edit_enter_control,
+        active_cell_edit_escape_cancels_uncommitted_text,
         active_cell_edit_click_inside_the_open_editor_keeps_editing,
         active_cell_edit_f2_after_click_saves_only_the_selected_cell,
         active_cell_edit_enter_after_grid_navigation_saves_only_the_selected_cell,

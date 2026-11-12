@@ -291,3 +291,16 @@ fn malformed_or_missing_flat_files_report_errors() {
     }
     assert!(open_path(dir.path().join("missing.csv").to_str().unwrap()).is_err());
 }
+
+#[test]
+fn the_driver_declares_how_an_import_updates_existing_rows() {
+    assert_eq!(
+        DuckdbDriver.capabilities().import_upsert,
+        bookie_core::ImportUpsertStyle::OnConflict
+    );
+}
+
+#[test]
+fn the_driver_declares_value_search() {
+    assert!(DuckdbDriver.capabilities().supports_value_search);
+}

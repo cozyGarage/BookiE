@@ -3,7 +3,8 @@ use std::cell::Cell;
 use bookie_core::{QueryCursorId, QueryCursorPage, QueryResultBatch, Session, SessionCommitOutcome};
 
 use super::*;
-use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control};
+use crate::parsed_sql::ParsedSql;
+use crate::transaction_control::{TransactionControl, hides_transaction_control, transaction_control_parsed};
 
 const CLOSE_ROLLBACK_TIMEOUT: Duration = Duration::from_secs(10);
 const CLOSE_CURSOR_TIMEOUT: Duration = Duration::from_secs(5);
@@ -149,7 +150,8 @@ impl Session for PolicySession {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         self.require_query_ready(sql).await?;
-        match transaction_control(sql, &self.guard.ctx.driver_id) {
+        let parsed = ParsedSql::new(sql, &self.guard.ctx.driver_id);
+        match transaction_control_parsed(&parsed, &self.guard.ctx.driver_id) {
             Some(TransactionControl::BeginReadWrite) if self.guard.ctx.read_only => {
                 self.refuse_policy(
                     sql,
@@ -167,7 +169,7 @@ impl Session for PolicySession {
                 )
                 .await
             }
-            Some(TransactionControl::BeginReadOnlySnapshot) => self.begin_read_only(sql, control).await,
+            Some(TransactionControl::BeginReadOnlySnapshot) => self.begin_read_only(sql, control, &parsed).await,
             Some(TransactionControl::Commit { chain }) => self
                 .finish(sql, control, Finish::Commit, chain)
                 .await
@@ -176,7 +178,7 @@ impl Session for PolicySession {
                 .finish(sql, control, Finish::Rollback, chain)
                 .await
                 .map(|(result, _)| result),
-            None if hides_transaction_control(sql, &self.guard.ctx.driver_id) => {
+            None if hides_transaction_control(&parsed, &self.guard.ctx.driver_id) => {
                 self.refuse_policy(
                     sql,
                     "hidden_transaction_control",
@@ -184,7 +186,7 @@ impl Session for PolicySession {
                 )
                 .await
             }
-            None => self.statement(sql, params, control).await,
+            None => self.statement(sql, params, control, &parsed).await,
         }
     }
 
@@ -598,7 +600,12 @@ impl PolicySession {
         result
     }
 
-    async fn begin_read_only(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+    async fn begin_read_only(
+        &mut self,
+        sql: &str,
+        control: &OperationControl,
+        parsed: &ParsedSql<'_>,
+    ) -> Result<QueryResult, DriverError> {
         if self.guard.ctx.driver_id != "postgres" {
             return self
                 .refuse_policy(
@@ -617,7 +624,7 @@ impl PolicySession {
                 )
                 .await;
         }
-        let analysis = self.guard.analyze_statement(sql);
+        let analysis = self.guard.analyze_parsed(parsed);
         let authorization = Authorization {
             decision: Decision::Allow {
                 rule: "read_only_snapshot".into(),
@@ -656,8 +663,9 @@ impl PolicySession {
         sql: &str,
         params: &[Value],
         control: &OperationControl,
+        parsed: &ParsedSql<'_>,
     ) -> Result<QueryResult, DriverError> {
-        let analysis = self.guard.analyze_statement(sql);
+        let analysis = self.guard.analyze_parsed(parsed);
         let external_effects = Effects::SESSION_STATE.union(Effects::HOST_OR_FILE_ACCESS);
         if self.batch.is_some_and(|batch| {
             batch.read_only && (analysis.facts.effects.writes() || analysis.facts.effects.contains(external_effects))

@@ -31,6 +31,21 @@ pub enum PlanError {
     #[error("the insert could not be built: {0}")]
     Sql(String),
 
+    #[error("this connection type cannot update existing rows during an import")]
+    UpsertUnsupported,
+
+    #[error("choose the key columns that identify an existing row")]
+    NoConflictKey,
+
+    #[error("the key column {0} is listed twice")]
+    DuplicateConflictColumn(String),
+
+    #[error("the key column {0} is not part of the import, so existing rows cannot be matched")]
+    ConflictColumnNotImported(String),
+
+    #[error("every imported column is part of the key, so there is nothing to update")]
+    NothingToUpdate,
+
     #[error("{total} rows could not be read into the table")]
     Rows { total: usize, first: Vec<CsvRowError> },
 }

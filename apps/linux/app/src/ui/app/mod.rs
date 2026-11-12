@@ -33,8 +33,11 @@ mod sidebar_layout;
 mod sidebar_state;
 mod status_pages;
 mod structure;
+mod tab_session;
 mod tab_title;
 mod types;
+mod value_search;
+mod window_close_prompt;
 mod workspace_chrome;
 mod workspace_close;
 mod workspace_overview;
@@ -213,6 +216,7 @@ pub struct App {
     /// so the close-request handler closure can mutate it from outside
     /// `App::update`.
     close_window_after_save: std::rc::Rc<std::cell::Cell<bool>>,
+    force_close: std::rc::Rc<std::cell::Cell<bool>>,
     /// Count of in-flight transaction commits (a tab clicked Save
     /// and is awaiting `execute_in_transaction`). Incremented by
     /// `on_execute_browse_transaction` at dispatch, decremented by
@@ -246,7 +250,7 @@ pub struct App {
     /// schema. Editor descriptors round-trip the buffer text;
     /// dirty tabs lose their pending row/DDL edits because the
     /// trackers have already been cleared by the close path.
-    closed_tabs_stack: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<ClosedTabDescriptor>>>,
+    closed_tabs_stack: std::rc::Rc<std::cell::RefCell<std::collections::VecDeque<(Uuid, ClosedTabDescriptor)>>>,
     /// Extra ApplicationWindows spawned via New Window. Kept alive so
     /// closing the primary window does not drop them mid-use. Removing an
     /// entry (see `AppMsg::ExtraWindowClosed`) drops its `Controller`,
@@ -647,6 +651,7 @@ impl SimpleComponent for App {
             grid_close: grid_close::GridCloseState::new(window_handles.grid_edits_ready),
             close_after_save: window_handles.close_after_save,
             close_window_after_save: window_handles.close_window_after_save,
+            force_close: window_handles.force_close,
             in_flight_saves: window_handles.in_flight_saves,
             active_browse_saves: std::collections::HashMap::new(),
             session_teardown_ready: window_handles.session_teardown_ready,
@@ -731,6 +736,7 @@ impl SimpleComponent for App {
             AppMsg::Disconnect => self.on_disconnect(sender),
             AppMsg::ForceDisconnect => self.request_disconnect(sender),
             AppMsg::PrepareWindowClose => self.prepare_window_close(sender),
+            AppMsg::PromptWindowClose => self.prompt_window_close_with_pending(sender),
             AppMsg::PersistWindowStateForClose {
                 width,
                 height,
@@ -952,6 +958,7 @@ impl SimpleComponent for App {
             AppMsg::ExecuteStructureTransaction { tab_id, statements } => {
                 self.on_execute_structure_transaction(tab_id, statements, sender)
             }
+            AppMsg::AttachWorkspaceTab { tab_id, connection_id } => self.attach_tab_to(tab_id, connection_id),
             AppMsg::SaveActiveStructureTabById(id) => self.save_structure_tab_by_id(id, sender),
             AppMsg::StructureSaveCompleted {
                 origin,
@@ -1108,6 +1115,7 @@ impl SimpleComponent for App {
                 // Controller drops.
                 let key = ctrl.widget().as_ptr() as usize;
                 let destroy_sender = sender.clone();
+                session_restore::forget_group_on_close(ctrl.widget().upcast_ref(), key, sender.clone());
                 ctrl.widget().connect_destroy(move |_| {
                     destroy_sender.input(AppMsg::ExtraWindowClosed(key));
                 });
@@ -1116,6 +1124,7 @@ impl SimpleComponent for App {
             AppMsg::ExtraWindowClosed(key) => {
                 self.extra_windows.retain(|(k, _)| *k != key);
             }
+            AppMsg::ExtraWindowDismissed(key) => self.forget_open_sessions_window(key, sender),
             AppMsg::JumpToColumn => {
                 let opened = self
                     .workspace_tab_view
@@ -1179,14 +1188,22 @@ impl SimpleComponent for App {
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
             AppMsg::CreateTableFromCsv { schema } => self.on_create_table_from_csv(schema, sender),
-            AppMsg::CsvFileChosen { schema, table, path } => self.on_csv_file_chosen(schema, table, path, sender),
+            AppMsg::CsvFileChosen {
+                schema,
+                table,
+                path,
+                more_files,
+            } => self.on_csv_file_chosen(schema, table, path, more_files, sender),
             AppMsg::CsvImportPrepared(preparation) => self.on_csv_import_prepared(*preparation, sender),
             AppMsg::CsvImportPreparationFailed(failure) => self.on_csv_import_preparation_failed(*failure),
             AppMsg::StartCsvImport(choice) => self.on_start_csv_import(*choice, sender),
             AppMsg::CsvImportPlanPrepared(preparation) => self.on_csv_import_plan_prepared(*preparation, sender),
             AppMsg::CsvImportProgress(committed) => self.on_csv_import_progress(committed),
             AppMsg::CsvImportFinished(report) => self.on_csv_import_finished(*report, sender),
+            AppMsg::ImportQueueFileStarted(started) => self.on_import_queue_file_started(*started),
+            AppMsg::ImportQueueFinished(finished) => self.on_import_queue_finished(*finished),
             AppMsg::BackUpDatabase => self.on_back_up_database(sender),
+            AppMsg::SearchDatabaseValues => self.on_search_database_values(&sender),
             AppMsg::RestoreDatabase => self.on_restore_database(sender),
             AppMsg::StartBackupJob(job) => self.on_start_backup_job(job, sender),
             AppMsg::BackupJobFinished(report) => self.on_backup_job_finished(*report, sender),

@@ -239,17 +239,7 @@ fn build_rule_sql(
     params: &mut Vec<Value>,
 ) -> Result<String, BuildFilterError> {
     let col_sql = filter_column(driver_id, col);
-    // PostgreSQL pattern operators require text. Unknown names include user
-    // enums/domains, so only known built-in text types bypass the cast.
-    let pattern_sql = if driver_id == "postgres"
-        && !matches!(
-            col.data_type.to_ascii_lowercase().as_str(),
-            "text" | "varchar" | "character varying" | "char" | "character" | "bpchar"
-        ) {
-        format!("CAST({col_sql} AS text)")
-    } else {
-        col_sql.clone()
-    };
+    let pattern_sql = pattern_column(driver_id, col);
     match rule.op {
         FilterOp::IsNull => Ok(format!("{col_sql} IS NULL")),
         FilterOp::IsNotNull => Ok(format!("{col_sql} IS NOT NULL")),
@@ -351,11 +341,24 @@ fn build_rule_sql(
     }
 }
 
-fn has_native_ilike(driver_id: &str) -> bool {
+pub(crate) fn pattern_column(driver_id: &str, col: &ColumnInfo) -> String {
+    let col_sql = filter_column(driver_id, col);
+    if driver_id == "postgres"
+        && !matches!(
+            col.data_type.to_ascii_lowercase().as_str(),
+            "text" | "varchar" | "character varying" | "char" | "character" | "bpchar"
+        )
+    {
+        return format!("CAST({col_sql} AS text)");
+    }
+    col_sql
+}
+
+pub(crate) fn has_native_ilike(driver_id: &str) -> bool {
     matches!(driver_id, "postgres" | "duckdb" | "clickhouse")
 }
 
-fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String {
+pub(crate) fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String {
     let placeholder = placeholder_for(driver_id, index);
     if driver_id == "postgres" && matches!(col.data_type.trim().to_ascii_lowercase().as_str(), "real" | "float4") {
         return format!("{placeholder}::real");
@@ -375,7 +378,7 @@ fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String
     )
 }
 
-fn filter_column(driver_id: &str, col: &ColumnInfo) -> String {
+pub(crate) fn filter_column(driver_id: &str, col: &ColumnInfo) -> String {
     let column = quote_ident(driver_id, &col.name);
     let Some(enum_type) = col
         .enum_type
@@ -423,11 +426,11 @@ fn require_list(rule: &FilterRule) -> Result<&Vec<String>, BuildFilterError> {
 /// Escape a string for safe inclusion inside a `LIKE` pattern.
 /// Backslash escapes `%` and `_` so a literal `50%` searches for
 /// exactly that text rather than matching anything ending in `50`.
-fn like_needs_escape_clause(driver_id: &str) -> bool {
+pub(crate) fn like_needs_escape_clause(driver_id: &str) -> bool {
     matches!(driver_id, "sqlite" | "duckdb" | "mssql" | "oracle")
 }
 
-fn escape_like(driver_id: &str, s: &str) -> String {
+pub(crate) fn escape_like(driver_id: &str, s: &str) -> String {
     if driver_id == "mysql" {
         return s.replace('|', "||").replace('%', "|%").replace('_', "|_");
     }
@@ -487,7 +490,7 @@ fn parse_value_for(col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterErr
     }
 }
 
-fn parse_filter_value(driver_id: &str, col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterError> {
+pub(crate) fn parse_filter_value(driver_id: &str, col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterError> {
     let value = crate::numeric_input::widened_single_precision(driver_id, col, &parse_value_for(col, text)?);
     if driver_id != "duckdb" {
         return Ok(value);

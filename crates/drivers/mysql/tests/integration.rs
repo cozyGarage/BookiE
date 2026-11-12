@@ -62,6 +62,9 @@ async fn an_unavailable_mysql_server_is_classified_as_connection_refused() {
         .expect("MySQL setup refusal remains distinct from established disconnect");
 }
 
+#[path = "support/import_upsert.rs"]
+mod import_upsert;
+
 #[path = "support/local_socket.rs"]
 mod local_socket;
 

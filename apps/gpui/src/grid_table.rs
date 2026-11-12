@@ -114,15 +114,7 @@ impl GridDelegate {
             let labels = match (&self.map.compare, &self.source) {
                 (Some(diff), _) => compare_labels(diff, row_ix, numeric),
                 (None, Some(source)) => match self.map.source_row(row_ix) {
-                    Some(index) => {
-                        let mut cells = source.row(index);
-                        for (column, cell) in cells.iter_mut().enumerate() {
-                            if let Some(edit) = self.edits.get(&(index, column)) {
-                                *cell = edit.clone();
-                            }
-                        }
-                        labels(&cells, numeric)
-                    }
+                    Some(index) => source_labels(source, index, numeric, &self.edits),
                     None => Vec::new(),
                 },
                 (None, None) => Vec::new(),
@@ -230,6 +222,25 @@ fn labels(cells: &[Cell], numeric: &[bool]) -> Vec<(String, bool)> {
         .collect()
 }
 
+fn source_labels(source: &Source, index: u64, numeric: &[bool], edits: &Edits) -> Vec<(String, bool)> {
+    match source.row_ref(index) {
+        Some(cells) => labels_with_edits(cells, numeric, index, edits),
+        None => labels_with_edits(&source.row(index), numeric, index, edits),
+    }
+}
+
+fn labels_with_edits(cells: &[Cell], numeric: &[bool], row: u64, edits: &Edits) -> Vec<(String, bool)> {
+    cells
+        .iter()
+        .enumerate()
+        .map(|(column, cell)| {
+            let cell = edits.get(&(row, column)).unwrap_or(cell);
+            let right = crate::right_aligned(numeric.get(column).copied().unwrap_or(false), cell);
+            (cell_preview(cell), right)
+        })
+        .collect()
+}
+
 fn compare_labels(diff: &Diff, row: usize, numeric: &[bool]) -> Vec<(String, bool)> {
     let Some(row) = diff.rows.get(row) else {
         return Vec::new();
@@ -250,6 +261,8 @@ pub fn cursor_at(cell: Option<(usize, usize)>) -> Option<bookie_results::grid_cu
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
     use bookie_gpui::model::Cell;
     use bookie_gpui::source::{ResultSource, Synthetic};
@@ -273,6 +286,81 @@ mod tests {
         assert_eq!(delegate.cached.as_ref().map(|(row, _)| *row), Some(1));
         assert_eq!(delegate.label_of(1, 1).0, expected);
         assert_eq!(delegate.label_of(9, 0).0, "");
+    }
+
+    struct BorrowedRowSource {
+        cells: Vec<Cell>,
+        row_copies: AtomicUsize,
+    }
+
+    impl ResultSource for BorrowedRowSource {
+        fn columns(&self) -> &[bookie_gpui::model::ColumnMeta] {
+            &[]
+        }
+
+        fn total(&self) -> u64 {
+            1
+        }
+
+        fn row(&self, _index: u64) -> Vec<Cell> {
+            self.row_copies.fetch_add(1, Ordering::Relaxed);
+            self.cells.clone()
+        }
+
+        fn row_ref(&self, index: u64) -> Option<&[Cell]> {
+            (index == 0).then_some(&self.cells)
+        }
+
+        fn find(
+            &self,
+            _query: &str,
+            _cap: usize,
+            _cancel: &tokio_util::sync::CancellationToken,
+        ) -> Result<bookie_gpui::model::FindResult, &'static str> {
+            Err("not available")
+        }
+
+        fn filter(
+            &self,
+            _predicate: &bookie_gpui::model::Predicate,
+            _cancel: &tokio_util::sync::CancellationToken,
+        ) -> Result<Vec<u32>, &'static str> {
+            Err("not available")
+        }
+
+        fn compare(
+            &self,
+            _keyed: bool,
+            _cancel: &tokio_util::sync::CancellationToken,
+        ) -> Result<bookie_gpui::model::Diff, &'static str> {
+            Err("not available")
+        }
+    }
+
+    #[test]
+    fn live_grid_previews_borrow_large_cells_instead_of_cloning_the_row() {
+        let source = Arc::new(BorrowedRowSource {
+            cells: vec![Cell::Text("x".repeat(1024 * 1024))],
+            row_copies: AtomicUsize::new(0),
+        });
+        let source_dyn: Source = source.clone();
+        let mut delegate = GridDelegate {
+            columns: vec![("value".into(), 100.0)],
+            numeric: vec![false],
+            source: Some(source_dyn),
+            map: RowMap {
+                count: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let preview = delegate.label_of(0, 0).0;
+
+        assert!(preview.starts_with(&"x".repeat(512)));
+        assert!(preview.len() < 600);
+        assert_eq!(source.row_copies.load(Ordering::Relaxed), 0);
+        assert!(matches!(&source.cells[0], Cell::Text(value) if value.len() == 1024 * 1024));
     }
 
     #[test]

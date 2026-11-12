@@ -68,8 +68,13 @@ impl App {
         filter: bookie_core::FilterSet,
         sender: ComponentSender<Self>,
     ) {
+        let front = self.connection_id;
         let existing = self.workspace_tabs.borrow().iter().find_map(|(id, tab)| match tab {
-            WorkspaceTab::Table(slot) if slot.schema == schema && slot.table == table => Some((*id, slot.page.clone())),
+            WorkspaceTab::Table(slot)
+                if slot.schema == schema && slot.table == table && self.tab_belongs_to(*id, front) =>
+            {
+                Some((*id, slot.page.clone()))
+            }
             _ => None,
         });
         if let Some((tab_id, page)) = existing {

@@ -43,6 +43,9 @@ fn choice(create: Option<Vec<DraftColumn>>) -> ImportChoice {
         capabilities: bookie_core::DriverCapabilities::default(),
         create,
         skip_rejected_rows: false,
+        write: bookie_core::import::WriteMode::Insert,
+        source: PathBuf::new(),
+        more_files: Vec::new(),
     }
 }
 
@@ -99,6 +102,9 @@ async fn generated_csv_column_is_skipped_in_preview_and_database_supplies_its_va
         capabilities,
         create: None,
         skip_rejected_rows: false,
+        write: bookie_core::import::WriteMode::Insert,
+        source: PathBuf::new(),
+        more_files: Vec::new(),
     };
     let prepared = prepare_csv_plan(Uuid::new_v4(), "sqlite".into(), choice.clone()).await;
     let (plan, _) = prepared.result.expect("build import plan");
@@ -206,6 +212,9 @@ async fn a_row_the_real_database_rejects_is_skipped_and_every_other_row_is_impor
         capabilities,
         create: None,
         skip_rejected_rows: true,
+        write: bookie_core::import::WriteMode::Insert,
+        source: PathBuf::new(),
+        more_files: Vec::new(),
     };
     let (plan, _) = prepare_csv_plan(Uuid::new_v4(), "sqlite".into(), choice.clone())
         .await
@@ -302,6 +311,8 @@ fn the_finishing_alert_gives_the_counts_then_every_listed_row_and_the_hidden_rem
         error: None,
         skipped: 3,
         skipped_summary: "Row 2: duplicate key\nRow 9: bad value\n…and 1 more skipped rows.".into(),
+        updates_existing_rows: false,
+        cancelled: false,
     };
     assert_eq!(
         skipped_rows_message(&report),

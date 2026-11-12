@@ -198,7 +198,7 @@ fn browse_save_dispatch_executes_and_audits_a_guarded_transaction() {
     runtime
         .block_on(connection.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)"))
         .unwrap();
-    let tab_id = uuid::Uuid::new_v4();
+    let tab_id = attach_new_tab_to_front(&controller);
     let save_id = uuid::Uuid::new_v4();
     controller.emit(AppMsg::ExecuteBrowseTransaction {
         tab_id,
@@ -225,6 +225,16 @@ fn browse_save_dispatch_executes_and_audits_a_guarded_transaction() {
         let event = &record["event"];
         event["operation_class"] == "mutation" && event["phase"] == "outcome" && event["terminal_status"] == "succeeded"
     }));
+}
+
+fn attach_new_tab_to_front(controller: &relm4::Controller<App>) -> uuid::Uuid {
+    let tab_id = uuid::Uuid::new_v4();
+    controller.emit(AppMsg::AttachWorkspaceTab {
+        tab_id,
+        connection_id: controller.model().connection_id,
+    });
+    spin_until(|| controller.model().multi.sessions.connection_for_tab(tab_id).is_some());
+    tab_id
 }
 
 fn prepared_sqlite_connection(
@@ -305,7 +315,7 @@ fn browse_save_dispatch_on_read_only_connection_is_denied_and_audited() {
     controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
-    let tab_id = uuid::Uuid::new_v4();
+    let tab_id = attach_new_tab_to_front(&controller);
     let save_id = uuid::Uuid::new_v4();
     controller.emit(AppMsg::ExecuteBrowseTransaction {
         tab_id,
@@ -492,8 +502,9 @@ fn browse_save_waits_for_approval_before_writing() {
     controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
+    let tab_id = attach_new_tab_to_front(&controller);
     controller.emit(AppMsg::ExecuteBrowseTransaction {
-        tab_id: uuid::Uuid::new_v4(),
+        tab_id,
         save_id: uuid::Uuid::new_v4(),
         statements: vec![(
             "INSERT INTO notes (id, title) VALUES (?, ?)".into(),
@@ -563,8 +574,9 @@ fn browse_save_denied_by_approval_preserves_data_and_audits() {
     controller.emit(AppMsg::ConnectionPrepared(Box::new(prepared)));
     spin_until(|| controller.model().window_connection().is_some());
     let connection = controller.model().window_connection().unwrap();
+    let tab_id = attach_new_tab_to_front(&controller);
     controller.emit(AppMsg::ExecuteBrowseTransaction {
-        tab_id: uuid::Uuid::new_v4(),
+        tab_id,
         save_id: uuid::Uuid::new_v4(),
         statements: vec![(
             "INSERT INTO notes (id, title) VALUES (?, ?)".into(),

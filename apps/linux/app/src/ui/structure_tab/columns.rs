@@ -1,6 +1,3 @@
-//! Column-row builder + per-driver type helpers used by the Columns
-//! page of the Structure tab.
-
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -12,10 +9,6 @@ use bookie_core::sql_ddl::{ColumnCommentCapability, DraftColumn};
 
 use super::{ColumnField, StructureTab, StructureTabInput};
 
-/// Curated type lists per driver. Free-text input still allowed via
-/// the combo box's editable entry; this list seeds the dropdown so
-/// common types are one click away. Order matters — most-common at
-/// the top.
 pub(super) fn driver_types(driver_id: &str) -> &'static [&'static str] {
     match driver_id {
         "postgres" => &[
@@ -85,18 +78,12 @@ pub(super) fn driver_types(driver_id: &str) -> &'static [&'static str] {
     }
 }
 
-/// Whether the driver supports column-level ALTER on an existing
-/// column (type / nullable / default). SQLite blocks all three; the
-/// UI uses this to grey out non-supported cells with explanatory
-/// tooltips.
 fn driver_can_alter_existing_column(driver_id: &str) -> bool {
     !matches!(driver_id, "sqlite")
 }
 
 fn driver_can_drop_column(_driver_id: &str) -> bool {
-    // SQLite ≥ 3.35 supports DROP COLUMN; the builder doesn't probe
-    // the runtime version. Always enable; the driver surfaces the
-    // error if running against an older SQLite.
+    // shortcut: assumes SQLite supports DROP COLUMN; add a runtime version check when older SQLite support is required.
     true
 }
 
@@ -110,11 +97,6 @@ pub(super) fn default_type_for(driver_id: &str) -> String {
     }
 }
 
-/// Render a draft column's summary line for the collapsed expander
-/// header — `varchar(255) · NOT NULL · Primary key`. Order: type,
-/// nullability, primary key, auto-increment. Empty parts are skipped
-/// so a freshly-added column with default state shows the minimum
-/// useful information.
 fn format_column_subtitle(col: &DraftColumn) -> String {
     let mut parts: Vec<String> = Vec::new();
     if !col.data_type.trim().is_empty() {
@@ -165,25 +147,13 @@ fn bind_expander_arrow(row: &adw::ExpanderRow) {
     row.connect_expanded_notify(update);
 }
 
-/// Build one collapsible column row as `adw::ExpanderRow`. Collapsed
-/// state shows the column name (title) + summary subtitle; expanded
-/// reveals one `AdwEntryRow` / `AdwSwitchRow` per editable attribute.
-/// SQLite-restricted fields render as `set_sensitive(false)` with
-/// explanatory tooltips so the user understands why they can't edit.
-/// Non-original (newly-added) columns always allow full editing —
-/// those become `AddColumn` ops which SQLite accepts at execution.
-///
-/// `suppress_emit` lets the caller mark a window during which signal
-/// callbacks should NOT push edits onto the model. Used during
-/// `rebuild_columns_view` to silence the `changed` / `toggled`
-/// emissions GTK fires while initial values are stamped onto the
-/// freshly-built widgets.
 #[derive(Clone, Copy)]
 pub(super) struct ColumnEditing<'a> {
     pub comment_capability: ColumnCommentCapability,
     pub collations: &'a [String],
 }
 
+// GTK emits change signals while controls are initialized, so rebuilds must suppress model edits.
 pub(super) fn build_column_expander_row(
     index: usize,
     col: &DraftColumn,
@@ -203,8 +173,6 @@ pub(super) fn build_column_expander_row(
     bind_expander_arrow(&row);
     row.set_widget_name(&format!("col-row-{index}"));
 
-    // Trash button as a header-suffix on the expander row itself —
-    // remains visible whether the row is expanded or collapsed.
     let remove_button = gtk::Button::builder()
         .icon_name("user-trash-symbolic")
         .tooltip_text(bookie_app_services::tr!("Remove column"))
@@ -218,8 +186,6 @@ pub(super) fn build_column_expander_row(
     remove_button.connect_clicked(move |_| sender_for_remove.input(StructureTabInput::RemoveColumn(index)));
     row.add_suffix(&remove_button);
 
-    // Name (AdwEntryRow). The expander's title mirrors this entry
-    // live so the collapsed header always reflects the user's input.
     let name_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Name")).build();
     name_row.set_text(&col.name);
     name_row.set_widget_name(&format!("col-name-{index}"));
@@ -239,10 +205,6 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&name_row);
 
-    // Type (AdwEntryRow — free text). A suffix MenuButton offers the
-    // curated `driver_types()` suggestions; free-text input remains the
-    // primary path so custom types like `decimal(10,2)` or Postgres
-    // `enum` literals work without enumeration.
     let type_row = adw::EntryRow::builder().title(bookie_app_services::tr!("Type")).build();
     type_row.set_text(&col.data_type);
     if limit_for_existing && !driver_can_alter_existing_column(driver_id) {
@@ -269,7 +231,6 @@ pub(super) fn build_column_expander_row(
     }
     row.add_row(&type_row);
 
-    // Nullable (AdwSwitchRow).
     let nullable_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Nullable"))
         .active(col.nullable)
@@ -293,7 +254,6 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&nullable_row);
 
-    // Default value (AdwEntryRow). Empty input means no DEFAULT clause.
     let default_row = adw::EntryRow::builder()
         .title(bookie_app_services::tr!("Default value"))
         .build();
@@ -319,7 +279,6 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&default_row);
 
-    // Primary key (AdwSwitchRow).
     let pk_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Primary key"))
         .active(col.primary_key)
@@ -337,10 +296,6 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&pk_row);
 
-    // Auto-increment (AdwSwitchRow). Bound `sensitive` to PK's
-    // `active` so the affordance reflects the driver-level constraint
-    // (MySQL rejects AUTO_INCREMENT on non-PK; Postgres SERIAL
-    // implies PK).
     let auto_row = adw::SwitchRow::builder()
         .title(bookie_app_services::tr!("Auto increment"))
         .subtitle(bookie_app_services::tr!("MySQL AUTO_INCREMENT / Postgres SERIAL"))
@@ -471,10 +426,6 @@ fn configure_comment_row(row: &adw::EntryRow, capability: ColumnCommentCapabilit
     }
 }
 
-/// Comment (AdwEntryRow). Empty input means no comment, matching the
-/// default-value row. The field is hidden where the engine cannot store
-/// one, and stays visible but insensitive where it can only store one
-/// at CREATE time.
 fn add_comment_row(
     row: &adw::ExpanderRow,
     index: usize,
@@ -503,32 +454,7 @@ fn add_comment_row(
     row.add_row(&comment_row);
 }
 
-/// Build a suffix MenuButton for the type AdwEntryRow that opens a
-/// native `gtk::PopoverMenu` listing curated `driver_types()` for
-/// `driver_id`. Selecting an entry rewrites the target row's text
-/// (which fires the row's `changed` signal — the existing handler
-/// picks up the new value). Free-text input via the entry stays as
-/// the primary path.
-///
-/// Implementation: a `gio::Menu` model + `MenuButton.set_menu_model`
-/// causes GTK to render a `gtk::PopoverMenu` automatically. That is
-/// the same widget powering app menus, right-click menus, and
-/// gnome-menus across the desktop, so the rendering is identical to
-/// every other GNOME menu the user has ever seen — proper menu-item
-/// padding, hover/active states, separators, focus ring, all native.
-///
-/// Each type-name menu item activates a single SimpleAction
-/// (`types.apply`) parameterised by the type string. The action is
-/// stored in a per-button action group so two columns' menus don't
-/// collide on the action name.
-///
-/// Returns the button plus the auto-built PopoverMenu so the caller
-/// can register it for popdown on rebuild — otherwise an open menu
-/// would keep its captured target alive and dispatch a click into a
-/// detached AdwEntryRow.
 fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gtk::MenuButton, Option<gtk::Popover>) {
-    // Per-button action group: one action `apply` keyed by `String`
-    // parameter. Each menu item activates `types.apply::<typename>`.
     let action_group = gio::SimpleActionGroup::new();
     let apply_action = gio::SimpleAction::new("apply", Some(&String::static_variant_type()));
     let target_for_action = target.clone();
@@ -539,10 +465,6 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
     });
     action_group.add_action(&apply_action);
 
-    // Build the menu model: every type becomes a labeled item that
-    // activates the apply action with the type string as parameter.
-    // gtk::PopoverMenu renders each gio::MenuItem as a native menu
-    // entry (no separator handling needed for a flat list).
     let menu = gio::Menu::new();
     for ty in driver_types(driver_id) {
         let item = gio::MenuItem::new(Some(ty), None);
@@ -559,9 +481,7 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
     button.insert_action_group("types", Some(&action_group));
     button.set_menu_model(Some(&menu));
 
-    // The PopoverMenu is auto-created by MenuButton from the menu
-    // model. Hand it back so the caller can `popdown` it before the
-    // owning column row is torn down on Refresh.
+    // The action retains the target entry; close the popover before its row is rebuilt.
     let popover = button.popover();
     (button, popover)
 }

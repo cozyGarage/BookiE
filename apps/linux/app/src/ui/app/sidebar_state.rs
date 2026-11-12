@@ -265,8 +265,9 @@ impl App {
 
     pub(super) fn restore_sidebar_state(&self) {
         let state = self
-            .workspace_target()
-            .and_then(|(id, database, _)| self.workspace.load_database(id, &database));
+            .connection_id
+            .zip(self.connected_database.as_deref())
+            .and_then(|(id, database)| self.workspace.load_database(id, database));
         *self.sidebar_collapsed.borrow_mut() = CollapseState::from_keys(
             state
                 .as_ref()

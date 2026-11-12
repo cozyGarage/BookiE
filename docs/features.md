@@ -26,6 +26,8 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - The welcome screen offers up to three recently opened connections, with their driver and environment shown on each card.
 - Saved connections keep passwords in the desktop keyring (Secret Service), not in BookiE's own files.
 - SSH tunnels use the built-in client or the system OpenSSH. BookiE asks before trusting an unknown host key.
+- The built-in SSH client can go through a chain of up to eight hosts. Add, reorder and remove jump hosts in the connection form; their passwords and key passphrases are kept in the desktop keyring, one entry per host.
+- One window can hold several open connections. Opening another saved connection adds its tabs to the same tab bar, and each tab says which connection it belongs to while more than one is open. The selected tab decides which connection the header, the sidebar and Safe Mode show. Saving, loading and exporting from a tab always use that tab's own connection. Closing the window asks once about unsaved changes in every connection and names them; Save writes each tab to its own connection and Cancel keeps every connection open. Disconnect closes one connection and its tabs. A connection that fails to open reports the error without disturbing the others. Each window reopens its connections at the next start.
 - TLS has several strictness levels, up to checking both the certificate authority and the host name.
 - Each connection has an environment: Local, Dev, Staging or Prod. A Prod connection shows a red badge, a tinted header and `[Production]` in the window title.
 - A read-only connection refuses every change.
@@ -66,6 +68,8 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 ![Structured filter rule editor](images/filter-builder.png)
 
 ![Filter applied in the data grid](images/filter-applied.png)
+
+- **Search Database Values** (main menu, next to Back Up Database) finds a value across the tables of the current connection on PostgreSQL, MySQL and MariaDB, SQLite, DuckDB and SQL Server. **Contains** matches text columns and ignores case where the engine allows; **Equals** matches whole values and can include integer, decimal and UUID columns. It reads one table at a time, at most 200 tables, 24 columns per table and 25 rows per table, skips hidden schemas, and every statement goes through the usual policy checks and audit log. Each table that matches has **Open filtered**, which opens its table tab narrowed to the matching columns. Cancel stops the search and the result says how many tables were not searched.
 
 ## Write SQL
 
@@ -121,6 +125,8 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
 - Import CSV into an existing table, or create a new table from a CSV file. Separator, header row and column mapping are detected and can be changed. The quote character, backslash escaping and file encoding (UTF-8, Windows-1252, UTF-16) can be set.
 - Import accepts Excel `.xlsx` files. The first worksheet with data is read.
+- Import into an existing table can update rows that already exist. On PostgreSQL, SQLite, DuckDB, MySQL and MariaDB, choose **Update the existing row** and a key (the primary key, or a unique index without a condition); rows with a new key are inserted and rows with an existing key are changed. The approval and the audit record say that existing rows may be updated. Other engines offer insert only.
+- Import into an existing table can take up to 20 files in one run. The first file's separator, header and column choices apply to every file, each file must have the same columns, and each file asks for its own approval. One Cancel stops the file in progress and the rest. The run stops at the first file that fails, and the report names it. Together the files can hold up to 256 MB and 2,000,000 rows.
 - Mappings can be remembered per connection and table.
 
 ## Safety and records

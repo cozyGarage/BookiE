@@ -38,12 +38,6 @@ impl App {
         prompt_for_password: bool,
         sender: ComponentSender<Self>,
     ) {
-        if crate::ui::connect_dialog::has_jump_chain(&saved) {
-            self.show_toast(&bookie_app_services::tr!(
-                "This connection uses an SSH jump chain, which the form cannot edit yet. Edit ssh.jump in the saved connection file."
-            ));
-            return;
-        }
         let reply = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -141,12 +135,10 @@ impl App {
         if let Some(connection_id) = self.connection_id {
             self.set_last_connection_id(Some(connection_id), sender.clone());
             self.restore_workspace_tabs(connection_id, sender.clone());
-            self.claim_orphan_tabs(connection_id);
             if self.multi.sessions.names_tabs_with_connection()
                 && self.multi.sessions.tabs_for_connection(connection_id).is_empty()
             {
                 self.append_editor_tab(None, sender.clone());
-                self.claim_orphan_tabs(connection_id);
             }
             self.refresh_multi_session_tab_titles();
             self.persist_open_sessions(sender.clone());
@@ -169,13 +161,11 @@ impl App {
         // the connection mid-edit silently destroys the user's work.
         // Confirm via an AlertDialog mirroring the window-close-with-
         // pending and F5-with-pending paths.
-        let has_pending = self.window_has_pending();
+        let has_pending = self.disconnect_has_pending();
         if has_pending {
             let dialog = adw::AlertDialog::new(
                 Some(&bookie_app_services::tr!("Discard pending changes?")),
-                Some(&bookie_app_services::tr!(
-                    "Disconnecting will close every tab and drop every unsaved row edit and DDL change."
-                )),
+                Some(&self.disconnect_discard_body()),
             );
             dialog.add_response("cancel", &bookie_app_services::tr!("Cancel"));
             dialog.add_response("discard", &bookie_app_services::tr!("Discard and disconnect"));
@@ -690,11 +680,7 @@ impl App {
             return;
         }
         crate::services::request_generation::replace_in_flight(&self.catalog_dialog_cancel);
-        if additive {
-            if let Some(previous) = self.connection_id {
-                self.claim_orphan_tabs(previous);
-            }
-        } else if self.connected {
+        if !additive && self.connected {
             self.teardown_workspace_tabs();
             self.clear_closed_tabs_stack();
             self.connected_database = None;
@@ -797,11 +783,7 @@ impl App {
                             let file_based = registry
                                 .get(&source.driver_id)
                                 .is_some_and(|driver| driver.capabilities().is_file_based);
-                            let eligible = duplicate_connection_prompt_eligible(
-                                source.auth_mode,
-                                file_based,
-                                crate::ui::connect_dialog::has_jump_chain(&source),
-                            );
+                            let eligible = duplicate_connection_prompt_eligible(source.auth_mode, file_based);
                             if !eligible {
                                 false
                             } else {
@@ -864,12 +846,8 @@ fn prompt_for_stored_password(stored: Result<Option<secrecy::SecretString>, book
     }
 }
 
-fn duplicate_connection_prompt_eligible(
-    auth_mode: bookie_core::AuthMode,
-    file_based: bool,
-    has_jump_chain: bool,
-) -> bool {
-    auth_mode == bookie_core::AuthMode::Password && !file_based && !has_jump_chain
+fn duplicate_connection_prompt_eligible(auth_mode: bookie_core::AuthMode, file_based: bool) -> bool {
+    auth_mode == bookie_core::AuthMode::Password && !file_based
 }
 
 /// Performs the actual disk + keyring teardown for a saved connection.
@@ -886,6 +864,11 @@ fn execute_delete_connection(
         shutdown
             .register(async move {
                 let _save_turn = crate::services::connection_save_turn::take().await;
+                let chain = bookie_storage::load_connections()
+                    .await
+                    .ok()
+                    .and_then(|all| all.into_iter().find(|saved| saved.id == id))
+                    .and_then(|saved| saved.ssh);
                 let result = bookie_storage::delete_connection(id).await;
                 if let Err(error) = result {
                     tracing::warn!(error = %error, "deleting the connection file entry failed");
@@ -903,6 +886,13 @@ fn execute_delete_connection(
                 let ssh_password = bookie_storage::delete_ssh_password(id).await;
                 let ssh_passphrase = bookie_storage::delete_ssh_passphrase(id).await;
                 let mut credential_failure = false;
+                if let Some(Err(error)) = match &chain {
+                    Some(chain) => Some(bookie_app_services::ssh_chain_secrets::delete_chain_secrets(id, chain).await),
+                    None => None,
+                } {
+                    credential_failure = true;
+                    tracing::warn!(error = %error, "deleting jump host credentials failed");
+                }
                 for error in [password.err(), ssh_password.err(), ssh_passphrase.err()]
                     .into_iter()
                     .flatten()
@@ -951,22 +941,14 @@ mod tests {
     fn duplicate_prompts_only_for_editable_password_authenticated_connections() {
         assert!(duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Password,
-            false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Kerberos,
-            false,
             false
         ));
         assert!(!duplicate_connection_prompt_eligible(
             bookie_core::AuthMode::Password,
-            true,
-            false
-        ));
-        assert!(!duplicate_connection_prompt_eligible(
-            bookie_core::AuthMode::Password,
-            false,
             true
         ));
     }

@@ -2,12 +2,16 @@ use relm4::adw;
 use relm4::adw::prelude::*;
 use secrecy::{ExposeSecret, SecretString};
 
+use bookie_app_services::ssh_chain_form::{HopSecretKind, HopSecretRef};
+use bookie_app_services::ssh_chain_secrets::hop_secret_is_stored;
 use bookie_core::{AuthMode, Environment};
 use bookie_storage::{
-    SavedConnection, SavedSshAuth, StorageError, load_password, load_ssh_passphrase, load_ssh_password,
+    SavedConnection, SavedSshAuth, SavedSshConfig, StorageError, load_password, load_ssh_hop_passphrase,
+    load_ssh_hop_password, load_ssh_passphrase, load_ssh_password,
 };
 
 use super::{AUTH_MODE_ROWS, ConnectDialog, DriverEntry};
+use crate::ui::ssh_jumps::JumpPrefill;
 
 #[derive(Debug)]
 pub struct ConnectionPrefill {
@@ -15,12 +19,9 @@ pub struct ConnectionPrefill {
     pub password: Option<SecretString>,
     pub ssh_password: Option<SecretString>,
     pub ssh_passphrase: Option<SecretString>,
+    pub jump_hops: Vec<JumpPrefill>,
     pub unreadable_secrets: bool,
     pub prompt_for_password: bool,
-}
-
-pub fn has_jump_chain(saved: &SavedConnection) -> bool {
-    saved.ssh.as_ref().is_some_and(|ssh| ssh.jump.is_some())
 }
 
 pub fn readable(result: Result<Option<SecretString>, StorageError>, unreadable: &mut bool) -> Option<SecretString> {
@@ -40,30 +41,106 @@ pub async fn load_prefill(saved: SavedConnection) -> ConnectionPrefill {
         AuthMode::Password => readable(load_password(saved.id).await, &mut unreadable_secrets),
         AuthMode::Kerberos => None,
     };
-    let (ssh_password, ssh_passphrase) = match saved.ssh.as_ref().map(|ssh| (&ssh.auth, ssh.agent)) {
-        Some((SavedSshAuth::Password, false)) => (
-            readable(load_ssh_password(saved.id).await, &mut unreadable_secrets),
-            None,
-        ),
-        Some((
-            SavedSshAuth::PrivateKey {
-                has_passphrase: true, ..
-            },
-            false,
-        )) => (
-            None,
-            readable(load_ssh_passphrase(saved.id).await, &mut unreadable_secrets),
-        ),
-        _ => (None, None),
+    let (ssh_password, ssh_passphrase) = match &saved.ssh {
+        Some(head) => head_secrets(saved.id, head, &mut unreadable_secrets).await,
+        None => (None, None),
     };
+    let jump_hops = load_jump_hops(&saved, &mut unreadable_secrets).await;
     ConnectionPrefill {
         saved,
         password,
         ssh_password,
         ssh_passphrase,
+        jump_hops,
         unreadable_secrets,
         prompt_for_password: false,
     }
+}
+
+async fn head_secrets(
+    id: uuid::Uuid,
+    head: &SavedSshConfig,
+    unreadable: &mut bool,
+) -> (Option<SecretString>, Option<SecretString>) {
+    let hop_level = head.credential_revision > 0;
+    match (&head.auth, head.agent) {
+        (SavedSshAuth::Password, false) if hop_level => (
+            readable(
+                load_ssh_hop_password(id, head.hop_id, head.credential_revision).await,
+                unreadable,
+            ),
+            None,
+        ),
+        (SavedSshAuth::Password, false) => (readable(load_ssh_password(id).await, unreadable), None),
+        (
+            SavedSshAuth::PrivateKey {
+                has_passphrase: true, ..
+            },
+            false,
+        ) if hop_level => (
+            None,
+            readable(
+                load_ssh_hop_passphrase(id, head.hop_id, head.credential_revision).await,
+                unreadable,
+            ),
+        ),
+        (
+            SavedSshAuth::PrivateKey {
+                has_passphrase: true, ..
+            },
+            false,
+        ) => (None, readable(load_ssh_passphrase(id).await, unreadable)),
+        _ => (None, None),
+    }
+}
+
+async fn load_jump_hops(saved: &SavedConnection, unreadable: &mut bool) -> Vec<JumpPrefill> {
+    let Some(head) = &saved.ssh else {
+        return Vec::new();
+    };
+    let mut hops = Vec::new();
+    for hop in head.flatten_hops().into_iter().skip(1) {
+        let stored = |kind| HopSecretRef {
+            hop_id: hop.hop_id,
+            revision: hop.credential_revision,
+            kind,
+        };
+        let present = |result: Result<bool, bookie_app_services::ssh_chain_secrets::HopSecretError>,
+                       flag: &mut bool| {
+            result.unwrap_or_else(|error| {
+                tracing::warn!(%error, "a saved jump host secret could not be checked");
+                *flag = true;
+                false
+            })
+        };
+        let has_password = hop.credential_revision > 0
+            && matches!(hop.auth, SavedSshAuth::Password)
+            && present(
+                hop_secret_is_stored(saved.id, stored(HopSecretKind::Password)).await,
+                unreadable,
+            );
+        let has_passphrase = hop.credential_revision > 0
+            && matches!(
+                hop.auth,
+                SavedSshAuth::PrivateKey {
+                    has_passphrase: true,
+                    ..
+                }
+            )
+            && present(
+                hop_secret_is_stored(saved.id, stored(HopSecretKind::Passphrase)).await,
+                unreadable,
+            );
+        hops.push(JumpPrefill {
+            saved: SavedSshConfig {
+                jump: None,
+                ..hop.clone()
+            },
+            has_password,
+            has_passphrase,
+        });
+    }
+    hops
 }
 
 pub(super) fn environment_row(environment: Environment) -> u32 {
@@ -137,6 +214,7 @@ impl ConnectDialog {
         if let Some(ssh) = &saved.ssh {
             self.ssh
                 .prefill(ssh, prefill.ssh_password.as_ref(), prefill.ssh_passphrase.as_ref());
+            self.ssh.jumps.prefill(ssh, &prefill.jump_hops);
         }
         if prefill.prompt_for_password {
             self.password.grab_focus();
@@ -161,59 +239,13 @@ impl ConnectDialog {
 mod tests {
     use super::*;
     use bookie_core::DriverMaturity;
-    use bookie_storage::{KeyringFailure, SavedSshConfig};
-    use uuid::Uuid;
+    use bookie_storage::KeyringFailure;
 
     fn entry(id: &str) -> DriverEntry {
         DriverEntry {
             id: id.to_string(),
             display_name: id.to_string(),
             maturity: DriverMaturity::Stable,
-        }
-    }
-
-    fn saved_with_ssh(ssh: Option<SavedSshConfig>) -> SavedConnection {
-        SavedConnection {
-            auth_source: None,
-            id: Uuid::new_v4(),
-            name: "db".into(),
-            driver_id: "postgres".into(),
-            host: "h".into(),
-            port: 5432,
-            socket_dir: None,
-            socket_path: None,
-            database: "d".into(),
-            username: "u".into(),
-            use_tls: false,
-            tls_mode: None,
-            tls_root_cert: None,
-            tls_client_cert: None,
-            tls_client_key: None,
-            read_only: false,
-            auth_mode: AuthMode::Password,
-            environment: Environment::Local,
-            ssh,
-            last_opened_at: None,
-            connect_timeout_secs: None,
-            query_timeout_secs: None,
-            attached_databases: Vec::new(),
-            tls_strict_encryption: false,
-        }
-    }
-
-    fn hop(jump: Option<SavedSshConfig>) -> SavedSshConfig {
-        SavedSshConfig {
-            hop_id: uuid::Uuid::new_v4(),
-            credential_revision: 0,
-            host: "bastion".into(),
-            port: 22,
-            username: "me".into(),
-            auth: SavedSshAuth::Password,
-            jump: jump.map(Box::new),
-            client: bookie_storage::SshClient::Builtin,
-            agent: false,
-            agent_identity: None,
-            local_port: None,
         }
     }
 
@@ -243,13 +275,6 @@ mod tests {
         let drivers = [entry("mysql"), entry("postgres"), entry("sqlite")];
         assert_eq!(driver_row(&drivers, "postgres"), Some(1));
         assert_eq!(driver_row(&drivers, "oracle"), None);
-    }
-
-    #[test]
-    fn only_a_connection_with_a_jump_chain_is_refused_for_editing() {
-        assert!(!has_jump_chain(&saved_with_ssh(None)));
-        assert!(!has_jump_chain(&saved_with_ssh(Some(hop(None)))));
-        assert!(has_jump_chain(&saved_with_ssh(Some(hop(Some(hop(None)))))));
     }
 
     #[test]

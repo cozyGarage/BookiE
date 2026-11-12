@@ -19,6 +19,7 @@ mod guard;
 mod input_refusal;
 mod linked_server;
 mod mask;
+mod parsed_sql;
 mod principal;
 mod rules;
 mod script_statements;
@@ -40,7 +41,7 @@ pub use audit::{
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome, AuditTransportClient,
     AuditTransportMetadata, AuditTransportOutcome, NullAuditSink,
 };
-pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite, count_sql_for_mutation};
+pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite};
 pub use classify::{StatementClass, StatementFacts, classify, statement_requires_write_capability};
 pub use config::{EnvPolicy, MaskRule, PolicyConfig, WritePolicy, load_from_path};
 pub use guard::{

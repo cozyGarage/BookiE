@@ -81,6 +81,7 @@ impl LiveSession {
             rows,
             scan,
             truncated,
+            snapshot_consistent: false,
             table: None,
         })
     }
@@ -130,6 +131,7 @@ impl LiveSession {
             rows,
             scan,
             truncated,
+            snapshot_consistent: session.supports_snapshot_cursor(),
             table: Some(table.clone()),
         })
     }
@@ -148,6 +150,7 @@ pub struct LiveTable {
     rows: QueryRows,
     scan: ScanSource,
     pub truncated: bool,
+    snapshot_consistent: bool,
     table: Option<TableInfo>,
 }
 
@@ -199,6 +202,36 @@ async fn read_pages(
     cancellation: &CancellationToken,
 ) -> Result<Pages, String> {
     let table = find_table(&session.tables, table)?;
+    let open_control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
+    let mut cursor = session
+        .open_table_cursor(&table, &open_control)
+        .await
+        .map_err(|failure| format!("{failure:?}"))?;
+    let result = collect_pages(session, &table, max_rows, cancellation, &mut cursor).await;
+    let close_result = if let Some(cursor) = cursor {
+        cursor.close().await.map_err(|failure| format!("{failure:?}"))
+    } else {
+        Ok(())
+    };
+    match result {
+        Ok(pages) => {
+            close_result?;
+            Ok(pages)
+        }
+        Err(error) => {
+            let _ = close_result;
+            Err(error)
+        }
+    }
+}
+
+async fn collect_pages(
+    session: &ReadSession,
+    table: &TableInfo,
+    max_rows: u64,
+    cancellation: &CancellationToken,
+    cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
+) -> Result<Pages, String> {
     let spool = StreamResultSpoolManager::from_environment()
         .create()
         .map_err(|error| error.to_string())?;
@@ -210,10 +243,23 @@ async fn read_pages(
     while (rows.len() as u64) < max_rows {
         let limit = PAGE_ROWS.min(max_rows - rows.len() as u64);
         let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-        let mut page = session
-            .read_page(&table, rows.len() as u64, limit, &control)
-            .await
-            .map_err(|failure| format!("{failure:?}"))?;
+        let (mut page, has_next_page) = match cursor {
+            Some(cursor) => {
+                let page = cursor
+                    .next_page(&control)
+                    .await
+                    .map_err(|failure| format!("{failure:?}"))?;
+                (page.result, page.has_next_page)
+            }
+            None => (
+                session
+                    .read_page(table, rows.len() as u64, limit, &control)
+                    .await
+                    .map_err(|failure| format!("{failure:?}"))?,
+                false,
+            ),
+        };
+        cap_page_rows(&mut page, limit);
         if infos.is_empty() {
             infos.clone_from(&page.columns);
         }
@@ -237,7 +283,7 @@ async fn read_pages(
             truncated = true;
             break;
         }
-        if count < limit {
+        if count == 0 || (cursor.is_some() && !has_next_page) || (cursor.is_none() && count < limit) {
             break;
         }
         truncated = (rows.len() as u64) >= max_rows;
@@ -304,6 +350,15 @@ fn bound_query_result(result: &mut QueryResult, cap: usize, budget: &mut QueryRe
     truncated
 }
 
+fn cap_page_rows(page: &mut QueryResult, cap: u64) -> bool {
+    if page.rows.len() as u64 <= cap {
+        return false;
+    }
+    page.rows.truncate(usize::try_from(cap).unwrap_or(usize::MAX));
+    page.truncated = true;
+    true
+}
+
 fn bound_page(page: &mut QueryResult, budget: &mut QueryResultBudget) -> bool {
     let admitted = page.rows.iter().take_while(|row| budget.admit(row)).count();
     let incomplete = page.truncated || admitted < page.rows.len();
@@ -358,7 +413,14 @@ impl ResultSource for LiveTable {
             .as_ref()
             .map(table_label)
             .unwrap_or_else(|| "query result".into());
-        format!("{} · {} · read-only{cap}", self.session.driver_id, table)
+        let consistency = self.table.as_ref().map_or("", |_| {
+            if self.snapshot_consistent {
+                " · snapshot for this load"
+            } else {
+                " · concurrent changes may shift rows"
+            }
+        });
+        format!("{} · {} · read-only{consistency}{cap}", self.session.driver_id, table)
     }
 
     fn total(&self) -> u64 {
@@ -371,6 +433,10 @@ impl ResultSource for LiveTable {
             .and_then(|index| self.rows.get(index))
             .map(<[Cell]>::to_vec)
             .unwrap_or_default()
+    }
+
+    fn row_ref(&self, index: u64) -> Option<&[Cell]> {
+        usize::try_from(index).ok().and_then(|index| self.rows.get(index))
     }
 
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str> {
@@ -532,6 +598,19 @@ mod tests {
         for (index, row) in second.rows.iter().enumerate() {
             assert_eq!(row[0], bookie_core::Value::Int(index as i64));
         }
+    }
+
+    #[test]
+    fn a_cursor_page_larger_than_the_remaining_row_cap_is_truncated() {
+        let mut page = QueryResult {
+            columns: Vec::new(),
+            rows: QueryRows::from_rows((0..3).map(|id| vec![bookie_core::Value::Int(id)]).collect()),
+            truncated: false,
+        };
+        assert!(cap_page_rows(&mut page, 2));
+        assert!(page.truncated);
+        assert_eq!(page.rows.len(), 2);
+        assert_eq!(page.rows[1][0], bookie_core::Value::Int(1));
     }
 
     #[test]
@@ -712,7 +791,7 @@ mod tests {
         assert!(table.truncated);
         assert_eq!(
             table.origin(),
-            "sqlite · orders · read-only · 4 rows loaded; result may be incomplete"
+            "sqlite · orders · read-only · concurrent changes may shift rows · 4 rows loaded; result may be incomplete"
         );
         let whole = LiveTable::load(
             &fixture(),
@@ -723,7 +802,11 @@ mod tests {
             100,
         )
         .expect("load");
-        assert_eq!(whole.origin(), "sqlite · orders · read-only");
+        assert_eq!(
+            whole.origin(),
+            "sqlite · orders · read-only · concurrent changes may shift rows"
+        );
+        assert!(whole.origin().contains("concurrent changes may shift rows"));
     }
 
     #[test]

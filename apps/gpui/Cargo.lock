@@ -1144,6 +1144,7 @@ dependencies = [
  "chrono",
  "gettext-rs",
  "rust_decimal",
+ "secrecy",
  "serde",
  "serde_json",
  "sqlparser",

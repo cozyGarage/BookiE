@@ -20,6 +20,14 @@ Saved custom CA and client certificate/key paths are assembled through saved con
 
 MongoDB and Redis TLS backends have no CA-only mode, so `VerifyCa` also verifies the hostname. PostgreSQL and MySQL Verify CA and Verify Full use the operating system trust store when no custom authority is named. A named authority is added to those roots. Verify CA checks the certificate chain; Verify Full also checks the service hostname. Typed keyring failure propagates instead of becoming a missing password; see [storage](storage.md#secrets).
 
+## SSH jump hosts
+
+The SSH section of the connection form edits a chain of hosts. The first host uses the rows of the section. **Add jump host** appends further hosts in the order BookiE connects through them; each has its own host, port, user and authentication (password, private key or ssh-agent). The up and down buttons reorder jump hosts, and the trash button removes one. A chain has at most eight hosts, and a host cannot appear twice with the same name and port.
+
+Passwords and key passphrases of jump hosts go to Secret Service, one entry per host and per credential revision, never into `connections.json`. When a saved connection is opened for editing the form shows whether a secret is stored and never its value; leave the field empty to keep it. Typing a new value stores it under the next revision, and the replaced entry is deleted once the connection is saved. If the save fails, the new entries are removed and the old ones stay. Removing a jump host deletes its entries. The first host keeps the older per-connection entries. Each host keeps its identity across edits, so saved trust decisions and secrets stay attached to it.
+
+The system OpenSSH client refuses saved jump hosts, so the form disables the jump host list while that client is selected and refuses a save that keeps jump hosts with it.
+
 ## Built-in SSH trust
 
 The GUI defaults to `UnknownHostKey::Refuse` and installs a prompter. An unknown key requires explicit consent before persistence; decline/cancel must write no key. A changed key is refused. Each hop owns its own trust decision. Agentd is unattended and refuses unknown keys. Built-in known hosts are distinct from OpenSSH's `~/.ssh/known_hosts`; running system `ssh` does not populate the built-in store. Manual scenarios are listed in the [verification checklist](manual-verification-0.2-features.md).

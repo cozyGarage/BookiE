@@ -67,6 +67,10 @@ impl DatabaseDriver for MssqlDriver {
         "mssql"
     }
 
+    fn supports_value_search(&self) -> bool {
+        true
+    }
+
     fn display_name(&self) -> &'static str {
         "SQL Server"
     }

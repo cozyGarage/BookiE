@@ -391,3 +391,16 @@ async fn a_retired_interrupt_handle_does_not_stop_later_statements_on_the_connec
     .unwrap();
     assert_eq!(count, 1_000_000);
 }
+
+#[test]
+fn the_driver_declares_how_an_import_updates_existing_rows() {
+    assert_eq!(
+        SqliteDriver.capabilities().import_upsert,
+        bookie_core::ImportUpsertStyle::OnConflict
+    );
+}
+
+#[test]
+fn the_driver_declares_value_search() {
+    assert!(SqliteDriver.capabilities().supports_value_search);
+}

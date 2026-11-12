@@ -33,7 +33,7 @@ apps/linux/app/src/ui/browse_tab/row_ops.rs 142
 apps/linux/app/src/ui/browse_tab/selection.rs 61
 apps/linux/app/src/ui/browse_tab/tests.rs 2
 apps/linux/app/src/ui/browse_tab/value_parse.rs 19
-apps/linux/app/src/ui/cell_editor.rs 52
+apps/linux/app/src/ui/cell_editor.rs 15
 apps/linux/app/src/ui/connect_dialog/identity.rs 6
 apps/linux/app/src/ui/connect_dialog/mod.rs 16
 apps/linux/app/src/ui/connection_bundle/export.rs 3
@@ -55,7 +55,7 @@ apps/linux/app/src/ui/row_object.rs 9
 apps/linux/app/src/ui/row_store.rs 5
 apps/linux/app/src/ui/sidebar_row.rs 79
 apps/linux/app/src/ui/ssh_section.rs 9
-apps/linux/app/src/ui/structure_tab/columns.rs 82
+apps/linux/app/src/ui/structure_tab/columns.rs 3
 apps/linux/app/src/ui/structure_tab/fks.rs 10
 apps/linux/app/src/ui/structure_tab/indexes.rs 14
 apps/linux/app/src/ui/structure_tab/mod.rs 262
@@ -152,7 +152,7 @@ crates/mcp/src/tokens.rs 2
 crates/mcp/src/tools.rs 1
 crates/policy/src/approval.rs 4
 crates/policy/src/audit.rs 10
-crates/policy/src/blast_radius.rs 12
+crates/policy/src/blast_radius.rs 8
 crates/policy/src/catalog_effect.rs 1
 crates/policy/src/classify.rs 15
 crates/policy/src/config.rs 13
