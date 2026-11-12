@@ -142,7 +142,14 @@ def x11_click(window_x, window_y, button=3, clicks=1, interval=0.08):
         if children:
             x11.XFree(children)
         assert origin is not None, "the application window was not found on the X display"
-        xtst.XTestFakeMotionEvent(display, -1, origin[0] + int(window_x), origin[1] + int(window_y) + ATSPI_WINDOW_Y_OFFSET, 0)
+        scale = int(os.environ.get("GDK_SCALE", "1"))
+        xtst.XTestFakeMotionEvent(
+            display,
+            -1,
+            origin[0] + int(window_x) * scale,
+            origin[1] + (int(window_y) + ATSPI_WINDOW_Y_OFFSET) * scale,
+            0,
+        )
         x11.XFlush(display)
         time.sleep(0.2)
         for _ in range(clicks):
