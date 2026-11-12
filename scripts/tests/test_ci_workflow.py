@@ -391,6 +391,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn('git merge-base HEAD origin/main', unit)
         self.assertIn("github.event.before", unit)
         self.assertIn('"$BOOKIE_CI_EVENT_NAME" != "push"', unit)
+        direct_bundle = 'prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct'
+        self.assertIn(direct_bundle, unit)
+        self.assertLess(unit.index(direct_bundle), unit.index("Focused Data-lane change contracts"))
 
     def test_forgejo_runs_gpui_model_and_interaction_tests(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
