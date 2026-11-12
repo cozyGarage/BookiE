@@ -329,6 +329,11 @@ class LayerRunnerTests(unittest.TestCase):
         self.assertIsNotNone(integration)
         job_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", integration.group(1))
         self.assertIsNotNone(job_timeout)
+        forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
+        driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n)", forgejo)
+        forgejo_timeout = re.search(r"(?m)^    timeout-minutes:\s+(\d+)$", driver.group(1))
+        self.assertIsNotNone(forgejo_timeout)
+        self.assertEqual(job_timeout.group(1), forgejo_timeout.group(1))
         layer_timeout = runner.catalog()["drivers"]["steps"][0]["timeout_seconds"]
         self.assertGreaterEqual(int(job_timeout.group(1)) * 60, layer_timeout + 300)
 

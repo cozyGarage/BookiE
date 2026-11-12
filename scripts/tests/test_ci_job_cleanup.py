@@ -232,7 +232,7 @@ class CiJobCleanupTests(unittest.TestCase):
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
         job = runner_jobs(WORKFLOWS[0])["driver"]
-        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", job)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
         self.assertNotIn(".tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
@@ -398,26 +398,27 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             rm.chmod(0o755)
-            scratch = "/var/cache/ci/tmp/bookie-driver-123-2-core"
-            result = subprocess.run(
-                ["bash", str(CLEANUP)],
-                env={
-                    **os.environ,
-                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
-                    "GITHUB_RUN_ID": "123",
-                    "GITHUB_JOB": "driver",
-                    "TMPDIR": scratch,
-                    "RM_CALLS": str(calls),
-                },
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
-            self.assertIn(["-rf", "--", scratch], rm_calls)
-
-            calls.unlink()
+            for group in ("core", "driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
+                with self.subTest(group=group):
+                    scratch = f"/var/cache/ci/tmp/bookie-driver-123-2-{group}"
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_RUN_ID": "123",
+                            "GITHUB_JOB": "driver",
+                            "TMPDIR": scratch,
+                            "RM_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+                    self.assertIn(["-rf", "--", scratch], rm_calls)
+                    calls.unlink(missing_ok=True)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 env={
