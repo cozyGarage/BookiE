@@ -146,6 +146,14 @@ impl McpBridge {
         self.rate_limiter.check(&token.id.to_string())
     }
 
+    pub fn ensure_tool_allowed(&self, token: &McpToken, tool: &str) -> Result<(), String> {
+        if token.allows_tool(tool) {
+            Ok(())
+        } else {
+            Err("token is not allowed to call this tool".into())
+        }
+    }
+
     pub fn ensure_connection_allowed(&self, token: &McpToken, connection_id: Uuid) -> Result<(), String> {
         if token.connection_allowlist.is_empty() {
             return Err("token has an empty connection allowlist".into());
@@ -199,7 +207,7 @@ impl McpBridge {
         Ok(control)
     }
 
-    async fn with_connection_controlled<F, T>(
+    pub(crate) async fn with_connection_controlled<F, T>(
         &self,
         token: &McpToken,
         connection_id: Uuid,
@@ -666,7 +674,7 @@ async fn touches_nontransactional_table(
     }
 }
 
-fn validated_identifier(name: &str) -> Result<String, String> {
+pub(crate) fn validated_identifier(name: &str) -> Result<String, String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
         return Err("identifier must not be empty".into());

@@ -142,7 +142,7 @@ Database snapshots are not available. [ADR 0015](decisions/0015-database-snapsho
 
 ## AI agents (MCP)
 
-BookiE can let an AI assistant use your saved connections through the Model Context Protocol. Open **Preferences → MCP** to create a token, choose which connections it may use and which tools it may call.
+BookiE can let an AI assistant use your saved connections through the Model Context Protocol. Open **Preferences → MCP** to create a token and choose whether it is read-only or can also write. A token created there covers the connections that exist at that moment and may call every tool its scope allows. `bookie-agentd --issue-token` can narrow a token to chosen connections with `--connection` and to chosen tools with `--tool`; a token with a tool list is refused every other tool, and the tool list shows it only those.
 
 ```mermaid
 flowchart LR
@@ -178,7 +178,9 @@ MCP data responses use the versioned `bookie-tagged-v1` format. Check `value_for
 
 Keep the digits as text or parse them with a lossless integer type. Parsed JSON uses nested tags, including `json_number` values whose digits stay strings. `json_text` contains the original JSON text; keep it as text when duplicate keys, whitespace or number spelling matter. Clients that expect primitive JSON cells must update their decoder. CSV exports keep their existing format.
 
-The tool list carries read-only and destructive hints for MCP clients. Only the table and metadata tools are marked read-only. Tools that run SQL are marked as able to change data, even when they preview first. The hints are advisory: they never grant a permission and the safety checks still decide every call.
+Two read-only tools help an agent plan without guessing definitions. `routine_source` returns the definition text of one function or procedure on PostgreSQL or SQL Server, given its schema and name. For an overloaded PostgreSQL function it answers with the candidate signatures, and you repeat the call with `arguments` set to the identity arguments that `list_objects` shows inside the routine detail. A routine the connection's database role cannot execute (PostgreSQL) or view (SQL Server) is reported as not found, the same as one that does not exist. Aggregates have no definition text. Definitions are cut at 64 KiB and flagged `truncated`. `schema_context` returns a compact snapshot of the tables, columns and primary-key columns the token can reach, optionally for one schema. It stops at 200 tables, 100 columns per table, 5,000 columns or 64 KiB, and `truncated` and `limit` say which cap applied. Both tools need a token that may use the connection, and both are audited as metadata reads; the audit journal keeps the routine's name but never its definition text.
+
+The tool list carries read-only and destructive hints for MCP clients. Only the table, metadata, routine and schema-context tools are marked read-only. Tools that run SQL are marked as able to change data, even when they preview first. The hints are advisory: they never grant a permission and the safety checks still decide every call.
 
 ## Keyboard shortcuts
 

@@ -280,3 +280,89 @@ fn subprocess_mutates_token_store() {
     store.revoke(token_id).unwrap();
     std::fs::write(revoke_complete, b"revoked").unwrap();
 }
+
+#[test]
+fn a_token_file_written_before_tool_allowlists_still_loads_and_allows_every_tool() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("tokens.json");
+    let connection = Uuid::new_v4();
+    let legacy = format!(
+        r#"[{{"id":"{}","name":"old","token_hash":"{}","permissions":"read_only","connection_allowlist":["{connection}"],"created_at":"2026-01-01T00:00:00Z"}}]"#,
+        Uuid::new_v4(),
+        hash_token("secret"),
+    );
+    std::fs::write(&path, legacy).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+
+    let token = TokenStore::open(path).unwrap().authenticate("secret").unwrap();
+
+    assert_eq!(token.tool_allowlist, None);
+    assert!(crate::tools::TOOL_NAMES.iter().all(|tool| token.allows_tool(tool)));
+}
+
+#[test]
+fn a_tool_allowlist_limits_the_token_and_survives_a_reload() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("tokens.json");
+    let store = TokenStore::open(path.clone()).unwrap();
+    let (issued, plaintext) = store
+        .issue_with_tools(
+            "narrow".into(),
+            TokenPermissions::ReadOnly,
+            vec![Uuid::new_v4()],
+            Some(vec![
+                "routine_source".into(),
+                "routine_source".into(),
+                "list_tables".into(),
+            ]),
+            None,
+        )
+        .unwrap();
+
+    assert_eq!(
+        issued.tool_allowlist.as_deref(),
+        Some(&["routine_source".to_string(), "list_tables".to_string()][..])
+    );
+    let reloaded = TokenStore::open(path).unwrap().authenticate(&plaintext).unwrap();
+    assert!(reloaded.allows_tool("routine_source"));
+    assert!(reloaded.allows_tool("list_tables"));
+    assert!(!reloaded.allows_tool("execute_query"));
+    assert!(!reloaded.allows_tool("schema_context"));
+}
+
+#[test]
+fn an_empty_or_unknown_tool_allowlist_is_refused_at_issue() {
+    let dir = TempDir::new().unwrap();
+    let store = TokenStore::open(dir.path().join("tokens.json")).unwrap();
+    for tools in [vec![], vec!["drop_everything".to_string()]] {
+        let error = store
+            .issue_with_tools(
+                "bad".into(),
+                TokenPermissions::ReadOnly,
+                vec![Uuid::new_v4()],
+                Some(tools),
+                None,
+            )
+            .unwrap_err();
+        assert!(error.contains("tool"), "{error}");
+    }
+    assert!(store.list().is_empty());
+}
+
+#[test]
+fn a_stored_empty_tool_allowlist_denies_every_tool() {
+    let mut token = McpToken {
+        id: Uuid::new_v4(),
+        name: "none".into(),
+        token_hash: String::new(),
+        permissions: TokenPermissions::ReadOnly,
+        connection_allowlist: Vec::new(),
+        tool_allowlist: Some(Vec::new()),
+        created_at: Utc::now(),
+        expires_at: None,
+        revoked: false,
+    };
+    assert!(!token.allows_tool("list_tables"));
+    token.tool_allowlist = None;
+    assert!(token.allows_tool("list_tables"));
+}

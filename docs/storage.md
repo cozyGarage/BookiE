@@ -51,7 +51,7 @@ graph TD
 | Query history | SQLite with FTS5 | `$XDG_CONFIG_HOME/bookie/history.db` |
 | Policy | TOML | `$XDG_CONFIG_HOME/bookie/policy.toml` |
 | Audit journal | Hash-chained JSONL | `$XDG_DATA_HOME/bookie/audit.jsonl` |
-| MCP token registry (token hashes only) | JSON | `$XDG_CONFIG_HOME/bookie/mcp-tokens.json` |
+| MCP token registry (token hashes, scope, connection allowlist and optional tool allowlist; no secrets) | JSON | `$XDG_CONFIG_HOME/bookie/mcp-tokens.json` |
 | Built-in SSH known hosts | OpenSSH `known_hosts` format | `$XDG_CONFIG_HOME/bookie/known_hosts` |
 | Database passwords, SSH passwords, SSH key passphrases | Secret Service through `oo7` | Desktop keyring |
 | GUI-issued MCP token plaintext | Returned once; storage is attempted through Secret Service | Desktop keyring, when the save succeeds |

@@ -134,7 +134,7 @@ Back Up Database and Restore from Backup in the app menu use the installed `pg_d
 
 ## AI agents (MCP)
 
-BookiE can let an AI assistant use saved connections through the Model Context Protocol. A token is created in Preferences, and limits which connections and which tools it may use. Every MCP request goes through the same policy guard as the desktop app. The headless `bookie-agentd` process serves MCP without a window. Data responses use a tagged value format that keeps wide integers exact ([user guide](user-guide.md#ai-agents-mcp)).
+BookiE can let an AI assistant use saved connections through the Model Context Protocol. A token is created in Preferences. It is read-only or read and write, and it covers the connections that exist when it is created. `bookie-agentd` can also limit a token to chosen connections and, with `--tool`, to chosen tools; a token without a tool list may call every tool its scope allows. Besides listing and describing objects, agents can read a routine definition (`routine_source`) and a bounded schema snapshot (`schema_context`). Every MCP request goes through the same policy guard as the desktop app. The headless `bookie-agentd` process serves MCP without a window. Data responses use a tagged value format that keeps wide integers exact ([user guide](user-guide.md#ai-agents-mcp)).
 
 ## What BookiE does not include
 

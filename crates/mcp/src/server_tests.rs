@@ -595,6 +595,49 @@ fn tools_list_succeeds_with_a_valid_token() {
 }
 
 #[test]
+fn tools_list_omits_the_tools_a_token_allowlist_excludes() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Arc::new(crate::tokens::TokenStore::open(dir.path().join("tokens.json")).unwrap());
+    let (_metadata, plaintext) = store
+        .issue_with_tools(
+            "narrow".into(),
+            crate::TokenPermissions::ReadOnly,
+            vec![],
+            Some(vec!["routine_source".into(), "list_tables".into()]),
+            None,
+        )
+        .unwrap();
+    let bridge = McpBridge::new(Arc::new(NoProvider), store);
+
+    let result = handle_tools_list(&bridge, &json!({"token": plaintext})).unwrap();
+
+    let names: Vec<&str> = result["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect();
+    assert_eq!(names, ["list_tables", "routine_source"]);
+}
+
+#[test]
+fn the_discovery_tools_are_advertised_as_read_only_with_object_schemas() {
+    let (_dir, bridge, token) = bridge_with_token();
+    let result = handle_tools_list(&bridge, &json!({"token": token})).unwrap();
+    for name in ["routine_source", "schema_context"] {
+        let tool = result["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .unwrap();
+        assert_eq!(tool["annotations"]["readOnlyHint"], true, "{name}");
+        assert_eq!(tool["inputSchema"]["type"], "object", "{name}");
+        assert!(!tool["description"].as_str().unwrap().is_empty(), "{name}");
+    }
+}
+
+#[test]
 fn tools_list_declares_conservative_safety_annotations() {
     let (_dir, bridge, token) = bridge_with_token();
     let result = handle_tools_list(&bridge, &json!({"token": token})).unwrap();

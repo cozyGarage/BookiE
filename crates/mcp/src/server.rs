@@ -383,9 +383,9 @@ mod structured_error_tests {
 /// reach the loopback listener.
 fn handle_tools_list(bridge: &McpBridge, params: &JsonValue) -> Result<JsonValue, String> {
     let token_str = extract_token_str(params).ok_or("missing token (pass params.token)")?;
-    bridge.authenticate(token_str)?;
+    let token = bridge.authenticate(token_str)?;
     Ok(json!({
-        "tools": TOOL_NAMES.iter().map(|name| json!({
+        "tools": TOOL_NAMES.iter().filter(|name| token.allows_tool(name)).map(|name| json!({
             "name": name,
             "description": tool_description(name),
             "inputSchema": tool_schema(name),
@@ -431,6 +431,12 @@ pub(crate) fn tool_description(name: &str) -> &'static str {
         "browse_table" => {
             "Read a page of table rows by offset and limit. Pass large offset or limit values as decimal strings. Results include value_format=bookie-tagged-v1; each cell is tagged and numeric digits remain exact strings"
         }
+        "routine_source" => {
+            "Read the definition text of one routine (function or procedure) by schema and name. When a function is overloaded, pass arguments as the identity-argument signature that list_objects shows in the routine detail. A routine the token's database role cannot execute is reported as not found. The definition is capped; truncated says when it was cut"
+        }
+        "schema_context" => {
+            "Read a compact snapshot of the tables, columns and primary-key columns this token can reach, optionally for one schema. The snapshot is bounded by table, column and byte caps; truncated and limit say when a cap applied"
+        }
         _ => "",
     }
 }
@@ -443,6 +449,8 @@ const READ_ONLY_TOOLS: &[&str] = &[
     "table_schema",
     "count_rows",
     "browse_table",
+    "routine_source",
+    "schema_context",
 ];
 
 pub(crate) fn tool_annotations(name: &str) -> JsonValue {
@@ -502,6 +510,7 @@ pub(crate) fn tool_schema(name: &str) -> JsonValue {
             },
             "required": ["connection_id", "table"]
         }),
+        "routine_source" | "schema_context" => crate::discovery::tool_schema(name),
         _ => json!({"type": "object"}),
     }
 }

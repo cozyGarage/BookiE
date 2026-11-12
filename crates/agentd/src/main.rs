@@ -34,6 +34,9 @@ struct Args {
     #[arg(long, requires = "issue_token")]
     connection: Vec<Uuid>,
 
+    #[arg(long = "tool", requires = "issue_token")]
+    tools: Vec<String>,
+
     /// Scope for --issue-token. Defaults to the least privilege that is useful.
     #[arg(long, requires = "issue_token", default_value = "read-only")]
     permissions: TokenScope,
@@ -334,6 +337,32 @@ async fn daemon_provider(
     }
 }
 
+async fn issue_token_command(name: String, args: Args, tokens: &TokenStore) -> Result<(), Box<dyn std::error::Error>> {
+    let saved = load_connections().await?;
+    validate_token_connections(&args.connection, &saved)?;
+    let expires_at = match args.expires_days {
+        Some(days) => Some(
+            chrono::Utc::now()
+                .checked_add_signed(chrono::TimeDelta::days(i64::from(days)))
+                .ok_or("--expires-days is too large")?,
+        ),
+        None => None,
+    };
+    let tool_allowlist = (!args.tools.is_empty()).then_some(args.tools);
+    let (_meta, plain) = tokens.issue_with_tools(
+        name,
+        args.permissions.into(),
+        args.connection,
+        tool_allowlist,
+        expires_at,
+    )?;
+    match args.token_file {
+        Some(path) => write_token_file(&path, &plain)?,
+        None => emit_token(&plain)?,
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     bookie_transport::install_crypto_provider();
@@ -347,7 +376,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tracing::error!(%error, "legacy tablepro state could not be copied; it was left untouched");
     }
 
-    let args = Args::parse();
+    let mut args = Args::parse();
     if !args.policy.exists() {
         tracing::error!(path = %args.policy.display(), "policy file not found");
         std::process::exit(2);
@@ -355,23 +384,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let policy = Arc::new(load_from_path(&args.policy).map_err(|e| e.to_string())?);
 
     let tokens = Arc::new(TokenStore::open_default().map_err(|e| e.to_string())?);
-    if let Some(name) = args.issue_token {
-        let saved = load_connections().await?;
-        validate_token_connections(&args.connection, &saved)?;
-        let expires_at = match args.expires_days {
-            Some(days) => Some(
-                chrono::Utc::now()
-                    .checked_add_signed(chrono::TimeDelta::days(i64::from(days)))
-                    .ok_or("--expires-days is too large")?,
-            ),
-            None => None,
-        };
-        let (_meta, plain) = tokens.issue(name, args.permissions.into(), args.connection, expires_at)?;
-        match args.token_file {
-            Some(path) => write_token_file(&path, &plain)?,
-            None => emit_token(&plain)?,
-        }
-        return Ok(());
+    if let Some(name) = args.issue_token.take() {
+        return issue_token_command(name, args, &tokens).await;
     }
 
     let approval: Arc<dyn bookie_policy::ApprovalSink> = match args.approval {
