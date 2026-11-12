@@ -5,7 +5,7 @@ pub(crate) use close_edits::finish_active_edits;
 mod column;
 mod column_select;
 pub use column_select::ColumnSelectionHandle;
-pub(crate) use column_select::{project_rows, refresh as refresh_column_selection};
+pub(crate) use column_select::{project_rows, refresh as refresh_column_selection, selection_chrome};
 mod column_jump;
 mod column_order;
 mod column_visibility;
@@ -39,7 +39,7 @@ mod value_viewer;
 #[cfg(test)]
 mod wide_scroll_tests;
 pub(crate) use column_order::displayed_column_order;
-pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_null};
+pub(crate) use presentation::{cell_allows_inline_edit, cell_allows_set_cells, cell_allows_set_null};
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -123,6 +123,12 @@ pub enum GridMsg {
     },
     ColumnSelectionChanged,
     SetCells(SetCellsRequest),
+    SetCellsConfirmed {
+        request: SetCellsRequest,
+        value: bookie_app_services::set_cells::SetCellsValue,
+        generation: u64,
+        run: u64,
+    },
     CopyToClipboard(String),
     FetchCellValue {
         col_index: usize,
@@ -205,6 +211,7 @@ pub struct TabGridContext {
     pub row_number_base: u64,
     pub column_selection: ColumnSelectionHandle,
     pub set_cells_enabled: bool,
+    pub column_selection_chrome: Option<gtk4::Box>,
 }
 
 pub type AmbiguousKeys =
@@ -387,6 +394,10 @@ pub fn build_column_view(
             .map(|(id, store)| (id, table.to_string(), store)),
     );
     header_alignment::install(&column_view, &display_columns);
+    let driver_id = connection_id
+        .and_then(|id| database.metadata(id))
+        .map(|metadata| metadata.driver_id)
+        .unwrap_or_default();
     column_jump::install(
         &column_view,
         &grid_actions,
@@ -429,6 +440,11 @@ pub fn build_column_view(
         &tab_ctx.column_selection,
         menu_sender.clone(),
         tab_ctx.set_cells_enabled,
+        column_select::CopySource {
+            columns: schema_columns,
+            driver_id: &driver_id,
+        },
+        tab_ctx.column_selection_chrome.as_ref(),
     );
     column_view.insert_action_group("grid", Some(&grid_actions));
     row_number_column::fit(&column_view, tab_ctx.row_number_base);
