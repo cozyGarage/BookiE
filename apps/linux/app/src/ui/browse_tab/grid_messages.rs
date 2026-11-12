@@ -31,6 +31,7 @@ fn view_input(msg: GridMsg) -> BrowseTabInput {
         GridMsg::CellEdited { .. }
         | GridMsg::CellEditedValue { .. }
         | GridMsg::ReplaceBatch { .. }
+        | GridMsg::SetCellsConfirmed { .. }
         | GridMsg::FetchCellValue { .. }
         | GridMsg::SetCellNull { .. }
         | GridMsg::DeleteRowAt { .. }

@@ -14,6 +14,8 @@ fn should_block_mutation_during_save(message: &GridMsg, save_in_flight: bool) ->
             message,
             GridMsg::CellEdited { .. }
                 | GridMsg::CellEditedValue { .. }
+                | GridMsg::SetCells(_)
+                | GridMsg::SetCellsConfirmed { .. }
                 | GridMsg::SetCellNull { .. }
                 | GridMsg::DeleteRowAt { .. }
                 | GridMsg::InsertRow
@@ -51,15 +53,16 @@ impl SqlEditor {
 
     fn dispatch_editable_grid_message(&mut self, message: GridMsg, sender: &ComponentSender<Self>) -> Option<GridMsg> {
         match message {
+            GridMsg::SetCells(_) | GridMsg::SetCellsConfirmed { .. } => {
+                self.dispatch_set_cells(message, sender.clone());
+                None
+            }
             GridMsg::CellEdited {
                 row_position,
                 col_index,
                 new_value,
                 row_key,
-            } => {
-                self.handle_result_cell_edited(row_position, col_index, new_value, row_key, sender);
-                None
-            }
+            } => self.dispatch_cell_edited(row_position, col_index, new_value, row_key, sender),
             GridMsg::CellEditedValue {
                 row_position,
                 col_index,
@@ -108,6 +111,18 @@ impl SqlEditor {
             }
             other => Some(other),
         }
+    }
+
+    fn dispatch_cell_edited(
+        &mut self,
+        row_position: u32,
+        col_index: usize,
+        new_value: String,
+        row_key: Vec<Value>,
+        sender: &ComponentSender<Self>,
+    ) -> Option<GridMsg> {
+        self.handle_result_cell_edited(row_position, col_index, new_value, row_key, sender);
+        None
     }
 
     fn handle_result_replace_batch(

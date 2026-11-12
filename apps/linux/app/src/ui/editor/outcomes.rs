@@ -886,6 +886,8 @@ pub(super) fn build_result_set_widget(
     let changed_cells = settings_store.changed_cells(settings_key);
     let local_result_view =
         super::super::grid::local_filter::LocalResultView::new(result.clone(), settings_store, settings_key);
+    let column_selection = Default::default();
+    let column_selection_chrome = super::super::grid::selection_chrome();
     let (column_view, _selection) = build_column_view(
         result,
         &result.columns,
@@ -905,6 +907,8 @@ pub(super) fn build_result_set_widget(
                 whole_result_filter,
                 changed_cells,
                 sortable_result_columns: crate::ui::grid::sortable_result_columns(result),
+                column_selection,
+                column_selection_chrome: Some(column_selection_chrome.clone()),
                 ..Default::default()
             },
             column_widths: None,
@@ -915,6 +919,7 @@ pub(super) fn build_result_set_widget(
     local_result_view.bind_column_view(&column_view);
     let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
     holder.append(&local_result_view.controls());
+    holder.append(&column_selection_chrome);
     holder.append(&crate::ui::grid::wrap_grid_scrolled(&column_view));
     holder.upcast()
 }

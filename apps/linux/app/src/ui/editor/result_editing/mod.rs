@@ -1,5 +1,6 @@
 mod explanation;
 mod mutations;
+mod set_cells;
 
 use std::sync::Arc;
 
@@ -51,6 +52,7 @@ pub(super) struct ResultEditing {
     pending: PendingBar,
     selection: Option<gtk::MultiSelection>,
     column_view: Option<gtk::ColumnView>,
+    column_selection: crate::ui::grid::ColumnSelectionHandle,
     save_in_flight: Option<Uuid>,
     rereading: bool,
     quiet_run: bool,
@@ -93,6 +95,7 @@ impl ResultEditing {
             pending,
             selection: None,
             column_view: None,
+            column_selection: Default::default(),
             save_in_flight: None,
             rereading: false,
             quiet_run: false,
@@ -186,6 +189,7 @@ impl SqlEditor {
         editing.sql.clear();
         editing.selection = None;
         editing.column_view = None;
+        editing.column_selection.borrow_mut().clear();
         editing.save_in_flight = None;
         editing
             .change_trackers
@@ -234,6 +238,7 @@ impl SqlEditor {
         editing.table = None;
         editing.selection = None;
         editing.column_view = None;
+        editing.column_selection.borrow_mut().clear();
         editing.identity = outcomes.first().map(|outcome| outcome.identity).unwrap_or_default();
         editing
             .change_trackers
@@ -438,6 +443,7 @@ impl SqlEditor {
             self.result_view_settings.clone(),
             settings_key,
         );
+        let column_selection_chrome = crate::ui::grid::selection_chrome();
         let (column_view, selection) = build_column_view(
             result,
             &editing.columns,
@@ -461,6 +467,9 @@ impl SqlEditor {
                     changed_cells: self.result_view_settings.changed_cells(settings_key),
                     sortable_result_columns: crate::ui::grid::sortable_result_columns(result),
                     row_mutations_allowed: true,
+                    column_selection: editing.column_selection.clone(),
+                    set_cells_enabled: true,
+                    column_selection_chrome: Some(column_selection_chrome.clone()),
                     ..Default::default()
                 },
                 column_widths: None,
@@ -471,6 +480,7 @@ impl SqlEditor {
         local_result_view.bind_column_view(&column_view);
         let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
         holder.append(&local_result_view.controls());
+        holder.append(&column_selection_chrome);
         holder.append(&crate::ui::grid::wrap_grid_scrolled(&column_view));
         (column_view, selection, holder)
     }
