@@ -131,11 +131,13 @@ async fn seed_catalog(admin: &dyn Connection) {
         "CREATE SCHEMA bookie_hidden",
         "CREATE TABLE bookie_visible.allowed (id integer PRIMARY KEY)",
         "CREATE TABLE bookie_visible.denied (id integer)",
+        "CREATE TABLE bookie_visible.partial (id integer, private_value text)",
         "CREATE TABLE bookie_hidden.secret (id integer PRIMARY KEY)",
         "CREATE FUNCTION bookie_visible.open_fn() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
         "CREATE FUNCTION bookie_hidden.secret_fn() RETURNS integer LANGUAGE sql AS 'SELECT 1'",
         "GRANT USAGE ON SCHEMA bookie_visible TO bookie_restricted",
         "GRANT SELECT ON bookie_visible.allowed TO bookie_restricted",
+        "GRANT SELECT (id) ON bookie_visible.partial TO bookie_restricted",
         "GRANT EXECUTE ON FUNCTION bookie_visible.open_fn() TO bookie_restricted",
     ] {
         admin.execute(sql).await.expect("seed role-scoped catalog");
@@ -164,8 +166,22 @@ async fn assert_restricted_catalog(bridge: &McpBridge, token: &bookie_mcp::McpTo
         .collect();
     assert_eq!(
         visible_tables,
-        vec![json!({"schema":"bookie_visible","name":"allowed"})]
+        vec![
+            json!({"schema":"bookie_visible","name":"allowed"}),
+            json!({"schema":"bookie_visible","name":"partial"}),
+        ]
     );
+
+    let partial_columns = dispatch(
+        bridge,
+        token,
+        "describe_table",
+        json!({"connection_id": connection_id.to_string(), "schema": "bookie_visible", "table": "partial"}),
+    )
+    .await
+    .expect("describe table with partial column access");
+    assert_eq!(partial_columns.as_array().map(Vec::len), Some(1));
+    assert_eq!(partial_columns[0]["name"], "id");
 
     let routines = dispatch(
         bridge,
