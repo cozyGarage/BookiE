@@ -1,32 +1,3 @@
-//! Inline filter strip — server-side WHERE clause editor that slides
-//! in above the Browse-tab grid. Reachable via the Filter button on
-//! the paginator action bar or the Ctrl+F shortcut.
-//!
-//! Why inline (vs. a modal dialog)? The user is filtering data they
-//! can see; obscuring the grid with a dialog adds a round-trip every
-//! time they want to tune a rule. The strip stays open while the user
-//! edits, applies on demand, collapses with Esc / Close. Matches
-//! GtkSearchBar's slide-in pattern (the native GNOME idiom for
-//! "transient editor above content") rather than the heavier
-//! AdwDialog "form-with-validate-then-apply" flow.
-//!
-//! UI shape (single-level combinator, no nested groups):
-//!
-//! ```text
-//! ┌────────────────────────────────────────────────────────────┐
-//! │ WHERE [ raw SQL … ] [Saved filters ▾] Clear all │ Apply │ ✕ │
-//! │ ▸ Or use the rule editor   <— GtkExpander                  │
-//! │    Match [ all ▾ ] of these rules   <— two or more clauses │
-//! │    [Column ▾] [Op ▾] [Value …]                       [✕]   │
-//! │    [+ Add rule]                                            │
-//! └────────────────────────────────────────────────────────────┘
-//! ```
-//!
-//! Rule rebuilds: every column / operator / value mutation rebuilds
-//! the entire list from `state.rules`. Heavy-handed but predictable —
-//! the strip is small (typical filter <5 rules) and the cost is
-//! invisible vs. the round-trip query the user is about to fire.
-
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -37,9 +8,6 @@ use bookie_core::{
     ColumnInfo, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, FilterValueKind, filter_value_kind,
 };
 
-/// Closure that rebuilds the rule list. Stored in an Rc<RefCell<>> so
-/// every input handler can call it through one slot, avoiding the
-/// type-complexity hit clippy raises on the raw signature.
 type Rebuilder = Rc<dyn Fn()>;
 type RebuilderSlot = Rc<RefCell<Option<Rebuilder>>>;
 
@@ -47,12 +15,9 @@ fn extra_is_blank(extra: Option<&str>) -> bool {
     extra.map(|s| s.trim().is_empty()).unwrap_or(true)
 }
 
-/// Operator rendered in the Op dropdown — label, FilterOp, and
-/// whether the rule needs a value.
 struct OpEntry {
     op: FilterOp,
     label: &'static str,
-    /// Shape of the value widget: None / Single / Pair / List.
     shape: ValueShape,
 }
 
@@ -251,17 +216,12 @@ const OPS_UUID: [OpEntry; 4] = [
     },
 ];
 
-/// Bytes columns are filtered out of the column dropdown entirely —
-/// no point letting the user pick one when nothing they could type
-/// would compare meaningfully.
+// Byte values have no meaningful text comparison in this editor.
 fn is_filterable(col: &ColumnInfo) -> bool {
     let lower = col.data_type.to_ascii_lowercase();
     !(lower.contains("bytea") || lower.contains("blob"))
 }
 
-/// The inline filter editor. BrowseTab owns one of these per tab,
-/// adds `widget` as a top bar on its `AdwToolbarView`, and toggles
-/// reveal via the Filter button / Ctrl+F / Esc.
 pub struct FilterStrip {
     pub widget: gtk::Revealer,
     state: Rc<RefCell<FilterSet>>,
@@ -284,17 +244,11 @@ impl FilterStrip {
         let opening = !self.is_revealed();
         self.set_revealed(opening);
         if opening {
-            // Drop the cursor in the raw SQL field so the user can
-            // start typing immediately. Raw is the primary path; the
-            // rule editor is one expander click away for the click-
-            // driven case.
+            // Focus the primary SQL field when the strip opens.
             self.raw_entry.grab_focus();
         }
     }
 
-    /// Refresh column metadata after a `ColumnsLoaded`. Drops any
-    /// existing operator dropdowns whose column type changed and
-    /// rebuilds the rule list against the new schema.
     pub fn update_columns(&self, columns: Vec<ColumnInfo>) {
         *self.columns.borrow_mut() = columns.into_iter().filter(is_filterable).collect();
         if let Some(f) = self.rebuild.borrow().as_ref() {
@@ -302,17 +256,10 @@ impl FilterStrip {
         }
     }
 
-    /// Replace the strip's editing state with `set` and rebuild the
-    /// rule list. Called when a filter applies from outside the
-    /// strip (e.g. saved-filter restore on tab open) so the editor
-    /// reflects what's actually in effect.
     pub fn update_filter(&self, set: FilterSet) {
         let extra = set.extra_sql.clone().unwrap_or_default();
         self.rules_expander.set_expanded(!set.rules.is_empty());
         *self.state.borrow_mut() = set;
-        // Raw entry mirrors state too — without this the entry's
-        // text still shows the previous raw fragment after a
-        // FilterApplied that cleared it.
         self.raw_entry.set_text(&extra);
         if let Some(f) = self.rebuild.borrow().as_ref() {
             f();
@@ -324,7 +271,7 @@ impl FilterStrip {
 struct StripState {
     filters: Rc<RefCell<FilterSet>>,
     columns: Rc<RefCell<Vec<ColumnInfo>>>,
-    // GTK emits `changed` and `selected` again when a rebuild sets widget values, so handlers return early while this is set.
+    // GTK re-emits input signals during rebuilds; handlers ignore them while this is set.
     suppress: Rc<Cell<bool>>,
     rebuild: RebuilderSlot,
 }
