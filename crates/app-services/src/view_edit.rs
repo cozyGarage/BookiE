@@ -62,8 +62,15 @@ pub async fn resolve_view_columns(
     schema: Option<&str>,
     table: &str,
     columns: Vec<ColumnInfo>,
+    check: bool,
     control: &OperationControl,
 ) -> ViewEditPlan {
+    if !check {
+        return ViewEditPlan {
+            columns,
+            restriction: None,
+        };
+    }
     match connection
         .fetch_view_editability_controlled(schema, table, control)
         .await

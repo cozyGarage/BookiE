@@ -209,7 +209,15 @@ async fn assert_denied_save(fixture: &Fixture) {
 async fn assert_resolved_columns(fixture: &Fixture) {
     let control = OperationControl::new(CancellationToken::new(), None);
     let columns = fixture.admin.fetch_columns(Some("public"), "v_alias").await.unwrap();
-    let plan = resolve_view_columns(fixture.admin.as_ref(), Some("public"), "v_alias", columns, &control).await;
+    let plan = resolve_view_columns(
+        fixture.admin.as_ref(),
+        Some("public"),
+        "v_alias",
+        columns,
+        true,
+        &control,
+    )
+    .await;
     assert_eq!(plan.restriction, None);
     let keyed: Vec<&str> = plan
         .columns
@@ -219,7 +227,15 @@ async fn assert_resolved_columns(fixture: &Fixture) {
         .collect();
     assert_eq!(keyed, ["item_id"]);
     let keyless = fixture.admin.fetch_columns(Some("public"), "v_keyless").await.unwrap();
-    let plan = resolve_view_columns(fixture.admin.as_ref(), Some("public"), "v_keyless", keyless, &control).await;
+    let plan = resolve_view_columns(
+        fixture.admin.as_ref(),
+        Some("public"),
+        "v_keyless",
+        keyless,
+        true,
+        &control,
+    )
+    .await;
     assert_eq!(plan.restriction, Some(ViewEditRestriction::KeyNotExposed));
     assert!(plan.columns.iter().all(|column| !column.primary_key));
     let aggregate = fixture
@@ -232,6 +248,7 @@ async fn assert_resolved_columns(fixture: &Fixture) {
         Some("public"),
         "v_aggregate",
         aggregate,
+        true,
         &control,
     )
     .await;

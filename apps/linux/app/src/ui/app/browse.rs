@@ -281,21 +281,15 @@ impl App {
                     match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
                         Ok(_) | Err(_) if control.cancellation_token().is_cancelled() => {}
                         Ok(columns) => {
-                            let plan = if check_view {
-                                bookie_app_services::view_edit::resolve_view_columns(
-                                    &*conn,
-                                    schema.as_deref(),
-                                    &table,
-                                    columns,
-                                    &control,
-                                )
-                                .await
-                            } else {
-                                bookie_app_services::view_edit::ViewEditPlan {
-                                    columns,
-                                    restriction: None,
-                                }
-                            };
+                            let plan = bookie_app_services::view_edit::resolve_view_columns(
+                                &*conn,
+                                schema.as_deref(),
+                                &table,
+                                columns,
+                                check_view,
+                                &control,
+                            )
+                            .await;
                             if control.cancellation_token().is_cancelled() {
                                 return;
                             }
