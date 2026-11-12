@@ -28,6 +28,9 @@ pub trait ResultSource: Send + Sync + 'static {
         false
     }
     fn row(&self, index: u64) -> Vec<Cell>;
+    fn row_ref(&self, _index: u64) -> Option<&[Cell]> {
+        None
+    }
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str>;
     fn filter(&self, predicate: &Predicate, cancel: &CancellationToken) -> Result<Vec<u32>, &'static str>;
     fn compare(&self, keyed: bool, cancel: &CancellationToken) -> Result<Diff, &'static str>;

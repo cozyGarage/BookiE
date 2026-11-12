@@ -435,6 +435,10 @@ impl ResultSource for LiveTable {
             .unwrap_or_default()
     }
 
+    fn row_ref(&self, index: u64) -> Option<&[Cell]> {
+        usize::try_from(index).ok().and_then(|index| self.rows.get(index))
+    }
+
     fn find(&self, query: &str, cap: usize, cancel: &CancellationToken) -> Result<FindResult, &'static str> {
         find_in(&self.scan, query, cap, cancel)
     }
