@@ -171,3 +171,26 @@ fn integrated_auth_names_the_remedy_and_keeps_the_detail() {
     assert!(message.contains("kinit"));
     assert!(message.contains("SPN"));
 }
+
+#[test]
+fn a_missing_database_file_names_the_path_and_is_not_an_internal_error() {
+    let message = driver_message(&DriverError::DatabaseFileNotFound("/data/moved.db".into()));
+    assert!(message.contains("/data/moved.db"), "{message}");
+    assert!(message.contains("does not exist"), "{message}");
+    assert!(!message.contains("Internal"), "{message}");
+}
+
+#[test]
+fn each_database_file_creation_failure_says_the_file_was_not_replaced_or_why_it_failed() {
+    use bookie_app_services::database_file::CreateDatabaseFileError;
+    let path = std::path::Path::new("/data/new.db");
+    let existing = create_database_file_message(&CreateDatabaseFileError::AlreadyExists, path);
+    assert!(existing.contains("/data/new.db"), "{existing}");
+    assert!(existing.contains("not replaced"), "{existing}");
+    let denied = create_database_file_message(
+        &CreateDatabaseFileError::Io(std::io::Error::from(std::io::ErrorKind::PermissionDenied)),
+        path,
+    );
+    assert!(denied.contains("/data/new.db"), "{denied}");
+    assert!(denied.contains("permission denied"), "{denied}");
+}
