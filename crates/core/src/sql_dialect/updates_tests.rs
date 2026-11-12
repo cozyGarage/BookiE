@@ -130,7 +130,7 @@ fn optimistic_updates_compare_the_original_value_with_null_safe_dialect_syntax()
         ("postgres", "\"payload\" IS NOT DISTINCT FROM $3"),
         ("sqlite", "\"payload\" COLLATE BINARY IS NOT DISTINCT FROM ?"),
         ("mysql", "`payload` <=> ?"),
-        ("mssql", "([payload] = @P3 OR ([payload] IS NULL AND @P4 IS NULL))"),
+        ("mssql", "[payload] IS NULL"),
     ] {
         let (sql, params) = build_optimistic_keyed_update(
             driver,
@@ -142,9 +142,57 @@ fn optimistic_updates_compare_the_original_value_with_null_safe_dialect_syntax()
         )
         .unwrap();
         assert!(sql.contains(expected), "{driver}: {sql}");
-        assert_eq!(params.last(), Some(&Value::Null));
+        if driver == "mssql" {
+            assert_eq!(params, vec![Value::Text("edited".into()), Value::Int(7)]);
+        } else {
+            assert_eq!(params.last(), Some(&Value::Null));
+        }
         assert_eq!(params.first(), Some(&Value::Text("edited".into())));
     }
+}
+
+#[test]
+fn mssql_null_original_binary_values_use_an_untyped_is_null_predicate() {
+    let mut payload = column("payload", false);
+    payload.data_type = "varbinary(max)".into();
+    let columns = [column("id", true), payload];
+    let (sql, params) = build_optimistic_keyed_update(
+        "mssql",
+        None,
+        "records",
+        &columns,
+        &[(1, Value::Null, Value::Bytes(Vec::new()))],
+        &[Value::Int(7)],
+    )
+    .unwrap();
+
+    assert_eq!(
+        sql,
+        "UPDATE [records] SET [payload] = @P1 WHERE [id] = @P2 AND [payload] IS NULL"
+    );
+    assert_eq!(params, vec![Value::Bytes(Vec::new()), Value::Int(7)]);
+}
+
+#[test]
+fn mssql_null_binary_edits_use_a_null_literal_for_the_assignment() {
+    let mut payload = column("payload", false);
+    payload.data_type = "varbinary(max)".into();
+    let columns = [column("id", true), payload];
+    let (sql, params) = build_optimistic_keyed_update(
+        "mssql",
+        None,
+        "records",
+        &columns,
+        &[(1, Value::Bytes(Vec::new()), Value::Null)],
+        &[Value::Int(7)],
+    )
+    .unwrap();
+
+    assert_eq!(
+        sql,
+        "UPDATE [records] SET [payload] = NULL WHERE [id] = @P1 AND (CONVERT(varbinary(max), [payload]) = @P2 AND DATALENGTH([payload]) = DATALENGTH(@P2))"
+    );
+    assert_eq!(params, vec![Value::Int(7), Value::Bytes(Vec::new())]);
 }
 
 #[test]
