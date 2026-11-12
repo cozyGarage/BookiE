@@ -128,7 +128,7 @@ fn start_view(
                 database,
             },
         );
-        model.attach_selection(&selection, &view);
+        attach_view_navigation(&view, &selection, &model);
         let status = gtk::Label::new(None);
         status.set_wrap(true);
         model.attach_status(&status);
@@ -144,6 +144,45 @@ fn start_view(
         container.append(&column_selection_chrome);
         container.append(&crate::ui::grid::wrap_grid_scrolled(&view));
     });
+}
+
+fn attach_view_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelection, model: &PagedModel) {
+    model.attach_selection(selection, view);
+    install_row_navigation(view, selection, model);
+}
+
+fn install_row_navigation(view: &gtk::ColumnView, selection: &gtk::MultiSelection, model: &PagedModel) {
+    let controller = gtk::ShortcutController::new();
+    controller.set_scope(gtk::ShortcutScope::Local);
+    for (trigger, last) in [("<Primary>Home", false), ("<Primary>End", true)] {
+        let view = view.downgrade();
+        let selection = selection.downgrade();
+        let model = model.downgrade();
+        controller.add_shortcut(
+            gtk::Shortcut::builder()
+                .trigger(&crate::ui::shortcut::parse(trigger))
+                .action(&gtk::CallbackAction::new(move |_, _| {
+                    let (Some(view), Some(selection), Some(model)) =
+                        (view.upgrade(), selection.upgrade(), model.upgrade())
+                    else {
+                        return gtk::glib::Propagation::Proceed;
+                    };
+                    let Some(position) = (if last { model.n_items().checked_sub(1) } else { Some(0) }) else {
+                        return gtk::glib::Propagation::Proceed;
+                    };
+                    selection.select_item(position, true);
+                    view.scroll_to(
+                        position,
+                        None,
+                        gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT,
+                        None,
+                    );
+                    gtk::glib::Propagation::Stop
+                }))
+                .build(),
+        );
+    }
+    view.add_controller(controller);
 }
 
 #[cfg(test)]
