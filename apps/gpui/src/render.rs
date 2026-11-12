@@ -191,7 +191,9 @@ impl Render for GridView {
                 )
         });
         let palette = self.palette_open.then(|| self.palette_overlay(cx));
-        self.sync_table(cx);
+        let sidebar_width = if self.sidebar_open { self.sidebar_width } else { 0.0 };
+        let grid_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
+        self.sync_table(grid_width, cx);
         let grid = div()
             .flex_1()
             .flex()
