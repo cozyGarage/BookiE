@@ -1775,6 +1775,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::health_report_dialog::tests::a_row_with_a_diagnostic_offers_copy_and_open_and_a_row_without_offers_neither"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::history_dialog::confirmation_tests::clear_history_confirmation_preserves_cancelled_rows_and_clears_only_when_confirmed"
     ],
     [

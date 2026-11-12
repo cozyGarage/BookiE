@@ -167,6 +167,8 @@ pub enum AppMsg {
     ShowShortcuts,
     ShowAbout,
     ShowActivity,
+    ShowHealthReport,
+    OpenSqlInEditor(String),
     ShowAuditLog,
     ShowAuditOperation(Uuid),
     ShowCatalog,

@@ -89,3 +89,16 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Disabled triggers display a `(disabled)` status indicator in their sidebar listing.
 - [ ] Multi-statement scripts creating and using session `#temp` tables execute sequentially and return results without syntax or scoping errors.
 
+## PostgreSQL table and index health report
+
+Use a PostgreSQL database with a table that has had many rows deleted, an index never used, two indexes on the same leading column and a table of more than 10,000 rows read by full scans. Run BookiE with isolated `XDG_*` and `HOME`.
+
+- [ ] On a PostgreSQL connection the main menu shows **Table and Index Health** under **Server Activity**. On a MySQL, SQLite or SQL Server connection the item is absent.
+- [ ] Open it and choose **Dead rows and vacuum**. The table with deleted rows is listed with its size, dead row count and last vacuum and analyze. The window stays responsive.
+- [ ] Choose **Unused indexes**. The unused index is listed, and primary key and unique indexes are not.
+- [ ] Choose **Duplicate indexes**. The index whose columns are covered by a longer index on the same table is listed with the covering index named.
+- [ ] Choose **Estimated bloat** and **Sequential scans**. The hint under the list says the bloat figure is an estimate.
+- [ ] Hide a schema in the sidebar and reopen the dialog. Its objects are not listed. Connect as a role without table privileges: those tables are not listed.
+- [ ] On a row, choose **Copy diagnostic SQL** and paste elsewhere: a `VACUUM (ANALYZE)` or `DROP INDEX CONCURRENTLY IF EXISTS` statement with quoted names. Choose **Open diagnostic SQL in an editor tab**: a new tab holds the statement and nothing runs.
+- [ ] Start a report on a large catalog and close the dialog. The server query is cancelled.
+

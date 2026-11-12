@@ -2,7 +2,7 @@ use bookie_app_services::open_failure::OpenFailure;
 use bookie_app_services::tls_failure::TlsRemedy;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ConnectFailure {
+pub(crate) struct ConnectFailure {
     pub message: String,
     pub tls_remedy: Option<TlsRemedy>,
 }

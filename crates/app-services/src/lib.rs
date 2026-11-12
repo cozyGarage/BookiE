@@ -39,6 +39,7 @@ pub mod enum_input;
 pub mod er_diagram;
 pub mod export_pages;
 pub mod filter_settings;
+pub mod health_report;
 pub mod highlight_settings;
 pub mod i18n;
 pub mod image_preview;
