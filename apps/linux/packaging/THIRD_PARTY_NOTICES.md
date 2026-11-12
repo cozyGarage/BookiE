@@ -1639,7 +1639,7 @@ text is in arrow-array/LICENSE-MIT.
 
 Packages:
 
-- `openssl 0.10.81`
+- `openssl 0.10.82`
 
 ```text
 Apache License
@@ -2062,9 +2062,10 @@ limitations under the License.
 Packages:
 
 - `aws-lc-sys 0.47.0`
-- `mongodb 3.9.1`
-- `mongodb-internal-macros 3.9.1`
-- `russh 0.65.0`
+- `constant_time_eq 0.6.1`
+- `mongodb 3.10.0`
+- `mongodb-internal-macros 3.10.0`
+- `russh 0.65.1`
 - `russh-cryptovec 0.62.0`
 - `russh-util 0.52.0`
 - `ryu 1.0.23`
@@ -2897,7 +2898,7 @@ express Statement of Purpose.
 
 Packages:
 
-- `webpki-roots 1.0.11`
+- `webpki-roots 1.0.12`
 
 ```text
 # Community Data License Agreement - Permissive - Version 2.0
@@ -3051,7 +3052,6 @@ pub fn eddsa_digest(signature_r: &[u8], public_key: &[u8], msg: &[u8]) -> digest
 
 Packages:
 
-- `untrusted 0.7.1`
 - `untrusted 0.9.0`
 
 ```text
@@ -3702,7 +3702,6 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `md-5 0.10.6`
 - `sha2 0.10.9`
 
 ```text
@@ -3841,7 +3840,7 @@ Packages:
 - `cfg-if 1.0.5`
 - `futures-timer 3.0.4`
 - `openssl-probe 0.2.2`
-- `openssl-sys 0.9.117`
+- `openssl-sys 0.9.118`
 - `socket2 0.6.5`
 - `stacker 0.1.25`
 
@@ -3939,7 +3938,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `mime 0.3.17`
+- `mime 0.3.18`
 
 ```text
 Copyright (c) 2014 Sean McArthur
@@ -4086,7 +4085,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `uuid 1.29.0`
+- `uuid 1.29.2`
 
 ```text
 Copyright (c) 2014 The Rust Project Developers
@@ -4121,7 +4120,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `libsqlite3-sys 0.39.1`
+- `libsqlite3-sys 0.40.0`
 
 ```text
 Copyright (c) 2014 The rusqlite developers
@@ -4218,7 +4217,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `flate2 1.1.10`
+- `flate2 1.1.11`
 
 ```text
 Copyright (c) 2014-2026 Alex Crichton
@@ -4388,7 +4387,6 @@ Packages:
 - `unicode-properties 0.1.5`
 - `unicode-segmentation 1.13.3`
 - `unicode-width 0.2.3`
-- `unicode-xid 0.2.6`
 
 ```text
 Copyright (c) 2015 The Rust Project Developers
@@ -4506,7 +4504,6 @@ SOFTWARE.
 
 Packages:
 
-- `hkdf 0.12.4`
 - `hkdf 0.13.0`
 
 ```text
@@ -4980,40 +4977,6 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `cipher 0.4.4`
-
-```text
-Copyright (c) 2016-2020 RustCrypto Developers
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-```
-
-## MIT
-
-Packages:
-
 - `blowfish 0.10.0`
 
 ```text
@@ -5346,7 +5309,7 @@ SOFTWARE.
 
 Packages:
 
-- `arc-swap 1.9.3`
+- `arc-swap 1.9.5`
 
 ```text
 Copyright (c) 2017 arc-swap developers
@@ -5621,40 +5584,6 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `aes 0.8.4`
-
-```text
-Copyright (c) 2018 Artyom Pavlov
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-```
-
-## MIT
-
-Packages:
-
 - `bytes 1.12.1`
 
 ```text
@@ -5689,7 +5618,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `smallvec 1.16.4`
+- `smallvec 1.16.5`
 
 ```text
 Copyright (c) 2018 The Servo Project Developers
@@ -5786,7 +5715,6 @@ THE SOFTWARE.
 Packages:
 
 - `block-buffer 0.10.4`
-- `block-padding 0.3.3`
 
 ```text
 Copyright (c) 2018-2019 The RustCrypto Project Developers
@@ -5820,7 +5748,6 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `cbc 0.1.2`
 - `cbc 0.2.1`
 - `ctr 0.10.1`
 
@@ -5886,7 +5813,7 @@ THE SOFTWARE.
 
 Packages:
 
-- `aes 0.9.3`
+- `aes 0.9.4`
 
 ```text
 Copyright (c) 2018-2024 The RustCrypto Project Developers
@@ -6955,7 +6882,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `const-oid 0.10.2`
+- `const-oid 0.10.3`
 - `cpufeatures 0.3.1`
 - `der 0.8.3`
 - `pkcs8 0.11.0`
@@ -7169,7 +7096,7 @@ DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `argon2 0.6.0`
-- `crypto-bigint 0.7.10`
+- `crypto-bigint 0.7.11`
 - `pkcs5 0.8.1`
 - `scrypt 0.12.0`
 - `sec1 0.8.1`
@@ -7271,41 +7198,6 @@ SOFTWARE.
 
 Packages:
 
-- `inout 0.1.4`
-
-```text
-Copyright (c) 2022 The RustCrypto Project Developers
-Copyright (c) 2022 Artyom Pavlov
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-```
-
-## MIT
-
-Packages:
-
 - `critical-section 1.2.0`
 
 ```text
@@ -7340,7 +7232,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `inout 0.2.5`
+- `inout 0.2.6`
 
 ```text
 Copyright (c) 2022-2025 The RustCrypto Project Developers
@@ -7410,7 +7302,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `rustls-pki-types 1.15.1`
+- `rustls-pki-types 1.16.0`
 
 ```text
 Copyright (c) 2023 Dirkjan Ochtman <dirkjan@ochtman.nl>
@@ -7563,11 +7455,9 @@ SOFTWARE.
 
 Packages:
 
-- `zbus 5.19.0`
-- `zbus_macros 5.19.0`
-- `zbus_names 4.3.5`
-- `zvariant 5.15.1`
-- `zvariant_derive 5.15.1`
+- `zbus 6.2.1`
+- `zbus_macros 6.2.1`
+- `zbus_utils 6.1.0`
 
 ```text
 Copyright (c) 2024 Zeeshan Ali Khan & zbus contributors
@@ -7698,7 +7588,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `ctutils 0.4.7`
+- `ctutils 0.4.8`
 
 ```text
 Copyright (c) 2025-2026 The RustCrypto Project Developers
@@ -7836,6 +7726,81 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
+- `zgvariant 2.0.0`
+- `zgvariant_derive 2.0.0`
+
+```text
+Copyright (c) 2026 Zeeshan Ali Khan & zgvariant contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+```
+
+## MIT
+
+Packages:
+
+- `zruntime 0.2.2`
+
+```text
+Copyright (c) 2026 Zeeshan Ali Khan & zruntime contributors
+
+Permission is hereby granted, free of charge, to any
+person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the
+Software without restriction, including without
+limitation the rights to use, copy, modify, merge,
+publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software
+is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice
+shall be included in all copies or substantial portions
+of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+The broadcast channel (`src/broadcast.rs`), its tests (`src/tests/broadcast.rs`) and its
+benchmark (`benches/broadcast.rs`) come from the async-broadcast crate
+(https://github.com/smol-rs/async-broadcast), under the license above and this notice:
+
+Copyright (c) 2020 Yoshua Wuyts, Stjepan Glavina & Zeeshan Ali Khan
+```
+
+## MIT
+
+Packages:
+
 - `anstream 1.0.0`
 - `anstyle 1.0.14`
 - `anstyle-parse 1.0.0`
@@ -7846,12 +7811,12 @@ Packages:
 - `clap_lex 1.1.1`
 - `colorchoice 1.0.5`
 - `is_terminal_polyfill 1.70.2`
-- `serde_spanned 1.1.2`
-- `toml 1.1.8+spec-1.1.0`
-- `toml_datetime 1.1.2+spec-1.1.0`
-- `toml_edit 0.25.17+spec-1.1.0`
+- `serde_spanned 1.1.3`
+- `toml 1.2.1+spec-1.1.0`
+- `toml_datetime 1.1.3+spec-1.1.0`
+- `toml_edit 0.25.19+spec-1.1.0`
 - `toml_parser 1.1.5+spec-1.1.0`
-- `toml_writer 1.1.3+spec-1.1.0`
+- `toml_writer 1.2.0+spec-1.1.0`
 
 ```text
 Copyright (c) Individual contributors
@@ -8559,7 +8524,7 @@ SOFTWARE.
 
 Packages:
 
-- `crc32fast 1.5.3`
+- `crc32fast 1.5.5`
 
 ```text
 MIT License
@@ -8929,7 +8894,7 @@ DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `ashpd 0.13.13`
+- `ashpd 0.14.0`
 
 ```text
 MIT License
@@ -9109,7 +9074,7 @@ SOFTWARE.
 
 Packages:
 
-- `oo7 0.6.0`
+- `oo7 0.7.1`
 
 ```text
 MIT License
@@ -9199,36 +9164,6 @@ SOFTWARE.
 
 Packages:
 
-- `convert_case 0.10.0`
-
-```text
-MIT License
-
-Copyright (c) 2025 rutrum
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-## MIT
-
-Packages:
-
 - `chrono 0.4.45`
 - `clickhouse-macros 0.3.0`
 - `clickhouse-types 0.1.4`
@@ -9238,7 +9173,7 @@ Packages:
 - `libgssapi-sys 0.3.4`
 - `libm 0.2.16`
 - `md5 0.8.1`
-- `rust_xlsxwriter 0.101.0`
+- `rust_xlsxwriter 0.102.0`
 - `scylla 1.10.0`
 - `scylla-cql 3.0.0`
 - `scylla-cql-core 1.10.0`
@@ -9436,14 +9371,10 @@ Packages:
 - `adler2 2.0.1`
 - `allocator-api2 0.2.21`
 - `async-channel 2.5.0`
-- `async-executor 1.14.1`
 - `async-fs 2.2.0`
 - `async-io 2.6.0`
-- `async-lock 3.4.2`
+- `async-lock 3.5.0`
 - `async-native-tls 0.6.0`
-- `async-process 2.5.0`
-- `async-recursion 1.2.0`
-- `async-signal 0.2.14`
 - `async-task 4.7.1`
 - `async-trait 0.1.92`
 - `atomic-waker 1.1.2`
@@ -9461,7 +9392,7 @@ Packages:
 - `flume 0.12.0`
 - `futures-lite 2.6.1`
 - `group 0.14.0`
-- `itoa 1.0.18`
+- `itoa 1.0.19`
 - `lazy_static 1.5.1`
 - `lexical-core 1.0.6`
 - `lexical-parse-float 1.0.6`
@@ -9496,7 +9427,7 @@ Packages:
 - `serde_repr 0.1.21`
 - `sqlformat 0.5.0`
 - `syn 2.0.119`
-- `syn 3.0.9`
+- `syn 3.0.10`
 - `thiserror 1.0.69`
 - `thiserror 2.0.21`
 - `thiserror-impl 1.0.69`
@@ -9506,7 +9437,6 @@ Packages:
 - `typed-path 0.13.0`
 - `unicode-ident 1.0.27`
 - `zmij 1.0.23`
-- `zvariant_utils 4.2.0`
 
 ```text
 Permission is hereby granted, free of charge, to any
@@ -9539,7 +9469,7 @@ DEALINGS IN THE SOFTWARE.
 Packages:
 
 - `winnow 0.7.15`
-- `winnow 1.0.4`
+- `winnow 1.0.5`
 
 ```text
 Permission is hereby granted, free of charge, to any person obtaining
@@ -9663,7 +9593,7 @@ Packages:
 
 - `spin 0.9.9`
 - `tracing-core 0.1.36`
-- `zip 9.2.1`
+- `zip 9.5.1`
 
 ```text
 The MIT License (MIT)
@@ -9757,8 +9687,8 @@ Packages:
 - `byteorder 1.5.0`
 - `csv 1.4.0`
 - `csv-core 0.1.13`
-- `jiff 0.2.38`
-- `jiff-core 0.1.1`
+- `jiff 0.2.43`
+- `jiff-core 0.1.5`
 - `memchr 2.8.3`
 
 ```text
@@ -10126,37 +10056,6 @@ IN THE SOFTWARE.
 
 Packages:
 
-- `derive_more 2.1.1`
-- `derive_more-impl 2.1.1`
-
-```text
-The MIT License (MIT)
-
-Copyright (c) 2016 Jelte Fennema
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-## MIT
-
-Packages:
-
 - `calamine 0.38.0`
 - `quick-xml 0.42.0`
 
@@ -10443,7 +10342,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Packages:
 
-- `async-broadcast 0.7.2`
 - `connection-string 0.2.0`
 
 ```text
