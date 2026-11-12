@@ -1855,6 +1855,21 @@
     [
       "bookie-app",
       "--lib",
+      "ui::import_dialog::write_mode::tests::a_table_without_a_key_refuses_the_update_mode"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::write_mode::tests::an_engine_without_upsert_does_not_offer_the_mode"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::import_dialog::write_mode::tests::insert_is_the_default_and_update_uses_the_chosen_key"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::import_dialog::tests::csv_preparation_progress_changes_from_spinner_to_row_count"
     ],
     [

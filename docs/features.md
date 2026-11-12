@@ -67,6 +67,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 ![Filter applied in the data grid](images/filter-applied.png)
 
+
 ## Write SQL
 
 <picture>
@@ -121,6 +122,8 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
 - Import CSV into an existing table, or create a new table from a CSV file. Separator, header row and column mapping are detected and can be changed. The quote character, backslash escaping and file encoding (UTF-8, Windows-1252, UTF-16) can be set.
 - Import accepts Excel `.xlsx` files. The first worksheet with data is read.
+- Import into an existing table can update rows that already exist. On PostgreSQL, SQLite, DuckDB, MySQL and MariaDB, choose **Update the existing row** and a key (the primary key, or a unique index without a condition); rows with a new key are inserted and rows with an existing key are changed. The approval and the audit record say that existing rows may be updated. Other engines offer insert only.
+- Import into an existing table can take up to 20 files in one run. The first file's separator, header and column choices apply to every file, each file must have the same columns, and each file asks for its own approval. One Cancel stops the file in progress and the rest. The run stops at the first file that fails, and the report names it. Together the files can hold up to 256 MB and 2,000,000 rows.
 - Mappings can be remembered per connection and table.
 
 ## Safety and records

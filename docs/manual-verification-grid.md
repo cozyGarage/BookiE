@@ -45,6 +45,14 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Progress advances and Cancel stops it.
 - [ ] A file with a bad row partway through stops the import and the message says how many rows were written.
 - [ ] Import refuses to start on a read-only connection.
+- [ ] On PostgreSQL, SQLite, MySQL or MariaDB, an existing-table import shows **Existing rows**. With **Update the existing row** and the primary key chosen, a CSV that repeats one existing id and adds a new id changes the existing row and adds the new one; typed values (numbers, dates, decimals) are unchanged by the round trip.
+- [ ] The approval text for an update import says that existing rows may change, and the audit entry for the import names the table with the upsert note. A plain insert import shows neither.
+- [ ] A table with no primary key or unique index shows the update mode greyed out with the reason. SQL Server and Oracle tables do not show the section.
+- [ ] Choosing a key whose column is left on Skip refuses to start the import and names the column.
+- [ ] Select three CSV files with the same columns in the file chooser: the dialog says the choices apply to two more files, each file asks for approval, the progress dialog names the file and its rows, and the final message counts all rows.
+- [ ] Select a second file with different headers: the run stops at that file, the message names it, and the third file is reported as not started. Rows from the first file stay written.
+- [ ] Press Cancel during the second of three files: that file ends cancelled, the third is cancelled without any approval prompt, and the audit journal has a cancelled entry for the second file and none for the third.
+- [ ] Select 21 files: the import refuses to start and says the limit is 20 files.
 
 ## Structure tab, column comments
 
