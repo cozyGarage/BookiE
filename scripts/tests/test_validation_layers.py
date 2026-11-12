@@ -193,6 +193,23 @@ class LayerRunnerTests(unittest.TestCase):
             self.assertEqual(report["layers"]["good"]["status"], "passed")
             self.assertEqual((directory / "good-1.log").read_text().strip(), "done")
 
+    def test_failure_excerpt_keeps_traceback_before_a_long_accessibility_snapshot(self):
+        output = "\n".join((
+            "passed: first_scenario (duration: 1.0s)",
+            "FAILED: enum_edit (duration: 2.0s)",
+            "Traceback (most recent call last):",
+            "  File \"gtk_safety.py\", line 10, in run_scenario",
+            "    scenario()",
+            "AssertionError: expected saved enum value 'high'",
+            *(f"accessible node {index}" for index in range(80)),
+            "Job 'gtk-server' failed",
+        ))
+        excerpt = runner.failure_excerpt(output)
+
+        self.assertIn("AssertionError: expected saved enum value 'high'", excerpt)
+        self.assertIn("... final log lines ...", excerpt)
+        self.assertIn("Job 'gtk-server' failed", excerpt)
+
     def test_unknown_duplicate_and_empty_selection_fail(self):
         for args in [[], ["missing"], ["harness", "harness"]]:
             result = subprocess.run([sys.executable, str(ROOT / "scripts/run-test-layer.py"), *args], capture_output=True)
