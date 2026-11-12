@@ -1,3 +1,4 @@
+use super::connect_failure::ConnectFailure;
 use super::*;
 
 pub(super) struct ConnectRequest {
@@ -41,11 +42,11 @@ pub(super) async fn open_candidate(
     timeout_secs: u32,
     cancellation: tokio_util::sync::CancellationToken,
     bootstrap: CandidateBootstrap<'_>,
-) -> Result<OpenedCandidate, String> {
+) -> Result<OpenedCandidate, ConnectFailure> {
     let (conn, tunnel) =
         bookie_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation.clone())
             .await
-            .map_err(crate::services::error_text::transport_message)?;
+            .map_err(ConnectFailure::from_transport)?;
     let conn: Arc<dyn bookie_core::Connection> = Arc::from(conn);
     let guarded = bootstrap
         .guard_factory
@@ -54,9 +55,9 @@ pub(super) async fn open_candidate(
     let control = crate::services::operation_control::bounded_with(timeout_secs, cancellation);
     let server_version = match guarded.server_version_controlled(&control).await {
         Ok(version) => version,
-        Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(bookie_core::DriverError::PolicyDenied(message)) => return Err(message.into()),
         Err(error @ (bookie_core::DriverError::Cancelled | bookie_core::DriverError::TimedOut)) => {
-            return Err(crate::services::error_text::driver_message(&error));
+            return Err(crate::services::error_text::driver_message(&error).into());
         }
         Err(bookie_core::DriverError::OperationOutcomeUnknown { source })
             if matches!(
@@ -64,7 +65,7 @@ pub(super) async fn open_candidate(
                 bookie_core::DriverError::Cancelled | bookie_core::DriverError::TimedOut
             ) =>
         {
-            return Err(crate::services::error_text::driver_message(&source));
+            return Err(crate::services::error_text::driver_message(&source).into());
         }
         Err(_) => None,
     };

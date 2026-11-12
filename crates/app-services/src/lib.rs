@@ -60,6 +60,7 @@ pub mod stream_page_validation;
 pub mod structure_metadata;
 pub mod structure_tracker;
 pub mod tab_mark;
+pub mod tls_failure;
 pub mod value_input;
 #[cfg(test)]
 mod value_input_tests;
