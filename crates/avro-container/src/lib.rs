@@ -54,7 +54,7 @@ mod tests {
             r#"{"type":"record","name":"Order","fields":[{"name":"id","type":"long"},{"name":"note","type":["null","string"]}]}"#,
         )
         .unwrap();
-        let mut writer = Writer::new(&schema, Vec::new());
+        let mut writer = Writer::new(&schema, Vec::new()).unwrap();
         for n in 0..records {
             let mut record = apache_avro::types::Record::new(&schema).unwrap();
             record.put("id", n as i64);
@@ -66,7 +66,7 @@ mod tests {
                     Value::Union(0, Box::new(Value::Null))
                 },
             );
-            writer.append(record).unwrap();
+            writer.append_value(record).unwrap();
         }
         writer.into_inner().unwrap()
     }
