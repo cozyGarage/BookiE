@@ -24,6 +24,8 @@ This page describes user-visible behavior and limits in the current source. Curr
 - **MongoDB browse pages are separate observations, not one point-in-time view.** Grid updates compare original values of edited fields; deletes compare materialized non-key fields ([ADR 0024](decisions/0024-keyed-grid-writes-check-what-they-overwrite.md)). These checks do not cover fields absent from the loaded set. Column types come from a bounded `_id`-ordered sample of at most 128 documents combined with the displayed page; other fields or types may remain undiscovered. Mixed-type columns are read-only. Reverse, last-page, explicitly sorted and keyless deep-page navigation use offset pagination.
 - **MySQL failed batches do not undo every side effect.** InnoDB changes are rolled back, but writes to nontransactional tables and some trigger or session effects can persist.
 
+- **View Value** decodes MessagePack and schema-less Protobuf only, for binary values up to 64 KiB. Avro and igbinary values show the hex dump only: Avro needs a schema that BookiE does not fetch, and igbinary has no decoder.
+
 ## Editing and connections
 
 - **Grid saves compare only edited cell values, and relational deletes check the key only** ([ADR 0024](decisions/0024-keyed-grid-writes-check-what-they-overwrite.md)). Case-insensitive equality may miss a case-only text change ([#1820](https://github.com/cozyGarage/BookiE/issues/1820)). A value changed and changed back is also not detected. Engines without checked writes save by key and warn after commit when no row matched.

@@ -34,6 +34,7 @@ mod row_number_column;
 #[cfg(test)]
 mod row_number_tests;
 mod types;
+mod value_decoded;
 mod value_viewer;
 #[cfg(test)]
 mod wide_scroll_tests;

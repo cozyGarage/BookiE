@@ -173,3 +173,13 @@ Use a keyed, editable table with at least four columns and some rows. Run BookiE
 8. Try the same on a primary key column, a NOT NULL column with **Set to NULL** ticked, and an integer column with `abc`. Each shows a message and stages nothing.
 9. Select two rows, right-click a cell and choose **Set Cells to Value…**. Only the selected rows change. In a query result grid the item is not offered.
 10. On a page of 10,000 rows, set a column to a value. The window stays responsive.
+
+## Decoded preview in View Value
+
+Use a table with a `bytea` or `blob` column. Run BookiE with isolated `XDG_*` and `HOME`.
+
+1. Store the MessagePack bytes `82 a1 61 01 a1 62 c3` in a row and open **View Value** on the cell. The hex dump shows, and a **Decoded as MessagePack** section below it shows `"a": 1` and `"b": true`. The section cannot be edited.
+2. Click **Copy Value** and paste. The clipboard holds the original bytes, not the decoded text.
+3. Store the bytes `08 96 01 12 07` followed by `testing`. The section reads **Decoded as Protobuf without a schema** and lists field `1` as 150 and field `2` as `testing`.
+4. Store `de ad be ef`, plain text and an image. No **Decoded** section appears.
+5. Store a MessagePack array over 64 KiB. No **Decoded** section appears and the hex dump still shows.

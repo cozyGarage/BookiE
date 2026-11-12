@@ -56,6 +56,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - **Set Cells to Value** stages one typed value or NULL into the selected cells of a keyed, editable browse table. Key and generated columns, NULL into NOT NULL columns and values that do not fit the column type are refused before anything is staged; the change then follows the normal Save path. Query result grids support column selection and Copy as but not Set Cells to Value.
 - Hide and reorder columns, and reset dragged column widths. The choice is remembered per table.
 - Long cells over 8 KiB show a preview and byte count. **View Value** displays up to 1 MiB rendered text or 16 KiB hex. **Copy Value** copies complete values. Eligible text and JSON cells can be edited in the full-value dialog with semantic JSON formatting.
+- **View Value** adds a read-only **Decoded** section below the hex dump when binary bytes are valid MessagePack, or look like schema-less Protobuf (shown by field number, as a best guess). Other bytes show the hex dump only. The preview never replaces the bytes that **Copy Value** copies.
 - The row inspector lists every column and its type. Selection statistics show count, sum, average, min, and max across numeric columns.
 
 ### Filters and search

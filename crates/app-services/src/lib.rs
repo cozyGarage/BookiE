@@ -30,6 +30,7 @@ pub mod database_backup;
 pub mod database_file;
 pub mod database_service;
 pub mod database_subscription;
+pub mod decoded_preview;
 pub mod driver_diagnostics;
 pub mod driver_error_presentation;
 pub mod editor_bookmarks;

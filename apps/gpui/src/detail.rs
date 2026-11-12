@@ -53,23 +53,13 @@ pub fn hex_lines(bytes: &[u8]) -> Vec<HexLine> {
 }
 
 fn decoded_preview(bytes: &[u8]) -> Option<(&'static str, String)> {
-    if let Ok(value) = bookie_core::decode_messagepack(bytes) {
-        return serde_json::to_string_pretty(&value)
-            .ok()
-            .map(|text| ("MessagePack", text));
-    }
-    let printable = bytes
-        .iter()
-        .all(|byte| byte.is_ascii_graphic() || byte.is_ascii_whitespace());
-    if printable {
-        return None;
-    }
-    let value = bookie_core::decode_protobuf_wire(bytes).ok()?;
-    let fields = value.as_object().map_or(0, serde_json::Map::len);
-    (fields >= 2)
-        .then(|| serde_json::to_string_pretty(&value).ok())
-        .flatten()
-        .map(|text| ("Possible Protobuf (no schema, field numbers only)", text))
+    use bookie_app_services::decoded_preview::{DecodedFormat, decoded_preview};
+    let preview = decoded_preview(bytes)?;
+    let label = match preview.format {
+        DecodedFormat::MessagePack => "MessagePack",
+        DecodedFormat::Protobuf => "Possible Protobuf (no schema, field numbers only)",
+    };
+    Some((label, preview.text))
 }
 
 fn hex_detail(bytes: &[u8]) -> Detail {

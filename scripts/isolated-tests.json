@@ -1770,6 +1770,11 @@
     [
       "bookie-app",
       "--lib",
+      "ui::grid::value_decoded::tests::the_decoded_section_is_read_only_and_absent_for_unrecognised_bytes"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::history_dialog::confirmation_tests::clear_history_confirmation_preserves_cancelled_rows_and_clears_only_when_confirmed"
     ],
     [
