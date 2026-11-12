@@ -2851,6 +2851,7 @@ GLib.MainLoop().run()
         for key in ("apostrophe", *"high8", "apostrophe"):
             ui.press_x11_key(key)
         ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
         click_cell("low16", count=2)
         for key in ("apostrophe", *"high16", "apostrophe"):
             ui.press_x11_key(key)

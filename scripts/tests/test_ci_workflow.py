@@ -363,6 +363,20 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("if: matrix.driver == 'core'", driver)
         self.assertIn("python3 scripts/run-test-layer.py pg-dump", driver)
 
+    def test_gtk_server_jobs_retry_prepulling_their_fixture_image(self):
+        for path in (".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
+            workflow = (ROOT / path).read_text()
+            job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
+            script_root = "src/scripts" if path.startswith(".forgejo/") else "scripts"
+
+            self.assertIn(
+                "BOOKIE_GTK_SERVER_IMAGE_GROUP: ${{ matrix.server == 'mysql-approval' && 'mysql' || matrix.server }}",
+                job,
+            )
+            prepull = job.index(f"bash {script_root}/prepull-test-images.sh \"$BOOKIE_GTK_SERVER_IMAGE_GROUP\"")
+            scenario = job.index('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"')
+            self.assertLess(prepull, scenario)
+
     def test_github_quick_and_forgejo_sandbox_use_the_same_test_script(self):
         github = (ROOT / ".github/workflows/build-linux.yml").read_text()
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
