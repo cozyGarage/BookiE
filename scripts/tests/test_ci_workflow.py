@@ -231,6 +231,15 @@ class CiWorkflowTests(unittest.TestCase):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
         self.assertTrue({"bookie-app-services", "bookie-dump"} <= set(bundle_groups["driver-core"]["test"]))
 
+    def test_specialized_bundles_include_everything_their_scripts_consume(self):
+        config = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())
+        isolated = json.loads((ROOT / "scripts/isolated-tests.json").read_text())
+        for package, target, _ in isolated["keyring"]:
+            kind = "lib" if target.startswith("--") else "test"
+            with self.subTest(package=package, target=target):
+                self.assertIn(package, config["groups"]["keyring"][kind])
+        self.assertIn("bookie-app", config["groups"]["pg-release"]["bin"])
+
     def test_forgejo_workflow_and_actionlint_config_changes_run_contract_checks(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
 

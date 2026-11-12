@@ -28,6 +28,7 @@
       ]
     },
     "pg-release": {
+      "bin": ["bookie-app"],
       "lib": ["bookie-release-tests"],
       "test": ["bookie-agentd", "bookie-release-tests"]
     },
@@ -39,7 +40,7 @@
       "test": ["bookie-driver-tls-tests"]
     },
     "keyring": {
-      "lib": ["bookie-storage", "bookie-transport"],
+      "lib": ["bookie-app-services", "bookie-storage", "bookie-transport"],
       "test": ["bookie-agentd"]
     }
   },
