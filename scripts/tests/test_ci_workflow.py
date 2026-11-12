@@ -313,12 +313,24 @@ class CiWorkflowTests(unittest.TestCase):
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         github_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github).group(1)
         forgejo_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+        forgejo_server_jobs = "\n".join(
+            re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
+            for name in ("e2e", "gtk-server")
+        )
 
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
-        self.assertIn("server: [clickhouse, mongodb, postgres, mysql]", github_job)
+        expected = {
+            name.removeprefix("gtk-")
+            for name in layers
+            if name.startswith("gtk-") and name != "gtk-app"
+        }
+        for server in expected:
+            with self.subTest(server=server):
+                self.assertRegex(github_job, rf"(?m)^\s*server:\s*\[.*\b{re.escape(server)}\b")
+                self.assertRegex(forgejo_server_jobs, rf"(?m)^\s*-\s*server:\s*{re.escape(server)}\b")
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', github_job)
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
-        self.assertIn("Build Linux / postgres-release", layers["gtk-mysql-approval"]["hosted_gate"])
+        self.assertIn("Build Linux / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
         self.assertIn("lab-ci / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
         for layer in ("gtk-clickhouse", "gtk-mongodb"):
             with self.subTest(layer=layer):

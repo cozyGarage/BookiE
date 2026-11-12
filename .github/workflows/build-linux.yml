@@ -516,7 +516,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        server: [clickhouse, mongodb, postgres, mysql]
+        server: [clickhouse, mongodb, postgres, mysql, mysql-approval]
     steps:
       - name: Install Git before checkout
         working-directory: /tmp
