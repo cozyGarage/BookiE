@@ -3,6 +3,7 @@ use bookie_core::DriverError;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DriverFailurePresentation {
     ConnectionRefused,
+    DatabaseFileNotFound(String),
     AuthFailed,
     Tls {
         detail: String,
@@ -52,6 +53,7 @@ pub enum SaveFailure {
 pub fn classify(error: &DriverError) -> DriverFailurePresentation {
     match error {
         DriverError::ConnectionRefused => DriverFailurePresentation::ConnectionRefused,
+        DriverError::DatabaseFileNotFound(path) => DriverFailurePresentation::DatabaseFileNotFound(path.clone()),
         DriverError::AuthFailed => DriverFailurePresentation::AuthFailed,
         DriverError::Tls(detail) => DriverFailurePresentation::Tls {
             detail: detail.clone(),

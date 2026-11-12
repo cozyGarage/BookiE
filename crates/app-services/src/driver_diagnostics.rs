@@ -32,6 +32,7 @@ pub fn warn_export_cleanup(error: &bookie_core::export::ExportError, operation: 
 fn driver_code(error: &DriverError) -> &'static str {
     match error {
         DriverError::ConnectionRefused => "connection_refused",
+        DriverError::DatabaseFileNotFound(_) => "database_file_not_found",
         DriverError::AuthFailed => "authentication_failed",
         DriverError::Tls(_) => "tls",
         DriverError::Query { .. } => "query",

@@ -132,6 +132,11 @@ pub enum ConnectDialogInput {
     Submit,
     TestConnection,
     InputChanged,
+    CreateDatabaseFile(std::path::PathBuf),
+    DatabaseFileCreated {
+        path: std::path::PathBuf,
+        outcome: Result<(), bookie_app_services::database_file::CreateDatabaseFileError>,
+    },
     Closed,
 }
 
@@ -247,7 +252,10 @@ impl Component for ConnectDialog {
         let database = adw::EntryRow::builder()
             .title(bookie_app_services::tr!("Database"))
             .build();
-        let database_file_picker = browse::attach_database_file_picker(&database);
+        let sender_for_create = sender.clone();
+        let database_file_picker = browse::attach_database_file_picker(&database, move |path| {
+            sender_for_create.input(ConnectDialogInput::CreateDatabaseFile(path));
+        });
         database_file_picker.set_visible(false);
         let auth_source = auth_source::row();
         let username = adw::EntryRow::builder()
@@ -497,6 +505,18 @@ impl Component for ConnectDialog {
             ConnectDialogInput::InputChanged => {
                 self.test_banner.set_revealed(false);
                 self.refresh_validity();
+            }
+
+            ConnectDialogInput::CreateDatabaseFile(path) => {
+                let selected = self.drivers.get(self.driver_combo.selected() as usize);
+                match selected.and_then(|entry| self.registry.get(&entry.id)) {
+                    Some(driver) => browse::request_database_file(driver, path, &sender),
+                    None => self.show_toast(&bookie_app_services::tr!("No driver selected")),
+                }
+            }
+
+            ConnectDialogInput::DatabaseFileCreated { path, outcome } => {
+                self.apply_created_database_file(&path, outcome);
             }
 
             ConnectDialogInput::Submit => {

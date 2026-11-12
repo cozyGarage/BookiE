@@ -1,5 +1,13 @@
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::sync::Arc;
+
 use relm4::adw::prelude::*;
-use relm4::{adw, gtk};
+use relm4::{ComponentSender, adw, gtk};
+
+use bookie_core::DatabaseDriver;
+
+use super::{ConnectDialog, ConnectDialogInput};
 
 fn picker_button(icon: &str, tooltip: &str) -> gtk::Button {
     let button = gtk::Button::builder()
@@ -87,7 +95,27 @@ fn attach_path_picker(row: &adw::EntryRow, tooltip: &str, title: &str, filter_na
     row.add_suffix(&button);
 }
 
-pub(super) fn attach_database_file_picker(row: &adw::EntryRow) -> gtk::Box {
+pub(super) fn request_database_file(
+    driver: Arc<dyn DatabaseDriver>,
+    path: PathBuf,
+    sender: &ComponentSender<ConnectDialog>,
+) {
+    let input = sender.input_sender().clone();
+    gtk::glib::spawn_future_local(async move {
+        let created = gtk::gio::spawn_blocking(move || {
+            let outcome = bookie_app_services::database_file::create_database_file(driver.as_ref(), &path);
+            (path, outcome)
+        })
+        .await;
+        let Ok((path, outcome)) = created else {
+            tracing::warn!("creating the database file did not finish");
+            return;
+        };
+        input.emit(ConnectDialogInput::DatabaseFileCreated { path, outcome });
+    });
+}
+
+pub(super) fn attach_database_file_picker(row: &adw::EntryRow, on_create: impl Fn(PathBuf) + 'static) -> gtk::Box {
     let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     let open = picker_button(
         "document-open-symbolic",
@@ -110,17 +138,21 @@ pub(super) fn attach_database_file_picker(row: &adw::EntryRow) -> gtk::Box {
         "document-new-symbolic",
         &bookie_app_services::tr!("Create a new database file"),
     );
-    let entry = row.clone();
+    let on_create = Rc::new(on_create);
     create.connect_clicked(move |button| {
         let dialog = gtk::FileDialog::builder()
             .title(bookie_app_services::tr!("Create database file"))
             .modal(true)
             .build();
-        let entry = entry.clone();
+        let on_create = on_create.clone();
         dialog.save(
             parent_window(button).as_ref(),
             gtk::gio::Cancellable::NONE,
-            move |result| set_entry_from_file(&entry, result),
+            move |result| {
+                if let Some(path) = result.ok().and_then(|file| file.path()) {
+                    on_create(path);
+                }
+            },
         );
     });
     buttons.append(&open);

@@ -1,5 +1,8 @@
 #[cfg(target_os = "linux")]
-use std::os::{fd::AsRawFd, unix::fs::MetadataExt};
+use std::os::{
+    fd::AsRawFd,
+    unix::fs::{MetadataExt, PermissionsExt},
+};
 use std::{
     fs::File,
     sync::{Arc, Mutex},
@@ -69,6 +72,10 @@ impl DatabaseDriver for DuckdbDriver {
         true
     }
 
+    fn initialize_new_database_file(&self, path: &std::path::Path) -> Result<(), DriverError> {
+        initialize_database_file(path)
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let path = opts.database.clone();
         let read_only = opts.read_only;
@@ -97,6 +104,7 @@ fn open_path_with_access(
             "read-only DuckDB requires a database file or a selected flat file".into(),
         ));
     }
+    require_existing_file(path)?;
     if let Some(reader_fn) = flat_file_reader_fn(path) {
         let (conn, selected_file) = open_read_only_flat_file(path, reader_fn)?;
         return Ok((conn, Some(selected_file)));
@@ -259,9 +267,7 @@ fn open_path(path: &str) -> Result<DuckConnection, DriverError> {
     if path.is_empty() || path == ":memory:" {
         return DuckConnection::open_in_memory().map_err(map_duck_error);
     }
-    if !std::path::Path::new(path).exists() {
-        return Err(DriverError::Internal(format!("database file does not exist: {path}")));
-    }
+    require_existing_file(path)?;
     let Some(reader_fn) = flat_file_reader_fn(path) else {
         return DuckConnection::open(path).map_err(map_duck_error);
     };
@@ -274,6 +280,25 @@ fn open_path(path: &str) -> Result<DuckConnection, DriverError> {
     );
     conn.execute(&sql, []).map_err(map_duck_error)?;
     Ok(conn)
+}
+
+fn initialize_database_file(path: &std::path::Path) -> Result<(), DriverError> {
+    let directory = path.parent().filter(|parent| !parent.as_os_str().is_empty());
+    let staging = tempfile::Builder::new()
+        .prefix(".bookie-new-")
+        .tempdir_in(directory.unwrap_or_else(|| std::path::Path::new(".")))
+        .map_err(map_file_error)?;
+    let staged = staging.path().join("database");
+    DuckConnection::open(&staged).map_err(map_duck_error)?;
+    std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o600)).map_err(map_file_error)?;
+    std::fs::rename(&staged, path).map_err(map_file_error)
+}
+
+fn require_existing_file(path: &str) -> Result<(), DriverError> {
+    if std::path::Path::new(path).exists() {
+        return Ok(());
+    }
+    Err(DriverError::DatabaseFileNotFound(path.to_string()))
 }
 
 fn flat_file_reader_fn(path: &str) -> Option<&'static str> {
