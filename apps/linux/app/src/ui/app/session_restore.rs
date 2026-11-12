@@ -16,6 +16,13 @@ pub(super) fn next_restore_target(queue: &mut VecDeque<Uuid>, can_open: impl Fn(
     None
 }
 
+pub(super) fn forget_group_on_close(window: &relm4::gtk::Window, key: usize, sender: ComponentSender<App>) {
+    window.connect_close_request(move |_| {
+        sender.input(AppMsg::ExtraWindowDismissed(key));
+        relm4::gtk::glib::Propagation::Proceed
+    });
+}
+
 impl App {
     pub(super) fn begin_session_restore(&mut self, connections: &[SavedConnection], sender: ComponentSender<Self>) {
         if !crate::services::window_state::take_session_restore_turn() {

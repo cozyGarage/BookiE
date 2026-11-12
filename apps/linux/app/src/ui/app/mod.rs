@@ -1114,6 +1114,7 @@ impl SimpleComponent for App {
                 // Controller drops.
                 let key = ctrl.widget().as_ptr() as usize;
                 let destroy_sender = sender.clone();
+                session_restore::forget_group_on_close(ctrl.widget().upcast_ref(), key, sender.clone());
                 ctrl.widget().connect_destroy(move |_| {
                     destroy_sender.input(AppMsg::ExtraWindowClosed(key));
                 });
@@ -1121,8 +1122,8 @@ impl SimpleComponent for App {
             }
             AppMsg::ExtraWindowClosed(key) => {
                 self.extra_windows.retain(|(k, _)| *k != key);
-                self.forget_open_sessions_window(key, sender);
             }
+            AppMsg::ExtraWindowDismissed(key) => self.forget_open_sessions_window(key, sender),
             AppMsg::JumpToColumn => {
                 let opened = self
                     .workspace_tab_view

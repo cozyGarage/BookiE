@@ -275,6 +275,16 @@
     [
       "bookie-app",
       "--lib",
+      "ui::app::multi_session::gtk_tests::closing_a_secondary_window_forgets_only_its_own_group"
+    ],
+    [
+      "bookie-app",
+      "--lib",
+      "ui::app::multi_session::gtk_tests::destroying_windows_without_a_close_request_keeps_every_group"
+    ],
+    [
+      "bookie-app",
+      "--lib",
       "ui::app::organization::lifetime_tests::dropping_the_colour_chooser_releases_its_popover"
     ],
     [

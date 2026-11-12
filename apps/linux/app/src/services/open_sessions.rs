@@ -23,6 +23,13 @@ pub struct PendingSave {
     generation: u64,
 }
 
+impl PendingSave {
+    #[cfg(test)]
+    pub fn record_windows(&self) -> &[Vec<Uuid>] {
+        &self.record.windows
+    }
+}
+
 impl WindowKeys {
     const fn new() -> Self {
         Self {

@@ -195,6 +195,7 @@ pub enum AppMsg {
     /// destroyed GTK widget's pointer, cast to `usize`, so the entry in
     /// `extra_windows` can be found and dropped.
     ExtraWindowClosed(usize),
+    ExtraWindowDismissed(usize),
     RowCountLoaded(Uuid, crate::ui::browse_tab::BrowseRowCountRequest, u64),
     RowCountFailed(Uuid, crate::ui::browse_tab::BrowseRowCountRequest),
     JumpToColumn,

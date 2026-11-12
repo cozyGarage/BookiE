@@ -250,3 +250,59 @@ fn a_failed_connect_keeps_both_sessions_in_the_same_window() {
     assert!(model.extra_windows.is_empty());
     assert!(model.connected);
 }
+
+struct WindowPair {
+    controller: relm4::Controller<App>,
+    primary: uuid::Uuid,
+    secondary: uuid::Uuid,
+    _directory: tempfile::TempDir,
+}
+
+fn primary_and_secondary_window() -> WindowPair {
+    relm4::adw::init().unwrap();
+    gtk4::gio::resources_register_include!("bookie.gresource").unwrap();
+    relm4::main_application()
+        .register(None::<&gtk4::gio::Cancellable>)
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let controller = launch(directory.path());
+    controller.widget().present();
+    controller.emit(AppMsg::NewWindow);
+    spin_until(|| controller.model().extra_windows.len() == 1);
+    let key = controller.model().extra_windows[0].0;
+    let primary = uuid::Uuid::new_v4();
+    let secondary = uuid::Uuid::new_v4();
+    crate::services::open_sessions::record_window(controller.widget().as_ptr() as usize, vec![primary]);
+    crate::services::open_sessions::record_window(key, vec![secondary]);
+    WindowPair {
+        controller,
+        primary,
+        secondary,
+        _directory: directory,
+    }
+}
+
+fn recorded_groups() -> Vec<Vec<uuid::Uuid>> {
+    crate::services::open_sessions::record_window(usize::MAX / 2, Vec::new())
+        .record_windows()
+        .to_vec()
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn closing_a_secondary_window_forgets_only_its_own_group() {
+    let pair = primary_and_secondary_window();
+    let window = pair.controller.model().extra_windows[0].1.widget().clone();
+    window.close();
+    spin_until(|| recorded_groups() == vec![vec![pair.primary]]);
+}
+
+#[test]
+#[ignore = "requires an isolated GTK display"]
+fn destroying_windows_without_a_close_request_keeps_every_group() {
+    let pair = primary_and_secondary_window();
+    let window = pair.controller.model().extra_windows[0].1.widget().clone();
+    window.destroy();
+    spin_for(Duration::from_millis(300));
+    assert_eq!(recorded_groups(), vec![vec![pair.primary], vec![pair.secondary]]);
+}
