@@ -299,3 +299,8 @@ fn the_driver_declares_how_an_import_updates_existing_rows() {
         bookie_core::ImportUpsertStyle::OnConflict
     );
 }
+
+#[test]
+fn the_driver_declares_value_search() {
+    assert!(DuckdbDriver.capabilities().supports_value_search);
+}

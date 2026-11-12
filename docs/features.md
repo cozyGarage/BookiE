@@ -67,6 +67,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 ![Filter applied in the data grid](images/filter-applied.png)
 
+- **Search Database Values** (main menu, next to Back Up Database) finds a value across the tables of the current connection on PostgreSQL, MySQL and MariaDB, SQLite, DuckDB and SQL Server. **Contains** matches text columns and ignores case where the engine allows; **Equals** matches whole values and can include integer, decimal and UUID columns. It reads one table at a time, at most 200 tables, 24 columns per table and 25 rows per table, skips hidden schemas, and every statement goes through the usual policy checks and audit log. Each table that matches has **Open filtered**, which opens its table tab narrowed to the matching columns. Cancel stops the search and the result says how many tables were not searched.
 
 ## Write SQL
 

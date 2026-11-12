@@ -201,3 +201,15 @@ Use a table with a `bytea` or `blob` column. Run BookiE with isolated `XDG_*` an
 3. Store the bytes `08 96 01 12 07` followed by `testing`. The section reads **Decoded as Protobuf without a schema** and lists field `1` as 150 and field `2` as `testing`.
 4. Store `de ad be ef`, plain text and an image. No **Decoded** section appears.
 5. Store a MessagePack array over 64 KiB. No **Decoded** section appears and the hex dump still shows.
+
+## Search database values
+
+Open the main menu on a connection with several tables and choose Search Database Values.
+
+- [ ] Searching for a name that appears in one text column of two tables lists both tables with the matching rows and columns; **Open filtered** opens the table narrowed to that column.
+- [ ] A term with `%` or `_` matches those characters literally.
+- [ ] **Equals** with a number finds nothing until **Also match numbers and ids** is on, then finds the matching integer column.
+- [ ] Cancel during a search on a database with many tables stops it quickly; the result says how many tables were not searched.
+- [ ] A hidden schema is not searched. A connection with more than 200 tables says some tables were left out.
+- [ ] A Redis, MongoDB or ClickHouse connection says the search is not available.
+- [ ] After a search, the audit log shows one read per table searched with the bound value not shown in the SQL.

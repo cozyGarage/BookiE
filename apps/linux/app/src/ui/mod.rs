@@ -43,6 +43,7 @@ mod ssh_section;
 mod structure_tab;
 mod structure_tab_dialogs;
 mod theme;
+mod value_search;
 mod welcome_view;
 
 pub use app::{App, AppInit};

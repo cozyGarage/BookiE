@@ -35,6 +35,7 @@ mod status_pages;
 mod structure;
 mod tab_title;
 mod types;
+mod value_search;
 mod workspace_chrome;
 mod workspace_close;
 mod workspace_overview;
@@ -1194,6 +1195,7 @@ impl SimpleComponent for App {
             AppMsg::ImportQueueFileStarted(started) => self.on_import_queue_file_started(*started),
             AppMsg::ImportQueueFinished(finished) => self.on_import_queue_finished(*finished),
             AppMsg::BackUpDatabase => self.on_back_up_database(sender),
+            AppMsg::SearchDatabaseValues => self.on_search_database_values(&sender),
             AppMsg::RestoreDatabase => self.on_restore_database(sender),
             AppMsg::StartBackupJob(job) => self.on_start_backup_job(job, sender),
             AppMsg::BackupJobFinished(report) => self.on_backup_job_finished(*report, sender),

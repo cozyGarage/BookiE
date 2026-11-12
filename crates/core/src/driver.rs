@@ -95,6 +95,7 @@ pub struct DriverCapabilities {
     pub supports_updatable_views: bool,
     pub supports_table_health_report: bool,
     pub import_upsert: ImportUpsertStyle,
+    pub supports_value_search: bool,
 }
 
 #[async_trait]
@@ -139,6 +140,7 @@ pub trait DatabaseDriver: Send + Sync {
             supports_updatable_views: self.supports_updatable_views(),
             supports_table_health_report: self.supports_table_health_report(),
             import_upsert: self.import_upsert(),
+            supports_value_search: self.supports_value_search(),
         }
     }
 
@@ -241,6 +243,10 @@ pub trait DatabaseDriver: Send + Sync {
 
     fn import_upsert(&self) -> ImportUpsertStyle {
         ImportUpsertStyle::Unsupported
+    }
+
+    fn supports_value_search(&self) -> bool {
+        false
     }
 
     fn catalog_object_kinds(&self) -> &'static [crate::CatalogObjectKind] {

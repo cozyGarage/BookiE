@@ -39,6 +39,7 @@ mod sqlite_any_csv;
 pub mod text_file;
 mod tls;
 mod transaction;
+mod value_search;
 mod view_editability;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
@@ -90,4 +91,5 @@ pub use server_message::{
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;
+pub use value_search::{SearchClause, SearchMode, search_clause};
 pub use view_editability::ViewEditability;

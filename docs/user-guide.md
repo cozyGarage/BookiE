@@ -105,6 +105,16 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
 - **Favorites & Open Quickly**: Press `Ctrl+D` to save a favorite query, `Ctrl+Shift+B` to view saved favorites, and `Ctrl+P` for Open Quickly across tabs, favorites, and connections.
 
+## Search database values
+
+Open the main menu and choose **Search Database Values…** to look for a value in every table of the connection.
+
+1. Type the value. **Contains** matches part of a text column and ignores case where the engine allows it. **Equals the value exactly** matches whole values; turn on **Also match numbers and ids** to compare integer, decimal and UUID columns as well.
+2. Press **Search**. Tables are read one at a time and the dialog names the table in progress. **Cancel** stops the search.
+3. The result lists the tables with matches, how many rows matched and in which columns. **Open filtered** opens that table narrowed to the matching columns.
+
+A search covers at most 200 tables, 24 columns in each table and 25 matching rows per table, and the result says when something was left out. It skips hidden schemas, binary and JSON columns, and never changes data. Each statement follows the connection's policy and is recorded in the audit log, so a policy denial or a timeout ends the search and is recorded. The feature is available on PostgreSQL, MySQL, MariaDB, SQLite, DuckDB and SQL Server.
+
 ## Import and export
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)

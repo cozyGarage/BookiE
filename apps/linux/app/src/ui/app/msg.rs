@@ -387,6 +387,7 @@ pub enum AppMsg {
     ImportQueueFileStarted(Box<super::import::ImportQueueFileStarted>),
     ImportQueueFinished(Box<super::import::ImportQueueFinished>),
     BackUpDatabase,
+    SearchDatabaseValues,
     RestoreDatabase,
     StartBackupJob(bookie_app_services::database_backup::BackupJob),
     BackupJobFinished(Box<super::backup::BackupReport>),
