@@ -386,11 +386,15 @@ impl HopRow {
 }
 
 fn entry_row(title: &str) -> adw::EntryRow {
-    adw::EntryRow::builder().title(title).build()
+    let row = adw::EntryRow::new();
+    row.set_title(title);
+    row
 }
 
 fn password_row(title: &str) -> adw::PasswordEntryRow {
-    adw::PasswordEntryRow::builder().title(title).build()
+    let row = adw::PasswordEntryRow::new();
+    row.set_title(title);
+    row
 }
 
 fn auth_row() -> adw::ComboRow {
