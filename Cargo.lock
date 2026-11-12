@@ -1577,7 +1577,7 @@ dependencies = [
  "argon2",
  "async-trait",
  "aws-lc-rs",
- "base64 0.22.1",
+ "base64 0.23.1",
  "bookie-core",
  "bookie-policy",
  "chrono",
