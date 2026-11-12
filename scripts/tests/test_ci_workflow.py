@@ -339,10 +339,7 @@ class CiWorkflowTests(unittest.TestCase):
             r"(?ms)^  postgres-release:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", github
         ).group(1)
         forgejo_job = re.search(r"(?ms)^  gtk-server:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
-        forgejo_server_jobs = "\n".join(
-            re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
-            for name in ("e2e", "gtk-server")
-        )
+        forgejo_server_jobs = forgejo_job
 
         layers = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]
         expected = {
@@ -356,6 +353,11 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertRegex(forgejo_server_jobs, rf"(?m)^\s*-\s*server:\s*{re.escape(server)}\b")
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', github_job)
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
+        self.assertIn("timeout-minutes: 45", forgejo_job)
+        self.assertEqual(
+            set(re.findall(r"(?m)^\s+- server: ([a-z-]+)$", forgejo_job)),
+            expected,
+        )
         self.assertIn("Build Linux / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
         self.assertIn("lab-ci / gtk-server", layers["gtk-mysql-approval"]["hosted_gate"])
         self.assertNotIn("gtk-mysql-approval", github_release_job)
@@ -366,13 +368,13 @@ class CiWorkflowTests(unittest.TestCase):
         for layer in ("gtk-postgres", "gtk-mysql"):
             with self.subTest(layer=layer):
                 self.assertIn("Build Linux / gtk-server", layers[layer]["hosted_gate"])
-                self.assertIn("lab-ci / e2e", layers[layer]["hosted_gate"])
+                self.assertIn("lab-ci / gtk-server", layers[layer]["hosted_gate"])
         self.assertIn("gtk-server", checker.REQUIRED)
         self.assertIn("actions/download-artifact@", github_job)
         self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", github_job)
         self.assertIn("python3 scripts/cleanup-testcontainers.py", github_job)
-        e2e = re.search(r"(?ms)^  e2e:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
-        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', e2e)
+        self.assertNotIn("  e2e:\n", forgejo)
+        self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
         driver = re.search(r"(?ms)^  driver:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", forgejo).group(1)
         self.assertIn("if: matrix.group == 'driver-core'", driver)
         self.assertIn("python3 scripts/run-test-layer.py pg-dump", driver)
@@ -744,7 +746,7 @@ class CiWorkflowTests(unittest.TestCase):
     def test_long_jobs_keep_artifact_dependencies_when_scheduled_after_fast_checks(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         jobs = (
-            "driver", "e2e", "consumers", "gtk",
+            "driver", "consumers", "gtk",
             "pg-release", "gtk-server", "driver-tls",
             "keyring", "supply-chain",
         )
@@ -753,9 +755,9 @@ class CiWorkflowTests(unittest.TestCase):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 dependencies = re.search(r"(?m)^    needs: \[(.+)\]$", job).group(1)
                 expected = {"pin-revision", "guards", "clippy"}
-                if name not in {"supply-chain", "e2e", "gtk", "gtk-server"}:
+                if name not in {"supply-chain", "gtk", "gtk-server"}:
                     expected.add("test-build")
-                if name in {"e2e", "gtk", "gtk-server"}:
+                if name in {"gtk", "gtk-server"}:
                     expected.add("gtk-build")
                 self.assertEqual({item.strip() for item in dependencies.split(",")}, expected)
         for name in ("unit", "sandbox", "widgets"):
@@ -764,7 +766,7 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_server_gtk_jobs_do_not_retry_stateful_scenarios_against_live_fixtures(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
-        for name in ("e2e", "gtk-server"):
+        for name in ("gtk-server",):
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
                 self.assertIn('BOOKIE_GTK_SCENARIO_RETRIES: "0"', job)
@@ -785,7 +787,7 @@ class CiWorkflowTests(unittest.TestCase):
             with self.subTest(job=name):
                 self.assertIn("runs-on: build-host", jobs[name])
         for name in (
-            "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver", "e2e",
+            "guards", "unit", "sandbox", "widgets", "distro-floor-scenarios", "driver",
             "consumers", "gtk", "pg-release", "gtk-server",
             "driver-tls", "keyring",
         ):
@@ -800,7 +802,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("compose logs --no-color --tail 50", script)
 
     def test_forgejo_jobs_bound_runtime_and_scope_checkout_credentials(self):
-        for name, expected_checkouts in (("ci", 23), ("nightly", 6)):
+        for name, expected_checkouts in (("ci", 22), ("nightly", 6)):
             workflow = (ROOT / f".forgejo/workflows/{name}.yml").read_text()
             jobs = workflow.split("\njobs:\n", 1)[1]
             headings = list(re.finditer(r"^  ([A-Za-z0-9_-]+):\s*$", jobs, re.MULTILINE))

@@ -40,9 +40,8 @@ def runner_jobs(path):
 class CiJobCleanupTests(unittest.TestCase):
     def test_gtk_server_fixtures_have_job_scoped_cleanup_labels(self):
         jobs = runner_jobs(WORKFLOWS[0])
-        for job in ("e2e", "gtk-server"):
-            self.assertIn("BOOKIE_TEST_RUN_ID:", jobs[job])
-            self.assertIn("${{ matrix.server }}", jobs[job])
+        self.assertIn("BOOKIE_TEST_RUN_ID:", jobs["gtk-server"])
+        self.assertIn("${{ matrix.server }}", jobs["gtk-server"])
         for server in ("postgres", "mysql", "mysql-approval", "mongodb", "clickhouse"):
             script = (ROOT / f"scripts/test-gtk-{server}.sh").read_text(encoding="utf-8")
             self.assertIn('com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}', script)

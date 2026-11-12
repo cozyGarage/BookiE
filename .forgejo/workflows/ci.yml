@@ -815,69 +815,6 @@ jobs:
           else
             rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
           fi
-  e2e:
-    runs-on: any-host
-    needs: [pin-revision, guards, clippy, gtk-build]
-    timeout-minutes: 45
-    env:
-      CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
-      BOOKIE_GTK_SCENARIO_RETRIES: "0"
-      BOOKIE_TEST_RUN_ID: forgejo-${{ github.run_id }}-${{ github.run_attempt }}-e2e-${{ matrix.server }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - server: postgres
-            mcp_port_slot: 5
-          - server: mysql
-            mcp_port_slot: 6
-    steps:
-      - name: Prepare runner workspace
-        run: |
-          rm -rf src
-      - name: Check runner space before checkout
-        shell: /usr/local/libexec/bookie-ci-cache checkout --min-free-gib 30 {0}
-        run: true
-      - name: Check out source revision
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ needs.pin-revision.outputs.revision }}
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          persist-credentials: false
-          fetch-depth: 1
-          path: src
-      - name: Prepare artifact runtime
-        env:
-          BOOKIE_TOOL_DIR: /var/cache/ci/tools
-        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
-      - name: Download the shared GTK binary
-        uses: https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a
-        with:
-          name: gtk-ci-${{ github.run_id }}-${{ needs.pin-revision.outputs.revision }}
-          path: gtk-artifact/
-      - name: Verify the shared GTK binary
-        run: |
-          binary=$(python3 src/scripts/ci-gtk-artifact.py verify "$GITHUB_WORKSPACE/gtk-artifact" "${{ needs.pin-revision.outputs.revision }}")
-          printf 'BOOKIE_GTK_BINARY=%s\nGSETTINGS_SCHEMA_DIR=%s/schemas\n' "$binary" "$GITHUB_WORKSPACE/gtk-artifact" >> "$GITHUB_ENV"
-      - name: Docker Hub login
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: bash src/scripts/docker-hub-login.sh
-      - name: Select isolated MCP HTTP port
-        run: cd src && python3 scripts/ci-mcp-port.py "${{ matrix.mcp_port_slot }}"
-      - name: Real server end to end
-        run: cd src && python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"
-
-      - name: Finalize runner job
-        if: always()
-        shell: bash
-        run: |
-          if [[ -f src/scripts/cleanup-ci-job.sh ]]; then
-            bash src/scripts/cleanup-ci-job.sh
-          else
-            rm -rf -- src gtk-artifact test-bundles floor-artifact floor-package floor-package-path coverage*.json mutants-* soak-*.log
-          fi
   security-policy:
     runs-on: any-host
     needs: [pin-revision, test-build]
@@ -1078,7 +1015,7 @@ jobs:
   gtk-server:
     runs-on: any-host
     needs: [pin-revision, guards, clippy, gtk-build]
-    timeout-minutes: 60
+    timeout-minutes: 45
     env:
       CARGO_TARGET_DIR: /var/cache/ci/target/gtk-build
       BOOKIE_GTK_SCENARIO_RETRIES: "0"
@@ -1088,10 +1025,14 @@ jobs:
       matrix:
         include:
           - server: clickhouse
-            mcp_port_slot: 7
-          - server: mysql-approval
-            mcp_port_slot: 8
+            mcp_port_slot: 5
           - server: mongodb
+            mcp_port_slot: 6
+          - server: postgres
+            mcp_port_slot: 7
+          - server: mysql
+            mcp_port_slot: 8
+          - server: mysql-approval
             mcp_port_slot: 9
     steps:
       - name: Prepare runner workspace
@@ -1295,7 +1236,6 @@ jobs:
       - floor-build
       - distro-floor-scenarios
       - driver
-      - e2e
       - security-policy
       - consumers
       - gtk
