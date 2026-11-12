@@ -1,5 +1,5 @@
 diff --git a/Cargo.toml b/Cargo.toml
-index 8a8dafd..0473ba4 100644
+index 8a8dafd..ba26c35 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -139,7 +139,7 @@ features = [
@@ -7,7 +7,7 @@ index 8a8dafd..0473ba4 100644
  
  [dependencies.libsqlite3-sys]
 -version = ">=0.30.1, <0.38.0"
-+version = ">=0.30.1, <0.40.0"
++version = ">=0.30.1, <0.41.0"
  features = [
      "pkg-config",
      "vcpkg",
