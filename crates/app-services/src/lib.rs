@@ -43,6 +43,7 @@ pub mod health_report;
 pub mod highlight_settings;
 pub mod i18n;
 pub mod image_preview;
+pub mod import_queue;
 pub mod open_failure;
 pub mod ordered_refresh;
 pub mod preparation;
@@ -71,6 +72,7 @@ pub mod tls_failure;
 pub mod value_input;
 #[cfg(test)]
 mod value_input_tests;
+pub mod value_search;
 pub mod view_edit;
 pub mod window_sessions;
 pub mod window_state;

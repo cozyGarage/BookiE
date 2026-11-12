@@ -47,6 +47,10 @@ pub(super) fn primary_menu_model() -> gio::Menu {
         Some(&bookie_app_services::tr!("Restore from Backup…")),
         Some("win.restore-database"),
     );
+    connection_section.append(
+        Some(&bookie_app_services::tr!("Search Database Values…")),
+        Some("win.search-database-values"),
+    );
     menu.append_section(None, &connection_section);
     let query_section = gio::Menu::new();
     query_section.append(
@@ -158,6 +162,7 @@ fn add_window_input_actions(
         input_action!("show-saved-queries", AppMsg::ShowSavedQueries),
         input_action!("back-up-database", AppMsg::BackUpDatabase),
         input_action!("restore-database", AppMsg::RestoreDatabase),
+        input_action!("search-database-values", AppMsg::SearchDatabaseValues),
     ]);
     group.add_action_entries([
         input_action!("focus-grid", AppMsg::FocusActiveGrid),

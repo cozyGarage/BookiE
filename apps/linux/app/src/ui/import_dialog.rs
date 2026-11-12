@@ -15,6 +15,7 @@ use relm4::{adw, gtk};
 use tokio_util::sync::CancellationToken;
 
 mod preview_queue;
+mod write_mode;
 
 /// Whether the rows go into a table that is already there, or into one
 /// the import creates first.
@@ -23,6 +24,7 @@ pub(crate) enum ImportMode {
         capabilities: DriverCapabilities,
         table: String,
         columns: Vec<ColumnInfo>,
+        keys: Vec<bookie_core::import::ConflictKey>,
     },
     NewTable {
         driver_id: String,
@@ -40,6 +42,7 @@ pub(crate) struct ImportRequest {
     pub mode: ImportMode,
     pub mapping_store: Option<CsvMappingStore>,
     pub mapping_scope: Option<CsvMappingScope>,
+    pub more_files: Vec<PathBuf>,
 }
 
 /// What the user settled on. The app re-reads the whole file with these
@@ -57,6 +60,30 @@ pub(crate) struct ImportChoice {
     /// CREATE is its own governed statement, run before any row.
     pub create: Option<Vec<DraftColumn>>,
     pub skip_rejected_rows: bool,
+    pub write: bookie_core::import::WriteMode,
+    pub source: PathBuf,
+    pub more_files: Vec<PathBuf>,
+}
+
+fn skip_rejected_group() -> (adw::SwitchRow, adw::PreferencesGroup) {
+    let skip_rejected = adw::SwitchRow::builder()
+        .title(bookie_app_services::tr!("Skip rows the database rejects"))
+        .subtitle(bookie_app_services::tr!(
+            "Off: the first rejected row stops the import. On: rejected rows are skipped and listed when the import finishes."
+        ))
+        .build();
+    let errors = adw::PreferencesGroup::builder()
+        .title(bookie_app_services::tr!("Errors"))
+        .build();
+    errors.add(&skip_rejected);
+    (skip_rejected, errors)
+}
+
+fn existing_write_mode(mode: &ImportMode) -> Option<write_mode::WriteModeSection> {
+    let ImportMode::ExistingTable { capabilities, keys, .. } = mode else {
+        return None;
+    };
+    write_mode::WriteModeSection::new(capabilities, keys)
 }
 
 const SKIP_LABEL: &str = "Skip";
@@ -79,16 +106,14 @@ pub(crate) fn present(
     page.add(&preview_group);
     let columns = ColumnSection::new(&request);
     page.add(columns.group());
-    let skip_rejected = adw::SwitchRow::builder()
-        .title(bookie_app_services::tr!("Skip rows the database rejects"))
-        .subtitle(bookie_app_services::tr!(
-            "Off: the first rejected row stops the import. On: rejected rows are skipped and listed when the import finishes."
-        ))
-        .build();
-    let errors = adw::PreferencesGroup::builder()
-        .title(bookie_app_services::tr!("Errors"))
-        .build();
-    errors.add(&skip_rejected);
+    let write_mode = existing_write_mode(&request.mode);
+    if let Some(section) = &write_mode {
+        page.add(section.group());
+    }
+    if let Some(notice) = write_mode::queue_notice(request.more_files.len()) {
+        page.add(&notice);
+    }
+    let (skip_rejected, errors) = skip_rejected_group();
     page.add(&errors);
     let start_button = gtk::Button::builder().label(bookie_app_services::tr!("Import")).build();
     start_button.add_css_class("suggested-action");
@@ -97,6 +122,7 @@ pub(crate) fn present(
         request,
         file,
         columns,
+        write_mode,
         skip_rejected,
         preview_status,
         start_button: start_button.downgrade(),
@@ -132,6 +158,7 @@ struct State {
     request: ImportRequest,
     file: FileOptions,
     columns: ColumnSection,
+    write_mode: Option<write_mode::WriteModeSection>,
     skip_rejected: adw::SwitchRow,
     preview_status: gtk::Label,
     start_button: gtk::glib::WeakRef<gtk::Button>,
@@ -184,6 +211,10 @@ impl State {
         }
         let options = self.file.options();
         let (table, columns, mapping, create) = self.columns.resolve()?;
+        let write = match &self.write_mode {
+            Some(section) => section.selection()?,
+            None => bookie_core::import::WriteMode::Insert,
+        };
         Some(ImportChoice {
             schema: self.request.schema.clone(),
             table,
@@ -198,6 +229,9 @@ impl State {
             },
             create,
             skip_rejected_rows: self.skip_rejected.is_active(),
+            write,
+            source: self.request.path.clone(),
+            more_files: self.request.more_files.clone(),
         })
     }
 }
@@ -978,6 +1012,7 @@ pub(crate) struct ImportProgress {
     label: gtk::Label,
     spinner: gtk::Spinner,
     total: Option<u64>,
+    file_note: Option<String>,
 }
 
 impl ImportProgress {
@@ -993,7 +1028,19 @@ impl ImportProgress {
             committed as f64 / total as f64
         };
         self.bar.set_fraction(fraction);
-        self.label.set_label(&rows_label(committed, total));
+        self.label.set_label(&self.progress_text(committed, total));
+    }
+
+    pub(crate) fn begin_file(&mut self, note: &str, total: u64) {
+        self.file_note = Some(note.to_owned());
+        self.set_total(total);
+    }
+
+    fn progress_text(&self, committed: u64, total: u64) -> String {
+        match &self.file_note {
+            Some(note) => format!("{note}\n{}", rows_label(committed, total)),
+            None => rows_label(committed, total),
+        }
     }
 
     pub(crate) fn set_total(&mut self, total: u64) {
@@ -1001,7 +1048,8 @@ impl ImportProgress {
         self.spinner.stop();
         self.spinner.set_visible(false);
         self.bar.set_visible(true);
-        self.label.set_label(&rows_label(0, total));
+        self.bar.set_fraction(0.0);
+        self.label.set_label(&self.progress_text(0, total));
     }
 
     pub(crate) fn is_cancelled(&self) -> bool {
@@ -1037,6 +1085,7 @@ pub(crate) fn present_preparing(parent: &adw::ApplicationWindow, table: &str) ->
         label,
         spinner,
         total: None,
+        file_note: None,
     }
 }
 

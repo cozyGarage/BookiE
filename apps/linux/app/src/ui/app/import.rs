@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use bookie_core::import::{
-    CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportError, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError,
-    build_insert_plan, detect_format, read_csv, read_import_file,
+    ConflictKey, CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportError, ImportTarget, InsertPlan, MAX_FILE_BYTES,
+    PlanError, build_insert_plan, conflict_key_candidates, detect_format, read_csv, read_import_file,
 };
 use bookie_core::sql_ddl::build_create_table;
 use bookie_core::{ColumnInfo, Connection, DriverCapabilities, DriverError, OperationControl};
@@ -19,7 +19,10 @@ use crate::services::csv_import_mappings::CsvMappingScope;
 use crate::services::error_text;
 use crate::ui::import_dialog::{ImportChoice, ImportMode, ImportRequest};
 
+mod queue;
 mod skips;
+
+pub use queue::{ImportQueueFileStarted, ImportQueueFinished};
 
 use super::browse::{RefreshDecision, refresh_decision};
 use super::types::WorkspaceTab;
@@ -37,6 +40,8 @@ pub struct CsvImportPreparation {
     pub bytes: Arc<[u8]>,
     pub format: CsvFormat,
     pub columns: Vec<ColumnInfo>,
+    pub keys: Vec<ConflictKey>,
+    pub more_files: Vec<PathBuf>,
     pub driver_id: String,
     pub capabilities: DriverCapabilities,
 }
@@ -51,6 +56,8 @@ pub struct CsvImportReport {
     pub error: Option<String>,
     pub skipped: u64,
     pub skipped_summary: String,
+    pub updates_existing_rows: bool,
+    pub cancelled: bool,
 }
 
 impl CsvImportReport {
@@ -63,6 +70,8 @@ impl CsvImportReport {
             error: Some(error),
             skipped: 0,
             skipped_summary: String::new(),
+            updates_existing_rows: false,
+            cancelled: false,
         }
     }
 }
@@ -150,14 +159,33 @@ impl App {
             .default_filter(&filter)
             .filters(&filters)
             .build();
-        dialog.open(Some(&self.window), gio::Cancellable::NONE, move |outcome| {
-            let Some(path) = outcome.ok().and_then(|file| file.path()) else {
+        if table.is_none() {
+            dialog.open(Some(&self.window), gio::Cancellable::NONE, move |outcome| {
+                let Some(path) = outcome.ok().and_then(|file| file.path()) else {
+                    return;
+                };
+                sender.input(AppMsg::CsvFileChosen {
+                    schema: schema.clone(),
+                    table: table.clone(),
+                    path,
+                    more_files: Vec::new(),
+                });
+            });
+            return;
+        }
+        dialog.open_multiple(Some(&self.window), gio::Cancellable::NONE, move |outcome| {
+            let Ok(files) = outcome else {
+                return;
+            };
+            let mut paths = chosen_paths(&files).into_iter();
+            let Some(path) = paths.next() else {
                 return;
             };
             sender.input(AppMsg::CsvFileChosen {
                 schema: schema.clone(),
                 table: table.clone(),
                 path,
+                more_files: paths.collect(),
             });
         });
     }
@@ -192,6 +220,7 @@ impl App {
         schema: Option<String>,
         table: Option<String>,
         path: PathBuf,
+        more_files: Vec<PathBuf>,
         sender: ComponentSender<Self>,
     ) {
         let (Some(connection_id), Some(driver_id)) = (self.connection_id, self.current_driver_id.clone()) else {
@@ -230,6 +259,7 @@ impl App {
                             schema,
                             table,
                             path,
+                            more_files,
                             driver_id,
                             capabilities,
                             connection_id,
@@ -287,6 +317,7 @@ impl App {
                 capabilities: preparation.capabilities,
                 table,
                 columns: preparation.columns,
+                keys: preparation.keys,
             },
             None => ImportMode::NewTable {
                 driver_id: preparation.driver_id,
@@ -302,6 +333,7 @@ impl App {
             mode,
             mapping_store: self.persistence.csv_import_mappings.clone(),
             mapping_scope,
+            more_files: preparation.more_files,
         };
         crate::ui::import_dialog::present(&self.window, request, move |choice| {
             sender.input(AppMsg::StartCsvImport(Box::new(choice)));
@@ -335,6 +367,10 @@ impl App {
             return;
         };
         if self.begin_csv_import_preparation(&choice.table).is_none() {
+            return;
+        }
+        if !choice.more_files.is_empty() {
+            self.start_import_queue(choice, connection_id, sender);
             return;
         }
         let worker_driver_id = driver_id.clone();
@@ -431,6 +467,7 @@ impl App {
                         token,
                         timeout_secs,
                         skip_rejected_rows: choice.skip_rejected_rows,
+                        updates_existing_rows: choice.write.updates_existing_rows(),
                     };
                     let report = run.execute(&sender_for_cmd).await;
                     sender_for_cmd.input(AppMsg::CsvImportFinished(Box::new(report)));
@@ -455,11 +492,7 @@ impl App {
                 self.report_skipped_rows(&report);
                 return;
             }
-            self.show_toast(
-                &bookie_app_services::tr!("Imported {done} rows into {table}")
-                    .replace("{done}", &report.committed.to_string())
-                    .replace("{table}", &report.table),
-            );
+            self.show_toast(&imported_toast(&report));
             return;
         };
         let message = bookie_app_services::tr!(
@@ -483,6 +516,17 @@ impl App {
         let message = skipped_rows_message(report);
         self.show_error_alert(&bookie_app_services::tr!("Import finished with skipped rows"), &message);
     }
+}
+
+fn imported_toast(report: &CsvImportReport) -> String {
+    let template = if report.updates_existing_rows {
+        bookie_app_services::tr!("Imported or updated {done} rows in {table}")
+    } else {
+        bookie_app_services::tr!("Imported {done} rows into {table}")
+    };
+    template
+        .replace("{done}", &report.committed.to_string())
+        .replace("{table}", &report.table)
 }
 
 fn skipped_rows_message(report: &CsvImportReport) -> String {
@@ -586,6 +630,7 @@ struct ImportRun {
     token: CancellationToken,
     timeout_secs: u32,
     skip_rejected_rows: bool,
+    updates_existing_rows: bool,
 }
 
 impl ImportRun {
@@ -624,6 +669,7 @@ impl ImportRun {
             Err(BatchStop::Cancelled) => BulkInsertEnd::Cancelled,
             Err(BatchStop::Failed(error)) => BulkInsertEnd::Failed(error),
         };
+        let cancelled = matches!(outcome, Err(BatchStop::Cancelled));
         let committed = self
             .guard
             .finish_bulk_insert(&mut scope, end)
@@ -637,6 +683,8 @@ impl ImportRun {
             error: stop_message(outcome),
             skipped: skips.total(),
             skipped_summary: skips.summary(),
+            updates_existing_rows: self.updates_existing_rows,
+            cancelled,
         }
     }
 
@@ -715,6 +763,7 @@ struct Prepare {
     schema: Option<String>,
     table: Option<String>,
     path: PathBuf,
+    more_files: Vec<PathBuf>,
     driver_id: String,
     capabilities: DriverCapabilities,
     connection_id: uuid::Uuid,
@@ -727,6 +776,11 @@ async fn prepare_import(
     prepare: Prepare,
 ) -> Result<CsvImportPreparation, String> {
     let path = prepare.path.clone();
+    let queued = prepare.more_files.clone();
+    let first = prepare.path.clone();
+    tokio::task::spawn_blocking(move || check_file_queue(&first, &queued))
+        .await
+        .map_err(|_| bookie_app_services::tr!("The import file could not be prepared."))??;
     let bytes = tokio::task::spawn_blocking(move || read_file(&path).map(Arc::from))
         .await
         .map_err(|_| bookie_app_services::tr!("The import file could not be prepared."))??;
@@ -734,9 +788,13 @@ async fn prepare_import(
         return Err(bookie_app_services::tr!("Import preparation was cancelled."));
     }
     let format = detect_format(&bytes);
-    let columns = match &prepare.table {
-        None => Vec::new(),
-        Some(table) => existing_columns(conn, control, prepare.schema.as_deref(), table).await?,
+    let (columns, keys) = match &prepare.table {
+        None => (Vec::new(), Vec::new()),
+        Some(table) => {
+            let columns = existing_columns(conn.clone(), control, prepare.schema.as_deref(), table).await?;
+            let keys = existing_keys(conn, control, &prepare, table, &columns).await?;
+            (columns, keys)
+        }
     };
     Ok(CsvImportPreparation {
         connection_id: prepare.connection_id,
@@ -747,9 +805,49 @@ async fn prepare_import(
         bytes,
         format,
         columns,
+        keys,
+        more_files: prepare.more_files,
         driver_id: prepare.driver_id,
         capabilities: prepare.capabilities,
     })
+}
+
+async fn existing_keys(
+    conn: Arc<dyn Connection>,
+    control: &OperationControl,
+    prepare: &Prepare,
+    table: &str,
+    columns: &[ColumnInfo],
+) -> Result<Vec<ConflictKey>, String> {
+    if prepare.capabilities.import_upsert == bookie_core::ImportUpsertStyle::Unsupported {
+        return Ok(Vec::new());
+    }
+    let indexes = conn
+        .fetch_indexes_controlled(prepare.schema.as_deref(), table, control)
+        .await
+        .map_err(|error| error_text::driver_message(&error))?;
+    Ok(conflict_key_candidates(columns, &indexes))
+}
+
+fn chosen_paths(files: &gio::ListModel) -> Vec<PathBuf> {
+    (0..files.n_items())
+        .filter_map(|index| files.item(index).and_downcast::<gio::File>())
+        .filter_map(|file| file.path())
+        .collect()
+}
+
+fn check_file_queue(first: &std::path::Path, more: &[PathBuf]) -> Result<(), String> {
+    if more.is_empty() {
+        return Ok(());
+    }
+    let sizes: Vec<(PathBuf, u64)> = std::iter::once(first)
+        .chain(more.iter().map(PathBuf::as_path))
+        .map(|path| {
+            let bytes = std::fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+            (path.to_path_buf(), bytes)
+        })
+        .collect();
+    bookie_app_services::import_queue::check_queue(&sizes).map_err(|error| error.to_string())
 }
 
 async fn existing_columns(
@@ -821,7 +919,8 @@ fn plan_for(driver_id: &str, choice: &ImportChoice) -> Result<InsertPlan, String
         columns: &choice.columns,
         mapping: &choice.mapping,
     };
-    build_insert_plan(&target, &sheet, &choice.options).map_err(plan_error_text)
+    let plan = build_insert_plan(&target, &sheet, &choice.options).map_err(plan_error_text)?;
+    choice.write.apply(plan, &target).map_err(plan_error_text)
 }
 
 async fn prepare_csv_plan(connection_id: Uuid, driver_id: String, choice: ImportChoice) -> CsvImportPlanPreparation {
@@ -868,3 +967,7 @@ fn plan_error_text(error: PlanError) -> String {
 #[cfg(test)]
 #[path = "import_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "import_upsert_tests.rs"]
+mod upsert_tests;

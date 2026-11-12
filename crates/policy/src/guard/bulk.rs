@@ -1,8 +1,8 @@
 use super::*;
 use crate::classify::StatementClass;
-use crate::classify::classify;
-use sqlparser::ast::{Statement, TableObject};
-use sqlparser::parser::Parser;
+use crate::classify::classify_parsed;
+use crate::parsed_sql::ParsedSql;
+use sqlparser::ast::{OnConflict, OnConflictAction, OnInsert, Statement, TableObject};
 
 /// Rows one approved import may write. A budget larger than this is
 /// refused before the user is asked, so no single approval can cover an
@@ -222,8 +222,31 @@ fn valid_sequence_columns(driver_id: &str, columns: &[String]) -> bool {
         })
 }
 
-fn approval_preview(target: &str, rows: u64, statement: &str) -> String {
-    format!("Import {rows} rows into {target}\n\nEvery row runs this statement with its own bound values:\n{statement}")
+fn approval_preview(target: &str, rows: u64, statement: &str, upserts: bool) -> String {
+    let notice = if upserts { UPSERT_NOTICE } else { "" };
+    format!(
+        "Import {rows} rows into {target}{notice}\n\nEvery row runs this statement with its own bound values:\n{statement}"
+    )
+}
+
+const UPSERT_REASON: &str = " (existing rows may be updated)";
+
+const UPSERT_AUDIT_SUFFIX: &str = " (upsert: existing rows may be updated)";
+
+const UPSERT_NOTICE: &str = ". Rows whose key already exists are updated, so existing rows may change";
+
+fn upserts_existing_rows(parsed: &ParsedSql) -> bool {
+    let Ok([Statement::Insert(insert)]) = parsed.statements() else {
+        return false;
+    };
+    matches!(
+        insert.on,
+        Some(OnInsert::DuplicateKeyUpdate(_))
+            | Some(OnInsert::OnConflict(OnConflict {
+                action: OnConflictAction::DoUpdate(_),
+                ..
+            }))
+    )
 }
 
 impl PolicyGuard {
@@ -232,7 +255,8 @@ impl PolicyGuard {
     /// the only thing that lets [`PolicyGuard::execute_bulk_batch`] run.
     pub async fn begin_bulk_insert(&self, request: BulkInsertRequest) -> Result<BulkInsertScope, DriverError> {
         self.require_governed_write_available()?;
-        let facts = bulk_facts(&request, &self.ctx.driver_id)?;
+        let parsed = ParsedSql::new(&request.statement, &self.ctx.driver_id);
+        let facts = bulk_facts(&request, &parsed, &self.ctx.driver_id)?;
         if !valid_sequence_columns(&self.ctx.driver_id, &request.sequence_columns) {
             self.record_bulk_refusal(
                 &request,
@@ -244,7 +268,7 @@ impl PolicyGuard {
             .await?;
             return Err(denied("the import sequence columns are invalid"));
         }
-        if !statement_target_matches_request(&request, &self.ctx.driver_id) {
+        if !statement_target_matches_request(&request, &parsed, &self.ctx.driver_id) {
             self.record_bulk_refusal(
                 &request,
                 &facts,
@@ -267,8 +291,9 @@ impl PolicyGuard {
             &env_policy,
             Some(request.row_budget),
         );
-        let granted = self.settle_bulk_decision(&request, &facts, decision).await?;
-        let scope = self.new_scope(request, &facts, granted);
+        let upserts = upserts_existing_rows(&parsed);
+        let granted = self.settle_bulk_decision(&request, &facts, decision, upserts).await?;
+        let scope = self.new_scope(request, &facts, granted, upserts);
         self.handle_intent_failure(self.record_intent(&scope.operation()).await)?;
         Ok(scope)
     }
@@ -417,6 +442,7 @@ impl PolicyGuard {
         request: &BulkInsertRequest,
         facts: &StatementFacts,
         decision: Decision,
+        upserts: bool,
     ) -> Result<GrantedBulkDecision, DriverError> {
         let target = qualified_target(request.schema.as_deref(), &request.table);
         match decision {
@@ -431,7 +457,7 @@ impl PolicyGuard {
                 Err(denied(message))
             }
             Decision::RequireApproval { ref rule, .. } => {
-                let preview = approval_preview(&target, request.row_budget, &request.statement);
+                let preview = approval_preview(&target, request.row_budget, &request.statement, upserts);
                 let outcome = self
                     .ctx
                     .approval
@@ -443,7 +469,11 @@ impl PolicyGuard {
                         sql: request.statement.clone(),
                         facts: facts.clone(),
                         rule: rule.clone(),
-                        reason: format!("import {} rows into {target}", request.row_budget),
+                        reason: format!(
+                            "import {} rows into {target}{}",
+                            request.row_budget,
+                            if upserts { UPSERT_REASON } else { "" }
+                        ),
                         preview: Some(preview.clone()),
                         estimated_rows: Some(request.row_budget),
                         cancellation: None,
@@ -501,12 +531,18 @@ impl PolicyGuard {
         request: BulkInsertRequest,
         facts: &StatementFacts,
         granted: GrantedBulkDecision,
+        upserts: bool,
     ) -> BulkInsertScope {
+        let target = qualified_target(request.schema.as_deref(), &request.table);
         BulkInsertScope {
             connection_id: self.ctx.connection_id,
             operation_id: Uuid::new_v4(),
             batch_id: Uuid::new_v4(),
-            target: qualified_target(request.schema.as_deref(), &request.table),
+            target: if upserts {
+                format!("{target}{UPSERT_AUDIT_SUFFIX}")
+            } else {
+                target
+            },
             schema: request.schema,
             table: request.table,
             statement: request.statement,
@@ -564,14 +600,14 @@ fn partial_transaction_outcome(committed: u64) -> AuditTransactionOutcome {
     AuditTransactionOutcome::Committed
 }
 
-fn bulk_facts(request: &BulkInsertRequest, driver_id: &str) -> Result<StatementFacts, DriverError> {
+fn bulk_facts(request: &BulkInsertRequest, parsed: &ParsedSql, driver_id: &str) -> Result<StatementFacts, DriverError> {
     if request.table.trim().is_empty() {
         return Err(denied("an import needs a target table"));
     }
     if request.row_budget == 0 || request.row_budget > MAX_BULK_ROW_BUDGET {
         return Err(denied("an import must name between one row and the import row limit"));
     }
-    let facts = classify(&request.statement, driver_id);
+    let facts = classify_parsed(parsed, driver_id);
     if facts.is_multi_statement || facts.class != StatementClass::Insert || !facts.writes() {
         return Err(denied(
             "an import approval covers one INSERT statement and nothing else",
@@ -580,12 +616,11 @@ fn bulk_facts(request: &BulkInsertRequest, driver_id: &str) -> Result<StatementF
     Ok(facts)
 }
 
-fn statement_target_matches_request(request: &BulkInsertRequest, driver_id: &str) -> bool {
-    let dialect = crate::classify::dialect_for(driver_id);
-    let Ok(statements) = Parser::parse_sql(dialect.as_ref(), &request.statement) else {
+fn statement_target_matches_request(request: &BulkInsertRequest, parsed: &ParsedSql, driver_id: &str) -> bool {
+    let Ok(statements) = parsed.statements() else {
         return false;
     };
-    let [Statement::Insert(insert)] = statements.as_slice() else {
+    let [Statement::Insert(insert)] = statements else {
         return false;
     };
     let TableObject::TableName(name) = &insert.table else {

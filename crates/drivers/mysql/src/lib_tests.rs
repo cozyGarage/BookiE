@@ -191,3 +191,16 @@ fn a_refused_plaintext_password_exchange_is_a_policy_refusal_naming_the_fix() {
     let other = map_sqlx_error(sqlx::Error::Configuration("unrelated option".into()));
     assert!(matches!(other, DriverError::Internal(_)), "{other:?}");
 }
+
+#[test]
+fn the_driver_declares_how_an_import_updates_existing_rows() {
+    assert_eq!(
+        MysqlDriver.capabilities().import_upsert,
+        bookie_core::ImportUpsertStyle::OnDuplicateKey
+    );
+}
+
+#[test]
+fn the_driver_declares_value_search() {
+    assert!(MysqlDriver.capabilities().supports_value_search);
+}

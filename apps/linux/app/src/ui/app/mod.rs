@@ -36,6 +36,7 @@ mod structure;
 mod tab_session;
 mod tab_title;
 mod types;
+mod value_search;
 mod window_close_prompt;
 mod workspace_chrome;
 mod workspace_close;
@@ -1187,14 +1188,22 @@ impl SimpleComponent for App {
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
             AppMsg::CreateTableFromCsv { schema } => self.on_create_table_from_csv(schema, sender),
-            AppMsg::CsvFileChosen { schema, table, path } => self.on_csv_file_chosen(schema, table, path, sender),
+            AppMsg::CsvFileChosen {
+                schema,
+                table,
+                path,
+                more_files,
+            } => self.on_csv_file_chosen(schema, table, path, more_files, sender),
             AppMsg::CsvImportPrepared(preparation) => self.on_csv_import_prepared(*preparation, sender),
             AppMsg::CsvImportPreparationFailed(failure) => self.on_csv_import_preparation_failed(*failure),
             AppMsg::StartCsvImport(choice) => self.on_start_csv_import(*choice, sender),
             AppMsg::CsvImportPlanPrepared(preparation) => self.on_csv_import_plan_prepared(*preparation, sender),
             AppMsg::CsvImportProgress(committed) => self.on_csv_import_progress(committed),
             AppMsg::CsvImportFinished(report) => self.on_csv_import_finished(*report, sender),
+            AppMsg::ImportQueueFileStarted(started) => self.on_import_queue_file_started(*started),
+            AppMsg::ImportQueueFinished(finished) => self.on_import_queue_finished(*finished),
             AppMsg::BackUpDatabase => self.on_back_up_database(sender),
+            AppMsg::SearchDatabaseValues => self.on_search_database_values(&sender),
             AppMsg::RestoreDatabase => self.on_restore_database(sender),
             AppMsg::StartBackupJob(job) => self.on_start_backup_job(job, sender),
             AppMsg::BackupJobFinished(report) => self.on_backup_job_finished(*report, sender),

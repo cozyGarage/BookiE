@@ -106,12 +106,24 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
 - **Favorites & Open Quickly**: Press `Ctrl+D` to save a favorite query, `Ctrl+Shift+B` to view saved favorites, and `Ctrl+P` for Open Quickly across tabs, favorites, and connections.
 
+## Search database values
+
+Open the main menu and choose **Search Database Values…** to look for a value in every table of the connection.
+
+1. Type the value. **Contains** matches part of a text column and ignores case where the engine allows it. **Equals the value exactly** matches whole values; turn on **Also match numbers and ids** to compare integer, decimal and UUID columns as well.
+2. Press **Search**. Tables are read one at a time and the dialog names the table in progress. **Cancel** stops the search.
+3. The result lists the tables with matches, how many rows matched and in which columns. **Open filtered** opens that table narrowed to the matching columns.
+
+A search covers at most 200 tables, 24 columns in each table and 25 matching rows per table, and the result says when something was left out. It skips hidden schemas, binary and JSON columns, and never changes data. Each statement follows the connection's policy and is recorded in the audit log, so a policy denial or a timeout ends the search and is recorded. The feature is available on PostgreSQL, MySQL, MariaDB, SQLite, DuckDB and SQL Server.
+
 ## Import and export
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
 - **Export**: Press `Ctrl+Shift+E`, or use Export Results from a result grid, to export the front tab's shown rows. Select **Scope** (Current table page or loaded query result) before choosing your format: CSV, JSON, Markdown, HTML, XML, SQL, or Excel (`.xlsx`). On PostgreSQL, **All matching table rows** exports the whole table, or the active filter and sort, from one consistent snapshot taken when the export starts. Other engines refuse a full-table export; export the current page or a query result instead.
 - **Import**: Right-click any table and choose **Import CSV…**, or import from a schema header to create a new table. Excel `.xlsx` files read the first populated sheet. Delimiters, headers, encodings (UTF-8, Windows-1252, UTF-16), and column mappings are detected automatically and can be remembered per table.
+- **Update existing rows**: When you import into an existing table on PostgreSQL, SQLite, DuckDB, MySQL or MariaDB, **Existing rows** offers **Update the existing row**. Pick the key under **Match rows by**: the table's primary key or one of its unique indexes. A row in the file whose key is already in the table replaces the other mapped columns of that row, and a row with a new key is added. A table with no primary key or unique index cannot use this mode. The approval prompt and the audit record state that existing rows may change. Without this mode, a duplicate key stops the import.
+- **Several files**: In the file chooser of **Import CSV…** for an existing table, select up to 20 files. You set the separator, header, mapping and write mode once, for the first file, and the same choices apply to the others, so every file needs the same columns in the same order. Each file asks for its own approval and is written in batches as for a single file. **Cancel** stops the file in progress and cancels the rest. The run stops at the first file that fails, and the final message lists every file as written, stopped, cancelled or not started. A run is limited to 256 MB of files and 2,000,000 rows.
 
 ## Safety
 

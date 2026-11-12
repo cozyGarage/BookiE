@@ -17,6 +17,7 @@ fn request() -> ImportRequest {
         },
         mapping_store: None,
         mapping_scope: None,
+        more_files: Vec::new(),
     }
 }
 
@@ -48,6 +49,7 @@ fn import_format_controls_release_their_source_bytes() {
     let state = Rc::new(State {
         file: FileOptions::new(&request),
         columns: ColumnSection::new(&request),
+        write_mode: None,
         skip_rejected: adw::SwitchRow::new(),
         request,
         preview_status: gtk::Label::new(None),

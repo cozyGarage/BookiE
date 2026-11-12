@@ -17,10 +17,11 @@ use crate::audit::{
     AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome,
 };
 use crate::blast_radius::BlastRadiusRewrite;
-use crate::classify::{StatementAnalysis, StatementClass, StatementFacts, analyze_statement};
+use crate::classify::{StatementAnalysis, StatementClass, StatementFacts, analyze_parsed, analyze_statement};
 use crate::config::PolicyConfig;
 use crate::effects::Effects;
 use crate::mask::SensitivePatterns;
+use crate::parsed_sql::ParsedSql;
 use crate::principal::Principal;
 use crate::rules::{
     Decision, evaluate_categorical, evaluate_eligible_write, evaluate_with_effects, interactive_transaction_decision,
@@ -163,6 +164,10 @@ impl PolicyGuard {
         analyze_statement(sql, &self.ctx.driver_id, self.mask_patterns.as_deref())
     }
 
+    fn analyze_parsed(&self, parsed: &ParsedSql) -> StatementAnalysis {
+        analyze_parsed(parsed, &self.ctx.driver_id, self.mask_patterns.as_deref(), true)
+    }
+
     async fn authorize(
         &self,
         sql: &str,
@@ -193,8 +198,9 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
         counter: &mut dyn Transaction,
     ) -> Result<Authorization, DriverError> {
-        let analysis = self.analyze_statement(sql);
-        if let Some(decision) = interactive_transaction_decision(&self.ctx.driver_id, sql, &analysis.facts) {
+        let parsed = ParsedSql::new(sql, &self.ctx.driver_id);
+        let analysis = self.analyze_parsed(&parsed);
+        if let Some(decision) = interactive_transaction_decision(&self.ctx.driver_id, &parsed, &analysis.facts) {
             return self.resolve_authorization(sql, analysis, decision, None, control).await;
         }
         if self.ctx.driver_id != "mysql"

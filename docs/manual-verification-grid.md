@@ -45,6 +45,14 @@ Right-click a table in the sidebar, then Import CSV. Separately, use the second 
 - [ ] Progress advances and Cancel stops it.
 - [ ] A file with a bad row partway through stops the import and the message says how many rows were written.
 - [ ] Import refuses to start on a read-only connection.
+- [ ] On PostgreSQL, SQLite, MySQL or MariaDB, an existing-table import shows **Existing rows**. With **Update the existing row** and the primary key chosen, a CSV that repeats one existing id and adds a new id changes the existing row and adds the new one; typed values (numbers, dates, decimals) are unchanged by the round trip.
+- [ ] The approval text for an update import says that existing rows may change, and the audit entry for the import names the table with the upsert note. A plain insert import shows neither.
+- [ ] A table with no primary key or unique index shows the update mode greyed out with the reason. SQL Server and Oracle tables do not show the section.
+- [ ] Choosing a key whose column is left on Skip refuses to start the import and names the column.
+- [ ] Select three CSV files with the same columns in the file chooser: the dialog says the choices apply to two more files, each file asks for approval, the progress dialog names the file and its rows, and the final message counts all rows.
+- [ ] Select a second file with different headers: the run stops at that file, the message names it, and the third file is reported as not started. Rows from the first file stay written.
+- [ ] Press Cancel during the second of three files: that file ends cancelled, the third is cancelled without any approval prompt, and the audit journal has a cancelled entry for the second file and none for the third.
+- [ ] Select 21 files: the import refuses to start and says the limit is 20 files.
 
 ## Structure tab, column comments
 
@@ -193,3 +201,15 @@ Use a table with a `bytea` or `blob` column. Run BookiE with isolated `XDG_*` an
 3. Store the bytes `08 96 01 12 07` followed by `testing`. The section reads **Decoded as Protobuf without a schema** and lists field `1` as 150 and field `2` as `testing`.
 4. Store `de ad be ef`, plain text and an image. No **Decoded** section appears.
 5. Store a MessagePack array over 64 KiB. No **Decoded** section appears and the hex dump still shows.
+
+## Search database values
+
+Open the main menu on a connection with several tables and choose Search Database Values.
+
+- [ ] Searching for a name that appears in one text column of two tables lists both tables with the matching rows and columns; **Open filtered** opens the table narrowed to that column.
+- [ ] A term with `%` or `_` matches those characters literally.
+- [ ] **Equals** with a number finds nothing until **Also match numbers and ids** is on, then finds the matching integer column.
+- [ ] Cancel during a search on a database with many tables stops it quickly; the result says how many tables were not searched.
+- [ ] A hidden schema is not searched. A connection with more than 200 tables says some tables were left out.
+- [ ] A Redis, MongoDB or ClickHouse connection says the search is not available.
+- [ ] After a search, the audit log shows one read per table searched with the bound value not shown in the SQL.

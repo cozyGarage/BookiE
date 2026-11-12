@@ -5,13 +5,13 @@ use sqlparser::ast::{
     Update, UpdateTableFromKind, UtilityOption,
 };
 use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
-use sqlparser::parser::Parser;
 
 use crate::admin_functions::is_administrative_function_name;
 use crate::constant_predicate::is_constant_true;
 use crate::effects::Effects;
 use crate::effects_classification::{merge_script_class, sql_effects_from_tokens, statement_effects, truncate_facts};
 use crate::explain_options::analyze_option_enabled;
+use crate::parsed_sql::ParsedSql;
 use crate::select_writes::select_writes;
 use crate::{blast_radius, mask::SensitivePatterns, sensitive_projection};
 
@@ -100,30 +100,35 @@ pub fn statement_requires_write_capability(sql: &str, driver_id: &str) -> bool {
 }
 
 pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
-    analyze_statement_inner(sql, driver_id, None, false).facts
+    classify_parsed(&ParsedSql::new(sql, driver_id), driver_id)
+}
+
+pub(crate) fn classify_parsed(parsed: &ParsedSql, driver_id: &str) -> StatementFacts {
+    analyze_parsed(parsed, driver_id, None, false).facts
 }
 
 pub(crate) fn analyze_statement(sql: &str, driver_id: &str, masks: Option<&SensitivePatterns>) -> StatementAnalysis {
-    analyze_statement_inner(sql, driver_id, masks, true)
+    analyze_parsed(&ParsedSql::new(sql, driver_id), driver_id, masks, true)
 }
 
-fn analyze_statement_inner(
-    sql: &str,
+pub(crate) fn analyze_parsed(
+    parsed: &ParsedSql,
     driver_id: &str,
     mask_patterns: Option<&SensitivePatterns>,
     include_execution_plans: bool,
 ) -> StatementAnalysis {
-    let dialect = dialect_for(driver_id);
-    let trimmed = sql.trim();
+    let dialect = parsed.dialect();
+    let dialect = dialect.as_ref();
+    let trimmed = parsed.trimmed();
     if trimmed.is_empty() {
         return failed_analysis("empty SQL");
     }
 
-    if let Some(reason) = crate::input_refusal::refusal(trimmed, driver_id, dialect.as_ref()) {
+    if let Some(reason) = crate::input_refusal::refusal(trimmed, driver_id, dialect) {
         return failed_analysis(reason);
     }
 
-    let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
+    let statements = match parsed.statements() {
         Ok(s) => s,
         Err(e) => return failed_analysis(e.to_string()),
     };
@@ -132,26 +137,26 @@ fn analyze_statement_inner(
         return failed_analysis("no statements parsed");
     }
 
-    let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect.as_ref(), driver_id);
-    let effects = if driver_id == "duckdb" && crate::duckdb_paths::touches_foreign_source(&statements) {
+    let (effects, contains_administrative_call) = sql_effects_from_tokens(trimmed, dialect, driver_id);
+    let effects = if driver_id == "duckdb" && crate::duckdb_paths::touches_foreign_source(statements) {
         effects.union(Effects::HOST_OR_FILE_ACCESS)
     } else {
         effects
     };
     let effects = effects.union_if(
         Effects::LINKED_SERVER,
-        crate::linked_server::names_a_linked_server_table(driver_id, &statements),
+        crate::linked_server::names_a_linked_server_table(driver_id, statements),
     );
     let facts = crate::select_writes::with_locking_backstop(
-        classify_statements(&statements, effects, contains_administrative_call),
+        classify_statements(statements, effects, contains_administrative_call),
         trimmed,
-        dialect.as_ref(),
+        dialect,
     );
     let (blast_radius, sensitive_positions, known_statement_rows) = if include_execution_plans {
-        let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(&statements, driver_id);
+        let (blast_radius, known_statement_rows) = blast_radius::analyze_blast_radius(statements, driver_id);
         (
             blast_radius,
-            mask_patterns.and_then(|patterns| sensitive_projection::projection_from_statements(&statements, patterns)),
+            mask_patterns.and_then(|patterns| sensitive_projection::projection_from_statements(statements, patterns)),
             known_statement_rows,
         )
     } else {
