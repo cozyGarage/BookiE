@@ -1103,8 +1103,7 @@ jobs:
           trap cleanup_testcontainers EXIT
           trap 'cleanup_testcontainers; exit 143' TERM
           trap 'cleanup_testcontainers; exit 130' INT
-          ./scripts/test-postgres-socket.sh
-          bash ./scripts/test-ssh.sh
+          python3 scripts/run-test-layer.py socket-ssh
 
       - name: Finalize runner job
         if: always()

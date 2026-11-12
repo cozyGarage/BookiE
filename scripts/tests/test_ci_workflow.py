@@ -458,7 +458,9 @@ class CiWorkflowTests(unittest.TestCase):
     def test_test_bundle_publication_contains_only_provider_consumed_groups(self):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())
         providers = bundle_groups["providers"]
-        self.assertEqual(set(providers["github"]), {"direct", "consumers", "drivers"})
+        self.assertEqual(set(providers["github"]), {
+            "direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "socket-ssh",
+        })
         self.assertEqual(set(providers["forgejo"]), {
             "direct", "consumers", "driver-core", "driver-analytics", "driver-extended",
             "pg-release", "socket-ssh", "driver-tls", "keyring",
@@ -636,7 +638,7 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_github_jobs_fetch_the_bundle_groups_they_execute(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
-        expected = {"preflight": ("unit", "sandbox"), "fast": ("unit", "direct"), "integration": ("drivers",)}
+        expected = {"preflight": ("unit", "sandbox"), "fast": ("unit", "direct")}
         for name, groups in expected.items():
             with self.subTest(job=name):
                 job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
@@ -647,6 +649,12 @@ class CiWorkflowTests(unittest.TestCase):
                         self.assertIn(f"--expected-group {group}", job)
                         self.assertIn(f"bookie-tests-${{{{ needs.pin-revision.outputs.revision }}}}-{group}", job)
                 self.assertNotIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-default", job)
+        integration = re.search(r"(?ms)^  integration:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("group: [driver-core, driver-analytics, driver-extended, socket-ssh]", integration)
+        self.assertIn("bookie-tests-${{ needs.pin-revision.outputs.revision }}-${{ matrix.group }}", integration)
+        self.assertIn('--expected-group "${{ matrix.group }}"', integration)
+        self.assertIn('python3 scripts/run-test-layer.py "$BOOKIE_TEST_LAYER"', integration)
+        self.assertIn("regression-integration-${{ matrix.group }}-${{ github.run_id }}-${{ github.run_attempt }}", integration)
         for name in ("preflight", "fast"):
             job = re.search(rf"(?ms)^  {name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
             self.assertIn("BOOKIE_REQUIRE_PREBUILT=1", job)
@@ -1264,14 +1272,20 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("BOOKIE_GTK_BINARY: target/installed/usr/bin/bookie", acceptance)
         self.assertIn("python3 scripts/run-test-layer.py gtk-mysql-approval", acceptance)
         integration = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
+        self.assertIn('if [[ "$BOOKIE_TEST_LAYER" == driver-core ]]', integration)
         self.assertIn("python3 scripts/run-test-layer.py pg-dump", integration)
 
     def test_docker_ssh_targets_run_in_hosted_and_local_integration(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         hosted = workflow.split("  integration:\n", 1)[1].split("  b4-rollback:\n", 1)[0]
         local = (ROOT / "scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1].split("run_release()", 1)[0]
-        self.assertIn("run-test-layer.py drivers", hosted)
+        self.assertIn("driver-core, driver-analytics, driver-extended, socket-ssh", hosted)
+        self.assertIn("socket-ssh", hosted)
         self.assertIn("scripts/test-ssh.sh", local)
+        socket_layer = json.loads((ROOT / "scripts/test-layers.json").read_text())["layers"]["socket-ssh"]
+        self.assertEqual([step["argv"][-1] for step in socket_layer["steps"]], [
+            "scripts/test-postgres-socket.sh", "scripts/test-ssh.sh",
+        ])
         script = (ROOT / "scripts/test-ssh.sh").read_text()
         for required in ["set -euo pipefail", "--test agent_auth", "--test openssh_session", "--include-ignored", "--test-threads=1"]:
             self.assertIn(required, script)
