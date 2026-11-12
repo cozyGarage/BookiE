@@ -252,6 +252,7 @@ impl App {
             self.workspace_outer_stack.set_visible_child_name("empty");
             return;
         };
+        let first_page = self.workspace_tab_view.as_ref().map_or(0, |view| view.n_pages());
         for record in &saved.tabs {
             match workspace_state::restored_workspace_tab(record) {
                 Some(workspace_state::RestoredWorkspaceTab::Editor {
@@ -289,11 +290,7 @@ impl App {
                 None => {}
             }
         }
-        if let Some(tab_view) = self.workspace_tab_view.as_ref()
-            && let Some(page) = tab_view.pages().item(saved.active_idx).and_downcast::<adw::TabPage>()
-        {
-            tab_view.set_selected_page(&page);
-        }
+        select_restored_page(self.workspace_tab_view.as_ref(), first_page as u32, saved.active_idx);
         self.workspace_outer_stack.set_visible_child_name("tabs");
         if let Some(tab_id) = self.selected_editor_tab_id() {
             self.dispatch_to_editor(tab_id, SqlEditorInput::FocusEditor);
@@ -696,6 +693,17 @@ impl App {
         focus_after_tab_close(tab_view, &self.workspace_outer_stack);
         self.refresh_schema_index();
         self.refresh_window_title();
+    }
+}
+
+fn select_restored_page(tab_view: Option<&adw::TabView>, first_page: u32, active_idx: u32) {
+    if let Some(view) = tab_view
+        && let Some(page) = view
+            .pages()
+            .item(first_page.saturating_add(active_idx))
+            .and_downcast::<adw::TabPage>()
+    {
+        view.set_selected_page(&page);
     }
 }
 
