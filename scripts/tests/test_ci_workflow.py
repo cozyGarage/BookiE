@@ -506,6 +506,12 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("CARGO_PROFILE_CI_STRIP: symbols", gtk_build)
         self.assertNotIn('mkdir -p "$GITHUB_WORKSPACE/gtk-artifact/schemas"', gtk_build)
 
+    def test_gpui_lockfile_is_checked_before_building_workspace_test_bundles(self):
+        build = (ROOT / "scripts/build-test-bundles.sh").read_text()
+        lock_check = 'cargo metadata --manifest-path apps/gpui/Cargo.toml --locked --format-version 1 >/dev/null'
+        self.assertIn(lock_check, build)
+        self.assertLess(build.index(lock_check), build.index('cargo test --locked --workspace'))
+
     def test_forgejo_gpui_test_builder_installs_linker_dependency(self):
         workflow = (ROOT / ".forgejo/workflows/ci.yml").read_text()
         job = re.search(r"(?ms)^  test-build:\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)", workflow).group(1)
