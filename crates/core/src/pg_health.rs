@@ -129,6 +129,7 @@ fn duplicate_indexes_sql() -> String {
          AND pg_catalog.pg_get_expr(a.indpred, a.indrelid) IS NOT DISTINCT FROM pg_catalog.pg_get_expr(b.indpred, b.indrelid) \
          AND (b.indkey::text = a.indkey::text OR b.indkey::text LIKE a.indkey::text || ' %') \
          AND (b.indclass::text = a.indclass::text OR b.indclass::text LIKE a.indclass::text || ' %') \
+         AND (b.indcollation::text = a.indcollation::text OR b.indcollation::text LIKE a.indcollation::text || ' %') \
          AND (b.indoption::text = a.indoption::text OR b.indoption::text LIKE a.indoption::text || ' %') \
          AND (b.indkey::text <> a.indkey::text OR a.indexrelid > b.indexrelid) \
          AND n.nspname NOT IN ('pg_catalog', 'information_schema') \

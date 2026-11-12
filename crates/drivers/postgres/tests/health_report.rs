@@ -7,6 +7,7 @@ use bookie_core::{
     hidden_schemas_param,
 };
 use drivers_postgres::PgDriver;
+use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
 use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::postgres::Postgres;
@@ -24,6 +25,10 @@ const SEED: &[&str] = &[
     "CREATE INDEX dup_long ON health_a.bloaty (b, a)",
     "CREATE INDEX twin_one ON health_a.bloaty (payload, a)",
     "CREATE INDEX twin_two ON health_a.bloaty (payload, a)",
+    "CREATE COLLATION health_a.other_c (provider = libc, locale = 'C')",
+    "CREATE TABLE health_a.collated (v text)",
+    "CREATE INDEX collate_c ON health_a.collated (v COLLATE \"C\")",
+    "CREATE INDEX collate_other ON health_a.collated (v COLLATE health_a.other_c)",
     "CREATE TABLE health_a.scanned (id int, v int) WITH (autovacuum_enabled = false)",
     "INSERT INTO health_a.scanned SELECT g, g FROM generate_series(1, 12000) g",
     "CREATE TABLE health_a.tiny (id int) WITH (autovacuum_enabled = false)",
@@ -73,13 +78,25 @@ async fn eventually(
     panic!("{report:?} never reported the expected rows");
 }
 
-async fn exercise(tag: &str) {
-    let container = Postgres::default()
-        .with_tag(tag)
+async fn start_postgres_16() -> ContainerAsync<Postgres> {
+    Postgres::default()
+        .with_tag("16-alpine")
         .with_startup_timeout(Duration::from_secs(180))
         .start()
         .await
-        .expect("start postgres");
+        .expect("start postgres")
+}
+
+async fn start_postgres_18() -> ContainerAsync<Postgres> {
+    Postgres::default()
+        .with_tag("18-alpine")
+        .with_startup_timeout(Duration::from_secs(180))
+        .start()
+        .await
+        .expect("start postgres")
+}
+
+async fn exercise(container: ContainerAsync<Postgres>) {
     let options = ConnectOptions {
         host: container.get_host().await.unwrap().to_string(),
         port: container.get_host_port_ipv4(5432.tcp()).await.unwrap(),
@@ -130,6 +147,12 @@ async fn exercise(tag: &str) {
     let duplicate_names = names(&duplicates, "index_name");
     assert!(duplicate_names.contains(&"dup_short".to_owned()), "{duplicate_names:?}");
     assert!(!duplicate_names.contains(&"dup_long".to_owned()));
+    assert!(
+        !duplicate_names
+            .iter()
+            .any(|name| name == "collate_c" || name == "collate_other"),
+        "indexes with different collations are not duplicates: {duplicate_names:?}"
+    );
     assert!(!duplicate_names.contains(&"unique_unused_idx".to_owned()));
     let twins = duplicate_names.iter().filter(|name| name.starts_with("twin_")).count();
     assert_eq!(twins, 1, "{duplicate_names:?}");
@@ -174,10 +197,10 @@ async fn exercise(tag: &str) {
 
 #[tokio::test]
 async fn every_health_report_runs_and_decodes_on_postgres_16() {
-    exercise("16-alpine").await;
+    exercise(start_postgres_16().await).await;
 }
 
 #[tokio::test]
 async fn every_health_report_runs_and_decodes_on_postgres_18() {
-    exercise("18-alpine").await;
+    exercise(start_postgres_18().await).await;
 }
