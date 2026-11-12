@@ -278,6 +278,7 @@ def scenarios(ui):
     def choose_menu_item(position):
         menu = ui.wait_for_node(role=pyatspi.ROLE_MENU)
         items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
+        assert items, "the menu has no items"
 
         def focused_item():
             items = [node for node in ui.descendants(menu) if ui.node_role(node) == pyatspi.ROLE_MENU_ITEM]
@@ -286,12 +287,13 @@ def scenarios(ui):
                 None,
             )
 
-        start = focused_item()
         if position == "last":
-            assert items, "the menu has no items"
             target = len(items) - 1
+            ui.press_x11_key("End")
         else:
-            target = (-1 if start is None else start) + position
+            target = position
+            assert 0 <= target < len(items), f"menu item {target} is outside {len(items)} items"
+            ui.press_x11_key("Home")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         moves = 0
         while focused_item() != target:
