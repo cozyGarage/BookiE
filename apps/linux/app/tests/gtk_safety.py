@@ -683,6 +683,32 @@ def database_tables(path):
         }
 
 
+def seed_catalog_hidden_schemas(bookie_config):
+    encoded = os.environ.get("BOOKIE_GTK_CATALOG_HIDDEN_SCHEMAS_JSON")
+    if encoded is None:
+        return
+    if "BOOKIE_GTK_POSTGRES_PORT" not in os.environ:
+        raise ValueError("catalog hidden-schema profiles require a PostgreSQL connection")
+    hidden_schemas = json.loads(encoded)
+    if not isinstance(hidden_schemas, list) or any(not isinstance(schema, str) or not schema for schema in hidden_schemas):
+        raise ValueError("catalog hidden schemas must be a JSON array of non-empty strings")
+    path = bookie_config / "workspace_state.json"
+    path.write_text(
+        json.dumps(
+            {
+                "connections": {
+                    POSTGRES_CONNECTION_ID: {
+                        "database": "bookie_test",
+                        "hidden_schemas": hidden_schemas,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+
+
 def write_fixture(base, audit_available=True, environment="prod", mcp_token=False):
     home = base / "home"
     config = base / "config"
@@ -978,6 +1004,7 @@ def write_fixture(base, audit_available=True, environment="prod", mcp_token=Fals
                 capture_output=True,
             )
     (bookie_config / "connections.json").write_text(json.dumps(connections), encoding="utf-8")
+    seed_catalog_hidden_schemas(bookie_config)
     (bookie_config / "preferences.json").write_text(
         json.dumps(
             {
