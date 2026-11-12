@@ -144,6 +144,7 @@ fn diff_outcome(request: &CompareRequest, diff: Arc<QueryResult>) -> StatementOu
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Rows(vec![diff]),
         pinned: true,
+        detail: Default::default(),
     }
 }
 

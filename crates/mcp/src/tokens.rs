@@ -23,11 +23,40 @@ pub struct McpToken {
     pub permissions: TokenPermissions,
     #[serde(default)]
     pub connection_allowlist: Vec<Uuid>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_allowlist: Option<Vec<String>>,
     pub created_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub revoked: bool,
+}
+
+impl McpToken {
+    pub fn allows_tool(&self, name: &str) -> bool {
+        self.tool_allowlist
+            .as_ref()
+            .is_none_or(|allowed| allowed.iter().any(|tool| tool == name))
+    }
+}
+
+fn validated_tool_allowlist(tools: Option<Vec<String>>) -> Result<Option<Vec<String>>, String> {
+    let Some(tools) = tools else {
+        return Ok(None);
+    };
+    if tools.is_empty() {
+        return Err("a tool allowlist must name at least one tool".into());
+    }
+    let mut checked: Vec<String> = Vec::with_capacity(tools.len());
+    for tool in tools {
+        if !crate::tools::TOOL_NAMES.contains(&tool.as_str()) {
+            return Err(format!("unknown tool {tool:?} in the tool allowlist"));
+        }
+        if !checked.contains(&tool) {
+            checked.push(tool);
+        }
+    }
+    Ok(Some(checked))
 }
 
 pub struct TokenStore {
@@ -83,6 +112,18 @@ impl TokenStore {
         connection_allowlist: Vec<Uuid>,
         expires_at: Option<DateTime<Utc>>,
     ) -> Result<(McpToken, String), String> {
+        self.issue_with_tools(name, permissions, connection_allowlist, None, expires_at)
+    }
+
+    pub fn issue_with_tools(
+        &self,
+        name: String,
+        permissions: TokenPermissions,
+        connection_allowlist: Vec<Uuid>,
+        tool_allowlist: Option<Vec<String>>,
+        expires_at: Option<DateTime<Utc>>,
+    ) -> Result<(McpToken, String), String> {
+        let tool_allowlist = validated_tool_allowlist(tool_allowlist)?;
         let plaintext = generate_token();
         let token = McpToken {
             id: Uuid::new_v4(),
@@ -90,6 +131,7 @@ impl TokenStore {
             token_hash: hash_token(&plaintext),
             permissions,
             connection_allowlist,
+            tool_allowlist,
             created_at: Utc::now(),
             expires_at,
             revoked: false,

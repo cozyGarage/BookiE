@@ -434,3 +434,21 @@ async fn an_approval_that_finishes_before_cancellation_keeps_its_answer() {
     let outcome = deny_when_cancelled(std::future::pending(), async { ApprovalOutcome::AllowOnce }).await;
     assert_eq!(outcome, ApprovalOutcome::AllowOnce);
 }
+
+#[test]
+fn the_tool_flag_repeats_and_needs_a_token_to_issue() {
+    let parsed = Args::try_parse_from([
+        "bookie-agentd",
+        "--policy",
+        "p.toml",
+        "--issue-token",
+        "agent",
+        "--tool",
+        "routine_source",
+        "--tool",
+        "schema_context",
+    ])
+    .unwrap();
+    assert_eq!(parsed.tools, ["routine_source", "schema_context"]);
+    assert!(Args::try_parse_from(["bookie-agentd", "--policy", "p.toml", "--tool", "list_tables"]).is_err());
+}

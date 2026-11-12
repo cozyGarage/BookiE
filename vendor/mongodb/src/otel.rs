@@ -1,6 +1,7 @@
 //! Support for OpenTelemetry.
 
 use std::{
+    borrow::Cow,
     future::Future,
     sync::{Arc, LazyLock},
 };
@@ -16,8 +17,9 @@ use opentelemetry::{
 
 use crate::{
     bson::Bson,
+    client::executor::ExecutionDetails,
     cmap::{conn::wire::Message, Command, ConnectionInfo, StreamDescription},
-    error::{ErrorKind, Result},
+    error::{Error, Result},
     operation::{Operation, OperationTarget},
     options::{ClientOptions, ServerAddress, DEFAULT_PORT},
     Client,
@@ -115,10 +117,7 @@ impl Client {
     ) -> OpSpan {
         let op = op.otel();
         if !self.options().otel_enabled() {
-            return OpSpan {
-                context: Context::current(),
-                enabled: false,
-            };
+            return OpSpan::disabled();
         }
         let span_name = format!("{} {}", op.log_name(), op_target(op));
         let mut attrs = common_attrs(op);
@@ -200,9 +199,6 @@ impl Client {
                     .unwrap_or_else(crate::bson_util::doc_err),
             ));
         }
-        if let Some(cursor_id) = op.cursor_id() {
-            attrs.push(KeyValue::new("db.mongodb.cursor_id", cursor_id));
-        }
         let span = self
             .tracer()
             .span_builder(cmd_attrs.name)
@@ -232,17 +228,33 @@ impl Client {
     }
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct OpSpan {
     context: Context,
     enabled: bool,
 }
 
 impl OpSpan {
-    pub(crate) fn record_error<T>(&self, result: &Result<T>) {
+    pub(crate) fn disabled() -> Self {
+        Self {
+            context: Context::current(),
+            enabled: false,
+        }
+    }
+
+    pub(crate) fn record_operation_result<Op: Operation>(
+        &self,
+        result: &Result<ExecutionDetails<Op>>,
+    ) {
         if !self.enabled {
             return;
         }
-        record_error(&self.context, result);
+        record_result::<Op>(&self.context, result.as_ref().map(|d| &d.output));
+        if let Err(error) = result {
+            self.context
+                .span()
+                .set_attribute(KeyValue::new("error.type", error.kind.name()));
+        }
     }
 }
 
@@ -256,25 +268,41 @@ impl CmdSpan {
         if !self.enabled {
             return;
         }
-        if let Ok(out) = result {
-            if let Some(cursor_id) = <Op::Otel as OtelWitness>::output_cursor_id(out) {
-                let span = self.context.span();
-                span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
-            }
+        record_result::<Op>(&self.context, result.as_ref());
+        if let Err(error) = result {
+            let span = self.context.span();
+            let error_type = if let Some(err_code) = error.code() {
+                let err_code = err_code.to_string();
+                span.set_attribute(KeyValue::new("db.response.status_code", err_code.clone()));
+                Cow::Owned(err_code)
+            } else {
+                Cow::Borrowed(error.kind.name())
+            };
+            span.set_attribute(KeyValue::new("error.type", error_type));
         }
-        record_error(&self.context, result);
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct TxnSpan(Context);
 
-fn record_error<T>(context: &Context, result: &Result<T>) {
-    let error = if let Err(error) = result {
-        error
-    } else {
-        return;
-    };
+fn record_result<Op: Operation>(context: &Context, result: std::result::Result<&Op::O, &Error>) {
+    match result {
+        Ok(out) => record_output::<Op>(context, out),
+        Err(e) => record_error(context, e),
+    }
+}
+
+fn record_output<Op: Operation>(context: &Context, output: &Op::O) {
+    if let Some(cursor_id) = <Op::Otel as OtelWitness>::output_cursor_id(output) {
+        if cursor_id != 0 {
+            let span = context.span();
+            span.set_attribute(KeyValue::new("db.mongodb.cursor_id", cursor_id));
+        }
+    }
+}
+
+fn record_error(context: &Context, error: &Error) {
     let span = context.span();
     span.set_attributes([
         KeyValue::new("exception.message", error.to_string()),
@@ -282,12 +310,6 @@ fn record_error<T>(context: &Context, result: &Result<T>) {
         #[cfg(feature = "error-backtrace")]
         KeyValue::new("exception.stacktrace", error.backtrace.to_string()),
     ]);
-    if let ErrorKind::Command(cmd_err) = &*error.kind {
-        span.set_attribute(KeyValue::new(
-            "db.response.status_code",
-            cmd_err.code.to_string(),
-        ));
-    }
     span.record_error(error);
     span.set_status(opentelemetry::trace::Status::Error {
         description: error.to_string().into(),
@@ -314,6 +336,11 @@ fn common_attrs(op: &impl OtelInfo) -> Vec<KeyValue> {
     ];
     if let Some(coll) = name.collection {
         attrs.push(KeyValue::new("db.collection.name", coll.to_owned()));
+    }
+    if let Some(cursor_id) = op.cursor_id() {
+        if cursor_id != 0 {
+            attrs.push(KeyValue::new("db.mongodb.cursor_id", cursor_id));
+        }
     }
     attrs
 }

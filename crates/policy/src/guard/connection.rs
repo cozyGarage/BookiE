@@ -115,6 +115,21 @@ impl Connection for PolicyGuard {
             .await
     }
 
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.governed_routine_definition(routine).await
+    }
+
+    async fn routine_definition_controlled(
+        &self,
+        routine: &bookie_core::RoutineRef,
+        control: &OperationControl,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.governed_routine_definition_controlled(routine, control).await
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         let operation = self.table_metadata_operation("FETCH COLUMNS", schema, table);
         self.prepare_governed_read(&operation).await?;
@@ -619,6 +634,45 @@ impl Connection for PolicyGuard {
             .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
+        result
+    }
+
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        let operation = self.table_metadata_operation("FETCH VIEW EDITABILITY", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH VIEW EDITABILITY",
+                self.inner.fetch_view_editability(schema, table),
+            )
+            .await;
+        self.audit_read_result(&operation, start, &result, None).await?;
+        result
+    }
+
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.table_metadata_operation("FETCH VIEW EDITABILITY", schema, table);
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "FETCH VIEW EDITABILITY",
+                self.inner.fetch_view_editability_controlled(schema, table, control),
+            )
+            .await;
+        self.audit_controlled_read_result(&operation, start, &result, None)
+            .await?;
         result
     }
 

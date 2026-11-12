@@ -46,6 +46,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Click a table or view in the sidebar to open it in a preview tab. Edit or keep the tab to make it permanent.
 - Tables are read in bounded pages. Deep forward navigation uses primary-key seeks where supported; previous-page, last-page and explicitly sorted paths may use offsets on some engines. See [known limitations](known-limitations.md#data-and-values).
 - Edit a cell with a double-click, F2 or Enter. Edits stay pending, with a dot on the tab, until Ctrl+S. Undo and redo apply to pending edits.
+- On PostgreSQL, a view that is automatically updatable, maps to one table and exposes every primary-key column of that table opens editable, through the same staged edits, approval and audit as a table. Insert is offered only when the view accepts inserts. A view with an INSTEAD OF trigger or rule, an aggregate, a join or a missing key column stays read-only and says which of these applies. MySQL, MariaDB and SQL Server views stay read-only ([#2203](https://github.com/cozyGarage/BookiE/issues/2203)).
 - Insert rows, delete rows and set a cell to NULL. Changes are saved in one transaction where the engine supports it.
 - NULL, empty text and unsupported values look different. Booleans show a check box with a third state for NULL. Sparse document fields that an object lacks show as (missing) and remain distinct from NULL.
 - The header shows each column's type. Primary key columns have a key mark, foreign key columns a link mark, and a column comment appears under the name.
@@ -75,6 +76,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 
 - Ctrl+E opens an editor tab. Ctrl+Enter runs the selected text, or the whole script when nothing is selected. Ctrl+Shift+Enter runs the statement at the cursor. Escape cancels a running query when the server supports it. Ctrl+Alt+G focuses the active query or browse result grid (and reopens a hidden Results panel); Ctrl+Alt+E returns focus to the SQL editor.
 - Syntax highlighting, code folding, line bookmarks and a side-by-side split of the same query.
+- Server messages: PostgreSQL `NOTICE` and `WARNING`, SQL Server `PRINT` and low-severity `RAISERROR`, and MySQL or MariaDB warnings show in a Messages section under the statement's result, with severity, code and text, a Copy button and a count in the status line. The status line tooltip shows the run time and any approval wait. See [known limitations](known-limitations.md#interface) for the bounds.
 - Completion offers keywords, tables after `FROM` and `JOIN`, and the columns of the tables named in the statement. `alias.` and `table.` narrow the list. Chosen names are inserted quoted for the engine.
 - Bound parameters: Write `:name` in queries; BookiE prompts for typed values before execution without string concatenation.
 - Progressive streaming: Single-statement PostgreSQL `SELECT`s stream within an estimated 64 MiB row budget; overflow pages spill to a local encrypted spool so previous pages remain revisitable without re-running SQL. The first page stays selected while rows arrive, and the result shows whether it is receiving, complete or incomplete. The newest page and the page currently being viewed remain in memory while later pages arrive; if a stream times out or is cancelled, received pages stay selected. After successful completion, Export all rows reads the stored result without executing the query again.
@@ -115,7 +117,7 @@ The sidebar table menu has Edit Structure, Show CREATE TABLE, Show ER Diagram, I
 
 ![Export scope dialog choosing data scope before format](images/export-wizard.png)
 
-- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook. Ctrl+Shift+E exports the front tab's shown rows.
+- Export a table page or a query result as CSV, JSON, Markdown, HTML, XML, SQL or an Excel workbook. Ctrl+Shift+E exports the front tab's shown rows. On PostgreSQL, a table can also be exported in full from one consistent read snapshot.
 - CSV export can protect cells that start like formulas, and can keep plain numbers unprotected so they import back into numeric columns.
 - Import CSV into an existing table, or create a new table from a CSV file. Separator, header row and column mapping are detected and can be changed. The quote character, backslash escaping and file encoding (UTF-8, Windows-1252, UTF-16) can be set.
 - Import accepts Excel `.xlsx` files. The first worksheet with data is read.
@@ -136,7 +138,7 @@ Back Up Database and Restore from Backup in the app menu use the installed `pg_d
 
 ## AI agents (MCP)
 
-BookiE can let an AI assistant use saved connections through the Model Context Protocol. A token is created in Preferences, and limits which connections and which tools it may use. Every MCP request goes through the same policy guard as the desktop app. The headless `bookie-agentd` process serves MCP without a window. Data responses use a tagged value format that keeps wide integers exact ([user guide](user-guide.md#ai-agents-mcp)).
+BookiE can let an AI assistant use saved connections through the Model Context Protocol. A token is created in Preferences. It is read-only or read and write, and it covers the connections that exist when it is created. `bookie-agentd` can also limit a token to chosen connections and, with `--tool`, to chosen tools; a token without a tool list may call every tool its scope allows. Besides listing and describing objects, agents can read a routine definition (`routine_source`) and a bounded schema snapshot (`schema_context`). Every MCP request goes through the same policy guard as the desktop app. The headless `bookie-agentd` process serves MCP without a window. Data responses use a tagged value format that keeps wide integers exact ([user guide](user-guide.md#ai-agents-mcp)).
 
 ## What BookiE does not include
 

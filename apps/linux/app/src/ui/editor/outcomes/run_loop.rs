@@ -98,26 +98,15 @@ where
             return Ok(context.stops_on_error.then_some(None));
         }
     };
-    let kind = match run_statement(
-        StreamAttempt {
-            target: context.target,
-            single_statement: context.single_statement,
-            driver_id: context.driver_id,
-            bound_sql: &bound.sql,
-            bound_params: &bound.values,
-            identity,
-            preview: preview.clone(),
-            sql: &sql,
-            started,
-            control: context.control,
-            spool_manager: context.spool_manager.clone(),
-        },
-        &mut context.stream_update,
-        context.succeeded,
-    )
-    .await
-    {
-        Ok(kind) => kind,
+    let attempt = StatementAttempt {
+        identity,
+        preview: &preview,
+        sql: &sql,
+        started,
+        bound: &bound,
+    };
+    let (kind, messages) = match run_bound_statement(context, attempt).await {
+        Ok(run) => run,
         Err(Halt::Finished(result)) => return Err(result),
         Err(Halt::Failed(outcome)) => {
             context.outcomes.push(*outcome);
@@ -125,9 +114,15 @@ where
         }
     };
     let mut next = (context.stops_on_error && matches!(kind, StatementOutcomeKind::Error(_))).then_some(None);
-    context
-        .outcomes
-        .push(statement_outcome(identity, preview, sql, started, waited_before, kind));
+    context.outcomes.push(statement_outcome(
+        identity,
+        preview,
+        sql,
+        started,
+        waited_before,
+        kind,
+        messages,
+    ));
     if next.is_none() && statement_index < context.last_index {
         match lexical_settings_change(context.target, context.settings_check, context.control).await {
             Ok(change) => next = change.map(Some),
@@ -135,4 +130,41 @@ where
         }
     }
     Ok(next)
+}
+
+struct StatementAttempt<'a> {
+    identity: StatementIdentity,
+    preview: &'a str,
+    sql: &'a str,
+    started: std::time::Instant,
+    bound: &'a crate::services::query_parameters::BoundStatement,
+}
+
+async fn run_bound_statement<S, F, Fut>(
+    context: &mut TrackedRunContext<'_, S, F>,
+    attempt: StatementAttempt<'_>,
+) -> Result<(StatementOutcomeKind, ServerMessages), Halt>
+where
+    S: Fn(&str),
+    F: FnMut(StreamUpdate) -> Fut,
+    Fut: Future<Output = bool>,
+{
+    run_statement(
+        StreamAttempt {
+            target: context.target,
+            single_statement: context.single_statement,
+            driver_id: context.driver_id,
+            bound_sql: &attempt.bound.sql,
+            bound_params: &attempt.bound.values,
+            identity: attempt.identity,
+            preview: attempt.preview.to_owned(),
+            sql: attempt.sql,
+            started: attempt.started,
+            control: context.control,
+            spool_manager: context.spool_manager.clone(),
+        },
+        &mut context.stream_update,
+        context.succeeded,
+    )
+    .await
 }

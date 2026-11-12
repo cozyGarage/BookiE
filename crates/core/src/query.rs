@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::QueryRows;
+use crate::{QueryRows, ServerMessages};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableInfo {
@@ -295,6 +295,7 @@ impl QueryResult {
 pub struct QueryResultBatch {
     pub result_sets: Vec<QueryResult>,
     pub truncated: bool,
+    pub messages: ServerMessages,
 }
 
 impl QueryResultBatch {
@@ -303,7 +304,13 @@ impl QueryResultBatch {
         Self {
             result_sets: vec![result],
             truncated,
+            messages: ServerMessages::default(),
         }
+    }
+
+    pub fn with_messages(mut self, messages: ServerMessages) -> Self {
+        self.messages = messages;
+        self
     }
 
     pub fn into_first(self) -> QueryResult {

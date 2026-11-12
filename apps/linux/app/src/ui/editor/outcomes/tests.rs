@@ -302,6 +302,7 @@ fn a_pinned_result_is_named_by_its_statement_without_a_run_number() {
         elapsed_ms: 3,
         kind: StatementOutcomeKind::Rows(Vec::new()),
         pinned: true,
+        detail: Default::default(),
     };
     assert_eq!(super::outcome_tab_label(&outcome), "📌 SELECT public.users (0)");
 }
@@ -318,6 +319,7 @@ fn a_fresh_result_keeps_its_script_number_after_pinned_results_precede_it() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Error("missing table".into()),
         pinned: false,
+        detail: Default::default(),
     };
     assert_eq!(super::outcome_tab_label(&outcome), "2 · SELECT missing_table (error)");
 }
@@ -640,6 +642,7 @@ fn streamed_result_pages(
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(streamed.clone())),
         pinned: false,
+        detail: Default::default(),
     };
     let (grid_sender, _) = relm4::channel::<crate::ui::grid::GridMsg>();
     let widget = super::build_streamed_result_widget(
@@ -944,6 +947,7 @@ fn outcome_with(kind: StatementOutcomeKind, pinned: bool) -> super::StatementOut
         elapsed_ms: 0,
         kind,
         pinned,
+        detail: Default::default(),
     }
 }
 
@@ -999,6 +1003,7 @@ fn skipped_empty_stream_page_does_not_shift_retained_result_identity() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
         pinned: false,
+        detail: Default::default(),
     };
 
     assert!(matches!(&outcome.kind, StatementOutcomeKind::Streamed(_)));

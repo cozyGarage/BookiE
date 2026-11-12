@@ -140,6 +140,7 @@ pub struct BrowseTab {
     /// can't dismiss by saving.
     read_only_banner: adw::Banner,
     no_pk_banner: adw::Banner,
+    view_restriction: Option<bookie_app_services::view_edit::ViewEditRestriction>,
     /// Last-emitted dirty state. PendingCountChanged fires on every
     /// tracker mutation including count-only changes (2 → 3) where the
     /// dirty flag hasn't actually flipped. Tracking the previous flag
@@ -691,6 +692,7 @@ impl SimpleComponent for BrowseTab {
             rendered_columns: Vec::new(),
             read_only_banner,
             no_pk_banner,
+            view_restriction: None,
             was_dirty: std::cell::Cell::new(false),
             save_in_flight: std::cell::Cell::new(None),
             pending_focus_restore: std::cell::RefCell::new(None),
@@ -807,6 +809,9 @@ impl SimpleComponent for BrowseTab {
                 // save. Waiting also avoids a wasted full rebuild when
                 // ColumnsLoaded fires next and triggers a re-render.
                 self.render_grid_if_ready(sender);
+            }
+            BrowseTabInput::ViewRestriction(restriction) => {
+                self.view_restriction = restriction;
             }
             BrowseTabInput::ColumnsLoaded(columns) => {
                 let columns = columns_for_browse_page(&self.driver_id, &columns, self.current_result.as_deref());

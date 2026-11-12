@@ -190,6 +190,10 @@ impl MySqlConnection {
                     let ok = packet.ok()?;
 
                     self.inner.status_flags = ok.status;
+                    self.inner.warning_count = self
+                        .inner
+                        .warning_count
+                        .saturating_add(u32::from(ok.warnings));
 
                     let rows_affected = ok.affected_rows;
                     logger.increase_rows_affected(rows_affected);
@@ -225,17 +229,21 @@ impl MySqlConnection {
                     let packet = self.inner.stream.recv_packet().await?;
 
                     if packet[0] == 0xfe {
-                        let (rows_affected, last_insert_id, status) = if packet.len() < 9 {
+                        let (rows_affected, last_insert_id, status, warnings) = if packet.len() < 9 {
                             // EOF packet
                             let eof = packet.eof(self.inner.stream.capabilities)?;
-                            (0, 0, eof.status)
+                            (0, 0, eof.status, eof.warnings)
                         } else {
                             // OK packet
                             let ok = packet.ok()?;
-                            (ok.affected_rows, ok.last_insert_id, ok.status)
+                            (ok.affected_rows, ok.last_insert_id, ok.status, ok.warnings)
                         };
 
                         self.inner.status_flags = status;
+                        self.inner.warning_count = self
+                            .inner
+                            .warning_count
+                            .saturating_add(u32::from(warnings));
                         r#yield!(Either::Left(MySqlQueryResult {
                             rows_affected,
                             last_insert_id,

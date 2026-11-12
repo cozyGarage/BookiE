@@ -12,6 +12,8 @@ pub const TOOL_NAMES: &[&str] = &[
     "table_schema",
     "count_rows",
     "browse_table",
+    "routine_source",
+    "schema_context",
 ];
 
 use bookie_core::export::{
@@ -40,6 +42,7 @@ pub(crate) async fn dispatch_structured(
     args: JsonValue,
 ) -> Result<JsonValue, McpToolError> {
     bridge.check_rate(token)?;
+    bridge.ensure_tool_allowed(token, name)?;
     match name {
         "list_connections" => {
             let list = bridge.list_connections(token).await?;
@@ -258,6 +261,8 @@ pub(crate) async fn dispatch_structured(
                 "truncated": result.truncated,
             }))
         }
+        "routine_source" => crate::discovery::routine_source(bridge, token, &args).await,
+        "schema_context" => crate::discovery::schema_context(bridge, token, &args).await,
         other => Err(format!("unknown tool: {other}").into()),
     }
 }
@@ -443,6 +448,13 @@ mod tests {
     #[test]
     fn shared_query_history_is_not_exposed() {
         assert!(!TOOL_NAMES.contains(&"search_query_history"));
+    }
+
+    #[test]
+    fn the_routine_and_schema_context_tools_are_advertised() {
+        for name in ["routine_source", "schema_context"] {
+            assert!(TOOL_NAMES.contains(&name), "{name}");
+        }
     }
 
     #[test]

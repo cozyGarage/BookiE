@@ -8,6 +8,7 @@
 
 mod auth;
 mod bridge;
+mod discovery;
 mod errors;
 mod rate_limit;
 #[cfg(feature = "rmcp-prototype")]

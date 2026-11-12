@@ -59,11 +59,13 @@ impl ServerHandler for BridgeHandler {
     ) -> Result<ListToolsResult, ErrorData> {
         let token = token_from_meta(&context)
             .ok_or_else(|| ErrorData::invalid_request("missing token (pass _meta.authorization)", None))?;
-        self.bridge
+        let token = self
+            .bridge
             .authenticate(&token)
             .map_err(|message| ErrorData::invalid_request(message, None))?;
         let tools = TOOL_NAMES
             .iter()
+            .filter(|name| token.allows_tool(name))
             .map(|name| {
                 let tool = Tool::new(*name, tool_description(name), Arc::new(json_object(tool_schema(name))));
                 match serde_json::from_value(tool_annotations(name)) {

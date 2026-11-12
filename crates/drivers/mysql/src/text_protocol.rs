@@ -1,5 +1,6 @@
 use bookie_core::{
     ColumnInfo, DriverError, MAX_QUERY_ROWS, QueryResult, QueryResultBatch, QueryResultBudget, QueryRows,
+    ServerMessages,
 };
 use futures::TryStreamExt;
 use sqlparser::ast::Statement as SqlStatement;
@@ -41,7 +42,11 @@ pub(crate) async fn text_protocol(
         }
     }
     finish_result_set(&mut current, &mut result_sets, &mut truncated);
-    Ok(QueryResultBatch { result_sets, truncated })
+    Ok(QueryResultBatch {
+        result_sets,
+        truncated,
+        messages: ServerMessages::default(),
+    })
 }
 
 fn collect_row(

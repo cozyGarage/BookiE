@@ -106,6 +106,7 @@ mod tests {
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Rows(sets.into_iter().map(Arc::new).collect()),
             pinned: false,
+            detail: Default::default(),
         }
     }
 
@@ -162,6 +163,7 @@ mod tests {
                 resident_pages: Default::default(),
             })),
             pinned: false,
+            detail: Default::default(),
         }
     }
 
@@ -174,6 +176,7 @@ mod tests {
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Error("boom".into()),
             pinned: false,
+            detail: Default::default(),
         };
         assert!(pick_shown_export(&[], None, None, None).is_none());
         assert!(pick_shown_export(&[error], None, None, None).is_none());

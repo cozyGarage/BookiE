@@ -35,3 +35,4 @@ sqlx-sqlite = { path = "../../vendor/sqlx-sqlite" }
 sqlx-postgres = { path = "../../vendor/sqlx-postgres" }
 mongodb = { path = "../../vendor/mongodb" }
 redis = { path = "../../vendor/redis" }
+tiberius = { path = "../../vendor/tiberius" }

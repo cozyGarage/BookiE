@@ -10,14 +10,16 @@ use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
     CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, CommitResolution, CommitToken, ConnectOptions,
     Connection, DatabaseDriver, DriverError, DriverValueInputCapabilities, ExecResult, ForeignKeyInfo,
-    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo,
-    Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult,
+    QueryResultBatch, ServerMessages, TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup,
+    run_server_cancellable,
 };
 
 mod array;
 mod catalog;
 mod commit_resolution;
 mod decode;
+mod notices;
 mod numeric;
 mod params;
 mod pool;
@@ -29,6 +31,7 @@ mod temporal;
 #[cfg(test)]
 mod test_rng;
 mod transaction;
+mod view_editability;
 
 use params::{bind_pg_params, describe_query_parameters, needs_text_type_inference};
 use query::{
@@ -49,6 +52,14 @@ impl DatabaseDriver for PgDriver {
 
     fn id(&self) -> &'static str {
         "postgres"
+    }
+
+    fn supports_snapshot_export(&self) -> bool {
+        true
+    }
+
+    fn supports_updatable_views(&self) -> bool {
+        true
     }
 
     fn display_name(&self) -> &'static str {
@@ -186,10 +197,10 @@ impl Connection for PgConnection {
     async fn list_collations(&self) -> Result<Vec<bookie_core::CollationInfo>, DriverError> {
         let rows = sqlx::query(
             "SELECT collname::text,
-                    CASE WHEN collencoding = -1 THEN '' ELSE pg_encoding_to_char(collencoding) END,
+                    CASE WHEN collencoding = -1 THEN '' ELSE pg_catalog.pg_encoding_to_char(collencoding) END,
                     collname = 'default'
-             FROM pg_collation
-             WHERE collencoding IN (-1, pg_char_to_encoding(pg_encoding_to_char((SELECT encoding FROM pg_database WHERE datname = current_database()))))
+             FROM pg_catalog.pg_collation
+             WHERE collencoding IN (-1, pg_catalog.pg_char_to_encoding(pg_catalog.pg_encoding_to_char((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))))
              ORDER BY collname
              LIMIT $1",
         )
@@ -209,8 +220,8 @@ impl Connection for PgConnection {
 
     async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
         let rows = sqlx::query(
-            "SELECT datname FROM pg_database
-             WHERE datallowconn AND NOT datistemplate AND has_database_privilege(datname, 'CONNECT')
+            "SELECT datname FROM pg_catalog.pg_database
+             WHERE datallowconn AND NOT datistemplate AND pg_catalog.has_database_privilege(datname, 'CONNECT')
              ORDER BY datname",
         )
         .fetch_all(&self.pool)
@@ -275,6 +286,13 @@ impl Connection for PgConnection {
         excluded_schemas: &[String],
     ) -> Result<Vec<bookie_core::CatalogObject>, DriverError> {
         catalog::list_objects_excluding(&self.pool, kind, schema, excluded_schemas).await
+    }
+
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        catalog::routine_definition(&self.pool, routine).await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
@@ -416,6 +434,14 @@ impl Connection for PgConnection {
             .collect::<Result<Vec<_>, DriverError>>()?)
     }
 
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        view_editability::fetch(&self.pool, schema, table).await
+    }
+
     async fn fetch_rows(
         &self,
         schema: Option<&str>,
@@ -439,6 +465,19 @@ impl Connection for PgConnection {
         let (connection, result) = controlled_query(connection, sql, &[], true, control).await;
         drop(connection);
         result
+    }
+
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let connection = acquire_controlled(&self.pool, control).await?;
+        let (connection, result) = controlled_query_with_messages(connection, sql, params, true, control).await;
+        drop(connection);
+        let (rows, messages) = result?;
+        Ok(QueryResultBatch::single(rows).with_messages(messages))
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
@@ -547,7 +586,7 @@ impl Connection for PgConnection {
                     SELECT CASE WHEN k.attnum = 0
                         THEN pg_catalog.pg_get_indexdef(ix.indexrelid, k.ordinality::int, true)
                         ELSE a.attname::text END
-                    FROM unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ordinality)
+                    FROM pg_catalog.unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ordinality)
                     LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
                     WHERE k.ordinality <= ix.indnkeyatts
                     ORDER BY k.ordinality
@@ -623,10 +662,10 @@ impl Connection for PgConnection {
         let rows = sqlx::query(
             "SELECT
                 c.conname AS fk_name,
-                array_agg(a.attname ORDER BY kf.ordinality) AS columns,
+                pg_catalog.array_agg(a.attname ORDER BY kf.ordinality) AS columns,
                 fn_class.relname AS ref_table,
                 fn_ns.nspname AS ref_schema,
-                array_agg(fa.attname ORDER BY kf.ordinality) AS ref_columns,
+                pg_catalog.array_agg(fa.attname ORDER BY kf.ordinality) AS ref_columns,
                 c.confdeltype::text AS on_delete_code,
                 c.confupdtype::text AS on_update_code
             FROM pg_catalog.pg_constraint c
@@ -634,9 +673,9 @@ impl Connection for PgConnection {
             JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
             JOIN pg_catalog.pg_class fn_class ON fn_class.oid = c.confrelid
             JOIN pg_catalog.pg_namespace fn_ns ON fn_ns.oid = fn_class.relnamespace
-            JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
+            JOIN LATERAL pg_catalog.unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
             JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = kf.attnum
-            JOIN LATERAL unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
+            JOIN LATERAL pg_catalog.unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
                 ON kfr.ordinality = kf.ordinality
             JOIN pg_catalog.pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = kfr.attnum
             WHERE c.contype = 'f'
@@ -678,16 +717,16 @@ impl Connection for PgConnection {
                 c.conname AS fk_name,
                 t_ns.nspname AS source_schema,
                 t.relname AS source_table,
-                array_agg(a.attname ORDER BY kf.ordinality) AS source_columns,
-                array_agg(fa.attname ORDER BY kf.ordinality) AS target_columns
+                pg_catalog.array_agg(a.attname ORDER BY kf.ordinality) AS source_columns,
+                pg_catalog.array_agg(fa.attname ORDER BY kf.ordinality) AS target_columns
             FROM pg_catalog.pg_constraint c
             JOIN pg_catalog.pg_class t ON t.oid = c.conrelid
             JOIN pg_catalog.pg_namespace t_ns ON t_ns.oid = t.relnamespace
             JOIN pg_catalog.pg_class fn_class ON fn_class.oid = c.confrelid
             JOIN pg_catalog.pg_namespace fn_ns ON fn_ns.oid = fn_class.relnamespace
-            JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
+            JOIN LATERAL pg_catalog.unnest(c.conkey) WITH ORDINALITY AS kf(attnum, ordinality) ON true
             JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = kf.attnum
-            JOIN LATERAL unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
+            JOIN LATERAL pg_catalog.unnest(c.confkey) WITH ORDINALITY AS kfr(attnum, ordinality)
                 ON kfr.ordinality = kf.ordinality
             JOIN pg_catalog.pg_attribute fa ON fa.attrelid = c.confrelid AND fa.attnum = kfr.attnum
             WHERE c.contype = 'f'
@@ -931,23 +970,39 @@ async fn acquire_controlled(
 }
 
 async fn controlled_query(
-    mut connection: PoolConnection<Postgres>,
+    connection: PoolConnection<Postgres>,
     sql: &str,
     params: &[Value],
     retry_stale_type_cache: bool,
     control: &OperationControl,
 ) -> (Option<PoolConnection<Postgres>>, Result<QueryResult, DriverError>) {
+    let (connection, result) =
+        controlled_query_with_messages(connection, sql, params, retry_stale_type_cache, control).await;
+    (connection, result.map(|(rows, _)| rows))
+}
+
+pub(crate) type MessagedResult = Result<(QueryResult, ServerMessages), DriverError>;
+
+async fn controlled_query_with_messages(
+    mut connection: PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+    retry_stale_type_cache: bool,
+    control: &OperationControl,
+) -> (Option<PoolConnection<Postgres>>, MessagedResult) {
     let cancel_token = connection.cancel_token();
     let stop = Some(QueryStop {
         cancel_token: cancel_token.clone(),
     });
+    notices::discard(&mut connection);
     let result = run_server_cancellable(
         async {
-            if retry_stale_type_cache {
+            let rows = if retry_stale_type_cache {
                 query_connection(&mut connection, sql, params, stop).await
             } else {
                 query_connection_once(&mut connection, sql, params, stop).await
-            }
+            }?;
+            Ok((rows, notices::drain(&mut connection)))
         },
         request_cancellation(cancel_token),
         confirms_cancellation,

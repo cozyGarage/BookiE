@@ -53,7 +53,7 @@ fn write_export(job: ExportJob, cancel: &CancellationToken, completed: &AtomicUs
             bookie_core::export::write_result_file(&job.path, &result, &export, cancelled, progress)
         }
         JobSource::Paged {
-            mode: super::PagedExportMode::StoredQuery,
+            mode: super::PagedExportMode::StoredQuery | super::PagedExportMode::SnapshotTable,
             columns,
             total,
             open,

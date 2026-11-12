@@ -82,6 +82,7 @@ impl ActiveStream {
                 Some(self.spool.clone()),
             ))),
             pinned: false,
+            detail: Default::default(),
         }
     }
 }

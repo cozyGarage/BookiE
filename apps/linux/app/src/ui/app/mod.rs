@@ -781,6 +781,9 @@ impl SimpleComponent for App {
                 self.on_open_referenced_row(schema, table, filter, sender)
             }
             AppMsg::ChooseReferencedRow(targets) => self.on_choose_referenced_row(targets, sender),
+            AppMsg::BrowseViewRestriction(tab_id, restriction) => {
+                self.dispatch_to_tab(tab_id, BrowseTabInput::ViewRestriction(restriction));
+            }
             AppMsg::ColumnsLoaded(tab_id, columns, request) => {
                 self.on_browse_columns_loaded(tab_id, columns, request, sender)
             }

@@ -11,5 +11,5 @@ name = "bookie_avro_container"
 path = "src/lib.rs"
 
 [dependencies]
-apache-avro = "0.17"
+apache-avro = "0.22"
 serde_json.workspace = true

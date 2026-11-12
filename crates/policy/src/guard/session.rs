@@ -55,6 +55,7 @@ impl CursorAudit {
 struct ExtraSets {
     collect: bool,
     sets: Vec<QueryResult>,
+    messages: ServerMessages,
 }
 
 struct StatementInput<'a> {
@@ -81,6 +82,7 @@ async fn inner_statement(
     }
     let batch = inner.query_result_sets_params_controlled(sql, params, control).await?;
     let truncated = batch.truncated;
+    extra.messages = guard.releasable_messages(batch.messages);
     let mut sets = batch.result_sets.into_iter();
     let mut first = sets.next().unwrap_or(QueryResult {
         columns: Vec::new(),
@@ -206,13 +208,19 @@ impl Session for PolicySession {
     ) -> Result<QueryResultBatch, DriverError> {
         self.extra.collect = true;
         self.extra.sets.clear();
+        self.extra.messages = ServerMessages::default();
         let first = self.query_params_controlled(sql, params, control).await;
         self.extra.collect = false;
         let extras = std::mem::take(&mut self.extra.sets);
+        let messages = std::mem::take(&mut self.extra.messages);
         let mut result_sets = vec![first?];
         result_sets.extend(extras);
         let truncated = result_sets.iter().any(|set| set.truncated);
-        Ok(QueryResultBatch { result_sets, truncated })
+        Ok(QueryResultBatch {
+            result_sets,
+            truncated,
+            messages,
+        })
     }
 
     async fn open_query_cursor_controlled(

@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 pub mod core_bridge;
 pub mod detail;
 pub mod edit;

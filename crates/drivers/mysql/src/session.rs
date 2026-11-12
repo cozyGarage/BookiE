@@ -59,6 +59,20 @@ pub(crate) async fn query_with_text_fallback(
     params: &[Value],
     control: &OperationControl,
 ) -> Result<QueryResultBatch, DriverError> {
+    crate::warnings::discard(connection);
+    let batch = run_statement(connection, cancellation_pool, connection_id, sql, params, control).await?;
+    let messages = crate::warnings::collect(connection).await;
+    Ok(batch.with_messages(messages))
+}
+
+async fn run_statement(
+    connection: &mut PoolConnection<MySql>,
+    cancellation_pool: &Pool<MySql>,
+    connection_id: u64,
+    sql: &str,
+    params: &[Value],
+    control: &OperationControl,
+) -> Result<QueryResultBatch, DriverError> {
     if params.is_empty() && crate::is_call_statement(sql) {
         return run_server_cancellable(
             crate::text_protocol(connection, sql),

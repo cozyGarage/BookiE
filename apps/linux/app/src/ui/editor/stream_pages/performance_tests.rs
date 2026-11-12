@@ -96,6 +96,7 @@ fn independent_pinned_streams_release_pages_and_keep_spools_until_unpin() {
                 Some(spool.clone()),
             ))),
             pinned: false,
+            detail: Default::default(),
         };
         drop(spool);
         displayed.push(outcome.clone());
@@ -141,6 +142,7 @@ fn pin_eviction_and_unpin_release_unspooled_result_pages() {
             elapsed_ms: 0,
             kind: StatementOutcomeKind::Streamed(Box::new(cache.snapshot(StreamTerminal::Complete, None))),
             pinned: false,
+            detail: Default::default(),
         };
         drop(cache);
         pins.add_pin(outcome);
@@ -367,6 +369,7 @@ fn completed_stream_export_keeps_spool_after_result_and_pin_are_dropped() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(snapshot)),
         pinned: false,
+        detail: Default::default(),
     };
     let mut pins = PinnedResults::default();
     pins.add_pin(outcome);

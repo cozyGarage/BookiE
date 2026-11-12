@@ -267,6 +267,11 @@ impl App {
         };
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
+        let check_view = self
+            .registry
+            .get(self.driver_id())
+            .is_some_and(|driver| driver.capabilities().supports_updatable_views)
+            && !self.relation_is_ordinary_table(schema.as_deref(), &table);
         let token = self.read_scopes.borrow_mut().start(tab_id, ReadScope::Columns);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
@@ -275,11 +280,26 @@ impl App {
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     match conn.fetch_columns_controlled(schema.as_deref(), &table, &control).await {
                         Ok(_) | Err(_) if control.cancellation_token().is_cancelled() => {}
-                        Ok(columns) => sender_clone.input(AppMsg::ColumnsLoaded(
-                            tab_id,
-                            columns,
-                            control.cancellation_token().clone(),
-                        )),
+                        Ok(columns) => {
+                            let plan = bookie_app_services::view_edit::resolve_view_columns(
+                                &*conn,
+                                schema.as_deref(),
+                                &table,
+                                columns,
+                                check_view,
+                                &control,
+                            )
+                            .await;
+                            if control.cancellation_token().is_cancelled() {
+                                return;
+                            }
+                            sender_clone.input(AppMsg::BrowseViewRestriction(tab_id, plan.restriction));
+                            sender_clone.input(AppMsg::ColumnsLoaded(
+                                tab_id,
+                                plan.columns,
+                                control.cancellation_token().clone(),
+                            ));
+                        }
                         Err(error) => sender_clone.input(AppMsg::LoadFailed(
                             Some(tab_id),
                             BrowseLoadFailure {
@@ -608,7 +628,7 @@ impl App {
         };
         Some(crate::ui::export_dialog::ExportRequest {
             scope: crate::ui::export_dialog::ExportScope::TablePage { filtered },
-            paged: None,
+            paged: self.snapshot_export(active_id),
             result: std::sync::Arc::new(result),
             suggested_name: table_label,
             driver_id: self.driver_id().to_string(),
@@ -677,12 +697,31 @@ impl App {
         Some((plan, total))
     }
 
+    fn snapshot_export(&self, tab_id: Uuid) -> Option<crate::ui::export_dialog::PagedExport> {
+        let supported = self
+            .registry
+            .get(self.driver_id())
+            .is_some_and(|driver| driver.capabilities().supports_snapshot_export);
+        if !supported {
+            return None;
+        }
+        let guard = self
+            .connection_id
+            .and_then(|id| self.database.guard(id, bookie_policy::Principal::human_gui()))?;
+        let (plan, total_rows) = self.export_page_plan(tab_id)?;
+        Some(crate::ui::export_dialog::PagedExport {
+            mode: crate::ui::export_dialog::PagedExportMode::SnapshotTable,
+            total_rows,
+            open: snapshot_fetcher_factory(guard, plan),
+        })
+    }
+
     pub(super) fn on_export_all(&self, format: ExportFormat) {
-        let planned = self
-            .selected_browse_tab_id()
+        let selected = self.selected_browse_tab_id();
+        let planned = selected
             .and_then(|id| self.export_page_plan(id))
             .zip(self.window_connection());
-        let Some(((plan, total_rows), conn)) = planned else {
+        let (Some(selected), Some(((plan, total_rows), conn))) = (selected, planned) else {
             self.show_toast(&bookie_app_services::tr!("Nothing to export"));
             return;
         };
@@ -690,6 +729,7 @@ impl App {
             Some(schema) => format!("{schema}.{}", plan.table),
             None => plan.table.clone(),
         };
+        let snapshot = self.snapshot_export(selected);
         let columns_only = QueryResult {
             columns: plan.columns.clone(),
             rows: Vec::new().into(),
@@ -699,14 +739,20 @@ impl App {
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
-                scope: crate::ui::export_dialog::ExportScope::TablePage {
-                    filtered: !plan.filter.is_empty(),
+                scope: if snapshot.is_some() {
+                    crate::ui::export_dialog::ExportScope::TableSnapshot {
+                        filtered: !plan.filter.is_empty(),
+                    }
+                } else {
+                    crate::ui::export_dialog::ExportScope::TablePage {
+                        filtered: !plan.filter.is_empty(),
+                    }
                 },
-                paged: Some(crate::ui::export_dialog::PagedExport {
+                paged: Some(snapshot.unwrap_or_else(|| crate::ui::export_dialog::PagedExport {
                     mode: crate::ui::export_dialog::PagedExportMode::FullTable,
                     total_rows,
                     open: page_fetcher_factory(conn, plan),
-                }),
+                })),
                 result: std::sync::Arc::new(columns_only),
                 suggested_name: label,
                 driver_id: self.driver_id().to_string(),
@@ -886,11 +932,34 @@ async fn run_browse_count(
     }
 }
 
-fn page_fetcher_factory(
-    conn: std::sync::Arc<dyn bookie_core::Connection>,
+fn snapshot_fetcher_factory(
+    guard: std::sync::Arc<bookie_policy::PolicyGuard>,
     plan: crate::services::export_pages::PagePlan,
 ) -> crate::ui::export_dialog::PageFetcherFactory {
-    let run: crate::services::export_pages::PageRunner = std::sync::Arc::new(|future| {
+    let run = page_runner();
+    std::sync::Arc::new(move |cancel| {
+        let pages =
+            bookie_app_services::snapshot_export::SnapshotPages::new(guard.clone(), plan.clone(), run.clone(), cancel);
+        let shared = std::sync::Arc::new(std::sync::Mutex::new(Some(pages)));
+        let reader = shared.clone();
+        crate::ui::export_dialog::PageFetcher::new(
+            move || {
+                let mut slot = reader.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                match slot.as_mut() {
+                    Some(pages) => pages.next_page(),
+                    None => Ok(None),
+                }
+            },
+            move || {
+                let taken = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
+                taken.map_or(Ok(()), |pages| pages.finish())
+            },
+        )
+    })
+}
+
+fn page_runner() -> crate::services::export_pages::PageRunner {
+    std::sync::Arc::new(|future| {
         let (reply, answer) = async_channel::bounded(1);
         relm4::spawn(async move {
             let _ = reply.send(future.await).await;
@@ -900,7 +969,14 @@ fn page_fetcher_factory(
                 "the export was interrupted".into(),
             ))
         })
-    });
+    })
+}
+
+fn page_fetcher_factory(
+    conn: std::sync::Arc<dyn bookie_core::Connection>,
+    plan: crate::services::export_pages::PagePlan,
+) -> crate::ui::export_dialog::PageFetcherFactory {
+    let run = page_runner();
     std::sync::Arc::new(move |cancel| {
         let fetcher = crate::services::export_pages::page_fetcher(conn.clone(), plan.clone(), run.clone(), cancel);
         crate::ui::export_dialog::PageFetcher::new(fetcher, || Ok(()))

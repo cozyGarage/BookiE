@@ -12,7 +12,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "vendor"
 PATCHES = VENDOR / "patches"
-TRIMMED = {"redis": {"benches", "examples", "tests", "release.toml", "CHANGELOG.md"}}
+TRIMMED = {
+    "redis": {"benches", "examples", "tests", "release.toml", "CHANGELOG.md"},
+    "tiberius": {".github", "docker", "docs", "examples", "tests", "docker-compose.yml", "Cargo.lock", "flake.lock", "flake.nix", "CHANGELOG.md"},
+}
 
 
 def crate_version(vendored):

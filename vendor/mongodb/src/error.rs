@@ -18,7 +18,10 @@ use crate::{
     cmap::RawCommandResponse,
     options::ServerAddress,
     sdam::TopologyVersion,
-    serde_util::deserialize_duration_option_from_u64_millis,
+    serde_util::{
+        deserialize_document_bypass_extjson,
+        deserialize_duration_option_from_u64_millis,
+    },
 };
 
 pub use bulk_write::{BulkWriteError, PartialBulkWriteResult};
@@ -197,12 +200,12 @@ impl Error {
     }
 
     pub(crate) fn is_network_timeout(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::Io(ref io_err) if io_err.kind() == std::io::ErrorKind::TimedOut)
+        matches!(self.kind.as_ref(), ErrorKind::Io(io_err) if io_err.kind() == std::io::ErrorKind::TimedOut)
     }
 
     /// Whether this error is an "ns not found" error or not.
     pub(crate) fn is_ns_not_found(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::Command(ref err) if err.code == 26)
+        matches!(self.kind.as_ref(), ErrorKind::Command(err) if err.code == 26)
     }
 
     pub(crate) fn is_server_selection_error(&self) -> bool {
@@ -319,7 +322,7 @@ impl Error {
     }
 
     pub(crate) fn is_non_timeout_network_error(&self) -> bool {
-        matches!(self.kind.as_ref(), ErrorKind::Io(ref io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
+        matches!(self.kind.as_ref(), ErrorKind::Io(io_err) if io_err.kind() != std::io::ErrorKind::TimedOut)
     }
 
     pub(crate) fn is_network_error(&self) -> bool {
@@ -356,7 +359,7 @@ impl Error {
     }
 
     /// Gets the code from this error.
-    #[cfg(test)]
+    #[cfg(any(feature = "opentelemetry", test))]
     pub(crate) fn code(&self) -> Option<i32> {
         match self.kind.as_ref() {
             ErrorKind::Command(command_error) => Some(command_error.code),
@@ -365,6 +368,10 @@ impl Error {
                 ..
             }) => Some(wc_error.code),
             ErrorKind::Write(e) => Some(e.code()),
+            ErrorKind::Io(e) => e
+                .get_ref()
+                .and_then(|e| e.downcast_ref::<Error>())
+                .and_then(|e| e.code()),
             _ => None,
         }
         .or_else(|| self.source.as_ref().and_then(|s| s.sdam_code()))
@@ -414,12 +421,12 @@ impl Error {
     #[cfg(test)]
     pub(crate) fn code_name(&self) -> Option<&str> {
         match self.kind.as_ref() {
-            ErrorKind::Command(ref cmd_err) => Some(cmd_err.code_name.as_str()),
-            ErrorKind::Write(ref failure) => match failure {
-                WriteFailure::WriteConcernError(ref wce) => Some(wce.code_name.as_str()),
-                WriteFailure::WriteError(ref we) => we.code_name.as_deref(),
+            ErrorKind::Command(cmd_err) => Some(cmd_err.code_name.as_str()),
+            ErrorKind::Write(failure) => match failure {
+                WriteFailure::WriteConcernError(wce) => Some(wce.code_name.as_str()),
+                WriteFailure::WriteError(we) => we.code_name.as_deref(),
             },
-            ErrorKind::InsertMany(ref bwe) => bwe
+            ErrorKind::InsertMany(bwe) => bwe
                 .write_concern_error
                 .as_ref()
                 .map(|wce| wce.code_name.as_str()),
@@ -885,7 +892,11 @@ pub struct WriteConcernError {
     pub message: String,
 
     /// A document identifying the write concern setting related to the error.
-    #[serde(rename = "errInfo")]
+    #[serde(
+        rename = "errInfo",
+        default,
+        deserialize_with = "deserialize_document_bypass_extjson"
+    )]
     pub details: Option<Document>,
 
     /// Labels categorizing the error.
@@ -925,7 +936,11 @@ pub struct WriteError {
 
     /// A document providing more information about the write error (e.g. details
     /// pertaining to document validation).
-    #[serde(rename = "errInfo")]
+    #[serde(
+        rename = "errInfo",
+        default,
+        deserialize_with = "deserialize_document_bypass_extjson"
+    )]
     pub details: Option<Document>,
 }
 
@@ -963,7 +978,11 @@ pub struct IndexedWriteError {
 
     /// A document providing more information about the write error (e.g. details
     /// pertaining to document validation).
-    #[serde(rename = "errInfo")]
+    #[serde(
+        rename = "errInfo",
+        default,
+        deserialize_with = "deserialize_document_bypass_extjson"
+    )]
     pub details: Option<Document>,
 }
 
@@ -1052,7 +1071,7 @@ impl WriteFailure {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(any(feature = "opentelemetry", test))]
     pub(crate) fn code(&self) -> i32 {
         match self {
             Self::WriteConcernError(e) => e.code,

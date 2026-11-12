@@ -1,13 +1,16 @@
 use async_trait::async_trait;
 use bookie_core::{
-    DriverError, MAX_QUERY_CURSOR_PAGE_ROWS, OperationControl, QueryCursorId, QueryCursorPage, QueryResult, Value,
-    check_pre_dispatch,
+    DriverError, MAX_QUERY_CURSOR_PAGE_ROWS, OperationControl, QueryCursorId, QueryCursorPage, QueryResult,
+    QueryResultBatch, Value, check_pre_dispatch,
 };
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::{Pool, Postgres};
 
-use crate::{CONTROL_SETUP_TIMEOUT, controlled_execute, controlled_query, map_sqlx_error};
+use crate::{
+    CONTROL_SETUP_TIMEOUT, MessagedResult, controlled_execute, controlled_query, controlled_query_with_messages,
+    map_sqlx_error,
+};
 
 struct ActiveCursor {
     id: QueryCursorId,
@@ -46,15 +49,19 @@ impl bookie_core::Session for PgSession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
-        if self.active_cursor.as_ref().is_some_and(|cursor| cursor.failed) {
-            self.active_cursor = None;
-        }
-        if self.active_cursor.is_some() {
-            return Err(DriverError::Unsupported(
-                "query while a forward-only cursor is active".into(),
-            ));
-        }
+        self.reject_active_cursor()?;
         self.run_query_controlled(sql, params, control).await
+    }
+
+    async fn query_result_sets_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        self.reject_active_cursor()?;
+        let (rows, messages) = self.run_messaged_query_controlled(sql, params, control).await?;
+        Ok(QueryResultBatch::single(rows).with_messages(messages))
     }
 
     async fn lexical_settings_controlled(
@@ -227,18 +234,41 @@ impl bookie_core::Session for PgSession {
 }
 
 impl PgSession {
+    fn reject_active_cursor(&mut self) -> Result<(), DriverError> {
+        if self.active_cursor.as_ref().is_some_and(|cursor| cursor.failed) {
+            self.active_cursor = None;
+        }
+        if self.active_cursor.is_some() {
+            return Err(DriverError::Unsupported(
+                "query while a forward-only cursor is active".into(),
+            ));
+        }
+        Ok(())
+    }
+
     async fn run_query_controlled(
         &mut self,
         sql: &str,
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
+        self.run_messaged_query_controlled(sql, params, control)
+            .await
+            .map(|(rows, _)| rows)
+    }
+
+    async fn run_messaged_query_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> MessagedResult {
         check_pre_dispatch(control)?;
         let connection = self
             .connection
             .take()
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
-        let (connection, result) = controlled_query(connection, sql, params, true, control).await;
+        let (connection, result) = controlled_query_with_messages(connection, sql, params, true, control).await;
         self.connection = connection;
         if matches!(result, Err(DriverError::Disconnected)) {
             // A lost backend also loses session-local state. Do not let the

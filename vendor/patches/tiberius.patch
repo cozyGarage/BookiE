@@ -1,0 +1,216 @@
+diff --git a/src/client.rs b/src/client.rs
+index dd521e1..a1fa29e 100644
+--- a/src/client.rs
++++ b/src/client.rs
+@@ -710,6 +710,14 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Client<S> {
+         Ok(())
+     }
+ 
++    /// Takes the informational messages (`PRINT`, `RAISERROR` at severity 10
++    /// or below) the server sent since the last call, and the number dropped
++    /// because more than [`MAX_BUFFERED_SERVER_INFO`](crate::MAX_BUFFERED_SERVER_INFO)
++    /// arrived.
++    pub fn take_server_info(&mut self) -> (Vec<crate::ServerInfoMessage>, u64) {
++        self.connection.context_mut().server_info_mut().take()
++    }
++
+     /// Closes this database connection explicitly.
+     pub async fn close(self) -> crate::Result<()> {
+         self.connection.close().await
+diff --git a/src/lib.rs b/src/lib.rs
+index b8805fb..0a37b91 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -226,6 +226,7 @@ mod to_sql;
+ pub mod error;
+ mod result;
+ mod row;
++mod server_info;
+ mod tds;
+ 
+ mod sql_browser;
+@@ -240,6 +241,7 @@ pub use from_sql::{FromSql, FromSqlOwned};
+ pub use query::Query;
+ pub use result::*;
+ pub use row::{Column, ColumnType, QueryIdx, Row, RowBuilder};
++pub use server_info::{MAX_BUFFERED_SERVER_INFO, MAX_SERVER_INFO_BYTES, ServerInfoMessage};
+ pub use sql_browser::SqlBrowser;
+ pub use tds::{
+     codec::{
+diff --git b/src/server_info.rs b/src/server_info.rs
+new file mode 100644
+index 0000000..91d571b
+--- /dev/null
++++ b/src/server_info.rs
+@@ -0,0 +1,122 @@
++//! Bounded buffer for the informational messages (INFO tokens) a server sends
++//! while a statement runs: `PRINT` output and `RAISERROR` at severity 10 or
++//! below.
++
++use crate::tds::codec::TokenInfo;
++
++/// The most messages kept per connection between two calls to
++/// [`Client::take_server_info`](crate::Client::take_server_info).
++pub const MAX_BUFFERED_SERVER_INFO: usize = 256;
++
++/// The longest message text kept, in bytes.
++pub const MAX_SERVER_INFO_BYTES: usize = 8192;
++
++/// One informational message from the server.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct ServerInfoMessage {
++    /// The message number (`PRINT` uses 0).
++    pub number: u32,
++    /// The error state.
++    pub state: u8,
++    /// The severity class (10 or below for informational messages).
++    pub class: u8,
++    /// The message text, cut to [`MAX_SERVER_INFO_BYTES`].
++    pub message: String,
++    /// The server name.
++    pub server: String,
++    /// The procedure that raised the message, empty outside a procedure.
++    pub procedure: String,
++    /// The line number in the batch or procedure.
++    pub line: u32,
++}
++
++#[derive(Debug, Default)]
++pub(crate) struct ServerInfoBuffer {
++    messages: Vec<ServerInfoMessage>,
++    dropped: u64,
++}
++
++impl ServerInfoBuffer {
++    pub(crate) fn push(&mut self, info: &TokenInfo) {
++        self.push_message(ServerInfoMessage {
++            number: info.number,
++            state: info.state,
++            class: info.class,
++            message: info.message.clone(),
++            server: info.server.clone(),
++            procedure: info.procedure.clone(),
++            line: info.line,
++        });
++    }
++
++    pub(crate) fn push_message(&mut self, mut message: ServerInfoMessage) {
++        if self.messages.len() >= MAX_BUFFERED_SERVER_INFO {
++            self.dropped = self.dropped.saturating_add(1);
++            return;
++        }
++        if message.message.len() > MAX_SERVER_INFO_BYTES {
++            let mut end = MAX_SERVER_INFO_BYTES;
++            while !message.message.is_char_boundary(end) {
++                end -= 1;
++            }
++            message.message.truncate(end);
++        }
++        self.messages.push(message);
++    }
++
++    pub(crate) fn take(&mut self) -> (Vec<ServerInfoMessage>, u64) {
++        (std::mem::take(&mut self.messages), std::mem::take(&mut self.dropped))
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn message(text: &str) -> ServerInfoMessage {
++        ServerInfoMessage {
++            number: 0,
++            state: 1,
++            class: 0,
++            message: text.to_owned(),
++            server: String::new(),
++            procedure: String::new(),
++            line: 1,
++        }
++    }
++
++    #[test]
++    fn take_returns_messages_in_order_and_empties_the_buffer() {
++        let mut buffer = ServerInfoBuffer::default();
++        buffer.push_message(message("first"));
++        buffer.push_message(message("second"));
++        let (messages, dropped) = buffer.take();
++        assert_eq!(messages.len(), 2);
++        assert_eq!(messages[0].message, "first");
++        assert_eq!(messages[1].message, "second");
++        assert_eq!(dropped, 0);
++        let (again, dropped_again) = buffer.take();
++        assert!(again.is_empty());
++        assert_eq!(dropped_again, 0);
++    }
++
++    #[test]
++    fn a_flood_keeps_the_cap_and_counts_the_rest() {
++        let mut buffer = ServerInfoBuffer::default();
++        for index in 0..MAX_BUFFERED_SERVER_INFO + 10 {
++            buffer.push_message(message(&index.to_string()));
++        }
++        let (messages, dropped) = buffer.take();
++        assert_eq!(messages.len(), MAX_BUFFERED_SERVER_INFO);
++        assert_eq!(dropped, 10);
++    }
++
++    #[test]
++    fn long_text_is_cut_on_a_character_boundary() {
++        let mut buffer = ServerInfoBuffer::default();
++        buffer.push_message(message(&"é".repeat(MAX_SERVER_INFO_BYTES)));
++        let (messages, _) = buffer.take();
++        assert!(messages[0].message.len() <= MAX_SERVER_INFO_BYTES);
++        assert!(messages[0].message.starts_with('é'));
++    }
++}
+diff --git a/src/tds/context.rs b/src/tds/context.rs
+index d2bfb36..ddb7bf2 100644
+--- a/src/tds/context.rs
++++ b/src/tds/context.rs
+@@ -1,4 +1,5 @@
+ use super::codec::*;
++use crate::server_info::ServerInfoBuffer;
+ use std::collections::HashMap;
+ use std::sync::Arc;
+ use std::time::Duration;
+@@ -28,6 +29,7 @@ pub(crate) struct Context {
+     /// [`Config::lossy_utf16_decoding`](crate::Config::lossy_utf16_decoding) at
+     /// connect time. Defaults to `false` (strict decoding).
+     lossy_utf16: bool,
++    server_info: ServerInfoBuffer,
+ }
+ 
+ impl Context {
+@@ -50,6 +52,7 @@ impl Context {
+             spn: None,
+             command_timeout: None,
+             lossy_utf16: false,
++            server_info: ServerInfoBuffer::default(),
+         }
+     }
+ 
+@@ -78,6 +81,10 @@ impl Context {
+         self.alt_metas.get(&id).cloned()
+     }
+ 
++    pub(crate) fn server_info_mut(&mut self) -> &mut ServerInfoBuffer {
++        &mut self.server_info
++    }
++
+     pub fn packet_size(&self) -> u32 {
+         self.packet_size
+     }
+diff --git a/src/tds/stream/token.rs b/src/tds/stream/token.rs
+index 8896eaf..658a10b 100644
+--- a/src/tds/stream/token.rs
++++ b/src/tds/stream/token.rs
+@@ -403,6 +403,7 @@ where
+     async fn get_info(&mut self) -> crate::Result<ReceivedToken> {
+         let info = TokenInfo::decode(self.conn).await?;
+         event!(Level::DEBUG, "{}", info.message);
++        self.conn.context_mut().server_info_mut().push(&info);
+         Ok(ReceivedToken::Info(info))
+     }
+ 

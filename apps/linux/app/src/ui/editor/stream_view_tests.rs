@@ -91,6 +91,7 @@ fn streamed(indices: &[u64], pages: Vec<Arc<QueryResult>>, total_rows: usize) ->
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(result.clone())),
         pinned: false,
+        detail: Default::default(),
     };
     (outcome, result)
 }
@@ -430,6 +431,7 @@ fn navigating_away_releases_a_cached_page_grid_and_keeps_its_rows_reusable() {
         elapsed_ms: 0,
         kind: StatementOutcomeKind::Streamed(Box::new(result.clone())),
         pinned: false,
+        detail: Default::default(),
     };
     let settings_store = LocalResultSettingsStore::default();
     let database = Arc::new(crate::services::database_service::DatabaseService::new_isolated());

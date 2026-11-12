@@ -13,6 +13,7 @@ use crate::query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo,
     Value,
 };
+use crate::routine::{RoutineLookup, RoutineRef};
 use crate::tls::TlsConfig;
 use crate::transaction::Transaction;
 
@@ -297,6 +298,16 @@ pub trait Connection: Send + Sync {
     ) -> Result<Vec<CatalogObject>, DriverError> {
         run_controlled(self.list_objects_excluding(kind, schema, excluded_schemas), control).await
     }
+    async fn routine_definition(&self, _routine: &RoutineRef) -> Result<RoutineLookup, DriverError> {
+        Err(DriverError::Unsupported("routine definitions".into()))
+    }
+    async fn routine_definition_controlled(
+        &self,
+        routine: &RoutineRef,
+        control: &OperationControl,
+    ) -> Result<RoutineLookup, DriverError> {
+        run_controlled(self.routine_definition(routine), control).await
+    }
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError>;
     async fn fetch_columns_controlled(
         &self,
@@ -492,6 +503,21 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<InboundForeignKeyInfo>, DriverError> {
         run_controlled(self.fetch_inbound_foreign_keys(schema, table), control).await
+    }
+    async fn fetch_view_editability(
+        &self,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> Result<crate::ViewEditability, DriverError> {
+        Ok(crate::ViewEditability::NotApplicable)
+    }
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<crate::ViewEditability, DriverError> {
+        run_controlled(self.fetch_view_editability(schema, table), control).await
     }
     async fn fetch_enum_labels(&self, _schema: &str, _name: &str) -> Result<Vec<String>, DriverError> {
         Ok(Vec::new())

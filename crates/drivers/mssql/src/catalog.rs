@@ -1,4 +1,7 @@
-use bookie_core::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError, Value};
+use bookie_core::{
+    CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind, DriverError, ROUTINE_DEFINITION_LIMIT_BYTES,
+    RoutineDefinition, RoutineLookup, RoutineRef, Value, cap_definition,
+};
 
 use crate::{MssqlClient, run_query};
 
@@ -110,9 +113,85 @@ fn object_from_row(kind: CatalogObjectKind, row: &[Value]) -> Option<CatalogObje
     })
 }
 
+const ROUTINE_DEFINITION_SQL: &str = "SELECT o.type, d.definition_text, d.over_cap \
+    FROM sys.objects o \
+    JOIN sys.schemas s ON s.schema_id = o.schema_id \
+    CROSS APPLY (SELECT OBJECT_DEFINITION(o.object_id) AS full_text) x \
+    CROSS APPLY (SELECT LEFT(x.full_text, @P3) AS definition_text, \
+        CASE WHEN DATALENGTH(x.full_text) > @P3 * 2 THEN 1 ELSE 0 END AS over_cap) d \
+    WHERE o.type IN ('P', 'FN', 'IF', 'TF') \
+      AND o.is_ms_shipped = 0 \
+      AND s.name = @P1 AND o.name = @P2";
+
+fn routine_kind(object_type: &str) -> &'static str {
+    match object_type.trim() {
+        "P" => "procedure",
+        "FN" => "scalar function",
+        "IF" => "inline table-valued function",
+        "TF" => "table-valued function",
+        _ => "routine",
+    }
+}
+
+pub(crate) async fn routine_definition(
+    client: &mut MssqlClient,
+    routine: &RoutineRef,
+) -> Result<RoutineLookup, DriverError> {
+    let cap = i64::try_from(ROUTINE_DEFINITION_LIMIT_BYTES).unwrap_or(i64::MAX);
+    let params = [
+        Value::Text(routine.schema.clone()),
+        Value::Text(routine.name.clone()),
+        Value::Int(cap),
+    ];
+    let result = run_query(client, ROUTINE_DEFINITION_SQL, &params, 2).await?;
+    Ok(result
+        .rows
+        .first()
+        .and_then(|row| definition_from_row(routine, row))
+        .map_or(RoutineLookup::NotFound, RoutineLookup::Found))
+}
+
+fn definition_from_row(routine: &RoutineRef, row: &[Value]) -> Option<RoutineDefinition> {
+    let Some(Value::Text(object_type)) = row.first() else {
+        return None;
+    };
+    let Some(Value::Text(text)) = row.get(1) else {
+        return None;
+    };
+    let over_cap = matches!(row.get(2), Some(Value::Int(flag)) if *flag != 0);
+    let (definition, cut) = cap_definition(text, ROUTINE_DEFINITION_LIMIT_BYTES);
+    Some(RoutineDefinition {
+        schema: routine.schema.clone(),
+        name: routine.name.clone(),
+        kind: routine_kind(object_type).to_string(),
+        identity_arguments: String::new(),
+        definition,
+        total_bytes: None,
+        truncated: cut || over_cap,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_definition_row_keeps_the_kind_and_flags_a_cut() {
+        let routine = RoutineRef {
+            schema: "dbo".into(),
+            name: "p".into(),
+            identity_arguments: None,
+        };
+        let row = vec![
+            Value::Text("P ".into()),
+            Value::Text("CREATE PROCEDURE p".into()),
+            Value::Int(1),
+        ];
+        let definition = definition_from_row(&routine, &row).unwrap();
+        assert_eq!(definition.kind, "procedure");
+        assert!(definition.truncated);
+        assert!(definition_from_row(&routine, &[Value::Text("P".into()), Value::Null, Value::Int(0)]).is_none());
+    }
 
     #[test]
     fn supported_kinds_contain_expected_variants() {

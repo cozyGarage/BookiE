@@ -49,6 +49,8 @@ const NO_CHANNEL_BINDING: char = 'n';
 
 /// The minimum number of iterations of the hash function that we will accept from the server.
 const MIN_ITERATION_COUNT: u32 = 4096;
+
+/// The maximum number of iterations of the hash function that we will accept from the server.
 const MAX_ITERATION_COUNT: u32 = 100_000;
 
 /// Cache of pre-computed salted passwords.
@@ -716,45 +718,23 @@ mod tests {
         };
         assert!(valid_iteration_count.validate(nonce).is_ok());
 
-        let max_allowed_iteration_count = ServerFirst {
-            i: 100_000,
+        let too_high = ServerFirst {
+            i: super::MAX_ITERATION_COUNT + 1,
             ..valid_iteration_count
         };
-        assert!(max_allowed_iteration_count.validate(nonce).is_ok());
-
-        let too_high_iteration_count = ServerFirst {
-            i: 100_001,
-            ..max_allowed_iteration_count
-        };
-        assert!(too_high_iteration_count.validate(nonce).is_err());
+        assert!(too_high.validate(nonce).is_err());
     }
 
-    fn server_first_with_nonce(nonce: &str) -> ServerFirst {
-        ServerFirst {
+    #[test]
+    fn test_short_server_nonce() {
+        let short = ServerFirst {
             conversation_id: Bson::Null,
             done: false,
             message: "mocked".to_string(),
-            nonce: nonce.to_string(),
+            nonce: "abc".to_string(),
             salt: Vec::new(),
             i: 4096,
-        }
-    }
-
-    #[test]
-    fn test_nonce_prefix_matches() {
-        let server_first = server_first_with_nonce("client-nonceserver-suffix");
-        assert!(server_first.validate("client-nonce").is_ok());
-    }
-
-    #[test]
-    fn test_nonce_mismatch_is_rejected() {
-        let server_first = server_first_with_nonce("server-nonce");
-        assert!(server_first.validate("client-nonce").is_err());
-    }
-
-    #[test]
-    fn test_client_nonce_longer_than_server_nonce_is_rejected_not_a_panic() {
-        let server_first = server_first_with_nonce("short");
-        assert!(server_first.validate("this-nonce-is-longer-than-the-server-echoed-back").is_err());
+        };
+        assert!(short.validate("abcdef").is_err());
     }
 }

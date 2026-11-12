@@ -24,6 +24,8 @@ mod protobuf_wire;
 mod query;
 mod query_rows;
 mod registry;
+mod routine;
+mod server_message;
 mod session;
 pub mod sql_credentials;
 pub mod sql_ddl;
@@ -37,6 +39,7 @@ mod sqlite_any_csv;
 pub mod text_file;
 mod tls;
 mod transaction;
+mod view_editability;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
@@ -78,6 +81,12 @@ pub use query::{
 };
 pub use query_rows::{QueryRowSet, QueryRows};
 pub use registry::DriverRegistry;
+pub use routine::{ROUTINE_DEFINITION_LIMIT_BYTES, RoutineDefinition, RoutineLookup, RoutineRef, cap_definition};
+pub use server_message::{
+    MAX_SERVER_MESSAGE_TEXT_BYTES, MAX_SERVER_MESSAGES, MAX_SERVER_MESSAGES_TOTAL_BYTES, MessageSeverity,
+    ServerMessage, ServerMessages,
+};
 pub use session::{Session, SessionCommitOutcome};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;
+pub use view_editability::ViewEditability;

@@ -22,6 +22,8 @@ mod disconnection;
 mod pooled_database;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
+#[path = "support/server_messages.rs"]
+mod server_messages;
 #[path = "support/shared_container.rs"]
 mod shared_container;
 

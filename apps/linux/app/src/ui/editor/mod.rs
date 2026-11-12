@@ -23,6 +23,7 @@ mod session_age;
 mod session_lexing;
 use bookie_core::sql_format as format_plan;
 use run_lifecycle::dim_previous_results;
+mod outcome_detail;
 mod outcomes;
 mod pinned;
 mod result_compare;

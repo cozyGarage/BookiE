@@ -38,6 +38,8 @@ mod pool_saturation;
 mod pool_session_reset;
 #[path = "support/read_only_session.rs"]
 mod read_only_session;
+#[path = "support/server_messages.rs"]
+mod server_messages;
 
 #[path = "support/vector_contract.rs"]
 mod vector_contract;

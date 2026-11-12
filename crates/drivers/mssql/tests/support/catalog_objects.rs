@@ -162,3 +162,65 @@ async fn lists_server_collations_with_one_default() {
     assert_eq!(default.len(), 1, "{default:?}");
     assert!(collations[0].is_default);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn routine_definitions_are_found_by_name_and_hidden_from_a_role_without_view_definition() {
+    let (_container, opts) = start_mssql().await;
+    let conn = connect(opts.clone()).await;
+    conn.execute(
+        "EXEC('CREATE SCHEMA rd_sales'); \
+         EXEC('CREATE PROCEDURE rd_sales.open_proc AS BEGIN SELECT 1; END'); \
+         EXEC('CREATE PROCEDURE rd_sales.exec_only_proc AS BEGIN SELECT 2; END'); \
+         EXEC('CREATE PROCEDURE rd_sales.hidden_proc AS BEGIN SELECT 3; END'); \
+         CREATE LOGIN rd_login WITH PASSWORD = 'Restricted#2024pw', CHECK_POLICY = OFF; \
+         CREATE USER rd_user FOR LOGIN rd_login; \
+         GRANT EXECUTE ON rd_sales.open_proc TO rd_user; \
+         GRANT VIEW DEFINITION ON rd_sales.open_proc TO rd_user; \
+         GRANT EXECUTE ON rd_sales.exec_only_proc TO rd_user;",
+    )
+    .await
+    .unwrap();
+    let routine = |name: &str| bookie_core::RoutineRef {
+        schema: "rd_sales".into(),
+        name: name.into(),
+        identity_arguments: None,
+    };
+
+    let found = match conn.routine_definition(&routine("open_proc")).await.unwrap() {
+        bookie_core::RoutineLookup::Found(definition) => definition,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(found.kind, "procedure");
+    assert!(found.definition.contains("SELECT 1"));
+    assert!(!found.truncated);
+    assert_eq!(
+        conn.routine_definition(&routine("missing")).await.unwrap(),
+        bookie_core::RoutineLookup::NotFound
+    );
+
+    let restricted = connect(ConnectOptions {
+        username: "rd_login".into(),
+        password: secrecy::SecretString::new("Restricted#2024pw".to_string().into()),
+        ..opts
+    })
+    .await;
+    assert!(matches!(
+        restricted.routine_definition(&routine("open_proc")).await.unwrap(),
+        bookie_core::RoutineLookup::Found(_)
+    ));
+    for hidden in ["exec_only_proc", "hidden_proc"] {
+        assert_eq!(
+            restricted.routine_definition(&routine(hidden)).await.unwrap(),
+            bookie_core::RoutineLookup::NotFound,
+            "{hidden}"
+        );
+    }
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    assert!(matches!(
+        conn.routine_definition_controlled(&routine("open_proc"), &control)
+            .await
+            .unwrap(),
+        bookie_core::RoutineLookup::Found(_)
+    ));
+}

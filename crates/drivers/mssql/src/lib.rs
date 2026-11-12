@@ -13,12 +13,13 @@ use bookie_core::sql_dialect::build_order_and_pagination;
 use bookie_core::{
     AuthMode, CatalogObject, CatalogObjectKind, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError,
     DriverValueInputCapabilities, ExecResult, ForeignKeyInfo, InboundForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS,
-    OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
-    run_server_cancellable,
+    OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, ServerMessages, TableInfo, Value,
+    check_pre_dispatch, run_server_cancellable,
 };
 
 mod catalog;
 mod codec;
+mod info;
 mod session;
 mod variant_guard;
 mod zoned;
@@ -444,6 +445,24 @@ impl Connection for MssqlConnection {
             .await
     }
 
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        let mut client = self.client().await?;
+        catalog::routine_definition(&mut client, routine).await
+    }
+
+    async fn routine_definition_controlled(
+        &self,
+        routine: &bookie_core::RoutineRef,
+        control: &OperationControl,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        let mut client = bookie_core::run_controlled_setup(self.client(), control).await??;
+        self.run_abandonable(catalog::routine_definition(&mut client, routine), control)
+            .await
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         // sys catalog is authoritative: is_identity/is_computed are exact
         // flags, sys.default_constraints.definition carries the DEFAULT
@@ -822,8 +841,10 @@ async fn run_query_sets(
     variant_guard::catch_tiberius_variant_panic(async {
         let boxes = boxed_params(params)?;
         let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
+        info::discard(client);
         let stream = client.query(sql, &refs).await.map_err(map_tiberius_error)?;
-        collect_result_sets(stream, limit, retain_additional_sets).await
+        let batch = collect_result_sets(stream, limit, retain_additional_sets).await?;
+        Ok(batch.with_messages(info::drain(client)))
     })
     .await
 }
@@ -838,8 +859,10 @@ async fn run_batch_sets(
     retain_additional_sets: bool,
 ) -> Result<QueryResultBatch, DriverError> {
     variant_guard::catch_tiberius_variant_panic(async {
+        info::discard(client);
         let stream = client.simple_query(sql).await.map_err(map_tiberius_error)?;
-        collect_result_sets(stream, limit, retain_additional_sets).await
+        let batch = collect_result_sets(stream, limit, retain_additional_sets).await?;
+        Ok(batch.with_messages(info::drain(client)))
     })
     .await
 }
@@ -937,7 +960,11 @@ async fn collect_result_sets(
     if let Some(last) = current {
         result_sets.push(last);
     }
-    Ok(QueryResultBatch { result_sets, truncated })
+    Ok(QueryResultBatch {
+        result_sets,
+        truncated,
+        messages: ServerMessages::default(),
+    })
 }
 
 async fn run_execute(client: &mut MssqlClient, sql: &str, params: &[Value]) -> Result<u64, DriverError> {

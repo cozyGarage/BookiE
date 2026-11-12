@@ -141,6 +141,21 @@ impl Connection for SessionConnection {
             .await
     }
 
+    async fn routine_definition(
+        &self,
+        routine: &bookie_core::RoutineRef,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.inner.routine_definition(routine).await
+    }
+
+    async fn routine_definition_controlled(
+        &self,
+        routine: &bookie_core::RoutineRef,
+        control: &OperationControl,
+    ) -> Result<bookie_core::RoutineLookup, DriverError> {
+        self.inner.routine_definition_controlled(routine, control).await
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         self.inner.fetch_columns(schema, table).await
     }
@@ -299,6 +314,25 @@ impl Connection for SessionConnection {
         control: &OperationControl,
     ) -> Result<Vec<ForeignKeyInfo>, DriverError> {
         self.inner.fetch_foreign_keys_controlled(schema, table, control).await
+    }
+
+    async fn fetch_view_editability(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        self.inner.fetch_view_editability(schema, table).await
+    }
+
+    async fn fetch_view_editability_controlled(
+        &self,
+        schema: Option<&str>,
+        table: &str,
+        control: &OperationControl,
+    ) -> Result<bookie_core::ViewEditability, DriverError> {
+        self.inner
+            .fetch_view_editability_controlled(schema, table, control)
+            .await
     }
 
     async fn fetch_inbound_foreign_keys(
