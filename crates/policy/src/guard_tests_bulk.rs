@@ -893,3 +893,13 @@ async fn the_skipping_path_denies_a_batch_for_another_table_before_reaching_the_
     assert!(batches.lock().unwrap().is_empty());
     end_quietly(&guard, &mut scope).await;
 }
+
+#[tokio::test]
+async fn beginning_a_bulk_insert_parses_the_statement_once() {
+    let (connection, _batches) = BulkConn::open(usize::MAX);
+    let (guard, _audit, _state) = approved_guard(connection, Uuid::new_v4());
+    crate::parsed_sql::counter::reset();
+    let mut scope = guard.begin_bulk_insert(request(6)).await.expect("scope");
+    assert_eq!(crate::parsed_sql::counter::count(), 1);
+    end_quietly(&guard, &mut scope).await;
+}

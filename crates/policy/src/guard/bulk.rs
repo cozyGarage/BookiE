@@ -1,8 +1,8 @@
 use super::*;
 use crate::classify::StatementClass;
-use crate::classify::classify;
+use crate::classify::classify_parsed;
+use crate::parsed_sql::ParsedSql;
 use sqlparser::ast::{Statement, TableObject};
-use sqlparser::parser::Parser;
 
 /// Rows one approved import may write. A budget larger than this is
 /// refused before the user is asked, so no single approval can cover an
@@ -232,7 +232,8 @@ impl PolicyGuard {
     /// the only thing that lets [`PolicyGuard::execute_bulk_batch`] run.
     pub async fn begin_bulk_insert(&self, request: BulkInsertRequest) -> Result<BulkInsertScope, DriverError> {
         self.require_governed_write_available()?;
-        let facts = bulk_facts(&request, &self.ctx.driver_id)?;
+        let parsed = ParsedSql::new(&request.statement, &self.ctx.driver_id);
+        let facts = bulk_facts(&request, &parsed, &self.ctx.driver_id)?;
         if !valid_sequence_columns(&self.ctx.driver_id, &request.sequence_columns) {
             self.record_bulk_refusal(
                 &request,
@@ -244,7 +245,7 @@ impl PolicyGuard {
             .await?;
             return Err(denied("the import sequence columns are invalid"));
         }
-        if !statement_target_matches_request(&request, &self.ctx.driver_id) {
+        if !statement_target_matches_request(&request, &parsed, &self.ctx.driver_id) {
             self.record_bulk_refusal(
                 &request,
                 &facts,
@@ -564,14 +565,14 @@ fn partial_transaction_outcome(committed: u64) -> AuditTransactionOutcome {
     AuditTransactionOutcome::Committed
 }
 
-fn bulk_facts(request: &BulkInsertRequest, driver_id: &str) -> Result<StatementFacts, DriverError> {
+fn bulk_facts(request: &BulkInsertRequest, parsed: &ParsedSql, driver_id: &str) -> Result<StatementFacts, DriverError> {
     if request.table.trim().is_empty() {
         return Err(denied("an import needs a target table"));
     }
     if request.row_budget == 0 || request.row_budget > MAX_BULK_ROW_BUDGET {
         return Err(denied("an import must name between one row and the import row limit"));
     }
-    let facts = classify(&request.statement, driver_id);
+    let facts = classify_parsed(parsed, driver_id);
     if facts.is_multi_statement || facts.class != StatementClass::Insert || !facts.writes() {
         return Err(denied(
             "an import approval covers one INSERT statement and nothing else",
@@ -580,12 +581,11 @@ fn bulk_facts(request: &BulkInsertRequest, driver_id: &str) -> Result<StatementF
     Ok(facts)
 }
 
-fn statement_target_matches_request(request: &BulkInsertRequest, driver_id: &str) -> bool {
-    let dialect = crate::classify::dialect_for(driver_id);
-    let Ok(statements) = Parser::parse_sql(dialect.as_ref(), &request.statement) else {
+fn statement_target_matches_request(request: &BulkInsertRequest, parsed: &ParsedSql, driver_id: &str) -> bool {
+    let Ok(statements) = parsed.statements() else {
         return false;
     };
-    let [Statement::Insert(insert)] = statements.as_slice() else {
+    let [Statement::Insert(insert)] = statements else {
         return false;
     };
     let TableObject::TableName(name) = &insert.table else {

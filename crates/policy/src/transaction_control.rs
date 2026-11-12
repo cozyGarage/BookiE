@@ -1,10 +1,10 @@
 use sqlparser::ast::{
     Query, Set, SetExpr, Statement, TransactionAccessMode, TransactionIsolationLevel, TransactionMode,
 };
-use sqlparser::parser::Parser;
 use sqlparser::tokenizer::{Token, Tokenizer};
 
 use crate::classify::dialect_for;
+use crate::parsed_sql::ParsedSql;
 use crate::show_statements::is_read_only_show;
 use crate::tsql_transaction::{self, TsqlPhrase};
 
@@ -76,18 +76,21 @@ fn is_word(token: Option<&Token>, expected: &str) -> bool {
 }
 
 pub fn transaction_control(sql: &str, driver_id: &str) -> Option<TransactionControl> {
-    if driver_id == "mssql" {
-        return tsql_transaction_control(sql);
-    }
-    parsed_transaction_control(sql, driver_id)
+    transaction_control_parsed(&ParsedSql::new(sql, driver_id), driver_id)
 }
 
-pub(crate) fn mysql_statement_is_transaction_safe(sql: &str) -> bool {
-    let dialect = dialect_for("mysql");
-    let Ok(statements) = Parser::parse_sql(dialect.as_ref(), sql.trim()) else {
+pub(crate) fn transaction_control_parsed(parsed: &ParsedSql, driver_id: &str) -> Option<TransactionControl> {
+    if driver_id == "mssql" {
+        return tsql_transaction_control(parsed);
+    }
+    parsed_transaction_control(parsed)
+}
+
+pub(crate) fn mysql_statement_is_transaction_safe(parsed: &ParsedSql) -> bool {
+    let Ok(statements) = parsed.statements() else {
         return false;
     };
-    let [statement] = statements.as_slice() else {
+    let [statement] = statements else {
         return false;
     };
     match statement {
@@ -116,33 +119,31 @@ fn mysql_locking_read(query: &Query) -> bool {
     !query.locks.is_empty() && matches!(query.body.as_ref(), SetExpr::Select(select) if select.into.is_none())
 }
 
-fn parsed_transaction_control(sql: &str, driver_id: &str) -> Option<TransactionControl> {
-    let dialect = dialect_for(driver_id);
-    let statements = Parser::parse_sql(dialect.as_ref(), sql.trim()).ok()?;
-    let [statement] = statements.as_slice() else {
+fn parsed_transaction_control(parsed: &ParsedSql) -> Option<TransactionControl> {
+    let statements = parsed.statements().ok()?;
+    let [statement] = statements else {
         return None;
     };
     control_of(statement)
 }
 
-fn tsql_transaction_control(sql: &str) -> Option<TransactionControl> {
-    let Some(phrase) = tsql_transaction::scan(sql).only_phrase() else {
-        return parsed_transaction_control(sql, "mssql");
+fn tsql_transaction_control(parsed: &ParsedSql) -> Option<TransactionControl> {
+    let Some(phrase) = tsql_transaction::scan(parsed.sql()).only_phrase() else {
+        return parsed_transaction_control(parsed);
     };
     match phrase {
-        TsqlPhrase::Begin => parsed_transaction_control(sql, "mssql").or(Some(TransactionControl::Begin)),
+        TsqlPhrase::Begin => parsed_transaction_control(parsed).or(Some(TransactionControl::Begin)),
         TsqlPhrase::Commit => Some(TransactionControl::Commit { chain: false }),
         TsqlPhrase::Rollback => Some(TransactionControl::Rollback { chain: false }),
         TsqlPhrase::NamedRollback | TsqlPhrase::Save => None,
     }
 }
 
-pub(crate) fn hides_transaction_control(sql: &str, driver_id: &str) -> bool {
-    if driver_id == "mssql" && tsql_transaction::scan(sql).hides_control() {
+pub(crate) fn hides_transaction_control(parsed: &ParsedSql, driver_id: &str) -> bool {
+    if driver_id == "mssql" && tsql_transaction::scan(parsed.sql()).hides_control() {
         return true;
     }
-    let dialect = dialect_for(driver_id);
-    let Ok(statements) = Parser::parse_sql(dialect.as_ref(), sql.trim()) else {
+    let Ok(statements) = parsed.statements() else {
         return false;
     };
     statements.len() > 1 && statements.iter().any(|statement| control_of(statement).is_some())
@@ -185,6 +186,10 @@ fn transaction_start(modes: &[TransactionMode]) -> Option<TransactionControl> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn hides(sql: &str, driver_id: &str) -> bool {
+        hides_transaction_control(&ParsedSql::new(sql, driver_id), driver_id)
+    }
 
     #[test]
     fn each_transaction_statement_is_recognised_per_dialect() {
@@ -250,8 +255,8 @@ mod tests {
         ] {
             assert_eq!(transaction_control(sql, "mssql"), expected, "{sql}");
         }
-        assert!(hides_transaction_control("ROLLBACK TRAN s1", "mssql"));
-        assert!(hides_transaction_control("SAVE TRAN s1", "mssql"));
+        assert!(hides("ROLLBACK TRAN s1", "mssql"));
+        assert!(hides("SAVE TRAN s1", "mssql"));
     }
 
     #[test]
@@ -263,14 +268,14 @@ mod tests {
             "UPDATE t SET a = 1 WHERE id = 1; ROLLBACK TRAN",
             "SAVE TRAN s1; UPDATE t SET a = 1",
         ] {
-            assert!(hides_transaction_control(sql, "mssql"), "{sql}");
+            assert!(hides(sql, "mssql"), "{sql}");
         }
         for sql in [
             "SELECT 'BEGIN TRAN' AS x",
             "SELECT 1 /* COMMIT TRAN */",
             "UPDATE tran SET a = 1",
         ] {
-            assert!(!hides_transaction_control(sql, "mssql"), "{sql}");
+            assert!(!hides(sql, "mssql"), "{sql}");
             assert_eq!(transaction_control(sql, "mssql"), None, "{sql}");
         }
     }

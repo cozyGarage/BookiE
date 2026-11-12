@@ -3,10 +3,11 @@ use bookie_core::Environment;
 use crate::classify::{StatementClass, StatementFacts};
 use crate::config::EnvPolicy;
 use crate::effects::Effects;
+use crate::parsed_sql::ParsedSql;
 use crate::principal::Principal;
 use crate::transaction_control::{
     TransactionControl, implicit_transaction_starter, leaves_tsql_transaction_unclosed,
-    mysql_statement_is_transaction_safe, transaction_control,
+    mysql_statement_is_transaction_safe, transaction_control_parsed,
 };
 pub use crate::verdict::Decision;
 
@@ -84,14 +85,18 @@ pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &Sta
     None
 }
 
-pub(crate) fn interactive_transaction_decision(driver_id: &str, sql: &str, facts: &StatementFacts) -> Option<Decision> {
+pub(crate) fn interactive_transaction_decision(
+    driver_id: &str,
+    parsed: &ParsedSql,
+    facts: &StatementFacts,
+) -> Option<Decision> {
     let plain_dml = matches!(
         facts.class,
         StatementClass::Select | StatementClass::Insert | StatementClass::Update | StatementClass::Delete
     );
     if driver_id != "mysql"
         || (plain_dml && !facts.contains_ddl() && !facts.contains_unknown_write())
-        || mysql_statement_is_transaction_safe(sql)
+        || mysql_statement_is_transaction_safe(parsed)
     {
         return None;
     }
@@ -114,7 +119,8 @@ fn has_unclosed_shared_transaction(sql: &str, driver_id: &str) -> bool {
 
     let mut open = false;
     for statement in statements {
-        match transaction_control(&statement, driver_id) {
+        let parsed = ParsedSql::new(&statement, driver_id);
+        match transaction_control_parsed(&parsed, driver_id) {
             Some(
                 TransactionControl::Begin
                 | TransactionControl::BeginReadWrite
@@ -134,7 +140,7 @@ fn has_unclosed_shared_transaction(sql: &str, driver_id: &str) -> bool {
                 open = false;
             }
             None if open => {
-                let facts = crate::classify::classify(&statement, driver_id);
+                let facts = crate::classify::classify_parsed(&parsed, driver_id);
                 if facts.class == StatementClass::Unparseable || (driver_id == "mysql" && facts.contains_ddl()) {
                     return true;
                 }
