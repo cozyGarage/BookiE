@@ -54,6 +54,17 @@ impl super::ConnectDialog {
         }
     }
 
+    pub(super) fn apply_created_database_file(
+        &self,
+        path: &std::path::Path,
+        outcome: Result<(), bookie_app_services::database_file::CreateDatabaseFileError>,
+    ) {
+        match outcome {
+            Ok(()) => self.database.set_text(&path.to_string_lossy()),
+            Err(error) => self.show_toast(&crate::services::error_text::create_database_file_message(&error, path)),
+        }
+    }
+
     pub(super) fn apply_driver_form_visibility(&mut self, driver: &dyn bookie_core::DatabaseDriver) {
         let capabilities = driver.capabilities();
         self.form = ConnectFormState::from_capabilities(capabilities, self.form.selected);

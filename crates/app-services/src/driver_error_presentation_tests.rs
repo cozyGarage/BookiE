@@ -24,6 +24,10 @@ fn every_driver_error_variant_has_a_typed_classification() {
             },
         ),
         (DriverError::Disconnected, DriverFailurePresentation::Disconnected),
+        (
+            DriverError::DatabaseFileNotFound("/data/app.db".into()),
+            DriverFailurePresentation::DatabaseFileNotFound("/data/app.db".into()),
+        ),
         (DriverError::ReadOnly, DriverFailurePresentation::ReadOnly),
         (
             DriverError::PolicyDenied("read only".into()),

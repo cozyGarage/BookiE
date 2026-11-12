@@ -146,6 +146,10 @@ pub trait DatabaseDriver: Send + Sync {
         false
     }
 
+    fn initialize_new_database_file(&self, _path: &std::path::Path) -> Result<(), DriverError> {
+        Ok(())
+    }
+
     /// Whether a multi-statement DDL batch can roll back as a unit, so
     /// the structure editor's Save runs through
     /// `Connection::execute_in_transaction` instead of statement by

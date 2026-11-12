@@ -87,10 +87,7 @@ impl DatabaseDriver for SqliteDriver {
         } else {
             let path = std::path::Path::new(&opts.database);
             if !path.exists() {
-                return Err(DriverError::Internal(format!(
-                    "database file does not exist: {}",
-                    opts.database
-                )));
+                return Err(DriverError::DatabaseFileNotFound(opts.database.clone()));
             }
             SqliteConnectOptions::new().filename(&opts.database)
         };

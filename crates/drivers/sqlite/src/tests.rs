@@ -93,6 +93,45 @@ async fn a_read_write_connection_does_not_create_a_missing_file() {
 }
 
 #[tokio::test]
+async fn a_missing_file_is_reported_as_a_missing_database_file() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("moved.db");
+    let path = path.to_str().unwrap();
+    for read_only in [false, true] {
+        let error = SqliteDriver
+            .connect(ConnectOptions {
+                read_only,
+                ..opts_for(path)
+            })
+            .await
+            .err()
+            .unwrap();
+        assert!(
+            matches!(&error, DriverError::DatabaseFileNotFound(missing) if missing == path),
+            "read_only={read_only}: {error:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_newly_created_empty_file_opens_as_a_database() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("new.db");
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .unwrap();
+    let conn = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    conn.execute("CREATE TABLE t (id INTEGER PRIMARY KEY)").await.unwrap();
+    conn.execute("INSERT INTO t (id) VALUES (7)").await.unwrap();
+    conn.close().await.unwrap();
+
+    let reopened = SqliteDriver.connect(opts_for(path.to_str().unwrap())).await.unwrap();
+    assert_eq!(reopened.query("SELECT id FROM t").await.unwrap().rows.len(), 1);
+}
+
+#[tokio::test]
 async fn an_expression_column_decodes_by_its_runtime_type() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("untyped.db");

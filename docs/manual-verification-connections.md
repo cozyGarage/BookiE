@@ -11,6 +11,7 @@ Part of the [manual verification checklist](manual-verification-0.2-features.md)
 - [ ] Confirm a missing or invalid socket path fails without attempting a TCP connection. Local sockets refuse TLS and SSH; existing PostgreSQL socket-directory and SSH-forwarded MySQL socket connections still work.
 - [ ] The current header title and grouped Test/Connect actions fit at narrow width in light and dark; the title does not overlap the actions.
 - [ ] Enter submits the form and Escape dismisses without changing saved data.
+- [ ] For SQLite and DuckDB, use Create a new database file with a new name: the file appears on disk as an empty file readable and writable only by its owner, the path fills the File path row, and Connect opens it. Choosing an existing file in the same dialog leaves the file unchanged and shows a message that it was not replaced. Delete the file of a saved connection and connect: the message says the database file does not exist and no file is created.
 - [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers; keyboard and click actions match their labels.
 
 ## Production marker
