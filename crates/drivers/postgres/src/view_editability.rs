@@ -10,13 +10,27 @@ const EVENT_UPDATE: i32 = 1 << 2;
 const EVENT_INSERT: i32 = 1 << 3;
 const EVENT_DELETE: i32 = 1 << 4;
 
-const RELATION_SELECT: &str = "SELECT c.oid::int8, c.relkind::text, \
+macro_rules! relation_sql {
+    ($tail:literal) => {
+        concat!(
+            "SELECT c.oid::int8, c.relkind::text, \
     pg_catalog.pg_relation_is_updatable(c.oid, false), \
     EXISTS (SELECT 1 FROM pg_catalog.pg_trigger t WHERE t.tgrelid = c.oid AND NOT t.tgisinternal \
         AND (t.tgtype & 64) <> 0), \
     EXISTS (SELECT 1 FROM pg_catalog.pg_rewrite r WHERE r.ev_class = c.oid AND r.rulename <> '_RETURN'), \
     (SELECT r.ev_action::text FROM pg_catalog.pg_rewrite r WHERE r.ev_class = c.oid AND r.rulename = '_RETURN') \
-    FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace";
+    FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace ",
+            $tail
+        )
+    };
+}
+
+const RELATION_BY_NAME_SQL: &str = relation_sql!(
+    "WHERE (($2::text IS NULL AND c.relname = $1 AND pg_catalog.pg_table_is_visible(c.oid)) \
+     OR (n.nspname = $2 AND c.relname = $1))"
+);
+
+const RELATION_BY_OID_SQL: &str = relation_sql!("WHERE c.oid = $1::int8::oid");
 
 const COLUMNS_SQL: &str = "SELECT a.attnum::int4, a.attname::text, \
     pg_catalog.pg_column_is_updatable(a.attrelid, a.attnum, false) \
@@ -68,18 +82,20 @@ pub(crate) fn target_origins(definition: &str) -> HashMap<i32, Origin> {
             continue;
         };
         if table != 0 {
-            origins.insert(resno as i32, Origin { table, column: column as i32 });
+            origins.insert(
+                resno as i32,
+                Origin {
+                    table,
+                    column: column as i32,
+                },
+            );
         }
     }
     origins
 }
 
 async fn relation(pool: &Pool<Postgres>, schema: Option<&str>, table: &str) -> Result<Option<Relation>, DriverError> {
-    let sql = format!(
-        "{RELATION_SELECT} WHERE (($2::text IS NULL AND c.relname = $1 AND pg_catalog.pg_table_is_visible(c.oid)) \
-         OR (n.nspname = $2 AND c.relname = $1))"
-    );
-    let row = sqlx::query(&sql)
+    let row = sqlx::query(RELATION_BY_NAME_SQL)
         .bind(table)
         .bind(schema)
         .fetch_optional(pool)
@@ -89,8 +105,7 @@ async fn relation(pool: &Pool<Postgres>, schema: Option<&str>, table: &str) -> R
 }
 
 async fn relation_by_oid(pool: &Pool<Postgres>, oid: i64) -> Result<Option<Relation>, DriverError> {
-    let sql = format!("{RELATION_SELECT} WHERE c.oid = $1::int8::oid");
-    let row = sqlx::query(&sql)
+    let row = sqlx::query(RELATION_BY_OID_SQL)
         .bind(oid)
         .fetch_optional(pool)
         .await
@@ -226,25 +241,42 @@ mod tests {
             :resno 3 :resname label :ressortgroupref 0 :resorigtbl 16390 :resorigcol 2 :resjunk false}) :override 0})";
         let origins = target_origins(definition);
         assert_eq!(origins.len(), 2);
-        assert_eq!(origins[&1], Origin { table: 16390, column: 1 });
-        assert_eq!(origins[&3], Origin { table: 16390, column: 2 });
+        assert_eq!(
+            origins[&1],
+            Origin {
+                table: 16390,
+                column: 1
+            }
+        );
+        assert_eq!(
+            origins[&3],
+            Origin {
+                table: 16390,
+                column: 2
+            }
+        );
         assert_eq!(single_base(&origins), Some(16390));
     }
 
     #[test]
     fn a_view_over_two_tables_has_no_single_base() {
-        let origins = HashMap::from([
-            (1, Origin { table: 1, column: 1 }),
-            (2, Origin { table: 2, column: 1 }),
-        ]);
+        let origins = HashMap::from([(1, Origin { table: 1, column: 1 }), (2, Origin { table: 2, column: 1 })]);
         assert_eq!(single_base(&origins), None);
     }
 
     #[test]
     fn every_primary_key_column_must_be_exposed() {
         let view = [
-            ViewColumn { attnum: 1, name: "pk".into(), updatable: true },
-            ViewColumn { attnum: 2, name: "label".into(), updatable: true },
+            ViewColumn {
+                attnum: 1,
+                name: "pk".into(),
+                updatable: true,
+            },
+            ViewColumn {
+                attnum: 2,
+                name: "label".into(),
+                updatable: true,
+            },
         ];
         let mapping = HashMap::from([(1, 5), (2, 6)]);
         assert_eq!(key_columns(&view, &mapping, &[5]), Some(vec!["pk".into()]));

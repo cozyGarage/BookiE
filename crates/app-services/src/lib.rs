@@ -52,7 +52,6 @@ pub mod schema_compare;
 pub mod sequence_value;
 pub mod single_flight;
 pub mod snapshot_export;
-pub mod view_edit;
 pub mod snippets;
 pub mod state_file;
 pub mod stream_page_validation;
@@ -62,6 +61,7 @@ pub mod tab_mark;
 pub mod value_input;
 #[cfg(test)]
 mod value_input_tests;
+pub mod view_edit;
 pub mod window_sessions;
 pub mod window_state;
 pub mod workspace;

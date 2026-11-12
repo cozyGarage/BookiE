@@ -8,8 +8,8 @@ use bookie_core::{
     ConnectOptions, Connection, DatabaseDriver, DriverError, Environment, OperationControl, Value, ViewEditability,
 };
 use bookie_policy::{
-    AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AutoApproveSink, GuardContext,
-    PolicyConfig, PolicyGuard, Principal,
+    AuditError, AuditEvent, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AutoApproveSink,
+    GuardContext, PolicyConfig, PolicyGuard, Principal,
 };
 use drivers_postgres::PgDriver;
 use secrecy::SecretString;
@@ -121,7 +121,11 @@ async fn assert_catalog_verdicts(fixture: &Fixture) {
         assert_eq!(editability(fixture, keyless).await, ViewEditability::KeyNotExposed);
     }
     for refused in ["v_aggregate", "v_join", "v_trigger", "v_rule"] {
-        assert_eq!(editability(fixture, refused).await, ViewEditability::NotUpdatable, "{refused}");
+        assert_eq!(
+            editability(fixture, refused).await,
+            ViewEditability::NotUpdatable,
+            "{refused}"
+        );
     }
 }
 
@@ -160,11 +164,18 @@ async fn assert_edit_reaches_the_base_table(fixture: &Fixture) {
         .await
         .expect("save through the view");
     assert_eq!(counts, vec![1]);
-    let stored = fixture.admin.query("SELECT name FROM items WHERE id = 1").await.unwrap();
+    let stored = fixture
+        .admin
+        .query("SELECT name FROM items WHERE id = 1")
+        .await
+        .unwrap();
     assert_eq!(stored.rows[0][0], Value::Text("washer".into()));
     let deleted = guard
         .execute_in_transaction_checked_controlled(
-            &[("DELETE FROM \"public\".\"v_items\" WHERE \"id\" = $1".into(), vec![Value::Int(2)])],
+            &[(
+                "DELETE FROM \"public\".\"v_items\" WHERE \"id\" = $1".into(),
+                vec![Value::Int(2)],
+            )],
             &[1],
             &control,
         )
@@ -188,7 +199,9 @@ async fn assert_denied_save(fixture: &Fixture) {
         .lock()
         .unwrap()
         .iter()
-        .filter(|event| event.phase == AuditRecordPhase::Outcome && event.terminal_status == AuditTerminalStatus::Denied)
+        .filter(|event| {
+            event.phase == AuditRecordPhase::Outcome && event.terminal_status == AuditTerminalStatus::Denied
+        })
         .count();
     assert!(denied >= 1);
 }
@@ -209,8 +222,19 @@ async fn assert_resolved_columns(fixture: &Fixture) {
     let plan = resolve_view_columns(fixture.admin.as_ref(), Some("public"), "v_keyless", keyless, &control).await;
     assert_eq!(plan.restriction, Some(ViewEditRestriction::KeyNotExposed));
     assert!(plan.columns.iter().all(|column| !column.primary_key));
-    let aggregate = fixture.admin.fetch_columns(Some("public"), "v_aggregate").await.unwrap();
-    let plan = resolve_view_columns(fixture.admin.as_ref(), Some("public"), "v_aggregate", aggregate, &control).await;
+    let aggregate = fixture
+        .admin
+        .fetch_columns(Some("public"), "v_aggregate")
+        .await
+        .unwrap();
+    let plan = resolve_view_columns(
+        fixture.admin.as_ref(),
+        Some("public"),
+        "v_aggregate",
+        aggregate,
+        &control,
+    )
+    .await;
     assert_eq!(plan.restriction, Some(ViewEditRestriction::NotUpdatable));
 }
 

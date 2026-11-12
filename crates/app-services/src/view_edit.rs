@@ -29,7 +29,6 @@ impl ViewEditRestriction {
             Self::InsertUnavailable => crate::tr!("This view does not accept inserts."),
         }
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,7 +64,10 @@ pub async fn resolve_view_columns(
     columns: Vec<ColumnInfo>,
     control: &OperationControl,
 ) -> ViewEditPlan {
-    match connection.fetch_view_editability_controlled(schema, table, control).await {
+    match connection
+        .fetch_view_editability_controlled(schema, table, control)
+        .await
+    {
         Ok(editability) => apply_view_editability(columns, &editability),
         Err(error) => {
             tracing::warn!(%error, "view editability could not be read; the relation stays read-only");
