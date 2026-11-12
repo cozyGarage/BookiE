@@ -376,11 +376,40 @@ fn find_table(tables: &[TableInfo], wanted: &TableInfo) -> Result<TableInfo, Str
 }
 
 fn column_meta(info: &ColumnInfo) -> ColumnMeta {
-    let width = (info.name.chars().count() as f32 * 9.0 + 48.0).clamp(110.0, 320.0);
+    let measured = (info.name.chars().count() as f32 * 9.0 + 48.0).clamp(110.0, 320.0);
+    let width = if numeric_type(&info.data_type) {
+        measured.max(200.0)
+    } else {
+        measured
+    };
     ColumnMeta {
         name: info.name.clone(),
         width,
         numeric: numeric_type(&info.data_type),
+    }
+}
+
+#[cfg(test)]
+mod column_meta_tests {
+    use super::*;
+
+    #[test]
+    fn numeric_columns_have_room_for_exact_integer_values() {
+        let column = column_meta(&ColumnInfo {
+            name: "value".into(),
+            data_type: "BIGINT".into(),
+            nullable: false,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        });
+
+        assert!(column.width >= 200.0, "{}", column.width);
     }
 }
 
