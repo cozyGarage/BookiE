@@ -205,6 +205,7 @@ jobs:
       - name: Run unit archive
         env:
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
+          GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-unit-bundle/schemas
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$RUNNER_TEMP/bookie-unit-bundle" "$BOOKIE_SOURCE_COMMIT" --expected-group unit
@@ -450,9 +451,11 @@ jobs:
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-direct-bundle
           BOOKIE_SOURCE_COMMIT: ${{ needs.pin-revision.outputs.revision }}
           BOOKIE_REQUIRE_PREBUILT: "1"
+          GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group direct
+          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
           python3 scripts/run-test-layer.py widgets
       - name: Retain GTK widget diagnostics
         if: always()

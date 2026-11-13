@@ -1299,8 +1299,12 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         unit = re.search(r"(?ms)^  unit:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         preflight = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         self.assertIn("--expected-group unit", unit)
         self.assertIn("nextest run --archive-file", unit)
+        self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-unit-bundle/schemas", unit)
+        self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas", widgets)
+        self.assertIn('find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +', widgets)
         self.assertIn("bash scripts/test-harness.sh", preflight)
         self.assertNotIn("run-test-layer.py full", unit)
         gate = workflow.split("  regression-gate:\n", 1)[1]
