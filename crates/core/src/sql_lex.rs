@@ -26,7 +26,8 @@ pub fn skip_span(rest: &str, driver_id: &str) -> Option<usize> {
 }
 
 pub fn skip_span_at(sql: &str, index: usize, driver_id: &str) -> Option<usize> {
-    let inside_identifier = sql[index..].starts_with('$')
+    let rest = &sql[index..];
+    let inside_identifier = (rest.starts_with('$') || rest.starts_with("E'") || rest.starts_with("e'"))
         && sql[..index]
             .chars()
             .next_back()
@@ -34,7 +35,7 @@ pub fn skip_span_at(sql: &str, index: usize, driver_id: &str) -> Option<usize> {
     if inside_identifier {
         return None;
     }
-    skip_span(&sql[index..], driver_id)
+    skip_span(rest, driver_id)
 }
 
 fn quoted_length(rest: &str, quote: char, backslash_escapes: bool) -> usize {

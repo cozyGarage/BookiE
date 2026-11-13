@@ -74,7 +74,6 @@ impl DatabaseDriver for MssqlDriver {
         true
     }
 
-
     fn display_name(&self) -> &'static str {
         "SQL Server"
     }

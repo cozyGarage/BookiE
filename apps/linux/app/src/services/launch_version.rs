@@ -40,9 +40,7 @@ fn read_string(key: &str) -> Option<String> {
 
 fn write_string(key: &str, value: &str, missing_settings: impl Into<String>) -> Result<(), String> {
     let settings = super::preferences::settings().ok_or_else(|| missing_settings.into())?;
-    settings
-        .set_string(key, value)
-        .map_err(|error| error.to_string())?;
+    settings.set_string(key, value).map_err(|error| error.to_string())?;
     gio::Settings::sync();
     Ok(())
 }

@@ -12,6 +12,7 @@ pub(crate) enum Boundary {
 pub(crate) enum CompoundRule {
     None,
     RoutineBody,
+    StoredProgramBody,
     TriggerBody,
 }
 
@@ -107,7 +108,7 @@ const POSTGRESQL: ScriptRules = ScriptRules {
 
 const MYSQL: ScriptRules = ScriptRules {
     boundary: Boundary::DelimiterDirectives,
-    compound: CompoundRule::None,
+    compound: CompoundRule::StoredProgramBody,
     parens_hold_semicolons: false,
     batch_error: BatchErrorPolicy::StopScript,
     syntax: ScriptSyntax {
