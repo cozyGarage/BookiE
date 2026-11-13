@@ -6,7 +6,11 @@
       "lib": ["bookie-app", "bookie-app-services", "bookie-core", "bookie-driver-clickhouse", "bookie-driver-sqlite", "bookie-policy"],
       "test": ["bookie-app", "bookie-core", "bookie-driver-postgres", "bookie-driver-sqlite", "bookie-policy"]
     },
+    "sandbox": {
+      "bin": ["bookie-agentd", "bookie-ssh"]
+    },
     "consumers": {
+      "bin": ["bookie-app"],
       "lib": ["bookie-app", "bookie-mcp", "bookie-policy"],
       "test": ["bookie-app", "bookie-mcp", "bookie-policy"]
     },
@@ -28,11 +32,12 @@
       ]
     },
     "pg-release": {
-      "bin": ["bookie-app"],
+      "bin": ["bookie-agentd", "bookie-app"],
       "lib": ["bookie-release-tests"],
       "test": ["bookie-agentd", "bookie-release-tests"]
     },
     "socket-ssh": {
+      "bin": ["bookie-agentd", "bookie-ssh"],
       "test": ["bookie-agentd", "bookie-driver-postgres", "bookie-ssh"]
     },
     "driver-tls": {
@@ -40,6 +45,7 @@
       "test": ["bookie-driver-tls-tests"]
     },
     "keyring": {
+      "bin": ["bookie-agentd"],
       "lib": ["bookie-app-services", "bookie-storage", "bookie-transport"],
       "test": ["bookie-agentd"]
     }

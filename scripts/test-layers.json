@@ -662,5 +662,261 @@
         }
       ]
     }
+  },
+  "gate_jobs": {
+  "pin-revision": {
+    "needs": [],
+    "timeout_minutes": 5,
+    "condition": null,
+    "matrix": {}
+  },
+  "guards": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "gpui-tests": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "gtk-build": {
+    "needs": [
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 20,
+    "condition": null,
+    "matrix": {}
+  },
+  "clippy": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "test-build": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "unit": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "sandbox": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "widgets": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {}
+  },
+  "floor-build": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+    "matrix": {}
+  },
+  "distro-floor-scenarios": {
+    "needs": [
+      "floor-build",
+      "pin-revision"
+    ],
+    "timeout_minutes": 90,
+    "condition": "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+    "matrix": {
+      "shard_group": [
+        "1",
+        "2"
+      ]
+    }
+  },
+  "driver": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 90,
+    "condition": null,
+    "matrix": {
+      "group": [
+        "driver-core",
+        "driver-analytics",
+        "driver-extended",
+        "socket-ssh"
+      ]
+    }
+  },
+  "b4-rollback": {
+    "needs": [
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "security-policy": {
+    "needs": [
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "consumers": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "gtk": {
+    "needs": [
+      "clippy",
+      "gtk-build",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 60,
+    "condition": null,
+    "matrix": {
+      "shard": [
+        "1",
+        "2",
+        "3"
+      ]
+    }
+  },
+  "pg-release": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "gtk-server": {
+    "needs": [
+      "clippy",
+      "gtk-build",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {
+      "server": [
+        "clickhouse",
+        "mongodb",
+        "postgres",
+        "mysql",
+        "mysql-approval"
+      ]
+    }
+  },
+  "driver-tls": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "keyring": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision",
+      "test-build"
+    ],
+    "timeout_minutes": 30,
+    "condition": null,
+    "matrix": {}
+  },
+  "supply-chain": {
+    "needs": [
+      "clippy",
+      "guards",
+      "pin-revision"
+    ],
+    "timeout_minutes": 45,
+    "condition": null,
+    "matrix": {}
+  },
+  "regression-gate": {
+    "needs": [
+      "b4-rollback",
+      "clippy",
+      "consumers",
+      "distro-floor-scenarios",
+      "driver",
+      "driver-tls",
+      "floor-build",
+      "gpui-tests",
+      "gtk",
+      "gtk-build",
+      "gtk-server",
+      "guards",
+      "keyring",
+      "pg-release",
+      "pin-revision",
+      "sandbox",
+      "security-policy",
+      "supply-chain",
+      "test-build",
+      "unit",
+      "widgets"
+    ],
+    "timeout_minutes": 5,
+    "condition": "always() && !cancelled()",
+    "matrix": {}
   }
+}
 }
