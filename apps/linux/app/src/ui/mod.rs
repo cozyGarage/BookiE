@@ -7,6 +7,7 @@ mod cell_editor;
 mod connect_dialog;
 pub(crate) mod connection_bundle;
 mod connection_row;
+mod context_menu;
 mod count_format;
 mod diagram;
 mod editor;
