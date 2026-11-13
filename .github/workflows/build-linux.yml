@@ -223,7 +223,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group direct
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Fetch the comparison base for changed-path tests
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         env:
@@ -484,7 +484,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group direct
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
           python3 scripts/run-test-layer.py widgets
       - name: Retain GTK widget diagnostics
         if: always()
@@ -699,7 +699,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group keyring
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
           python3 scripts/run-test-layer.py keyring
       - name: Upload validation evidence
         if: always()
@@ -1019,7 +1019,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$BOOKIE_SOURCE_COMMIT"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group driver-tls
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -1125,7 +1125,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group pg-release
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Log in to Docker Hub
         uses: ./.github/actions/dockerhub-login
         with:
@@ -1240,7 +1240,7 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group consumers
-          find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +
+          find "$BOOKIE_TEST_BUNDLE" -type f \( -path "$BOOKIE_TEST_BUNDLE/tests/*" -o -path "$BOOKIE_TEST_BUNDLE/bin/*" \) -exec chmod u+x {} +
       - name: Security policy tests
         env:
           BOOKIE_TEST_BUNDLE: ${{ runner.temp }}/bookie-security-policy-bundle
