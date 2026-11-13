@@ -71,6 +71,30 @@ fn a_file_without_a_header_is_shaped_by_its_field_count() {
 }
 
 #[test]
+fn a_missing_later_file_is_rejected_before_the_queue_can_start() {
+    let directory = tempfile::tempdir().expect("directory");
+    let first = directory.path().join("first.csv");
+    std::fs::write(&first, b"id,name\n1,Ada\n").expect("first file");
+    let missing = directory.path().join("missing.csv");
+
+    assert!(super::super::check_file_queue(&first, &[missing]).is_err());
+}
+
+#[test]
+fn an_over_limit_later_file_is_rejected_before_the_queue_can_start() {
+    let directory = tempfile::tempdir().expect("directory");
+    let first = directory.path().join("first.csv");
+    let oversized = directory.path().join("oversized.csv");
+    std::fs::write(&first, b"id,name\n1,Ada\n").expect("first file");
+    std::fs::File::create(&oversized)
+        .expect("oversized file")
+        .set_len(bookie_core::import::MAX_FILE_BYTES + 1)
+        .expect("set sparse file size");
+
+    assert!(super::super::check_file_queue(&first, &[oversized]).is_err());
+}
+
+#[test]
 fn the_toast_names_the_rows_the_files_and_the_table() {
     let queue = QueueReport {
         files: vec![

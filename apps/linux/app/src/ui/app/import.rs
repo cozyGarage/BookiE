@@ -840,13 +840,21 @@ fn check_file_queue(first: &std::path::Path, more: &[PathBuf]) -> Result<(), Str
     if more.is_empty() {
         return Ok(());
     }
-    let sizes: Vec<(PathBuf, u64)> = std::iter::once(first)
-        .chain(more.iter().map(PathBuf::as_path))
-        .map(|path| {
-            let bytes = std::fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
-            (path.to_path_buf(), bytes)
-        })
-        .collect();
+    let mut sizes = Vec::with_capacity(more.len() + 1);
+    for path in std::iter::once(first).chain(more.iter().map(PathBuf::as_path)) {
+        let metadata =
+            std::fs::metadata(path).map_err(|_| bookie_app_services::tr!("The import file could not be read."))?;
+        if !metadata.is_file() {
+            return Err(bookie_app_services::tr!("The import file could not be read."));
+        }
+        if metadata.len() > MAX_FILE_BYTES {
+            return Err(
+                bookie_app_services::tr!("The file is larger than the {limit} MB import limit.")
+                    .replace("{limit}", &(MAX_FILE_BYTES / (1024 * 1024)).to_string()),
+            );
+        }
+        sizes.push((path.to_path_buf(), metadata.len()));
+    }
     bookie_app_services::import_queue::check_queue(&sizes).map_err(|error| error.to_string())
 }
 
