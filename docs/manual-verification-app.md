@@ -104,10 +104,12 @@ Use a PostgreSQL database with a table that has had many rows deleted, an index 
 
 ## Check for updates and What's new
 
-Use an installed Arch package or AppImage build whose version matches `config::VERSION`. Clear `last-launched-version` in GSettings when testing the first-launch dialog (`gsettings reset com.bookie.linux last-launched-version` or the Devel schema).
+Use an installed Arch package or AppImage build whose version matches `config::VERSION`. Clear `last-launched-version` in GSettings when testing the first-launch dialog (`gsettings reset com.bookie.linux last-launched-version` or the Devel schema). Reset `dismissed-update-version` the same way when re-testing the update banner.
 
 - [ ] Primary menu → **Check for Updates** while online against the current published release: a toast says BookiE is up to date.
 - [ ] Primary menu → **Check for Updates** while offline or with DNS blocked: a toast reports the network failure; the main window stays usable.
 - [ ] After clearing `last-launched-version`, launch the app once: a What's new dialog shows the AppStream notes for the running version. Close it, quit, and launch again: the dialog does not appear.
 - [ ] About BookiE shows the running version and release notes for that version, and a Releases link opens the GitHub releases page.
+- [ ] With a build whose version is older than the published latest release, and `dismissed-update-version` cleared: launch online. A banner reports the newer version without a blocking toast. **Review** opens the update dialog; **Not now** hides the banner and stores the dismissed version so the next launch stays quiet for that release.
+- [ ] Launch offline after resetting `dismissed-update-version`: no toast, no banner, and the main window stays usable.
 
