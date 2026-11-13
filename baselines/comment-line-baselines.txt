@@ -26,7 +26,7 @@ apps/linux/app/src/ui/app/workspace_chrome.rs 21
 apps/linux/app/src/ui/app/workspace_persist.rs 9
 apps/linux/app/src/ui/app/workspace_tabs.rs 111
 apps/linux/app/src/ui/browse_tab/chrome.rs 42
-apps/linux/app/src/ui/browse_tab/grid_render.rs 126
+apps/linux/app/src/ui/browse_tab/grid_render.rs 10
 apps/linux/app/src/ui/browse_tab/mod.rs 212
 apps/linux/app/src/ui/browse_tab/row_ops.rs 142
 apps/linux/app/src/ui/browse_tab/selection.rs 3
