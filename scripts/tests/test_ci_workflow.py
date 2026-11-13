@@ -183,6 +183,20 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("zizmor --offline", forgejo)
         self.assertIn("python3 scripts/run-test-layer.py harness packaging-contracts", forgejo)
 
+    def test_forgejo_pr_title_workflow_matches_github_merge_rules(self):
+        github_path = ROOT / ".github/workflows/pr-title.yml"
+        forgejo_path = ROOT / ".forgejo/workflows/pr-title.yml"
+        github = github_path.read_text()
+        forgejo = forgejo_path.read_text()
+        github_triggers = github.split("\non:\n", 1)[1].split("\npermissions:\n", 1)[0]
+        forgejo_triggers = forgejo.split("\non:\n", 1)[1].split("\nconcurrency:\n", 1)[0]
+
+        self.assertEqual(github_triggers, forgejo_triggers)
+        self.assertEqual(workflow_job_graph(github_path), workflow_job_graph(forgejo_path))
+        for workflow in (github, forgejo):
+            self.assertIn("python3 scripts/check-pr-title.py \"$TITLE\"", workflow)
+            self.assertIn("git diff --no-renames --name-only HEAD^1 HEAD -- CHANGELOG.md", workflow)
+
     def test_forgejo_and_github_pin_dispatch_revisions_with_the_same_script(self):
         workflows = {
             ".github/workflows/build-linux.yml": (ROOT / ".github/workflows/build-linux.yml").read_text(),

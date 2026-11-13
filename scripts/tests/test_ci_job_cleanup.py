@@ -12,6 +12,7 @@ WORKFLOWS = (
     ROOT / ".forgejo/workflows/ci.yml",
     ROOT / ".forgejo/workflows/ci-contracts.yml",
     ROOT / ".forgejo/workflows/nightly.yml",
+    ROOT / ".forgejo/workflows/pr-title.yml",
 )
 CLEANUP = ROOT / "scripts/cleanup-ci-job.sh"
 NIGHTLY = ROOT / ".forgejo/workflows/nightly.yml"

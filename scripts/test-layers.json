@@ -626,6 +626,7 @@
             ".forgejo/workflows/ci.yml",
             ".forgejo/workflows/ci-contracts.yml",
             ".forgejo/workflows/nightly.yml",
+            ".forgejo/workflows/pr-title.yml",
             ".github/workflows/build-linux.yml",
             ".github/workflows/gtk-soak.yml",
             ".github/workflows/linux-quality.yml",
