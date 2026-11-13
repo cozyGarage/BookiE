@@ -33,6 +33,7 @@ fn postgres_unkeyed_browse_pages_have_a_stable_generated_order() {
         filter: &filter,
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     let PageQuery::Sql(page) = target.page_by_row_id(50, 50, None, None).unwrap() else {
         panic!("PostgreSQL unkeyed browse pages require ordered SQL")
@@ -52,6 +53,7 @@ fn a_page_without_the_row_id_order_never_mentions_ctid_so_a_view_still_browses()
         filter: &filter,
         hidden_columns: None,
         long_text_preview: false,
+        supports_reverse_keyset: true,
     };
     assert!(matches!(target.page(50, 50, None, None).unwrap(), PageQuery::Native));
     let PageQuery::Sql(sorted) = target.page(0, 50, Some((0, true)), None).unwrap() else {
