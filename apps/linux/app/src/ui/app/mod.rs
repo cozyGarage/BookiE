@@ -1073,24 +1073,9 @@ impl SimpleComponent for App {
                 self.mcp_bridge.clone(),
             ),
             AppMsg::NewWindow => {
-                let ctrl = App::builder()
-                    .launch(AppInit {
-                        registry: self.registry.clone(),
-                        persistence: self.persistence.clone(),
-                        workspace: self.workspace.clone(),
-                        history: self.history.clone(),
-                        database: self.database.clone(),
-                        preferences: self.preferences.clone(),
-                        mcp_bridge: self.mcp_bridge.clone(),
-                    })
-                    .detach();
                 // Only the window relm4 starts the application with is
                 // presented for us. A window spawned here stays unmapped
                 // unless it joins the application and is presented.
-                if let Some(application) = self.window.application() {
-                    ctrl.widget().set_application(Some(&application));
-                }
-                ctrl.widget().present();
                 // Dropping a Controller is what actually runs the child's
                 // Component::shutdown (which closes its connection and
                 // cancels its timers), but nothing does that when the user
@@ -1098,13 +1083,7 @@ impl SimpleComponent for App {
                 // while this Vec keeps the Controller alive forever. Watch
                 // for that destruction and remove our own entry so the
                 // Controller drops.
-                let key = ctrl.widget().as_ptr() as usize;
-                let destroy_sender = sender.clone();
-                session_restore::forget_group_on_close(ctrl.widget().upcast_ref(), key, sender.clone());
-                ctrl.widget().connect_destroy(move |_| {
-                    destroy_sender.input(AppMsg::ExtraWindowClosed(key));
-                });
-                self.extra_windows.push((key, ctrl));
+                session_restore::open_extra_window(self, sender)
             }
             AppMsg::ExtraWindowClosed(key) => {
                 self.extra_windows.retain(|(k, _)| *k != key);

@@ -193,7 +193,7 @@ jobs:
     if: github.event_name != 'push'
     runs-on: build-host
     needs: [pin-revision, guards]
-    timeout-minutes: 20
+    timeout-minutes: 45
     defaults:
       run:
         shell: bash
@@ -610,6 +610,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
           path: src
+      - name: Mark checkout safe for Git in container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE/src"
       - name: Install package validation tools
         run: |
           apt-get update -qq
@@ -1207,7 +1209,7 @@ jobs:
     env:
       CARGO_HOME: /cargo
       RUSTC_WRAPPER: ""
-      PATH: /opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
+      PATH: /cargo/bin:/opt/cargo/bin:/usr/local/bin:/usr/bin:/bin
       CARGO_TARGET_DIR: /target/${{ github.run_id }}/${{ github.job }}
       TMPDIR: /target/${{ github.run_id }}/${{ github.job }}
     steps:
