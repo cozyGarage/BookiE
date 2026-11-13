@@ -327,11 +327,14 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn(group, bundle_helper.BUNDLE_GROUPS)
                 for kind, names in selections.items():
                     for name in names:
+                        targets = packages[name]["targets"]
                         self.assertTrue(
-                            any(target["test"] and kind in target["kind"]
-                                for target in packages[name]["targets"]),
+                            any("bin" in target["kind"] if kind == "bin" else target["test"] and kind in target["kind"]
+                                for target in targets),
                             f"{group} has no testable {name}:{kind} target",
                         )
+        self.assertTrue(any(target["name"] == "bookie-askpass" and "bin" in target["kind"]
+                            for target in packages["bookie-ssh"]["targets"]))
         direct = {(package, kind) for kind, packages in bundle_groups["direct"].items() for package in packages}
 
         self.assertEqual(
@@ -356,7 +359,7 @@ class CiWorkflowTests(unittest.TestCase):
             "direct": {"bookie-app"},
             "consumers": {"bookie-app"},
             "sandbox": {"bookie-agentd", "bookie-ssh"},
-            "pg-release": {"bookie-agentd", "bookie-app"},
+            "pg-release": {"bookie-agentd", "bookie-app", "bookie-ssh"},
             "socket-ssh": {"bookie-agentd", "bookie-ssh"},
             "keyring": {"bookie-agentd"},
         }
