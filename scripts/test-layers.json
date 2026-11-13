@@ -33,7 +33,7 @@
     "quick": {
       "purpose": "Non-GTK formatting, Clippy, unit and sandbox regressions",
       "prerequisites": "Rust 1.98; native non-GTK development libraries",
-      "hosted_gate": "Build Linux / preflight",
+      "hosted_gate": "Build Linux / guards, clippy, unit and sandbox; lab-ci / guards, clippy, unit and sandbox",
       "steps": [
         {
           "argv": [
@@ -49,7 +49,7 @@
     "full": {
       "purpose": "Default workspace formatting, Clippy, unit and sandbox regressions",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "Build Linux / fast",
+      "hosted_gate": "Build Linux / guards, clippy, unit and sandbox; lab-ci / guards, clippy, unit and sandbox",
       "steps": [
         {
           "argv": [
@@ -86,9 +86,9 @@
       ]
     },
     "gtk-app": {
-      "purpose": "GTK app Clippy and library/binary unit regressions after the non-GTK preflight tier",
+      "purpose": "GTK app Clippy and library/binary unit regressions for focused local validation",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "Build Linux / fast; lab-ci / clippy and unit",
+      "hosted_gate": "Build Linux / clippy and unit; lab-ci / clippy and unit",
       "steps": [
         {
           "argv": [
@@ -104,7 +104,7 @@
     "change-contracts": {
       "purpose": "Run focused, required regressions for changed Data-lane value-path Rust files",
       "prerequisites": "Python 3; Rust 1.98; mapped crates' native development libraries",
-      "hosted_gate": "Build Linux / fast; lab-ci / unit",
+      "hosted_gate": "Build Linux / unit; lab-ci / unit",
       "steps": [
         {
           "argv": [
@@ -119,7 +119,7 @@
     "sandbox": {
       "purpose": "Tests without database containers or a display",
       "prerequisites": "Rust 1.98; native non-GTK development libraries; local sockets permitted",
-      "hosted_gate": "Build Linux / preflight; lab-ci / sandbox",
+      "hosted_gate": "Build Linux / sandbox; lab-ci / sandbox",
       "steps": [
         {
           "argv": [
@@ -134,7 +134,7 @@
     "drivers": {
       "purpose": "Database drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
-      "hosted_gate": "Build Linux / integration (driver-core, driver-analytics, driver-extended, socket-ssh); lab-ci / driver (driver-core, driver-analytics, driver-extended, socket-ssh), consumers",
+      "hosted_gate": "Build Linux / driver matrix; lab-ci / driver matrix",
       "steps": [
         {
           "argv": [
@@ -150,7 +150,7 @@
     "driver-core": {
       "purpose": "PostgreSQL, MySQL and SQL Server integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-core); lab-ci / driver (core)",
+      "hosted_gate": "Build Linux / driver (driver-core); lab-ci / driver (driver-core)",
       "steps": [
         {
           "argv": [
@@ -166,7 +166,7 @@
     "driver-analytics": {
       "purpose": "ClickHouse, MongoDB and Redis integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-analytics); lab-ci / driver (analytics)",
+      "hosted_gate": "Build Linux / driver (driver-analytics); lab-ci / driver (driver-analytics)",
       "steps": [
         {
           "argv": [
@@ -182,7 +182,7 @@
     "driver-extended": {
       "purpose": "Cassandra, DuckDB and Oracle integration tests",
       "prerequisites": "Rust 1.98; Docker; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-extended); lab-ci / driver (extended)",
+      "hosted_gate": "Build Linux / driver (driver-extended); lab-ci / driver (driver-extended)",
       "steps": [
         {
           "argv": [
@@ -198,7 +198,7 @@
     "b4-rollback": {
       "purpose": "Focused MySQL failed-batch rollback and PostgreSQL rollback-failure acceptance",
       "prerequisites": "Rust 1.98; Docker; native TLS build dependencies",
-      "hosted_gate": "Build Linux / Policy rollback acceptance; lab-ci / b4-rollback",
+      "hosted_gate": "Build Linux / b4-rollback; lab-ci / b4-rollback",
       "steps": [
         {
           "argv": [
@@ -275,7 +275,7 @@
     "ssh": {
       "purpose": "Agent authentication and OpenSSH sessions",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / driver (socket-ssh)",
+      "hosted_gate": "Build Linux / driver (socket-ssh); lab-ci / driver (socket-ssh)",
       "steps": [
         {
           "argv": [
@@ -290,7 +290,7 @@
     "socket-ssh": {
       "purpose": "PostgreSQL Unix-socket and OpenSSH integration tests",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",
-      "hosted_gate": "Build Linux / integration (socket-ssh); lab-ci / driver (socket-ssh)",
+      "hosted_gate": "Build Linux / driver (socket-ssh); lab-ci / driver (socket-ssh)",
       "steps": [
         {
           "argv": ["bash", "scripts/test-postgres-socket.sh"],
@@ -322,7 +322,7 @@
     "pg-dump": {
       "purpose": "PostgreSQL dump and restore integration through the packaged client tools",
       "prerequisites": "Rust 1.98; Docker with postgres:18-alpine; source-pinned test bundle",
-      "hosted_gate": "Build Linux / integration (driver-core); lab-ci / driver (core)",
+      "hosted_gate": "Build Linux / driver (driver-core); lab-ci / driver (driver-core)",
       "steps": [
         {
           "argv": [
@@ -353,7 +353,7 @@
     "app-server": {
       "purpose": "App parser and grid edit contracts against PostgreSQL, MongoDB, MySQL, and SQL Server",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Docker",
-      "hosted_gate": "Build Linux / fast; lab-ci / consumers",
+      "hosted_gate": "Build Linux / consumers; lab-ci / consumers",
       "steps": [
         {
           "argv": [
@@ -369,7 +369,7 @@
     "widgets": {
       "purpose": "Isolated GTK widget contracts",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack; Xvfb; private D-Bus",
-      "hosted_gate": "Build Linux / fast; lab-ci / widgets",
+      "hosted_gate": "Build Linux / widgets; lab-ci / widgets",
       "steps": [
         {
           "argv": [
@@ -399,7 +399,7 @@
     "ui": {
       "purpose": "Installed application safety flows through AT-SPI under X11",
       "prerequisites": "GTK 4.24; Rust 1.98 or BOOKIE_GTK_BINARY; Xvfb; PyAT-SPI; private D-Bus",
-      "hosted_gate": "Build Linux / gtk-safety; lab-ci / gtk; GTK Safety Soak",
+      "hosted_gate": "Build Linux / gtk; lab-ci / gtk; GTK Safety Soak",
       "steps": [
         {
           "argv": [
@@ -648,7 +648,7 @@
     "no-default-features": {
       "purpose": "Workspace and test targets compile without the default Kerberos feature",
       "prerequisites": "Rust 1.98; GTK 4.24 development stack",
-      "hosted_gate": "Build Linux / reusable-test-builds; lab-ci / test-build",
+      "hosted_gate": "Build Linux / test-build; lab-ci / test-build",
       "steps": [
         {
           "argv": [
