@@ -50,7 +50,9 @@ pub use connections::{
 };
 pub use error::{KeyringFailure, StorageError};
 pub use favorites::{
-    SavedQuery, delete_favorite, load_favorites, matches_filter, rank_favorites, save_favorite, touch_favorite,
+    SavedQuery, SavedQueryFolder, SavedQueryLibrary, delete_favorite, delete_saved_query_folder, load_favorites,
+    load_saved_query_library, matches_filter, organize_saved_query, rank_favorites, save_favorite,
+    save_saved_query_folder, touch_favorite,
 };
 pub use legacy_state::migrate_legacy_state;
 pub use paths::{config_path, connections_config_path, data_path, secret_schema, storage_dir_name};

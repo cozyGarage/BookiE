@@ -91,7 +91,7 @@ Drivers are linked at build time. There is no plugin system ([ADR 0001](decision
 - Session mode: Binds tabs to dedicated connections for temporary tables and transactions, displaying live transaction state.
 - Visual explain plans: PostgreSQL displays execution trees with relative cost bars; SQLite displays indented trees.
 - Timeout retry: Queries that hit timeouts offer an instant extended retry button.
-- Query history & favorites: Toggle history with `Ctrl+H`, save favorites with `Ctrl+D`, view favorites with `Ctrl+Shift+B`, and use Open Quickly with `Ctrl+P`.
+- Query history & saved queries: Toggle history with `Ctrl+H`, save queries with `Ctrl+D`, organize them into folders and search keywords with `Ctrl+Shift+B`, and use Open Quickly with `Ctrl+P`.
 
 ### Split editor and streaming
 

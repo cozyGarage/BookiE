@@ -104,7 +104,7 @@ Single-statement PostgreSQL `SELECT` queries stream progressively:
 - **Session mode**: Toggle **Session** to bind the tab to a dedicated connection for transactions and temporary tables. When a transaction is active, use **Commit & close session** or **Roll back & close session**.
 - **Explain plans**: Click **Explain** to inspect execution plans. PostgreSQL displays a visual **Tree** with cost-distribution bars alongside raw text; SQLite provides an indented tree.
 - **Query history**: Press `Ctrl+H` to toggle the bottom history drawer. Statements containing secrets are automatically excluded.
-- **Favorites & Open Quickly**: Press `Ctrl+D` to save a favorite query, `Ctrl+Shift+B` to view saved favorites, and `Ctrl+P` for Open Quickly across tabs, favorites, and connections.
+- **Saved queries & Open Quickly**: Press `Ctrl+D` to save a query, `Ctrl+Shift+B` to browse queries, create folders, assign queries and keywords, and `Ctrl+P` for Open Quickly across tabs, saved queries, and connections. Search matches query names, SQL, and keywords. Deleting a folder leaves its queries available as unfiled.
 
 ## Search database values
 

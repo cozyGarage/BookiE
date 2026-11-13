@@ -188,6 +188,18 @@ def wait_within(root, name=None, role=None, present=True, timeout=WAIT_SECONDS):
     )
 
 
+def set_text_within(root, text):
+    for node in descendants(root):
+        if node_role(node) != pyatspi.ROLE_TEXT:
+            continue
+        try:
+            node.queryEditableText().setTextContents(text)
+            return
+        except Exception:
+            continue
+    raise AssertionError(f"no editable text field inside {node_name(root)!r}:\n{accessible_snapshot()}")
+
+
 def invoke_named_action(anchor_lookup, anchor_name, action_name):
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline:
@@ -319,6 +331,21 @@ def wait_for_node(name=None, role=None, present=True, timeout=WAIT_SECONDS):
         time.sleep(POLL_SECONDS)
     expectation = "appear" if present else "disappear"
     raise AssertionError(f"expected accessible node {name!r} to {expectation}:\n{accessible_snapshot()}")
+
+
+def dismiss_release_notes():
+    for application in desktop_applications():
+        alert = next(
+            (
+                node
+                for node in descendants(application)
+                if node_role(node) == pyatspi.ROLE_ALERT and node_name(node).startswith("What's new in BookiE")
+            ),
+            None,
+        )
+        if alert is not None:
+            invoke(wait_within(alert, name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
+            return
 
 
 def wait_for_sensitive_node(name, role=None, timeout=WAIT_SECONDS):
@@ -601,7 +628,7 @@ def set_text_by_name(name, text, timeout=WAIT_SECONDS):
         for application in desktop_applications():
             for node in descendants(application):
                 if node_name(node) != name or node_role(node) not in {
-                    pyatspi.ROLE_TEXT, pyatspi.ROLE_PASSWORD_TEXT,
+                    pyatspi.ROLE_ENTRY, pyatspi.ROLE_TEXT, pyatspi.ROLE_PASSWORD_TEXT,
                 }:
                     continue
                 try:
@@ -1139,6 +1166,7 @@ def run_scenario(binary, scenario):
         )
         environment.update(getattr(scenario, "environment_overrides", {}))
         process = start_application(binary, environment)
+        dismiss_release_notes()
         if getattr(scenario, "requires_editor", True):
             open_editor()
         def restart(before_start=None, empty=False, restored=None):
@@ -1153,6 +1181,7 @@ def run_scenario(binary, scenario):
                 before_start(environment)
             restored = "empty" if empty else restored or ("welcome" if before_start else True)
             process = start_application(binary, environment, restored=restored)
+            dismiss_release_notes()
 
         if getattr(scenario, "needs_restart", False):
             scenario(database, base, restart)
@@ -1878,6 +1907,120 @@ def wait_for_favorites(base, predicate, description, timeout=WAIT_SECONDS):
     raise AssertionError(f"{description}; favorites file held {last!r}")
 
 
+def saved_query_document(base):
+    path = favorites_path(base)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def wait_for_saved_query_document(base, predicate, description, timeout=WAIT_SECONDS):
+    deadline = time.monotonic() + timeout
+    last = None
+    while time.monotonic() < deadline:
+        last = saved_query_document(base)
+        if last is not None and predicate(last):
+            return last
+        time.sleep(POLL_SECONDS)
+    raise AssertionError(f"{description}; saved query document held {last!r}")
+
+
+def choose_combo_option(combo, arrow_count):
+    button = next(
+        (node for node in descendants(combo) if node_role(node) == pyatspi.ROLE_TOGGLE_BUTTON),
+        combo,
+    )
+    invoke(button)
+    if arrow_count == 0:
+        press_x11_key("Home")
+    else:
+        press_x11_key("Down", presses=arrow_count + 1)
+    press_x11_key("Return")
+
+
+def choose_saved_query_folder(dialog):
+    combo = wait_within(dialog, name="Folder", role=pyatspi.ROLE_COMBO_BOX)
+    bounds = combo.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+    gtk_ux.x11_click(bounds.x + bounds.width - 24, bounds.y + bounds.height // 2, button=1)
+    press_x11_key("Down")
+    press_x11_key("Return")
+
+
+def saved_query_folders_keep_queries_and_keywords(base):
+    press_x11_key("b", modifiers=["Control_L", "Shift_L"])
+    wait_for_node(name="New folder", role=pyatspi.ROLE_PUSH_BUTTON)
+    invoke(wait_for_node(name="New folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Folder name")
+    set_text_by_name("Folder name", "Reports")
+    invoke(wait_for_node(name="Create folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_saved_query_document(
+        base,
+        lambda document: any(folder["name"] == "Reports" for folder in document.get("folders", [])),
+        "creating a folder did not persist it",
+    )
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    organize_dialog = wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    choose_saved_query_folder(organize_dialog)
+    set_text_within(organize_dialog, "finance, daily")
+    invoke(wait_within(organize_dialog, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+    assigned = wait_for_saved_query_document(
+        base,
+        lambda document: any(
+            item["name"] == "smoke favorite" and item.get("folder_id") and item.get("keywords") == ["finance", "daily"]
+            for item in document.get("favorites", [])
+        ),
+        "moving a query into a folder did not persist its folder and keywords",
+    )
+    folder_id = assigned["favorites"][0]["folder_id"]
+
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    invalid_organization = wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    set_text_within(invalid_organization, ", ".join(f"tag-{index}" for index in range(33)))
+    invoke(wait_within(invalid_organization, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+    save_error = wait_for_node(name="Saved queries could not be saved", role=pyatspi.ROLE_ALERT)
+    invoke(wait_within(save_error, name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    press_x11_key("Escape")
+    wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT, present=False)
+
+    selector = wait_for_node(name="All queries", role=pyatspi.ROLE_COMBO_BOX)
+    choose_combo_option(selector, 2)
+    wait_for_node(name="Reports", role=pyatspi.ROLE_COMBO_BOX)
+    wait_for_node(name="smoke favorite")
+    invoke(wait_for_node(name="Rename folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Folder name")
+    set_text_by_name("Folder name", "Reports renamed")
+    rename_dialog = wait_for_node(name="Rename folder", role=pyatspi.ROLE_ALERT)
+    invoke(wait_within(rename_dialog, name="Rename folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_saved_query_document(
+        base,
+        lambda document: any(folder["name"] == "Reports renamed" for folder in document.get("folders", [])),
+        "renaming a folder did not persist it",
+    )
+    wait_for_node(name="smoke favorite")
+
+    set_text_by_name("Search saved queries", "finance")
+    wait_for_node(name="smoke favorite")
+    set_text_by_name("Search saved queries", "missing keyword")
+    wait_for_node(name="No matches")
+    set_text_by_name("Search saved queries", "")
+    wait_for_node(name="smoke favorite")
+    invoke(wait_for_node(name="Delete folder", role=pyatspi.ROLE_PUSH_BUTTON))
+    delete_dialog = wait_for_node(name="Delete folder?")
+    invoke(wait_within(delete_dialog, name="Delete", role=pyatspi.ROLE_PUSH_BUTTON))
+    deleted = wait_for_saved_query_document(
+        base,
+        lambda document: not any(folder["id"] == folder_id for folder in document.get("folders", []))
+        and any(item["name"] == "smoke favorite" and item.get("folder_id") is None for item in document.get("favorites", [])),
+        "deleting a populated folder did not keep its query unfiled",
+    )
+    assert any(item.get("keywords") == ["finance", "daily"] for item in deleted["favorites"])
+
+
 def favorite_round_trips_through_open_quickly(_database, base):
     set_editor_text("SELECT 42 AS answer")
     press_x11_key("d", modifiers=["Control_L"])
@@ -1920,6 +2063,7 @@ def favorite_round_trips_through_open_quickly(_database, base):
         lambda favorites: any(item.get("last_used_at") for item in favorites),
         "opening the favorite did not record a use",
     )
+    saved_query_folders_keep_queries_and_keywords(base)
 
 
 favorite_round_trips_through_open_quickly.environment = "local"
