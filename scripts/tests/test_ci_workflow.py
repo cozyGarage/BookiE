@@ -63,6 +63,9 @@ def workflow_job_graph(paths, adapter_jobs=()):
             strategy = re.search(r"(?ms)^    strategy:\n(.*?)(?=^    [A-Za-z][A-Za-z0-9_-]*:|\Z)", block)
             matrix = {}
             if strategy:
+                max_parallel = re.search(r"(?m)^      max-parallel:\s*(\d+)\s*$", strategy.group(1))
+                if max_parallel:
+                    matrix["max-parallel"] = int(max_parallel.group(1))
                 for key in ("group", "layer", "server", "shard", "shard_group"):
                     values = re.search(rf"(?m)^        {key}:\s*(.*)$", strategy.group(1))
                     if values:

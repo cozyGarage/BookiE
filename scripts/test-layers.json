@@ -760,6 +760,7 @@
     "timeout_minutes": 90,
     "condition": "github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
     "matrix": {
+      "max-parallel": 2,
       "shard_group": [
         "1",
         "2"
