@@ -969,6 +969,12 @@ impl SimpleComponent for App {
                 self.on_truncate_table_confirmed(origin, schema, table, sender)
             }
             AppMsg::DropTablePrompt { schema, table } => self.on_drop_table_prompt(schema, table, sender),
+            AppMsg::DropTablePromptReady {
+                origin,
+                schema,
+                table,
+                referencing,
+            } => self.present_drop_table_prompt(origin, schema, table, &referencing, sender),
             AppMsg::DropTableConfirmed { origin, schema, table } => {
                 self.on_drop_table_confirmed(origin, schema, table, sender)
             }

@@ -328,6 +328,12 @@ pub enum AppMsg {
         schema: Option<String>,
         table: String,
     },
+    DropTablePromptReady {
+        origin: crate::services::catalog::CatalogOrigin,
+        schema: Option<String>,
+        table: String,
+        referencing: Vec<String>,
+    },
     DropTableConfirmed {
         origin: crate::services::catalog::CatalogOrigin,
         schema: Option<String>,
