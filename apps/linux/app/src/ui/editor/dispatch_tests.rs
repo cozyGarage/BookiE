@@ -1122,18 +1122,24 @@ fn large_sql_buffers_pause_syntax_highlighting_and_resume_after_shrinking() {
     let initial_buffer = sourceview5::Buffer::with_language(&language);
     let highlight_during_initial_load = Arc::new(AtomicUsize::new(usize::MAX));
     let observed_highlight = highlight_during_initial_load.clone();
+    let language_detached_during_initial_load = Arc::new(AtomicUsize::new(0));
+    let observed_language = language_detached_during_initial_load.clone();
     initial_buffer.connect_changed(move |buffer| {
         observed_highlight.store(usize::from(buffer.is_highlight_syntax()), Ordering::SeqCst);
+        observed_language.store(usize::from(buffer.language().is_none()), Ordering::SeqCst);
     });
     super::set_initial_sql_buffer_text(&initial_buffer, &large);
     assert_eq!(highlight_during_initial_load.load(Ordering::SeqCst), 0);
+    assert_eq!(language_detached_during_initial_load.load(Ordering::SeqCst), 1);
 
     buffer.set_text(&large);
 
     assert!(!buffer.is_highlight_syntax());
+    assert!(buffer.language().is_none());
     assert!(view.tooltip_text().is_some());
     buffer.set_text("SELECT 1;");
     assert!(buffer.is_highlight_syntax());
+    assert!(buffer.language().is_some());
     assert!(view.tooltip_text().is_none());
 }
 
