@@ -478,6 +478,8 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/run-test-layer.py unused-dependencies", supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", github_supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", supply_chain)
+        self.assertIn("CARGO_HOME: /cargo", supply_chain)
+        self.assertRegex(supply_chain, r"(?m)^      PATH: /cargo/bin:")
         self.assertIn("cargo-shear 1.13.4", layer["prerequisites"])
         self.assertEqual(layer["steps"][0]["argv"], ["cargo", "shear"])
         contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
