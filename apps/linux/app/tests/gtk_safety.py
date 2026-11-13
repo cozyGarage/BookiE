@@ -1976,6 +1976,17 @@ def saved_query_folders_keep_queries_and_keywords(base):
     )
     folder_id = assigned["favorites"][0]["folder_id"]
 
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    invalid_organization = wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    set_text_within(invalid_organization, ", ".join(f"tag-{index}" for index in range(33)))
+    invoke(wait_within(invalid_organization, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+    save_error = wait_for_node(name="Saved queries could not be saved", role=pyatspi.ROLE_ALERT)
+    invoke(wait_within(save_error, name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke(wait_for_node(name="Organize", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT)
+    press_x11_key("Escape")
+    wait_for_node(name="Organize saved query", role=pyatspi.ROLE_ALERT, present=False)
+
     selector = wait_for_node(name="All queries", role=pyatspi.ROLE_COMBO_BOX)
     choose_combo_option(selector, 2)
     wait_for_node(name="Reports", role=pyatspi.ROLE_COMBO_BOX)

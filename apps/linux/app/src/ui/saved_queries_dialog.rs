@@ -668,12 +668,7 @@ fn row_button(
         .build();
     button.add_css_class("flat");
     let sender = sender.clone();
-    let message = std::cell::RefCell::new(Some(message));
-    button.connect_clicked(move |_| {
-        if let Some(message) = message.borrow_mut().take() {
-            sender.input(message);
-        }
-    });
+    button.connect_clicked(move |_| sender.input(message.clone()));
     button
 }
 
