@@ -146,6 +146,7 @@ pub(super) fn present_index_dialog(
             primary: false,
             predicate: None,
             has_expression_key: false,
+            using_clause: None,
         }));
         dialog_for_submit.close();
     });

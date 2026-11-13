@@ -107,6 +107,7 @@ fn index(name: &str, constraint: Option<&str>) -> crate::query::IndexInfo {
         predicate: None,
         constraint: constraint.map(str::to_string),
         has_expression_key: false,
+        using_clause: None,
     }
 }
 

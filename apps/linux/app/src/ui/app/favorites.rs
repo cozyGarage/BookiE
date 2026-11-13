@@ -9,6 +9,8 @@ use crate::services::quick_switcher::{QuickItem, QuickTarget, favorite_items, re
 use super::types::{WorkspaceTab, read_workspace_tab_id};
 use super::{App, AppMsg};
 
+const QUICK_SWITCHER_HISTORY_LIMIT: usize = 50;
+
 impl App {
     pub(super) fn load_favorites(&self, sender: ComponentSender<Self>) {
         let ticket = self.favorites_order.begin();
@@ -94,10 +96,40 @@ impl App {
     }
 
     pub(super) fn on_show_quick_switcher(&self, sender: ComponentSender<Self>) {
+        let (Some(history), Some(connection_id)) = (self.history.clone(), self.connection_id) else {
+            sender.input(AppMsg::QuickSwitcherHistoryLoaded(Vec::new()));
+            return;
+        };
+        let filter = bookie_storage::query_history::SearchFilter {
+            connection_id: Some(connection_id),
+            success_only: Some(true),
+            exclude_cancelled: Some(true),
+            source: Some(bookie_storage::query_history::Source::Editor),
+            limit: QUICK_SWITCHER_HISTORY_LIMIT,
+            ..Default::default()
+        };
+        let sender_for_items = sender.clone();
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let entries = history.search(filter).await.unwrap_or_else(|error| {
+                        tracing::warn!(error = %error, "query history search for Open Quickly failed");
+                        Vec::new()
+                    });
+                    let label = bookie_app_services::tr!("History");
+                    let items = bookie_app_services::quick_switcher::history_items(&entries, &label);
+                    sender_for_items.input(AppMsg::QuickSwitcherHistoryLoaded(items));
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn present_quick_switcher(&self, history: Vec<QuickItem>, sender: ComponentSender<Self>) {
         let mut items = favorite_items(&self.favorites);
         items.extend(self.open_tab_items());
         items.extend(relation_items(&self.sidebar_tables, &self.sidebar_views));
         items.extend(self.connection_items());
+        items.extend(history);
         items.extend(crate::services::quick_switcher::command_items());
         let sender_for_choice = sender.clone();
         crate::ui::quick_switcher_dialog::present(&self.window, items, move |target| {
@@ -122,6 +154,7 @@ impl App {
                         .drop_on_shutdown()
                 });
             }
+            QuickTarget::History(sql) => self.append_editor_tab(Some(sql), sender),
             QuickTarget::Tab(id) => self.select_workspace_tab(id),
             QuickTarget::Relation { schema, name } => sender.input(AppMsg::SelectTable {
                 schema,
