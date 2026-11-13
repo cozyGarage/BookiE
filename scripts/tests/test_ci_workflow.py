@@ -416,7 +416,9 @@ class CiWorkflowTests(unittest.TestCase):
             kind = "lib" if target.startswith("--") else "test"
             with self.subTest(package=package, target=target):
                 self.assertIn(package, config["groups"]["keyring"][kind])
-        self.assertIn("bookie-app", config["groups"]["pg-release"]["bin"])
+        for group in ("pg-release", "socket-ssh"):
+            with self.subTest(group=group):
+                self.assertIn("bookie-ssh", config["groups"][group]["bin"])
 
     def test_forgejo_workflow_and_actionlint_config_changes_run_contract_checks(self):
         workflow = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
@@ -478,6 +480,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/run-test-layer.py unused-dependencies", supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", github_supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", supply_chain)
+        self.assertRegex(supply_chain, r"(?m)^      PATH: /cargo/bin:")
         self.assertIn("cargo-shear 1.13.4", layer["prerequisites"])
         self.assertEqual(layer["steps"][0]["argv"], ["cargo", "shear"])
         contracts = (ROOT / ".github/workflows/linux-ci-contracts.yml").read_text()
@@ -1296,8 +1299,12 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         unit = re.search(r"(?ms)^  unit:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         preflight = re.search(r"(?ms)^  guards:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         self.assertIn("--expected-group unit", unit)
         self.assertIn("nextest run --archive-file", unit)
+        self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-unit-bundle/schemas", unit)
+        self.assertIn("GSETTINGS_SCHEMA_DIR: ${{ runner.temp }}/bookie-direct-bundle/schemas", widgets)
+        self.assertIn('find "$BOOKIE_TEST_BUNDLE/tests" "$BOOKIE_TEST_BUNDLE/bin" -type f -exec chmod u+x {} +', widgets)
         self.assertIn("bash scripts/test-harness.sh", preflight)
         self.assertNotIn("run-test-layer.py full", unit)
         gate = workflow.split("  regression-gate:\n", 1)[1]
