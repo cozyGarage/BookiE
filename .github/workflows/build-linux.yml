@@ -454,6 +454,14 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           python3 scripts/ci-test-bundle.py verify "$BOOKIE_TEST_BUNDLE" "$BOOKIE_SOURCE_COMMIT" --expected-group direct
           python3 scripts/run-test-layer.py widgets
+      - name: Retain GTK widget diagnostics
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: widgets-${{ github.run_id }}-${{ github.run_attempt }}
+          path: target/quality/*-layers
+          if-no-files-found: error
+          retention-days: 2
 
   consumers:
     if: github.event_name != 'push'

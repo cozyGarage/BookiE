@@ -1051,7 +1051,7 @@ class CiWorkflowTests(unittest.TestCase):
             expected_full_fetches = 2 if name == "ci" else 0
             self.assertEqual(workflow.count("fetch-depth: 0"), expected_full_fetches)
             self.assertEqual(workflow.count("fetch-depth: 1"), expected_checkouts - expected_full_fetches)
-            self.assertEqual(workflow.count("path: src"), expected_checkouts)
+            self.assertEqual(len(re.findall(r"(?m)^\s+path: src\s*$", workflow)), expected_checkouts)
             self.assertIn("name: Check runner space before checkout", workflow)
             for index, heading in enumerate(headings):
                 end = headings[index + 1].start() if index + 1 < len(headings) else len(jobs)
@@ -1325,6 +1325,27 @@ class CiWorkflowTests(unittest.TestCase):
         final_gate = graph["regression-gate"]["needs"]
         self.assertIn("guards", final_gate)
         self.assertIn("clippy", final_gate)
+
+    def test_gtk_widget_failures_retain_layer_diagnostics_on_both_providers(self):
+        for path, artifact_action, artifact_path in (
+            (
+                ROOT / ".github/workflows/build-linux.yml",
+                "actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f",
+                "target/quality/*-layers",
+            ),
+            (
+                ROOT / ".forgejo/workflows/ci.yml",
+                "https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5",
+                "src/target/quality/*-layers",
+            ),
+        ):
+            workflow = path.read_text()
+            widgets = re.search(r"(?ms)^  widgets:\n(.*?)(?=^  [a-z0-9-]+:\n|\Z)", workflow).group(1)
+            evidence = widgets.split("      - name: Retain GTK widget diagnostics\n", 1)[1]
+            self.assertIn("if: always()", evidence)
+            self.assertIn(f"uses: {artifact_action}", evidence)
+            self.assertIn(f"path: {artifact_path}", evidence)
+            self.assertIn("retention-days: 2", evidence)
 
     def test_quality_workflow_only_saves_caches_from_the_scheduled_default_branch(self):
         workflow = (ROOT / ".github/workflows/linux-quality.yml").read_text().splitlines()
@@ -1919,6 +1940,8 @@ class CiWorkflowTests(unittest.TestCase):
             "actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c",
             "taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283",
             "dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772",
+            "https://github.com/taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283",
+            "https://github.com/dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772",
             "https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5",
             "https://code.forgejo.org/actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a",
         }

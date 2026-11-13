@@ -550,6 +550,16 @@ jobs:
         run: bash src/scripts/prepare-test-bundle.sh "${{ needs.pin-revision.outputs.revision }}" direct
       - name: GTK widget tests
         run: cd src && python3 scripts/run-test-layer.py widgets
+      - name: Prepare artifact runtime
+        run: bash src/scripts/ensure-node.sh >> "$GITHUB_PATH"
+      - name: Retain GTK widget diagnostics
+        if: always()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: widgets-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Finalize runner job
         if: always()
