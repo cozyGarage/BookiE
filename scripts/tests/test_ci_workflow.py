@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -79,6 +80,21 @@ def workflow_job_graph(paths, adapter_jobs=()):
     return graph
 
 
+def workflow_job_test_layers(path):
+    section = path.read_text().split("\njobs:\n", 1)[1]
+    headings = list(re.finditer(r"(?m)^  ([A-Za-z0-9_-]+):\s*$", section))
+    layers = {}
+    for index, heading in enumerate(headings):
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(section)
+        block = section[heading.start():end]
+        layers[heading.group(1)] = sorted(
+            layer
+            for match in re.finditer(r"python3 scripts/run-test-layer\.py\s+([^\n;]+)", block)
+            for layer in shlex.split(match.group(1))
+        )
+    return layers
+
+
 class CiWorkflowTests(unittest.TestCase):
     def test_forgejo_workflow_omits_unsupported_permissions_block(self):
         forgejo = (ROOT / ".forgejo/workflows/ci.yml").read_text()
@@ -138,6 +154,13 @@ class CiWorkflowTests(unittest.TestCase):
         forgejo = workflow_job_graph(ROOT / ".forgejo/workflows/ci.yml")
         self.maxDiff = None
         self.assertEqual(expected, forgejo)
+        self.assertEqual(github, forgejo)
+
+    def test_forgejo_and_github_run_the_same_test_layers_per_gate_job(self):
+        github = workflow_job_test_layers(ROOT / ".github/workflows/build-linux.yml")
+        forgejo = workflow_job_test_layers(ROOT / ".forgejo/workflows/ci.yml")
+        github.pop("ensure-ci-gtk-image")
+        github.pop("current-stable-clippy")
         self.assertEqual(github, forgejo)
 
     def test_forgejo_contract_workflow_matches_github_contracts(self):
