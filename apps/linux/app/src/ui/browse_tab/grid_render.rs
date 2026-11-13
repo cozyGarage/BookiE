@@ -81,6 +81,7 @@ impl BrowseTab {
             return;
         };
         let selection = self.current_selection.clone();
+        // Let GTK allocate the visible grid's scroll adjustments before scrolling to the draft.
         glib::idle_add_local_once(move || {
             // The deferred focus can outlive the view after a refresh.
             if cv.root().is_none() {
@@ -168,6 +169,7 @@ impl BrowseTab {
             return;
         };
         if self.current_columns.is_empty() {
+            // Keep cells unavailable until schema metadata determines their editability.
             return;
         }
         self.refresh_ambiguous_keys(&result);
