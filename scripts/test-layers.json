@@ -704,7 +704,7 @@
       "guards",
       "pin-revision"
     ],
-    "timeout_minutes": 20,
+    "timeout_minutes": 45,
     "condition": "github.event_name != 'push'",
     "matrix": {}
   },

@@ -523,7 +523,7 @@ jobs:
   gtk-build:
     if: github.event_name != 'push'
     name: Build shared GTK binary
-    timeout-minutes: 20
+    timeout-minutes: 45
     runs-on: ubuntu-24.04
     needs: [pin-revision, ensure-ci-gtk-image, guards]
     container:
