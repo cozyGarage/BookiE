@@ -51,7 +51,6 @@ impl DatabaseDriver for SqliteDriver {
         true
     }
 
-
     fn import_upsert(&self) -> bookie_core::ImportUpsertStyle {
         bookie_core::ImportUpsertStyle::OnConflict
     }
