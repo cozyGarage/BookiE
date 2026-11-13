@@ -10,6 +10,7 @@ import sys
 import tempfile
 import tomllib
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("ci_jobs", ROOT / "scripts/check-ci-jobs.py")
@@ -219,13 +220,63 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertFalse(bundle_helper.target_selected("bookie-driver-duckdb", "test", set(), direct))
         self.assertEqual(
             set(bundle_groups),
-            {"direct", "consumers", "driver-core", "driver-analytics", "driver-extended", "drivers",
+            {"direct", "sandbox", "consumers", "driver-core", "driver-analytics", "driver-extended", "drivers",
              "pg-release", "socket-ssh", "driver-tls", "keyring"},
         )
         self.assertTrue({"bookie-app", "bookie-mcp", "bookie-policy"} <= set(bundle_groups["consumers"]["lib"] + bundle_groups["consumers"]["test"]))
         self.assertIn("bookie-app", bundle_groups["consumers"]["test"])
+        required_binaries = {
+            "direct": {"bookie-app"},
+            "consumers": {"bookie-app"},
+            "sandbox": {"bookie-agentd", "bookie-ssh"},
+            "pg-release": {"bookie-agentd", "bookie-app"},
+            "socket-ssh": {"bookie-agentd", "bookie-ssh"},
+            "keyring": {"bookie-agentd"},
+        }
+        for group, packages in required_binaries.items():
+            with self.subTest(group=group):
+                self.assertTrue(packages <= set(bundle_groups[group]["bin"]))
         for group in ("driver-core", "driver-analytics", "driver-extended"):
             self.assertTrue(bundle_groups[group]["test"])
+
+    def test_test_bundle_copies_only_binaries_declared_for_its_group(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            messages = root / "build.jsonl"
+            app_binary = root / "bookie-app"
+            test_binary = root / "postgres-test"
+            app_binary.write_bytes(b"app")
+            test_binary.write_bytes(b"test")
+            packages = [
+                {"id": "app", "name": "bookie-app", "manifest_path": str(ROOT / "apps/linux/app/Cargo.toml")},
+                {"id": "postgres", "name": "bookie-driver-postgres", "manifest_path": str(ROOT / "crates/drivers/postgres/Cargo.toml")},
+            ]
+            messages.write_text("\n".join(json.dumps(message) for message in (
+                {"reason": "compiler-artifact", "package_id": "app", "target": {"kind": ["bin"], "name": "bookie-app"},
+                 "profile": {"test": False}, "executable": str(app_binary)},
+                {"reason": "compiler-artifact", "package_id": "postgres", "target": {"kind": ["test"], "name": "integration"},
+                 "profile": {"test": True}, "executable": str(test_binary)},
+            )) + "\n")
+
+            def check_output(command, **kwargs):
+                if command[0] == "cargo":
+                    return json.dumps({"packages": packages}).encode()
+                return "rustc 1.98.0" if kwargs.get("text") else b"rustc 1.98.0"
+
+            with patch.object(bundle_helper.subprocess, "check_output", side_effect=check_output), \
+                    patch.object(bundle_helper.subprocess, "run"):
+                bundle_helper.create(root / "bundle", messages, "revision", "driver-core", package_kinds={
+                    ("bookie-driver-postgres", "test"),
+                })
+                bundle_helper.create(root / "direct", messages, "revision", "direct", package_kinds={
+                    ("bookie-app", "bin"), ("bookie-driver-postgres", "test"),
+                })
+
+            index = json.loads((root / "bundle/index.json").read_text())
+            self.assertEqual(index["binaries"], {})
+            self.assertNotIn("bin/bookie-app", index["files"])
+            direct_index = json.loads((root / "direct/index.json").read_text())
+            self.assertEqual(direct_index["binaries"], {"bookie-app": "bin/bookie-app"})
 
     def test_forgejo_driver_core_bundle_includes_pg_dump_targets(self):
         bundle_groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
