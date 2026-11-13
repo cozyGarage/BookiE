@@ -198,7 +198,7 @@
     "b4-rollback": {
       "purpose": "Focused MySQL failed-batch rollback and PostgreSQL rollback-failure acceptance",
       "prerequisites": "Rust 1.98; Docker; native TLS build dependencies",
-      "hosted_gate": "Build Linux / b4-rollback; lab-ci / b4-rollback",
+      "hosted_gate": "Build Linux / Policy rollback acceptance; lab-ci / b4-rollback",
       "steps": [
         {
           "argv": [
