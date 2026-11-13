@@ -152,6 +152,13 @@ pub use messages::{SqlEditorInput, SqlEditorOutput, StatementIdentity, Statement
 
 pub(super) const MAX_SQL_FILE_BYTES: u64 = bookie_app_services::sql_text::EDITOR_MAX_SQL_BYTES;
 
+fn set_initial_sql_buffer_text(buffer: &sourceview5::Buffer, text: &str) {
+    if text.len() > query_changes::MAX_SYNTAX_HIGHLIGHT_BYTES {
+        buffer.set_highlight_syntax(false);
+    }
+    buffer.set_text(text);
+}
+
 #[derive(Debug)]
 struct ExecutionContext {
     sql: String,
@@ -385,11 +392,11 @@ impl SimpleComponent for SqlEditor {
         };
         if let Some(lang) = lang_manager.language("sql") {
             let buffer = sourceview5::Buffer::with_language(&lang);
-            buffer.set_text(&initial_text);
+            set_initial_sql_buffer_text(&buffer, &initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
         } else {
             let buffer = sourceview5::Buffer::new(None::<&gtk::TextTagTable>);
-            buffer.set_text(&initial_text);
+            set_initial_sql_buffer_text(&buffer, &initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
         }
         let split_view =
