@@ -11,7 +11,9 @@ The core `QueryResult` describes one tabular result. At the time this decision w
 
 Keep `QueryResult` as the representation of one result set and add an ordered `QueryResultBatch` containing every tabular set, including empty sets, plus one batch-level truncation flag. Add a controlled query method with a default implementation that wraps the existing single-result method. SQL Server overrides it and collects every set from the TDS stream under the existing shared row, cell and byte budgets. Existing single-result methods keep returning the first set and drain later sets without retaining them.
 
-The guard authorizes and audits the submitted SQL once, applies masking to every set, and records the total retained row count. The editor exposes sets as ordered result tabs within the statement. MCP keeps its existing first-set `columns` and `rows` fields and adds `additional_result_sets`; JSON export returns every set, while CSV export refuses a multi-set result rather than silently dropping data.
+The guard authorizes and audits the submitted SQL once, applies masking to every set, and records the total retained row count. The editor exposes sets as an ordered result-set dropdown with a view stack within the statement. MCP keeps its existing first-set `columns` and `rows` fields and adds `additional_result_sets`; JSON export of every set is an MCP `export_data` path, while the GUI export operates on one `QueryResult` and CSV export refuses a multi-set result rather than silently dropping data.
+
+**Clarified (2026-11-13):** the editor UI is a dropdown and view stack, not notebook tabs; multi-set JSON/CSV rules for MCP stay as above.
 
 Drivers must drain the full response and surface late server errors. A query that fails after producing an earlier set returns an error with no partial batch. Cancellation and timeout keep each driver's existing contract, including SQL Server's unknown outcome and connection retirement; see [ADR 0005](0005-server-side-cancellation.md). Reaching a batch budget marks the batch truncated but still drains the response so the connection is reusable and late errors remain visible.
 
