@@ -693,6 +693,7 @@ impl Connection for MssqlConnection {
                     primary,
                     predicate: None,
                     has_expression_key: false,
+                    using_clause: None,
                 }),
             }
         }

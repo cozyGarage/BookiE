@@ -16,15 +16,23 @@ pub fn build_create_index(
     if index.columns.is_empty() {
         return Err(BuildDdlError::NoColumns);
     }
+    let unique = if index.unique { "UNIQUE " } else { "" };
+    let qualified = qualified_table(driver_id, schema, table);
+    if driver_id == "postgres"
+        && let Some(server_definition) = &index.using_clause
+    {
+        return Ok(format!(
+            "CREATE {unique}INDEX {} ON {qualified} USING {server_definition}",
+            quote_ident(driver_id, &index.name),
+        ));
+    }
     if index.predicate.is_some() {
         return Err(BuildDdlError::PartialIndex);
     }
     if index.has_expression_key {
         return Err(BuildDdlError::ExpressionIndex);
     }
-    let unique = if index.unique { "UNIQUE " } else { "" };
     let cols: Vec<String> = index.columns.iter().map(|c| quote_ident(driver_id, c)).collect();
-    let qualified = qualified_table(driver_id, schema, table);
     // MySQL does not accept schema prefix on the index name, and
     // CREATE INDEX scopes to the table by default. Postgres / SQLite
     // accept schema-qualified index names but the table reference
