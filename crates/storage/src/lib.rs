@@ -5,6 +5,7 @@ mod connection_color;
 mod connection_import_another_redis;
 mod connection_import_datagrip;
 mod connection_import_dbeaver;
+mod connection_import_dbx;
 mod connection_import_navicat;
 mod connection_import_peer;
 mod connection_import_resp;
@@ -34,6 +35,7 @@ pub use connection_color::{
 pub use connection_import_another_redis::{MAX_ANOTHER_REDIS_BYTES, parse_another_redis_connections};
 pub use connection_import_datagrip::{MAX_DATAGRIP_BYTES, parse_datagrip_data_sources};
 pub use connection_import_dbeaver::{MAX_DBEAVER_BYTES, parse_dbeaver_data_sources};
+pub use connection_import_dbx::{MAX_DBX_CONFIG_BYTES, parse_dbx_connection_database};
 pub use connection_import_navicat::{MAX_NAVICAT_BYTES, parse_navicat_connections};
 pub use connection_import_peer::PeerImport;
 pub use connection_import_resp::{MAX_RESP_BYTES, looks_like_resp_export, parse_resp_connections};
