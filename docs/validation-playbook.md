@@ -204,19 +204,19 @@ CI is split into fast feedback and slower integration or acceptance checks. Read
 
 ### Build Linux
 
-[`build-linux.yml`](../.github/workflows/build-linux.yml) and Forgejo's [`ci.yml`](../.forgejo/workflows/ci.yml) pin the tested revision and run the same required regression jobs on every pull request and every push to `main` (docs-only path filters still skip the whole workflow). Provider setup differs, but job names, dependencies, timeouts, matrices and selected test layers are checked for parity by `scripts/tests/test_ci_workflow.py`. `scripts/check-ci-jobs.py` allows `floor-build` and `distro-floor-scenarios` to be skipped on pull requests; they run for `main`, schedules and manual dispatches. `current-stable-clippy` is a scheduled/manual GitHub-only check outside the required regression gate.
+[`build-linux.yml`](../.github/workflows/build-linux.yml) and Forgejo's [`ci.yml`](../.forgejo/workflows/ci.yml) pin the tested revision and run the same gate graph on pull requests and pushes to `main` (docs-only path filters still skip the whole workflow). Pull requests, schedules and manual dispatches run the full T1 gate; pushes to `main` run the lighter T0 profile. Provider setup differs, but job names, dependencies, timeouts, matrices, event profiles and selected test layers are checked for parity by `scripts/tests/test_ci_workflow.py`. `current-stable-clippy` is a scheduled/manual GitHub-only check outside the required regression gate.
 
 | Job | Runs on |
 |---|---|
 | Required on every gate: `pin-revision`, `guards`, `clippy`, `test-build`, `unit`, `sandbox`, `gpui-tests`, `widgets`, `gtk-build`, `gtk`, `gtk-server`, `driver`, `driver-tls`, `b4-rollback`, `security-policy`, `consumers`, `pg-release`, `keyring`, `supply-chain` | pull_request, push, schedule, workflow_dispatch |
-| Conditionally required: `floor-build`, `distro-floor-scenarios` | push to `main`, schedule, workflow_dispatch; allowed to skip on pull_request |
+| Full-gate only: `floor-build`, `distro-floor-scenarios` | pull_request, schedule, workflow_dispatch; skipped on push to `main` |
 | `regression-gate` | always; requires every required job to succeed or be an allowed pull-request skip |
 | `ensure-ci-gtk-image` | GitHub-only image preparation; not a regression job |
 | `current-stable-clippy` | GitHub-only scheduled/manual check; outside the regression gate |
 
 Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/test_ci_workflow.py` in the same change.
 
-`scripts/forgejo-gate.sh` ensures the requested commit exists on its gate ref, then dispatches `ci.yml` for that exact SHA. The workflow's push trigger is limited to `main`, so a standalone gate ref must use `workflow_dispatch`. The Debian floor package build and scenarios run on `main`, scheduled runs and manual dispatches. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
+`scripts/forgejo-gate.sh` ensures the requested commit exists on its gate ref, then dispatches `ci.yml` for that exact SHA. The workflow's push trigger is limited to `main`, so a standalone gate ref must use `workflow_dispatch`. The Debian floor package build and scenarios run for pull requests, scheduled runs and manual dispatches, but not for pushes to `main`. The Forgejo driver matrix includes every workspace driver crate, with the fixture image list checked against each driver's tests.
 
 ### Pull request hygiene checks
 
