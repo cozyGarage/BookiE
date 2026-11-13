@@ -406,7 +406,7 @@ class CiCacheTests(unittest.TestCase):
             self.assertEqual(workflow.count('shell: /usr/local/libexec/bookie-ci-cache run {0}'), 1)
             for step in workflow.split('      - name: ')[1:]:
                 if 'uses: https://code.forgejo.org/actions/' in step:
-                    self.assertRegex(step, r'(?m)^          path: (gtk|floor)-artifact/$')
+                    self.assertRegex(step, r'(?m)^          path: ((gtk|floor)-artifact/|src/target/quality/\*-layers)$')
                     self.assertNotIn('path: /var/cache/', step)
                     self.assertNotIn('path: ${{ env.CARGO_TARGET_DIR }}', step)
 

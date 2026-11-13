@@ -8,8 +8,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOWS = (ROOT / ".forgejo/workflows/ci.yml", ROOT / ".forgejo/workflows/nightly.yml")
+WORKFLOWS = (
+    ROOT / ".forgejo/workflows/ci.yml",
+    ROOT / ".forgejo/workflows/ci-contracts.yml",
+    ROOT / ".forgejo/workflows/nightly.yml",
+    ROOT / ".forgejo/workflows/pr-title.yml",
+)
 CLEANUP = ROOT / "scripts/cleanup-ci-job.sh"
+NIGHTLY = ROOT / ".forgejo/workflows/nightly.yml"
 
 
 def runner_jobs(path):
@@ -40,12 +46,21 @@ def runner_jobs(path):
 class CiJobCleanupTests(unittest.TestCase):
     def test_gtk_server_fixtures_have_job_scoped_cleanup_labels(self):
         jobs = runner_jobs(WORKFLOWS[0])
-        for job in ("e2e", "gtk-server"):
-            self.assertIn("BOOKIE_TEST_RUN_ID:", jobs[job])
-            self.assertIn("${{ matrix.server }}", jobs[job])
+        self.assertIn("BOOKIE_TEST_RUN_ID:", jobs["gtk-server"])
+        self.assertIn("${{ matrix.server }}", jobs["gtk-server"])
         for server in ("postgres", "mysql", "mysql-approval", "mongodb", "clickhouse"):
             script = (ROOT / f"scripts/test-gtk-{server}.sh").read_text(encoding="utf-8")
             self.assertIn('com.bookie.test-run=${BOOKIE_TEST_RUN_ID:-local-$$}', script)
+
+    def test_clickhouse_driver_fixtures_have_job_scoped_cleanup_labels(self):
+        for relative in (
+            "crates/drivers/clickhouse/tests/support/clickhouse.rs",
+            "crates/drivers/clickhouse/tests/conformance.rs",
+        ):
+            with self.subTest(file=relative):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn('"com.bookie.test-run"', source)
+                self.assertIn('"BOOKIE_TEST_RUN_ID"', source)
 
     def test_every_runner_job_finishes_with_the_finalizer(self):
         for workflow in WORKFLOWS:
@@ -232,7 +247,7 @@ class CiJobCleanupTests(unittest.TestCase):
 
     def test_pg_dump_uses_and_removes_a_run_scoped_temp_directory(self):
         job = runner_jobs(WORKFLOWS[0])["driver"]
-        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.driver }}", job)
+        self.assertIn("TMPDIR: /var/cache/ci/tmp/bookie-driver-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.group }}", job)
         self.assertNotIn(".tmp-pg-dump-${{ github.run_id }}-${{ github.run_attempt }}", job)
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary) / "workspace"
@@ -398,26 +413,27 @@ class CiJobCleanupTests(unittest.TestCase):
                 encoding="utf-8",
             )
             rm.chmod(0o755)
-            scratch = "/var/cache/ci/tmp/bookie-driver-123-2-core"
-            result = subprocess.run(
-                ["bash", str(CLEANUP)],
-                env={
-                    **os.environ,
-                    "PATH": f"{bin_dir}:{os.environ['PATH']}",
-                    "GITHUB_RUN_ID": "123",
-                    "GITHUB_JOB": "driver",
-                    "TMPDIR": scratch,
-                    "RM_CALLS": str(calls),
-                },
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
-            self.assertIn(["-rf", "--", scratch], rm_calls)
-
-            calls.unlink()
+            for group in ("core", "driver-core", "driver-analytics", "driver-extended", "socket-ssh"):
+                with self.subTest(group=group):
+                    scratch = f"/var/cache/ci/tmp/bookie-driver-123-2-{group}"
+                    result = subprocess.run(
+                        ["bash", str(CLEANUP)],
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "GITHUB_RUN_ID": "123",
+                            "GITHUB_JOB": "driver",
+                            "TMPDIR": scratch,
+                            "RM_CALLS": str(calls),
+                        },
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    rm_calls = [json.loads(line) for line in calls.read_text(encoding="utf-8").splitlines()]
+                    self.assertIn(["-rf", "--", scratch], rm_calls)
+                    calls.unlink(missing_ok=True)
             result = subprocess.run(
                 ["bash", str(CLEANUP)],
                 env={
@@ -444,7 +460,7 @@ class CiJobCleanupTests(unittest.TestCase):
         self.assertIn('--project-name "${BOOKIE_TEST_RUN_ID:-driver-tls}"', script)
 
     def test_nightly_outputs_do_not_use_tmp(self):
-        self.assertNotIn("/tmp/", WORKFLOWS[1].read_text(encoding="utf-8"))
+        self.assertNotIn("/tmp/", NIGHTLY.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
