@@ -32,7 +32,7 @@
       ]
     },
     "pg-release": {
-      "bin": ["bookie-agentd", "bookie-app"],
+      "bin": ["bookie-agentd", "bookie-app", "bookie-ssh"],
       "lib": ["bookie-release-tests"],
       "test": ["bookie-agentd", "bookie-release-tests"]
     },

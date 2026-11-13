@@ -41,7 +41,7 @@ if [[ -n "$test_bundle" ]]; then
   mkdir -p "${CARGO_TARGET_DIR:?Cargo target directory required}"
   export TMPDIR="$CARGO_TARGET_DIR"
   expected_group=()
-  if [[ -n "${BOOKIE_SANDBOX_BUNDLE:-}" ]]; then expected_group+=(--expected-group sandbox); fi
+  if [[ -n "${BOOKIE_SANDBOX_BUNDLE:-}" ]]; then expected_group+=(--expected-group workspace); fi
   python3 "$ROOT/scripts/ci-test-bundle.py" verify "$test_bundle" \
     "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}" "${expected_group[@]}"
   packages=""

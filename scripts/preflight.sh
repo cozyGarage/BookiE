@@ -88,7 +88,7 @@ NEXTEST="$("$ROOT/scripts/ensure-nextest.sh")"
 unit_bundle="${BOOKIE_UNIT_BUNDLE:-${BOOKIE_TEST_BUNDLE:-}}"
 if [[ -n "$unit_bundle" ]]; then
   expected_group=()
-  if [[ -n "${BOOKIE_UNIT_BUNDLE:-}" ]]; then expected_group+=(--expected-group unit); fi
+  if [[ -n "${BOOKIE_UNIT_BUNDLE:-}" ]]; then expected_group+=(--expected-group workspace); fi
   python3 "$ROOT/scripts/ci-test-bundle.py" verify "$unit_bundle" \
     "${BOOKIE_SOURCE_COMMIT:-${GITHUB_SHA:?source revision required}}" "${expected_group[@]}"
   packages=""

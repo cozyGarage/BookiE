@@ -15,13 +15,6 @@ impl BrowseTab {
         selection.model()?.downcast::<crate::ui::row_store::RowStore>().ok()
     }
 
-    /// Notify the chain (ListStore → SelectionModel → ColumnView) that
-    /// the row at `pos` has changed so the view rebinds its cells.
-    ///
-    /// Why: per GTK4 docs, `items-changed` "should never be emitted
-    /// directly by users of the model". Splicing a fresh RowObject
-    /// into the underlying `gio::ListStore` is the canonical way to
-    /// force the downstream chain to invalidate caches and rebind.
     pub(super) fn refresh_row_at(&self, pos: u32) {
         let row_obj = self.row_object_at(pos);
         let store = self.list_store();
@@ -29,35 +22,13 @@ impl BrowseTab {
             (Some(r), Some(s)) => s.find(r),
             _ => None,
         };
-        // ColumnView's list-item-manager keeps a per-listitem
-        // cached pointer to the model item it's currently bound
-        // to. When it receives items-changed for a position, it
-        // re-fetches the model item at that position and
-        // **compares pointers**: if same identity, it skips
-        // unbind/bind because the bound item "didn't actually
-        // change". Mutating cells *inside* the existing
-        // RowObject (which is what set_cell does) keeps the
-        // pointer constant — that's why neither plain
-        // `items_changed` nor `splice(pos, 1, &[same_row_obj])`
-        // forces a rebind here.
-        //
-        // The fix: substitute a freshly-allocated RowObject
-        // carrying the post-mutation cells. Different GObject
-        // identity → list-item-manager invalidates the cache,
-        // unbinds the old listitem widget, rebinds with the
-        // new item, connect_bind fires, label.set_text picks up
-        // the reverted value. Atomic via splice: one items-
-        // changed emission, no flicker, no scroll jump.
+        // ColumnView skips rebinding when a changed item keeps the same GObject identity.
         if let (Some(store), Some(store_pos), Some(old)) = (store, store_pos, row_obj) {
             let replacement = old.clone_preserving_loading_state();
             store.splice(store_pos, 1, &[replacement]);
         }
     }
 
-    /// Look up the live `RowObject` at a selection-model position.
-    /// Used to detect whether a row is a draft (`draft_id().is_some()`)
-    /// vs a persisted row, and to mutate draft cells in place when
-    /// the user types into them.
     pub(super) fn row_object_at(&self, position: u32) -> Option<crate::ui::row_object::RowObject> {
         let model = self.current_selection.as_ref()?.model()?;
         model
@@ -66,18 +37,9 @@ impl BrowseTab {
             .ok()
     }
 
-    /// Locate the row in the current model that matches a given
-    /// `RowKey`. Drafts match by `draft_id`; persisted rows match by
-    /// recomputing the row's PK key-tuple from cell values and
-    /// comparing. Returns the position in the (filtered) selection
-    /// model, or `None` if the row isn't on the current page.
     pub(super) fn capture_focus_for_restore(&self) {
         use crate::services::change_tracker::RowKey;
-        // If a previous capture is still pending (sort+save fire in
-        // quick succession before the first reload's restore runs), keep
-        // the original capture. The first user-visible focus should
-        // anchor to where they were before triggering the chain — not
-        // wherever focus drifted mid-rebuild.
+        // A second reload must not replace the focus captured before the first finishes.
         if self.pending_focus_restore.borrow().is_some() {
             return;
         }
@@ -114,30 +76,17 @@ impl BrowseTab {
         *self.pending_focus_restore.borrow_mut() = key;
     }
 
-    /// Grab focus + start-editing on the freshly-inserted draft row's
-    /// Scroll + focus + select the freshly-prepended draft row, then
-    /// open its first editable cell for input. Called via
-    /// `BrowseTabInput::FocusInsertedDraft` rather than directly so we
-    /// read the current `column_view` / `selection` state rather than
-    /// a captured-by-value reference that could go stale if a
-    /// RowsLoaded fires between Insert and the deferred focus. The
-    /// whole sequence is queued via `idle_add_local_once` so the
-    /// inner-stack flip (empty → grid) has time to allocate the
-    /// ScrolledWindow's adjustments before `cv.scroll_to(...)` runs.
     pub(super) fn focus_inserted_draft(&self) {
         let Some(cv) = self.current_column_view.clone() else {
             return;
         };
         let selection = self.current_selection.clone();
+        // Let GTK allocate the visible grid's scroll adjustments before scrolling to the draft.
         glib::idle_add_local_once(move || {
-            // At idle time the column-view may already be detached
-            // (rare race, e.g. user pressed F5 between InsertRow and
-            // this idle). Bail silently — the row was inserted; only
-            // the auto-edit affordance is missed.
+            // The deferred focus can outlive the view after a refresh.
             if cv.root().is_none() {
                 return;
             }
-            // New drafts always land at position 0 (prepended).
             if let Some(sel) = selection.as_ref() {
                 sel.select_item(0, true);
             }
@@ -156,16 +105,9 @@ impl BrowseTab {
             if let Ok(label) = focused.dynamic_cast::<crate::ui::cell_editor::CellEditor>() {
                 crate::ui::grid::enter_cell_edit_mode(&label);
             }
-            // Bool draft (CheckButton focused) needs no edit-mode
-            // dance; clicking / Space toggles natively.
         });
     }
 
-    /// Re-select and scroll-to the row captured by
-    /// `capture_focus_for_restore`, if it's still on the page after
-    /// the reload. Silently no-ops if the row was filtered out, sorted
-    /// to a different page, or removed by the commit. Always clears
-    /// the captured key so it doesn't bleed into the next reload.
     pub(super) fn restore_focused_row(&self) {
         let Some(key) = self.pending_focus_restore.borrow_mut().take() else {
             return;
@@ -181,11 +123,6 @@ impl BrowseTab {
         }
     }
 
-    /// Build the `ColumnView` if we have both the schema (`current_columns`,
-    /// from `ColumnsLoaded`) and the current page's data (`current_result`,
-    /// from `RowsLoaded`). Until both are present the `inner_stack` stays
-    /// on the "loading" status page so the user can't interact with cells
-    /// whose editability map is wrong.
     fn refresh_ambiguous_keys(&self, result: &bookie_core::QueryResult) {
         let ambiguous = if self.driver_id == "clickhouse" {
             let key_indices: Vec<usize> = self
@@ -232,18 +169,13 @@ impl BrowseTab {
             return;
         };
         if self.current_columns.is_empty() {
-            // Schema not yet loaded — keep the loading status visible.
-            // ColumnsLoaded will re-invoke this when it arrives.
+            // Keep cells unavailable until schema metadata determines their editability.
             return;
         }
         self.refresh_ambiguous_keys(&result);
         let dropped_column_selection = self.drop_column_selection();
 
-        // Fast path: column structure hasn't changed since the last
-        // render (typical for sort flips / page changes / save reloads
-        // within one tab). Reuse the existing `ColumnView` and only
-        // refresh the underlying `ListStore`. Saves O(N×M) factory
-        // recreations and selection rebuilds per page change.
+        // Reuse the view to avoid rebuilding each column factory after page updates.
         if self.column_view_matches_current_columns()
             && let Some(store) = self.list_store()
         {
@@ -260,9 +192,6 @@ impl BrowseTab {
             return;
         }
 
-        // Cold path: first render for this tab, or column structure
-        // changed (rare in practice — would require schema migration
-        // mid-session). Build the full column-view scaffolding.
         clear_box(&self.grid_holder);
         let edit_sender = if self.allows_keyed_row_mutations() {
             Some(self.grid_sender.clone())
@@ -330,10 +259,6 @@ impl BrowseTab {
         self.current_column_view = Some(column_view.clone());
         self.rendered_columns.clone_from(&self.current_columns);
 
-        // Selection-changed signal updates the count badge and the
-        // Delete button's tooltip live. The new MultiSelection is a
-        // fresh instance per rebuild, so the previous binding (if
-        // any) drops with the old selection — no leak.
         let selection_label_for_signal = self.selection_label.clone();
         let selection_count_label_for_signal = self.selection_count_label.clone();
         let selection_details_label_for_signal = self.selection_details_label.clone();
@@ -354,8 +279,7 @@ impl BrowseTab {
                 );
                 inspector.show_row(inspected_row(sel, &columns));
             });
-            // Page rebuild clears MultiSelection's bitset; reset the
-            // chrome explicitly so a stale "5 selected" doesn't linger.
+            // Rebuilding the page clears the selection bitset.
             update_selection_chrome(
                 &self.selection_label,
                 &self.selection_count_label,
@@ -366,11 +290,7 @@ impl BrowseTab {
             );
         }
 
-        // Re-prepend any pending draft rows so they survive page changes,
-        // sort flips, and F5 refresh. The tracker is the canonical source
-        // of truth for drafts; the grid model is rebuilt fresh on every
-        // RowsLoaded so without this step the drafts vanish visually
-        // while the tracker still holds them, leading to confused state.
+        // The tracker retains draft rows while RowsLoaded replaces the model.
         self.reprepend_drafts();
 
         let scrolled = crate::ui::grid::wrap_grid_scrolled(&column_view);
@@ -382,16 +302,10 @@ impl BrowseTab {
         let _ = sender.output(BrowseTabOutput::StateChanged);
     }
 
-    /// True when the cached `ColumnView` uses the current column metadata.
-    /// A type or editability change requires new factories even if the count
-    /// stays fixed.
     pub(super) fn column_view_matches_current_columns(&self) -> bool {
         self.current_column_view.is_some() && column_layout_matches(&self.rendered_columns, &self.current_columns)
     }
 
-    /// Replace the rows in the existing `ListStore` without touching
-    /// the columns / factories / selection model. Drafts are
-    /// re-prepended so they survive the swap.
     pub(super) fn refresh_grid_data(
         &self,
         result: &std::sync::Arc<QueryResult>,
@@ -447,8 +361,6 @@ impl BrowseTab {
         self.inner_stack.set_visible_child_name("error");
     }
 
-    /// Update paginator label, button sensitivity, and stack child —
-    /// chrome that depends on the result but not the column structure.
     pub(super) fn refresh_grid_chrome(&self) {
         self.refresh_crud_buttons();
         self.update_paginator_label();
@@ -456,10 +368,7 @@ impl BrowseTab {
         self.first_button.set_sensitive(!on_first_page);
         self.prev_button.set_sensitive(!on_first_page);
         self.update_next_page_sensitivity();
-        // Last only enables when we know the total AND we aren't
-        // already there. Without a known total, the button stays
-        // disabled — matches `RowCountLoaded`-gated UX everywhere
-        // else.
+        // The last-page target is unavailable until the row count arrives.
         let last_target = self
             .current_total_rows
             .filter(|t| *t > 0)
@@ -470,33 +379,14 @@ impl BrowseTab {
         self.refresh_inner_stack_visibility();
     }
 
-    /// Switch the inner stack to the grid once the first page has
-    /// loaded. Previously this helper also flipped to a dedicated
-    /// "empty" AdwStatusPage when there were 0 rows + 0 drafts on
-    /// page 0 — but that pattern triggered a GtkListBase bounds
-    /// invariant violation when the user then inserted a draft and
-    /// the stack crossfaded back to "grid": the GtkColumnView's
-    /// adjustments hadn't been allocated yet because the view was
-    /// the hidden stack child during the empty interlude, and the
-    /// first scroll / select call against it aborted with
-    /// `gtk_list_base_update_adjustments: bounds.y == 0`.
-    ///
-    /// GNOME Files / Builder don't show a status page for empty
-    /// lists either — they just render an empty list with column
-    /// headers. Mirror that: once the grid is built, stay on it
-    /// regardless of row count. The "Press Ctrl+N to add the first
-    /// row" hint moves into the column view's empty body (handled
-    /// natively by GtkColumnView's empty-area rendering).
+    /// Keep empty results in the built grid; switching to a hidden child leaves GTK adjustments unallocated.
+    /// Scrolling to the first draft then triggers `gtk_list_base_update_adjustments`.
     pub(super) fn refresh_inner_stack_visibility(&self) {
         if self.current_result.is_some() {
             self.inner_stack.set_visible_child_name("grid");
         }
     }
 
-    /// Walk `tracker.drafts()` and prepend each as a draft `RowObject`
-    /// at the top of the grid's `ListStore`. Forward iteration with
-    /// `insert(0, …)` preserves the original insertion order: newest
-    /// at the top, then older drafts beneath, then persisted rows.
     pub(super) fn reprepend_drafts(&self) {
         let Some(store) = self.list_store() else {
             return;
@@ -516,11 +406,7 @@ impl BrowseTab {
         }
     }
 
-    /// Force a single-row re-bind. Used when rejecting an invalid
-    /// cell edit: the `CellEditor` still holds the user's typed text
-    /// after editing-notify fires, so we trigger a re-bind to restore
-    /// the canonical display from `RowObject.cell_value()` (which we
-    /// did NOT mutate because the parse failed).
+    /// Restore the canonical cell display after rejecting an invalid edit.
     pub(super) fn refresh_row(&self, position: u32) {
         self.refresh_row_at(position);
     }

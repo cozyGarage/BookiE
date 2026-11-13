@@ -1,13 +1,3 @@
-//! App-side handlers for the Structure (DDL) workspace tab.
-//!
-//! Each `on_*` method mirrors the equivalent Browse-tab path in
-//! `browse.rs` / `row_ops.rs`: dispatch by tab id, take a slot
-//! reference, run async work via `sender.command`, route results
-//! back through `AppMsg::Structure*Loaded` / `Structure*Completed`
-//! variants. Window-close is gated by the shared `in_flight_saves`
-//! counter so a Structure DDL transaction can't commit after the
-//! window has been torn down.
-
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender, adw};
 use uuid::Uuid;
@@ -73,7 +63,6 @@ impl App {
         );
     }
 
-    /// Sidebar right-click → "New Table…" or schema-header "+" button.
     pub(super) fn on_new_table_tab(&mut self, schema: Option<String>, sender: ComponentSender<Self>) {
         if !self.connected {
             self.show_toast(&bookie_app_services::tr!("Connect to a database first."));
@@ -82,12 +71,6 @@ impl App {
         self.append_new_structure_tab(schema, sender);
     }
 
-    /// Sidebar right-click → "Edit Structure". Opens a dedicated
-    /// Structure tab (separate AdwTabPage). If one already exists for
-    /// this `(schema, table)` it's just re-selected; otherwise a new
-    /// `WorkspaceTab::Structure` is appended via
-    /// `append_existing_structure_tab`. The Data-side Browse tab (if
-    /// any) is independent — both can stay open side by side.
     pub(super) fn on_edit_structure_tab(
         &mut self,
         schema: Option<String>,
@@ -311,7 +294,6 @@ impl App {
         });
     }
 
-    /// Right-click → "Drop Table…", or in-tab destructive button.
     pub(super) fn on_drop_table_prompt(
         &mut self,
         schema: Option<String>,
@@ -386,11 +368,7 @@ impl App {
         dialog.present(Some(&self.window));
     }
 
-    /// User confirmed the drop. Run DROP TABLE async; only close any
-    /// open Browse / Structure tabs for the table after the DROP
-    /// returns Ok. Tabs stay open if DROP fails (FK violation,
-    /// privileges) so the user doesn't lose their state on a failed
-    /// destructive action.
+    /// Close tabs for the table only after DROP succeeds.
     pub(super) fn on_drop_table_confirmed(
         &mut self,
         origin: CatalogOrigin,
@@ -448,17 +426,9 @@ impl App {
         });
     }
 
-    /// Targeted save: commit a specific Structure tab's pending DDL
-    /// without requiring it to be the active tab. Used by the
-    /// close-with-pending dialog's "Save" branch — the user might be
-    /// closing a background tab via its X button.
+    /// Save a background Structure tab selected for close-with-pending.
     pub(super) fn save_structure_tab_by_id(&mut self, tab_id: Uuid, sender: ComponentSender<Self>) {
-        // If a save is already in flight for this tab, do nothing —
-        // calling `on_execute_structure_transaction` would silently
-        // early-return on the duplicate insert, never firing a
-        // completion. The in-flight save's `on_structure_save_completed`
-        // (or _failed) drains `close_after_save` for `tab_id`, so the
-        // close-with-pending flow still resolves through that path.
+        // Let the active save resolve close-after-save instead of re-dispatching.
         if self.structure_saves_in_flight.borrow().contains(&tab_id) {
             tracing::debug!(
                 ?tab_id,
@@ -478,8 +448,7 @@ impl App {
                 self.on_execute_structure_transaction(tab_id, statements, sender);
             }
             Some(Ok(_)) => {
-                // Nothing to save — short-circuit so close-after-save
-                // can proceed.
+                // Continue close-after-save when there is nothing to commit.
                 sender.input(AppMsg::StructureSaveCompleted {
                     origin: self.tab_origin(tab_id),
                     tab_id,
@@ -493,10 +462,7 @@ impl App {
         }
     }
 
-    /// Drop succeeded on the driver — now close any open tabs for
-    /// the dropped table and refresh sidebar. Run synchronously on
-    /// the GTK main thread so the close + sidebar refresh appear
-    /// atomic to the user.
+    /// Close matching tabs before refreshing the sidebar after a successful drop.
     pub(super) fn on_drop_table_succeeded(
         &mut self,
         origin: CatalogOrigin,
@@ -515,9 +481,7 @@ impl App {
         });
     }
 
-    /// Walk the tab map and force-close any Browse / Structure tabs
-    /// pointing at `(schema, table)`. Skips the per-tab pending-changes
-    /// dialog because the underlying table is gone.
+    /// Skip pending-change prompts because the dropped table no longer exists.
     pub(super) fn close_tabs_for_table(&mut self, connection_id: Uuid, schema: Option<&str>, table: &str) {
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
@@ -538,22 +502,14 @@ impl App {
         }
     }
 
-    /// Structure tab Save → run ordered DDL statements. Engines whose
-    /// DDL is transactional go through `execute_in_transaction` so a
-    /// mid-batch failure rolls the whole save back; the driver owns the
-    /// transaction-control statements because their spelling and their
-    /// wire encoding are engine-specific. The rest execute
-    /// sequentially.
+    /// Run transactional DDL as one batch; run non-transactional DDL sequentially.
     pub(super) fn on_execute_structure_transaction(
         &mut self,
         tab_id: Uuid,
         statements: Vec<String>,
         sender: ComponentSender<Self>,
     ) {
-        // Reject re-entry: a second Ctrl+S (or rapid double-click on
-        // Save) while the first DDL transaction is still mid-flight
-        // would dispatch a parallel async command and potentially
-        // commit the same statements twice. Mark the tab and bail.
+        // Prevent concurrent saves from committing the same DDL twice.
         if !self.structure_saves_in_flight.borrow_mut().insert(tab_id) {
             tracing::debug!(?tab_id, "structure save already in flight; ignoring duplicate");
             return;
@@ -575,20 +531,14 @@ impl App {
             };
             match slot {
                 WorkspaceTab::Structure(s) => s.mode,
-                // Table tabs no longer host the DDL editor — structure
-                // lives in its own WorkspaceTab::Structure. A structure
-                // Save dispatched against a Table-tab id can only be a
-                // stale queued message from before the split; clear the
-                // in-flight gate and bail.
+                // A table-tab save is stale because DDL now uses Structure tabs.
                 _ => {
                     self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
                     return;
                 }
             }
         };
-        // For New mode we need the user-typed table name. Today the
-        // stub UI doesn't expose a name field yet, so pull it from
-        // the first CreateTable op in the tracker.
+        // The first CreateTable op carries the name for a new-table draft.
         let new_table_name = if matches!(mode, StructureMode::New) {
             self.structure_trackers
                 .with_tab_ref(tab_id, |t| {
@@ -659,16 +609,6 @@ impl App {
         });
     }
 
-    /// Save resolved successfully. Two cases:
-    ///
-    /// 1. **New-Table draft (`Structure` slot)**: CreateTable
-    ///    succeeded so the table now exists. Close the draft and
-    ///    append a fresh `Table` tab pointed at the new name in
-    ///    Structure mode so the user keeps editing in the canonical
-    ///    UI.
-    /// 2. **Table tab Save**: the slot stays put; just forward
-    ///    `SaveCompleted` to the structure controller so it clears
-    ///    the tracker + refetches introspection.
     pub(super) fn on_structure_save_completed(
         &mut self,
         origin: Option<CatalogOrigin>,
@@ -685,15 +625,11 @@ impl App {
             return;
         };
 
-        // Inspect slot kind first so we can branch — promote-and-close
-        // vs. in-place clear — without borrowing across mutation.
         enum SaveKind {
             PromoteNewToTable(Option<String>, String),
             UpdateInPlace(Option<String>, String),
             Skip,
         }
-        // `WorkspaceTab::Structure` only exists for New-Table drafts;
-        // Edit-mode DDL flows through Table tabs exclusively.
         let kind = {
             let tabs = self.workspace_tabs.borrow();
             match tabs.get(&tab_id) {
@@ -712,12 +648,6 @@ impl App {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
                     self.finish_close_workspace_tab_now(tab_id, &tab_view);
                 }
-                // After the CREATE TABLE lands, drop the user into a
-                // Browse tab on the freshly-created table — they just
-                // designed it, so showing Data (empty grid) is the
-                // natural next step. If they want to keep editing the
-                // schema, sidebar right-click → "Edit Structure"
-                // reopens a Structure tab.
                 super::App::append_table_tab(
                     self,
                     schema.clone(),
@@ -751,16 +681,7 @@ impl App {
             SaveKind::Skip => {}
         }
 
-        // Mirror the browse `SaveCompletedForTab` cleanup. Without this,
-        // a close-with-pending dialog that picked "Save" leaves the tab
-        // open after a successful structure save (the dialog inserted
-        // tab_id into close_after_save, expecting completion to drain
-        // it). For PromoteNewToTable the original Structure tab was
-        // already closed by `finish_close_workspace_tab`; the
-        // `WorkspaceTabClosed` here is therefore dispatched only for
-        // UpdateInPlace and Skip paths where the tab is still alive.
-        // The window-close-after-save check runs unconditionally since
-        // the counter membership was consumed either way.
+        // Consume close-after-save state even when a new-table draft was already closed.
         let drained = self.close_after_save.borrow_mut().complete(&tab_id);
         if drained && !kind_promoted {
             self.request_workspace_tab_close(tab_id);
@@ -776,12 +697,7 @@ impl App {
             self.in_flight_saves.set(self.in_flight_saves.get() - 1);
         }
         self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
-        // Match the Browse-side `SaveFailedForTab` handler: a save
-        // that started from the close-with-pending dialog left this
-        // tab in `close_after_save`, and the window-close-after-save
-        // intent in `close_window_after_save`. Both must be cleared
-        // on failure or the next unrelated SaveCompleted on another
-        // tab will spuriously close the window.
+        // A failed save must not let a later tab completion close this window.
         self.close_after_save.borrow_mut().cancel(&tab_id);
         self.close_window_after_save.set(false);
         self.announce_save_failure(tab_id, &message);
@@ -795,11 +711,6 @@ impl App {
         }
     }
 
-    /// Sidebar "Show CREATE TABLE" — synthesise the canonical
-    /// CREATE statement for an existing table by fetching columns,
-    /// indexes, and FKs and feeding them through
-    /// `sql_ddl::materialize_ops`. Result lands in a fresh editor
-    /// tab. No Structure tab is touched; the user just sees the SQL.
     pub(super) fn on_structure_text(
         &self,
         schema: Option<String>,
@@ -930,11 +841,7 @@ impl App {
                             return;
                         }
                     };
-                    // Synthesise the CreateTable op directly from the
-                    // fetched schema. DraftColumn::from_info preserves
-                    // the original ColumnInfo so materialise emits the
-                    // right type / nullability / default per driver
-                    // dialect.
+                    // Preserve fetched metadata so generated SQL retains driver-specific types and defaults.
                     let op = bookie_core::sql_ddl::StructureOp::CreateTable {
                         schema: schema_for_cmd.clone(),
                         table: table_for_cmd.clone(),
@@ -948,10 +855,6 @@ impl App {
                     };
                     match bookie_core::sql_ddl::materialize_ops(&[op], &driver_id) {
                         Ok(stmts) if !stmts.is_empty() => {
-                            // Multi-statement output (CreateTable + N
-                            // CREATE INDEX + N ALTER ... ADD FK) joins
-                            // with semicolons + blank lines so the
-                            // editor renders each statement on its own.
                             let sql = stmts.join(";\n\n") + ";";
                             sender_for_cmd.input(AppMsg::ShowCreateTableLoaded { sql });
                         }
@@ -970,11 +873,7 @@ impl App {
         });
     }
 
-    /// Edit-mode init asks for introspection. Fetch columns / indexes /
-    /// FKs in one async block and dispatch a single StructureLoaded
-    /// carrying all three so the tab only rebuilds its UI once. The
-    /// previous fan-out (3 messages, 3 rebuilds) was visible as
-    /// flicker on Edit-mode tab open.
+    /// Fetch all structure metadata together to avoid rebuilding the tab three times.
     pub(super) fn on_fetch_structure_data(&self, tab_id: Uuid, sender: ComponentSender<Self>) {
         let (schema, table) = {
             let tabs = self.workspace_tabs.borrow();
@@ -1132,8 +1031,7 @@ impl App {
         }
     }
 
-    /// A workspace is rebuilt on connection switch: check its origin before
-    /// touching any tabs, then reject reordered catalog completions as well.
+    /// Reject stale schema and catalog work after a connection or request change.
     pub(super) fn on_schema_changed(
         &self,
         origin: CatalogOrigin,
@@ -1228,9 +1126,7 @@ impl App {
         let (page, schema, table_name, combined_dirty) = match slot {
             WorkspaceTab::Structure(s) => (&s.page, s.schema.as_deref(), s.table.clone(), dirty),
             WorkspaceTab::Table(s) => {
-                // Combine with the data-side dirty state — either
-                // mode contributing pending changes prefixes the tab
-                // with the "•" GNOME convention.
+                // Either data or structure edits mark the shared tab dirty.
                 let data = self
                     .change_trackers
                     .with_tab_ref(s.id, |tr| tr.has_pending())
