@@ -102,3 +102,12 @@ Use a PostgreSQL database with a table that has had many rows deleted, an index 
 - [ ] On a row, choose **Copy diagnostic SQL** and paste elsewhere: a `VACUUM (ANALYZE)` or `DROP INDEX CONCURRENTLY IF EXISTS` statement with quoted names. Choose **Open diagnostic SQL in an editor tab**: a new tab holds the statement and nothing runs.
 - [ ] Start a report on a large catalog and close the dialog. The server query is cancelled.
 
+## Check for updates and What's new
+
+Use an installed Arch package or AppImage build whose version matches `config::VERSION`. Clear `last-launched-version` in GSettings when testing the first-launch dialog (`gsettings reset com.bookie.linux last-launched-version` or the Devel schema).
+
+- [ ] Primary menu → **Check for Updates** while online against the current published release: a toast says BookiE is up to date.
+- [ ] Primary menu → **Check for Updates** while offline or with DNS blocked: a toast reports the network failure; the main window stays usable.
+- [ ] After clearing `last-launched-version`, launch the app once: a What's new dialog shows the AppStream notes for the running version. Close it, quit, and launch again: the dialog does not appear.
+- [ ] About BookiE shows the running version and release notes for that version, and a Releases link opens the GitHub releases page.
+
