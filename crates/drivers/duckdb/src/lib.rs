@@ -1,8 +1,7 @@
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 #[cfg(target_os = "linux")]
-use std::os::{
-    fd::AsRawFd,
-    unix::fs::{MetadataExt, PermissionsExt},
-};
+use std::os::{fd::AsRawFd, unix::fs::MetadataExt};
 use std::{
     fs::File,
     sync::{Arc, Mutex},
